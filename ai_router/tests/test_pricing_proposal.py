@@ -1093,3 +1093,63 @@ def test_a_parenthesised_effective_date_is_still_read():
     assert pp.split_anthropic_label("Claude Sonnet 5 (starting September 1, 2026)") == (
         "Claude Sonnet 5", "2026-09-01"
     )
+
+
+# ---------------------------------------------------------------------------
+# Close-backstop findings. The first is a real bug the round-6 fix introduced.
+# ---------------------------------------------------------------------------
+
+
+def test_an_unreadable_row_poisons_its_whole_multi_row_model():
+    """Sonnet 5 is published across TWO rows -- that is how the effective date
+    is expressed -- so readability is a property of the GROUP. Round 6's
+    `setdefault` let a readable sibling append into an unreadable entry,
+    producing non-empty rows that sailed past the fatal check with a tier
+    missing. Lose the future row and the introductory price becomes permanent;
+    lose the introductory row and resolve_rates' earliest-period fallback
+    applies the future price today."""
+    for target in (">$2 / MTok<", ">$3 / MTok<"):
+        broken = fx.ANTHROPIC_PRICING_TABLE.replace(target, ">TBC<", 1)
+        entry = pp.parse_anthropic(pp.parse_document(broken))["Claude Sonnet 5"]
+        assert entry.rows == [], f"{target} left a partial schedule"
+        assert "several rows" in entry.observations[0]["unreadable"]
+
+
+def test_a_partially_unreadable_anthropic_model_aborts_for_a_configured_entry():
+    broken = fx.ANTHROPIC_PRICING_TABLE.replace(">$3 / MTok<", ">TBC<", 1)
+    page_rates = dict(_parsed())
+    page_rates["anthropic"] = pp.parse_anthropic(pp.parse_document(broken))
+    config = _config(**{"sonnet": {
+        "provider": "anthropic", "model_id": "claude-sonnet-5",
+        "input_cost_per_1m": 2.00, "output_cost_per_1m": 10.00,
+    }})
+    with pytest.raises(pp.PageStructureError, match="sonnet"):
+        pp.build_proposal(config, page_rates, generated_on=TODAY)
+
+
+def test_a_footnote_on_an_openai_model_name_does_not_change_the_key():
+    """A footnote decorates the label; it does not rename the model. Leaving
+    it attached changed the dictionary key, sending a configured id into the
+    non-fatal 'absent' branch."""
+    broken = fx.OPENAI_PRICING_TABLE.replace(">gpt-5.4<", ">gpt-5.4 *<", 1)
+    rates = pp.parse_openai(pp.parse_document(broken))
+    assert "gpt-5.4" in rates
+    assert rates["gpt-5.4"].rows[0]["input_cost_per_1m"] == 2.50
+
+
+def test_render_survives_an_unreadable_observation():
+    """The unreadable marker carries only a reason. Rendering used to assume
+    every observation had `label` and rate fields -- and the KeyError would
+    have fired AFTER the proposal file was already written."""
+    proposal = {
+        "changes": [{
+            "alias": "x", "provider": "google", "model_id": "y",
+            "source_url": "u", "change_type": "update",
+            "current": {"input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+            "proposed": {"input_cost_per_1m": 3.0, "output_cost_per_1m": 4.0},
+            "observations": [{"unreadable": "some reason"}],
+            "decision": pp.DECISION_PENDING,
+        }],
+        "unmatched_config_entries": [], "unclaimed_page_models": {},
+    }
+    assert "x" in "\n".join(pp.render_proposal(proposal))

@@ -417,3 +417,79 @@ call to fund — not the orchestrator's to take.
   derive is reported `NOT CHECKED` rather than proposed. Currently vacuous.
 - OpenAI's long-context tier is reported, never proposed (the page states no
   boundary). Unchanged by design since round 1.
+
+---
+
+# Round 7 — the close backstop, and a real bug it caught in round 6's own fix
+
+`close_session` refused the close: its in-process backstop verification (Set
+084) ran independently and returned **2 blocking Majors**. Both accepted. The
+first is a defect **introduced by round 6's fix**, which is exactly what an
+independent backstop is for.
+
+## B1 — an unreadable row could be resurrected by its readable sibling
+
+**Accepted; my bug, three hours old.** Round 6 recorded an unreadable Anthropic
+row with `out.setdefault(display, _unreadable(...))`, while a readable row used
+`out.setdefault(display, PageRates()).rows.append(entry)`. `setdefault` never
+replaces. So for a model published across **several rows** — which is precisely
+how Anthropic expresses an effective date — an unreadable first row created the
+entry and its readable sibling then appended into that same object. `rows`
+became non-empty, the fatal check was bypassed, and a schedule shipped with a
+tier missing.
+
+The backstop spelled out both directions, and both are bad:
+
+- lose Sonnet 5's **future** row → the proposal contains only the introductory
+  `$2/$10`, which then becomes permanent past 2026-09-01;
+- lose its **introductory** row → the surviving future-dated row passes
+  validation, and `resolve_rates`' earliest-period fallback applies the future
+  price **today**.
+
+It also noticed that `render_proposal` assumes every observation carries
+`label` and rate fields, so an unreadable observation would raise `KeyError`
+**after the proposal file had already been written**.
+
+**Fix.** Readability is now a property of the **group**, not the row: rows are
+collected per display name and any unreadable row **poisons its whole model**.
+`render_proposal` skips observations that are not rate-bearing.
+
+Pinned by `test_an_unreadable_row_poisons_its_whole_multi_row_model` (which
+breaks *each* of Sonnet 5's two rows in turn),
+`test_a_partially_unreadable_anthropic_model_aborts_for_a_configured_entry`,
+and `test_render_survives_an_unreadable_observation`.
+
+## B2 — two dictionary-miss paths survived round 6's sweep
+
+**Accepted in the parts that are actionable.** Round 6's changelog claim —
+"all three parsers now record a row they could not read" — was too broad, and
+the backstop was right to hold it to account:
+
+- `parse_openai` skipped any row whose cell count was not exactly nine. Now
+  recorded as unreadable under its own name.
+- A **footnote marker** on an OpenAI model label (`gpt-5.4 *`) changed the
+  dictionary KEY, so recording the row "under its own name" did not help — the
+  configured bare id still missed. Footnote markers are now stripped from the
+  key: a footnote decorates a label, it does not rename a model.
+
+Pinned by `test_a_footnote_on_an_openai_model_name_does_not_change_the_key`
+and the existing malformed-row coverage.
+
+**Residual, documented rather than fixed:** `_google_section_rates` still
+returns `None` when a section's `Input price` / `Output price` row labels are
+absent, which is indistinguishable from a per-model label rename. It stays as
+it is because that return is what makes ~100 image / video / TTS / robotics
+sections ignorable, and a **global** rename is already fatal — every section
+would lose its labels, `parse_google` would yield nothing, and the
+`_require` fires. The uncovered case is a rename affecting one model and not
+its ninety-nine neighbours.
+
+## Where this leaves the session
+
+Seven rounds, three providers, one module, one question. The findings did not
+stop, but their character changed: rounds 1–5 found fail-opens in code I wrote
+deliberately, round 6 found the mechanism behind them, and round 7 found a
+regression in round 6's own fix. That last one is the strongest argument that
+the loop was still earning its cost — and the closing count is the operator's
+call, not the orchestrator's. The authorised budget is spent; residuals are
+named here and in `disposition.json`.

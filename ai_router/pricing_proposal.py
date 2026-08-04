@@ -358,9 +358,22 @@ def parse_openai(blocks: list[Any]) -> dict[str, PageRates]:
 
     out: dict[str, PageRates] = {}
     for row in table.rows[2:]:
-        if len(row) != 9 or not row[0]:
+        if not row or not row[0].strip():
             continue
-        name = row[0].strip()
+        # A footnote marker decorates the label, it does not rename the model;
+        # leaving it on would change the dictionary KEY and send a configured
+        # id straight into the non-fatal "absent" branch.
+        name = _FOOTNOTE.sub("", row[0]).strip()
+        if len(row) != 9:
+            # Skipping the row would drop it from the result and let
+            # build_proposal read the miss as absence -- the fail-open the
+            # close backstop was still finding after round 6.
+            out[name] = _unreadable(
+                name,
+                f"its row has {len(row)} cells where this parser expects 9 "
+                "(model + four short-context + four long-context).",
+            )
+            continue
         short_in, short_out = parse_money(row[1]), parse_money(row[4])
         if short_in is None or short_out is None:
             # Round 6 (third-provider opinion): `continue` here dropped the row
@@ -481,26 +494,50 @@ def parse_anthropic(blocks: list[Any]) -> dict[str, PageRates]:
             f"parser reads: {table.rows[0]!r}"
         ) from exc
 
-    out: dict[str, PageRates] = {}
+    # One model can occupy SEVERAL rows -- that is how an effective date is
+    # published -- so readability is a property of the whole GROUP, not of a
+    # row. The close backstop caught the round-6 code getting this wrong via
+    # `setdefault`: an unreadable first row created the entry, and its readable
+    # sibling then appended into that same object, producing non-empty rows
+    # that sailed past the fatal check with a tier silently missing. Worse
+    # either way round -- lose Sonnet 5's future row and the introductory price
+    # becomes permanent; lose its introductory row and `resolve_rates`'
+    # earliest-period fallback applies the future price today.
+    #
+    # So rows are collected per display name and an unreadable row POISONS its
+    # whole group.
+    rows_by_display: dict[str, list[dict]] = {}
+    unreadable_reason: dict[str, str] = {}
     for row in table.rows[1:]:
         if len(row) <= max(name_col, in_col, out_col) or not row[name_col]:
             continue
         display, effective_from = split_anthropic_label(row[name_col])
-        input_rate, output_rate = parse_money(row[in_col]), parse_money(row[out_col])
         if not display:
             continue
+        rows_by_display.setdefault(display, [])
+        input_rate, output_rate = parse_money(row[in_col]), parse_money(row[out_col])
         if input_rate is None or output_rate is None:
-            # The OpenAI sibling of the same defect, fixed in the same pass.
-            out.setdefault(display, _unreadable(
+            unreadable_reason.setdefault(
                 display,
-                f"its Base Input / Output Tokens cells state no rate this "
-                f"parser recognises ({row[in_col]!r} / {row[out_col]!r}).",
-            ))
+                f"one of its rows states no rate this parser recognises "
+                f"({row[in_col]!r} / {row[out_col]!r}); a model published "
+                "across several rows cannot be read from the survivors.",
+            )
             continue
         entry = {"input_cost_per_1m": input_rate, "output_cost_per_1m": output_rate}
         if effective_from:
             entry["effective_from"] = effective_from
-        out.setdefault(display, PageRates()).rows.append(entry)
+        rows_by_display[display].append(entry)
+
+    out: dict[str, PageRates] = {}
+    for display, rows in rows_by_display.items():
+        if display in unreadable_reason or not rows:
+            out[display] = _unreadable(
+                display,
+                unreadable_reason.get(display, "it published no readable rate."),
+            )
+        else:
+            out[display] = PageRates(rows=rows)
     _require(
         any(r.rows for r in out.values()),
         "anthropic: the pricing table parsed but yielded no priced rows",
@@ -701,6 +738,10 @@ def _priced_lines(lines: list[str]) -> Optional[list[tuple[Optional[int], float]
         return None
     return text_lines
 
+
+#: Footnote markers a page may hang off a model label. They decorate the name;
+#: they are not part of it, and leaving one attached changes the lookup key.
+_FOOTNOTE = re.compile(r"[\*†‡§¶]+\s*$")
 
 #: A modality qualifier naming text, e.g. ``(text / image / video)``.
 _TEXT_MODALITY = re.compile(r"\(\s*[^)]*\btext\b[^)]*\)", re.IGNORECASE)
@@ -995,12 +1036,19 @@ def render_proposal(proposal: dict) -> list[str]:
         lines.append("    the page says:")
         lines.extend(_render_declaration(change["proposed"]))
         for observation in change.get("observations") or []:
+            # Observations are not all the same shape: an unreadable marker
+            # carries only a reason. Rendering must not assume the rate-bearing
+            # shape -- the close backstop noted a KeyError here would fire
+            # AFTER the proposal file had already been written.
+            if "label" not in observation:
+                continue
             lines.append(
                 f"    also on the page, NOT proposed -- {observation['label']}: "
                 f"in ${observation['input_cost_per_1m']} / "
                 f"out ${observation['output_cost_per_1m']} per 1M"
             )
-            lines.append(f"      {observation['note']}")
+            if observation.get("note"):
+                lines.append(f"      {observation['note']}")
 
     for miss in proposal.get("unmatched_config_entries") or []:
         lines.append(

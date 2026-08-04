@@ -124,11 +124,17 @@ are no stroke widths to survive scaling). Verified 2026-08-04: one `<path>`,
 no `fill`/`stroke` attributes, and the only remaining hex colors are in the
 non-rendering `sodipodi:namedview` editor block.
 
-Two cosmetic residuals, neither a blocker: that Inkscape metadata block could
-be stripped (the shipping icon has none), and the mark should still be *looked
-at* in both themes and in the active and inactive activity-bar states at real
-render size rather than only at its authored 128px — that is a UAT
-observation, not a code change.
+Re-saved as **Plain SVG** afterwards, which cleared the editor metadata too.
+The asset is now structurally identical to the shipping icon — same
+`width`/`height`/`viewBox`, a single `<path>` with `fill:currentColor`, no
+`sodipodi:namedview`, no hex colors anywhere in the file. **No work is owed on
+it.** The ring survives the flattening correctly: the outer and inner circle
+subpaths wind in opposite directions, so the default nonzero fill rule yields
+a ring rather than the solid disc a same-winding flatten would have produced.
+
+One residual, and it is a UAT observation rather than a code change: the mark
+should still be *looked at* in both themes and in the active and inactive
+activity-bar states at real render size, not only at its authored 128px.
 
 **Every reference to update** — there are exactly three, verified by grep:
 `package.json` (`contributes.viewsContainers.activitybar[0].icon`),

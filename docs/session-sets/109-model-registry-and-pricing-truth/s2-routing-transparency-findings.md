@@ -295,13 +295,19 @@ the precise false negative the module exists to prevent.
 
 ## Evidence
 
-| What | Where |
-| :--- | :--- |
-| Pre-fix trace, tier-2 case (2 requests / 2 rows, no breach) | run log, `repro.py` |
-| Pre-fix trace, tier-3 case (the breach, spec's exact rows) | `repro3-prefix.json` |
-| Post-fix trace, same call (1 request, 0 breach) | `repro3-postfix.json` |
-| Falsifier check | **9** of the 27 new tests fail with the three fix files reverted to HEAD (instrumentation kept, so the failures are the defect and not a broken harness); all 27 pass restored |
-| Routed step-3.5 analysis | `s2-ai-assignment-analysis.json` |
+All three live traces are committed as `s2-trace-evidence.json`, beside this
+document — raw `call_trace` output paired with the metrics rows each call
+appended. (They were originally cited from a scratchpad, which the close
+backstop correctly flagged: an evidence table must name files that exist.)
+
+| What | Where | Result |
+| :--- | :--- | :--- |
+| Pre-fix trace, tier-2 case | `s2-trace-evidence.json` → `tier2_prefix` | 2 requests / 2 rows, **0** to the excluded provider — the shape that never exhibited the defect |
+| Pre-fix trace, tier-3 case | `s2-trace-evidence.json` → `tier3_prefix` | 2 requests / 2 rows, **1** to the excluded provider — the breach, and the spec's exact rows |
+| Post-fix trace, same tier-3 call | `s2-trace-evidence.json` → `tier3_postfix` | 1 request / 1 row, **0** to the excluded provider |
+| Falsifier check | — | **9** of the 27 new tests fail with the three fix files reverted to HEAD (instrumentation kept, so the failures are the defect and not a broken harness); all 27 pass restored |
+| Routed step-3.5 analysis | `s2-ai-assignment-analysis.json` | gemini-2.5-pro, $0.0172, truncation-clean |
+| Round-1 verification + nit adjudication | `s2-verification.md`, `s2-verification-fanout-2.md`, `s2-remediation-round-1.md` | VERIFIED, 0 blocking, 7 nits all fixed |
 
 `ai_router/tests/test_routing_exclusion_integrity.py` — **27** tests covering
 `call_trace` itself (including that a retry counts separately and that a

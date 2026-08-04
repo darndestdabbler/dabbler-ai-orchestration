@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "109-model-registry-and-pricing-truth",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -51,9 +51,9 @@
     {
       "number": 4,
       "title": "Session 4",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-04T15:32:36.856866-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-04T17:32:28.993882-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -61,7 +61,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "WAIVED"
     }
   ]
 }

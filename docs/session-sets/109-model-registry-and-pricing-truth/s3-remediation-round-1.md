@@ -95,19 +95,21 @@ been wrong too:
 2. Anything else the parser cannot pair — differing line counts, disagreeing
    tier bounds, tiers with no unbounded row — is **unreadable**.
 
-An unreadable section is neither fatal nor silent. It is fatal only if the
-whole page structure changed (unchanged behaviour); it is per-model here, and
-`build_proposal` reports a **configured** model whose section was unreadable as
-`NOT CHECKED`, with the reason. A model nobody configured — most of the ~100
-sections price video, images, TTS, robotics — is simply ignored, so one
-unreadable section cannot fail a run that never cared about it.
+A model nobody configured — most of the ~100 sections price video, images, TTS,
+robotics — is simply ignored, so one unreadable section cannot fail a run that
+never cared about it.
+
+> **Superseded in round 3.** This fix originally reported a **configured**
+> model's unreadable section as `NOT CHECKED` and let the run continue. Round 3
+> rejected that half of it, correctly — see *F3-followup* below, where a
+> configured model's unreadable section becomes fatal. The modality-split read
+> and the unconfigured-model behaviour described here stand unchanged.
 
 Pinned by `test_a_modality_split_reads_the_labelled_text_rate`,
 `test_an_unlabelled_multi_rate_cell_is_unreadable`,
 `test_two_text_lines_are_unreadable_rather_than_first_wins`,
 `test_mismatched_google_line_counts_do_not_become_a_flat_price`,
-`test_disagreeing_tier_bounds_do_not_become_a_price`,
-`test_an_unreadable_section_is_reported_as_not_checked_not_proposed`, and
+`test_disagreeing_tier_bounds_do_not_become_a_price`, and
 `test_an_unreadable_model_nobody_configured_is_simply_ignored`.
 
 ## F4 — finding 5: the global rollup could read falsely fresh
@@ -155,3 +157,46 @@ Pinned by `test_apply_refuses_when_the_alias_now_points_at_a_different_model`.
   confirmations, 2 not-checked, exit 1**, config untouched.
 - No fix required a change to `ai_router/pricing.py`, to any of the six wired
   consumers, or to a single rate in `router-config.yaml`.
+
+---
+
+# Round 3 (remediation-review) — one finding, accepted
+
+Round 3 reviewed the fix delta: **2 accepted, 2 accepted-with-modification, 1
+rejected**, plus one new in-hunk Major. The rejection and the Major are the
+same point, and it is a good one.
+
+## F3-followup — an unreadable section for a CONFIGURED model was a permitted partial
+
+**Accepted; the round-1 fix was half-right.** Removing the fail-open stopped
+the parser manufacturing a number, but routed the failure into
+`unmatched_config_entries` — so `build_proposal` still returned, a proposal was
+still written for the other eleven models, and an operator could apply it while
+a configured Google rate sat unchecked. As the verifier put it, that converts a
+parse failure into a permitted partial, and the rule is *no proposal, loudly*.
+
+The reasoning I got wrong: I treated "reported in the output" as equivalent to
+"loud". It is not, when the same run still hands the operator eleven applicable
+changes to work through. Loud has to mean the run stops.
+
+**Fix.** A configured model whose section is on the page but unreadable now
+raises `PageStructureError` from `build_proposal`, and the call moved inside
+`main`'s existing guard so it reaches the **same quarantine** as a fetch
+failure: nothing written, any previous proposal moved to `.stale.json`, exit 2.
+
+The distinction round 1 introduced survives, because the two cases really are
+different facts:
+
+| situation | outcome | why |
+| :--- | :--- | :--- |
+| Configured model, section unreadable | **fatal**, no proposal | a parse failure on a rate we route to |
+| Configured model, not on the page at all | reported, run continues | a *registry* defect (`gpt-5.6`), Session 4's to fix — not a parser failure |
+| Unconfigured model, section unreadable | ignored | ~100 sections price video, images, TTS; one going unreadable must not fail a run that never cared |
+
+Pinned by `test_an_unreadable_section_for_a_CONFIGURED_model_aborts_the_run`,
+`test_a_model_absent_from_the_page_is_reported_but_NOT_fatal`,
+`test_an_unreadable_model_nobody_configured_is_simply_ignored`, and
+`test_an_unreadable_configured_model_quarantines_the_previous_proposal`.
+
+**Verified live** after the fix: 10 entries (5 rate changes + 5 confirmations),
+2 reported unchecked (`gpt-5-6`, `gemini-3-pro`), exit 1, config untouched.

@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Configured Google parse failures still produce an applicable partial proposal**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** Google adds, removes, or rearranges pricing lines for a configured model, causing `_google_section_rates()` to classify that model as unreadable. Such provider-page evolution is the expected operating condition for this scraper. The tool then generates and can write a proposal for the remaining models instead of aborting; an operator can apply that proposal while the configured Google rate remains unchecked and potentially stale.\n  - **Details:**\n    - **Violation:** The task requires: “A parse failure must produce *no proposal*, loudly — never a silent partial.” This explicitly challenges the Round 1 L3/L7 remediation: it prevents a guessed number but converts the parse failure into a permitted partial proposal.\n    - **Impact:** The proposal artifact no longer guarantees that all configured provider rates were successfully parsed. That defeats a central safety invariant and permits normal application of a review that omitted a configured model.\n    - **Evidence:** `_google_section_rates()` now returns `_unreadable(...)`, represented as `PageRates(rows=[])`. `build_proposal()` handles `not found.rows` by appending to `unmatched_config_entries` and continuing. The added `test_an_unreadable_section_is_reported_as_not_checked_not_proposed` explicitly confirms that `build_proposal()` returns successfully rather than aborting.\n    - **Location:** `ai_router/pricing_proposal.py`, `_google_section_rates()`, `_unreadable()`, and `build_proposal()`.\n    - **Fix:** Abort proposal generation when a configured model has an unreadable parsed section, and route that failure through the same stale-proposal quarantine used for fetch/parser exceptions. Unreadable sections for models not referenced by the config may remain ignorable.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Google adds, removes, or rearranges pricing lines for a configured model, causing `_google_section_rates()` to classify that model as unreadable. Such provider-page evolution is the expected operating condition for this scraper. The tool then generates and can write a proposal for the remaining models instead of aborting; an operator can apply that proposal while the configured Google rate remains unchecked and potentially stale."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 matching rates can now receive and refresh confirmation stamps",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 failed refresh normally retires the prior proposal",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 Google parser ambiguity still permits a partial proposal",
+      "verdict": "fix-rejected",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 global rollup no longer advances while priced models are unstamped",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 apply rejects proposals after an alias changes model ID",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L7"
+    }
+  ]
+}

@@ -755,22 +755,35 @@ def build_proposal(
 
         key = page_key_for(provider, model_id)
         found = rates_by_key.get(key)
-        if found is None or not found.rows:
-            # Loud, not silent. A configured model its own provider does not
-            # list is the exact specimen Session 1's drift gate exists for,
-            # and staying quiet about it here would let a rate go unchecked
-            # while the run still reported success. The second case — a
-            # section that IS on the page but cannot be read without guessing
-            # — lands here too, carrying its own reason.
-            reason = "it is not listed there"
-            if found is not None:
-                claimed[provider].add(key)
-                for observation in found.observations:
-                    if "unreadable" in observation:
-                        reason = observation["unreadable"]
+        if found is not None and not found.rows:
+            # The section is ON the page and could not be read. That is a
+            # PARSE failure on a model the config routes to, so it aborts the
+            # whole run exactly as a fetch failure does.
+            #
+            # Round 3 rejected the softer treatment this replaced, and was
+            # right to: reporting it as "not checked" while still writing a
+            # proposal for the other eleven models turns a parse failure into
+            # a permitted partial. The rule is that a parse failure produces
+            # NO proposal, loudly — and "loudly" cannot mean a line an
+            # operator may skim past on the way to applying everything else.
+            unreadable = next(
+                (o["unreadable"] for o in found.observations if "unreadable" in o),
+                "its section could not be read",
+            )
+            raise PageStructureError(
+                f"{provider}: model {alias!r} ({model_id}) is on the price "
+                f"list but {unreadable}"
+            )
+        if found is None:
+            # Not on the page AT ALL. Deliberately NOT fatal, and a different
+            # fact: this is the specimen Session 1's drift gate exists for
+            # (`gpt-5.6`, which OpenAI does not list), and it is a registry
+            # defect for Session 4 rather than a parser failure. It is
+            # reported loudly as unchecked so the run cannot report success
+            # over a hole.
             unmatched_config.append(
                 {"alias": alias, "provider": provider, "model_id": model_id,
-                 "looked_for": key, "reason": reason}
+                 "looked_for": key, "reason": "it is not listed there"}
             )
             continue
         claimed[provider].add(key)
@@ -1165,6 +1178,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         try:
             with httpx.Client(timeout=_HTTP_TIMEOUT_SECONDS) as client:
                 page_rates = fetch_all(client)
+            # Building the proposal is inside the same guard because a
+            # configured model whose section cannot be read is a parse
+            # failure like any other, and must reach the same quarantine.
+            proposal = build_proposal(config, page_rates)
         except PageStructureError as exc:
             print(f"[x] FATAL: {exc}", file=sys.stderr)
             print(
@@ -1200,7 +1217,6 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                     )
             return EXIT_FATAL
 
-        proposal = build_proposal(config, page_rates)
         proposal_path.write_text(
             json.dumps(proposal, indent=2) + "\n", encoding="utf-8"
         )

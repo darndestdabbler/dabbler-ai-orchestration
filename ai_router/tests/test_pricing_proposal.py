@@ -761,9 +761,11 @@ def test_mismatched_google_line_counts_do_not_become_a_flat_price():
     assert "unreadable" in entry.observations[0]
 
 
-def test_an_unreadable_section_is_reported_as_not_checked_not_proposed():
-    """It must not vanish either: a configured model whose rate went
-    unexamined has to say so, or the run reports success over a hole."""
+def test_an_unreadable_section_for_a_CONFIGURED_model_aborts_the_run():
+    """Round 3 rejected the softer treatment this replaced. Reporting it as
+    "not checked" while still writing a proposal for the other models turns a
+    parse failure into a permitted partial, and "no silent partial" cannot
+    mean a line an operator may skim past on the way to applying the rest."""
     page_rates = dict(_parsed())
     page_rates["google"] = pp.parse_google(
         pp.parse_document(_google_with_mismatched_lines())
@@ -772,13 +774,23 @@ def test_an_unreadable_section_is_reported_as_not_checked_not_proposed():
         "provider": "google", "model_id": "gemini-2.5-pro",
         "input_cost_per_1m": 1.25, "output_cost_per_1m": 10.00,
     }})
-    proposal = pp.build_proposal(config, page_rates, generated_on=TODAY)
+    with pytest.raises(pp.PageStructureError, match="gemini-pro"):
+        pp.build_proposal(config, page_rates, generated_on=TODAY)
 
-    assert proposal["changes"] == []
-    miss = proposal["unmatched_config_entries"][0]
-    assert miss["alias"] == "gemini-pro"
-    assert "cannot be paired without guessing" in miss["reason"]
-    assert "was NOT checked" in "\n".join(pp.render_proposal(proposal))
+
+def test_a_model_absent_from_the_page_is_reported_but_NOT_fatal():
+    """The contrast case. `gpt-5.6` is not on OpenAI's list at all -- a
+    registry defect for Session 4, not a parser failure -- so it is reported
+    as unchecked and the run continues."""
+    config = _config(**{
+        "gpt-5-6": {"provider": "openai", "model_id": "gpt-5.6",
+                    "input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00},
+        "gpt-5-4": {"provider": "openai", "model_id": "gpt-5.4",
+                    "input_cost_per_1m": 2.50, "output_cost_per_1m": 15.00,
+                    "confirmed_on": "2026-08-01"},
+    })
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert [m["alias"] for m in proposal["unmatched_config_entries"]] == ["gpt-5-6"]
 
 
 def test_disagreeing_tier_bounds_do_not_become_a_price():
@@ -895,3 +907,32 @@ def test_two_text_lines_are_unreadable_rather_than_first_wins():
     )
     entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-flash"]
     assert entry.rows == []
+
+
+def test_an_unreadable_configured_model_quarantines_the_previous_proposal(
+    tmp_path, monkeypatch, config_file
+):
+    """The parse failure must reach the SAME quarantine a fetch failure does,
+    or the stale proposal it leaves behind is applicable."""
+    monkeypatch.setattr(pp, "load_config", lambda path=None: _minimal_config())
+    proposal_path = tmp_path / "proposal.json"
+    proposal_path.write_text(json.dumps({
+        "schema_version": pp.SCHEMA_VERSION,
+        "changes": [_change("gpt-5-5",
+                            {"input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+                            pp.DECISION_ACCEPT)],
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        pp.httpx, "Client",
+        lambda **kw: _client(
+            overrides={pp.PRICING_PAGES["google"]: _google_with_mismatched_lines()}
+        ),
+    )
+
+    code = pp.main([
+        "--fetch", "--config", str(config_file), "--proposal", str(proposal_path)
+    ])
+
+    assert code == pp.EXIT_FATAL
+    assert not proposal_path.exists()
+    assert proposal_path.with_suffix(".stale.json").exists()

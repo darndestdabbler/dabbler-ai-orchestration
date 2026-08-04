@@ -131,25 +131,54 @@ not. Lazy `getChildren` removes the DOM half. It does not remove the scan half.
 
 ### Consequences, stated plainly
 
-- **No CHANGELOG line in this set may claim the Explorer starts faster.** S4's
-  re-measurement will show empty-startup unchanged, because nothing in the plan
-  touches discovery.
-- **The real startup fix is a follow-on**: make discovery async, cache the
+- **There is a ~102 ms floor the migration cannot remove.** Discovery runs
+  before any view exists and is untouched by anything in this plan. No
+  CHANGELOG line may claim the migration removed *that*.
+- **The real fix for the floor is a follow-on**: make discovery async, cache the
   worktree enumeration, or drop the second discovery pass. It is explicitly a
   non-goal here (spec: *no change to the watcher/scan pipeline*) and must not be
   smuggled in.
 - This is the single most likely candidate for **Set 111**, and it is now backed
   by a number rather than a hunch.
 
-### What was NOT measured, and why
+### What was NOT measured — and the claim this session is NOT entitled to make
 
-`resolveWebviewView` and webview-cold-start-to-first-paint need a real extension
-host and are not measurable from Node. The spec asked for four buckets; this
-session honestly delivers two of them plus a decomposition of the dominant one.
-Layer 3 owns the other two, and S4 should report them. **The set's headline
-conclusion does not depend on them**: 102 ms of blocking host work before any
-view exists is already enough to explain a sluggish empty tree, and none of it
-is rendering.
+`resolveWebviewView`, extension activation, and webview cold-start-to-first-paint
+need a running extension host and are not measurable from Node. The spec asked
+for four buckets; this session honestly delivers two, plus a decomposition of
+the dominant measured one.
+
+**An earlier draft of this document overreached here, and the verification round
+was right to block it.** It instructed S4 to "report empty-startup as
+unchanged", which silently converts *"I did not measure activation"* into
+*"activation cannot matter"*. Those are different claims, and only the first is
+supported.
+
+What is actually established:
+
+| claim | status |
+| --- | --- |
+| A ~102 ms discovery floor exists and the migration cannot remove it | **measured** |
+| Reading session sets is not the empty-tree cost (0.3 ms) | **measured** |
+| Lazy children remove DOM construction for collapsed sets at scale | **measured** (scan is linear; DOM build is unconditional today) |
+| Whether removing the webview improves activation / view creation | **UNKNOWN — not measured** |
+| Whether total perceived startup improves | **UNKNOWN — depends on the above** |
+
+The webview being replaced is a real cost centre — it loads HTML, CSS and
+~1,100 lines of script into a renderer — so it is entirely possible the
+migration *does* improve perceived startup on top of an unchanged floor.
+
+**S4's obligation is therefore to measure, not to confirm.** It must report the
+activation and first-paint numbers for both the old and new views, and state
+whichever way they fall. If the native tree is faster to first paint, S4 should
+say so and quantify it; if it is not, S4 should say that. What S4 must **not**
+do is claim the ~102 ms floor moved, because nothing in this set touches it.
+
+**Suggested method for S4** (so the number is comparable, not anecdotal): the
+Extension Development Host's *Developer: Show Running Extensions* reports
+per-extension activation time, and Layer 3 can timestamp from window ready to
+first tree row present. Run each five times on the same machine and report
+medians, the way this session's harness does.
 
 ---
 
@@ -174,15 +203,40 @@ offers less.
 **Set 048 S3's flaky DOM-drawn menu is a warning, not a precedent.** This is a
 different mechanism and it works.
 
-### (b) `"group": "inline"` — **WORKS, and fixes the original complaint**
+### (b) `"group": "inline"` — **WORKS AT TWO ACTIONS, FAILS AT FOUR**
 
-Evidence: [`04-inline-actions-render-as-icons.png`](s1-spike-evidence/04-inline-actions-render-as-icons.png).
+Evidence: [`04-inline-actions-render-as-icons.png`](s1-spike-evidence/04-inline-actions-render-as-icons.png)
+(two actions, default width) and
+[`06-four-inline-actions-erase-the-label.png`](s1-spike-evidence/06-four-inline-actions-erase-the-label.png)
+(four actions, minimum width).
 
-The two inline commands render as platform icons (`$(add)`, `$(go-to-file)`),
+With **two** inline commands (`$(add)`, `$(go-to-file)`) the icons render
 right-aligned at the row's trailing edge, revealed on hover, **not overlapping
-the label**. The operator's original complaint — the hand-rolled action strip
-covering the module name — is solved by the platform, and the 0.48.0 ellipsis
-CSS that exists to work around it becomes dead code as the spec predicted.
+the label**.
+
+**With four — the module strip's real action count — the label is erased.** At
+minimum panel width the hovered module row renders as chevron, folder icon, a
+one-character stub of the name, then four icons. The module name is gone.
+
+> **This finding exists because the verification round caught the first draft
+> generalising a two-action spike to a four-action strip.** It was right to.
+> The corrected spike reproduces *the operator's original complaint inside the
+> native tree*: the action strip covering the module name at narrow widths is
+> not automatically solved by going native. It is solved by **limiting how many
+> inline actions there are**.
+
+**Binding constraint for S2:** at most **two** inline actions. Everything else
+goes in the context menu, which the submenu spike proved works. This is also
+what the operator asked for in the first place — *either* quick-access
+shortcuts *or* a working hierarchical menu, explicitly not a hybrid — so the
+constraint costs nothing that was wanted.
+
+The 0.48.0 ellipsis CSS still becomes dead code, because at two actions nothing
+overlays the title.
+
+**Residual for S4's walk:** even at two actions, confirm the module name stays
+readable at the operator's actual minimum width. The spike shows two actions
+are safe at *default* width; minimum width with two was not separately captured.
 
 ### (c) Lazy `getChildren` — **WORKS, more strongly than assumed**
 
@@ -295,14 +349,52 @@ has.
 | --- | --- | --- |
 | session-set name | `label` | confirmed |
 | `3/5` fraction column | **removed entirely** | **operator-decided 2026-08-04** |
-| the single most severe marker | `iconPath` | confirmed |
+| the single most severe marker | `iconPath`, per the precedence below | confirmed, spike-proven |
 | the remaining markers, in full | markdown `tooltip` | confirmed |
 | kind / state, for menu gating | `contextValue` | confirmed, spike-proven |
-| module action strip | `view/item/context`, `"group": "inline"` | confirmed, spike-proven |
+| module action strip | `view/item/context`, `"group": "inline"`, **capped at 2** | confirmed, spike-proven — four erases the label |
 | hierarchical actions | `contributes.submenus` | confirmed, spike-proven |
 | **session rows (4th level)** | `label` = title, `iconPath` = status glyph | operator ask 1, confirmed |
 | in-flight session | `description` = `in flight` | short label, so it renders |
 | bucket rows | `description` = `N sets` | **proposed, not put to the operator** — renders reliably because bucket labels are short; S4's walk confirms or drops it |
+
+### The icon precedence rule — required, and previously missing
+
+"The single most severe marker" is not implementable without saying which
+marker *is* most severe. The first draft omitted this, and the verification
+round correctly called it a gap: the worst-case fixture is a set that is
+simultaneously blocked, migration-required and verification-WAIVED, and the
+draft's spike rendered it with a **generic in-progress dot** — leaving every
+actionable state on hover only, which is precisely the density regression the
+panel named as a no-go risk.
+
+**Precedence, most severe first.** The first match wins the icon slot; every
+other marker still appears in the tooltip.
+
+| rank | state | icon | colour |
+| ---: | --- | --- | --- |
+| 1 | blocked by prerequisite | `$(error)` | `problemsErrorIcon.foreground` |
+| 2 | schema migration required | `$(warning)` | `problemsWarningIcon.foreground` |
+| 3 | verification failed / WAIVED | `$(unverified)` | `problemsWarningIcon.foreground` |
+| 4 | duplicate name across roots | `$(warning)` | `problemsWarningIcon.foreground` |
+| 5 | tier mismatch vs workspace | `$(info)` | `problemsInfoIcon.foreground` |
+| 6 | *no marker* — plain run state | the status glyph (not-started / in-progress / done / cancelled) | per asset |
+
+Ranks 1–5 are `ThemeIcon`s and therefore recolour correctly in both themes for
+free — which is a second reason to prefer them over authored SVGs for the
+marker states, given the light-theme defect found in (d).
+
+**Spike-proven:** [`07-severity-precedence-at-minimum-width.png`](s1-spike-evidence/07-severity-precedence-at-minimum-width.png)
+renders a blocked set (red `$(error)`), a migration-required set (yellow
+`$(warning)`) and a complete set (green check) in the same tree at **minimum**
+panel width. The three are distinguishable at a glance with no hover and no
+label — which is the property the density trade needs and the draft had not
+demonstrated.
+
+**Note the interaction with rank 6:** a set carrying a marker loses its
+run-state glyph from the icon slot. The run state remains legible from the
+fourth-level session rows once expanded, and from the tooltip when not. S4's
+walk should confirm that is acceptable in practice.
 
 ---
 
@@ -340,6 +432,15 @@ Its **Ends with** also needs the fourth level added, per operator-notes wrinkle
 4; the spec's `module → bucket → session set` shape is now
 `module → bucket → session set → session`.
 
+**Two hard constraints S2 must honour**, both established by spike evidence
+rather than preference:
+
+1. **At most two inline actions.** Four erases the module label at minimum
+   width — the operator's original complaint, reproduced natively.
+2. **Implement the icon precedence table**, not "the most severe marker" as
+   prose. Ranks 1–5 are `ThemeIcon`s; only rank 6 uses the authored SVGs, and
+   those still need their light-theme fix.
+
 ### S4 — unchanged in scope, one caveat
 
 The walk stays in S4. Both routed voices wanted it earlier; the operator's
@@ -365,14 +466,37 @@ None of the three no-go conditions fired:
 | --- | --- |
 | Operator judges the density loss unacceptable | **No** — trade accepted, with the fraction removed rather than degraded |
 | `contributes.submenus` fails to give a hierarchical menu | **No** — works, two levels deep |
-| `"group": "inline"` renders unacceptably | **No** — renders as platform icons, and fixes the original complaint |
+| `"group": "inline"` renders unacceptably | **Conditionally** — **fails at four actions**, fine at two. Not a no-go, because the fix is a cap S2 can honour and the operator never wanted four shortcuts plus a menu. Recorded as a binding constraint, not a residual. |
 
 Recorded residuals, none blocking:
 
 1. The four status SVGs need theme-safe variants — one is invisible on a light
-   theme. **Owed in S2/S3.**
-2. `resolveWebviewView` and cold-start-to-first-paint remain unmeasured; Layer 3
-   owns them in S4.
+   theme. **Owed in S2/S3.** Ranks 1–5 of the icon precedence use `ThemeIcon`s
+   and are unaffected.
+2. **Activation, `resolveWebviewView` and first paint are unmeasured**, so the
+   migration's effect on perceived startup is genuinely unknown in both
+   directions. S4 must measure and report whichever way it falls.
 3. The bucket-row `N sets` description is proposed, not operator-confirmed.
 4. The discovery-cost fix (the ~102 ms git subprocess) is out of scope here and
    is the strongest candidate for the next set.
+5. Two inline actions were proven safe at *default* width; minimum width with
+   two was not separately captured. S4's walk closes it.
+
+### What the verification round changed
+
+Round 1 returned four Major findings, all of them real and none disputed. They
+are recorded here rather than quietly folded in, because two of them corrected
+claims this document had already made:
+
+1. **The startup conclusion overreached** — see §2's *What was NOT measured*.
+   The draft told S4 to report startup unchanged; it now tells S4 to measure.
+2. **The same, restated as a completeness gap** — merged with (1).
+3. **The inline-action spike tested two actions and the decision generalised to
+   four.** Re-spiked at four: the label is erased. The GO on inline actions is
+   now capped at two.
+4. **The mapping claimed a "most severe marker" with no precedence rule**, and
+   the spike had rendered a blocked set as a generic in-progress dot. A ranked
+   precedence table now exists and is spike-proven at minimum width.
+
+The set's verdict did not change. Two of its supporting claims did, and one
+spike result was reversed.

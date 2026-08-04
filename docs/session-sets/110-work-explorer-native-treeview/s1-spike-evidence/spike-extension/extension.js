@@ -100,10 +100,29 @@ class SpikeProvider {
       // The worst-case row, mapped per the spec's table.
       const worst = new vscode.TreeItem(WORST_CASE.name, C.Collapsed);
       worst.description = WORST_CASE.fraction; // Set 034 column -> dimmed text
-      worst.iconPath = icon("in-progress.svg"); // single most severe marker
+      // Finding 4: "the single most severe marker" needs a PRECEDENCE RULE and
+      // a distinct glyph per state, or a blocked/migration-required set renders
+      // as a generic in-progress dot and the warning survives only on hover.
+      // Precedence, most severe first:
+      //   blocked > schema-migration > verification-failed/waived > tier-mismatch
+      //   > duplicate-name > plain run state
+      worst.iconPath = new vscode.ThemeIcon(
+        "error",
+        new vscode.ThemeColor("problemsErrorIcon.foreground"),
+      ); // blocked-by-prerequisite wins
       worst.tooltip = markdownTooltip(WORST_CASE); // the other four markers
       worst.contextValue = "set-inprogress-blocked-migration";
       rows.push({ kind: "set", name: WORST_CASE.name, item: worst, parent: el });
+
+      // Second severity, so precedence is visible rather than asserted.
+      const migrating = new vscode.TreeItem("086-copilot-seat-verification-integrity", C.Collapsed);
+      migrating.iconPath = new vscode.ThemeIcon(
+        "warning",
+        new vscode.ThemeColor("problemsWarningIcon.foreground"),
+      ); // schema-migration required
+      migrating.tooltip = new vscode.MarkdownString("**086** — schema migration v3 -> v4 required");
+      migrating.contextValue = "set-migration-required";
+      rows.push({ kind: "set", name: "086", item: migrating, parent: el });
 
       // A benign row, for contrast at a glance.
       const calm = new vscode.TreeItem("108-three-module-pipeline-tutorial", C.Collapsed);
@@ -160,7 +179,8 @@ function activate(context) {
   view.badge = { value: 7, tooltip: "7 sets in progress" };
 
   for (const id of [
-    "spike.newSession", "spike.openSpec", "spike.rename", "spike.delete",
+    "spike.newSession", "spike.openSpec", "spike.newSet", "spike.refresh",
+    "spike.rename", "spike.delete",
     "spike.planCreate", "spike.planImport", "spike.planRegen",
     "spike.verifyRun", "spike.verifyMode",
   ]) {
@@ -258,14 +278,14 @@ function activate(context) {
     // stated as a WIDTH THRESHOLD rather than a single anecdote.
     fs.writeFileSync(path.join(__dirname, "..", "width-stage-default.marker"), "ready", "utf8");
     await new Promise((r) => setTimeout(r, 9000));
-    for (let i = 0; i < 8; i++) {
-      await vscode.commands.executeCommand("workbench.action.increaseViewSize");
+    for (let i = 0; i < 14; i++) {
+      await vscode.commands.executeCommand("workbench.action.decreaseViewSize");
       await new Promise((r) => setTimeout(r, 120));
     }
     fs.writeFileSync(path.join(__dirname, "..", "width-stage-wide.marker"), "ready", "utf8");
     await new Promise((r) => setTimeout(r, 9000));
-    for (let i = 0; i < 16; i++) {
-      await vscode.commands.executeCommand("workbench.action.increaseViewSize");
+    for (let i = 0; i < 8; i++) {
+      await vscode.commands.executeCommand("workbench.action.decreaseViewSize");
       await new Promise((r) => setTimeout(r, 120));
     }
     fs.writeFileSync(path.join(__dirname, "..", "width-stage-widest.marker"), "ready", "utf8");

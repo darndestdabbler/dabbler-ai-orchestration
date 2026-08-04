@@ -84,6 +84,22 @@
       "dateTime": "2026-08-04T18:25:33.070567-04:00",
       "description": "Wrote s1-migration-decision.md: panel verdict, measurements, four spike answers, the operator-confirmed mapping table, plan adjustments, and an explicit GO with the performance claim withdrawn.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "session-001/verify-discovery",
+      "dateTime": "2026-08-04T18:38:22.452462-04:00",
+      "description": "Discovery round (fan-out 2, gpt-5-6-sol x2, anthropic excluded): ISSUES_FOUND, 4 blocking Majors, $0.8240. Supplementary completeness pass: VERIFIED, nothing new, $0.0541.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 12,
+      "stepKey": "session-001/remediate-round-1",
+      "dateTime": "2026-08-04T18:38:22.452998-04:00",
+      "description": "Accepted all 4 findings, none disputed. Withdrew the startup over-claim (S4 must now measure, not confirm); re-spiked inline actions at the real four-action count and REVERSED the result (label erased at min width) -> capped at 2; added a ranked icon precedence table, spike-proven at min width. Sidecar: s1-remediation-round-1.md.",
+      "status": "complete"
     }
   ]
 }

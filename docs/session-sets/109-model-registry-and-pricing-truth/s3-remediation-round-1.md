@@ -252,3 +252,46 @@ The trend supports one more rather than many: rounds 1 → 3 → 4 went 7 blocki
 → 1 → 1, each successive finding narrower and confined to the same Google
 parse-classification seam, with no finding yet touching `pricing.py`, the six
 wired consumers, or any rate in `router-config.yaml`.
+
+---
+
+# Round 5 (remediation-review, cycle 3 — operator-authorised) — one finding, accepted
+
+**6 accepted, 1 rejected**, the rejection carrying one new Major. Accepted.
+
+## F3-followup-3 — dropping unparseable lines was itself a fail-open
+
+**Accepted.** `_priced_lines` filters out every line `parse_money` cannot read
+and never compares the survivors against the input. So three published tiers of
+which two parse become a structurally valid **two-tier** schedule — matching
+bounds, exactly one unbounded row — which passes every check downstream and
+produces a proposal full of real published numbers with one tier quietly
+missing.
+
+That is worse than it first sounds, and the verifier said why: a partial
+schedule is not a smaller truth, it is a wrong one. The prompt sizes that fell
+in the dropped band get priced at a neighbouring tier's rate, silently.
+
+This is the third finding on the same seam, and the pattern across all three is
+worth naming: each time, the guard I added checked the *shape that survived
+parsing* rather than *whether parsing lost anything*. Round 3 checked "rows
+empty", round 4 checked "no rows at all", and both were satisfiable by a cell
+that had quietly shed a line.
+
+**Fix.** Every non-blank line in a Standard `Input price` / `Output price` cell
+must yield a rate. One that does not makes the section unreadable — and
+therefore fatal when the config routes to that model — naming the offending
+line.
+
+**Blast radius measured before shipping:** across every Standard section on the
+live page today, **zero** Input/Output cells contain a non-blank line that
+fails to parse. Hardening again, with no behaviour change on the current page;
+the live re-run is identical (10 entries, 2 unchecked, exit 1).
+
+Pinned by `test_one_unparseable_tier_does_not_become_a_smaller_schedule` and
+`test_a_partially_unparseable_cell_on_a_configured_model_aborts`.
+
+One earlier test was adjusted rather than left green by luck: round 4's
+`test_a_price_cell_with_no_recognised_rate_is_unreadable_not_absent` now trips
+this stricter rule first, so it asserts the *classification* (unreadable, not
+absent) instead of the specific message.

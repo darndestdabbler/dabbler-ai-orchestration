@@ -948,8 +948,11 @@ def test_a_price_cell_with_no_recognised_rate_is_unreadable_not_absent():
         1,
     )
     entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-flash"]
+    # Unreadable, not absent -- absent is the non-fatal branch. (Round 5's
+    # stricter every-line rule now catches this one first; the outcome is what
+    # matters, so this asserts the classification rather than the wording.)
     assert entry.rows == []
-    assert "no per-token rate" in entry.observations[0]["unreadable"]
+    assert "unreadable" in entry.observations[0]
 
 
 def test_an_unrecognised_price_cell_on_a_configured_model_aborts(tmp_path,
@@ -982,3 +985,50 @@ def test_a_section_with_no_price_rows_at_all_is_still_irrelevant():
     assert pp._google_section_rates(
         pp.Table(rows=[["Image price", "Free", "$0.04 / image"]]), "imagen-4"
     ) is None
+
+
+def test_one_unparseable_tier_does_not_become_a_smaller_schedule():
+    """Round 5: dropping the lines that do not parse is its own fail-open.
+    Three published tiers of which two parse become a structurally valid
+    TWO-tier schedule that proposes real numbers with one tier missing --
+    and the prompt sizes in the dropped band then price at a neighbour."""
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "<td>$1.25, prompts <= 200k tokens<br>$2.50, prompts > 200k tokens</td>",
+        "<td>$1.25, prompts <= 200k tokens<br>see calculator, prompts <= 400k"
+        "<br>$2.50, prompts > 400k tokens</td>",
+        1,
+    )
+    entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-pro"]
+    assert entry.rows == []
+    assert "missing a tier" in entry.observations[0]["unreadable"]
+
+
+def test_a_partially_unparseable_cell_on_a_configured_model_aborts(
+    tmp_path, monkeypatch, config_file
+):
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "<td>$1.25, prompts <= 200k tokens<br>$2.50, prompts > 200k tokens</td>",
+        "<td>$1.25, prompts <= 200k tokens<br>see calculator, prompts <= 400k"
+        "<br>$2.50, prompts > 400k tokens</td>",
+        1,
+    )
+    monkeypatch.setattr(pp, "load_config", lambda path=None: _minimal_config())
+    monkeypatch.setattr(
+        pp.httpx, "Client",
+        lambda **kw: _client(overrides={pp.PRICING_PAGES["google"]: broken}),
+    )
+    proposal_path = tmp_path / "proposal.json"
+    proposal_path.write_text(json.dumps({
+        "schema_version": pp.SCHEMA_VERSION,
+        "changes": [_change("gpt-5-5",
+                            {"input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+                            pp.DECISION_ACCEPT)],
+    }), encoding="utf-8")
+
+    code = pp.main([
+        "--fetch", "--config", str(config_file), "--proposal", str(proposal_path)
+    ])
+
+    assert code == pp.EXIT_FATAL
+    assert not proposal_path.exists()
+    assert proposal_path.with_suffix(".stale.json").exists()

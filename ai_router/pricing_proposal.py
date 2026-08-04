@@ -552,6 +552,22 @@ def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
 
     input_lines = [ln for ln in input_cell.split("\n") if ln.strip()]
     output_lines = [ln for ln in output_cell.split("\n") if ln.strip()]
+
+    # Every non-blank line in a price cell must yield a rate. Round 5 found
+    # that dropping the ones that do not is its own fail-open: three published
+    # tiers of which two parse become a structurally valid TWO-tier schedule,
+    # with matching bounds and an unbounded row, that passes every check below
+    # and proposes real published numbers with one tier quietly missing. A
+    # partial schedule is not a smaller truth, it is a wrong one — the prompt
+    # sizes that fell in the dropped band get priced at a neighbouring tier.
+    for line in input_lines + output_lines:
+        if parse_money(line) is None:
+            return _unreadable(
+                model_id,
+                f"one line of its Standard price cells states no rate this "
+                f"parser recognises ({line!r}), so any schedule built from the "
+                "rest would be missing a tier the page publishes.",
+            )
     inputs = _priced_lines(input_lines)
     outputs = _priced_lines(output_lines)
     if inputs is None or outputs is None:

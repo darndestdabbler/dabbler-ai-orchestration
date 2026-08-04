@@ -24,8 +24,9 @@
 > decisions, so they belong in S1's confirmed mapping; the third also changes
 > Session 2's stated `module → bucket → session set` shape. It also brings the
 > **new activity-bar icon** into scope (a Session 3 asset swap, and it needs a
-> `currentColor` fix first), and carries **one unresolved question** S1 must
-> put to the operator before confirming the mapping.
+> `currentColor` fix first). The Set 034 fraction list-icon column is
+> **retired** by operator decision; the fraction text itself survives in
+> `description`.
 
 ---
 

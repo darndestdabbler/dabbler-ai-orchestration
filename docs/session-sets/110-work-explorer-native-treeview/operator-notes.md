@@ -61,8 +61,11 @@ currently a bespoke right-aligned bold colored column, not description text.
 `description` and into that dedicated column. Putting it back into
 `description` is a knowing partial reversal, forced by the platform rather
 than chosen. S1 should record it as such so a later reviewer does not file it
-as a regression — and should confirm with the operator that dimmed
-`3/6` after the set name reads as well as the colored column did.
+as a regression. **The operator has confirmed the trade** (see the icon
+section below): the fraction text stays, the color-coded column goes. What is
+still worth an eyeball during the S1 spike is whether dimmed `3/6` after the
+set name carries enough of what the color coding did — the column encoded
+state in its color, and `description` text does not.
 
 The alternative reading — a count on the group header row itself (e.g.
 `In Progress · 4 sets`) — is worth putting to the operator as the second
@@ -104,8 +107,10 @@ the two are not mutually exclusive.
 
 **In scope for this set.** The rationale is coherent: the shipping mark is a
 single path whose motif reads as a fraction, and the new one is a circled
-checkmark — a completion motif that matches a tree whose status now lives in
-icons rather than in a numeric column.
+checkmark — a completion motif that matches a tree whose row icons become
+status glyphs. (On "eliminating the fractions", see the operator's
+clarification at the end of this section: the fraction *text* stays in
+`description`; the fraction *list-icon column* is what goes.)
 
 **One blocking defect to fix before it can ship.** The current icon is a
 single path with `style="fill:currentColor"` — the theme-safe idiom, which is
@@ -139,14 +144,21 @@ dependency on the `TreeDataProvider`, so it fits Session 3 ("switch over"),
 which is already the session that retires the surfaces this replaces. It is
 too small to justify its own session and too visible to leave uncommitted.
 
-> **Open question for the operator, and it changes what S1 builds.** This ask
-> says *"eliminating the fractions"*, but ask 3 above **keeps** the fraction —
-> moved from its dedicated column into `TreeItem.description`. Both cannot be
-> true. Either (a) the fraction survives as dimmed description text and only
-> the bespoke *column* is eliminated, or (b) the fraction leaves the tree
-> entirely, ask 3 is withdrawn, and `description` is free for something else
-> (or nothing). S1 must settle this before the density mapping is confirmed;
-> it is recorded here unresolved rather than guessed.
+**Settled by the operator, same day.** *"I meant eliminating the fraction
+icons. We will keep it in the description."* So the **fraction survives** as
+`TreeItem.description` text exactly as ask 3 states; what goes is the Set 034
+**fraction list-icon column** — the `.row-fraction` span rendered as a
+fixed-width, right-aligned, bold, state-color-coded pseudo-icon
+(`--row-fraction-width: 3em`, `.row-fraction-in-progress` /
+`-not-started` / `-complete` in `tree.css`), which occupied the row's icon
+slot. That column is a webview construct with no native equivalent and dies
+with the migration regardless; the operator is confirming the loss is
+intended, not incidental.
+
+That also sharpens the icon rationale: the row's icon slot stops being a
+*number* and becomes a *status glyph*, at both the set and the new session
+level — so an activity-bar mark built on a fraction motif is describing a
+column the product no longer has.
 
 ### Why this belongs to S1 rather than being applied directly
 

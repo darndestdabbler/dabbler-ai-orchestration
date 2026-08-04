@@ -113,6 +113,27 @@ You need a line beginning `10.0.`. On the machine this tutorial was written on:
 Older SDKs alongside it are fine. Download:
 https://dotnet.microsoft.com/download/dotnet/10.0
 
+> **A *newer* SDK alongside it is not fine on its own, and this is the one setup
+> step people miss.** Look at the last line of that example: a .NET 11 preview.
+> `dotnet` picks the highest SDK it can find, so on a machine like that
+> `dotnet new` gives you a .NET 11 project and every "10" in this tutorial
+> quietly stops applying.
+>
+> Pin the repository once, in a `global.json` at its root, and the whole team
+> builds the same thing:
+>
+> ```json
+> {
+>   "sdk": {
+>     "version": "10.0.201",
+>     "rollForward": "latestFeature"
+>   }
+> }
+> ```
+>
+> Use whichever `10.0.` version your own `dotnet --list-sdks` printed. Then
+> `dotnet --version` should report it. The answer key pins itself exactly this way.
+
 **2. SQL Server LocalDB.** Check it:
 
 ```powershell
@@ -600,6 +621,8 @@ and the entries in member-major order.
 
 ```yaml
 modules:
+  # Your Adopt Dabbler module is already here. Leave its entry alone and add
+  # the new ones after it -- this block shows the shape, not the whole file.
   - slug: priya-converter
     title: "Converter (Priya)"
     codeRoots:
@@ -842,6 +865,18 @@ Open your `{owner}-persistence` module — again, already declared. Ask for
 - `GET /batches/{id}` and `GET /health`.
 - **Listening on `5102`.** Same reason as Part A: ask for the port, or the project
   picks its own.
+
+> **If your agent builds this with EF Core *migrations*, you need one more tool.**
+> Generating a migration needs `dotnet-ef`, which the .NET SDK does not include:
+>
+> ```powershell
+> dotnet tool install --global dotnet-ef
+> ```
+>
+> You will know you need it when a command fails with *"Could not execute because
+> the specified command or file was not found"*. Not every implementation takes
+> that route — an agent that creates the schema directly on start-up needs nothing
+> extra — which is why this is here rather than in the install list at the top.
 
 ## The beat that earns its place
 
@@ -1086,12 +1121,17 @@ curl.exe -s "http://localhost:5102/batches/$($result[0].batchId)"
 > storing anything, and you would also be moving a second `orders.csv` on top of the
 > one already sitting in `archive\`.
 
-> **Got an empty array back?** The scheduled poll almost certainly beat you to it —
-> it runs every minute whether you asked or not, so a file dropped just before the
-> minute boundary is already gone by the time you call `/run-now`. Nothing is wrong;
-> drop another file under a new name and run again. If you would rather the schedule
-> stayed out of your way while you experiment, set `"ScheduleEnabled": false` and
-> drive everything with `/run-now`.
+> **Got an empty array back — or an error?** The scheduled poll almost certainly
+> beat you to it — it runs every minute whether you asked or not, so a file dropped
+> just before the minute boundary is already gone by the time you call `/run-now`.
+> Usually that shows up as an empty array. If the two passes collide over the same
+> file it can instead surface as an error, because one of them went to file away a
+> file the other had already moved. Same cause, same fix, and neither means your
+> pipeline is broken.
+>
+> **Set `"ScheduleEnabled": false` and drive everything with `/run-now` while you
+> are experimenting.** It makes every run in this part reproducible, and you can
+> turn the schedule back on when you want to watch it work unattended.
 
 **5. Now try the failure paths.** They matter more than the happy one:
 
@@ -1122,9 +1162,11 @@ rule from Part B doing its job.
 
 > **Two details about that capture, so you are not confused when yours differs.**
 > It was taken on a run where the converter was on **`5201`**, which is why the
-> `Deferred` message names that port — yours will name `5101`. The file names are
-> from that run too. **The `outcome` values are the contract; the ports, names and
-> GUIDs are just what that machine happened to produce.**
+> `Deferred` message names that port. The file names are from that run too. **The
+> `outcome` values are the contract; everything else in these lines — `detail`,
+> ports, names and GUIDs — is just what that machine happened to produce.** Your
+> `detail` comes from whatever your HTTP client reported, so it may well read
+> differently, or not name a port at all.
 
 ## The finish line
 

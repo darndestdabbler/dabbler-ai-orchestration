@@ -473,3 +473,142 @@ The other standing candidates, unchanged:
 
 - **Orchestrator used:** claude / anthropic / claude-opus-5 / high.
 - **Routed calls:** one step-3.5 analysis; the mandatory cross-provider verification.
+
+---
+
+## Session 4 of 4 — Walk it, then cut the checklist
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked, and the
+  engine S3's close recommended for this session).
+- Routed step-3.5 analysis: `s4-ai-assignment-analysis.json` (route
+  `task_type=analysis`, excl. anthropic).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**this session walks it**), `requiresE2E false`,
+  `pathAwareCritique advisory` (set-terminal, runs here).
+- Budget: `DABBLER_*` provider keys plus the Claude subscription the walk itself runs
+  on. **Zero Copilot seat capacity.**
+
+### The one decision the spec required of Step 1 — walk staffing
+
+The spec's Step 1 says *"agree the walk's staffing with the operator."* Three costed
+options were put to the operator: the orchestrator walks all four parts; the
+orchestrator walks a reduced scope (day one plus Part D against the answer key); or
+the operator walks it personally and the session pauses until they have.
+
+**The operator chose the full A–D orchestrator walk.** The reasoning offered and
+accepted:
+
+- The machine already satisfies both hard prerequisites — .NET SDK `10.0.201` and
+  LocalDB `MSSQLLocalDB` — so the walk is genuinely runnable here rather than
+  simulated.
+- The VS Code UI steps this tutorial mentions (`Dabbler: New Module`, the plan and
+  decomposition sets) are **borrowed procedure that it links to `adopt-dabbler.md`
+  rather than owning**. An orchestrator walk therefore still exercises nearly all of
+  the material this document is actually responsible for.
+- The cost lands on the Claude subscription, not on the very limited Copilot seat and
+  not on the `DABBLER_*` keys beyond the mandatory verification.
+
+**The reduced-scope option was explicitly rejected in the framing**, because skipping
+the Parts A–C builds would leave the tutorial's central premise — that the two
+contract sections are *sufficient to build against* — untested, which is the one
+thing a walk is uniquely able to falsify.
+
+### The two disciplines this walk binds itself to in advance
+
+Both exist to stop the walk producing evidence that flatters the document.
+
+1. **Contract-only construction.** Parts A, B and C are built from the tutorial's
+   contract sections **alone**. The answer key's source is not opened until Part D.
+   Anything the contract fails to state is a finding, not a gap to be quietly filled
+   from the reference solution — and the moment the reference solution is consulted,
+   the walk stops being a test of the document.
+2. **Strict copy-paste, no silent correction.** Every command is run exactly as the
+   tutorial prints it. A command that fails is a **defect in the document**, recorded
+   as one, and not quietly repaired on the way past. This is the step-3.5 analyst's
+   third risk, adopted verbatim.
+
+A third choice serves the same end: the walker's name is **`denmi`**, which appears
+nowhere in the tutorial. The document's examples are `priya` (team) and `alex`
+(solo), so a walk conducted as either would silently pass any instruction that had
+accidentally hard-coded an example name.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; agree staffing with the operator. | Orchestrator direct + `AskUserQuestion` — the spec names this as an operator decision. |
+| 2–4 | Walk the tutorial; build three services; confirm the negative tests; fix what the walk breaks. | **Orchestrator direct, and this is the point** — the tutorial instructs the reader to hand its contract sections to an AI agent. The orchestrator *is* that agent. Routing the builds elsewhere would test a different agent than the one a reader would use. |
+| 5 | Author the UAT checklist from the walk. | Orchestrator direct — it must be derived from what the walker saw, and only the walker saw it. |
+| 6 | Record product gaps as follow-ons. | Orchestrator direct — observation, not analysis. |
+| 7 | Phased `verify_session --phase discovery`; path-aware critique. | **Routed** — anthropic auto-excluded per the no-skip mandate. |
+| Close | `change-log.md`; Step 9 review; `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct — mechanics, plus the Step 9 review. |
+
+### Where this departs from the routed analyst, and why
+
+**Rejected — its `next_orchestrator` model ids, as out of catalogue.** It returned
+`claude-3-opus-20240229` and `gpt-4o`, neither of which is a model this repo routes
+to. This is the **third consecutive session** in which the step-3.5 analyst emitted an
+identifier that does not exist here (S3's was the engine `bedrock`). The pattern is
+now established enough to be worth a follow-on rather than another one-line
+correction: the analysis prompt asks for a model id but hands the analyst no
+catalogue to choose from, so it answers from its own training data, and its training
+data is older than this repo's registry. Recorded in the follow-ons.
+
+**Declined — its `next_session_set`, `increment-b-core-workflow`.** Its stated reason
+is that Increment B "delivers the highest business value" while the `adopt-dabbler.md`
+walk is merely "resolving documentation debt." That weighting is defensible in the
+abstract and wrong on these facts: the debt in question is that a document **no human
+has ever followed end to end** just had a third of it removed by S3, and Set 107's
+finding — that a checklist written from a document rather than from a walk documents
+intent, not reality — was earned in this very repo. Increment B stays the standing
+number two.
+
+**Adopted — its third risk, in full.** *"Upon encountering a failed command due to a
+typo, the orchestrator may auto-correct and proceed, thus completing the walk but
+failing to identify the error."* That is exactly the failure mode an orchestrator walk
+is most prone to, and it is why strict copy-paste is bound above.
+
+**Adopted with a stated limit — its first risk**, that a pre-configured environment
+produces a false positive a clean machine would not reproduce. Its mitigation is a
+fresh VM or container, which is not available here. The limit is therefore recorded
+rather than resolved, and it is sharper than the analyst knew: **this is the machine
+the tutorial was written on**, so its prerequisite section cannot be falsified here at
+all. The walk records that as an explicit non-finding rather than a pass.
+
+**Set aside — its second risk**, that the orchestrator leaks context between its
+reader and agent roles. The concern is real but its mitigation (a hard context
+boundary per prompt) would model a reader who cannot see their own screen. The
+honest mitigation is the one already bound: build from the contract sections only,
+and record every place the document had to be supplemented.
+
+### Next-orchestrator recommendation
+
+Restated on merits, since the analyst's ids were unusable.
+
+**claude / anthropic / claude-opus-5 / high**, if the next set is the owed
+`adopt-dabbler.md` walk — for the same reason this session was assigned it: a walk is
+a long, stateful, judgement-heavy task whose value lies in noticing what a document
+fails to say, and it ends in a UAT checklist gated on volume as well as wording.
+
+Provider-diversity second choice: **openai / gpt-5-6**, effort high. Cross-provider
+verification already supplies fresh eyes, so diversity alone does not justify the
+switch against a constrained budget.
+
+### Next-session-set recommendation
+
+**The owed `adopt-dabbler.md` walk**, unchanged from S2's and S3's closes and now
+overdue by three sets. Carried since Set 106, never performed, and made materially
+larger by S3, which removed two of its six parts, renumbered its branch-protection
+stages, rewrote its opening and its close, and changed its stated completion time.
+Everything downstream of it — including this tutorial, which names it as a hard
+prerequisite four times — rests on a document nobody has walked.
+
+Standing candidates behind it, unchanged: **Increment B** (`Start work` /
+`Send for review`, one-form module creation), then the **Java track**, which this
+session's walk unblocks by the spec's own condition.
+
+### Actuals (filled at close)
+
+- **Orchestrator used:** claude / anthropic / claude-opus-5 / high.
+- **Routed calls:** one step-3.5 analysis; the mandatory cross-provider verification;
+  the advisory path-aware critique.

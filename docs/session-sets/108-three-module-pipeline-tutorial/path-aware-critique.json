@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "108-three-module-pipeline-tutorial",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-08-03T20:26:31.185507-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I read the Session 3 spec/change-log/status artifacts, the actual edited docs (`adopt-dabbler.md`, `README.md`, `quick-start.md`, `module-reorganization.md`, `module-team-hello-world.md`, `release-and-recovery.md`, `hello-world.md`, `three-module-pipeline.md`), and the gate change in `ai_router/scripts/tutorial_gate.py` plus `ai_router/tests/test_tutorial_gate.py`. The video folder is in fact gone, the dotted-command fix matches the shipped command title in `tools/dabbler-ai-orchestration/package.json`, and the linker sweep largely lines up with the repository. I found one blocking documentation defect in the retained tutorial path for Azure DevOps users.",
+      "findings": [
+        {
+          "description": "Violation: `docs/tutorials/adopt-dabbler.md` explicitly promises host neutrality: `This walkthrough works on both` and says anything outside a `Your host` block is shared, but the main happy-path steps later instruct the reader to `merge the pull request on GitHub.` Impact: Azure DevOps is presented as a first-class supported host throughout the tutorial, so this is not cosmetic wording: an Azure DevOps reader reaches the final merge/cleanup sequence and is told to perform the action on the wrong platform, undermining the tutorial's claim that the retained single-module walk works on both hosts. In a procedural tutorial, a wrong step on a supported path is merge-blocking because it changes whether the document is actually runnable for one of its advertised audiences. Evidence: the dual-host claim appears in `docs/tutorials/adopt-dabbler.md` near the top (`Pick your host before you start: GitHub or Azure DevOps` / `This walkthrough works on both`), while `docs/tutorials/adopt-dabbler.md:295` says `Wait for the test check to pass and merge the pull request on GitHub.` Fix: make Step 8 host-neutral (`merge the pull request on your host`) or split it into the same GitHub/Azure DevOps block style used elsewhere in the guide.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the provided set of changes, focusing on the trimming of the `adopt-dabbler.md` tutorial, the deletion of the corresponding video assets, the updates to linking documents, and the bug fix in `tutorial_gate.py`.\n\nMy verification process involved reading the following files:\n- `docs/tutorials/adopt-dabbler.md`: Confirmed the removal of Parts 5 and 6, the updated completion time, and the internal consistency of the remaining content.\n- `README.md`, `docs/quick-start.md`, `docs/module-reorganization.md`, `docs/tutorials/module-team-hello-world.md`, and `docs/tutorials/release-and-recovery.md`: Verified that all linking documents were updated to point to the new, streamlined tutorial structure.\n- `ai_router/scripts/tutorial_gate.py`: Inspected the regex change for command parsing and confirmed it correctly handles titles with periods without incorrectly consuming sentence-ending punctuation.\n- `ai_router/tests/test_tutorial_gate.py`: Verified the addition of new regression tests for the regex fix, and confirmed that the test correctly asserts for an exact match, preventing a fail-open scenario.\n\nAll claims made in the session summary were substantiated by the file contents. The changes are consistent, correct, and represent a clear improvement to the repository's documentation and test fidelity.",
+      "findings": []
+    }
+  ]
+}

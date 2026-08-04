@@ -112,24 +112,23 @@ status glyphs. (On "eliminating the fractions", see the operator's
 clarification at the end of this section: the fraction *text* stays in
 `description`; the fraction *list-icon column* is what goes.)
 
-**One blocking defect to fix before it can ship.** The current icon is a
-single path with `style="fill:currentColor"` — the theme-safe idiom, which is
-why it follows the activity bar's active/inactive foreground. The new icon
-does not:
+**A theme-safety defect was found on inspection and the operator has already
+fixed it — S1 has nothing to do here.** As first delivered, the icon carried
+hardcoded `fill:#ffffff` plus `stroke:#000000` on a ring path and a separate
+stroked checkmark, which would not have tracked the activity bar's
+active/inactive foreground the way the shipping mark does. It has since been
+**flattened to a single path with `style="fill:currentColor"`** — the same
+idiom as `dabbler-ai-orchestration-icon.svg`, and the sturdier of the two
+options offered (a filled silhouette rather than recolored strokes, so there
+are no stroke widths to survive scaling). Verified 2026-08-04: one `<path>`,
+no `fill`/`stroke` attributes, and the only remaining hex colors are in the
+non-rendering `sodipodi:namedview` editor block.
 
-```xml
-style="...fill:#ffffff;stroke:#000000;stroke-width:2.1822;..."   <!-- outer ring -->
-style="fill:none;stroke:#000000;stroke-width:5.29167;..."        <!-- checkmark -->
-```
-
-Hardcoded `#ffffff` fill and `#000000` strokes will not track the theme, and a
-white disc is wrong in at least one of light/dark. **Convert both paths to
-`currentColor`** (or flatten to a single filled path with
-`fill:currentColor`), then look at it in both themes and in the active and
-inactive activity-bar states. Two smaller cleanups while it is open: the file
-still carries Inkscape `sodipodi:namedview` editor cruft, and it should be
-confirmed to read cleanly at the activity bar's render size rather than only
-at its authored 128px.
+Two cosmetic residuals, neither a blocker: that Inkscape metadata block could
+be stripped (the shipping icon has none), and the mark should still be *looked
+at* in both themes and in the active and inactive activity-bar states at real
+render size rather than only at its authored 128px — that is a UAT
+observation, not a code change.
 
 **Every reference to update** — there are exactly three, verified by grep:
 `package.json` (`contributes.viewsContainers.activitybar[0].icon`),

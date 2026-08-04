@@ -22,9 +22,17 @@ the next.
 
 ## The acceptance test is the deliverable, and it passed
 
-S4 walked the tutorial end to end and **built all three services from the
-contract sections alone**, without opening the published answer key until Part D.
-The result is the strongest evidence this set could have produced:
+S4 walked the tutorial and **built all three services from the contract sections
+alone**, without opening the published answer key until Part D.
+
+**It is a partial walk, and the boundary is stated rather than blurred.** Every
+command the tutorial prints was run and all three services were built and driven
+against each other — but the **Dabbler lifecycle each part routes through**
+(`Dabbler: New Module`, the Work Explorer, and the plan-set → decomposition-set →
+implement sequence) **was not executed**; the code was written directly by the
+orchestrator acting as the reader's agent. That is the largest gap in the
+evidence and the strongest reason the human UAT walk is still required. Within
+that boundary, the result is the strongest evidence this set could have produced:
 
 - **All four documented response bodies came back byte-identical** to the strings
   the tutorial prints — the `200` envelope, the `400` envelope, the
@@ -34,7 +42,9 @@ The result is the strongest evidence this set could have produced:
   key's 74 — close enough to reassure, different enough to prove nothing was
   copied, which is exactly what the tutorial says finished looks like.
 - **The negative tests, measured rather than inspected.** Part D changed **zero**
-  code files (`git diff` on `*.cs`/`*.csproj`); `watcher`'s suite ran in 54 ms
+  code files — against a pinned Part C baseline, with untracked files staged in
+  and build output excluded, after a verifier correctly showed the first version
+  of that check was not a falsifier at all; `watcher`'s suite ran in 54 ms
   with both services **confirmed down**. The third — can a reader stop cleanly
   after Parts A and B — is **split**: its machine half passes (both boundaries
   re-entered from cold, with Part B's stored batch and duplicate rule intact

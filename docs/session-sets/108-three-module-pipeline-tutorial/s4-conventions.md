@@ -26,9 +26,12 @@ step, who stalls or is misled.
 
 ## What was actually done
 
-1. **The tutorial was walked end to end** — Day one and Parts A–D — by building
-   all three .NET 10 services for real, in a fresh repository at
-   `C:\temp\dabbler-108-walk` (six commits, 84 tests).
+1. **The tutorial was walked — Day one and Parts A–D** — by building all three
+   .NET 10 services for real, in a fresh repository at `C:\temp\dabbler-108-walk`
+   (six commits, 84 tests). **The walk is PARTIAL and says so:** the Dabbler
+   lifecycle each part routes through (`Dabbler: New Module`, the Work Explorer,
+   plan set → decomposition set → implement) was **not executed**; the code was
+   written directly. `s4-walk-evidence.md` §2.1 is the full statement.
 2. **Five defects were found and all five fixed** in
    `docs/tutorials/three-module-pipeline.md` (+51/−9 lines).
 3. **A 4-item UAT checklist** was cut from the walk.
@@ -66,7 +69,7 @@ than asserted:
 | Claim | How it was established |
 | --- | --- |
 | The contract sections are sufficient to build against | Three response bodies came back **byte-identical** to the tutorial's printed strings (379, 421 and the unknown-schema envelope), compared programmatically against the literal document lines. Contract 2's `400` likewise. |
-| Part D changes no code | `git diff --name-only -- '*.cs' '*.csproj'` → **0 files**; whole diff is 2 lines. |
+| Part D changes no code | Against a **pinned Part C baseline**, with `git add -A` first so untracked source cannot hide and `bin/`+`obj/` excluded: **0 files**. The whole source diff for the Part D range is one `appsettings.json`. The check was confirmed to be a real falsifier by planting a line and watching it appear. (Round 4 correctly rejected the first version of this check; §5 records why.) |
 | `watcher`'s tests need nothing running | Both services stopped and **confirmed `DOWN` by curl**; 26 tests then passed in 54 ms. |
 | No part leaves state behind that a later part needs | With all five services down, each suite runs alone: 29 / 29 / 26 = **84 green**; then both boundaries re-entered from cold — Part A's finish line again byte-identical, Part B's stored batch and duplicate rule intact. Whether a *person* can resume from the document is explicitly **unverified**. |
 | Two independent implementations interoperate | The walk's `watcher` drove the **published answer key's** services; batch stored, read back from their database, `404` on the walker's own. |

@@ -2,8 +2,18 @@
 
 > **What this is.** A record of walking
 > [`docs/tutorials/three-module-pipeline.md`](../../tutorials/three-module-pipeline.md)
-> end to end — Day one and Parts A, B, C and D — on 2026-08-03, in a fresh
-> repository, building all three services for real.
+> — Day one and Parts A, B, C and D — on 2026-08-03, in a fresh repository,
+> building all three services for real.
+>
+> **This is a PARTIAL walk, and the word matters.** Every command the tutorial
+> prints was run, and all three services were built and driven end to end. But
+> **the Dabbler lifecycle the tutorial routes each part through — `Dabbler: New
+> Module`, the Work Explorer, and the plan-set → decomposition-set →
+> implementation sequence — was NOT executed.** The code was written directly by
+> the orchestrator acting as the reader's AI agent. §2.3 says exactly what that
+> leaves unverified. An earlier draft of this document called the walk "end to
+> end"; a cross-provider verifier was right that this overstated it, and the
+> claim is corrected throughout rather than defended.
 >
 > **Captured against the fixed template S3's close prescribed:**
 > `{Part, Step, Action, Expected, Actual, Defect/Stall}`, rather than freeform notes.
@@ -36,24 +46,38 @@ repository at `C:\temp\dabbler-108-walk`, six commits.
 Stated first, because the limits bound how every result below should be read.
 
 **It proves** that the two contract sections are sufficient to build conforming
-services against; that all four parts reach their stated finish lines; that the three
-negative tests hold; and — beyond what the tutorial claims — that two independently
-written implementations interoperate.
+services against; that the *engineering* content of all four parts reaches its stated
+finish lines; that Part D's acceptance test holds; and — beyond what the tutorial
+claims — that two independently written implementations interoperate.
 
 **It cannot prove** four things, each recorded rather than glossed:
 
-1. **The prerequisites section cannot be falsified here.** This is the machine the
+1. **The Dabbler lifecycle on the main path was never executed — the largest gap,
+   and it is a gap in coverage, not merely in observation.** Each of Parts A, B and C
+   opens by telling the reader to *"run its plan set, then its decomposition set, then
+   implement"*, and Day one Step 3 tells them to run `Dabbler: New Module` three times.
+   **None of that was performed.** The manifest entries were written by hand in the
+   exact shape the extension's `renderModuleManifestEntry` emits, and the services were
+   then written directly by the orchestrator acting as the reader's agent. So a broken
+   command, a misleading Explorer state or a lifecycle stall on the tutorial's main
+   path would not have been caught here, and the claim that *every* walk-surfaceable
+   defect was found is correspondingly weaker.
+
+   An earlier draft filed this under "VS Code surfaces exercised only as file effects"
+   and justified it as *borrowed procedure the tutorial merely links to*. That was
+   wrong on the facts: the *mechanics* of the commands live in `adopt-dabbler.md`, but
+   the **instruction to run them is in this tutorial**, on its main path, in every
+   part. §4 records what was verified mechanically in place of it; that is a partial
+   substitute and not an equivalent. **This is the single strongest reason the human
+   UAT walk is still required**, and checklist items 1 and 2 are pointed straight at it.
+2. **The prerequisites section cannot be falsified here.** This is the machine the
    tutorial was written on; the document literally prints this machine's
    `dotnet --list-sdks` output. Both prerequisite checks passing is a **non-finding**,
    not a pass.
-2. **The reading experience is under-tested.** The walker is not a naive reader.
+3. **The reading experience is under-tested.** The walker is not a naive reader.
    Stalls caused by ambiguity, intimidation or lost place are exactly what an
    orchestrator walk is worst at detecting, and they are the risk the spec calls
    biggest.
-3. **The VS Code surfaces were exercised only as file effects.** `Dabbler: New Module`
-   and the plan/decomposition lifecycle are borrowed procedure this tutorial *links*
-   to `adopt-dabbler.md` rather than owning — but the Explorer was never looked at by
-   a human. See §4 for what was verified mechanically instead.
 4. **The per-part human timings the spec asks for do not exist.** See §7.
 
 ---
@@ -162,9 +186,40 @@ half of it is measurable at all — see below.
 
 | Negative test | Result | Evidence |
 | --- | --- | --- |
-| **It fails if Part D required editing any code.** | **PASS** | `git diff --name-only -- '*.cs' '*.csproj'` → 0 files. The entire change is two lines in one `appsettings.json`. |
+| **It fails if Part D required editing any code.** | **PASS**, re-established with a sound check | See *The Part D falsifier* below. |
 | **It fails if `watcher`'s unit tests needed another module running.** | **PASS** | Both services stopped and confirmed `DOWN` by `curl`; 26 tests then passed in 54 ms. |
 | **It fails if a reader could not stop cleanly after Part A or Part B.** | **PASS on the machine half; UNVERIFIED on the human half** | See immediately below. |
+
+### The Part D falsifier, rebuilt after a verifier caught it being unsound
+
+The original check was `git diff --name-only -- '*.cs' '*.csproj'` against the working
+tree. A cross-provider verifier pointed out that this **is not a falsifier at all**:
+it misses code that was staged or committed, misses untracked new source files, and
+has no baseline, so it can pass a coupled implementation and fail a conforming one.
+That objection was tested rather than argued with — and it is worse than stated in
+theory, because run over this very repository the naive command matched **two `.cs`
+files that are generated build artifacts** (`obj/.../AssemblyInfo.cs`), not source.
+
+The sound check pins a baseline at the end of Part C, stages everything so untracked
+files cannot hide, and excludes build output:
+
+```
+git add -A
+git diff --cached --name-only <part-C-commit> -- "*.cs" "*.csproj" \
+    ":(exclude)*/bin/*" ":(exclude)*/obj/*"
+```
+
+**Result on the walk repository: 0 files.** The complete source diff across the whole
+Part D range is a single file, `watcher/appsettings.json`, and `git ls-files --others
+--exclude-standard` confirms **no untracked source**. Its three changed lines are the
+two `BaseAddress` repoints plus the `ScheduleEnabled` flip, the last of which was made
+*after* the two-line measurement and is disclosed as a deliberate extra in §3.
+
+**And it was confirmed to be a real falsifier**, not merely a check that happens to
+return zero: planting one line in `DecisionTable.cs` and re-running it made the file
+appear immediately. The planted line was then reverted.
+
+**UAT checklist item 4 now carries this version**, not the original.
 
 ### The clean-stop test, split honestly
 

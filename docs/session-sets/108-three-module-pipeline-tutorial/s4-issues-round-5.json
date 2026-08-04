@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The remediation documents the missing Dabbler lifecycle walk instead of completing it.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** Every typical reader must run `Dabbler: New Module`, use the Work Explorer, and traverse plan set → decomposition set → implementation across the tutorial’s main path. Because the session never exercised any of those steps, the eventual UAT participant becomes their first walker; a command failure, misleading Explorer state, or lifecycle stall therefore reaches the user without having been found and remediated before the checklist was authored. This is probable rather than exceptional because these steps are mandatory and repeated throughout Day one and Parts A–C.\n  - **Details:**\n    - **Violation:** The plan requires, “**Walk the tutorial.** Record where it stalls, what it assumes…” and explicitly states, “**The walk comes before the checklist**.” It ends with “A walked tutorial” and every walk-surfaced defect fixed or recorded.\n    - **Location:** `s4-walk-evidence.md` §2.1 admits that `Dabbler: New Module`, the Work Explorer, and the plan/decomposition/implementation sequence “**was NOT executed**.” `s4-conventions.md` likewise calls the walk partial. The checklist was nevertheless already authored.\n    - **Impact:** The session still lacks its required main-path walk, and the checklist cannot be fully derived from actual walk behavior. Relabeling the evidence as partial correctly removes the false “end to end” claim but does not satisfy the required work.\n    - **Evidence:** The response says manifest entries were written manually and services were implemented directly, while acknowledging that broken commands, misleading UI state, and lifecycle stalls would not have been caught.\n    - **Fix:** Execute the documented Dabbler lifecycle on the tutorial path before finalizing the checklist, record its actual behavior and stalls, and remediate or record every resulting defect.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "Every typical reader must run `Dabbler: New Module`, use the Work Explorer, and traverse plan set → decomposition set → implementation across the tutorial’s main path. Because the session never exercised any of those steps, the eventual UAT participant becomes their first walker; a command failure, misleading Explorer state, or lifecycle stall therefore reaches the user without having been found and remediated before the checklist was authored. This is probable rather than exceptional because these steps are mandatory and repeated throughout Day one and Parts A–C."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 clean-stop boundary after Part B is now explicitly exercised by the checklist",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 required Dabbler lifecycle walk remains unperformed",
+      "verdict": "fix-rejected",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 Part D check now uses a pinned baseline and detects staged, committed, and untracked source changes",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    }
+  ]
+}

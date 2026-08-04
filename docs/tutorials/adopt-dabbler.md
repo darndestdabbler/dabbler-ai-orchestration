@@ -64,8 +64,16 @@ the framework is built around.
    > `copilot --version` to drift past the pin; when it does, re-probe with **`Dabbler: Set Up
    > Copilot Seat`** (available once Part 3 has created the `.venv`).
 
-5. **GitHub CLI**, so Dabbler can open pull requests without a browser trip: install it from
-   [cli.github.com](https://cli.github.com), then run `gh auth login` and `gh auth status`.
+5. **Your host's command-line tool**, so Dabbler can open pull requests without a browser trip.
+   This is the tool **`Dabbler: Open PR for this set`** drives for you in Part 4.
+
+   > **▸ Your host — do ONE of these.**
+   >
+   > - **GitHub:** install **GitHub CLI** from [cli.github.com](https://cli.github.com), then
+   >   run `gh auth login` and `gh auth status`.
+   > - **Azure DevOps:** install the **Azure CLI** from
+   >   [aka.ms/installazurecli](https://aka.ms/installazurecli), add the DevOps extension with
+   >   `az extension add --name azure-devops`, then run `az login`.
 
 > **Variant — direct provider API keys instead of a Copilot seat.** Set
 > `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` in your
@@ -292,7 +300,8 @@ git switch -c authoring/greeter-lifecycle
    `az repos pr create` on Azure DevOps — and you click to approve. Every remote-touching
    Dabbler command works this way: it removes the typing, never the decision.
 
-8. Wait for the `test` check to pass and merge the pull request on GitHub. Then, in your **main**
+8. Wait for the `test` check to pass, then merge the pull request on your host — **Merge pull
+   request** on GitHub, **Complete** on Azure DevOps. Then, in your **main**
    VS Code window, run **`Dabbler: Finalize merged set`** and confirm — it pulls the merge onto
    your local `main`, removes the worktree folder, deletes the session branch, and prunes stale
    remotes. The set now shows as **Complete**.

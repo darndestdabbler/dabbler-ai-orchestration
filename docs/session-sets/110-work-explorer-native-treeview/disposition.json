@@ -1,4 +1,49 @@
 {
+  "status": "completed",
+  "summary": "Session 1 of 4: the session allowed to stop the set, which does not. Re-ran the architecture panel on the registry Set 109 corrected (Opus 5 direct per operator ruling, Sonnet 5 and GPT-5.6 Sol routed) - all three GO, all three ranking defect-class elimination first, all three declining to decide the density trade. Built scripts/perf-harness.ts and measured at 0/10/100/500 synthetic sets plus the real repo: an empty tree costs ~102 ms of blocking host work of which 0.3 ms is reading session sets, the rest being a synchronous `git worktree list` subprocess inside discoverRootsWithFamilies(). The migration cannot remove that floor, so the performance claim is withdrawn in writing; whether removing the webview improves activation and first paint is explicitly UNKNOWN and assigned to S4 to measure. Answered all four API unknowns by running a throwaway extension in a real Extension Development Host (VS Code 1.131.0) rather than by reading documentation: submenus nest two levels deep, getChildren is lazy per level and is not called at all until the view is visible, and inline actions render as platform icons. Two spike findings overturned prior assumptions: TreeItem.description is dropped entirely when the label truncates, so the 3/5 fraction is invisible at working panel width for every real set name - the operator chose to drop the fraction from set rows outright - and four inline actions erase the module label at minimum width, reproducing the operator's original complaint natively, so inline actions are capped at two. Also found a real defect in shipping assets: all four status SVGs carry #ffffff/#000000 beyond the documented green/grey, leaving not-started.svg nearly invisible on a light theme. Verdict GO, with an operator-confirmed density mapping, a ranked icon precedence table, and two hard constraints for S2.",
   "verification_method": "api",
-  "verification_verdict": "ISSUES_FOUND"
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "docs/session-sets/110-work-explorer-native-treeview/ai-assignment.md",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-ai-assignment-analysis.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-panel-opus-5.md",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-panel-sonnet-5.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-panel-gpt-5-6-sol.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-perf-measurements.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-migration-decision.md",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-conventions.md",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-remediation-round-1.md",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/01-default-width-fraction-invisible.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/02-wide-panel-fraction-visible.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/03-hierarchical-submenu-two-levels.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/04-inline-actions-render-as-icons.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/05-light-theme-icon-defect.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/06-four-inline-actions-erase-the-label.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/07-severity-precedence-at-minimum-width.png",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/spike-report.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/spike-laziness-trace.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/spike-extension/package.json",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/spike-extension/extension.js",
+    "docs/session-sets/110-work-explorer-native-treeview/s1-spike-evidence/spike-extension/media/icon.svg",
+    "docs/session-sets/110-work-explorer-native-treeview/activity-log.json",
+    "tools/dabbler-ai-orchestration/scripts/perf-harness.ts"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "claude-code",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Recorded as the continuation default, NOT as an orchestrator opinion on model choice. The routed step-3.5 analyst (gemini-2.5-pro, anthropic excluded) recommended codex / gpt-5.6-sol for S2 on the grounds that it is greenfield implementation against a typed SDK, and claude / opus for S3's deletion-plus-test-rewrite. That advice is recorded verbatim in ai-assignment.md and is the operator's to take. It is not defaulted to here because it draws on an ENGINE SEAT budget rather than the DABBLER_* API keys this session spent, and the operator has recently been cutting back that spend, so switching engines is a budget decision rather than a free one. S1 also leaves S2 an unusually well-specified brief - an operator-confirmed mapping table, a ranked icon precedence table, two hard constraints (at most two inline actions; implement precedence rather than prose), and a working spike extension to start from - which lowers the value of a model switch for authoring."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-064-9",
+    "L-064-10",
+    "L-065-1",
+    "L-095-1"
+  ]
 }

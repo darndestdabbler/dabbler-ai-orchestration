@@ -100,6 +100,22 @@
       "dateTime": "2026-08-04T18:38:22.452998-04:00",
       "description": "Accepted all 4 findings, none disputed. Withdrew the startup over-claim (S4 must now measure, not confirm); re-spiked inline actions at the real four-action count and REVERSED the result (label erased at min width) -> capped at 2; added a ranked icon precedence table, spike-proven at min width. Sidecar: s1-remediation-round-1.md.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 13,
+      "stepKey": "session-001/verify-remediation-review",
+      "dateTime": "2026-08-04T18:40:58.583830-04:00",
+      "description": "Remediation-review on the fix delta: VERIFIED, 0 findings, 1 fix accepted + 2 accepted-with-modification, 0 rejected, $0.1495. Two nits: min-width check for two inline actions (already a recorded S4 residual) and a precedence-order mismatch between the spike comment and the binding table (fixed, per L-065-1). Operator pre-authorized 2 extra rounds and a third-provider round; NEITHER was needed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 14,
+      "stepKey": "session-001/close",
+      "dateTime": "2026-08-04T18:40:58.584359-04:00",
+      "description": "Authored disposition.json (status completed, verdict VERIFIED, next_orchestrator recorded with the routed recommendation and its budget caveat); committed and pushed; ran close_session.",
+      "status": "complete"
     }
   ]
 }

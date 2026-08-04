@@ -104,8 +104,10 @@ class SpikeProvider {
       // a distinct glyph per state, or a blocked/migration-required set renders
       // as a generic in-progress dot and the warning survives only on hover.
       // Precedence, most severe first:
-      //   blocked > schema-migration > verification-failed/waived > tier-mismatch
-      //   > duplicate-name > plain run state
+      //   blocked > schema-migration > verification-failed/waived
+      //   > duplicate-name > tier-mismatch > plain run state
+      // The table in s1-migration-decision.md is authoritative; this comment
+      // had duplicate-name and tier-mismatch reversed until round 3 caught it.
       worst.iconPath = new vscode.ThemeIcon(
         "error",
         new vscode.ThemeColor("problemsErrorIcon.foreground"),

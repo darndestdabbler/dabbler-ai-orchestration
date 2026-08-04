@@ -994,7 +994,7 @@ def test_one_unparseable_tier_does_not_become_a_smaller_schedule():
     and the prompt sizes in the dropped band then price at a neighbour."""
     broken = fx.GOOGLE_PRICING_SECTIONS.replace(
         "<td>$1.25, prompts <= 200k tokens<br>$2.50, prompts > 200k tokens</td>",
-        "<td>$1.25, prompts <= 200k tokens<br>see calculator, prompts <= 400k"
+        "<td>$1.25, prompts <= 200k tokens<br>$ TBC, prompts <= 400k"
         "<br>$2.50, prompts > 400k tokens</td>",
         1,
     )
@@ -1008,7 +1008,7 @@ def test_a_partially_unparseable_cell_on_a_configured_model_aborts(
 ):
     broken = fx.GOOGLE_PRICING_SECTIONS.replace(
         "<td>$1.25, prompts <= 200k tokens<br>$2.50, prompts > 200k tokens</td>",
-        "<td>$1.25, prompts <= 200k tokens<br>see calculator, prompts <= 400k"
+        "<td>$1.25, prompts <= 200k tokens<br>$ TBC, prompts <= 400k"
         "<br>$2.50, prompts > 400k tokens</td>",
         1,
     )
@@ -1032,3 +1032,64 @@ def test_a_partially_unparseable_cell_on_a_configured_model_aborts(
     assert code == pp.EXIT_FATAL
     assert not proposal_path.exists()
     assert proposal_path.with_suffix(".stale.json").exists()
+
+
+# ---------------------------------------------------------------------------
+# Round 6 (third-provider opinion, google/gemini-3-1-pro). The structural
+# point it made and the OpenAI verifier never did: a parse failure most often
+# manifests as a DICTIONARY MISS, and a miss took the deliberately non-fatal
+# "absent from the page" branch. Both remaining parsers `continue`d past a row
+# they could not read, which is that same fail-open in the two parsers three
+# rounds of findings had never looked at.
+# ---------------------------------------------------------------------------
+
+
+def test_openai_row_with_an_unreadable_price_is_unreadable_not_absent():
+    # `$0.75` is gpt-5.4-mini's short-context input and appears exactly once.
+    broken = fx.OPENAI_PRICING_TABLE.replace(">$0.75<", ">$.75<", 1)
+    entry = pp.parse_openai(pp.parse_document(broken))["gpt-5.4-mini"]
+    assert entry.rows == []
+    assert "unreadable" in entry.observations[0]
+
+
+def test_an_unreadable_openai_row_aborts_for_a_configured_model():
+    broken = fx.OPENAI_PRICING_TABLE.replace(">$5.00<", ">$five<", 1)
+    page_rates = dict(_parsed())
+    page_rates["openai"] = pp.parse_openai(pp.parse_document(broken))
+    config = _config(**{"gpt-5-6-sol": {
+        "provider": "openai", "model_id": "gpt-5.6-sol",
+        "input_cost_per_1m": 5.00, "output_cost_per_1m": 30.00,
+    }})
+    with pytest.raises(pp.PageStructureError, match="gpt-5.6-sol"):
+        pp.build_proposal(config, page_rates, generated_on=TODAY)
+
+
+def test_anthropic_row_with_an_unreadable_price_is_unreadable_not_absent():
+    """The sibling site, fixed in the same pass (L-069-1)."""
+    broken = fx.ANTHROPIC_PRICING_TABLE.replace(">$5 / MTok<", ">TBC<", 1)
+    entry = pp.parse_anthropic(pp.parse_document(broken))["Claude Opus 5"]
+    assert entry.rows == []
+    assert "unreadable" in entry.observations[0]
+
+
+def test_a_prose_annotation_in_a_price_cell_does_not_abort_the_run():
+    """Round 6 judged the round-5 rule an over-correction: provider pages
+    carry footnotes, and aborting on one would be operational toil for no
+    safety gain. A line with no `$` is prose; a line that names a price and
+    cannot be read is still fatal."""
+    annotated = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "<td>$0.30 (text / image / video)<br>$1.00 (audio)</td>",
+        "<td>$0.30 (text / image / video)<br>$1.00 (audio)"
+        "<br>* prices exclude context caching</td>",
+        1,
+    )
+    entry = pp.parse_google(pp.parse_document(annotated))["gemini-2.5-flash"]
+    assert entry.rows == [{"input_cost_per_1m": 0.30, "output_cost_per_1m": 2.50}]
+
+
+def test_a_parenthesised_effective_date_is_still_read():
+    """The parenthetical strip used to run first and delete the date, which
+    would have applied a FUTURE price immediately."""
+    assert pp.split_anthropic_label("Claude Sonnet 5 (starting September 1, 2026)") == (
+        "Claude Sonnet 5", "2026-09-01"
+    )

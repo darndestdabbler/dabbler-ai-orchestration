@@ -360,8 +360,21 @@ def parse_openai(blocks: list[Any]) -> dict[str, PageRates]:
     for row in table.rows[2:]:
         if len(row) != 9 or not row[0]:
             continue
+        name = row[0].strip()
         short_in, short_out = parse_money(row[1]), parse_money(row[4])
         if short_in is None or short_out is None:
+            # Round 6 (third-provider opinion): `continue` here dropped the row
+            # from the result, so `build_proposal` looked it up, missed, and
+            # took the deliberately NON-fatal "absent from the page" branch. A
+            # reformatted price (`$.50`) or a footnoted name would therefore
+            # turn a parse failure on a CONFIGURED model into a permitted
+            # partial -- the same class rounds 3-5 closed on the Google side,
+            # still open here because this parser had never been examined.
+            out[name] = _unreadable(
+                name,
+                f"its Short-context Input/Output cells state no rate this "
+                f"parser recognises ({row[1]!r} / {row[4]!r}).",
+            )
             continue
         rates = PageRates(
             rows=[{"input_cost_per_1m": short_in, "output_cost_per_1m": short_out}]
@@ -381,8 +394,11 @@ def parse_openai(blocks: list[Any]) -> dict[str, PageRates]:
                     ),
                 }
             )
-        out[row[0].strip()] = rates
-    _require(out, "openai: the pricing table parsed but yielded no priced rows")
+        out[name] = rates
+    _require(
+        any(r.rows for r in out.values()),
+        "openai: the pricing table parsed but yielded no priced rows",
+    )
     return out
 
 
@@ -416,21 +432,25 @@ def split_anthropic_label(cell: str) -> tuple[str, Optional[str]]:
     "(limited availability)") is stripped: it is commentary on availability,
     not part of the model's identity.
     """
-    text = _PARENTHETICAL.sub(" ", cell.replace("\n", " "))
+    # Round 6 (third-provider opinion): the date is read BEFORE parentheticals
+    # are stripped. The page writes "Claude Sonnet 5 starting September 1,
+    # 2026" bare today, but were it ever to move that inside parentheses the
+    # strip would delete the date first and the row would be proposed with no
+    # ``effective_from`` — applying a FUTURE price immediately, which is the
+    # one error the effective-date schema exists to prevent.
+    flattened = cell.replace("\n", " ")
     effective_from: Optional[str] = None
-    starting = _STARTING.search(text)
+    starting = _STARTING.search(flattened)
     if starting:
         month = _MONTHS.get(starting.group(1).lower())
         if month:
             effective_from = datetime.date(
                 int(starting.group(3)), month, int(starting.group(2))
             ).isoformat()
-        text = text[: starting.start()]
-    else:
-        through = _THROUGH.search(text)
-        if through:
-            text = text[: through.start()]
-    return re.sub(r"\s+", " ", text).strip(), effective_from
+    text = _STARTING.sub(" ", flattened)
+    text = _THROUGH.sub(" ", text)
+    text = _PARENTHETICAL.sub(" ", text)
+    return re.sub(r"\s+", " ", text).strip(" ()").strip(), effective_from
 
 
 def parse_anthropic(blocks: list[Any]) -> dict[str, PageRates]:
@@ -467,13 +487,24 @@ def parse_anthropic(blocks: list[Any]) -> dict[str, PageRates]:
             continue
         display, effective_from = split_anthropic_label(row[name_col])
         input_rate, output_rate = parse_money(row[in_col]), parse_money(row[out_col])
-        if not display or input_rate is None or output_rate is None:
+        if not display:
+            continue
+        if input_rate is None or output_rate is None:
+            # The OpenAI sibling of the same defect, fixed in the same pass.
+            out.setdefault(display, _unreadable(
+                display,
+                f"its Base Input / Output Tokens cells state no rate this "
+                f"parser recognises ({row[in_col]!r} / {row[out_col]!r}).",
+            ))
             continue
         entry = {"input_cost_per_1m": input_rate, "output_cost_per_1m": output_rate}
         if effective_from:
             entry["effective_from"] = effective_from
         out.setdefault(display, PageRates()).rows.append(entry)
-    _require(out, "anthropic: the pricing table parsed but yielded no priced rows")
+    _require(
+        any(r.rows for r in out.values()),
+        "anthropic: the pricing table parsed but yielded no priced rows",
+    )
     return out
 
 
@@ -561,12 +592,12 @@ def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
     # partial schedule is not a smaller truth, it is a wrong one — the prompt
     # sizes that fell in the dropped band get priced at a neighbouring tier.
     for line in input_lines + output_lines:
-        if parse_money(line) is None:
+        if "$" in line and parse_money(line) is None:
             return _unreadable(
                 model_id,
-                f"one line of its Standard price cells states no rate this "
-                f"parser recognises ({line!r}), so any schedule built from the "
-                "rest would be missing a tier the page publishes.",
+                f"one line of its Standard price cells names a price this "
+                f"parser cannot read ({line!r}), so any schedule built from "
+                "the rest would be missing a tier the page publishes.",
             )
     inputs = _priced_lines(input_lines)
     outputs = _priced_lines(output_lines)
@@ -655,6 +686,12 @@ def _priced_lines(lines: list[str]) -> Optional[list[tuple[Optional[int], float]
     Returns ``None`` when a multi-rate cell is neither — the caller reports the
     model as unchecked rather than picking one.
     """
+    # Lines carrying no "$" at all are prose annotations ("* includes
+    # caching"), not rates -- round 6 flagged the stricter reading as an
+    # over-correction that would abort the whole run on an ordinary footnote.
+    # A line that DOES claim a price and cannot be read is caught by the
+    # caller before this point, so nothing silently disappears here.
+    lines = [ln for ln in lines if "$" in ln]
     priced = [(parse_upper_bound(ln), parse_money(ln), ln) for ln in lines]
     priced = [(b, v, ln) for b, v, ln in priced if v is not None]
     if len(priced) <= 1 or any(b is not None for b, _, _ in priced):

@@ -201,7 +201,40 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   with an explicit `max_input_tokens`. Manufacturing that number would be
   inventing the one thing the page does not state.
 
+  An unchanged rate still reaches a stamp. It appears as a `confirm` entry
+  going through the same accept/reject machinery, writing **only**
+  `confirmed_on` and never a rate — without which a registry whose prices are
+  all *correct* could never become one whose prices are all *confirmed*, and
+  every stamp would age out at `review_frequency_days` with no sanctioned way
+  to refresh it. Confirm entries appear only while an entry is unstamped or
+  stale, so a freshly confirmed model stays out of the way.
+
+  Classification of a section the parser cannot read is the part six rounds of
+  verification concentrated on, and it settles three-way. A **configured**
+  model whose section is on the page but unreadable is **fatal** — no proposal,
+  any previous proposal moved aside to `pricing-proposal.stale.json`, exit 2 —
+  because "no silent partial" cannot mean a line an operator skims past on the
+  way to applying eleven other changes. A configured model **absent from the
+  page entirely** stays reported-but-not-fatal: that is a *registry* defect
+  (`gpt-5.6`, which OpenAI does not list) for a later session, not a parser
+  failure. A model **nobody configured** is ignored, since roughly a hundred of
+  Google's sections price video, images, TTS and robotics that no run cares
+  about. Crucially, a parse failure can no longer *masquerade* as absence: all
+  three parsers now record a row they could not read rather than skipping past
+  it, so "absent" means absent.
+
 ### Fixed
+
+- **(Set 109 S3) The Google, OpenAI, and Anthropic request timeouts could not
+  complete a mandatory verification.** `providers.google` and
+  `providers.openai` carried `timeout_seconds: 300` while `anthropic` has
+  always carried 600. A tier-3 model reasoning at high effort over a large
+  evidence bundle exceeds 300s routinely, and the transport gave out before
+  the model did. That is not a comfort setting: cross-provider verification is
+  mandatory on every Full-tier session, and Set 109 S3 lost two routed
+  architecture calls **and two whole verification rounds** to it — three
+  attempts × 300s each, paid for, returning nothing but `The read operation
+  timed out`. Both raised to 900s.
 
 - **(Set 109 S2) An excluded provider could still receive a real request.**
   `route()` enforced `exclude_providers` on its own model pick and then

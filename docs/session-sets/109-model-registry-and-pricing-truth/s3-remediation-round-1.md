@@ -295,3 +295,125 @@ One earlier test was adjusted rather than left green by luck: round 4's
 `test_a_price_cell_with_no_recognised_rate_is_unreadable_not_absent` now trips
 this stricter rule first, so it asserts the *classification* (unreadable, not
 absent) instead of the specific message.
+
+---
+
+# Round 6 — third-provider opinion (google / `gemini-3-1-pro`), and the close
+
+The constitution's escalation path for a loop that will not settle is a
+**third-provider opinion**. Anthropic is the orchestrator (excluded) and every
+prior round was OpenAI, so this round routed to Google with both other
+providers excluded. It was given the fix delta, the complete current module,
+and an explicit brief: *is this class closed, or is the OpenAI verifier
+exhausting edge cases on an unbounded surface?*
+
+Raw output: `s3-third-opinion-round-6.json`. Verdict **ISSUES_FOUND**,
+recommendation **CONTINUE**. Its diagnosis is the most useful thing any round
+produced, and it is right:
+
+> Rounds 3, 4 and 5 added guards *inside* the successfully-identified-model
+> paths, but ignored the dictionary-miss ("absent") path. Because parsing
+> errors frequently manifest as skipping a row or failing a name match, they
+> fall into the "absent" bucket, which remains explicitly fail-open.
+
+That is a better statement of the pattern than the one I wrote after round 5.
+The three earlier findings were all *instances*; this is the mechanism.
+
+## Accepted and fixed
+
+**A1 — both remaining parsers `continue`d past a row they could not read.**
+`parse_openai` skipped any row whose prices did not parse, and `parse_anthropic`
+did the same. The row then simply was not in the result, so `build_proposal`
+looked it up, missed, and took the **non-fatal** "absent from the page" branch
+— the identical fail-open rounds 3–5 closed on the Google side, still open in
+the two parsers that had never had a finding against them. A reformatted price
+(`$.50`) or a footnoted model name was enough to trigger it.
+
+Both are now `_unreadable` under the row's own name, so a configured model
+bound to that row hits the fatal path. Fixed in one pass across both sites
+rather than only the one reported (L-069-1).
+
+Pinned by `test_openai_row_with_an_unreadable_price_is_unreadable_not_absent`,
+`test_an_unreadable_openai_row_aborts_for_a_configured_model`, and
+`test_anthropic_row_with_an_unreadable_price_is_unreadable_not_absent`.
+
+**A2 — round 5 was an over-correction, and this round was right to say so.**
+Requiring *every* non-blank line in a price cell to yield a rate means an
+ordinary footnote (`* prices exclude context caching`) aborts the entire run.
+That is real operational toil for no safety gain. The rule is now: a line
+containing `$` that cannot be read is unreadable (fatal); a line with no `$` is
+prose and is ignored. This keeps round 5's actual defect closed — a *price*
+that fails to parse can no longer vanish — while tolerating annotation.
+
+Its own suggested alternative (check the surviving tiers form contiguous
+bounds) does not work here: with a single inclusive `max_input_tokens` per row,
+tiers are contiguous *by construction*, so a dropped middle tier leaves no gap
+to detect. Recorded because rejecting a suggested fix while accepting the
+finding should say why.
+
+Pinned by `test_a_prose_annotation_in_a_price_cell_does_not_abort_the_run`.
+
+**A3 — the effective date is now read before parentheticals are stripped.**
+`split_anthropic_label` stripped `(...)` first, so had Anthropic ever written
+`(starting September 1, 2026)` the date would have been deleted and the row
+proposed with **no `effective_from`** — applying a future price immediately,
+the one error the effective-date schema exists to prevent. Speculative today
+(the page writes it bare) and a two-line reorder, so it was fixed rather than
+argued about.
+
+Pinned by `test_a_parenthesised_effective_date_is_still_read`.
+
+## Not accepted, with reasons
+
+**R1 — "make `absent` fatal for any configured model" (its Q2).** Rejected.
+That would abort every run on `gpt-5.6`, which OpenAI genuinely does not list.
+That is a **registry** defect — Session 1 built `model_inventory --check`
+specifically to catch it and Session 4 is scheduled to fix it — not a parser
+failure, and conflating the two would make the tool unusable until an unrelated
+session lands. A1 addresses the real substance of the objection: parse failures
+no longer *masquerade* as absence, so "absent" now means absent.
+
+**R2 — "Anthropic versioned ids (`claude-3-5-sonnet-20241022`) silently
+bypass", graded Critical.** Downgraded to a documented residual. No id of that
+shape exists in this registry (`claude-sonnet-4-6`, `claude-opus-4-8`,
+`claude-opus-5`, `claude-sonnet-5` — all derive correctly, and a test asserts
+every one of them resolves against the page). The failure is also **visible**,
+not silent: the model is reported `NOT CHECKED` in the run output. Real enough
+to write down, not a Critical against a registry it cannot occur in.
+
+## Why the session closes here
+
+The operator pre-authorised two further rounds on the current engine and one on
+a third engine, then close. All three are spent. Recording the shape of the
+loop honestly, since the recommendation was CONTINUE:
+
+| round | verifier | blocking findings |
+| :--- | :--- | ---: |
+| 1 (discovery ×2) | gpt-5-6 | 7 |
+| 2 (supplementary) | gpt-5-6 | 0 — nothing new |
+| 3 | gpt-5-6 | 1 |
+| 4 | gpt-5-6 | 1 |
+| 5 | gpt-5-6 | 1 |
+| 6 (third provider) | gemini-3-1-pro | 3 accepted, 2 rejected |
+
+Every finding across all six rounds was in **one module**
+(`pricing_proposal.py`) and, bar the effective-date ordering, on **one
+question**: how a parse failure is classified. Nothing in six rounds touched
+`ai_router/pricing.py`, the six wired consumers, the cost calculation, the
+schema validation, or any rate in `router-config.yaml` — the parts of this
+session that other code depends on. The surface still generating findings is a
+scraper's tolerance of hypothetical future page shapes, which is L-095-1's
+unbounded-artifact pattern: technically-real findings that reshuffle salience
+each pass.
+
+Against that, this round also produced the single best structural fix of the
+set, so the loop was not merely exhausting itself. The honest summary is: the
+mechanism has now been named and closed at both remaining sites, the residual
+is documented rather than unknown, and the next round would be the operator's
+call to fund — not the orchestrator's to take.
+
+**Residual carried to Session 4**, in `disposition.json`:
+- The Anthropic display-name derivation is rule-based; an id shape it cannot
+  derive is reported `NOT CHECKED` rather than proposed. Currently vacuous.
+- OpenAI's long-context tier is reported, never proposed (the page states no
+  boundary). Unchanged by design since round 1.

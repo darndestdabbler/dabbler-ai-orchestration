@@ -509,12 +509,26 @@ def parse_anthropic(blocks: list[Any]) -> dict[str, PageRates]:
     rows_by_display: dict[str, list[dict]] = {}
     unreadable_reason: dict[str, str] = {}
     for row in table.rows[1:]:
-        if len(row) <= max(name_col, in_col, out_col) or not row[name_col]:
+        if not row or name_col >= len(row) or not row[name_col].strip():
+            # No name at all -- a spacer or section row. There is no model here
+            # to be unreadable ABOUT, so this is the one honest skip.
             continue
         display, effective_from = split_anthropic_label(row[name_col])
         if not display:
             continue
         rows_by_display.setdefault(display, [])
+        if len(row) <= max(in_col, out_col):
+            # A NAMED row missing its rate cells. Round 7 of the backstop: this
+            # used to `continue`, dropping the row so `build_proposal` read the
+            # miss as absence -- the same fail-open the OpenAI sibling had, and
+            # it should have been fixed in the same pass rather than one round
+            # later (L-069-1).
+            unreadable_reason.setdefault(
+                display,
+                f"one of its rows has {len(row)} cells, too few to hold the "
+                "Base Input / Output Tokens rates this parser reads.",
+            )
+            continue
         input_rate, output_rate = parse_money(row[in_col]), parse_money(row[out_col])
         if input_rate is None or output_rate is None:
             unreadable_reason.setdefault(
@@ -607,15 +621,40 @@ def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
     distinction this module turns on.
     """
     input_cell = output_cell = None
+    saw_price_label = False
     for row in table.rows:
-        if len(row) < 3:
+        if not row:
             continue
         label = row[0].strip().lower()
-        if label.startswith(_GOOGLE_INPUT_LABEL):
+        is_input = label.startswith(_GOOGLE_INPUT_LABEL)
+        is_output = label.startswith(_GOOGLE_OUTPUT_LABEL)
+        if not (is_input or is_output):
+            continue
+        saw_price_label = True
+        if len(row) < 3:
+            # A price row that is LABELLED but too short to hold a value. The
+            # same shape as the Anthropic and OpenAI short-row cases: dropping
+            # it would leave the section looking un-priced, i.e. irrelevant,
+            # which is the non-fatal branch.
+            return _unreadable(
+                model_id,
+                f"its {row[0].strip()!r} row has {len(row)} cells, too few to "
+                "hold a rate.",
+            )
+        if is_input:
             input_cell = row[-1]
-        elif label.startswith(_GOOGLE_OUTPUT_LABEL):
+        else:
             output_cell = row[-1]
     if input_cell is None or output_cell is None:
+        if saw_price_label:
+            return _unreadable(
+                model_id,
+                "its Standard table carries only one of the Input price / "
+                "Output price rows, so a rate pair cannot be read.",
+            )
+        # No price rows AT ALL -- the shape of the page's image, video, TTS
+        # and embedding models. The one case that genuinely means "this
+        # section is not token-priced". See the docstring.
         return None
 
     input_lines = [ln for ln in input_cell.split("\n") if ln.strip()]

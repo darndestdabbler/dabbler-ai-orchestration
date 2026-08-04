@@ -1153,3 +1153,45 @@ def test_render_survives_an_unreadable_observation():
         "unmatched_config_entries": [], "unclaimed_page_models": {},
     }
     assert "x" in "\n".join(pp.render_proposal(proposal))
+
+
+def test_a_named_anthropic_row_missing_its_rate_cells_is_unreadable():
+    """Round 7 of the backstop: this used to `continue`, dropping the row so
+    build_proposal read the miss as absence. The OpenAI sibling had already
+    been fixed; this should have gone in the same pass (L-069-1)."""
+    blocks = pp.parse_document(
+        "<table><tr><th>Model</th><th>Base Input Tokens</th>"
+        "<th>Output Tokens</th></tr>"
+        "<tr><td>Claude Opus 5</td><td>$5 / MTok</td><td>$25 / MTok</td></tr>"
+        "<tr><td>Claude Sonnet 5</td></tr></table>"
+    )
+    rates = pp.parse_anthropic(blocks)
+    assert rates["Claude Sonnet 5"].rows == []
+    assert "too few" in rates["Claude Sonnet 5"].observations[0]["unreadable"]
+    assert rates["Claude Opus 5"].rows          # the readable sibling is fine
+
+
+def test_a_google_price_row_too_short_to_hold_a_rate_is_unreadable():
+    """Labelled but valueless. Dropping it would leave the section looking
+    un-priced -- i.e. irrelevant, the non-fatal branch."""
+    result = pp._google_section_rates(
+        pp.Table(rows=[["Input price"], ["Output price", "Free", "$2.50"]]),
+        "gemini-x",
+    )
+    assert result is not None and result.rows == []
+    assert "too few" in result.observations[0]["unreadable"]
+
+
+def test_a_google_section_with_only_one_price_row_is_unreadable():
+    result = pp._google_section_rates(
+        pp.Table(rows=[["Input price", "Free", "$1.25"]]), "gemini-x"
+    )
+    assert result is not None and result.rows == []
+    assert "only one of" in result.observations[0]["unreadable"]
+
+
+def test_a_google_section_with_no_price_rows_is_still_irrelevant():
+    """The contrast that must survive: ~100 image / video / TTS sections."""
+    assert pp._google_section_rates(
+        pp.Table(rows=[["Image price", "Free", "$0.04 / image"]]), "imagen-4"
+    ) is None

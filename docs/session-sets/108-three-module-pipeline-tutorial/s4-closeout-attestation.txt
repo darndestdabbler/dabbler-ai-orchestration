@@ -1,0 +1,87 @@
+OPERATOR-ADJUDICATED CLOSE — Set 108 Session 4 of 4 (set-terminal)
+
+This is NOT a `verification_unavailable` bypass. Cross-provider verification RAN,
+five rounds, and its evidence is on disk. The override records an OPERATOR
+ADJUDICATION of one residual Major that the orchestrator cannot fix, taken at the
+loop's bound rather than by grinding further rounds.
+
+WHAT VERIFICATION ACTUALLY DID (the evidence this attestation stands beside, not
+in place of):
+
+- Verifying surface: `python -m ai_router.verify_session`, the sanctioned routed
+  path, plus the Set 084 close-out backstop running in-process.
+- Verifier model: gpt-5-6 on every round. Effective provider: openai — which
+  differs from the orchestrator's model-derived effective provider (anthropic,
+  claude-opus-5), the exclusion the automated path enforces and did enforce
+  ("excluded providers: anthropic" is stamped on every round).
+- Template: the canonical adversarial `session-verification` template, driven by
+  verify_session itself; no hand-rolled review was substituted.
+- Rounds and raw artifacts, all committed and never edited after writing:
+    round 1  discovery (2-way fan-out)   ISSUES_FOUND, 1 Major   s4-verification.md,
+                                                                 s4-verification-fanout-2.md,
+                                                                 s4-issues.json
+    round 2  supplementary               VERIFIED, 0 findings    s4-verification-round-2.md
+    round 3  remediation-review          VERIFIED, fix accepted  s4-verification-round-3.md
+    round 4  close backstop              ISSUES_FOUND, 2 Majors  s4-verification-round-4.md,
+                                                                 s4-issues-round-4.json
+    round 5  remediation-review          ISSUES_FOUND, 1 Major   s4-verification-round-5.md,
+                                                                 s4-issues-round-5.json
+                                         (2 fixes accepted, 1 rejected)
+- Remediation sidecars: s4-remediation-round-1.md, s4-remediation-round-2.md.
+- Advisory path-aware critique also ran, two distinct providers:
+  path-aware-critique.json.
+- Timestamp of this close: 2026-08-03, immediately following round 5.
+
+THREE OF THE FOUR MAJORS RAISED ACROSS THOSE ROUNDS WERE ACCEPTED AND FIXED. None
+was disputed. In order: the clean-stop negative test was marked PASS on evidence
+that only proved test-suite independence (fixed — the cold-resume experiment was
+actually run at both boundaries, and the human half pushed into the checklist);
+the walk was called "end to end" while skipping the Dabbler lifecycle (fixed —
+relabelled "PARTIAL" throughout, with the gap promoted to the largest declared
+limit); and the Part D acceptance test was not a falsifier (fixed — replaced with
+a baseline-pinned check, run for real and then proved to catch a planted change).
+
+THE RESIDUAL, AND THE ADJUDICATION:
+
+Round 5 rejected the second of those fixes on the ground that the session
+DOCUMENTED the missing Dabbler-lifecycle walk instead of COMPLETING it — that
+`Dabbler: New Module`, the Work Explorer, and the plan-set → decomposition-set →
+implementation sequence were never executed, so the human UAT participant becomes
+their first walker.
+
+The orchestrator does not dispute the finding on its merits. It is correct that
+the session did not perform those steps and correct that this weakens the walk.
+It is unfixable by this orchestrator: those steps require driving the VS Code
+extension UI, which cannot be exercised headlessly (the Layer 2
+@vscode/test-electron harness does not launch on VS Code 1.128.0), and the
+plan/decomposition lifecycle additionally requires live AI sessions per module.
+
+THE OPERATOR WAS PRESENTED WITH FOUR OPTIONS and chose to accept the residual and
+close: (a) accept and close; (b) the operator runs the lifecycle themselves in the
+walk repository and the orchestrator folds the results in; (c) the orchestrator
+drives the extension's `scaffoldNewModule` function through the mocha/vscode-stub
+harness as a partial substitute; (d) a third-provider opinion on whether
+"documented, not completed" should block a set-terminal close.
+
+THE OPERATOR CHOSE (a). The reasoning that supports it: the staffing model was
+itself an operator decision taken at Step 1, with the UI limitation disclosed in
+the framing before the walk began; the gap is now labelled honestly everywhere
+rather than papered over; and the UAT checklist — which is the set's remaining
+deliverable and is explicitly still outstanding — is aimed directly at it, with
+items 1 and 2 telling the walker in terms that they are the first to exercise that
+sequence and that a stall there is a genuine finding rather than user error.
+
+WHAT REMAINS TRUE AND UNVERIFIED AFTER THIS CLOSE, so the audit trail is not
+weaker than the evidence:
+
+- The Dabbler lifecycle on the tutorial's main path has NOT been walked by anyone.
+- No human has seen the Work Explorer with these modules in it.
+- Per-part HUMAN timings do not exist.
+- The team scenario and ownership routing are unwalked (not walkable solo).
+- One Major from the advisory path-aware critique is a recorded deferred residual:
+  `adopt-dabbler.md:295` tells an Azure DevOps reader to merge on GitHub. It
+  predates this set (introduced by Set 107 S2, commit bf3eaee), sits outside this
+  session's declared Touches, and is handed to the owed adopt-dabbler walk.
+
+The set's own success criterion is therefore MET ON ITS ENGINEERING and NOT YET on
+its product-workflow half, and the disposition says so.

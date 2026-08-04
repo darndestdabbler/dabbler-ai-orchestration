@@ -321,3 +321,55 @@ def test_unparseable_stamp_counts_as_never_confirmed():
     config = _config(broken={**FLAT, "confirmed_on": "whenever"})
     never, stale = unconfirmed_and_stale(config, today=AUG)
     assert never == ["broken"] and stale == []
+
+
+# ---------------------------------------------------------------------------
+# The consumers are actually wired to the resolver
+#
+# Everything above tests `resolve_rates` in isolation, which would stay green
+# if `_calculate_cost` still read the two flat fields and quietly ignored
+# tiers. These four pin the wiring itself -- the session's "cost computation
+# honours tiers and effective dates" claim lives here, not above.
+# ---------------------------------------------------------------------------
+
+
+def test_calculate_cost_honours_the_context_tier():
+    from ai_router import _calculate_cost
+
+    cheap = _calculate_cost(200_000, 1_000_000, TIERED)
+    dear = _calculate_cost(200_001, 1_000_000, TIERED)
+    # One extra input token moves BOTH sides of the bill to the upper tier.
+    assert cheap == pytest.approx(200_000 / 1e6 * 1.25 + 10.00)
+    assert dear == pytest.approx(200_001 / 1e6 * 2.50 + 15.00)
+    assert dear > cheap
+
+
+def test_calculate_cost_reads_a_flat_entry_exactly_as_before():
+    from ai_router import _calculate_cost
+
+    assert _calculate_cost(1_000_000, 1_000_000, FLAT) == pytest.approx(18.00)
+
+
+def test_selection_paths_share_one_answer_for_cheapest():
+    """verification.py, models.py and utils.py must not each invent their own
+    notion of a tiered model's cost."""
+    from ai_router import models as models_mod
+    from ai_router import utils as utils_mod
+    from ai_router import verification as verification_mod
+
+    for module in (models_mod, utils_mod, verification_mod):
+        assert module.worst_case_output_cost_per_1m is worst_case_output_cost_per_1m
+
+
+def test_config_load_rejects_an_unresolvable_rate_declaration(tmp_path):
+    """Validation is wired into load_config, so a malformed entry fails at
+    startup rather than costing a call at zero."""
+    import config as config_mod
+
+    bad = {"models": {"broken": {"provider": "google", "pricing": [
+        {"max_input_tokens": 1000,
+         "input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+    ]}}}
+    with pytest.raises(PricingError, match="no unbounded row"):
+        for alias, entry in bad["models"].items():
+            config_mod.validate_model_rates(alias, entry)

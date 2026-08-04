@@ -72,12 +72,21 @@ if str(TESTS_DIR) not in sys.path:
 # ``providers`` announced requests on the package module would observe an
 # empty trace and read it as "no request was sent" — the precise false
 # negative the module exists to make impossible.
+#
+# Set 109 S3 added ``pricing``. It holds no mutable state, but it defines
+# ``PricingError``, and ``config`` — which validates every model entry at load
+# — is itself imported both ways. Without the alias the exception raised by a
+# bare-imported ``config`` is a DIFFERENT class object from
+# ``ai_router.pricing.PricingError``, so an ``except PricingError`` written
+# against the package path silently fails to catch it. Same split-identity
+# bug, exception classes rather than caches.
 _SHARED_MODULE_NAMES = (
     "runtime_mode",
     "spec_config",
     "suggestion_disposition",
     "migrate_lightweight_to_canonical_v4",
     "call_trace",
+    "pricing",
 )
 for _name in _SHARED_MODULE_NAMES:
     _pkg = importlib.import_module(f"ai_router.{_name}")

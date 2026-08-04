@@ -241,13 +241,39 @@ def _config(**models):
     return {"models": models}
 
 
-def test_a_matching_rate_produces_no_change():
+def test_a_matching_but_unstamped_rate_becomes_a_confirmation():
+    """Without this, a registry whose prices are all CORRECT could never
+    become one whose prices are all CONFIRMED: a matching rate produced no
+    change, so it had no route to a confirmed_on stamp, ever."""
     config = _config(**{"gpt-5-4-mini": {
         "provider": "openai", "model_id": "gpt-5.4-mini",
         "input_cost_per_1m": 0.75, "output_cost_per_1m": 4.50,
     }})
     proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
-    assert proposal["changes"] == []
+    change = proposal["changes"][0]
+    assert change["change_type"] == "confirm"
+    assert change["decision"] == pp.DECISION_PENDING
+    assert pp._normalized(change["current"]) == pp._normalized(change["proposed"])
+
+
+def test_a_matching_and_freshly_stamped_rate_produces_no_change():
+    """...and once confirmed it stops nagging, until the stamp ages out."""
+    config = _config(**{"gpt-5-4-mini": {
+        "provider": "openai", "model_id": "gpt-5.4-mini",
+        "input_cost_per_1m": 0.75, "output_cost_per_1m": 4.50,
+        "confirmed_on": "2026-08-01",
+    }})
+    assert pp.build_proposal(config, _parsed(), generated_on=TODAY)["changes"] == []
+
+
+def test_a_matching_rate_with_a_stale_stamp_comes_back():
+    config = _config(**{"gpt-5-4-mini": {
+        "provider": "openai", "model_id": "gpt-5.4-mini",
+        "input_cost_per_1m": 0.75, "output_cost_per_1m": 4.50,
+        "confirmed_on": "2026-01-01",
+    }})
+    proposal = pp.build_proposal(config, _parsed(), generated_on=TODAY)
+    assert proposal["changes"][0]["change_type"] == "confirm"
 
 
 def test_an_understated_rate_produces_a_pending_change():
@@ -302,10 +328,11 @@ def test_a_configured_model_the_page_omits_is_reported_loudly():
     assert proposal["changes"] == []
     assert proposal["unmatched_config_entries"] == [
         {"alias": "gpt-5-6", "provider": "openai", "model_id": "gpt-5.6",
-         "looked_for": "gpt-5.6"}
+         "looked_for": "gpt-5.6",
+         "reason": "it is not listed there"}
     ]
     rendered = "\n".join(pp.render_proposal(proposal))
-    assert "NOT ON THE PAGE" in rendered
+    assert "NOT CHECKED" in rendered
     assert "was NOT checked" in rendered
 
 
@@ -402,10 +429,15 @@ def config_file(tmp_path) -> Path:
     return path
 
 
-def _change(alias, proposed, decision):
-    return {"alias": alias, "provider": "x", "model_id": "y", "page_key": "y",
-            "source_url": "u", "current": {}, "proposed": proposed,
-            "observations": [], "decision": decision}
+_FIXTURE_MODEL_IDS = {"gpt-5-5": "gpt-5.5", "gemini-pro": "gemini-2.5-pro"}
+
+
+def _change(alias, proposed, decision, change_type="update", model_id=None):
+    return {"alias": alias, "provider": "x",
+            "model_id": model_id or _FIXTURE_MODEL_IDS.get(alias, "y"),
+            "page_key": "y", "source_url": "u", "current": {},
+            "proposed": proposed, "observations": [],
+            "change_type": change_type, "decision": decision}
 
 
 def test_a_pending_change_refuses_the_whole_apply():
@@ -497,7 +529,12 @@ def test_apply_preserves_the_config_comments(config_file):
     assert "# Load-bearing documentation about this entry." in text
 
 
-def test_apply_refreshes_the_global_rollup_the_extension_reads(config_file):
+def test_the_rollup_does_NOT_advance_while_a_priced_model_is_unstamped(config_file):
+    """The extension's Cost Dashboard renders its staleness banner from this
+    field. Setting it to the oldest EXISTING stamp would read as today the
+    moment one model is confirmed, declaring the whole file freshly reviewed
+    while the rest sit unconfirmed. A confidently-wrong rollup is worse than a
+    visibly old one."""
     ruamel = pytest.importorskip("ruamel.yaml")
     pp.apply_changes(
         config_file,
@@ -507,7 +544,59 @@ def test_apply_refreshes_the_global_rollup_the_extension_reads(config_file):
         confirmed_on=TODAY,
     )
     document = ruamel.YAML().load(config_file.read_text(encoding="utf-8"))
+    assert document["models"]["gpt-5-5"]["confirmed_on"] == "2026-08-04"
+    assert document["metadata"]["pricing_reviewed"] == "2026-07-03"   # unmoved
+
+
+def test_the_rollup_advances_once_every_priced_model_is_stamped(config_file):
+    ruamel = pytest.importorskip("ruamel.yaml")
+    pp.apply_changes(
+        config_file,
+        [
+            _change("gpt-5-5",
+                    {"input_cost_per_1m": 5.00, "output_cost_per_1m": 30.00},
+                    pp.DECISION_ACCEPT),
+            _change("gemini-pro",
+                    {"input_cost_per_1m": 1.25, "output_cost_per_1m": 10.00},
+                    pp.DECISION_ACCEPT, change_type="confirm"),
+        ],
+        confirmed_on=TODAY,
+    )
+    document = ruamel.YAML().load(config_file.read_text(encoding="utf-8"))
     assert document["metadata"]["pricing_reviewed"] == "2026-08-04"
+
+
+def test_a_confirmation_stamps_without_touching_the_rate(config_file):
+    ruamel = pytest.importorskip("ruamel.yaml")
+    pp.apply_changes(
+        config_file,
+        [_change("gemini-pro",
+                 {"input_cost_per_1m": 999.0, "output_cost_per_1m": 999.0},
+                 pp.DECISION_ACCEPT, change_type="confirm")],
+        confirmed_on=TODAY,
+    )
+    entry = ruamel.YAML().load(config_file.read_text(encoding="utf-8"))["models"]["gemini-pro"]
+    # A confirm entry's `proposed` equals `current` by construction; even a
+    # doctored one must not become a rate write.
+    assert entry["input_cost_per_1m"] == 1.25
+    assert entry["confirmed_on"] == "2026-08-04"
+
+
+def test_apply_refuses_when_the_alias_now_points_at_a_different_model(config_file):
+    """Session 4 repoints aliases. A proposal fetched before a repoint would
+    otherwise write the old model's rates into the new model's entry and stamp
+    them confirmed today."""
+    pytest.importorskip("ruamel.yaml")
+    before = config_file.read_text(encoding="utf-8")
+    with pytest.raises(pp.ProposalError, match="different model"):
+        pp.apply_changes(
+            config_file,
+            [_change("gemini-pro",
+                     {"input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+                     pp.DECISION_ACCEPT, model_id="gemini-3.1-pro-preview")],
+            confirmed_on=TODAY,
+        )
+    assert config_file.read_text(encoding="utf-8") == before
 
 
 def test_apply_refuses_a_change_that_would_not_load(config_file):
@@ -644,3 +733,165 @@ def test_apply_refuses_and_writes_nothing_while_a_change_is_pending(
 
     assert code == pp.EXIT_CHANGES
     assert config_file.read_text(encoding="utf-8") == before
+
+
+# ---------------------------------------------------------------------------
+# Round-1 remediation: the fail-open paths this session's own verification
+# round found. Each one manufactured a structurally valid, plausible-looking
+# price -- which is the precise failure the module exists to prevent.
+# ---------------------------------------------------------------------------
+
+
+def _google_with_mismatched_lines():
+    """Google adds a modality line to output but not input -- an ordinary
+    page evolution. The two sides can no longer be paired without guessing."""
+    return fx.GOOGLE_PRICING_SECTIONS.replace(
+        "<td>$10.00, prompts <= 200k tokens<br>$15.00, prompts > 200k</td>",
+        "<td>$10.00, prompts <= 200k tokens</td>",
+        1,
+    )
+
+
+def test_mismatched_google_line_counts_do_not_become_a_flat_price():
+    """The earlier draft paired the first input line with the first output
+    line and returned a flat rate. That is a guess."""
+    rates = pp.parse_google(pp.parse_document(_google_with_mismatched_lines()))
+    entry = rates["gemini-2.5-pro"]
+    assert entry.rows == []
+    assert "unreadable" in entry.observations[0]
+
+
+def test_an_unreadable_section_is_reported_as_not_checked_not_proposed():
+    """It must not vanish either: a configured model whose rate went
+    unexamined has to say so, or the run reports success over a hole."""
+    page_rates = dict(_parsed())
+    page_rates["google"] = pp.parse_google(
+        pp.parse_document(_google_with_mismatched_lines())
+    )
+    config = _config(**{"gemini-pro": {
+        "provider": "google", "model_id": "gemini-2.5-pro",
+        "input_cost_per_1m": 1.25, "output_cost_per_1m": 10.00,
+    }})
+    proposal = pp.build_proposal(config, page_rates, generated_on=TODAY)
+
+    assert proposal["changes"] == []
+    miss = proposal["unmatched_config_entries"][0]
+    assert miss["alias"] == "gemini-pro"
+    assert "cannot be paired without guessing" in miss["reason"]
+    assert "was NOT checked" in "\n".join(pp.render_proposal(proposal))
+
+
+def test_disagreeing_tier_bounds_do_not_become_a_price():
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "$15.00, prompts > 200k", "$15.00, prompts <= 400k tokens", 1
+    )
+    entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-pro"]
+    assert entry.rows == []
+    assert "bounds disagree" in entry.observations[0]["unreadable"]
+
+
+def test_an_unreadable_model_nobody_configured_is_simply_ignored():
+    """Roughly a hundred sections on that page price video, images, TTS and
+    embeddings. One of them going unreadable must not fail a run that never
+    cared about it."""
+    page_rates = dict(_parsed())
+    page_rates["google"] = pp.parse_google(
+        pp.parse_document(_google_with_mismatched_lines())
+    )
+    config = _config(**{"gemini-flash": {
+        "provider": "google", "model_id": "gemini-2.5-flash",
+        "input_cost_per_1m": 0.30, "output_cost_per_1m": 2.50,
+        "confirmed_on": "2026-08-01",
+    }})
+    proposal = pp.build_proposal(config, page_rates, generated_on=TODAY)
+    # gemini-2.5-pro is the unreadable one and nothing configured points at
+    # it, so the run is silent about it.
+    assert proposal["changes"] == []
+    assert proposal["unmatched_config_entries"] == []
+
+
+def test_a_failed_refresh_moves_the_previous_proposal_out_of_reach(
+    tmp_path, monkeypatch, config_file
+):
+    """Writing nothing is not enough: an edited proposal from an earlier run
+    is still sitting at that path, and the next --apply would write its
+    months-old numbers and stamp them confirmed today."""
+    monkeypatch.setattr(pp, "load_config", lambda path=None: _minimal_config())
+    proposal_path = tmp_path / "proposal.json"
+    proposal_path.write_text(json.dumps({
+        "schema_version": pp.SCHEMA_VERSION,
+        "changes": [_change("gpt-5-5",
+                            {"input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+                            pp.DECISION_ACCEPT)],
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        pp.httpx, "Client",
+        lambda **kw: _client(overrides={pp.PRICING_PAGES["google"]: "<html></html>"}),
+    )
+
+    code = pp.main([
+        "--fetch", "--config", str(config_file), "--proposal", str(proposal_path)
+    ])
+
+    assert code == pp.EXIT_FATAL
+    assert not proposal_path.exists()
+    # Moved aside, not destroyed -- the operator's accept/reject work is theirs.
+    stale = proposal_path.with_suffix(".stale.json")
+    assert stale.exists()
+    assert json.loads(stale.read_text(encoding="utf-8"))["changes"][0]["decision"] == "accept"
+
+
+def test_apply_after_a_failed_refresh_finds_nothing_to_apply(
+    tmp_path, monkeypatch, config_file
+):
+    """The point of moving it aside: the very next --apply is a no-op rather
+    than a confident write of unverified numbers."""
+    monkeypatch.setattr(pp, "load_config", lambda path=None: _minimal_config())
+    proposal_path = tmp_path / "proposal.json"
+    proposal_path.write_text(json.dumps({
+        "schema_version": pp.SCHEMA_VERSION,
+        "changes": [_change("gpt-5-5",
+                            {"input_cost_per_1m": 1.0, "output_cost_per_1m": 2.0},
+                            pp.DECISION_ACCEPT)],
+    }), encoding="utf-8")
+    monkeypatch.setattr(
+        pp.httpx, "Client",
+        lambda **kw: _client(overrides={pp.PRICING_PAGES["google"]: "<html></html>"}),
+    )
+    pp.main(["--fetch", "--config", str(config_file),
+             "--proposal", str(proposal_path)])
+
+    before = config_file.read_text(encoding="utf-8")
+    code = pp.main(["--apply", "--config", str(config_file),
+                    "--proposal", str(proposal_path)])
+
+    assert code == pp.EXIT_CHANGES          # refused: there is no proposal
+    assert config_file.read_text(encoding="utf-8") == before
+
+
+def test_a_modality_split_reads_the_labelled_text_rate():
+    """`gemini-2.5-flash` prices input as `$0.30 (text / image / video)` and
+    `$1.00 (audio)` against a single output price. Those cells are split on
+    different axes; reading the labelled text line is a read, pairing line 1
+    with line 1 would be a guess that happened to be right."""
+    rates = pp.parse_google(pp.parse_document(fx.GOOGLE_PRICING_SECTIONS))
+    assert rates["gemini-2.5-flash"].rows == [
+        {"input_cost_per_1m": 0.30, "output_cost_per_1m": 2.50}
+    ]
+
+
+def test_an_unlabelled_multi_rate_cell_is_unreadable():
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "$0.30 (text / image / video)", "$0.30 (image)", 1
+    )
+    entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-flash"]
+    assert entry.rows == []
+    assert "cannot be told apart" in entry.observations[0]["unreadable"]
+
+
+def test_two_text_lines_are_unreadable_rather_than_first_wins():
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "$1.00 (audio)", "$1.00 (text, long)", 1
+    )
+    entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-flash"]
+    assert entry.rows == []

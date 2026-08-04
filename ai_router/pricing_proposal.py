@@ -80,7 +80,7 @@ try:  # package vs bare-import (mirrors the rest of ai_router)
         CONFIRMED_ON_KEY,
         PRICING_KEY,
         PricingError,
-        resolve_rates,
+        unconfirmed_and_stale,
         validate_model_rates,
     )
 except ImportError:  # pragma: no cover - test/bare context
@@ -89,7 +89,7 @@ except ImportError:  # pragma: no cover - test/bare context
         CONFIRMED_ON_KEY,
         PRICING_KEY,
         PricingError,
-        resolve_rates,
+        unconfirmed_and_stale,
         validate_model_rates,
     )
 
@@ -543,30 +543,45 @@ def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
 
     input_lines = [ln for ln in input_cell.split("\n") if ln.strip()]
     output_lines = [ln for ln in output_cell.split("\n") if ln.strip()]
-    inputs = [(parse_upper_bound(ln), parse_money(ln)) for ln in input_lines]
-    outputs = [(parse_upper_bound(ln), parse_money(ln)) for ln in output_lines]
-    inputs = [(b, v) for b, v in inputs if v is not None]
-    outputs = [(b, v) for b, v in outputs if v is not None]
+    inputs = _priced_lines(input_lines)
+    outputs = _priced_lines(output_lines)
+    if inputs is None or outputs is None:
+        return _unreadable(
+            model_id,
+            "one of its price cells lists several rates that are neither "
+            "prompt-size tiers nor a labelled text rate, so which one applies "
+            "to a text prompt cannot be told apart from the rest.",
+        )
     if not inputs or not outputs:
         return None
 
     # A tiered cell states the same boundary on both sides. Anything else --
-    # a modality split like "$0.50 (text) $3.00 (audio)" -- is not a prompt-size
-    # tier, and pairing those lines would fabricate one.
+    # a modality split like "$0.50 (text) $3.00 (audio)", an added line, a
+    # reordered one -- is not a prompt-size tier.
+    #
+    # An earlier draft paired the first input line with the first output line
+    # in that case and returned a flat rate. Session 3's own verification round
+    # was right to call that out: pairing first-with-first is a GUESS, and a
+    # guess that produces a structurally valid, plausible-looking price is
+    # precisely the failure this module exists to prevent. It is now UNREADABLE
+    # instead — reported, never guessed, and never silently dropped either: a
+    # model the config actually routes to surfaces in the proposal as "its rate
+    # was NOT checked", with the reason.
     if len(inputs) != len(outputs):
-        return PageRates(rows=[{
-            "input_cost_per_1m": inputs[0][1],
-            "output_cost_per_1m": outputs[0][1],
-        }])
+        return _unreadable(
+            model_id,
+            f"the Standard table states {len(inputs)} input price(s) and "
+            f"{len(outputs)} output price(s). Those cannot be paired without "
+            "guessing which rate goes with which.",
+        )
 
     rows: list[dict] = []
     for (in_bound, in_value), (out_bound, out_value) in zip(inputs, outputs):
         if len(inputs) > 1 and in_bound != out_bound:
-            raise PageStructureError(
-                f"google: model {model_id!r} states {len(inputs)} input rates "
-                f"and {len(outputs)} output rates whose prompt-size bounds do "
-                f"not agree ({in_bound!r} vs {out_bound!r}); the parser will "
-                "not guess which price pairs with which."
+            return _unreadable(
+                model_id,
+                f"its input and output prompt-size bounds disagree "
+                f"({in_bound!r} vs {out_bound!r}).",
             )
         row: dict[str, Any] = {
             "input_cost_per_1m": in_value,
@@ -578,12 +593,58 @@ def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
 
     # Exactly one unbounded row, or the entry cannot pass validation.
     if len(rows) > 1 and sum(1 for r in rows if "max_input_tokens" not in r) != 1:
-        raise PageStructureError(
-            f"google: model {model_id!r} states {len(rows)} tiers but not "
-            "exactly one unbounded one; the parser cannot tell which rate "
-            "applies above the largest bound."
+        return _unreadable(
+            model_id,
+            f"it states {len(rows)} tiers but not exactly one unbounded one, "
+            "so nothing prices a prompt above the largest bound.",
         )
     return PageRates(rows=rows)
+
+
+def _priced_lines(lines: list[str]) -> Optional[list[tuple[Optional[int], float]]]:
+    """``(bound, rate)`` per priced line, collapsing a MODALITY split.
+
+    Google states two different things with the same multi-line cell shape:
+
+        $1.25, prompts <= 200k tokens / $2.50, prompts > 200k tokens   <- tiers
+        $0.30 (text / image / video)  / $1.00 (audio)                  <- modality
+
+    The first is a prompt-size tier and both lines belong in the schema. The
+    second is not: the router sends text, so exactly one of those lines is its
+    rate and the others price products it never buys. Reading the labelled
+    ``text`` line is a READ; pairing line 1 with line 1 across two cells that
+    are split on different axes is a GUESS, and it is how `gemini-2.5-flash`
+    silently got the right answer for the wrong reason before this session's
+    verification round caught it.
+
+    Returns ``None`` when a multi-rate cell is neither — the caller reports the
+    model as unchecked rather than picking one.
+    """
+    priced = [(parse_upper_bound(ln), parse_money(ln), ln) for ln in lines]
+    priced = [(b, v, ln) for b, v, ln in priced if v is not None]
+    if len(priced) <= 1 or any(b is not None for b, _, _ in priced):
+        return [(b, v) for b, v, _ in priced]
+    text_lines = [(b, v) for b, v, ln in priced if _TEXT_MODALITY.search(ln)]
+    if len(text_lines) != 1:
+        return None
+    return text_lines
+
+
+#: A modality qualifier naming text, e.g. ``(text / image / video)``.
+_TEXT_MODALITY = re.compile(r"\(\s*[^)]*\btext\b[^)]*\)", re.IGNORECASE)
+
+
+def _unreadable(model_id: str, reason: str) -> PageRates:
+    """A section that was found but cannot be read without guessing.
+
+    Distinct from all three of: a section that prices something the router does
+    not buy (returns None, correctly ignored), a page whose whole structure
+    changed (fatal), and a changed price (a proposal). This one is per-model
+    and only matters if the config routes to that model — in which case
+    :func:`build_proposal` reports the rate as unchecked rather than proposing
+    a number nobody can stand behind.
+    """
+    return PageRates(rows=[], observations=[{"unreadable": reason}])
 
 
 PARSERS = {
@@ -680,6 +741,8 @@ def build_proposal(
     changes: list[dict] = []
     unmatched_config: list[dict] = []
     claimed: dict[str, set] = {p: set() for p in page_rates}
+    never, stale = unconfirmed_and_stale(config, today=generated_on)
+    needs_stamp = set(never) | set(stale)
 
     for alias, entry in sorted((config.get("models") or {}).items()):
         if not isinstance(entry, dict):
@@ -692,21 +755,30 @@ def build_proposal(
 
         key = page_key_for(provider, model_id)
         found = rates_by_key.get(key)
-        if found is None:
+        if found is None or not found.rows:
             # Loud, not silent. A configured model its own provider does not
             # list is the exact specimen Session 1's drift gate exists for,
             # and staying quiet about it here would let a rate go unchecked
-            # while the run still reported success.
+            # while the run still reported success. The second case — a
+            # section that IS on the page but cannot be read without guessing
+            # — lands here too, carrying its own reason.
+            reason = "it is not listed there"
+            if found is not None:
+                claimed[provider].add(key)
+                for observation in found.observations:
+                    if "unreadable" in observation:
+                        reason = observation["unreadable"]
             unmatched_config.append(
                 {"alias": alias, "provider": provider, "model_id": model_id,
-                 "looked_for": key}
+                 "looked_for": key, "reason": reason}
             )
             continue
         claimed[provider].add(key)
 
         current = _current_declaration(entry)
         proposed = _proposed_declaration(found.rows)
-        if current and _normalized(current) == _normalized(proposed):
+        unchanged = bool(current) and _normalized(current) == _normalized(proposed)
+        if unchanged and alias not in needs_stamp:
             continue
         changes.append(
             {
@@ -715,6 +787,16 @@ def build_proposal(
                 "model_id": model_id,
                 "page_key": key,
                 "source_url": PRICING_PAGES[provider],
+                # A rate that already matches still needs a route to a
+                # `confirmed_on` stamp, or a registry whose prices are all
+                # correct can never become a registry whose prices are all
+                # CONFIRMED — and every stamp would age out with no sanctioned
+                # way to refresh it. So an unchanged rate appears as a
+                # `confirm` entry, going through the identical accept/reject
+                # machinery and writing nothing but the stamp. It only appears
+                # while the entry is unstamped or stale, so a freshly
+                # confirmed model stays out of the way until it ages.
+                "change_type": "confirm" if unchanged else "update",
                 "current": current,
                 "proposed": proposed,
                 "observations": found.observations,
@@ -806,6 +888,19 @@ def render_proposal(proposal: dict) -> list[str]:
     if not changes:
         lines.append("[ ] OK: every configured rate matches what its provider publishes.")
     for change in changes:
+        if change.get("change_type") == "confirm":
+            lines.append(
+                f"[ ] {change['alias']} ({change['provider']} / "
+                f"{change['model_id']}) already MATCHES the page -- "
+                f"{change['source_url']}"
+            )
+            lines.extend(_render_declaration(change["proposed"]))
+            lines.append(
+                "    Accepting stamps confirmed_on and changes no rate. It is "
+                "listed because it has never been confirmed, or its stamp has "
+                "aged past the review window."
+            )
+            continue
         lines.append(
             f"[~] {change['alias']} ({change['provider']} / "
             f"{change['model_id']}) -- {change['source_url']}"
@@ -824,10 +919,11 @@ def render_proposal(proposal: dict) -> list[str]:
 
     for miss in proposal.get("unmatched_config_entries") or []:
         lines.append(
-            f"[x] NOT ON THE PAGE: {miss['alias']} (model_id "
+            f"[x] NOT CHECKED: {miss['alias']} (model_id "
             f"{miss['model_id']!r}) -- looked for {miss['looked_for']!r} on "
-            f"{miss['provider']}'s price list and did not find it. Its rate "
-            "was NOT checked."
+            f"{miss['provider']}'s price list -- "
+            + str(miss.get("reason") or "not listed there").rstrip(".")
+            + ". Its rate was NOT checked."
         )
     for provider, ids in sorted((proposal.get("unclaimed_page_models") or {}).items()):
         if ids:
@@ -837,11 +933,13 @@ def render_proposal(proposal: dict) -> list[str]:
                 + (f", +{len(ids) - 8} more" if len(ids) > 8 else "")
             )
     if changes:
+        updates = sum(1 for c in changes if c.get("change_type") != "confirm")
+        confirms = len(changes) - updates
         lines.append("")
         lines.append(
-            f"{len(changes)} proposed change(s). Nothing has been written. Set "
-            "each \"decision\" to \"accept\" or \"reject\" in the proposal file, "
-            "then run --apply."
+            f"{updates} rate change(s) and {confirms} confirmation(s) to "
+            "review. Nothing has been written. Set each \"decision\" to "
+            "\"accept\" or \"reject\" in the proposal file, then run --apply."
         )
     return lines
 
@@ -951,16 +1049,29 @@ def apply_changes(
                 f"{path.name}. Re-run --fetch against the current config."
             )
         entry = models[alias]
+        # The proposal was built against a specific model_id. Session 4's work
+        # is precisely to REPOINT aliases, so a proposal fetched before a
+        # repoint would otherwise write the old model's rates into the new
+        # model's entry and stamp them confirmed today.
+        recorded = change.get("model_id")
+        if recorded and str(entry.get("model_id")) != str(recorded):
+            raise ProposalError(
+                f"model {alias!r} now points at "
+                f"{entry.get('model_id')!r}, but this proposal was built "
+                f"against {recorded!r}. Its rates were confirmed for a "
+                "different model. Re-run --fetch. Nothing was written."
+            )
         proposed = change["proposed"]
 
-        entry.pop("input_cost_per_1m", None)
-        entry.pop("output_cost_per_1m", None)
-        entry.pop(PRICING_KEY, None)
-        if PRICING_KEY in proposed:
-            entry[PRICING_KEY] = proposed[PRICING_KEY]
-        else:
-            entry["input_cost_per_1m"] = proposed["input_cost_per_1m"]
-            entry["output_cost_per_1m"] = proposed["output_cost_per_1m"]
+        if change.get("change_type") != "confirm":
+            entry.pop("input_cost_per_1m", None)
+            entry.pop("output_cost_per_1m", None)
+            entry.pop(PRICING_KEY, None)
+            if PRICING_KEY in proposed:
+                entry[PRICING_KEY] = proposed[PRICING_KEY]
+            else:
+                entry["input_cost_per_1m"] = proposed["input_cost_per_1m"]
+                entry["output_cost_per_1m"] = proposed["output_cost_per_1m"]
         entry[CONFIRMED_ON_KEY] = confirmed_on.isoformat()
 
         try:
@@ -973,20 +1084,36 @@ def apply_changes(
         written.append(alias)
 
     if written:
-        # The global rollup the VS Code Cost Dashboard reads. Maintained here
-        # so it cannot drift away from the per-model stamps it summarises: it
-        # is the OLDEST confirmation, which is what "how stale is this file"
-        # actually means.
-        stamps = [
-            str(m.get(CONFIRMED_ON_KEY))
-            for m in models.values()
-            if isinstance(m, dict) and m.get(CONFIRMED_ON_KEY)
-        ]
-        if stamps:
-            document.setdefault("metadata", {})["pricing_reviewed"] = min(stamps)
+        _refresh_rollup(document, models)
         with path.open("w", encoding="utf-8") as handle:
             yaml_rt.dump(document, handle)
     return written
+
+
+def _refresh_rollup(document, models) -> bool:
+    """Advance ``metadata.pricing_reviewed`` only when EVERY priced model is
+    stamped. Returns whether it moved.
+
+    The VS Code Cost Dashboard renders its staleness banner from this field.
+    An earlier draft set it to the oldest EXISTING stamp, which Session 3's
+    own verification round correctly called false-fresh: with two of twelve
+    models stamped, the oldest existing stamp is today, and the dashboard
+    would report the whole file freshly reviewed while ten rates sat
+    unconfirmed. A rollup that summarises a subset is worse than a stale one,
+    because it is confidently wrong rather than visibly old. So it stays put
+    until there is nothing left to confirm.
+    """
+    priced = [
+        entry for entry in models.values()
+        if isinstance(entry, dict)
+        and (entry.get(PRICING_KEY) or "input_cost_per_1m" in entry
+             or "output_cost_per_1m" in entry)
+    ]
+    stamps = [str(e.get(CONFIRMED_ON_KEY)) for e in priced if e.get(CONFIRMED_ON_KEY)]
+    if not priced or len(stamps) != len(priced):
+        return False
+    document.setdefault("metadata", {})["pricing_reviewed"] = min(stamps)
+    return True
 
 
 # ---------------------------------------------------------------------------
@@ -1046,6 +1173,31 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "checked' while one silently went stale.",
                 file=sys.stderr,
             )
+            # Writing nothing is not enough on its own: a proposal from an
+            # EARLIER run is still sitting at this path, quite possibly with
+            # decisions already marked, and a following --apply would happily
+            # write its months-old numbers and stamp them confirmed today.
+            # Move it aside rather than delete it — the operator's accept/reject
+            # work is theirs, not this command's to throw away.
+            if proposal_path.exists():
+                stale_path = proposal_path.with_suffix(".stale.json")
+                try:
+                    proposal_path.replace(stale_path)
+                except OSError as move_exc:  # pragma: no cover - fs-dependent
+                    print(
+                        f"[x] Could NOT move the previous proposal aside "
+                        f"({move_exc}). Do not run --apply against "
+                        f"{proposal_path}: this refresh failed, so its "
+                        "contents are unverified.",
+                        file=sys.stderr,
+                    )
+                else:
+                    print(
+                        f"    The previous proposal was moved to {stale_path} "
+                        "so it cannot be applied as if it were current. Your "
+                        "decisions are preserved there.",
+                        file=sys.stderr,
+                    )
             return EXIT_FATAL
 
         proposal = build_proposal(config, page_rates)

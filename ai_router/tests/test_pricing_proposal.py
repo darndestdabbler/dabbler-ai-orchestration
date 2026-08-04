@@ -936,3 +936,49 @@ def test_an_unreadable_configured_model_quarantines_the_previous_proposal(
     assert code == pp.EXIT_FATAL
     assert not proposal_path.exists()
     assert proposal_path.with_suffix(".stale.json").exists()
+
+
+def test_a_price_cell_with_no_recognised_rate_is_unreadable_not_absent():
+    """Round 4: `_priced_lines` drops every unparseable line, so a reformatted
+    cell left the section looking ABSENT rather than unreadable -- and absent
+    is the non-fatal branch."""
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "<td>$0.30 (text / image / video)<br>$1.00 (audio)</td>",
+        "<td>see the pricing calculator</td>",
+        1,
+    )
+    entry = pp.parse_google(pp.parse_document(broken))["gemini-2.5-flash"]
+    assert entry.rows == []
+    assert "no per-token rate" in entry.observations[0]["unreadable"]
+
+
+def test_an_unrecognised_price_cell_on_a_configured_model_aborts(tmp_path,
+                                                                 monkeypatch,
+                                                                 config_file):
+    broken = fx.GOOGLE_PRICING_SECTIONS.replace(
+        "<td>$1.25, prompts <= 200k tokens<br>$2.50, prompts > 200k tokens</td>",
+        "<td>see the pricing calculator</td>",
+        1,
+    )
+    monkeypatch.setattr(pp, "load_config", lambda path=None: _minimal_config())
+    monkeypatch.setattr(
+        pp.httpx, "Client",
+        lambda **kw: _client(overrides={pp.PRICING_PAGES["google"]: broken}),
+    )
+    proposal_path = tmp_path / "proposal.json"
+
+    code = pp.main([
+        "--fetch", "--config", str(config_file), "--proposal", str(proposal_path)
+    ])
+
+    assert code == pp.EXIT_FATAL
+    assert not proposal_path.exists()
+
+
+def test_a_section_with_no_price_rows_at_all_is_still_irrelevant():
+    """The contrast: image / video / TTS sections carry no Input price row and
+    must stay ignorable, or one of the ~100 non-text models would fail every
+    run."""
+    assert pp._google_section_rates(
+        pp.Table(rows=[["Image price", "Free", "$0.04 / image"]]), "imagen-4"
+    ) is None

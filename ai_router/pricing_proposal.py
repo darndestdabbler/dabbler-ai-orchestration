@@ -526,9 +526,18 @@ def parse_google(blocks: list[Any]) -> dict[str, PageRates]:
 
 
 def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
-    """Read one Standard-section table. Returns None for a section that
-    prices something the router does not buy (image, video, TTS, embeddings),
-    which have no input/output token rows at all."""
+    """Read one Standard-section table.
+
+    Returns ``None`` ONLY for a section that is not token-priced at all — it
+    carries no ``Input price`` / ``Output price`` rows, which is how the page's
+    image, video, TTS and embedding models look. That is the one case meaning
+    "this section is irrelevant".
+
+    A section that HAS those rows but cannot be read returns an unreadable
+    marker instead, because ``build_proposal`` treats ``None`` as "absent from
+    the page" and reports it non-fatally. Absent and unreadable are the whole
+    distinction this module turns on.
+    """
     input_cell = output_cell = None
     for row in table.rows:
         if len(row) < 3:
@@ -553,7 +562,17 @@ def _google_section_rates(table: Table, model_id: str) -> Optional[PageRates]:
             "to a text prompt cannot be told apart from the rest.",
         )
     if not inputs or not outputs:
-        return None
+        # The section HAS "Input price" / "Output price" rows and none of them
+        # yields a rate this parser recognises. That is a parse failure, not an
+        # irrelevant section — round 4 caught it returning None, which
+        # `build_proposal` reads as "absent from the page" and reports
+        # non-fatally. Absent and unreadable are the distinction this module
+        # turns on, and a section that was FOUND is not absent.
+        return _unreadable(
+            model_id,
+            "its Input/Output price rows carry no per-token rate this parser "
+            "recognises.",
+        )
 
     # A tiered cell states the same boundary on both sides. Anything else --
     # a modality split like "$0.50 (text) $3.00 (audio)", an added line, a

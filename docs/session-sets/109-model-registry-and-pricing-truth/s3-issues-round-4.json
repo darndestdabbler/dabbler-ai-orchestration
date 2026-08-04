@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Empty parsed price cells still bypass the fatal configured-model path**\n- **Category:** Correctness\n- **Severity:** Major\n- **Failure scenario:** Google changes a configured model’s input or output price cell to formatting that `parse_money()` no longer recognizes. This is probable over the scraper’s lifetime because provider-page evolution is the operating condition the fail-loud requirement addresses. The parser treats that model as absent rather than unreadable, writes a proposal for other models, and permits its application while the configured model remains unchecked and potentially stale.\n- **Details:**\n  - **Violation:** The requirement says, “A parse failure must produce *no proposal*, loudly — never a silent partial.”\n  - **Impact:** Operators can apply an apparently valid partial proposal after a configured model’s price parsing failed, materially defeating the session’s pricing-truth objective.\n  - **Evidence:** In `_google_section_rates()`, `_priced_lines()` removes every line for which `parse_money()` returns `None`; the subsequent `if not inputs or not outputs: return None` does not produce the empty-row `PageRates` marker. In `build_proposal()`, only `found is not None and not found.rows` raises `PageStructureError`. `found is None` is instead added to `unmatched_config_entries`, followed by `continue`, so proposal generation succeeds.\n  - **Location:** `ai_router/pricing_proposal.py`, `_google_section_rates()` and `build_proposal()`.\n  - **Fix:** Return an unreadable `PageRates` result when a discovered model section has no parseable input or output prices. Reserve `None` only for sections positively identified as irrelevant to router text pricing. Add a test where one configured Google model’s price cell contains no parseable monetary value and assert that `build_proposal()` and `--fetch` abort and quarantine any previous proposal.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Google changes a configured model’s input or output price cell to formatting that `parse_money()` no longer recognizes. This is probable over the scraper’s lifetime because provider-page evolution is the operating condition the fail-loud requirement addresses. The parser treats that model as absent rather than unreadable, writes a proposal for other models, and permits its application while the configured model remains unchecked and potentially stale."
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 matching rates can enter the confirmation workflow",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 stale proposals are quarantined after failed refreshes",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 mismatched Google price lines no longer manufacture flat rates",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 global review rollup waits for every priced model",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 apply rejects proposals for repointed aliases",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 configured Google parse failures can still yield partial proposals",
+      "verdict": "fix-rejected",
+      "ledgerId": "L8"
+    }
+  ]
+}

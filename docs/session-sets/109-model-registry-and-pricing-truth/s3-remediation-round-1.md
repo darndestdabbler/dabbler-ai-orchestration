@@ -200,3 +200,55 @@ Pinned by `test_an_unreadable_section_for_a_CONFIGURED_model_aborts_the_run`,
 
 **Verified live** after the fix: 10 entries (5 rate changes + 5 confirmations),
 2 reported unchecked (`gpt-5-6`, `gemini-3-pro`), exit 1, config untouched.
+
+---
+
+# Round 4 (remediation-review, cycle 2) — one finding, accepted
+
+**4 accepted, 1 accepted-with-modification, 1 rejected** — the rejection and
+the new Major are again the same point, and again it is right.
+
+## F3-followup-2 — a price cell with no recognised rate read as ABSENT, not unreadable
+
+**Accepted.** Round 3's fix keys the fatal path on "the section was found but
+its rows are empty". `_priced_lines` drops every line `parse_money` cannot
+read, so a cell reformatted beyond the parser's vocabulary — `see the pricing
+calculator`, a new currency notation — leaves `inputs` empty, and
+`_google_section_rates` returned `None`. `None` means *absent from the page*,
+which is the deliberately **non-fatal** branch: the run would continue and
+write an applicable proposal for the other models while a configured rate went
+unchecked.
+
+The verifier called this correctly at the level of the distinction rather than
+the symptom: absent and unreadable is the axis this module turns on, and a
+section that was *found* is not absent.
+
+**Fix.** `None` is now returned only for a section that carries no
+`Input price` / `Output price` rows at all — the shape of the page's image,
+video, TTS and embedding models, the one case that genuinely means "not
+token-priced". A section that has those rows and yields no rate this parser
+recognises is **unreadable**, and therefore fatal when the config routes to it.
+
+**Blast radius measured before shipping, not assumed:** across all 23
+Standard sections on the live page today, **zero** take the newly-fatal path.
+This is pure hardening against page evolution, with no behaviour change on the
+page as it stands. The live re-run after the fix is identical to the one
+before it — 10 entries, 2 unchecked, exit 1.
+
+Pinned by `test_a_price_cell_with_no_recognised_rate_is_unreadable_not_absent`,
+`test_an_unrecognised_price_cell_on_a_configured_model_aborts`, and
+`test_a_section_with_no_price_rows_at_all_is_still_irrelevant`.
+
+## Note on the round budget
+
+The constitution bounds this at two remediation-review cycles, and round 4 is
+the second. The loop suspended itself correctly and told the orchestrator to
+stop to the operator. The operator had **pre-authorised** up to two further
+rounds on the current engine and one on a third engine before closing
+(2026-08-04, ahead of an offsite). This round was fixed under that
+authorisation rather than on the orchestrator's own authority.
+
+The trend supports one more rather than many: rounds 1 → 3 → 4 went 7 blocking
+→ 1 → 1, each successive finding narrower and confined to the same Google
+parse-classification seam, with no finding yet touching `pricing.py`, the six
+wired consumers, or any rate in `router-config.yaml`.

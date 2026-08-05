@@ -832,6 +832,251 @@ export async function triggerRefresh(page: Page): Promise<void> {
   await page.waitForTimeout(750);
 }
 
+// ---------------------------------------------------------------------------
+// Set 110 Session 3 — the NATIVE Work Explorer tree.
+//
+// Session 2 wrote these against the native pane inside `native-tree.spec.ts`;
+// Session 3 promotes them here because eleven specs now need them. They
+// deliberately locate the pane by the presence of a `.monaco-list` rather than
+// by its TITLE, for one reason worth stating: this session flips the shipping
+// surface mid-flight, so the pane is called "Work Explorer (native preview)"
+// before the switchover and "Work Explorer" after it. A title-matched helper
+// would have to be edited in the same commit that changes the title, and every
+// spec would silently pass against whichever surface happened to answer.
+//
+// The shipping IDENTITY — which view is first, which is default, and that the
+// old renderer is gone — is asserted in exactly one place
+// (`shipping-surface.spec.ts`) instead of being implicitly re-asserted by
+// every spec's locator. That is the sequencing gap the step-3.5 analyst named:
+// suites written before the switchover prove the provider works, not that it
+// is what the container shows.
+// ---------------------------------------------------------------------------
+
+/**
+ * A three-module manifest used by several specs.
+ *
+ * Set 110 S3: this and `stampModule` used to live inside `module-tier.spec.ts`
+ * and were imported from there by `system-status.spec.ts`. Playwright rejects
+ * that outright - a spec file importing another spec file registers the
+ * imported file's tests twice - so shared FIXTURE material belongs here, with
+ * the other fixture helpers, and spec files export nothing.
+ */
+export const MODULES_YAML = [
+  "modules:",
+  "  - slug: greeter",
+  "    title: Greeter",
+  "    codeRoots: [services/greeter]",
+  "  - slug: clock",
+  "    title: Clock",
+  "    codeRoots: [services/clock]",
+  "  - slug: integration",
+  "    title: Cross-Module Integration",
+  "    codeRoots: []",
+  "    touches: [greeter, clock]",
+  "",
+].join("\n");
+
+/**
+ * Stamp `module: <slug>` into a fixture's Session Set Configuration block.
+ *
+ * Newline-agnostic: the Python harness writes the spec in text mode, so the
+ * file carries CRLF on Windows and LF elsewhere, and the inserted line reuses
+ * whatever EOL the anchor line has (a CI windows-latest run caught an LF-only
+ * version never matching). Throws rather than no-opping: a fixture helper
+ * that quietly does nothing surfaces several steps later looking like a
+ * product bug.
+ */
+export function stampModule(h: FixtureHandle, moduleSlug: string): void {
+  const specPath = path.join(h.set_dir, "spec.md");
+  const spec = fs.readFileSync(specPath, "utf8");
+  const patched = spec.replace(
+    /requiresE2E: false(\r?\n)/,
+    (_m, eol: string) => `requiresE2E: false${eol}module: ${moduleSlug}${eol}`,
+  );
+  if (patched === spec) {
+    throw new Error(`stampModule: no anchor in ${specPath}; the fixture template changed`);
+  }
+  fs.writeFileSync(specPath, patched, "utf8");
+}
+
+/**
+ * Reveal the Dabbler container — IDEMPOTENTLY.
+ *
+ * The click is guarded on the activity-bar item's checked state, and that
+ * guard is the whole point. VS Code's activity-bar icons TOGGLE: clicking one
+ * whose container is already active HIDES the sidebar. An unconditional click
+ * is therefore only correct when you know the container is closed.
+ *
+ * Set 110 S3 learned this the expensive way. `vsix-first-run-walkthrough`
+ * opens the Getting Started webview, drives a real venv + pip install, and
+ * then reaches for the tree — so by the time it called this the container was
+ * already open, the second click closed the sidebar, and the walkthrough
+ * waited out a five-minute timeout for a row that could not be visible. It
+ * was the only failure in an otherwise-green full suite, and it was in this
+ * helper rather than in the product.
+ */
+export async function openDabblerContainer(page: Page): Promise<void> {
+  const activityIcon = page.locator(
+    '.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]',
+  );
+  await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
+  await activityIcon.click();
+  await page.waitForTimeout(250);
+}
+
+/**
+ * Open the Dabbler container and return the pane hosting the native tree,
+ * expanding its header if it is contributed collapsed.
+ *
+ * Waits for the first row, so a caller that gets a Locator back is looking at
+ * a painted tree — not an empty pane that will fill in later. Callers that
+ * WANT the empty case (no folder open, `viewsWelcome`) must use
+ * `workExplorerPane` instead, which does not wait for rows.
+ */
+export async function openWorkExplorerTree(
+  page: Page,
+): Promise<import("@playwright/test").Locator> {
+  const pane = await workExplorerPane(page);
+  await pane
+    .locator(".monaco-list-row")
+    .first()
+    .waitFor({ state: "visible", timeout: 30_000 });
+  return pane;
+}
+
+/**
+ * The native-tree pane, expanded, WITHOUT waiting for any row. Use this when
+ * the assertion is about emptiness (the welcome content) or about the
+ * `TreeView.message` band, both of which render with zero rows present.
+ */
+export async function workExplorerPane(
+  page: Page,
+  opts: { reveal?: boolean } = {},
+): Promise<import("@playwright/test").Locator> {
+  // `reveal` is an explicit parameter rather than a cleverness, and the
+  // reason is worth stating: VS Code's activity-bar icons TOGGLE. Clicking
+  // one whose container is already active HIDES the sidebar.
+  //
+  // Set 110 S3 paid for that. `vsix-first-run-walkthrough` opens the Getting
+  // Started webview, drives a real venv + pip install, and only then reaches
+  // for the tree — so the container was already open, the reveal click closed
+  // the sidebar, and the walkthrough waited out a five-minute timeout for a
+  // row that could not be visible. It was the only failure in an otherwise
+  // green full suite.
+  //
+  // The first fix attempted to DETECT the open state from the workbench's own
+  // `.checked` markers and got it backwards, turning one failure into three.
+  // Guessing at another product's internal DOM state to avoid a parameter is
+  // a bad trade; callers know whether they have already opened the container,
+  // so they say so.
+  if (opts.reveal !== false) await openDabblerContainer(page);
+  // `.monaco-list` is the native tree's own list widget. The webview pane
+  // hosts an iframe and never matches, so this disambiguates the two panes
+  // while they coexist without depending on either one's title.
+  const pane = page
+    .locator(".pane")
+    .filter({ has: page.locator(".monaco-list") })
+    .first();
+  await pane.waitFor({ state: "visible", timeout: 30_000 });
+  const header = pane.locator(".pane-header");
+  if ((await header.getAttribute("aria-expanded")) === "false") {
+    await header.click();
+    await page.waitForTimeout(250);
+  }
+  return pane;
+}
+
+/** Every rendered row in the native tree. */
+export function treeRows(
+  pane: import("@playwright/test").Locator,
+): import("@playwright/test").Locator {
+  return pane.locator(".monaco-list-row");
+}
+
+/** The first row whose rendered text contains `label`. */
+export function treeRow(
+  pane: import("@playwright/test").Locator,
+  label: string | RegExp,
+): import("@playwright/test").Locator {
+  return pane.locator(".monaco-list-row").filter({ hasText: label }).first();
+}
+
+/**
+ * Expand a row by clicking its twistie, then let the list settle.
+ *
+ * Clicking the TWISTIE rather than the row body is deliberate: a set row
+ * carries a `command`, so clicking its body opens `spec.md` and steals editor
+ * focus. The twistie is the expansion affordance in both cases.
+ */
+export async function expandTreeRow(
+  pane: import("@playwright/test").Locator,
+  label: string | RegExp,
+): Promise<void> {
+  const row = treeRow(pane, label);
+  await row.waitFor({ state: "visible", timeout: 15_000 });
+  if ((await row.getAttribute("aria-expanded")) === "false") {
+    await row.locator(".monaco-tl-twistie").click();
+  }
+  await pane.page().waitForTimeout(400);
+}
+
+/**
+ * Drill module -> bucket -> set and return the set's row.
+ *
+ * The three-argument form exists because every rewritten spec needs the same
+ * drill: the native tree is lazy, so a set row does not exist in the DOM until
+ * both its ancestors are expanded. A spec that asserts on a set row without
+ * drilling is asserting on absence, and would pass for the wrong reason.
+ */
+export async function revealSetRow(
+  pane: import("@playwright/test").Locator,
+  opts: { module?: string; bucket: string; set: string },
+): Promise<import("@playwright/test").Locator> {
+  await expandTreeRow(pane, opts.module ?? "Default");
+  await expandTreeRow(pane, opts.bucket);
+  const row = treeRow(pane, opts.set);
+  await row.waitFor({ state: "visible", timeout: 15_000 });
+  return row;
+}
+
+/**
+ * Open a row's context menu and return the menu's rendered text.
+ *
+ * The menu is a workbench-level overlay, not a child of the pane, so it is
+ * located off the page rather than off the pane locator.
+ */
+export async function rowContextMenuText(
+  page: Page,
+  row: import("@playwright/test").Locator,
+): Promise<string> {
+  await row.click({ button: "right" });
+  const menu = page.locator(".context-view .monaco-menu");
+  await menu.waitFor({ state: "visible", timeout: 15_000 });
+  const text = await menu.innerText();
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(200);
+  return text;
+}
+
+/**
+ * The `TreeView.message` band, if the view is currently showing one.
+ *
+ * VS Code renders it as `.pane-body > .welcome-view`-adjacent content above
+ * the list. Asserted through `innerText` on the pane body minus the list, so
+ * the test does not hard-code a workbench class that changes between
+ * releases — a lesson from this repo's own DOM-coupled suite.
+ */
+export async function treeViewMessageText(
+  pane: import("@playwright/test").Locator,
+): Promise<string> {
+  const body = pane.locator(".pane-body");
+  const full = (await body.innerText()).trim();
+  const list = pane.locator(".monaco-list");
+  if ((await list.count()) === 0) return full;
+  const rows = (await list.innerText()).trim();
+  return full.startsWith(rows) ? full.slice(rows.length).trim() : full.replace(rows, "").trim();
+}
+
 export async function closeVSCode(launch: LaunchedVSCode): Promise<void> {
   try {
     await launch.app.close();

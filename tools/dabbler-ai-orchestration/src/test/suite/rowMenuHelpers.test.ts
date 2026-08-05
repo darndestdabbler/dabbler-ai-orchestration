@@ -1,125 +1,19 @@
 import * as assert from "assert";
-import {
-  buildSubmenuItems,
-  buildTopLevelItems,
-  planLeftClickActivation,
-} from "../../providers/rowMenuHelpers";
-import { CategorizedActions, RowAction } from "../../providers/ActionRegistry";
+import { planLeftClickActivation } from "../../providers/rowMenuHelpers";
 
-// Set 048 S3 — rowMenuHelpers tests. The two-step QuickPick item
-// construction and the L5 left-click planner are pure functions
-// extracted from CustomSessionSetsView; this suite exercises them
-// without standing up a webview provider.
+// Set 048 S3 — the L5 left-click planner: a pure function deciding what
+// activating a set row should DO. Set 110 S3: it is now shared by the native
+// tree's row command, so it is more load-bearing than it was, not less.
 
-function action(over: Partial<RowAction>): RowAction {
-  return {
-    id: over.id ?? "dabbler.test",
-    label: over.label ?? "Test",
-    group: over.group ?? 100,
-    category: over.category ?? "flat",
-    when: over.when ?? (() => true),
-  };
-}
-
-function cat(over: Partial<CategorizedActions>): CategorizedActions {
-  return {
-    openFile: over.openFile ?? [],
-    copyEval: over.copyEval ?? [],
-    flat: over.flat ?? [],
-  };
-}
-
-suite("rowMenuHelpers — buildTopLevelItems", () => {
-  test("returns empty list when all three categories are empty", () => {
-    assert.deepStrictEqual(buildTopLevelItems(cat({})), []);
-  });
-
-  test("includes 'Open File ▸' only when openFile category has entries", () => {
-    const withOpen = buildTopLevelItems(
-      cat({ openFile: [action({ id: "openSpec", label: "Spec", category: "openFile" })] }),
-    );
-    assert.strictEqual(withOpen.length, 1);
-    assert.strictEqual(withOpen[0].label, "Open File ▸");
-    assert.strictEqual(withOpen[0].dabblerKind, "openFile");
-
-    const withoutOpen = buildTopLevelItems(cat({}));
-    assert.ok(!withoutOpen.some((i) => i.dabblerKind === "openFile"));
-  });
-
-  test("includes 'Copy Prompt ▸' only when copyEval category has entries", () => {
-    const withCopy = buildTopLevelItems(
-      cat({ copyEval: [action({ id: "x", label: "Eval", category: "copyEval" })] }),
-    );
-    assert.ok(withCopy.some((i) => i.label === "Copy Prompt ▸" && i.dabblerKind === "copyEval"));
-  });
-
-  test("appends flat actions verbatim after the submenu chips", () => {
-    const items = buildTopLevelItems(
-      cat({
-        openFile: [action({ id: "a", category: "openFile" })],
-        copyEval: [action({ id: "b", category: "copyEval" })],
-        flat: [
-          action({ id: "dabbler.openOrchestratorWriterLog", label: "Open Orchestrator Writer Log", category: "flat" }),
-          action({ id: "dabblerSessionSets.cancel", label: "Cancel Session Set", category: "flat" }),
-        ],
-      }),
-    );
-    assert.deepStrictEqual(
-      items.map((i) => i.label),
-      ["Open File ▸", "Copy Prompt ▸", "Open Orchestrator Writer Log", "Cancel Session Set"],
-    );
-    assert.strictEqual(items[2].dabblerKind, "action");
-    assert.strictEqual(items[2].action?.id, "dabbler.openOrchestratorWriterLog");
-  });
-
-  test("submenu chips come BEFORE flat actions regardless of category order", () => {
-    const items = buildTopLevelItems(
-      cat({
-        flat: [action({ id: "cancel", label: "Cancel", category: "flat" })],
-        openFile: [action({ id: "spec", label: "Spec", category: "openFile" })],
-        copyEval: [action({ id: "eval", label: "Evaluate Spec", category: "copyEval" })],
-      }),
-    );
-    assert.deepStrictEqual(
-      items.map((i) => i.label),
-      ["Open File ▸", "Copy Prompt ▸", "Cancel"],
-    );
-  });
-});
-
-suite("rowMenuHelpers — buildSubmenuItems", () => {
-  test("maps actions to QuickPick items preserving label and action reference", () => {
-    const actions = [
-      action({ id: "x", label: "Spec", category: "openFile" }),
-      action({ id: "y", label: "Activity Log", category: "openFile" }),
-    ];
-    const items = buildSubmenuItems(actions);
-    assert.strictEqual(items.length, 2);
-    assert.strictEqual(items[0].label, "Spec");
-    assert.strictEqual(items[0].action.id, "x");
-    assert.strictEqual(items[1].label, "Activity Log");
-    assert.strictEqual(items[1].action.id, "y");
-  });
-
-  test("returns empty array for empty input", () => {
-    assert.deepStrictEqual(buildSubmenuItems([]), []);
-  });
-
-  test("passes a registry detail line through to the QuickPick item (Set 062 S2)", () => {
-    const withDetail = action({
-      id: "dabbler.openExternalVerificationDoc",
-      label: "Open External Verification Note",
-      detail: "Record the out-of-band verdict — creating external-verification.md clears the v? marker.",
-    });
-    const [sub] = buildSubmenuItems([withDetail]);
-    assert.strictEqual(sub.detail, withDetail.detail);
-    const top = buildTopLevelItems(cat({ flat: [withDetail] }));
-    assert.strictEqual(top[0].detail, withDetail.detail);
-    // Actions without a detail stay detail-less (no empty-string noise).
-    const [plain] = buildSubmenuItems([action({ id: "x", label: "Spec" })]);
-    assert.strictEqual(plain.detail, undefined);
-  });
-});
+// Set 110 Session 3: the `buildTopLevelItems` / `buildSubmenuItems` suites
+// ended here. They exercised the two-step QuickPick that stood in for a
+// hierarchical context menu the webview could not draw. VS Code renders the
+// real thing from `contributes.submenus` now, and the CONTRACT that replaced
+// them — every registry action reaches exactly one menu, and every menu entry
+// is reachable by some real row — is checked bidirectionally against the real
+// `package.json` in `workExplorerMenuParity.test.ts`. That is a stronger
+// assertion than the item-shape tests it replaces, because it fails on a menu
+// entry nothing can reach as well as on an action nothing exposes.
 
 suite("rowMenuHelpers — planLeftClickActivation (L5)", () => {
   test("ALWAYS opens spec.md (preserved S4 default)", () => {

@@ -214,3 +214,114 @@ regardless.
 Routed spend before verification draws on `DABBLER_*` provider credit only:
 $0.0164 (analysis) + $0.0164 (the lost first attempt, disclosed above)
 = **$0.0328**. **Zero Copilot / engine-seat capacity consumed.**
+
+---
+
+## Session 3 of 4 — Switch over, re-home the empty state, rewrite the tests
+
+- Orchestrator: claude / anthropic / claude-opus-5 / high (operator-invoked).
+  This matches S2's `disposition.next_orchestrator` and the S1 analyst's own
+  recommendation.
+- Routed step-3.5 analysis: [`s3-ai-assignment-analysis.json`](s3-ai-assignment-analysis.json)
+  (route `task_type=analysis`, excl. anthropic → `gpt-5.6-luna`, $0.0170,
+  truncation-clean, 13,680 output tokens).
+- Set-level facts carried from the spec (immutable at runtime): **Full tier**,
+  `requiresUAT true` (**S4** walks it — S3 neither arms nor runs it),
+  `requiresE2E true` — and unlike S1, **L-064-12 lands on this session at full
+  strength**: S3 *is* the Explorer-rendering switchover, and the operator's
+  2026-08-05 test-run policy names it the non-negotiable full-Layer-3-at-close
+  session, explicitly forbidding it from deferring that debt to S4.
+  `pathAwareCritique advisory` (set-terminal, in S4).
+
+### The lost first call, disclosed
+
+The step-3.5 call was made **twice**. The first completed, returned, and was
+then thrown away by an `AttributeError` on a metadata line that ran *after*
+the content had already been paid for and *before* anything was written to
+disk. That is precisely the failure L-079-1 warns about — "never touch the
+result before persisting it" — and **it is the second consecutive session in
+this set to lose a step-3.5 call the same way** (S2 disclosed the same waste,
+$0.0164). Two occurrences in two sessions is a pattern, not an accident;
+it is raised at Step 9 as a candidate for a one-line
+`route()`-result-persistence helper rather than a rule nobody remembers.
+The re-run's script writes `result.content` to disk as its first act.
+
+### Routing plan
+
+| Step | Action | Routing decision |
+| :--- | :--- | :--- |
+| 1 | Register; preload; keys; confirm S1/S2 Creates on disk. | Orchestrator direct — bootstrapping. |
+| 3.5 | Assignment analysis + next-orchestrator / next-set recommendations. | **Routed** (`analysis`) — repo rule: never self-opine on model choice. |
+| 3 | The stacked-`WebviewView` presence rules, `viewsWelcome`, `TreeView.message`. | **Routed** (`architecture`) — a genuine in-session design question with more than one plausible answer (decision-time consensus, ahead of `AskUserQuestion`). |
+| 4 | Re-express the Layer 2 + Layer 3 behavioural specification against the native surface. | **Routed** (`test-generation`) — delegation discipline names test generation explicitly, and the analyst's verdict is that the size and the behavioural-mapping nature both justify it. |
+| 2/5 | Deletion + orphan review before the renderer is removed. | **Routed** (`code-review`) — the *decision* that a module is orphaned is a consumer review, not a mechanical grep. |
+| 2/5 | Applying the approved edits, the `package.json` switchover, the icon-reference swap. | Orchestrator direct — mechanics, and the analyst agrees. |
+| 6 | Full Layer 3 at close, after the last code change. | Orchestrator direct — **execution, not reasoning.** The analyst labelled this `session-verification`; that conflates *running the suite* with the *routed* verification stage, and the two are not the same gate. Recorded as a correction. |
+| Verify | Phased `verify_session` for this set. | **Routed** — `session-verification`, anthropic auto-excluded per the no-skip mandate. |
+| Close | `disposition.json`; commit + push; `close_session`; notify. | Orchestrator direct — mechanics. |
+
+### What this session took from the analyst, and what it did not
+
+**Taken, and load-bearing:**
+
+1. **The seeded regression is now specified, not vague.** The operator's
+   ordering says "seed a regression and prove the new Layer 3 catches it" but
+   not *which*. The analyst named it: force an overlay to render **without
+   hover**, give it **non-zero height above the first tree row** with
+   **pointer-events enabled**, then require a **normal, non-forced click** on a
+   module row to fail to produce its lazy child — and require the same test to
+   pass once the seed is removed. That is the Set 108 defect class exactly
+   (a hover-revealed element occupying flow space above tree content, which
+   Layer 2 and every static gate missed while it was live), expressed as an
+   executable falsifier rather than as care.
+2. **The sequencing gap the operator's ordering does not close.** Suites
+   written *before* the switchover open the native pane **by its preview
+   title**, so they prove the provider works — not that it is what the
+   container *shows*. The fix is a targeted clean-host smoke **after** the
+   switchover and **before** the single full run: open the normal container,
+   assert the native tree is the shipping view and the old renderer is absent,
+   click-expand the first row, and drive a malformed `docs/modules.yaml` so
+   `TreeView.message` explains itself and clears on repair.
+3. **Deletion granularity: same session, staged phases.** There is no S5, and
+   pushing either half into S4 would put architectural integration risk inside
+   the release session.
+
+**Not taken:**
+
+- **The analyst routes five of seven steps, including the suite runs.** Its
+  plan labels running Layer 3 as `session-verification`. Running a test suite
+  is execution; the routed verification stage is a different gate with its own
+  artifacts and its own no-skip mandate. Collapsing them would have double-
+  counted one as the other. The suite runs stay orchestrator-direct.
+- **Its own confidence note is honoured over its plan.** It flags that
+  `TreeView.message`, `contributes.viewsWelcome`, and contribution-order-
+  determines-what-is-shown are all **API recall, not derivation**, and asks for
+  real-host confirmation. Given that this set has already had one confident
+  API recall (`currentColor`) disproved by measurement in S2, every one of
+  those three is treated as a hypothesis this session must **run** before it
+  ships.
+
+### The routed analyst's forward-looking recommendations
+
+- **Session 4:** `claude` / `anthropic` / `claude-opus-5` / `high` — the
+  release session, with UAT, the walk, the full matrix and the advisory
+  path-aware critique; "focused routed verification and measurement, not
+  additional ceremony or repeated full runs." Budget: `DABBLER_*` API-key
+  routed spend only, **not** the limited Copilot seat and **not** a competing
+  engine CLI.
+- **Next session set:** the owed **`adopt-dabbler.md` walk**, with the small
+  **router model-id fix** as an immediate prerequisite, on the grounds that the
+  adoption walk is the number-one unpaid item and has never once been executed
+  — *"the repository lacks evidence about whether the orchestration machinery
+  is worth retaining."* It asks for a minimal executable measurement-based walk
+  rather than another ceremonial round, and would use its findings to shape
+  Set 111's capability-scaling test. Note the constraint it could not know:
+  **111 is reserved**, so this needs a fresh number. Its S1-era sibling
+  recommendation — making the ~102 ms synchronous `git worktree list` async —
+  remains live and is now the first suspect if S4 misses the sub-second gate.
+
+### Budget note, by source
+
+Routed spend before verification draws on `DABBLER_*` provider credit only:
+$0.0170 (analysis) + $0.0170 (the lost first attempt, disclosed above)
+= **$0.0340** so far. **Zero Copilot / engine-seat capacity consumed.**

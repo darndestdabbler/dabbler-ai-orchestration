@@ -1,60 +1,14 @@
-// Pure helpers for the Session Sets Explorer right-click QuickPick
-// (Set 048 S3 spec §3.3, audit Bias 3 flip) and the L5 left-click
-// dual-action. Extracted from `CustomSessionSetsView` so the
-// decision logic is unit-testable without instantiating the webview
-// provider — the view supplies its own vscode dependencies, this
-// module is pure.
-
-import type * as vscode from "vscode";
-import type { CategorizedActions, RowAction } from "./ActionRegistry";
-
-// ----- Two-step QuickPick decision logic -----
-
-// `dabblerKind` (rather than `kind`) because VS Code reserves
-// `QuickPickItem.kind` for its own `QuickPickItemKind` enum
-// (Default / Separator). Using a custom name avoids the structural
-// collision — consumers MUST read `picked.dabblerKind` after
-// `showQuickPick` returns; a naive `picked.kind` read would always
-// see VS Code's enum value (or `undefined`) instead of our
-// discriminator and silently no-op every dispatch.
-export interface TopLevelPickItem extends vscode.QuickPickItem {
-  dabblerKind: "openFile" | "copyEval" | "action";
-  action?: RowAction;
-}
-
-export interface SubmenuPickItem extends vscode.QuickPickItem {
-  action: RowAction;
-}
-
-// Build the top-level QuickPick item list:
-//   - "Open File ▸" when the openFile category is non-empty
-//   - "Copy Prompt ▸" when the copyEval category is non-empty (label
-//     was "Copy Eval ▸" in Set 048 S3; renamed Set 049 S1 because the
-//     submenu contains non-evaluation entries like "Start Next Session"
-//     and "Start New Parallel Session". The internal `dabblerKind` /
-//     ActionCategory identifier stays `copyEval` so this rename is
-//     user-visible only.)
-//   - one item per flat action (already sorted by `applicableActions`)
-export function buildTopLevelItems(categorized: CategorizedActions): TopLevelPickItem[] {
-  const items: TopLevelPickItem[] = [];
-  if (categorized.openFile.length > 0) {
-    items.push({ label: "Open File ▸", dabblerKind: "openFile" });
-  }
-  if (categorized.copyEval.length > 0) {
-    items.push({ label: "Copy Prompt ▸", dabblerKind: "copyEval" });
-  }
-  for (const action of categorized.flat) {
-    // Set 062 S2: registry entries may carry a `detail` line (e.g. the
-    // marker-clearing consequence on "Open External Verification
-    // Note"); pass it through so the QuickPick renders it.
-    items.push({ label: action.label, detail: action.detail, dabblerKind: "action", action });
-  }
-  return items;
-}
-
-export function buildSubmenuItems(submenu: RowAction[]): SubmenuPickItem[] {
-  return submenu.map((action) => ({ label: action.label, detail: action.detail, action }));
-}
+// The L5 left-click dual-action, pure and unit-testable.
+//
+// Set 110 Session 3: this module used to also hold the two-step QuickPick
+// item builders (`buildTopLevelItems` / `buildSubmenuItems`) that the
+// webview's hand-drawn right-click menu needed. VS Code renders a real
+// hierarchical menu from `contributes.submenus` now, so the item builders
+// and their `TopLevelPickItem` / `SubmenuPickItem` types went with it.
+//
+// What survives is the one decision the platform does NOT make for us: what
+// activating a set row should DO. That is shared by the native row command
+// so the behaviour cannot drift.
 
 // ----- L5 left-click dual-action decision -----
 

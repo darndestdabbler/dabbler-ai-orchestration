@@ -485,129 +485,16 @@ suite("Set 087 S2 — buildModulePayloads payload shape (Layer 2 fixture)", () =
     }
   });
 });
-
-// Wiring source scans. The host class and the webview IIFE are not
-// importable from the unit harness, so — per the prerequisites.test.ts
-// / verificationMarker.test.ts house pattern — assert the shipped
-// sources delegate to the behavior-tested builder above and carry the
-// rendering the protocol promises.
-suite("Set 087 S2 — module tier payload + rendering source scans", () => {
-  const extRoot = path.resolve(__dirname, "..", "..", "..");
-
-  test("host ships visible modules through the behavior-tested builder; no top-level buckets", () => {
-    const view = fs.readFileSync(
-      path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
-      "utf8",
-    );
-    assert.ok(view.includes("const moduleSnapshot = this.buildModules(all)"));
-    assert.ok(view.includes("modules: moduleSnapshot.modules"));
-    assert.ok(view.includes("systemStatus: this.buildSystemStatus("));
-    assert.ok(view.includes("moduleSnapshot.manifestFaults"));
-    assert.ok(
-      view.includes("buildVisibleModulePayloads("),
-      "buildModules must delegate to the extracted, behavior-tested builder",
-    );
-    assert.ok(
-      !view.includes("buckets: this.buildBuckets"),
-      "the pre-087 top-level bucket payload must be gone (ruling Q2)",
-    );
-  });
-
-  test("protocol replaces SnapshotPayload.buckets with modules", () => {
-    const proto = fs.readFileSync(
-      path.join(extRoot, "src", "types", "sessionSetsWebviewProtocol.ts"),
-      "utf8",
-    );
-    assert.ok(proto.includes("modules: ModulePayload[]"));
-    const snapshotBlock = proto.slice(
-      proto.indexOf("export interface SnapshotPayload"),
-      proto.indexOf("// ----- Host → Webview -----"),
-    );
-    // Match a real field DECLARATION line (the block's doc comment
-    // legitimately names the retired field in prose).
-    assert.ok(
-      !/\n\s*buckets: BucketPayload\[\];/.test(snapshotBlock),
-      "SnapshotPayload must not carry the retired top-level buckets field",
-    );
-  });
-
-  test("webview renders one conformant 3-level ARIA dialect (Set 100 S1)", () => {
-    const client = fs.readFileSync(
-      path.join(extRoot, "media", "session-sets-tree", "client.js"),
-      "utf8",
-    );
-    assert.ok(!client.includes("implicitOnly"));
-    assert.ok(!client.includes("renderBucket(bucket, null)"));
-    // Module nodes: role="treeitem" carrying aria-level 1 + aria-expanded,
-    // children nested in role="group", semantic Default label, per-module
-    // collapse state, composite per-(module, bucket) collapse keys.
-    assert.ok(client.includes('class="module-header"'));
-    assert.ok(client.includes('mod.slug || "Default"'));
-    assert.ok(client.includes("moduleCollapsed[moduleKey]"));
-    assert.ok(client.includes('moduleKey + "/" + bucket.key'));
-    assert.ok(
-      client.includes('\'<div role="treeitem" tabindex="-1" aria-level="1"\''),
-      "the module node itself is a treeitem at level 1",
-    );
-    // Set 100 S1: the 093-era persistent Plan / Session sets child nodes
-    // are GONE — buckets are the module's direct children at level 2,
-    // rows at level 3. The retired render functions, data hooks, and the
-    // "<module>/sessionsets" collapse key must not survive.
-    assert.ok(!client.includes("renderPlanNode"));
-    assert.ok(!client.includes("renderSessionSetsNode"));
-    assert.ok(!client.includes("data-module-child"));
-    assert.ok(!client.includes("data-plan-state"));
-    assert.ok(!client.includes("data-session-sets-state"));
-    assert.ok(!client.includes('moduleKey + "/sessionsets"'));
-    assert.ok(!client.includes("child-body"));
-    assert.ok(
-      client.includes('\'<div role="treeitem" tabindex="-1" aria-level="2"\''),
-      "the bucket node itself is a treeitem at level 2 under the module",
-    );
-    assert.ok(client.includes('class="module-body" role="group"'));
-    assert.ok(client.includes('class="bucket-body" role="group"'));
-    assert.ok(client.includes("renderRow(row, 3)"));
-    assert.ok(
-      !client.includes("renderRow(row, 4)"),
-      "no row renders at the retired level 4",
-    );
-    assert.ok(client.includes('data-testid="work-explorer-tree"'));
-    // Set 100 S1: the kind-aware row badge renders as a quiet chip after
-    // the row name, carrying the kind verbatim + its tooltip.
-    assert.ok(client.includes('class="row-kind-badge row-kind-badge-'));
-    assert.ok(client.includes("row.kindBadge"));
-    assert.ok(client.includes("row.kindTooltip"));
-    // Keyboard operability: shared toggler wired to Enter/Space and
-    // ArrowRight/ArrowLeft; arrow navigation walks visible nodes only.
-    assert.ok(client.includes("function toggleCollapsible(nodeEl"));
-    assert.ok(client.includes("toggleCollapsible(item, true)"));
-    assert.ok(client.includes("toggleCollapsible(item, false)"));
-    assert.ok(client.includes("function visibleTreeItems()"));
-    // NEVER HIDE WORK: with the Session sets node gone, the guarantee
-    // rests entirely on the TERMINAL row-rendering gate (renderBucket) —
-    // emptiness is decided from the actual rows array, never the display
-    // count, so a stale/zero count can never drop populated rows.
-    assert.ok(
-      client.includes("const rowCount = Array.isArray(bucket.rows) ? bucket.rows.length : 0"),
-      "renderBucket must measure emptiness from bucket.rows, not count",
-    );
-    assert.ok(
-      client.includes("if (rowCount === 0)"),
-      "renderBucket renders the empty leaf only when there are genuinely no rows",
-    );
-  });
-
-  test("the module header style ships (collapse affordance + hidden body)", () => {
-    const css = fs.readFileSync(
-      path.join(extRoot, "media", "session-sets-tree", "tree.css"),
-      "utf8",
-    );
-    assert.ok(css.includes(".module-header"));
-    assert.ok(css.includes('.module[aria-expanded="false"] .module-body'));
-    // Set 100 S1: the persistent child-node styles retired with the
-    // nodes; the kind badge chip ships instead.
-    assert.ok(!css.includes(".child-header"));
-    assert.ok(!css.includes(".module-session-sets"));
-    assert.ok(css.includes(".row-kind-badge"));
-  });
-});
+// Set 110 Session 3: the 'module tier payload + rendering source scans'
+// suite ended here. It scanned `CustomSessionSetsView.ts` for
+// `buildVisibleModulePayloads(` and the protocol for
+// `modules: ModulePayload[]`, then scanned `client.js` for the webview's
+// 3-level ARIA dialect. All four are gone: the view is deleted, the
+// payload field is removed from the protocol, and VS Code emits the ARIA
+// contract now.
+//
+// It was a source scan standing in for a behaviour, because the host class
+// was not importable from the unit harness. The native tree has no such
+// problem — `workExplorerTreeModel.ts` imports no `vscode` — so the
+// behaviour is asserted directly in `workExplorerTreeModel.test.ts` and
+// `workExplorerTreeProvider.test.ts` instead of inferred from source text.

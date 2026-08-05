@@ -14,6 +14,11 @@ dist/*.whl
 ai_router/local-overrides.yaml
 .session-reasons/
 tools/dabbler-ai-orchestration/test-results/
+# Set 110 S3: Playwright also writes a repo-root `test-results/.last-run.json`
+# when the run is invoked from the repo root rather than from the extension
+# directory. Same artifact class as the line above; ignoring only the nested
+# path left it showing up as an untracked deliverable in the change set.
+test-results/
 # Set 029 Session 3 (per-session-set orchestrator marker, schema v3).
 # The writer also drops a self-protecting `.gitignore` inside each
 # `.dabbler/` directory so consumer repos that haven't patched their

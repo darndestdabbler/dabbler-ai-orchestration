@@ -296,75 +296,54 @@ suite("Set 100 S1 — prerequisite badge carries the plan gate", () => {
     }
   });
 });
+// Set 110 Session 3: two source-scan suites ended here.
+//
+//   - "host ships the kind badge on the row payload" scanned
+//     `CustomSessionSetsView.ts` for `kindBadge: kindBadge(set)`. There is no
+//     row payload and no kind badge: a set row has one icon slot and no
+//     description, so `kind` moved into the markdown tooltip.
+//   - "module action strip retired/added actions" scanned the view AND
+//     `client.js` for the action-id literals. The strip is deleted; the
+//     actions are `contextValue`-gated menu contributions now.
+//
+// Both behaviours survive with better carriers, and both are asserted where
+// they live rather than scanned for:
+//
+//   - kind in the tooltip -> the two tests below, driving `setDescriptor`
+//     directly (no `vscode` import, no source scan);
+//   - the action set -> `workExplorerMenuParity.test.ts`, which checks the
+//     contract BIDIRECTIONALLY (every registry action reaches exactly one
+//     menu, and every menu entry is reachable by some real row) against the
+//     real `package.json`. That is strictly stronger than scanning two files
+//     for four string literals.
 
-// House pattern (the host class is not importable from the unit
-// harness): pin the buildRow wiring by source scan.
-suite("Set 100 S1 — host ships the kind badge on the row payload", () => {
-  const extRoot = path.resolve(__dirname, "..", "..", "..");
+import { setDescriptor, setTooltip } from "../../providers/workExplorerTreeModel";
 
-  test("buildRow ships kindBadge/kindTooltip through the shared model functions", () => {
-    const view = fs.readFileSync(
-      path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
-      "utf8",
-    );
-    assert.ok(view.includes("kindBadge: kindBadge(set)"));
-    assert.ok(view.includes("kindTooltip: kindTooltip(set)"));
-    // The retired 093 planExists resolution must not survive on the host.
-    assert.ok(!view.includes("planExists"));
-  });
-});
+suite("Set 100 S1 / Set 110 S3 — kind reaches the native row", () => {
+  const NO_SUPPORTS = { uat: false, e2e: false };
 
-// Set 100 Session 2 — the reworked module action strip / context menu:
-// `Open Plan` stays; the retired `ai-plan` / `import-plan` / `ai-sets`
-// actions are gone from BOTH surfaces; `add-module` / `rename-module` /
-// `delete-module` are declared-only. House pattern: the host class
-// (webview lifecycle) and the webview client (DOM-only) are not importable
-// from the unit harness, so this pins the wiring by source scan.
-suite("Set 100 S2 — module action strip retired/added actions", () => {
-  const extRoot = path.resolve(__dirname, "..", "..", "..");
-  const viewSrc = fs.readFileSync(
-    path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
-    "utf8",
-  );
-  const clientSrc = fs.readFileSync(
-    path.join(extRoot, "media", "session-sets-tree", "client.js"),
-    "utf8",
-  );
-
-  test("the retired ai-plan / import-plan / ai-sets actions are gone from the context menu and the strip", () => {
-    for (const retired of ['"ai-plan"', '"import-plan"', '"ai-sets"']) {
-      assert.ok(!viewSrc.includes(retired), `context menu still references ${retired}`);
-      assert.ok(!clientSrc.includes(retired), `client.js strip still references ${retired}`);
-    }
-  });
-
-  test("open-plan survives; add-module / rename-module / delete-module join both surfaces", () => {
-    for (const action of ['"open-plan"', '"add-module"', '"rename-module"', '"delete-module"']) {
-      assert.ok(viewSrc.includes(action), `context menu missing ${action}`);
-      assert.ok(clientSrc.includes(action), `client.js strip missing ${action}`);
-    }
-  });
-
-  test("the three lifecycle-management actions are gated declared-only on both surfaces", () => {
-    // Context menu: pushed only inside the `kind === "declared"` branch.
-    assert.match(
-      viewSrc,
-      /kind === "declared"[\s\S]{0,200}add-module[\s\S]{0,120}rename-module[\s\S]{0,120}delete-module/,
-    );
-    // Strip: buttons pushed only inside the `kind === "declared"` branch.
-    assert.match(
-      clientSrc,
-      /kind === "declared"[\s\S]{0,200}add-module[\s\S]{0,120}rename-module[\s\S]{0,120}delete-module/,
-    );
-  });
-
-  test("moduleActionExec binds the lifecycle flows with the explicit-target seam", () => {
-    assert.ok(viewSrc.includes("runNewModuleFlow()"));
+  test("a plan set carries its kind in the row tooltip", () => {
+    const set = fakeSet({ name: "001-default-plan", kind: "plan" });
     assert.ok(
-      viewSrc.includes("runRenameModuleFlow(undefined, { preselectedSlug: slug })"),
+      setTooltip(set).includes("plan"),
+      `kind missing from the tooltip:
+${setTooltip(set)}`,
     );
-    assert.ok(
-      viewSrc.includes("runDeleteModuleFlow(undefined, { preselectedSlug: slug })"),
-    );
+  });
+
+  test("an ordinary work set says nothing about kind", () => {
+    const set = fakeSet({ name: "001-ordinary" });
+    const tooltip = setTooltip(set);
+    assert.ok(!/decomposition/.test(tooltip), tooltip);
+  });
+
+  test("the row descriptor carries no description at all", () => {
+    // The density decision Session 1 confirmed and Session 2 implemented:
+    // `TreeItem.description` is dropped when the label truncates, and every
+    // real set name truncates at working panel width, so the fraction was
+    // removed outright rather than moved. Pinned so a future reader does not
+    // "restore" it.
+    const set = fakeSet({ name: "001-default-plan", kind: "plan" });
+    assert.strictEqual(setDescriptor(set, NO_SUPPORTS).description, undefined);
   });
 });

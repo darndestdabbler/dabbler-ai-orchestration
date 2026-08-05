@@ -576,46 +576,14 @@ suite("readSessionSets — verification-marker derivation (Set 062 S1)", () => {
     fs.rmSync(root, { recursive: true });
   });
 });
-
-// Payload carriage + rendering. The webview renderer and the host's
-// private toRowPayload are not importable from the unit harness, so —
-// per the prerequisites.test.ts house pattern — assert the shipped
-// sources carry the wiring the protocol promises.
-suite("verification marker — payload + rendering source scans (Set 062 S1)", () => {
-  const extRoot = path.resolve(__dirname, "..", "..", "..");
-
-  test("host ships verificationMarker + verificationTooltip on the row payload", () => {
-    const view = fs.readFileSync(
-      path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
-      "utf8",
-    );
-    assert.ok(view.includes("verificationMarker: verificationMarker(set)"));
-    assert.ok(view.includes("verificationTooltip: verificationTooltip(set)"));
-    // The non-plus fraction-tooltip slot carries the verdict enrichment.
-    assert.ok(view.includes("verdictFractionTooltip(set)"));
-  });
-
-  test("webview renders the marker span and wires its click to showRowContextMenu", () => {
-    const client = fs.readFileSync(
-      path.join(extRoot, "media", "session-sets-tree", "client.js"),
-      "utf8",
-    );
-    assert.ok(client.includes('class="row-verification-marker"'));
-    assert.ok(client.includes("row.verificationMarker"));
-    assert.ok(client.includes("row.verificationTooltip"));
-    // The click handler posts the EXISTING context-menu message — the
-    // marker is an action surface, never a mutation path.
-    const markerWiring = client.slice(client.indexOf(".row-verification-marker\")"));
-    assert.ok(markerWiring.includes('vscode.postMessage({ type: "showRowContextMenu"'));
-  });
-
-  test("the marker style ships with the quiet treatment (help cursor)", () => {
-    const css = fs.readFileSync(
-      path.join(extRoot, "media", "session-sets-tree", "tree.css"),
-      "utf8",
-    );
-    const idx = css.indexOf(".row-verification-marker");
-    assert.ok(idx >= 0);
-    assert.ok(css.slice(idx, idx + 400).includes("cursor: help"));
-  });
-});
+// Set 110 Session 3: the 'payload + rendering source scans' suite ended
+// here. It asserted that `CustomSessionSetsView.buildRow` shipped
+// `verificationMarker` / `verificationTooltip` onto `RowPayload` and that
+// `client.js` rendered a `.row-verification-marker` span wired to the
+// context menu. None of those exist.
+//
+// The BEHAVIOUR survives and is asserted where it now lives: an unclean
+// verdict is rank 3 of the native icon precedence table, and the verdict
+// text is in the row tooltip — both driven directly in
+// `workExplorerTreeModel.test.ts` (`severityOf`, `setTooltip`), which is a
+// real assertion rather than a scan for a substring.

@@ -378,9 +378,16 @@ suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
     // launch required). The legitimate callers are the explicit-action sites
     // (openModulesManifest.ts, gitScaffold.ts scaffold, moduleAuthoring.ts
     // Add-module, and Session 2's copy-decomposition command) — not asserted here.
+    // Set 110 S3: the passive set GREW. The native `TreeDataProvider` and
+    // the shared module assembly both run on a passive open, so both join
+    // the boundary; `SetupStatusView.ts` replaces the deleted
+    // `CustomSessionSetsView.ts`.
     const srcDir = path.resolve(process.cwd(), "src");
     const passivePaths = [
-      path.join(srcDir, "providers", "CustomSessionSetsView.ts"),
+      path.join(srcDir, "providers", "SetupStatusView.ts"),
+      path.join(srcDir, "providers", "WorkExplorerTreeProvider.ts"),
+      path.join(srcDir, "providers", "moduleAssembly.ts"),
+      path.join(srcDir, "providers", "systemStatus.ts"),
       path.join(srcDir, "extension.ts"),
     ];
     for (const file of passivePaths) {

@@ -46,7 +46,7 @@
         {
           "id": "dabblerSessionSetsContainer",
           "title": "Dabbler AI Orchestration",
-          "icon": "media/dabbler-ai-orchestration-icon.svg"
+          "icon": "media/dabbler-ai-orchestration-icon-2.svg"
         }
       ]
     },
@@ -55,14 +55,14 @@
         {
           "type": "webview",
           "id": "dabblerSessionSets",
-          "name": "Work Explorer",
-          "contextualTitle": "Dabbler AI Orchestration"
+          "name": "Setup & Status",
+          "contextualTitle": "Dabbler AI Orchestration",
+          "when": "dabblerSessionSets.setupNeeded"
         },
         {
           "id": "dabblerWorkExplorerTree",
-          "name": "Work Explorer (native preview)",
-          "contextualTitle": "Dabbler AI Orchestration",
-          "visibility": "collapsed"
+          "name": "Work Explorer",
+          "contextualTitle": "Dabbler AI Orchestration"
         }
       ]
     },
@@ -386,27 +386,27 @@
       "view/title": [
         {
           "command": "dabblerSessionSets.refresh",
-          "when": "view == dabblerSessionSets",
+          "when": "view == dabblerWorkExplorerTree",
           "group": "navigation@1"
         },
         {
           "command": "dabbler.showCostDashboard",
-          "when": "view == dabblerSessionSets && dabblerSessionSets.routesCost",
+          "when": "view == dabblerWorkExplorerTree && dabblerSessionSets.routesCost",
           "group": "navigation@2"
         },
         {
           "command": "dabbler.getStarted",
-          "when": "view == dabblerSessionSets",
+          "when": "view == dabblerWorkExplorerTree",
           "group": "navigation@3"
         },
         {
           "command": "dabbler.openModulesManifest",
-          "when": "view == dabblerSessionSets",
+          "when": "view == dabblerWorkExplorerTree",
           "group": "navigation@4"
         },
         {
           "command": "dabblerSessionSets.upgradeOlderSets",
-          "when": "view == dabblerSessionSets && dabblerSessionSets.hasSubCurrentSets",
+          "when": "view == dabblerWorkExplorerTree && dabblerSessionSets.hasSubCurrentSets",
           "group": "navigation@5"
         }
       ],

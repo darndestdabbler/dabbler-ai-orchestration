@@ -544,16 +544,16 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
 });
 
 suite("Set 061 / S2 — [BLOCKED BY PREREQS] badge retired (D3)", () => {
-  // The all-caps description badge must not survive anywhere in the
-  // shipped Explorer surface: not in the model helpers, not in the
-  // host's RowPayload assembly, not in the webview renderer. A source
-  // scan keeps the retirement honest without depending on private
-  // functions.
-  test("badge literal is gone from the model, view, and webview client", () => {
+  // The all-caps description badge must not survive anywhere in the shipped
+  // Explorer surface. Set 110 S3: the host's RowPayload assembly and the
+  // webview renderer that used to be scanned here are both deleted, so the
+  // scan follows the badge to where it could still reappear — the model
+  // helpers and the native tree's row descriptors.
+  test("badge literal is gone from the model and the tree descriptors", () => {
     const extRoot = path.resolve(__dirname, "..", "..", "..");
     const shippedSources = [
       path.join(extRoot, "src", "providers", "SessionSetsModel.ts"),
-      path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
+      path.join(extRoot, "src", "providers", "workExplorerTreeModel.ts"),
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
     ];
     for (const file of shippedSources) {

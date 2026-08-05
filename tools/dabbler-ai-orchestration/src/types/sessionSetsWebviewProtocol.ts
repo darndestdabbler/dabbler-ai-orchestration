@@ -239,16 +239,11 @@ export interface GettingStartedPayload {
 }
 
 export interface SnapshotPayload {
-  // Set 087 Session 2: the module tier replaces the top-level bucket
-  // list as the snapshot's single rendering source (routed ruling Q2 —
-  // host and webview always ship together in one VSIX, so the
-  // pre-087 `buckets: BucketPayload[]` field is REMOVED rather than
-  // duplicated; a redundant copy would only invite divergence).
-  // Ordering contract: manifest file order, implicit module last. A
-  // no-manifest / all-implicit workspace ships exactly one implicit
-  // ModulePayload (slug "", title "") whose buckets the webview renders
-  // as today's two-level view, byte-identical (routed ruling Q4).
-  modules: ModulePayload[];
+  // Set 110 Session 3: `modules: ModulePayload[]` is GONE. The webview
+  // stopped rendering a tree — the native `TreeDataProvider` derives every
+  // row from `SessionSet` directly in `workExplorerTreeModel.ts` — so
+  // shipping a serialised module tree across the message boundary was
+  // carrying a payload nobody read.
   hasAnySets: boolean;
   systemStatus: SystemStatusPayload;
   // Set 060 Session 1: the dual-mode Getting Started state. Set 063 S2

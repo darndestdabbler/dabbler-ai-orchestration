@@ -32,27 +32,24 @@ import {
   cleanupTmpDir,
   closeVSCode,
   driveHappyPath,
-  FixtureHandle,
+  expandTreeRow,
   launchVSCode,
   LaunchedVSCode,
   makeAdditionalSet,
   makeSet,
   makeTmpDir,
+  MODULES_YAML,
+  openWorkExplorerTree,
+  stampModule,
   startSession,
 } from "./electronLaunch";
 
-const NATIVE_VIEW_TITLE = "Work Explorer (native preview)";
-
-const MODULES_YAML = [
-  "modules:",
-  "  - slug: core",
-  "    title: Orchestration Core",
-  "    codeRoots: [src/core]",
-  "  - slug: ui",
-  "    title: User Interface",
-  "    codeRoots: [src/ui]",
-  "",
-].join("\n");
+// Set 110 Session 3: the local `openNativeTree` / `expandRow` helpers and
+// the `NATIVE_VIEW_TITLE` constant are gone. They matched the pane by its
+// SESSION 2 title, "Work Explorer (native preview)" - a name this session
+// retires when the native tree becomes the shipping view. The shared
+// helpers in `electronLaunch.ts` locate the pane by the presence of a
+// `.monaco-list` instead, which is exactly why they survive the rename.
 
 interface PerTest {
   tmpPath?: string;
@@ -70,61 +67,6 @@ async function teardown(per: PerTest): Promise<void> {
   if (per.tmpPath) cleanupTmpDir(per.tmpPath);
 }
 
-/**
- * Stamp a set's spec with a `module:` attribution so it groups.
- *
- * Anchored on `requiresUAT:`, which the harness template
- * (`ai_router/tests/e2e/fixtures.py` → `_SPEC_TEMPLATE`) definitely
- * writes. An earlier version anchored on `tier:`, which that template
- * does NOT emit — the replace silently did nothing, the set fell into
- * the pseudo module, and the failure surfaced several steps later
- * looking like a tree bug. Hence the throw: a fixture helper that
- * quietly no-ops costs more than one that fails at the point of use.
- */
-function stampModule(handle: FixtureHandle, slug: string): void {
-  const specPath = path.join(handle.set_dir, "spec.md");
-  const spec = fs.readFileSync(specPath, "utf-8");
-  const stamped = spec.replace(/^requiresUAT:/m, `module: ${slug}\nrequiresUAT:`);
-  if (stamped === spec) {
-    throw new Error(`stampModule: no anchor in ${specPath}; the fixture template changed`);
-  }
-  fs.writeFileSync(specPath, stamped, "utf-8");
-}
-
-/** Open the Dabbler container and expand the native pane. */
-async function openNativeTree(page: import("@playwright/test").Page) {
-  const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]',
-  );
-  await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
-  await activityIcon.click();
-
-  const pane = page
-    .locator(".pane")
-    .filter({ has: page.locator(`.title:text-is("${NATIVE_VIEW_TITLE}")`) })
-    .first();
-  await pane.waitFor({ state: "visible", timeout: 30_000 });
-  const header = pane.locator(".pane-header");
-  if ((await header.getAttribute("aria-expanded")) === "false") {
-    await header.click();
-  }
-  await pane.locator(".monaco-list-row").first().waitFor({ state: "visible", timeout: 30_000 });
-  return pane;
-}
-
-/** Expand the row whose label matches, and wait for the list to settle. */
-async function expandRow(
-  pane: import("@playwright/test").Locator,
-  label: string,
-): Promise<void> {
-  const row = pane.locator(".monaco-list-row").filter({ hasText: label }).first();
-  await row.waitFor({ state: "visible", timeout: 15_000 });
-  if ((await row.getAttribute("aria-expanded")) === "false") {
-    await row.locator(".monaco-tl-twistie").click();
-  }
-  await pane.page().waitForTimeout(400);
-}
-
 test.describe("Set 110 S2 — native Work Explorer tree", () => {
   const per: PerTest = {};
   test.afterEach(async () => {
@@ -138,7 +80,7 @@ test.describe("Set 110 S2 — native Work Explorer tree", () => {
     const first = makeSet(per.tmpPath, "001-core-alpha", 3);
     fs.mkdirSync(path.join(first.repo_root, "docs"), { recursive: true });
     fs.writeFileSync(path.join(first.repo_root, "docs", "modules.yaml"), MODULES_YAML, "utf-8");
-    stampModule(first, "core");
+    stampModule(first, "greeter");
     // Session 1 complete, session 2 in flight: gives the fourth level two
     // distinct statuses to render, which is what makes the operator's
     // "which session is in flight" ask legible without any text.
@@ -146,17 +88,17 @@ test.describe("Set 110 S2 — native Work Explorer tree", () => {
     startSession(first, 2);
 
     const second = makeAdditionalSet(first, "002-ui-beta", 2);
-    stampModule(second, "ui");
+    stampModule(second, "clock");
 
     per.launch = await launchVSCode(first.repo_root);
-    const pane = await openNativeTree(per.launch.page);
+    const pane = await openWorkExplorerTree(per.launch.page);
 
     // 1. Module rows.
     await expect(
-      pane.locator(".monaco-list-row").filter({ hasText: "Orchestration Core" }),
+      pane.locator(".monaco-list-row").filter({ hasText: "Greeter" }),
     ).toHaveCount(1);
     await expect(
-      pane.locator(".monaco-list-row").filter({ hasText: "User Interface" }),
+      pane.locator(".monaco-list-row").filter({ hasText: "Clock" }),
     ).toHaveCount(1);
 
     // 3. Laziness, in the running host: no set row exists before its
@@ -166,8 +108,8 @@ test.describe("Set 110 S2 — native Work Explorer tree", () => {
     ).toHaveCount(0);
 
     // 2. Drill all four levels.
-    await expandRow(pane, "Orchestration Core");
-    await expandRow(pane, "In Progress");
+    await expandTreeRow(pane, "Greeter");
+    await expandTreeRow(pane, "In Progress");
     await expect(
       pane.locator(".monaco-list-row").filter({ hasText: "001-core-alpha" }),
     ).toHaveCount(1);
@@ -177,7 +119,7 @@ test.describe("Set 110 S2 — native Work Explorer tree", () => {
       pane.locator(".monaco-list-row").filter({ hasText: "Session 2" }),
     ).toHaveCount(0);
 
-    await expandRow(pane, "001-core-alpha");
+    await expandTreeRow(pane, "001-core-alpha");
     const sessionRows = pane.locator(".monaco-list-row").filter({ hasText: /^Session \d/ });
     expect(await sessionRows.count()).toBeGreaterThan(0);
 
@@ -210,10 +152,10 @@ test.describe("Set 110 S2 — native Work Explorer tree", () => {
     const handle = makeSet(per.tmpPath, "001-activate-me", 2);
 
     per.launch = await launchVSCode(handle.repo_root);
-    const pane = await openNativeTree(per.launch.page);
+    const pane = await openWorkExplorerTree(per.launch.page);
 
-    await expandRow(pane, "Default");
-    await expandRow(pane, "Not Started");
+    await expandTreeRow(pane, "Default");
+    await expandTreeRow(pane, "Not Started");
     const setRow = pane.locator(".monaco-list-row").filter({ hasText: "001-activate-me" }).first();
     await setRow.waitFor({ state: "visible", timeout: 15_000 });
     await setRow.click();

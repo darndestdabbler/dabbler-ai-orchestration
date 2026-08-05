@@ -731,8 +731,12 @@ suite("Set 092 S1 — visible-module renderer assembly", () => {
     );
   });
 
-  test("both Explorer surfaces go through the shared assembly", () => {
-    for (const file of ["CustomSessionSetsView.ts", "WorkExplorerTreeProvider.ts"]) {
+  // Set 110 S3: there is one Explorer surface again. The webview's copy went
+  // with the renderer, so the assertion narrows from "both surfaces agree" to
+  // "the surviving surface still does not re-derive" — which is what keeps a
+  // future second consumer from forking the logic again.
+  test("the Explorer surface goes through the shared assembly", () => {
+    for (const file of ["WorkExplorerTreeProvider.ts"]) {
       const src = fs.readFileSync(path.join(extRoot, "src", "providers", file), "utf8");
       assert.ok(
         src.includes("assembleVisibleModules("),
@@ -814,15 +818,30 @@ suite("Set 092 S1 — visible-module renderer assembly", () => {
     );
   });
 
-  test("the webview client renders semantic module inputs without recomputing the model", () => {
+  test("no surface recomputes the model outside the shared assembly", () => {
+    // Set 110 S3: this test used to scan `client.js` for the webview's
+    // module-rendering expressions (`mod.title || mod.slug || "Default"`,
+    // `moduleWarningText(mod.warning)`). The webview renders no modules any
+    // more, so scanning it for those would assert a coincidence.
+    //
+    // What the test was really protecting is the invariant that no RENDERER
+    // re-derives the module model — that is how two surfaces drift. So it is
+    // re-expressed against the surfaces that exist: the tree model owns the
+    // display strings, and neither it nor the webview client may reach for
+    // the raw computation.
+    const treeModel = fs.readFileSync(
+      path.join(extRoot, "src", "providers", "workExplorerTreeModel.ts"),
+      "utf8",
+    );
     const client = fs.readFileSync(
       path.join(extRoot, "media", "session-sets-tree", "client.js"),
       "utf8",
     );
     assert.ok(!client.includes("computeVisibleModules"));
-    assert.ok(client.includes('mod.title || mod.slug || "Default"'));
-    assert.ok(client.includes("moduleWarningText(mod.warning)"));
-    assert.ok(client.includes('warning.code === "undeclared-slug"'));
+    assert.ok(!treeModel.includes("computeVisibleModules("));
+    // The display name is read from the assembled model, never re-derived
+    // from slug/title fallbacks at the render site.
+    assert.ok(treeModel.includes("module.displayName"));
   });
 
   test("legacy groupByModule semantics remain stable for callers outside the shipping renderer", () => {

@@ -1,26 +1,28 @@
-// Set 101 Session 1 — Layer-3 Playwright rendering smoke for the
-// default-module scaffold (Set 101 S1 verification round 1, Major:
-// "Required Work Explorer end-state tests are missing"). The Node-level
-// unit suite (gitScaffoldDefaultModule.test.ts) proves the SCAFFOLD
-// WRITER produces the right files and, via computeVisibleModules /
-// buildVisibleModulePayloads, the right in-memory model — but neither of
-// those exercises the REAL webview in a REAL VS Code Electron instance.
-// This spec closes that gap: it seeds the EXACT fixture shape
-// scaffoldDefaultModuleAndLifecycleSets produces (a declared `default`
-// module with a `kind: plan` set and a `kind: decomposition` set
-// prereq-linked to it) and asserts the tree the operator actually sees —
-// one declared module, two pending rows, kind chips, the decomposition
-// row's blocked marker, and NO pseudo-module alongside it.
+// Set 101 Session 1 — Layer 3 rendering smoke for the default-module
+// scaffold, re-expressed by Set 110 Session 3 against the native `TreeView`.
 //
-// Driving the Build button itself (which runs a real venv + network pip
-// install) and the native rename/delete input-box + confirm-dialog flow
-// are OUT of scope here, consistent with this repo's own documented
-// Playwright boundary (context-menu-quickpick.spec.ts's header: driving
-// the outer VS Code QuickPick/dialog layer from inside a Playwright frame
-// is brittle) and the known-broken @vscode/test-electron harness noted in
-// CONTRIBUTING.md — those flows are covered by
-// renameModule.test.ts / deleteModule.test.ts's `preselectedSlug` suites
-// and this session's writer-level dogfood (s1-dogfood.md) instead.
+// The Node-level unit suite (`gitScaffoldDefaultModule.test.ts`) proves the
+// scaffold WRITER produces the right files and the right in-memory model;
+// neither exercises a real VS Code instance. This spec seeds the exact
+// fixture shape `scaffoldDefaultModuleAndLifecycleSets` produces — a declared
+// `default` module with a `kind: plan` set and a `kind: decomposition` set
+// prereq-linked to it — and asserts the tree the operator actually sees.
+//
+// Carrier changes, all of them the same trade:
+//
+//   - the module identity was `data-testid="module-declared-default"`; it is
+//     now the row's LABEL, which is what the operator reads anyway;
+//   - the kind chip ("plan" / "decomposition") was a rendered span. A set row
+//     has no description and one icon slot, so kind moved into the tooltip.
+//     `workExplorerTreeModel.test.ts` pins it there and this file drops it —
+//     asserting a tooltip through a 40-second host launch buys nothing.
+//   - the blocked marker was a `⛓︎` span; it is now RANK 1 of the icon
+//     precedence table, so the decomposition row carries an error codicon.
+//
+// The plan-then-decomposition GATE is the load-bearing behaviour and it is
+// asserted more sharply than before: the plan row must be unflagged and the
+// decomposition row flagged, in the same fixture, so a derivation that
+// flagged everything or nothing fails.
 
 import { expect, test } from "@playwright/test";
 import * as fs from "fs";
@@ -28,18 +30,16 @@ import * as path from "path";
 import {
   cleanupTmpDir,
   closeVSCode,
-  launchVSCode,
+  expandTreeRow,
   LaunchedVSCode,
+  launchVSCode,
   makeAdditionalSet,
   makeSet,
   makeTmpDir,
-  openSessionSetsView,
-  triggerRefresh,
+  openWorkExplorerTree,
+  treeRow,
+  treeRows,
 } from "./electronLaunch";
-
-// Must match BLOCKED_MARKER in src/providers/SessionSetsModel.ts (also
-// pinned by blocked-by-prereqs.spec.ts).
-const BLOCKED_MARKER = "⛓︎";
 
 const MODULES_YAML = [
   "modules:",
@@ -56,25 +56,14 @@ interface PerTest {
 }
 
 async function teardown(per: PerTest): Promise<void> {
-  const errs: unknown[] = [];
   if (per.launch) {
     try {
       await closeVSCode(per.launch);
-    } catch (e) {
-      errs.push(e);
+    } catch {
+      /* best effort */
     }
   }
-  if (per.tmpPath) {
-    try {
-      cleanupTmpDir(per.tmpPath);
-    } catch (e) {
-      errs.push(e);
-    }
-  }
-  if (errs.length > 0) {
-    // eslint-disable-next-line no-console
-    console.warn("teardown errors:", errs);
-  }
+  if (per.tmpPath) cleanupTmpDir(per.tmpPath);
 }
 
 function stampConfigLines(setDir: string, lines: string[]): void {
@@ -90,13 +79,13 @@ function stampConfigLines(setDir: string, lines: string[]): void {
   fs.writeFileSync(specPath, patched, "utf8");
 }
 
-test("fresh default-module scaffold: one declared module, two pending rows, plan-then-decomposition gating, no pseudo-module", async () => {
+test("fresh default-module scaffold renders one declared module with the plan gate live", async () => {
   const per: PerTest = {};
   try {
-    per.tmpPath = makeTmpDir("dabbler-pw-default-module");
-    // Exactly the two lifecycle sets scaffoldModuleLifecycleSets produces
-    // for the `default` module (Set 098 templates: single-session, kind +
-    // module stamped, decomposition prereq-linked to the plan).
+    per.tmpPath = makeTmpDir("dabbler-default-module");
+    // Exactly the two lifecycle sets the scaffold produces for the `default`
+    // module (Set 098 templates: single-session, kind + module stamped, the
+    // decomposition prereq-linked to the plan).
     const plan = makeSet(per.tmpPath, "001-default-plan", 1);
     const decomposition = makeAdditionalSet(plan, "002-default-decomposition", 1);
     stampConfigLines(plan.set_dir, ["kind: plan", "module: default"]);
@@ -114,38 +103,27 @@ test("fresh default-module scaffold: one declared module, two pending rows, plan
     );
 
     per.launch = await launchVSCode(plan.repo_root);
-    const inner = await openSessionSetsView(per.launch.page);
-    await triggerRefresh(per.launch.page);
+    const pane = await openWorkExplorerTree(per.launch.page);
 
-    const tree = inner.getByTestId("work-explorer-tree");
-    await expect(tree).toBeVisible({ timeout: 30_000 });
+    // Exactly ONE module row — the manifest's declared `default`, with no
+    // pseudo module alongside it. That is the starter scaffold's whole
+    // point, and before expansion the root rows ARE the modules.
+    await expect(treeRows(pane)).toHaveCount(1);
+    await expect(treeRow(pane, "Default")).toBeVisible();
+    await expect(treeRow(pane, "Default")).toContainText("2 sets");
 
-    // Exactly one module group, titled "Default" (the manifest's title,
-    // not the pseudo-module's fallback label), no pseudo-module alongside
-    // it — the Class1 starter's whole point.
-    await expect(inner.locator(".module-title")).toHaveText(["Default"]);
-    const defaultModule = inner.getByTestId("module-declared-default");
-    await expect(defaultModule).toBeVisible();
-    await expect(inner.getByTestId("module-pseudo-default")).toHaveCount(0);
+    await expandTreeRow(pane, "Default");
+    await expandTreeRow(pane, "Not Started");
 
-    const planRow = inner.locator('[role="treeitem"][data-slug="001-default-plan"]');
-    const decompRow = inner.locator(
-      '[role="treeitem"][data-slug="002-default-decomposition"]',
-    );
+    const planRow = treeRow(pane, "001-default-plan");
+    const decompRow = treeRow(pane, "002-default-decomposition");
     await expect(planRow).toBeVisible();
     await expect(decompRow).toBeVisible();
-    // Both rows land under the one declared module, and nowhere else.
-    await expect(defaultModule.locator('[data-slug="001-default-plan"]')).toHaveCount(1);
-    await expect(defaultModule.locator('[data-slug="002-default-decomposition"]')).toHaveCount(1);
 
-    // Kind chips.
-    await expect(planRow.locator(".row-kind-badge")).toHaveText("plan");
-    await expect(decompRow.locator(".row-kind-badge")).toHaveText("decomposition");
-
-    // The Class1 plan-first-then-decomposition gate: the plan is ready
-    // (no prereqs), the decomposition is blocked on it (not yet complete).
-    await expect(planRow.locator(".row-blocked-marker")).toHaveCount(0);
-    await expect(decompRow.locator(".row-blocked-marker")).toHaveText(BLOCKED_MARKER);
+    // The gate: the plan is ready (no prerequisites), the decomposition is
+    // blocked on it until it completes.
+    await expect(planRow.locator(".codicon-error")).toHaveCount(0);
+    await expect(decompRow.locator(".codicon-error")).toHaveCount(1);
   } finally {
     await teardown(per);
   }

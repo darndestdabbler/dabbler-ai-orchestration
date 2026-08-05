@@ -363,6 +363,158 @@
           "cost_usd": 0.57644
         }
       ]
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-05T04:06:27.263287-04:00",
+      "description": "Registered Session 3 via start_session (claude/anthropic/claude-opus-5/high); preload read (constitution, project-guidance, lessons-learned, CLAUDE.md); all three DABBLER_* keys present; no decision-review-queue entries.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "read-spec",
+      "dateTime": "2026-08-05T04:06:27.264280-04:00",
+      "description": "Read the spec's Session 3 plan and config block (full tier, requiresUAT true -> S4, requiresE2E true -> L-064-12 at full strength HERE, pathAwareCritique advisory -> S4). Read operator-notes: the 2026-08-05 test-run policy names S3 as the non-negotiable full-Layer-3-at-close session, and the verification-loop discipline note binds the phased bounds.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "prerequisites",
+      "dateTime": "2026-08-05T04:06:27.265281-04:00",
+      "description": "Confirmed S1 complete (WAIVED, GO) and S2 complete (VERIFIED). Verified every S2 Create exists on disk (providers/WorkExplorerTreeProvider.ts, workExplorerTreeModel.ts, moduleAssembly.ts, commands/workExplorerTreeCommands.ts, utils/startupTiming.ts, media/light + media/dark glyph pairs). Surveyed the deletion surface: client.js 1201 lines, tree.css 723, CustomSessionSetsView.ts 977; 11 of 15 Layer 3 specs drive the webview through openSessionSetsView.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-08-05T04:06:27.265940-04:00",
+      "description": "Routed step-3.5 analysis (analysis, excl. anthropic -> gpt-5.6-luna, $0.0170, truncation-clean). FIRST ATTEMPT LOST ITS PAID OUTPUT to an AttributeError on a metadata line after the call returned - L-079-1's exact warning, recorded rather than hidden; the script now writes result.content to disk before touching any other attribute.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "design-consult",
+      "dateTime": "2026-08-05T04:38:54.713425-04:00",
+      "description": "Routed the one genuine design question \u2014 the stacked WebviewView's PRESENCE RULES (architecture, excl. anthropic -> gemini-2.5-pro, $0.0146). Verdict: a `when`-gated view, with the host loading the webview's OWN systemStatusHtml.js in-process rather than reimplementing its fault rules (no parity test needed because there is one implementation). Departed from it on two points, both recorded: viewsWelcome is NOT contributed (it would only fire in the no-folder case the webview already covers more richly), and the manifest fault ships in ONE channel (TreeView.message) not two.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "layer3-rewrite",
+      "dateTime": "2026-08-05T04:38:54.715188-04:00",
+      "description": "Re-expressed the Layer 3 behavioural specification against the native surface, routed as test-generation (excl. anthropic -> gemini-2.5-pro, $0.0918, 29.8k in / 5.5k out). Promoted 8 native-tree helpers into electronLaunch.ts, located by the presence of a .monaco-list rather than by pane TITLE so no spec had to change in the commit that flipped the shipping surface. 15 Layer 3 specs -> 14: 5 deleted (session-sets-tree split, multi-in-progress folded, context-menu-quickpick superseded, migration-cta + migration-cta-v4 merged), 6 rewritten, 3 new. REJECTED two of the analyst's verdicts on the record: loading-state.spec.ts and the four Getting Started scenarios are NOT superseded \u2014 the form is untouched by this migration.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "tree-diagnostic",
+      "dateTime": "2026-08-05T04:38:54.715548-04:00",
+      "description": "Discharged S2 residual 1: WorkExplorerTreeProvider now retains manifestFaults and reports them through an onDiagnostic sink that extension.ts binds to TreeView.message. Reports on EVERY recompute including the clean case, so a repaired manifest clears the message rather than leaving the workspace permanently accused. describeManifestFaults is pure and exported so Layer 2 can pin the wording without a TreeView.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "switchover",
+      "dateTime": "2026-08-05T04:38:54.715548-04:00",
+      "description": "package.json: the native tree is the shipping `Work Explorer` (no visibility, no when); the webview becomes `Setup & Status`, stacked above, gated on dabblerSessionSets.setupNeeded; all five view/title actions retargeted to the tree (an action gated on a conditional view disappears with it); the activity-bar mark swapped to the circled-checkmark icon-2. extension.ts wires the diagnostic sink and the new context key, which fails toward VISIBLE.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "rehome",
+      "dateTime": "2026-08-05T04:38:54.717565-04:00",
+      "description": "providers/systemStatus.ts extracted (buildSystemStatus + isSetupNeeded). CustomSessionSetsView.ts (977 lines) DELETED, replaced by SetupStatusView.ts (~270) carrying only the Getting Started form and the System Status strip; view id unchanged so saved layouts survive. Message protocol 8 -> 2 messages; the COMMAND_ALLOWLIST went with the dispatch channel it guarded (removing the surface beats allowlisting it).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "deletions",
+      "dateTime": "2026-08-05T04:38:54.717565-04:00",
+      "description": "client.js 1202 -> 400 lines; tree.css 724 -> 277 (incl. the 0.48.0 ellipsis rule and the action strip whose comment records the Set 108 swallowed-click defect); SnapshotPayload.modules removed. Deleted outright: suppressionState.ts, moduleActionNarrowing.ts, both poc-nine-modules scripts, the two dead QuickPick item builders, and three orphaned webview mockup/screenshot assets. Routed deletion/orphan review (code-review, excl. anthropic -> gemini-2.5-pro, $0.0450) drove the scope; two of its coverage_at_risk claims are rejected on the record.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "layer2",
+      "dateTime": "2026-08-05T04:38:54.719575-04:00",
+      "description": "Repaired 8 Layer-2 suites that scanned the deleted view BY PATH. Live invariants RETARGETED (the never-write-the-manifest trust boundary now polices 5 passive paths instead of 2; the blocked-badge retirement follows the badge to the tree descriptors); dead contracts DELETED; two behaviours MIGRATED from source scans to real assertions on setDescriptor/setTooltip. The Set 110 S2 view-contribution test became the single shipping-surface contract. Layer 2: 1866 passing / 0 failing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "seeded-regression",
+      "dateTime": "2026-08-05T04:38:54.719575-04:00",
+      "description": "Wrote overlay-click-swallow.spec.ts \u2014 the operator's 'seed a regression and prove Layer 3 catches it' step, as a PERMANENT falsifier rather than a one-off manual demo. It seeds the Set 108 shape (flow-height overlay above tree content, pointer-events live) in the real workbench frame, requires a NORMAL non-forced click to fail, then removes it and requires the identical click to pass. If the seed fails to break the click the test fails loudly, because an unfalsifiable guard reads as coverage.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "layer3-targeted",
+      "dateTime": "2026-08-05T04:54:13.127842-04:00",
+      "description": "complete",
+      "status": "Targeted Layer 3 across every new and rewritten spec. First pass 18/22; four failures, ALL in the tests rather than the product, and all four are my own over-claims: (a) native-tree.spec.ts still opened the pane by its Session 2 preview TITLE via a local helper I had not replaced; (b) the same file's fixture stamped module slugs from its own retired manifest copy after I re-pointed it at the shared one; (c) cancellation-state-file asserted an empty `Cancelled` bucket renders with '0 sets' - orderedBuckets emits that fourth bucket ONLY when non-empty (the three defaults always render; Cancelled is conditional), so the webview's original toHaveCount(0) translated literally after all; (d) module-tier split module row text on a newline that is not there - VS Code renders label and description inline, so 'Greeter 3 sets' is one line. Each header comment now records the corrected reading, since (c) and (d) were both L-064-8: a claim about current behaviour written into a new doc and not checked."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 14,
+      "stepKey": "startup-guard",
+      "dateTime": "2026-08-05T04:54:13.127842-04:00",
+      "description": "complete",
+      "status": "Self-review catch, no gate would have seen it: isSetupNeeded stats every PATH entry twice (the Python and Copilot-CLI presence probes) and evaluateContextKeys is called synchronously inside activate(). Filesystem stats, not subprocess spawns, so small - but this set exists because of startup cost and S4 has a sub-second view-open gate. Moved that one evaluation behind setImmediate so activate() does not pay it. Watcher-inventory allowlist line numbers updated twice as extension.ts shifted."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 15,
+      "stepKey": "layer3-full",
+      "dateTime": "2026-08-05T05:10:32.092014-04:00",
+      "description": "complete",
+      "status": "Full Layer 3 suite (the operator's non-negotiable for a session touching the Explorer rendering surface). First full run: 30 passed / 3 failed, and all three were specs OUTSIDE the set I had rewritten - which is exactly the coverage a targeted run cannot buy. (a) real-host-baseline.spec.ts measured the WEBVIEW's cold launch-to-first-row through the deleted iframe; RETARGETED at the native tree through the identical protocol, writing s3-native-tree-baseline.json rather than overwriting S1's before-number, so S4 inherits a working after-harness. (b) icon-render-mechanism.spec.ts still located its pane by the Session 2 preview title. (c) vsix-first-run-walkthrough hit a hidden assumption in a helper I wrote: openWorkExplorerTree waits 30s for a first row, but at that point a real venv+pip install is still running; switched to workExplorerPane, which does not wait. Second full run is the run of record."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 16,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-08-05T05:43:16.043959-04:00",
+      "description": "complete",
+      "status": "Phased discovery round 1 (fan-out 2, both gpt-5-6-sol, anthropic auto-excluded, $2.0296): ISSUES_FOUND, 1 blocking Major, 0 minor. The finding is sharper than 'flaky test': the new environment-fault Layer 3 test did not deterministically CAUSE a fault. Its stated reason (the workspace-initialization probe fails) was factually impossible - workspaceInitialized is hasAnySets || structureBuilt and the fixture creates a set - and it passed only because the Electron launcher's env allowlist happens to strip DABBLER_* keys, so the PROVIDER-KEY fault fired instead. On a runner that passed those keys through, the mandatory full-suite gate would have failed on the environment rather than the product."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 17,
+      "stepKey": "verify-supplementary",
+      "dateTime": "2026-08-05T05:43:16.045959-04:00",
+      "description": "complete",
+      "status": "Supplementary completeness-critic pass ($0.9877), run BEFORE any remediation as the loop requires: VERIFIED, zero findings. Nothing joined the merge."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 18,
+      "stepKey": "remediation",
+      "dateTime": "2026-08-05T05:43:16.045959-04:00",
+      "description": "complete",
+      "status": "Fixed the Major by making the fixture CAUSE a fault it controls (dabblerSessionSets.pythonPath pointed at a nonexistent file, which short-circuits the Python probe deterministically) and asserting the exact fault code, so the test can no longer pass on a fault it did not cause. Declined the verifier's suggested fix (use an empty workspace) on the record: that returns true on the !hasAnySets branch and stops exercising the fault path at all. B-lite acceptance checks run against BOTH states with outputs pasted in s3-remediation-round-1.md. TWO MORE defects fixed in the same round, both found by the full run rather than a verifier and both in code this session wrote: openDabblerContainer clicked the activity-bar icon unconditionally (VS Code icons TOGGLE, so the second call closed the sidebar and cost the walkthrough a 5-minute timeout), and the first fix for it guessed at the workbench's .checked markers, read them backwards, and turned one failure into three - replaced by an explicit reveal flag. Plus a third race: the scaffold writes modules.yaml BEFORE the lifecycle sets, so the SET COUNT is the completion signal, not the module row."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 19,
+      "stepKey": "remediation-review",
+      "dateTime": "2026-08-05T05:43:16.046960-04:00",
+      "description": "complete",
+      "status": "remediation-review round 3 over the fix delta ($0.1244): VERIFIED, 1 fix accepted / 0 rejected / 0 accepted-with-modification, zero new findings. 2 of 2 permitted discovery passes used; no third round opened."
     }
   ]
 }

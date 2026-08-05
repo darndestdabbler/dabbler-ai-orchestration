@@ -25,8 +25,23 @@
 //   mask-image present   -> the SVG is a stencil; CSS supplies the
 //                           colour; ONE asset suffices and its own
 //                           fills are irrelevant.
-//   background-image only-> the SVG is painted as authored; a
-//                           {light, dark} pair is required.
+//   background-image only-> the SVG is painted as authored, so
+//                           `currentColor` cannot inherit the workbench
+//                           foreground.
+//
+// Set 110 Session 3 (Session 2's second assigned residual): that second
+// line used to end "a {light, dark} pair is required". Round 1 narrowed the
+// same over-claim in `status-icon-theming.md` and in the implementation
+// notes but missed the string this harness GENERATES, so a future run would
+// have re-recorded the over-claim into the evidence file. That is L-065-1
+// exactly — a consistency fix is rarely local — and it is fixed here rather
+// than in the committed artifact, which is a raw record of what the harness
+// said at the time and is never edited.
+//
+// The precise claim: the probe proves the authored colours are what render.
+// A {light, dark} pair is the SELECTED solution, not the only workable one —
+// a single asset painted legibly on both themes would also work. The pair
+// won because these glyphs carry a ring that has to invert.
 //
 // The result is auditable rather than asserted: the probe is written to
 // the run's own artifact directory every time, and to the TRACKED
@@ -55,6 +70,7 @@ import {
   LaunchedVSCode,
   makeSet,
   makeTmpDir,
+  workExplorerPane,
 } from "./electronLaunch";
 
 const EVIDENCE_DIR = path.resolve(
@@ -148,31 +164,16 @@ test("TreeItem.iconPath render mechanism — mask vs background-image", async ({
     launch = await launchVSCode(handle.repo_root);
     const page = launch.page;
 
-    // Open the Dabbler container, then the NATIVE tree (the webview is
-    // still the default surface this session, so the native view is
-    // contributed collapsed underneath it and must be expanded).
-    const activityIcon = page.locator(
-      '.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]',
-    );
-    await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
-    await activityIcon.click();
-
-    // The native view ships COLLAPSED this session (the webview is still
-    // the default surface), so it must be expanded before it renders any
-    // row. Find its pane by title text and click the twisty.
-    const nativePane = page
-      .locator(".pane")
-      .filter({ has: page.locator('.title:text-is("Work Explorer (native preview)")') });
-    await nativePane.first().waitFor({ state: "visible", timeout: 30_000 });
-    const header = nativePane.first().locator(".pane-header");
-    if ((await header.getAttribute("aria-expanded")) === "false") {
-      await header.click();
-      await page.waitForTimeout(1000);
-    }
+    // Set 110 Session 3: this used to open the container by hand and find
+    // the pane by the title "Work Explorer (native preview)" — a name that
+    // retires the moment the native tree becomes the shipping view, which is
+    // what this session does. The shared helper locates the pane by the
+    // presence of a `.monaco-list` instead, so it survives the rename.
+    const nativePane = await workExplorerPane(page);
 
     // Drill to a SET row, which is where a file-backed status glyph
     // renders (module and bucket rows use ThemeIcons).
-    const rows = nativePane.first().locator(".monaco-list-row");
+    const rows = nativePane.locator(".monaco-list-row");
     try {
       await rows.first().waitFor({ state: "visible", timeout: 20_000 });
     } catch {
@@ -190,7 +191,7 @@ test("TreeItem.iconPath render mechanism — mask vs background-image", async ({
     // levels: module -> bucket -> set. Bounded so a structural change
     // cannot turn this into an infinite loop.
     for (let depth = 0; depth < 3; depth++) {
-      const collapsed = nativePane.first().locator('.monaco-list-row[aria-expanded="false"]');
+      const collapsed = nativePane.locator('.monaco-list-row[aria-expanded="false"]');
       const n = await collapsed.count();
       if (n === 0) break;
       for (let i = 0; i < n; i++) {
@@ -254,7 +255,9 @@ test("TreeItem.iconPath render mechanism — mask vs background-image", async ({
       ? usesMask || usesWebkitMask
         ? "MASKED — one asset suffices; the SVG's own fills are irrelevant"
         : usesBackground
-          ? "BACKGROUND-IMAGE — the SVG paints as authored; a {light, dark} pair is required"
+          ? "BACKGROUND-IMAGE — the SVG paints as authored, so `currentColor` " +
+            "cannot inherit the workbench foreground; a {light, dark} pair is the " +
+            "selected solution, not the only workable one"
           : "INCONCLUSIVE — an icon element was found but neither mechanism carried a url()"
       : "NO FILE-BACKED ICON FOUND — the probe never reached a set row";
 

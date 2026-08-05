@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { CustomSessionSetsView } from "./providers/CustomSessionSetsView";
+import { SetupStatusView } from "./providers/SetupStatusView";
 import { ScanState } from "./providers/scanState";
 import { registerMigrateSetCommand } from "./commands/migrateSet";
 import { registerMigrateSetV4Command } from "./commands/migrateSetV4";
@@ -50,6 +50,8 @@ import { SessionSet } from "./types";
 // so the two can be compared before Session 3 switches over.
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
+// Set 110 Session 3: the presence rule for the setup/status webview.
+import { isSetupNeeded } from "./providers/systemStatus";
 // Set 110 Session 2: host-side startup buckets (S1's assigned residual).
 import { markActivateEnd, markActivateStart } from "./utils/startupTiming";
 
@@ -70,6 +72,41 @@ function evaluateRouterCapabilityContextKey(): void {
     routes = false;
   }
   vscode.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
+}
+
+// Set 110 S3: the setup/status webview is contributed with
+// `when: dabblerSessionSets.setupNeeded`, so it appears only when it has
+// something to say — a repo with sets and a healthy environment gets the
+// whole panel for its tree, which is the operator's standing complaint about
+// this Explorer.
+//
+// The key MUST be computed here rather than inside the view: a view hidden by
+// a `when` clause is never resolved, so its own provider could never decide
+// to bring it back. `isSetupNeeded` answers the fault half by loading the
+// webview's own renderer in-process rather than reimplementing its rules —
+// see `providers/systemStatus.ts` for why that matters.
+function evaluateSetupNeededContextKey(
+  extensionPath: string,
+  allSets: SessionSet[],
+): void {
+  let needed = true;
+  try {
+    needed = isSetupNeeded(extensionPath, allSets.length > 0);
+  } catch (err) {
+    // Fail toward VISIBLE. The point of the gate is that a fault is never
+    // invisible; a gate that fails closed would hide the surface that
+    // reports faults, which is the opposite of what it is for.
+    console.error(
+      "[dabbler-ai-orchestration] setup-needed evaluation threw; " +
+        "showing the Setup & Status view.",
+      err,
+    );
+  }
+  vscode.commands.executeCommand(
+    "setContext",
+    "dabblerSessionSets.setupNeeded",
+    needed,
+  );
 }
 
 function evaluateSupportContextKeys(allSets: SessionSet[]): void {
@@ -124,17 +161,12 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push({ dispose: () => scanState.dispose() });
   scanState.setLoading();
 
-  // Set 029 Session 4: replaced the native TreeView with a custom
-  // webview tree. CustomSessionSetsView owns rendering, the typed
-  // message protocol with monotonic version, and the QuickPick-based
-  // row-context menu (per S4 audit Q6 = a). The per-row accordion-body
-  // was retired in Set 034 (accordionHtml ships as null on every row)
-  // and the source modules deleted in Set 036 Session 6.
-  //
-  // Set 033 Session 2: MarkerWatchService retired (H2). The
-  // workspace-level file-watcher below (which already watches
-  // session-state.json) covers every signal the view needs.
-  const provider = new CustomSessionSetsView(context, scanState);
+  // Set 110 Session 3: the webview no longer renders a tree. It carries
+  // only the surfaces a `TreeItem` cannot host — the Getting Started form
+  // and the System Status strip — and is contributed conditionally, so on a
+  // healthy repo with session sets it is absent entirely and the tree gets
+  // the whole panel.
+  const provider = new SetupStatusView(context, scanState);
   context.subscriptions.push({ dispose: () => provider.dispose() });
   // Set 077 S2 (Feature 1, A1): `retainContextWhenHidden` was evaluated
   // here as belt-and-braces for the Getting Started tier-leak fix and
@@ -146,20 +178,17 @@ export function activate(context: vscode.ExtensionContext): void {
   // standing memory cost VS Code's own guidance says to avoid when
   // getState/setState suffices.
   context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(CustomSessionSetsView.viewType, provider),
+    vscode.window.registerWebviewViewProvider(SetupStatusView.viewType, provider),
   );
 
-  // Set 110 Session 2: the native `TreeView`, registered ALONGSIDE the
-  // webview — not instead of it. The webview stays the default surface
-  // for this session so the two can be compared before Session 3
-  // switches over and deletes the hand-rolled renderer; the native view
-  // is contributed collapsed, below it, in the same container.
+  // Set 110 Session 3: the native `TreeView` is now THE Work Explorer. The
+  // webview above it carries only the surfaces a `TreeItem` cannot host —
+  // the Getting Started form and the System Status strip — and is
+  // contributed conditionally.
   //
   // `createTreeView` rather than `registerTreeDataProvider` because the
   // former returns the `TreeView` handle that `TreeView.message`,
-  // `TreeView.badge` and `reveal()` live on — Session 3 re-homes the
-  // empty state onto those, and Layer 3 drives expansion through
-  // `reveal()`.
+  // `TreeView.badge` and `reveal()` live on.
   const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
   context.subscriptions.push({ dispose: () => treeProvider.dispose() });
   const treeView = vscode.window.createTreeView(WorkExplorerTreeProvider.viewType, {
@@ -167,10 +196,32 @@ export function activate(context: vscode.ExtensionContext): void {
     showCollapseAll: true,
   });
   context.subscriptions.push(treeView);
+  // Set 110 S3 (Session 2's assigned residual): a broken `docs/modules.yaml`
+  // used to leave the tree showing a stale last-known-good module list with
+  // NO explanation. `TreeView.message` renders directly above the rows, so
+  // the explanation lands where the operator is already looking. The
+  // provider reports on every recompute including the clean one, so a
+  // repaired manifest clears the message rather than leaving the workspace
+  // permanently accused.
+  treeProvider.onDiagnostic((message) => {
+    treeView.message = message;
+  });
 
   const evaluateContextKeys = () => {
-    evaluateSupportContextKeys(readAllSessionSets());
+    const allSets = readAllSessionSets();
+    evaluateSupportContextKeys(allSets);
     evaluateRouterCapabilityContextKey();
+    // Set 110 S3: DELIBERATELY off the synchronous path. `isSetupNeeded`
+    // stats every PATH entry twice (the Python and Copilot-CLI presence
+    // probes), and this function is called inside `activate()`. The probes
+    // are filesystem stats rather than subprocess spawns, so the cost is
+    // small — but this whole session set exists because of startup cost, and
+    // Session 4 has a sub-second view-open gate to hit. Paying it one tick
+    // later costs nothing an operator can perceive and keeps it out of the
+    // bucket VS Code charges to activation.
+    setImmediate(() =>
+      evaluateSetupNeededContextKey(context.extensionPath, allSets),
+    );
   };
   // v0.13.2: defensive — `evaluateContextKeys()` calls `readAllSessionSets()`
   // which iterates every session set's session-state.json. A single

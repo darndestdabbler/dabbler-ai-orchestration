@@ -25,7 +25,11 @@ import * as vscode from "vscode";
 import { SessionSet } from "../types";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { ActionSupports } from "./ActionRegistry";
-import { assembleVisibleModules, nodeModuleAssemblyIo } from "./moduleAssembly";
+import {
+  ManifestFault,
+  assembleVisibleModules,
+  nodeModuleAssemblyIo,
+} from "./moduleAssembly";
 import { VisibleModule } from "./SessionSetsModel";
 import {
   IconSpec,
@@ -56,7 +60,37 @@ export class WorkExplorerTreeProvider
   /** Parent links, populated as children are served, so `reveal()` works. */
   private readonly parents = new WeakMap<object, WorkExplorerNode>();
 
+  /**
+   * Set 110 S3 — the invalid-manifest diagnostic, and Session 2's assigned
+   * residual.
+   *
+   * Session 2 took `assembleVisibleModules(...).modules` and DROPPED
+   * `.manifestFaults`, so a broken `docs/modules.yaml` left this tree
+   * showing a stale last-known-good module list with no explanation: the
+   * operator saw modules that no longer matched their file and nothing
+   * saying why. Three independent reads raised it (both round-2 fan-out
+   * calls and the close backstop) and it is a fail-quiet in a codebase
+   * whose standing rule is fail-loud.
+   *
+   * The fix is a callback rather than a `TreeView` reference held here,
+   * because the provider does not own the view — `extension.ts` creates it
+   * and is the only place that can set `TreeView.message`. Keeping the
+   * dependency pointing that way also keeps this class driveable from the
+   * Layer 2 suite with no `window` stub.
+   *
+   * `undefined` means "no fault"; the caller clears the message.
+   */
+  private diagnostic: ((message: string | undefined) => void) | undefined;
+
   constructor(private readonly extensionUri: vscode.Uri) {}
+
+  /**
+   * Register the sink that renders manifest faults. Called once, by
+   * `extension.ts`, immediately after `createTreeView`.
+   */
+  public onDiagnostic(sink: (message: string | undefined) => void): void {
+    this.diagnostic = sink;
+  }
 
   public dispose(): void {
     this.onDidChangeEmitter.dispose();
@@ -109,11 +143,17 @@ export class WorkExplorerTreeProvider
 
   private modules(): VisibleModule[] {
     if (!this.modulesCache) {
-      this.modulesCache = assembleVisibleModules(
+      const assembly = assembleVisibleModules(
         this.sets(),
         nodeModuleAssemblyIo(),
         this.lastKnownGoodModules,
-      ).modules;
+      );
+      this.modulesCache = assembly.modules;
+      // Report on every recompute, INCLUDING the clean case — the message
+      // has to disappear when the operator fixes the file, and a sink that
+      // only fires on faults would leave a repaired workspace permanently
+      // accused.
+      this.diagnostic?.(describeManifestFaults(assembly.manifestFaults));
     }
     return this.modulesCache;
   }
@@ -200,6 +240,29 @@ export class WorkExplorerTreeProvider
       dark: vscode.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug),
     };
   }
+}
+
+/**
+ * The one-line `TreeView.message` for a set of manifest faults, or
+ * `undefined` when there are none.
+ *
+ * Exported and pure so the Layer 2 suite can pin the wording without a
+ * `TreeView`. It says which root, what is wrong, and — the part that makes
+ * the stale tree comprehensible rather than merely flagged — whether what is
+ * on screen is the last-known-good list or a recoverable fallback.
+ */
+export function describeManifestFaults(
+  faults: readonly ManifestFault[],
+): string | undefined {
+  if (faults.length === 0) return undefined;
+  return faults
+    .map((fault) => {
+      const shown = fault.retainedLastKnownGood
+        ? "Showing the last-known-good module tree."
+        : "No prior valid module tree is available; showing recoverable fallback groups.";
+      return `${fault.rootLabel}: ${fault.message} ${shown}`;
+    })
+    .join("  ");
 }
 
 /** Narrow an untrusted command argument to a module node. */

@@ -53,14 +53,26 @@
 // SLOW: includes a real venv + pip install (the same first-run cost any
 // human operator pays). Generous timeouts throughout.
 
+//   6. Set 110 S3: this walkthrough now spans BOTH surfaces, and that is
+//      the point of keeping it. The Getting Started form is still a webview
+//      (a `TreeItem` cannot host radio buttons and a validated budget
+//      field), so the Build step drives `openSessionSetsView`; every
+//      MODULE assertion afterwards reads the native tree through
+//      `openWorkExplorerTree`. If the two views ever stop agreeing about
+//      the same workspace, this is the spec that notices.
+
 import { expect, test } from "@playwright/test";
 import {
   cleanupTmpDir,
   closeVSCode,
+  expandTreeRow,
   launchVSCode,
   LaunchedVSCode,
   makeTmpDir,
   openSessionSetsView,
+  treeRow,
+  treeRows,
+  workExplorerPane,
 } from "./electronLaunch";
 
 interface PerTest {
@@ -142,15 +154,38 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
     await expect(buildButton).toBeEnabled({ timeout: 15_000 });
     await buildButton.click();
 
-    // The real install takes a while; the tree flipping from the Getting
-    // Started form to the scaffolded Default module is the observable
-    // completion signal (the Layer-3 convention: assert the rendered
-    // tree, never a transient toast).
-    const defaultModule = inner.getByTestId("module-declared-default");
-    await expect(defaultModule).toBeVisible({ timeout: 300_000 });
-    await expect(inner.locator(".module-title")).toHaveText(["Default"]);
-    await expect(inner.getByTestId("module-pseudo-default")).toHaveCount(0);
-    await expect(inner.locator('[role="treeitem"][aria-level="3"]')).toHaveCount(2);
+    // The real install takes a while; the NATIVE tree acquiring the
+    // scaffolded Default module is the observable completion signal (the
+    // Layer 3 convention: assert the rendered tree, never a transient
+    // toast). Set 110 S3: this is the hand-off point between the two
+    // surfaces — the form posted to the host, and the tree is where the
+    // result appears.
+    // `workExplorerPane`, NOT `openWorkExplorerTree`: the latter waits 30s
+    // for a first row, and at this instant the tree has none — the real venv
+    // + pip install is still running and can take minutes. The wait that
+    // matters is the one below, on the Default module row, with the install's
+    // own timeout. Reaching for the row-waiting helper here made this the
+    // last failure of the switch-over and is worth naming: a convenience
+    // helper's built-in wait is a hidden assumption about what has already
+    // happened.
+    //   - `reveal: false`: the container is ALREADY open (the Build step above
+    //     drove the Getting Started webview inside it). Revealing again would
+    //     click the activity-bar icon a second time, which TOGGLES the sidebar
+    //     shut.
+    const pane = await workExplorerPane(page, { reveal: false });
+    // The SET COUNT is the completion signal, not the module row. The
+    // scaffold writes `docs/modules.yaml` before it creates the lifecycle
+    // sets, so the Default row appears reading "Default0 sets" while the real
+    // venv + pip install is still running, and only later becomes "2 sets".
+    // Waiting on the row and then asserting the count with a short timeout
+    // raced that gap and failed on "Default0 sets" — the webview never
+    // exposed the seam because it rebuilt the whole tree per snapshot.
+    await expect(treeRow(pane, "Default")).toContainText("2 sets", {
+      timeout: 300_000,
+    });
+    // Exactly one module row, so no pseudo module rendered alongside the
+    // declared one. Before expansion the root rows ARE the modules.
+    await expect(treeRows(pane)).toHaveCount(1);
 
     // ---- Step 2: rename Default -> Greeter, through the real palette
     // command + QuickPick + two InputBoxes + modal confirm. ----
@@ -172,12 +207,13 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
     await renameDialog.waitFor({ state: "visible", timeout: 15_000 });
     await renameDialog.getByRole("button", { name: "Rename Module" }).click();
 
-    await expect(inner.getByTestId("module-declared-greeter")).toBeVisible({
-      timeout: 30_000,
-    });
-    await expect(inner.locator(".module-title")).toHaveText(["Greeter"]);
     // The rename restamped both lifecycle sets — names unchanged, still 2.
-    await expect(inner.locator('[role="treeitem"][aria-level="3"]')).toHaveCount(2);
+    // A rename that failed to restamp would strand the sets in a pseudo
+    // module, which would show up as a SECOND root row.
+    await expect(treeRow(pane, "Greeter")).toContainText("2 sets", {
+      timeout: 60_000,
+    });
+    await expect(treeRows(pane)).toHaveCount(1);
 
     // ---- Step 3: delete Greeter, through the real palette command +
     // QuickPick + modal confirm. ----
@@ -187,9 +223,9 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
     await deleteDialog.waitFor({ state: "visible", timeout: 15_000 });
     await deleteDialog.getByRole("button", { name: "Delete Module" }).click();
 
-    await expect(inner.getByTestId("module-declared-greeter")).toHaveCount(0, {
-      timeout: 30_000,
-    });
+    await expect(
+      treeRows(pane).filter({ hasText: "Greeter" }),
+    ).toHaveCount(0, { timeout: 30_000 });
 
     // ---- Step 4: re-add a real module (payments), through the real
     // palette command + two InputBoxes (titled steps 1/2 and 2/2). ----
@@ -207,12 +243,17 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
     await newTitleStep.locator("input").fill("Payments");
     await page.keyboard.press("Enter");
 
-    await expect(inner.getByTestId("module-declared-payments")).toBeVisible({
-      timeout: 30_000,
+    // The re-add scaffolded a fresh plan/decomposition pair — again, the
+    // count is the completion signal, not the row.
+    await expect(treeRow(pane, "Payments")).toContainText("2 sets", {
+      timeout: 120_000,
     });
-    await expect(inner.locator(".module-title")).toHaveText(["Payments"]);
-    // The re-add scaffolded a fresh plan/decomposition pair.
-    await expect(inner.locator('[role="treeitem"][aria-level="3"]')).toHaveCount(2);
+    await expect(treeRows(pane)).toHaveCount(1);
+    // And they really are under it, not merely counted: drill once at the
+    // end of the walk so the whole journey ends on a real leaf.
+    await expandTreeRow(pane, "Payments");
+    await expandTreeRow(pane, "Not Started");
+    await expect(treeRows(pane).filter({ hasText: /-plan$/ })).toHaveCount(1);
   } finally {
     await teardown(per);
   }

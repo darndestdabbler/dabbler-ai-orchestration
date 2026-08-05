@@ -45,8 +45,11 @@ suite("cost-dashboard D3 gate wiring", () => {
       entry!.when && entry!.when.includes(CONTEXT_KEY),
       `view/title cost action must be gated on ${CONTEXT_KEY}; got when="${entry!.when}"`,
     );
-    // Still scoped to the Session Sets view so it doesn't leak elsewhere.
-    assert.ok(entry!.when!.includes("view == dabblerSessionSets"));
+    // Still scoped to a single view so it does not leak elsewhere. Set 110
+    // S3: that view is the native tree — the webview is contributed
+    // conditionally now, and an action gated on it would vanish on exactly
+    // the healthy repos most likely to want a cost dashboard.
+    assert.ok(entry!.when!.includes("view == dabblerWorkExplorerTree"));
   });
 
   test("command palette hides the cost command unless routesCost", () => {

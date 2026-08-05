@@ -43,7 +43,7 @@ interface Pkg {
   contributes: {
     commands: { command: string; title: string; icon?: string }[];
     submenus?: { id: string; label: string }[];
-    views: Record<string, { id: string; name: string; visibility?: string }[]>;
+    views: Record<string, { id: string; name: string; visibility?: string; when?: string }[]>;
     menus: Record<string, MenuEntry[]>;
   };
 }
@@ -58,17 +58,54 @@ const openFileItems = menus[SUBMENU_OPEN] ?? [];
 const copyPromptItems = menus[SUBMENU_COPY] ?? [];
 const allNativeEntries = [...nativeItemContext, ...openFileItems, ...copyPromptItems];
 
-suite("Set 110 S2 — the native view is contributed without disturbing the webview", () => {
-  test("both views live in the same container, webview FIRST and native collapsed", () => {
-    // Spec, Session 2 step 5: "Keep the webview tree in place and
-    // default." Order and visibility are how that is expressed
-    // declaratively — this session ships the provider BEHIND the
-    // existing surface, it does not switch over. Session 3 does.
-    const views = pkg.contributes.views.dabblerSessionSetsContainer;
-    assert.strictEqual(views[0].id, "dabblerSessionSets", "the webview must remain first");
+suite("Set 110 S3 — the native tree is the shipping Work Explorer", () => {
+  // This is the ONE place the shipping identity is asserted. Every Layer 3
+  // spec locates the tree pane by the presence of a `.monaco-list` rather
+  // than by title, precisely so that none of them quietly re-assert this
+  // and none of them had to change in the commit that flipped it.
+  const views = pkg.contributes.views.dabblerSessionSetsContainer;
+
+  test("the tree is named Work Explorer and is unconditionally present", () => {
     const native = views.find((v) => v.id === VIEW);
     assert.ok(native, "the native tree view is not contributed");
-    assert.strictEqual(native.visibility, "collapsed");
+    assert.strictEqual(native.name, "Work Explorer");
+    // No `visibility: collapsed` (Session 2's preview posture) and no `when`
+    // clause: the tree is the surface, and it is always there.
+    assert.strictEqual(native.visibility, undefined);
+    assert.strictEqual(native.when, undefined);
+  });
+
+  test("the webview is a conditionally-present Setup & Status surface above it", () => {
+    assert.strictEqual(views[0].id, "dabblerSessionSets", "setup/status stacks above the tree");
+    assert.strictEqual(views[0].name, "Setup & Status");
+    // The presence rule. A view hidden by a `when` clause is never resolved,
+    // so its own provider cannot decide to bring it back — the key is
+    // computed in `extension.ts` via `providers/systemStatus.ts`, which
+    // fails toward VISIBLE so a fault is never invisible.
+    assert.strictEqual(views[0].when, "dabblerSessionSets.setupNeeded");
+    assert.strictEqual(views[1].id, VIEW, "the tree is the second, and last, view");
+    assert.strictEqual(views.length, 2);
+  });
+
+  test("every title-bar action is gated on the tree, not on the conditional view", () => {
+    // The failure this catches is quiet and total: an action gated on the
+    // webview disappears with it, so on a healthy repo the operator would
+    // lose Refresh, the cost dashboard, Get Started, the manifest opener and
+    // the bulk upgrade — with nothing on screen to say why.
+    const titleEntries = menus["view/title"] ?? [];
+    assert.ok(titleEntries.length > 0, "no view/title contributions found");
+    for (const entry of titleEntries) {
+      const when = entry.when ?? "";
+      assert.ok(
+        when.includes(`view == ${VIEW}`),
+        `${entry.command} is gated on "${when}" — title actions belong on the ` +
+          `always-present tree view`,
+      );
+      assert.ok(
+        !when.includes("view == dabblerSessionSets "),
+        `${entry.command} is still gated on the conditional webview`,
+      );
+    }
   });
 });
 

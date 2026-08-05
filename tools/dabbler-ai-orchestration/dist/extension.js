@@ -107,17 +107,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path47) {
-      const ctrl = callVisitor(key, node, visitor, path47);
+    function visit_(key, node, visitor, path48) {
+      const ctrl = callVisitor(key, node, visitor, path48);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path47, ctrl);
-        return visit_(key, ctrl, visitor, path47);
+        replaceNode(key, path48, ctrl);
+        return visit_(key, ctrl, visitor, path48);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path47 = Object.freeze(path47.concat(node));
+          path48 = Object.freeze(path48.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = visit_(i2, node.items[i2], visitor, path47);
+            const ci = visit_(i2, node.items[i2], visitor, path48);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -128,13 +128,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path47 = Object.freeze(path47.concat(node));
-          const ck = visit_("key", node.key, visitor, path47);
+          path48 = Object.freeze(path48.concat(node));
+          const ck = visit_("key", node.key, visitor, path48);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path47);
+          const cv = visit_("value", node.value, visitor, path48);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -155,17 +155,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path47) {
-      const ctrl = await callVisitor(key, node, visitor, path47);
+    async function visitAsync_(key, node, visitor, path48) {
+      const ctrl = await callVisitor(key, node, visitor, path48);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path47, ctrl);
-        return visitAsync_(key, ctrl, visitor, path47);
+        replaceNode(key, path48, ctrl);
+        return visitAsync_(key, ctrl, visitor, path48);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path47 = Object.freeze(path47.concat(node));
+          path48 = Object.freeze(path48.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = await visitAsync_(i2, node.items[i2], visitor, path47);
+            const ci = await visitAsync_(i2, node.items[i2], visitor, path48);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -176,13 +176,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path47 = Object.freeze(path47.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path47);
+          path48 = Object.freeze(path48.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path48);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path47);
+          const cv = await visitAsync_("value", node.value, visitor, path48);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -209,23 +209,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path47) {
+    function callVisitor(key, node, visitor, path48) {
       if (typeof visitor === "function")
-        return visitor(key, node, path47);
+        return visitor(key, node, path48);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path47);
+        return visitor.Map?.(key, node, path48);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path47);
+        return visitor.Seq?.(key, node, path48);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path47);
+        return visitor.Pair?.(key, node, path48);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path47);
+        return visitor.Scalar?.(key, node, path48);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path47);
+        return visitor.Alias?.(key, node, path48);
       return void 0;
     }
-    function replaceNode(key, path47, node) {
-      const parent = path47[path47.length - 1];
+    function replaceNode(key, path48, node) {
+      const parent = path48[path48.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -835,10 +835,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path47, value) {
+    function collectionFromPath(schema, path48, value) {
       let v = value;
-      for (let i2 = path47.length - 1; i2 >= 0; --i2) {
-        const k2 = path47[i2];
+      for (let i2 = path48.length - 1; i2 >= 0; --i2) {
+        const k2 = path48[i2];
         if (typeof k2 === "number" && Number.isInteger(k2) && k2 >= 0) {
           const a = [];
           a[k2] = v;
@@ -857,7 +857,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path47) => path47 == null || typeof path47 === "object" && !!path47[Symbol.iterator]().next().done;
+    var isEmptyPath = (path48) => path48 == null || typeof path48 === "object" && !!path48[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -887,11 +887,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path47, value) {
-        if (isEmptyPath(path47))
+      addIn(path48, value) {
+        if (isEmptyPath(path48))
           this.add(value);
         else {
-          const [key, ...rest] = path47;
+          const [key, ...rest] = path48;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -905,8 +905,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path47) {
-        const [key, ...rest] = path47;
+      deleteIn(path48) {
+        const [key, ...rest] = path48;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -920,8 +920,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path47, keepScalar) {
-        const [key, ...rest] = path47;
+      getIn(path48, keepScalar) {
+        const [key, ...rest] = path48;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -939,8 +939,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path47) {
-        const [key, ...rest] = path47;
+      hasIn(path48) {
+        const [key, ...rest] = path48;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -950,8 +950,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path47, value) {
-        const [key, ...rest] = path47;
+      setIn(path48, value) {
+        const [key, ...rest] = path48;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3466,9 +3466,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path47, value) {
+      addIn(path48, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path47, value);
+          this.contents.addIn(path48, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3543,14 +3543,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path47) {
-        if (Collection.isEmptyPath(path47)) {
+      deleteIn(path48) {
+        if (Collection.isEmptyPath(path48)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path47) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path48) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3565,10 +3565,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path47, keepScalar) {
-        if (Collection.isEmptyPath(path47))
+      getIn(path48, keepScalar) {
+        if (Collection.isEmptyPath(path48))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path47, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path48, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3579,10 +3579,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path47) {
-        if (Collection.isEmptyPath(path47))
+      hasIn(path48) {
+        if (Collection.isEmptyPath(path48))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path47) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path48) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3599,13 +3599,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path47, value) {
-        if (Collection.isEmptyPath(path47)) {
+      setIn(path48, value) {
+        if (Collection.isEmptyPath(path48)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path47), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path48), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path47, value);
+          this.contents.setIn(path48, value);
         }
       }
       /**
@@ -5561,9 +5561,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path47) => {
+    visit.itemAtPath = (cst, path48) => {
       let item = cst;
-      for (const [field, index] of path47) {
+      for (const [field, index] of path48) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5572,23 +5572,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path47) => {
-      const parent = visit.itemAtPath(cst, path47.slice(0, -1));
-      const field = path47[path47.length - 1][0];
+    visit.parentCollection = (cst, path48) => {
+      const parent = visit.itemAtPath(cst, path48.slice(0, -1));
+      const field = path48[path48.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path47, item, visitor) {
-      let ctrl = visitor(item, path47);
+    function _visit(path48, item, visitor) {
+      let ctrl = visitor(item, path48);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i2 = 0; i2 < token.items.length; ++i2) {
-            const ci = _visit(Object.freeze(path47.concat([[field, i2]])), token.items[i2], visitor);
+            const ci = _visit(Object.freeze(path48.concat([[field, i2]])), token.items[i2], visitor);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -5599,10 +5599,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path47);
+            ctrl = ctrl(item, path48);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path47) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path48) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -7466,7 +7466,7 @@ var require_ms = __commonJS({
 // node_modules/debug/src/common.js
 var require_common = __commonJS({
   "node_modules/debug/src/common.js"(exports2, module2) {
-    function setup(env12) {
+    function setup(env11) {
       createDebug.debug = createDebug;
       createDebug.default = createDebug;
       createDebug.coerce = coerce;
@@ -7475,8 +7475,8 @@ var require_common = __commonJS({
       createDebug.enabled = enabled;
       createDebug.humanize = require_ms();
       createDebug.destroy = destroy;
-      Object.keys(env12).forEach((key) => {
-        createDebug[key] = env12[key];
+      Object.keys(env11).forEach((key) => {
+        createDebug[key] = env11[key];
       });
       createDebug.names = [];
       createDebug.skips = [];
@@ -7830,20 +7830,20 @@ var require_supports_color = __commonJS({
     var os5 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
-    var { env: env12 } = process;
+    var { env: env11 } = process;
     var forceColor;
     if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
       forceColor = 0;
     } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
       forceColor = 1;
     }
-    if ("FORCE_COLOR" in env12) {
-      if (env12.FORCE_COLOR === "true") {
+    if ("FORCE_COLOR" in env11) {
+      if (env11.FORCE_COLOR === "true") {
         forceColor = 1;
-      } else if (env12.FORCE_COLOR === "false") {
+      } else if (env11.FORCE_COLOR === "false") {
         forceColor = 0;
       } else {
-        forceColor = env12.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env12.FORCE_COLOR, 10), 3);
+        forceColor = env11.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env11.FORCE_COLOR, 10), 3);
       }
     }
     function translateLevel(level) {
@@ -7871,7 +7871,7 @@ var require_supports_color = __commonJS({
         return 0;
       }
       const min = forceColor || 0;
-      if (env12.TERM === "dumb") {
+      if (env11.TERM === "dumb") {
         return min;
       }
       if (process.platform === "win32") {
@@ -7881,34 +7881,34 @@ var require_supports_color = __commonJS({
         }
         return 1;
       }
-      if ("CI" in env12) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env12) || env12.CI_NAME === "codeship") {
+      if ("CI" in env11) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env11) || env11.CI_NAME === "codeship") {
           return 1;
         }
         return min;
       }
-      if ("TEAMCITY_VERSION" in env12) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env12.TEAMCITY_VERSION) ? 1 : 0;
+      if ("TEAMCITY_VERSION" in env11) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env11.TEAMCITY_VERSION) ? 1 : 0;
       }
-      if (env12.COLORTERM === "truecolor") {
+      if (env11.COLORTERM === "truecolor") {
         return 3;
       }
-      if ("TERM_PROGRAM" in env12) {
-        const version = parseInt((env12.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env12.TERM_PROGRAM) {
+      if ("TERM_PROGRAM" in env11) {
+        const version = parseInt((env11.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env11.TERM_PROGRAM) {
           case "iTerm.app":
             return version >= 3 ? 3 : 2;
           case "Apple_Terminal":
             return 2;
         }
       }
-      if (/-256(color)?$/i.test(env12.TERM)) {
+      if (/-256(color)?$/i.test(env11.TERM)) {
         return 2;
       }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env12.TERM)) {
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env11.TERM)) {
         return 1;
       }
-      if ("COLORTERM" in env12) {
+      if ("COLORTERM" in env11) {
         return 1;
       }
       return min;
@@ -8121,10 +8121,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path47, isFile, isDirectory) {
-      log(`checking %s`, path47);
+    function check(path48, isFile, isDirectory) {
+      log(`checking %s`, path48);
       try {
-        const stat = fs_1.statSync(path47);
+        const stat = fs_1.statSync(path48);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -8144,8 +8144,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path47, type = exports2.READABLE) {
-      return check(path47, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path48, type = exports2.READABLE) {
+      return check(path48, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -11060,20 +11060,20 @@ var require_compile = __commonJS({
     var util_1 = require_util();
     var validate_1 = require_validate();
     var SchemaEnv = class {
-      constructor(env12) {
+      constructor(env11) {
         var _a2;
         this.refs = {};
         this.dynamicAnchors = {};
         let schema;
-        if (typeof env12.schema == "object")
-          schema = env12.schema;
-        this.schema = env12.schema;
-        this.schemaId = env12.schemaId;
-        this.root = env12.root || this;
-        this.baseId = (_a2 = env12.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env12.schemaId || "$id"]);
-        this.schemaPath = env12.schemaPath;
-        this.localRefs = env12.localRefs;
-        this.meta = env12.meta;
+        if (typeof env11.schema == "object")
+          schema = env11.schema;
+        this.schema = env11.schema;
+        this.schemaId = env11.schemaId;
+        this.root = env11.root || this;
+        this.baseId = (_a2 = env11.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env11.schemaId || "$id"]);
+        this.schemaPath = env11.schemaPath;
+        this.localRefs = env11.localRefs;
+        this.meta = env11.meta;
         this.$async = schema === null || schema === void 0 ? void 0 : schema.$async;
         this.refs = {};
       }
@@ -11257,15 +11257,15 @@ var require_compile = __commonJS({
           baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
         }
       }
-      let env12;
+      let env11;
       if (typeof schema != "boolean" && schema.$ref && !(0, util_1.schemaHasRulesButRef)(schema, this.RULES)) {
         const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema.$ref);
-        env12 = resolveSchema.call(this, root, $ref);
+        env11 = resolveSchema.call(this, root, $ref);
       }
       const { schemaId } = this.opts;
-      env12 = env12 || new SchemaEnv({ schema, schemaId, root, baseId });
-      if (env12.schema !== env12.root.schema)
-        return env12;
+      env11 = env11 || new SchemaEnv({ schema, schemaId, root, baseId });
+      if (env11.schema !== env11.root.schema)
+        return env11;
       return void 0;
     }
   }
@@ -11414,8 +11414,8 @@ var require_utils = __commonJS({
       }
       return ind;
     }
-    function removeDotSegments(path47) {
-      let input = path47;
+    function removeDotSegments(path48) {
+      let input = path48;
       const output = [];
       let nextSlash = -1;
       let len = 0;
@@ -11614,8 +11614,8 @@ var require_schemes = __commonJS({
         wsComponent.secure = void 0;
       }
       if (wsComponent.resourceName) {
-        const [path47, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path47 && path47 !== "/" ? path47 : void 0;
+        const [path48, query] = wsComponent.resourceName.split("?");
+        wsComponent.path = path48 && path48 !== "/" ? path48 : void 0;
         wsComponent.query = query;
         wsComponent.resourceName = void 0;
       }
@@ -12668,8 +12668,8 @@ var require_ref = __commonJS({
       schemaType: "string",
       code(cxt) {
         const { gen, schema: $ref, it } = cxt;
-        const { baseId, schemaEnv: env12, validateName, opts, self } = it;
-        const { root } = env12;
+        const { baseId, schemaEnv: env11, validateName, opts, self } = it;
+        const { root } = env11;
         if (($ref === "#" || $ref === "#/") && baseId === root.baseId)
           return callRootRef();
         const schOrEnv = compile_1.resolveRef.call(self, root, baseId, $ref);
@@ -12679,8 +12679,8 @@ var require_ref = __commonJS({
           return callValidate(schOrEnv);
         return inlineRefSchema(schOrEnv);
         function callRootRef() {
-          if (env12 === root)
-            return callRef(cxt, validateName, env12, env12.$async);
+          if (env11 === root)
+            return callRef(cxt, validateName, env11, env11.$async);
           const rootName = gen.scopeValue("root", { ref: root });
           return callRef(cxt, (0, codegen_1._)`${rootName}.validate`, root, root.$async);
         }
@@ -12710,14 +12710,14 @@ var require_ref = __commonJS({
     exports2.getValidate = getValidate;
     function callRef(cxt, v, sch, $async) {
       const { gen, it } = cxt;
-      const { allErrors, schemaEnv: env12, opts } = it;
+      const { allErrors, schemaEnv: env11, opts } = it;
       const passCxt = opts.passContext ? names_1.default.this : codegen_1.nil;
       if ($async)
         callAsyncRef();
       else
         callSyncRef();
       function callAsyncRef() {
-        if (!env12.$async)
+        if (!env11.$async)
           throw new Error("async schema referenced by sync schema");
         const valid = gen.let("valid");
         gen.try(() => {
@@ -14681,13 +14681,13 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode45 = __toESM(require("vscode"));
+var vscode46 = __toESM(require("vscode"));
 var fs42 = __toESM(require("fs"));
-var path46 = __toESM(require("path"));
+var path47 = __toESM(require("path"));
 
-// src/providers/CustomSessionSetsView.ts
+// src/providers/SetupStatusView.ts
 var crypto4 = __toESM(require("crypto"));
-var vscode16 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 
 // src/utils/fileSystem.ts
 var vscode = __toESM(require("vscode"));
@@ -15536,7 +15536,6 @@ function shouldRenderPlusFraction(tier, verificationMode, sessions) {
     return false;
   return !hasTypedVerificationSession(sessions);
 }
-var PLUS_FRACTION_TOOLTIP = "Lightweight dedicated-sessions set: verification/remediation sessions are appended when the work sessions complete, so the session count can still grow.";
 var TIER_MARKER = "lw";
 var TIER_MARKER_TOOLTIP = "Lightweight tier \u2014 router-off; verification per the set's verificationMode.";
 function tierMarkerFor(tier) {
@@ -16898,7 +16897,7 @@ function readSessionSets(root) {
     const completedVerification = completedVerificationInfo(
       ledgerSessions
     );
-    const verificationMarker2 = verificationMarkerFor(
+    const verificationMarker = verificationMarkerFor(
       config.tier,
       config.verificationMode,
       ledgerSessions,
@@ -16949,7 +16948,7 @@ function readSessionSets(root) {
       plusFraction,
       externalVerificationNoteExists,
       completedVerification,
-      verificationMarker: verificationMarker2,
+      verificationMarker,
       workspaceTierMarker,
       workflowState,
       // Set 110 S2: the fourth tree level's data, taken from the ledger
@@ -17088,3036 +17087,36 @@ function readAllSessionSets() {
   return readAllSessionSetsWithDiagnostics().sets;
 }
 
-// src/providers/moduleAssembly.ts
-var fs7 = __toESM(require("fs"));
-var path8 = __toESM(require("path"));
-var vscode2 = __toESM(require("vscode"));
-
-// src/utils/moduleAuthoring.ts
-var crypto2 = __toESM(require("crypto"));
-var fs6 = __toESM(require("fs"));
-var path7 = __toESM(require("path"));
-var YAML2 = __toESM(require_dist());
-
-// src/utils/resolveSetNumber.ts
-var PREFIX_RE = /^(\d+)-/;
-function numericPrefix(slug) {
-  const m = PREFIX_RE.exec(slug);
-  return m ? parseInt(m[1], 10) : null;
-}
-function resolveSetNumber(slugs, n) {
-  const matches = slugs.filter((s) => numericPrefix(s) === n);
-  if (matches.length === 0) {
-    const available = Array.from(
-      new Set(
-        slugs.map(numericPrefix).filter((p2) => p2 !== null)
-      )
-    ).sort((a, b2) => a - b2);
-    return { kind: "no-match", available };
-  }
-  if (matches.length > 1) {
-    return { kind: "collision", matches: matches.slice().sort() };
-  }
-  return { kind: "match", slug: matches[0] };
-}
-function parseSetHandle(raw) {
-  const trimmed2 = raw.trim().replace(/^set\s+/i, "");
-  if (!/^\d+$/.test(trimmed2))
-    return null;
-  return parseInt(trimmed2, 10);
-}
-function prefixWidth(slug) {
-  const m = PREFIX_RE.exec(slug);
-  return m ? m[1].length : 0;
-}
-function nextSessionSetNumberFrom(dirNames) {
-  const numbered = dirNames.map(numericPrefix).filter((p2) => p2 !== null);
-  const n = numbered.length ? Math.max(...numbered) + 1 : 1;
-  const widest = dirNames.reduce((w, name) => Math.max(w, prefixWidth(name)), 0);
-  const width = Math.max(3, widest);
-  return { n, padded: String(n).padStart(width, "0") };
-}
-
-// src/utils/moduleAuthoring.ts
-var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
-var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-function validateNewModuleSlug(raw, existingSlugs) {
-  const slug = (raw ?? "").trim();
-  if (slug === "") {
-    return "Enter a module slug (kebab-case, e.g. greeter).";
-  }
-  if (!MODULE_SLUG_RE.test(slug)) {
-    return 'Module slugs are kebab-case: lowercase letters and digits, joined by single hyphens (e.g. "greeter", "payment-api").';
-  }
-  if (existingSlugs.includes(slug)) {
-    return `Module "${slug}" already exists in ${MODULES_MANIFEST_DISPLAY}.`;
-  }
-  return null;
-}
-function defaultModulePlanPath(slug) {
-  return `docs/modules/${slug}/project-plan.md`;
-}
-var LEGACY_ROOT_PLAN_REL = "docs/planning/project-plan.md";
-function classifyModulesManifest(root) {
-  const entries = readModulesManifest(root);
-  if (entries !== null)
-    return { kind: "present", entries };
-  return manifestEntryExists(path7.join(root, MODULES_MANIFEST_REL)) ? { kind: "invalid" } : { kind: "absent" };
-}
-function manifestEntryExists(abs) {
-  try {
-    fs6.lstatSync(abs);
-    return true;
-  } catch {
-    return false;
-  }
-}
-var INVALID_MANIFEST_MESSAGE = `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before using the module-aware flows.`;
-var MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
-#
-# Each entry declares one module of this repo:
-#   slug:      machine identity (kebab-case). Session sets declare
-#              \`module: <slug>\` in their spec.md configuration block and the
-#              Session Set Explorer groups them under this module.
-#   title:     the display name the Explorer shows for the group.
-#   codeRoots: the code paths this module owns ([] for an integration
-#              module that only composes other modules).
-#   planPath:  the module's project plan (decomposed into session sets).
-#   touches:   optional \u2014 the modules an integration module is sanctioned
-#              to work across; owners of every touched module review its PRs.
-#
-# Explorer display order = this file's order. Session-set NAMES stay
-# globally unique across ALL modules \u2014 \`module\` is a grouping attribute,
-# never part of a set's identity.
-#
-# To have an AI assistant decompose this project into modules and fill this
-# file in, run the "Dabbler: Copy Module Decomposition Prompt" command
-# (Command Palette) \u2014 or the "Copy AI decomposition prompt" button in the
-# Getting Started form \u2014 then paste the copied prompt into your assistant.
-#
-# Renaming, deleting, splitting, or merging modules later (and adopting
-# modules in an older repo) is covered in the module reorganization guide:
-# https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md
-`;
-var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
-# Example entries (copy below \`modules:\`, uncommented, to declare this
-# repo's modules \u2014 or leave the list empty for a single-module repo):
-#
-# - slug: payment-api
-#   title: "Payment API"
-#   codeRoots:
-#     - src/payment
-#   planPath: docs/modules/payment-api/project-plan.md
-# - slug: integration
-#   title: "Cross-Module Integration"
-#   codeRoots: []
-#   planPath: docs/modules/integration/project-plan.md
-#   touches:
-#     - payment-api
-
-modules: []
-`;
-var NODE_ENSURE_MANIFEST_IO = {
-  mkdirp: (dir) => fs6.mkdirSync(dir, { recursive: true }),
-  writeFileExclusive: (abs, data) => writeFileExclusiveSync(abs, data)
-};
-function ensureModulesManifest(root, io = NODE_ENSURE_MANIFEST_IO) {
-  const abs = path7.join(root, MODULES_MANIFEST_REL);
-  io.mkdirp(path7.dirname(abs));
-  try {
-    io.writeFileExclusive(abs, MODULES_YAML_TEMPLATE);
-    return { created: true, manifestRel: MODULES_MANIFEST_DISPLAY };
-  } catch (err) {
-    if (err.code === "EEXIST") {
-      return { created: false, manifestRel: MODULES_MANIFEST_DISPLAY };
-    }
-    throw err;
-  }
-}
-function renderModuleManifestEntry(slug, title, planRelPath) {
-  return `  - slug: ${slug}
-    title: ${JSON.stringify(title)}
-    codeRoots: []                # TODO: the code paths this module owns, e.g. [src/${slug}]
-    planPath: ${planRelPath}
-`;
-}
-function renderModulePlanStub(slug, title) {
-  return `# ${title} \u2014 module project plan
-
-> Module: \`${slug}\` (declared in \`docs/modules.yaml\`)
-> Owner: TODO \u2014 name the developer(s) who own this module.
-
-TODO: describe this module's goals, phases, and key deliverables. When the
-plan is ready, decompose it into session sets: run "Dabbler: Generate
-Session-Set Prompt" and pick this module \u2014 each generated set is stamped
-\`module: ${slug}\` and grouped under this module in the Session Set
-Explorer. Session-set names stay globally unique across all modules; we
-recommend including \`${slug}\` in each set's name.
-`;
-}
-var EMPTY_MODULES_LINE_RE = /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
-function replaceEmptyModulesList(text, entryBlock) {
-  const out = [];
-  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
-    const indent = m[1];
-    const quote = m[2];
-    const comment = m[3] ? ` ${m[3]}` : "";
-    const after = text.slice(m.index + m[0].length);
-    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock).split("\n").map((line) => indent + line).join("\n");
-    out.push(
-      text.slice(0, m.index) + `${indent}${quote}modules${quote}:${comment}
-` + block + (after === "" ? "\n" : after)
-    );
-  }
-  return out;
-}
-function scaffoldNewModule(root, rawSlug, rawTitle) {
-  const slug = (rawSlug ?? "").trim();
-  const classified = classifyModulesManifest(root);
-  const existing = classified.kind === "present" ? classified.entries : [];
-  const slugError = validateNewModuleSlug(
-    slug,
-    existing.map((e) => e.slug)
-  );
-  if (slugError)
-    throw new Error(slugError);
-  const manifestAbs = path7.join(root, MODULES_MANIFEST_REL);
-  if (classified.kind === "invalid") {
-    throw new Error(INVALID_MANIFEST_MESSAGE);
-  }
-  const title = (rawTitle ?? "").trim() || slug;
-  const planRel = defaultModulePlanPath(slug);
-  const entryBlock = renderModuleManifestEntry(slug, title, planRel);
-  const manifestCreated = classified.kind === "absent";
-  const sourceText = manifestCreated ? MODULES_YAML_TEMPLATE : fs6.readFileSync(manifestAbs, "utf8");
-  let candidate = null;
-  if (existing.length === 0) {
-    for (const replaced of replaceEmptyModulesList(sourceText, entryBlock)) {
-      try {
-        assertAppendedManifestParses(
-          replaced,
-          slug,
-          existing.length + 1,
-          entryBlock
-        );
-        candidate = replaced;
-        break;
-      } catch {
-      }
-    }
-  }
-  if (candidate === null) {
-    candidate = (sourceText.endsWith("\n") ? sourceText : sourceText + "\n") + entryBlock;
-  }
-  assertAppendedManifestParses(
-    candidate,
-    slug,
-    existing.length + 1,
-    entryBlock
-  );
-  const planAbs = path7.join(root, ...planRel.split("/"));
-  let planCreated = false;
-  if (!fs6.existsSync(planAbs)) {
-    fs6.mkdirSync(path7.dirname(planAbs), { recursive: true });
-    fs6.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
-      encoding: "utf8"
-    });
-    planCreated = true;
-  }
-  fs6.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
-  return {
-    manifestRel: MODULES_MANIFEST_DISPLAY,
-    planRel,
-    manifestCreated,
-    planCreated
-  };
-}
-function assertAppendedManifestParses(candidate, slug, expectedCount, entryBlock) {
-  const refuse = (why) => {
-    throw new Error(
-      `Could not append the module entry to ${MODULES_MANIFEST_DISPLAY} automatically (${why}). Add this entry to the "modules:" list by hand:
-${entryBlock}`
-    );
-  };
-  let doc;
-  try {
-    doc = YAML2.parse(candidate);
-  } catch {
-    return refuse(
-      'appending requires the "modules:" block list to be the last top-level key'
-    );
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the result is not a YAML mapping");
-  }
-  const modules = doc.modules;
-  if (!Array.isArray(modules))
-    return refuse('no "modules:" list survived');
-  const slugs = modules.filter(
-    (m) => m !== null && typeof m === "object" && !Array.isArray(m)
-  ).map((m) => typeof m.slug === "string" ? m.slug.trim() : "").filter((s) => s !== "");
-  if (modules.length !== expectedCount || !slugs.includes(slug)) {
-    return refuse(
-      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style, holds entries the manifest reader dropped, or is not the last top-level key'
-    );
-  }
-}
-function resolveModuleTarget(entries) {
-  if (!entries || entries.length === 0)
-    return { kind: "none" };
-  if (entries.length === 1)
-    return { kind: "auto", entry: entries[0] };
-  return { kind: "pick", entries };
-}
-function isSafeRepoRelativePath(p2) {
-  if (p2 === "")
-    return false;
-  if (p2.startsWith("/"))
-    return false;
-  if (/^[A-Za-z]:/.test(p2))
-    return false;
-  return p2.split("/").every((seg) => seg !== ".." && seg !== "");
-}
-function resolveModulePlanRelPath(entry) {
-  const fallback = defaultModulePlanPath(entry.slug);
-  const raw = entry.planPath && entry.planPath.trim() !== "" ? entry.planPath.trim().replace(/\\/g, "/") : "";
-  if (raw === "")
-    return { path: fallback, degraded: false };
-  if (!isSafeRepoRelativePath(raw))
-    return { path: fallback, degraded: true };
-  return { path: raw, degraded: false };
-}
-function modulePlanRelPath(entry) {
-  const resolved = resolveModulePlanRelPath(entry);
-  if (resolved.degraded) {
-    console.warn(
-      `[dabblerSessionSets] module "${entry.slug}" declares planPath ${JSON.stringify(entry.planPath)}, which is not a safe repo-relative path \u2014 using the default ${resolved.path} instead.`
-    );
-  }
-  return resolved.path;
-}
-function unknownModuleMessage(slug) {
-  return `Module "${slug}" is no longer declared in ${MODULES_MANIFEST_DISPLAY} (it may have been removed or renamed). Refresh the Work Explorer and try again.`;
-}
-async function pickModuleForAuthoring(root, ui, opts) {
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return { kind: "invalid-manifest", entry: null };
-  }
-  if (opts && opts.preselectedSlug !== void 0) {
-    const slug = opts.preselectedSlug;
-    if (slug === "")
-      return { kind: "none", entry: null };
-    const entries = classified.kind === "present" ? classified.entries : [];
-    const entry = entries.find((e) => e.slug === slug);
-    if (!entry) {
-      ui.showErrorMessage(unknownModuleMessage(slug));
-      return { kind: "unknown-module", entry: null };
-    }
-    return { kind: "picked", entry };
-  }
-  const target = resolveModuleTarget(
-    classified.kind === "present" ? classified.entries : null
-  );
-  if (target.kind === "none")
-    return { kind: "none", entry: null };
-  if (target.kind === "auto") {
-    ui.showInformationMessage(
-      `Using module "${target.entry.title}" (${target.entry.slug}) \u2014 the only module in ${MODULES_MANIFEST_DISPLAY}.`
-    );
-    return { kind: "picked", entry: target.entry };
-  }
-  const picked = await ui.showQuickPick(
-    target.entries.map((e) => ({
-      label: e.title,
-      description: e.slug,
-      detail: `plan: ${modulePlanRelPath(e)}`,
-      entry: e
-    })),
-    { placeHolder: "Which module is this for?", ignoreFocusOut: true }
-  );
-  if (!picked)
-    return { kind: "cancelled", entry: null };
-  return { kind: "picked", entry: picked.entry };
-}
-var CONFIG_HEADING_RE = /^##[ \t]+Session Set Configuration[ \t]*$/im;
-var CONFIG_YAML_FENCE_OPEN_RE = /^```ya?ml[ \t]*\r?\n/im;
-var CONFIG_FENCE_CLOSE_RE = /^```[ \t]*$/m;
-var CONFIG_TOP_LEVEL_MODULE_RE = /^module[ \t]*:/gm;
-function stampModuleIntoSpecText(text, slug) {
-  const heading = CONFIG_HEADING_RE.exec(text);
-  if (!heading)
-    return { kind: "refused", reason: { code: "no-config-block" } };
-  const afterHeading = heading.index + heading[0].length;
-  const rest = text.slice(afterHeading);
-  const nextHeadingRel = rest.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
-  const section = text.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen)
-    return { kind: "refused", reason: { code: "no-yaml-fence" } };
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = text.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1)
-    return { kind: "refused", reason: { code: "no-yaml-fence" } };
-  const blockContent = boundedTail.slice(0, closeRel);
-  let parsedBlock;
-  try {
-    parsedBlock = YAML2.parse(blockContent);
-  } catch {
-    parsedBlock = void 0;
-  }
-  if (parsedBlock !== null && typeof parsedBlock === "object" && !Array.isArray(parsedBlock) && "module" in parsedBlock) {
-    const existingModule = parsedBlock.module;
-    if (existingModule === slug)
-      return { kind: "noop" };
-    return {
-      kind: "refused",
-      reason: {
-        code: "already-assigned",
-        existing: typeof existingModule === "string" ? existingModule : String(existingModule)
-      }
-    };
-  }
-  const inserted = `module: ${slug}
-`;
-  const newText = text.slice(0, blockContentStart) + inserted + text.slice(blockContentStart);
-  return { kind: "written", text: newText, inserted, insertAt: blockContentStart };
-}
-function extractConfigBlock(text) {
-  const heading = CONFIG_HEADING_RE.exec(text);
-  if (!heading)
-    return null;
-  const afterHeading = heading.index + heading[0].length;
-  const rest = text.slice(afterHeading);
-  const nextHeadingRel = rest.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
-  const section = text.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen)
-    return null;
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = text.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1)
-    return null;
-  return boundedTail.slice(0, closeRel);
-}
-function assertStampedTextValid(originalText, newText, slug) {
-  const refuse = (why) => {
-    throw new Error(`Refusing the module stamp (${why}).`);
-  };
-  const expected = stampModuleIntoSpecText(originalText, slug);
-  if (expected.kind !== "written") {
-    return refuse(
-      expected.kind === "noop" ? "the original is already stamped to this module" : "the original has no spliceable config block"
-    );
-  }
-  if (newText !== expected.text) {
-    return refuse("the result is not the exact canonical single-line splice");
-  }
-  const block = extractConfigBlock(newText);
-  if (block === null)
-    return refuse("the config block no longer parses");
-  let doc;
-  try {
-    doc = YAML2.parse(block);
-  } catch {
-    return refuse("the config block is not valid YAML after the stamp");
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the config block is not a YAML mapping");
-  }
-  const parsedModule = doc.module;
-  if (parsedModule !== slug) {
-    return refuse(`module resolved to ${JSON.stringify(parsedModule)}, not ${JSON.stringify(slug)}`);
-  }
-  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
-  if (moduleLineCount !== 1) {
-    return refuse(`${moduleLineCount} top-level module: lines in the block`);
-  }
-}
-var NODE_SPEC_IO = {
-  readFileSync: (p2) => fs6.readFileSync(p2, "utf8"),
-  writeFileSync: (p2, d) => fs6.writeFileSync(p2, d, { encoding: "utf8" }),
-  renameSync: (from, to) => fs6.renameSync(from, to),
-  rmSync: (p2) => fs6.rmSync(p2, { force: true })
-};
-function assignLegacySetsToModule(root, targetSlug, sets, io = NODE_SPEC_IO) {
-  const slug = (targetSlug ?? "").trim();
-  if (slug === "" || slug.toLowerCase() === "default") {
-    return {
-      stamped: [],
-      alreadyAssigned: [],
-      refused: { reason: `"${targetSlug}" is not a valid module target.` }
-    };
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    return { stamped: [], alreadyAssigned: [], refused: { reason: INVALID_MANIFEST_MESSAGE } };
-  }
-  const declaredSlugs = classified.kind === "present" ? classified.entries.map((e) => e.slug) : [];
-  if (!declaredSlugs.includes(slug)) {
-    return {
-      stamped: [],
-      alreadyAssigned: [],
-      refused: { reason: unknownModuleMessage(slug) }
-    };
-  }
-  const queued = [];
-  const alreadyAssigned = [];
-  for (const set of sets) {
-    let original;
-    try {
-      original = io.readFileSync(set.specAbs);
-    } catch (err) {
-      return {
-        stamped: [],
-        alreadyAssigned: [],
-        refused: {
-          reason: `could not read ${set.name}'s spec.md: ${err instanceof Error ? err.message : String(err)}`,
-          setName: set.name
-        }
-      };
-    }
-    const result = stampModuleIntoSpecText(original, slug);
-    if (result.kind === "noop") {
-      alreadyAssigned.push(set.name);
-      continue;
-    }
-    if (result.kind === "refused") {
-      const why = result.reason.code === "already-assigned" ? `${set.name} is already stamped module: ${result.reason.existing} \u2014 reassigning is not a legacy stamp` : result.reason.code === "no-config-block" ? `${set.name}'s spec.md has no "Session Set Configuration" block to stamp` : `${set.name}'s Session Set Configuration block has no \`\`\`yaml fence to stamp`;
-      return {
-        stamped: [],
-        alreadyAssigned: [],
-        refused: { reason: why, setName: set.name }
-      };
-    }
-    try {
-      assertStampedTextValid(original, result.text, slug);
-    } catch (err) {
-      return {
-        stamped: [],
-        alreadyAssigned: [],
-        refused: {
-          reason: `${set.name}: ${err instanceof Error ? err.message : String(err)}`,
-          setName: set.name
-        }
-      };
-    }
-    queued.push({ name: set.name, specAbs: set.specAbs, original, next: result.text });
-  }
-  const stamped = [];
-  const fail = (setName, reason) => ({
-    stamped,
-    alreadyAssigned,
-    writeFailed: { setName, reason, written: [...stamped] }
-  });
-  const revalidateTarget = () => {
-    const c3 = classifyModulesManifest(root);
-    if (c3.kind === "invalid")
-      return INVALID_MANIFEST_MESSAGE;
-    const slugs = c3.kind === "present" ? c3.entries.map((e) => e.slug) : [];
-    return slugs.includes(slug) ? null : unknownModuleMessage(slug);
-  };
-  for (const item of queued) {
-    const manifestErr = revalidateTarget();
-    if (manifestErr) {
-      return stamped.length > 0 ? fail(
-        item.name,
-        `the target module "${slug}" is no longer declared in the manifest after ${stamped.length} set(s) were already stamped \u2014 ${manifestErr}`
-      ) : {
-        stamped: [],
-        alreadyAssigned,
-        refused: { reason: manifestErr, setName: item.name }
-      };
-    }
-    let current;
-    try {
-      current = io.readFileSync(item.specAbs);
-    } catch (err) {
-      return fail(
-        item.name,
-        `could not re-read ${item.name}'s spec.md before writing: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-    if (current !== item.original) {
-      return fail(
-        item.name,
-        `${item.name}'s spec.md changed after it was validated (a concurrent edit) \u2014 refused to overwrite it`
-      );
-    }
-    const tmp = `${item.specAbs}.${process.pid}.${crypto2.randomBytes(6).toString("hex")}.dabbler-assign-tmp`;
-    let staged = false;
-    try {
-      io.writeFileSync(tmp, item.next);
-      staged = true;
-      if (io.readFileSync(tmp) !== item.next) {
-        throw new Error("the staged temp file did not verify");
-      }
-      if (io.readFileSync(item.specAbs) !== item.original) {
-        io.rmSync(tmp);
-        return fail(
-          item.name,
-          `${item.name}'s spec.md changed during the staged write (a concurrent edit) \u2014 refused to overwrite it`
-        );
-      }
-      io.renameSync(tmp, item.specAbs);
-    } catch (err) {
-      if (staged) {
-        try {
-          io.rmSync(tmp);
-        } catch {
-        }
-      }
-      return fail(
-        item.name,
-        `writing ${item.name}'s spec.md failed; the original was left intact (${err instanceof Error ? err.message : String(err)})`
-      );
-    }
-    stamped.push(item.name);
-  }
-  return { stamped, alreadyAssigned };
-}
-function restampModuleInSpecText(text, expectedOldSlug, newSlug) {
-  const heading = CONFIG_HEADING_RE.exec(text);
-  if (!heading) {
-    return { kind: "refused", reason: 'no "Session Set Configuration" block' };
-  }
-  const afterHeading = heading.index + heading[0].length;
-  const rest = text.slice(afterHeading);
-  const nextHeadingRel = rest.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
-  const section = text.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen) {
-    return { kind: "refused", reason: "the config block has no ```yaml fence" };
-  }
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = text.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1) {
-    return { kind: "refused", reason: "the config block has no closing fence" };
-  }
-  const blockContent = boundedTail.slice(0, closeRel);
-  let parsed;
-  try {
-    parsed = YAML2.parse(blockContent);
-  } catch {
-    return { kind: "refused", reason: "the config block is not valid YAML" };
-  }
-  const parsedModule = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.module : void 0;
-  if (parsedModule === void 0) {
-    return { kind: "refused", reason: "no top-level module: key to rewrite" };
-  }
-  if (parsedModule === newSlug)
-    return { kind: "noop" };
-  if (parsedModule !== expectedOldSlug) {
-    return {
-      kind: "refused",
-      reason: `stamped module: ${JSON.stringify(parsedModule)}, not ${JSON.stringify(expectedOldSlug)}`
-    };
-  }
-  const lineRe = /^(module[ \t]*:[ \t]*)([^\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
-  const lm = lineRe.exec(blockContent);
-  if (!lm) {
-    return { kind: "refused", reason: "could not locate the module: line to rewrite" };
-  }
-  const valueAbs = blockContentStart + lm.index + lm[1].length;
-  const valueLen = lm[2].length;
-  const newText = text.slice(0, valueAbs) + newSlug + text.slice(valueAbs + valueLen);
-  return { kind: "written", text: newText };
-}
-function assertRestampedTextValid(originalText, newText, oldSlug, newSlug) {
-  const refuse = (why) => {
-    throw new Error(`Refusing the module restamp (${why}).`);
-  };
-  const expected = restampModuleInSpecText(originalText, oldSlug, newSlug);
-  if (expected.kind !== "written") {
-    return refuse(
-      expected.kind === "noop" ? "the original is already stamped to the new module" : `the original cannot be restamped (${expected.reason})`
-    );
-  }
-  if (newText !== expected.text) {
-    return refuse("the result is not the exact canonical single-value rewrite");
-  }
-  const heading = CONFIG_HEADING_RE.exec(newText);
-  const afterHeading = heading ? heading.index + heading[0].length : -1;
-  if (afterHeading < 0)
-    return refuse("the config block no longer parses");
-  const restText = newText.slice(afterHeading);
-  const nextHeadingRel = restText.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? newText.length : afterHeading + nextHeadingRel;
-  const section = newText.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen)
-    return refuse("the config block no longer parses");
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = newText.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1)
-    return refuse("the config block no longer parses");
-  const block = boundedTail.slice(0, closeRel);
-  let doc;
-  try {
-    doc = YAML2.parse(block);
-  } catch {
-    return refuse("the config block is not valid YAML after the restamp");
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the config block is not a YAML mapping");
-  }
-  if (doc.module !== newSlug) {
-    return refuse(
-      `module resolved to ${JSON.stringify(doc.module)}, not ${JSON.stringify(newSlug)}`
-    );
-  }
-  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
-  if (moduleLineCount !== 1) {
-    return refuse(`${moduleLineCount} top-level module: lines in the block`);
-  }
-}
-function parseManifestEntriesFromText(text) {
-  let doc;
-  try {
-    doc = YAML2.parse(text);
-  } catch {
-    return null;
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc))
-    return null;
-  const rawModules = doc.modules;
-  if (rawModules === null)
-    return [];
-  if (!Array.isArray(rawModules))
-    return null;
-  const stringList = (v) => Array.isArray(v) ? v.filter((x2) => typeof x2 === "string" && x2.trim() !== "").map((s) => s.trim()) : [];
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const raw of rawModules) {
-    if (raw === null || typeof raw !== "object" || Array.isArray(raw))
-      continue;
-    const obj = raw;
-    const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
-    if (!slug || seen.has(slug))
-      continue;
-    seen.add(slug);
-    const title = typeof obj.title === "string" && obj.title.trim() !== "" ? obj.title.trim() : slug;
-    const planPath = typeof obj.planPath === "string" && obj.planPath.trim() !== "" ? obj.planPath.trim() : null;
-    out.push({
-      slug,
-      title,
-      codeRoots: stringList(obj.codeRoots),
-      planPath,
-      touches: stringList(obj.touches)
-    });
-  }
-  return out;
-}
-function entriesEqual(a, b2) {
-  return a.slug === b2.slug && a.title === b2.title && a.planPath === b2.planPath && a.codeRoots.length === b2.codeRoots.length && a.codeRoots.every((v, i2) => v === b2.codeRoots[i2]) && a.touches.length === b2.touches.length && a.touches.every((v, i2) => v === b2.touches[i2]);
-}
-function unquoteScalar(raw) {
-  const t2 = raw.trim();
-  if (t2.length >= 2 && (t2[0] === '"' || t2[0] === "'") && t2[t2.length - 1] === t2[0]) {
-    return t2.slice(1, -1);
-  }
-  return t2;
-}
-function rewriteManifestEntryText(text, oldSlug, opts) {
-  const markerRe = /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
-  let target = null;
-  for (const m of text.matchAll(markerRe)) {
-    if (unquoteScalar(m[4]) === oldSlug) {
-      target = m;
-      break;
-    }
-  }
-  if (target === null)
-    return null;
-  const entryIndent = target[1].length;
-  const keyIndent = target[1].length + 1 + target[2].length;
-  const slugValueStart = target.index + target[1].length + 1 + target[2].length + 4 + target[3].length;
-  const slugValueEnd = slugValueStart + target[4].length;
-  const slugLineEnd = target.index + target[0].length;
-  let spanEnd = text.length;
-  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
-  boundaryRe.lastIndex = slugLineEnd;
-  let bm;
-  while ((bm = boundaryRe.exec(text)) !== null) {
-    if (bm[1].length <= entryIndent) {
-      spanEnd = bm.index;
-      break;
-    }
-  }
-  const edits = [];
-  if (opts.newSlug !== void 0 && opts.newSlug !== oldSlug) {
-    edits.push({ start: slugValueStart, end: slugValueEnd, replacement: opts.newSlug });
-  }
-  if (opts.newTitle !== void 0) {
-    const titleRe = /^([ \t]+)title([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
-    const span = text.slice(slugLineEnd, spanEnd);
-    const tm = titleRe.exec(span);
-    if (tm) {
-      const titleValueStart = slugLineEnd + tm.index + tm[1].length + 5 + tm[2].length;
-      const titleValueEnd = titleValueStart + tm[3].length;
-      edits.push({
-        start: titleValueStart,
-        end: titleValueEnd,
-        replacement: JSON.stringify(opts.newTitle)
-      });
-    } else {
-      const nl = text.includes("\r\n") ? "\r\n" : "\n";
-      const insertion = `${nl}${" ".repeat(keyIndent)}title: ${JSON.stringify(opts.newTitle)}`;
-      edits.push({ start: slugLineEnd, end: slugLineEnd, replacement: insertion });
-    }
-  }
-  if (edits.length === 0)
-    return text;
-  edits.sort((a, b2) => b2.start - a.start);
-  let out = text;
-  for (const e of edits) {
-    out = out.slice(0, e.start) + e.replacement + out.slice(e.end);
-  }
-  return out;
-}
-function assertRenamedManifestParses(originalEntries, candidateText, oldSlug, expected) {
-  const refuse = (why) => {
-    throw new Error(`Could not rename the module entry (${why}).`);
-  };
-  const arrEq = (a, b2) => a.length === b2.length && a.every((v, i2) => v === b2[i2]);
-  const candidate = parseManifestEntriesFromText(candidateText);
-  if (candidate === null)
-    return refuse("the result is not a valid module manifest");
-  if (candidate.length !== originalEntries.length) {
-    return refuse(
-      `entry count changed (${originalEntries.length} -> ${candidate.length})`
-    );
-  }
-  const targetIndex = originalEntries.findIndex((e) => e.slug === oldSlug);
-  if (targetIndex < 0)
-    return refuse(`the original had no "${oldSlug}" entry`);
-  for (let i2 = 0; i2 < originalEntries.length; i2++) {
-    const before = originalEntries[i2];
-    const after = candidate[i2];
-    if (i2 === targetIndex) {
-      if (after.slug !== expected.newSlug) {
-        return refuse(
-          `entry ${i2} slug is ${JSON.stringify(after.slug)}, expected ${JSON.stringify(expected.newSlug)}`
-        );
-      }
-      if (after.planPath !== before.planPath || !arrEq(after.codeRoots, before.codeRoots) || !arrEq(after.touches, before.touches)) {
-        return refuse(`entry ${i2} changed a field other than slug/title`);
-      }
-      if (expected.newTitle !== null) {
-        if (after.title !== expected.newTitle) {
-          return refuse(
-            `entry ${i2} title is ${JSON.stringify(after.title)}, expected ${JSON.stringify(expected.newTitle)}`
-          );
-        }
-      } else if (after.title !== before.title && after.title !== expected.newSlug) {
-        return refuse(
-          `entry ${i2} title changed unexpectedly to ${JSON.stringify(after.title)}`
-        );
-      }
-    } else if (!entriesEqual(after, before)) {
-      return refuse(`entry ${i2} (${before.slug}) changed unexpectedly`);
-    }
-  }
-  const newSlugCount = candidate.filter((e) => e.slug === expected.newSlug).length;
-  if (newSlugCount !== 1) {
-    return refuse(`the new slug appears ${newSlugCount} times`);
-  }
-  if (expected.newSlug !== oldSlug && candidate.some((e) => e.slug === oldSlug)) {
-    return refuse(`the old slug "${oldSlug}" still appears`);
-  }
-}
-var NODE_RENAME_IO = {
-  readFileSync: (p2) => fs6.readFileSync(p2, "utf8"),
-  writeFileSync: (p2, data) => {
-    const tmp = `${p2}.${process.pid}.${crypto2.randomBytes(6).toString("hex")}.dabbler-rename-tmp`;
-    try {
-      fs6.writeFileSync(tmp, data, { encoding: "utf8" });
-      fs6.renameSync(tmp, p2);
-    } catch (err) {
-      try {
-        fs6.rmSync(tmp, { force: true });
-      } catch {
-      }
-      throw err;
-    }
-  }
-};
-function inferLegacyStatus(dir) {
-  if (fs6.existsSync(path7.join(dir, "change-log.md")))
-    return "complete";
-  if (fs6.existsSync(path7.join(dir, "activity-log.json")))
-    return "in-progress";
-  return "not-started";
-}
-function hasRunningSessionAt(setDir, io) {
-  let raw;
-  try {
-    raw = io.readFileSync(path7.join(setDir, "session-state.json"));
-  } catch {
-    return inferLegacyStatus(setDir) === "in-progress";
-  }
-  let doc;
-  try {
-    doc = JSON.parse(raw);
-  } catch {
-    return inferLegacyStatus(setDir) === "in-progress";
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return inferLegacyStatus(setDir) === "in-progress";
-  }
-  const d = doc;
-  if (d.status === "in-progress")
-    return true;
-  if (Array.isArray(d.sessions)) {
-    return d.sessions.some(
-      (s) => s !== null && typeof s === "object" && s.status === "in-progress"
-    );
-  }
-  return false;
-}
-function renameModule(root, oldSlugRaw, changes, io = NODE_RENAME_IO) {
-  const oldSlug = (oldSlugRaw ?? "").trim();
-  const msg = (e) => e instanceof Error ? e.message : String(e);
-  const refuse = (reason) => ({
-    oldSlug,
-    newSlug: oldSlug,
-    newTitle: null,
-    slugChanged: false,
-    titleChanged: false,
-    restamped: [],
-    refused: { reason }
-  });
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid")
-    return refuse(INVALID_MANIFEST_MESSAGE);
-  const entries = classified.kind === "present" ? classified.entries : [];
-  const targetEntry = entries.find((e) => e.slug === oldSlug);
-  if (!targetEntry) {
-    return refuse(
-      `Module "${oldSlug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`
-    );
-  }
-  const requestedSlug = changes.newSlug === void 0 ? void 0 : changes.newSlug.trim();
-  const requestedTitle = changes.newTitle === void 0 ? void 0 : changes.newTitle.trim();
-  const slugChanging = requestedSlug !== void 0 && requestedSlug !== "" && requestedSlug !== oldSlug;
-  const newSlug = slugChanging ? requestedSlug : oldSlug;
-  const currentTitle = targetEntry.title;
-  const titleChanging = requestedTitle !== void 0 && requestedTitle !== "" && requestedTitle !== currentTitle;
-  const newTitle = titleChanging ? requestedTitle : null;
-  if (!slugChanging && !titleChanging) {
-    return refuse(
-      "no change requested \u2014 the new slug and title match the current module."
-    );
-  }
-  if (slugChanging) {
-    const declaredSlugs = entries.map((e) => e.slug);
-    const slugErr = validateNewModuleSlug(newSlug, declaredSlugs);
-    if (slugErr)
-      return refuse(slugErr);
-  }
-  const setsRoot = path7.join(root, SESSION_SETS_REL);
-  const affected = [];
-  const newSlugCollisions = [];
-  for (const name of listSessionSetDirNames(root)) {
-    const dir = path7.join(setsRoot, name);
-    const specAbs = path7.join(dir, "spec.md");
-    const mod = parseSessionSetConfig(specAbs).module;
-    if (mod === oldSlug)
-      affected.push({ name, dir, specAbs });
-    else if (slugChanging && mod === newSlug)
-      newSlugCollisions.push(name);
-  }
-  if (slugChanging && newSlugCollisions.length > 0) {
-    return refuse(
-      `Renaming to "${newSlug}" would merge histories: ${newSlugCollisions.length} set(s) already declare module: ${newSlug}, which is not a declared module (${newSlugCollisions.join(", ")}). Pick a different name.`
-    );
-  }
-  if (slugChanging) {
-    const running = affected.filter((a) => hasRunningSessionAt(a.dir, io));
-    if (running.length > 0) {
-      return refuse(
-        `Refusing to rename "${oldSlug}" while ${running.length} affected set(s) have a running session (${running.map((r2) => r2.name).join(", ")}). Finish or close them first.`
-      );
-    }
-  }
-  const writes = [];
-  const restampedNames = [];
-  if (slugChanging) {
-    for (const a of affected) {
-      let original;
-      try {
-        original = io.readFileSync(a.specAbs);
-      } catch (e) {
-        return refuse(`could not read ${a.name}'s spec.md: ${msg(e)}`);
-      }
-      const res = restampModuleInSpecText(original, oldSlug, newSlug);
-      if (res.kind === "noop")
-        continue;
-      if (res.kind === "refused")
-        return refuse(`${a.name}: ${res.reason}`);
-      try {
-        assertRestampedTextValid(original, res.text, oldSlug, newSlug);
-      } catch (e) {
-        return refuse(`${a.name}: ${msg(e)}`);
-      }
-      writes.push({ abs: a.specAbs, original, next: res.text, label: a.name });
-      restampedNames.push(a.name);
-    }
-  }
-  const manifestAbs = path7.join(root, MODULES_MANIFEST_REL);
-  let manifestOriginal;
-  try {
-    manifestOriginal = io.readFileSync(manifestAbs);
-  } catch (e) {
-    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  const manifestNext = rewriteManifestEntryText(manifestOriginal, oldSlug, {
-    newSlug: slugChanging ? newSlug : void 0,
-    newTitle: titleChanging ? newTitle : void 0
-  });
-  if (manifestNext === null) {
-    return refuse(
-      `could not rewrite the ${MODULES_MANIFEST_DISPLAY} entry for "${oldSlug}" while preserving formatting \u2014 edit the slug/title by hand.`
-    );
-  }
-  try {
-    assertRenamedManifestParses(entries, manifestNext, oldSlug, {
-      newSlug,
-      // null = title not explicitly changed — the guard then tolerates a
-      // slug-derived implicit default (a title-less entry's display name
-      // follows its slug), so a slug-only rename of a title-less entry is not
-      // spuriously refused.
-      newTitle: titleChanging ? newTitle : null
-    });
-  } catch (e) {
-    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  writes.push({
-    abs: manifestAbs,
-    original: manifestOriginal,
-    next: manifestNext,
-    label: MODULES_MANIFEST_DISPLAY
-  });
-  const written = [];
-  for (const w of writes) {
-    try {
-      io.writeFileSync(w.abs, w.next);
-      written.push({ abs: w.abs, original: w.original });
-      if (io.readFileSync(w.abs) !== w.next) {
-        throw new Error("did not verify after write");
-      }
-    } catch (e) {
-      let rolledBack = true;
-      for (const done of written) {
-        try {
-          io.writeFileSync(done.abs, done.original);
-        } catch {
-          rolledBack = false;
-        }
-      }
-      return {
-        oldSlug,
-        newSlug,
-        newTitle,
-        slugChanged: false,
-        titleChanged: false,
-        restamped: [],
-        writeFailed: { reason: `writing ${w.label} failed: ${msg(e)}`, rolledBack }
-      };
-    }
-  }
-  return {
-    oldSlug,
-    newSlug,
-    newTitle,
-    slugChanged: slugChanging,
-    titleChanged: titleChanging,
-    restamped: restampedNames
-  };
-}
-var EXECUTION_ARTIFACT_FILENAMES = [
-  "activity-log.json",
-  "session-events.jsonl",
-  "change-log.md",
-  "ai-assignment.md",
-  "disposition.json",
-  "CANCELLED.md",
-  "RESTORED.md"
-];
-function hasExecutionArtifacts(dir) {
-  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs6.existsSync(path7.join(dir, f)));
-}
-function rawSessionSetStatus(dir) {
-  let raw;
-  try {
-    raw = fs6.readFileSync(path7.join(dir, "session-state.json"), "utf8");
-  } catch {
-    return inferLegacyStatus(dir);
-  }
-  let doc;
-  try {
-    doc = JSON.parse(raw);
-  } catch {
-    return inferLegacyStatus(dir);
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc))
-    return inferLegacyStatus(dir);
-  const status = doc.status;
-  if (typeof status !== "string")
-    return inferLegacyStatus(dir);
-  const canon = status === "completed" || status === "done" ? "complete" : status;
-  return canon === "complete" || canon === "in-progress" ? canon : "not-started";
-}
-function classifyOneSetForDeletion(dir, kind) {
-  const cancellation = readCancellationState(dir);
-  if (cancellation === "cancelled" || cancellation === "unknown" && isCancelled(dir)) {
-    return "terminal";
-  }
-  const status = rawSessionSetStatus(dir);
-  if (status === "complete")
-    return "terminal";
-  if (status === "not-started") {
-    const k2 = (kind ?? "").toLowerCase();
-    const isLifecycleScaffold = k2 === "plan" || k2 === "decomposition";
-    if (isLifecycleScaffold && !hasExecutionArtifacts(dir))
-      return "remove";
-  }
-  return "cancel";
-}
-function classifyModuleSetsForDeletion(root, slug) {
-  const setsRoot = path7.join(root, SESSION_SETS_REL);
-  const out = [];
-  for (const name of listSessionSetDirNames(root)) {
-    const dir = path7.join(setsRoot, name);
-    const specAbs = path7.join(dir, "spec.md");
-    const config = parseSessionSetConfig(specAbs);
-    if (config.module !== slug)
-      continue;
-    out.push({ name, dir, disposition: classifyOneSetForDeletion(dir, config.kind) });
-  }
-  return out;
-}
-function removeManifestEntryText(text, slug) {
-  const markerRe = /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
-  let target = null;
-  for (const m of text.matchAll(markerRe)) {
-    if (unquoteScalar(m[4]) === slug) {
-      target = m;
-      break;
-    }
-  }
-  if (target === null)
-    return null;
-  const entryIndent = target[1].length;
-  const slugLineEnd = target.index + target[0].length;
-  let spanEnd = text.length;
-  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|#|[^ \t\r\n#])/g;
-  boundaryRe.lastIndex = slugLineEnd;
-  let bm;
-  while ((bm = boundaryRe.exec(text)) !== null) {
-    if (bm[1].length <= entryIndent) {
-      spanEnd = bm.index;
-      break;
-    }
-  }
-  const nlMatch = /^\r?\n/.exec(text.slice(spanEnd));
-  const deleteEnd = spanEnd + (nlMatch ? nlMatch[0].length : 0);
-  return text.slice(0, target.index) + text.slice(deleteEnd);
-}
-function assertManifestEntryRemoved(originalEntries, candidateText, slug) {
-  const refuse = (why) => {
-    throw new Error(`Could not remove the module entry (${why}).`);
-  };
-  const candidate = parseManifestEntriesFromText(candidateText);
-  if (candidate === null)
-    return refuse("the result is not a valid module manifest");
-  if (candidate.length !== originalEntries.length - 1) {
-    return refuse(
-      `entry count changed (${originalEntries.length} -> ${candidate.length}, expected ${originalEntries.length - 1})`
-    );
-  }
-  if (candidate.some((e) => e.slug === slug)) {
-    return refuse(`the removed slug "${slug}" still appears`);
-  }
-  const remainingOriginal = originalEntries.filter(
-    (e) => e.slug !== slug
-  );
-  for (let i2 = 0; i2 < remainingOriginal.length; i2++) {
-    if (!entriesEqual(remainingOriginal[i2], candidate[i2])) {
-      return refuse(`entry ${i2} (${remainingOriginal[i2].slug}) changed unexpectedly`);
-    }
-  }
-}
-async function deleteModule(root, slugRaw, io = NODE_RENAME_IO) {
-  const slug = (slugRaw ?? "").trim();
-  const msg = (e) => e instanceof Error ? e.message : String(e);
-  const refuse = (reason2) => ({
-    slug,
-    cancelled: [],
-    removed: [],
-    terminal: [],
-    refused: { reason: reason2 }
-  });
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid")
-    return refuse(INVALID_MANIFEST_MESSAGE);
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (!entries.some((e) => e.slug === slug)) {
-    return refuse(`Module "${slug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`);
-  }
-  const classifications = classifyModuleSetsForDeletion(root, slug);
-  const running = classifications.filter((c3) => hasRunningSessionAt(c3.dir, io));
-  if (running.length > 0) {
-    return refuse(
-      `Refusing to delete "${slug}" while ${running.length} affected set(s) have a running session (${running.map((r2) => r2.name).join(", ")}). Finish or close them first.`
-    );
-  }
-  const terminalNames = classifications.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
-  const toCancel = classifications.filter((c3) => c3.disposition === "cancel");
-  const toRemove = classifications.filter((c3) => c3.disposition === "remove");
-  const manifestAbs = path7.join(root, MODULES_MANIFEST_REL);
-  let manifestOriginal;
-  try {
-    manifestOriginal = io.readFileSync(manifestAbs);
-  } catch (e) {
-    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  const manifestNext = removeManifestEntryText(manifestOriginal, slug);
-  if (manifestNext === null) {
-    return refuse(
-      `could not remove the ${MODULES_MANIFEST_DISPLAY} entry for "${slug}" while preserving formatting \u2014 remove it by hand.`
-    );
-  }
-  try {
-    assertManifestEntryRemoved(entries, manifestNext, slug);
-  } catch (e) {
-    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  const cancelled = [];
-  const removed = [];
-  const reason = `module ${slug} deleted`;
-  for (const c3 of toCancel) {
-    try {
-      await cancelSessionSet(c3.dir, reason);
-      cancelled.push(c3.name);
-    } catch (e) {
-      return {
-        slug,
-        cancelled,
-        removed,
-        terminal: terminalNames,
-        partialFailure: { reason: `cancelling ${c3.name} failed: ${msg(e)}` }
-      };
-    }
-  }
-  for (const c3 of toRemove) {
-    try {
-      fs6.rmSync(c3.dir, { recursive: true, force: true });
-      removed.push(c3.name);
-    } catch (e) {
-      return {
-        slug,
-        cancelled,
-        removed,
-        terminal: terminalNames,
-        partialFailure: { reason: `removing ${c3.name} failed: ${msg(e)}` }
-      };
-    }
-  }
-  try {
-    io.writeFileSync(manifestAbs, manifestNext);
-  } catch (e) {
-    return {
-      slug,
-      cancelled,
-      removed,
-      terminal: terminalNames,
-      partialFailure: {
-        reason: `${cancelled.length} set(s) cancelled and ${removed.length} scaffold(s) removed, but writing ${MODULES_MANIFEST_DISPLAY} failed: ${msg(e)} \u2014 re-run to finish removing the manifest entry.`
-      }
-    };
-  }
-  return { slug, cancelled, removed, terminal: terminalNames };
-}
-var MODULE_PLAN_SET_TEMPLATE_FILENAME = "module-plan-set.spec.md.template";
-var MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME = "module-decomposition-set.spec.md.template";
-function resolveModuleLifecycleTemplatesDir() {
-  const candidates = [
-    path7.join(__dirname, "templates", "consumer-bootstrap"),
-    path7.join(__dirname, "..", "..", "..", "..", "docs", "templates", "consumer-bootstrap")
-  ];
-  for (const c3 of candidates) {
-    if (fs6.existsSync(path7.join(c3, MODULE_PLAN_SET_TEMPLATE_FILENAME)))
-      return c3;
-  }
-  return candidates[candidates.length - 1];
-}
-function loadModuleLifecycleTemplate(filename) {
-  const dir = resolveModuleLifecycleTemplatesDir();
-  return fs6.readFileSync(path7.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
-}
-function substituteLifecycleTokens(text, table) {
-  return text.replace(
-    /{{([A-Z_]+)}}/g,
-    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
-  );
-}
-function assertNoUnsubstitutedTokens(rendered, filename) {
-  const leftover = rendered.match(/{{[A-Z_]+}}/g);
-  if (leftover) {
-    throw new Error(
-      `${filename}: unsubstituted token(s) ${leftover.join(", ")} \u2014 a template/writer token-table mismatch.`
-    );
-  }
-}
-function renderModulePlanSetSpec(ctx) {
-  const rendered = substituteLifecycleTokens(
-    loadModuleLifecycleTemplate(MODULE_PLAN_SET_TEMPLATE_FILENAME),
-    {
-      MODULE_TITLE: ctx.moduleTitle,
-      MODULE_SLUG: ctx.moduleSlug,
-      SLUG: ctx.slug,
-      CREATED: ctx.created,
-      PLAN_REL_PATH: ctx.planRelPath
-    }
-  );
-  assertNoUnsubstitutedTokens(rendered, MODULE_PLAN_SET_TEMPLATE_FILENAME);
-  return rendered;
-}
-function renderModuleDecompositionSetSpec(ctx) {
-  const rendered = substituteLifecycleTokens(
-    loadModuleLifecycleTemplate(MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME),
-    {
-      MODULE_TITLE: ctx.moduleTitle,
-      MODULE_SLUG: ctx.moduleSlug,
-      SLUG: ctx.slug,
-      CREATED: ctx.created,
-      PLAN_REL_PATH: ctx.planRelPath,
-      PLAN_SLUG: ctx.planSlug
-    }
-  );
-  assertNoUnsubstitutedTokens(rendered, MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME);
-  return rendered;
-}
-function findExistingLifecycleSetSlug(dirNames, moduleSlug, kind) {
-  const suffix = `-${moduleSlug}-${kind}`;
-  const matches = dirNames.filter((n) => n.endsWith(suffix) && numericPrefix(n) !== null).sort();
-  return matches.length > 0 ? matches[0] : null;
-}
-function writeSpecSkipExisting(abs, text) {
-  if (fs6.existsSync(abs))
-    return false;
-  fs6.mkdirSync(path7.dirname(abs), { recursive: true });
-  fs6.writeFileSync(abs, text, { encoding: "utf8" });
-  if (fs6.readFileSync(abs, "utf8") !== text) {
-    throw new Error(`${abs} did not verify after writing (concurrent modification?).`);
-  }
-  return true;
-}
-function assertLifecycleSpecWritten(abs, expectedKind, expectedPrereqSlug) {
-  const config = parseSessionSetConfig(abs);
-  if (config.kind !== expectedKind) {
-    throw new Error(
-      `${abs}: expected kind "${expectedKind}", parsed "${config.kind}" \u2014 refusing (template/parser drift).`
-    );
-  }
-  if (expectedPrereqSlug !== null) {
-    const prereqs = parsePrerequisites(abs);
-    const ok = prereqs !== null && prereqs.some(
-      (p2) => p2.slug === expectedPrereqSlug && p2.condition === "complete"
-    );
-    if (!ok) {
-      throw new Error(
-        `${abs}: expected a prerequisites: entry for "${expectedPrereqSlug}" \u2014 refusing (template/parser drift).`
-      );
-    }
-  }
-}
-function scaffoldModuleLifecycleSets(root, module2) {
-  const moduleSlug = (module2.slug ?? "").trim();
-  if (!MODULE_SLUG_RE.test(moduleSlug)) {
-    throw new Error(
-      `Cannot scaffold lifecycle sets: "${module2.slug}" is not a valid module slug.`
-    );
-  }
-  const dirNames = listSessionSetDirNames(root);
-  const existingPlanSlug = findExistingLifecycleSetSlug(dirNames, moduleSlug, "plan");
-  const existingDecompositionSlug = findExistingLifecycleSetSlug(
-    dirNames,
-    moduleSlug,
-    "decomposition"
-  );
-  const planSlug = existingPlanSlug ?? `${nextSessionSetNumberFrom(dirNames).padded}-${moduleSlug}-plan`;
-  const reservedDirNames = existingPlanSlug || dirNames.includes(planSlug) ? dirNames : [...dirNames, planSlug];
-  const decompositionSlug = existingDecompositionSlug ?? `${nextSessionSetNumberFrom(reservedDirNames).padded}-${moduleSlug}-decomposition`;
-  const created = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const planRelPath = modulePlanRelPath(module2);
-  const moduleTitle = (module2.title ?? "").trim() || moduleSlug;
-  const planAbs = path7.join(root, SESSION_SETS_REL, planSlug, "spec.md");
-  const decompositionAbs = path7.join(
-    root,
-    SESSION_SETS_REL,
-    decompositionSlug,
-    "spec.md"
-  );
-  let planCreated = false;
-  if (!existingPlanSlug) {
-    const planText = renderModulePlanSetSpec({
-      slug: planSlug,
-      moduleSlug,
-      moduleTitle,
-      created,
-      planRelPath
-    });
-    planCreated = writeSpecSkipExisting(planAbs, planText);
-    if (planCreated)
-      assertLifecycleSpecWritten(planAbs, "plan", null);
-  }
-  let decompositionCreated = false;
-  if (!existingDecompositionSlug) {
-    const decompositionText = renderModuleDecompositionSetSpec({
-      slug: decompositionSlug,
-      moduleSlug,
-      moduleTitle,
-      created,
-      planRelPath,
-      planSlug
-    });
-    decompositionCreated = writeSpecSkipExisting(decompositionAbs, decompositionText);
-    if (decompositionCreated) {
-      assertLifecycleSpecWritten(decompositionAbs, "decomposition", planSlug);
-    }
-  }
-  return {
-    planSlug,
-    planSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${planSlug}/spec.md`,
-    planCreated,
-    decompositionSlug,
-    decompositionSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${decompositionSlug}/spec.md`,
-    decompositionCreated
-  };
-}
-
-// src/providers/inProgressSetsService.ts
-function listInProgressSets(all) {
-  const sets = all ?? readAllSessionSets();
-  return sets.filter((s) => s.state === "in-progress").sort((a, b2) => {
-    const aStart = a.liveSession?.startedAt ?? "";
-    const bStart = b2.liveSession?.startedAt ?? "";
-    return aStart.localeCompare(bStart);
-  });
-}
-
-// src/providers/SessionSetsModel.ts
-function migrationMarker(set) {
-  return set.needsMigration ? "*" : "";
-}
-function migrationTooltip(set) {
-  if (!set.needsMigration)
-    return "";
-  const v = set.schemaVersionOnDisk;
-  return typeof v === "number" ? `Ran under schema v${v}` : "Ran under an older schema";
-}
-function hasSubCurrentSets(allSets) {
-  return allSets.some((s) => s.needsMigration);
-}
-function tierMarker(set) {
-  const specTier = set.config?.tier ?? "full";
-  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
-    return TIER_MISMATCH_MARKER;
-  }
-  return tierMarkerFor(specTier);
-}
-function tierTooltip(set) {
-  const specTier = set.config?.tier ?? "full";
-  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
-    return tierMismatchTooltipFor(specTier, set.workspaceTierMarker);
-  }
-  return tierTooltipFor(specTier);
-}
-function fractionTooltip(set) {
-  return set.plusFraction ? PLUS_FRACTION_TOOLTIP : "";
-}
-function verificationMarker(set) {
-  return set.verificationMarker ?? "";
-}
-function verificationTooltip(set) {
-  return verificationMarkerTooltipFor(set.verificationMarker ?? "");
-}
-function verdictFractionTooltip(set) {
-  const cv = set.completedVerification;
-  if (!cv || !cv.verdict)
-    return "";
-  const suffix = cv.sessionNumber != null ? ` (session ${cv.sessionNumber})` : "";
-  if (!isRecognizedVerdictToken(cv.verdict)) {
-    return `Verification: "${cv.verdict}" is not a recognized verdict${suffix}`;
-  }
-  return `Verification: ${cv.verdict}${suffix}`;
-}
-var ICON_FILES = {
-  complete: "done.svg",
-  "in-progress": "in-progress.svg",
-  "not-started": "not-started.svg",
-  cancelled: "cancelled.svg"
-};
-function verificationOwedText(set) {
-  if (set.state === "cancelled")
-    return "";
-  if (set.workflowState === "awaiting-verification")
-    return "verification owed";
-  if (set.workflowState === "awaiting-remediation")
-    return "remediation owed";
-  return "";
-}
-function touchedDate(set) {
-  if (!set.lastTouched)
-    return "";
-  return new Date(set.lastTouched).toLocaleDateString("en-CA");
-}
-function uatBadge(set) {
-  if (!set.config?.requiresUAT || !set.uatSummary)
-    return "";
-  if (set.uatSummary.pendingItems > 0)
-    return `[UAT ${set.uatSummary.pendingItems}]`;
-  if (set.uatSummary.totalItems > 0)
-    return "[UAT done]";
-  return "";
-}
-function forceClosedBadge(set) {
-  return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
-}
-var BLOCKED_MARKER = "\u26D3\uFE0E";
-function targetStateLabel(state) {
-  switch (state) {
-    case "in-progress":
-      return "in progress";
-    case "not-started":
-      return "not started";
-    case "unknown":
-      return "unknown set \u2014 check the slug";
-    default:
-      return state;
-  }
-}
-function blockedMarker(set) {
-  if (set.unsatisfiedPrereqs.length === 0)
-    return "";
-  if (set.state === "complete" || set.state === "cancelled")
-    return "";
-  return BLOCKED_MARKER;
-}
-function blockedTooltip(set) {
-  if (blockedMarker(set) === "")
-    return "";
-  const parts = set.unsatisfiedPrereqs.map(
-    (p2) => `${p2.slug} (${targetStateLabel(p2.targetState)})`
-  );
-  return `Blocked by prerequisites: ${parts.join(", ")} \u2014 all must complete first.`;
-}
-function kindBadge(set) {
-  return set.kind ?? "";
-}
-function kindTooltip(set) {
-  if (set.kind === "plan") {
-    return "Module lifecycle set: creates or imports this module's project plan.";
-  }
-  if (set.kind === "decomposition") {
-    return "Module lifecycle set: decomposes the module's plan into session sets.";
-  }
-  return "";
-}
-function bucketSets(all) {
-  return {
-    inProgress: all.filter((s) => s.state === "in-progress"),
-    notStarted: all.filter((s) => s.state === "not-started"),
-    complete: all.filter((s) => s.state === "complete"),
-    cancelled: all.filter((s) => s.state === "cancelled")
-  };
-}
-function sortBucket(subset, groupKey) {
-  const out = subset.slice();
-  if (groupKey === "not-started") {
-    out.sort((a, b2) => a.name.localeCompare(b2.name));
-  } else {
-    out.sort((a, b2) => (b2.lastTouched || "").localeCompare(a.lastTouched || ""));
-  }
-  return out;
-}
-function buildBucketPayloads(subset, rowFor) {
-  return orderedBuckets(subset).map((bucket) => ({
-    key: bucket.key,
-    label: bucket.label,
-    count: bucket.sets.length,
-    rows: bucket.sets.map(rowFor)
-  }));
-}
-function orderedBuckets(subset) {
-  const buckets = bucketSets(subset);
-  const groups = [
-    {
-      key: "in-progress",
-      label: "In Progress",
-      sets: listInProgressSets(buckets.inProgress)
-    },
-    {
-      key: "not-started",
-      label: "Not Started",
-      sets: sortBucket(buckets.notStarted, "not-started")
-    },
-    {
-      key: "complete",
-      label: "Complete",
-      sets: sortBucket(buckets.complete, "complete")
-    }
-  ];
-  if (buckets.cancelled.length > 0) {
-    groups.push({
-      key: "cancelled",
-      label: "Cancelled",
-      sets: sortBucket(buckets.cancelled, "cancelled")
-    });
-  }
-  return groups;
-}
-function mergeVisibleModules(roots) {
-  const declared = /* @__PURE__ */ new Map();
-  const fallback = /* @__PURE__ */ new Map();
-  let pseudo = null;
-  let firstSeen = 0;
-  const warningRank = (warning) => {
-    if (!warning)
-      return 0;
-    if (warning.code === "manifest-invalid")
-      return 3;
-    if (warning.code === "manifest-missing")
-      return 2;
-    return 1;
-  };
-  for (const modules of roots) {
-    let declaredOrder = 0;
-    for (const module2 of modules) {
-      if (module2.kind === "declared") {
-        const slug = module2.slug;
-        const existing = declared.get(slug);
-        if (existing) {
-          existing.module = {
-            ...existing.module,
-            sets: [...existing.module.sets, ...module2.sets]
-          };
-          existing.order = Math.min(existing.order, declaredOrder);
-        } else {
-          declared.set(slug, {
-            module: { ...module2, sets: [...module2.sets] },
-            order: declaredOrder,
-            firstSeen: firstSeen++
-          });
-        }
-        declaredOrder++;
-        continue;
-      }
-      if (module2.kind === "fallback") {
-        const slug = module2.slug;
-        const existing = fallback.get(slug);
-        fallback.set(
-          slug,
-          existing ? { ...existing, sets: [...existing.sets, ...module2.sets] } : { ...module2, sets: [...module2.sets] }
-        );
-        continue;
-      }
-      if (!pseudo) {
-        pseudo = { ...module2, sets: [...module2.sets] };
-      } else {
-        const existingPseudo = pseudo;
-        pseudo = {
-          ...existingPseudo,
-          warning: warningRank(module2.warning) > warningRank(existingPseudo.warning) ? module2.warning : existingPseudo.warning,
-          sets: [...existingPseudo.sets, ...module2.sets]
-        };
-      }
-    }
-  }
-  const out = Array.from(declared.values()).sort((a, b2) => a.order - b2.order || a.firstSeen - b2.firstSeen).map((entry) => entry.module);
-  out.push(...Array.from(fallback.values()).sort((a, b2) => a.slug.localeCompare(b2.slug)));
-  const mergedPseudo = pseudo;
-  if (mergedPseudo) {
-    out.push({
-      ...mergedPseudo,
-      displayName: out.length === 0 ? PSEUDO_MODULE_SOLE_NAME : PSEUDO_MODULE_COEXIST_NAME
-    });
-  }
-  return out;
-}
-function buildVisibleModulePayloads(modules, rowFor) {
-  return modules.map((module2) => ({
-    slug: module2.slug ?? "",
-    title: module2.displayName,
-    kind: module2.kind,
-    warning: module2.warning,
-    buckets: buildBucketPayloads([...module2.sets], rowFor)
-  }));
-}
-var PSEUDO_MODULE_SOLE_NAME = "Default";
-var PSEUDO_MODULE_COEXIST_NAME = "Unassigned";
-function chooseRenderableModuleSnapshot(classification, current, lastKnownGood) {
-  if (classification.kind === "invalid" && lastKnownGood) {
-    return { modules: lastKnownGood, retainedLastKnownGood: true };
-  }
-  return { modules: current, retainedLastKnownGood: false };
-}
-function computeVisibleModules(classification, allSets, opts) {
-  const declared = classification.kind === "present" ? classification.entries : [];
-  const declaredSlugs = new Set(declared.map((e) => e.slug));
-  const declaredSets = /* @__PURE__ */ new Map();
-  const fallbackSets = /* @__PURE__ */ new Map();
-  const unstamped = [];
-  for (const s of allSets) {
-    const raw = s.config?.module ?? null;
-    if (raw === null) {
-      unstamped.push(s);
-    } else if (declaredSlugs.has(raw)) {
-      const list = declaredSets.get(raw);
-      if (list)
-        list.push(s);
-      else
-        declaredSets.set(raw, [s]);
-    } else {
-      const list = fallbackSets.get(raw);
-      if (list)
-        list.push(s);
-      else
-        fallbackSets.set(raw, [s]);
-    }
-  }
-  const out = declared.map((entry) => ({
-    kind: "declared",
-    slug: entry.slug,
-    displayName: entry.title,
-    warning: null,
-    planPath: resolveModulePlanRelPath(entry).path,
-    sets: declaredSets.get(entry.slug) ?? []
-  }));
-  for (const rawSlug of Array.from(fallbackSets.keys()).sort()) {
-    out.push({
-      kind: "fallback",
-      slug: rawSlug,
-      displayName: rawSlug,
-      warning: { code: "undeclared-slug", rawSlug },
-      planPath: null,
-      sets: fallbackSets.get(rawSlug)
-    });
-  }
-  const otherGroupsVisible = out.length > 0;
-  const pseudoVisible = unstamped.length > 0 || opts.legacyRootPlanExists || !otherGroupsVisible;
-  if (pseudoVisible) {
-    let warning = null;
-    if (classification.kind === "invalid") {
-      warning = { code: "manifest-invalid" };
-    } else if (classification.kind === "absent" && allSets.length > 0) {
-      warning = { code: "manifest-missing" };
-    } else if (unstamped.length > 0 && otherGroupsVisible) {
-      warning = { code: "unstamped-sets" };
-    }
-    out.push({
-      kind: "pseudo",
-      slug: null,
-      displayName: otherGroupsVisible ? PSEUDO_MODULE_COEXIST_NAME : PSEUDO_MODULE_SOLE_NAME,
-      warning,
-      planPath: LEGACY_ROOT_PLAN_REL,
-      sets: unstamped
-    });
-  }
-  return out;
-}
-
-// src/providers/moduleAssembly.ts
-function nodeModuleAssemblyIo() {
-  return {
-    workspaceRoots: () => (vscode2.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
-    classify: (root) => classifyModulesManifest(root),
-    // Set 100 S1: the 093-era per-module plan-existence resolution retired
-    // with the persistent `Plan` child node it fed. This probe stays — it
-    // drives pseudo-module VISIBILITY (the legacy root plan keeps the
-    // pseudo-module rendered even when every set is stamped).
-    legacyRootPlanExists: (root) => fs7.existsSync(path8.join(root, LEGACY_ROOT_PLAN_REL)),
-    rootLabel: (root) => path8.basename(root)
-  };
-}
-var INVALID_MANIFEST_MESSAGE2 = "docs/modules.yaml is invalid (expected a YAML mapping with a modules list). Fix the file by hand; Work Explorer never overwrites it.";
-function assembleVisibleModules(allSets, io, lastKnownGood) {
-  const roots = new Set(io.workspaceRoots());
-  for (const set of allSets)
-    roots.add(set.root);
-  const manifestFaults = [];
-  const byRoot = Array.from(roots).map((root) => {
-    const classification = io.classify(root);
-    const current = computeVisibleModules(
-      classification,
-      allSets.filter((set) => set.root === root),
-      { legacyRootPlanExists: io.legacyRootPlanExists(root) }
-    );
-    const selected = chooseRenderableModuleSnapshot(
-      classification,
-      current,
-      lastKnownGood.get(root)
-    );
-    if (classification.kind === "invalid") {
-      manifestFaults.push({
-        rootLabel: io.rootLabel(root),
-        message: INVALID_MANIFEST_MESSAGE2,
-        retainedLastKnownGood: selected.retainedLastKnownGood
-      });
-    } else {
-      lastKnownGood.set(root, current);
-    }
-    return selected.modules;
-  });
-  return { modules: mergeVisibleModules(byRoot), manifestFaults };
-}
-
-// src/utils/startupTiming.ts
-var fs8 = __toESM(require("fs"));
-var path9 = __toESM(require("path"));
-var marks = {
-  moduleLoadedAtUptimeMs: null,
-  moduleLoadedAt: null,
-  activateStart: null,
-  activateEnd: null,
-  webviewResolveStart: null,
-  webviewResolveEnd: null,
-  treeFirstChildrenServed: null,
-  treeFirstChildrenCount: null
-};
-try {
-  marks.moduleLoadedAt = Date.now();
-  marks.moduleLoadedAtUptimeMs = Math.round(process.uptime() * 1e3);
-} catch {
-}
-function markActivateStart() {
-  marks.activateStart = Date.now();
-}
-function markActivateEnd() {
-  marks.activateEnd = Date.now();
-  emitIfRequested();
-}
-function markWebviewResolveStart() {
-  if (marks.webviewResolveStart !== null)
-    return;
-  marks.webviewResolveStart = Date.now();
-}
-function markWebviewResolveEnd() {
-  if (marks.webviewResolveEnd !== null)
-    return;
-  marks.webviewResolveEnd = Date.now();
-  emitIfRequested();
-}
-function markFirstChildrenServed(count) {
-  if (marks.treeFirstChildrenServed !== null)
-    return;
-  marks.treeFirstChildrenServed = Date.now();
-  marks.treeFirstChildrenCount = count;
-  emitIfRequested();
-}
-function readStartupMarks() {
-  return { ...marks };
-}
-var delta = (from, to) => from === null || to === null ? null : to - from;
-function startupDurations(m = marks) {
-  return {
-    activateMs: delta(m.activateStart, m.activateEnd),
-    webviewResolveMs: delta(m.webviewResolveStart, m.webviewResolveEnd),
-    activateEndToTreeRootsMs: delta(m.activateEnd, m.treeFirstChildrenServed)
-  };
-}
-function emitIfRequested() {
-  const target = process.env.DABBLER_STARTUP_TIMING_PATH;
-  if (!target)
-    return;
-  const payload = {
-    marks: readStartupMarks(),
-    durations: startupDurations(),
-    note: "Host-side buckets only. First paint is NOT here \u2014 it is observed from the DOM by the Layer 3 harness, because the host cannot see when a row becomes visible."
-  };
-  try {
-    fs8.mkdirSync(path9.dirname(target), { recursive: true });
-    fs8.writeFileSync(target, JSON.stringify(payload, null, 2), { encoding: "utf-8" });
-  } catch (err) {
-    console.error(
-      `[dabbler-ai-orchestration] startup timing: could not write DABBLER_STARTUP_TIMING_PATH (${target}) \u2014 the harness will find no file, which must NOT be read as "startup was not instrumented".`,
-      err
-    );
-  }
-}
-
-// src/wizard/planImport.ts
-var vscode3 = __toESM(require("vscode"));
-var fs9 = __toESM(require("fs"));
-var path10 = __toESM(require("path"));
-
-// src/providers/ActionRegistry.ts
-var inFlightLike = (s) => s.state === "in-progress" || s.state === "not-started";
-var cancellable = (s) => s.state === "in-progress" || s.state === "not-started" || s.state === "complete";
-var isCancelled2 = (s) => s.state === "cancelled";
-var hasCompletedSession = (s) => s.sessionsCompleted > 0;
-var isCompleteState = (s) => s.state === "complete";
-var needsMigrationToV3 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 3;
-var needsMigrationToV4 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 4;
-var hasUnsatisfiedPrereqs = (s) => inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
-var isNotStarted = (s) => s.state === "not-started";
-var kickoffEligible = (s) => s.config.tier === "lightweight" && s.config.verificationMode === "dedicated-sessions" && s.completedVerification === null && s.state !== "cancelled";
-var setupVerificationEligible = (s) => s.config.tier === "lightweight" && (isNotStarted(s) || isCompleteState(s) && s.config.verificationMode === "out-of-band-or-none");
-var showsOutOfBandMarker = (s) => s.verificationMarker === "v?";
-var ROW_ACTIONS = [
-  // Open File ▸ submenu. L2 locks the four entries to: Spec, Activity
-  // Log, Change Log, Session State. "Open AI Assignment" removed per
-  // L3. Open UAT Checklist / Reveal Playwright Tests / Reveal Folder
-  // remain registered as Command-Palette-only commands — they are not
-  // surfaced on the right-click menu under L2.
-  { id: "dabblerSessionSets.openSpec", label: "Spec", group: 101, category: "openFile", when: () => true },
-  { id: "dabblerSessionSets.openActivityLog", label: "Activity Log", group: 102, category: "openFile", when: () => true },
-  { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, category: "openFile", when: () => true },
-  { id: "dabblerSessionSets.openSessionState", label: "Session State", group: 104, category: "openFile", when: () => true },
-  // Copy Prompt ▸ submenu — L2 labels match the spec §3.3 table (the
-  // submenu was renamed Set 049 S1 to better reflect its contents,
-  // which include action prompts like "Start Next Session" not just
-  // evaluation prompts).
-  { id: "dabbler.copySpecReviewPrompt", label: "Evaluate Specification", group: 301, category: "copyEval", when: () => true },
-  {
-    id: "dabbler.copySessionAccomplishmentsPrompt",
-    label: "Evaluate Most Recent Session",
-    group: 302,
-    category: "copyEval",
-    when: (s) => hasCompletedSession(s)
-  },
-  {
-    id: "dabbler.copySetAccomplishmentsPrompt",
-    label: "Evaluate Session Set",
-    group: 303,
-    category: "copyEval",
-    when: (s) => isCompleteState(s)
-  },
-  {
-    id: "dabbler.copyStartNextSessionPrompt",
-    label: "Start Next Session",
-    group: 304,
-    category: "copyEval",
-    when: (s) => inFlightLike(s)
-  },
-  // Set 049 S1 hygiene: surface the parallel-session command in the
-  // submenu. Gated identically to "Start Next Session" — the parallel
-  // pattern is only meaningful on non-terminal rows.
-  {
-    id: "dabbler.copyStartNextParallelSessionPrompt",
-    label: "Start New Parallel Session",
-    group: 305,
-    category: "copyEval",
-    when: (s) => inFlightLike(s)
-  },
-  // Set 062 S2 (spec D2): paste-ready agent handoff into the Set 057
-  // dedicated-verification flow (typed session, different engine).
-  {
-    id: "dabbler.copyVerificationKickoffPrompt",
-    label: "Verification Kickoff",
-    group: 306,
-    category: "copyEval",
-    when: kickoffEligible
-  },
-  // Flat actions — appear at the top level of the QuickPick. The
-  // spec §3.3 table lists v4 only because v4 is the canonical target;
-  // the v3 entry is kept here for legacy v1/v2 sets (mutually exclusive
-  // with v4 — at most one of the two ever appears per row).
-  //
-  // Set 049 S4 (rip-out): `dabbler.checkOutOrchestrator` ("Set
-  // Orchestrator…") retired alongside the check-out / check-in
-  // coordination layer. The writer-log opener stays as a diagnostic
-  // surface (the log itself is preserved provisionally per T5).
-  { id: "dabblerSessionSets.copySlug", label: "Copy Slug", group: 501, category: "flat", when: () => true },
-  { id: "dabbler.openOrchestratorWriterLog", label: "Open Orchestrator Writer Log", group: 502, category: "flat", when: () => true },
-  // Set 061 S2 (spec D3): companion to the blocked marker — jumps to
-  // the spec of whichever unsatisfied prerequisite is blocking this
-  // row (QuickPick when more than one). Reuses the openSpec plumbing
-  // in commands/openFile.ts.
-  { id: "dabblerSessionSets.openPrerequisiteSpec", label: "Open Prerequisite Spec", group: 503, category: "flat", when: hasUnsatisfiedPrereqs },
-  // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
-  // QuickPick; not-started rows only. See commands/switchTier.ts.
-  { id: "dabblerSessionSets.switchTier", label: "Switch Tier\u2026", group: 504, category: "flat", when: isNotStarted },
-  // Set 062 S2+S3 (spec D3): not-started Lightweight rows get the
-  // confirmed spec-seed rewrite; completed Mode-A rows get the
-  // blessed-writer transition (A->B only). See
-  // commands/setupVerification.ts.
-  {
-    id: "dabblerSessionSets.setupVerification",
-    label: "Set Up Dedicated Verification\u2026",
-    group: 505,
-    category: "flat",
-    when: setupVerificationEligible
-  },
-  // Set 062 S2 (spec step 4): reuse the existing out-of-band note
-  // command on exactly the rows that render `v?` — the sanctioned
-  // recording path; the detail names the marker-clearing consequence.
-  {
-    id: "dabbler.openExternalVerificationDoc",
-    label: "Open External Verification Note",
-    group: 506,
-    category: "flat",
-    detail: "Record the out-of-band verdict \u2014 creating external-verification.md clears the v? marker.",
-    when: showsOutOfBandMarker
-  },
-  { id: "dabblerSessionSets.migrate", label: "Migrate to v3 schema", group: 801, category: "flat", when: needsMigrationToV3 },
-  { id: "dabblerSessionSets.migrateToV4", label: "Migrate to v4 schema", group: 802, category: "flat", when: needsMigrationToV4 },
-  {
-    id: "dabblerSessionSets.cancel",
-    label: "Cancel Session Set",
-    group: 901,
-    category: "flat",
-    when: (s) => cancellable(s)
-  },
-  {
-    id: "dabblerSessionSets.restore",
-    label: "Restore Session Set",
-    group: 902,
-    category: "flat",
-    when: (s) => isCancelled2(s)
-  }
-];
-function applicableActions(set, supports) {
-  return ROW_ACTIONS.filter((a) => a.when(set, supports)).sort((a, b2) => a.group - b2.group);
-}
-function categorizedActions(set, supports) {
-  const applicable = applicableActions(set, supports);
-  return {
-    openFile: applicable.filter((a) => a.category === "openFile"),
-    copyEval: applicable.filter((a) => a.category === "copyEval"),
-    flat: applicable.filter((a) => a.category === "flat")
-  };
-}
-
-// src/providers/workExplorerTreeModel.ts
-function moduleKeyOf(module2) {
-  return `${module2.kind}:${module2.slug ?? ""}`;
-}
-function preselectFromTreeNode(arg) {
-  if (arg === null || typeof arg !== "object")
-    return void 0;
-  const node = arg;
-  if (node.kind !== "module" || !node.module)
-    return void 0;
-  return { preselectedSlug: node.module.slug ?? "" };
-}
-function moduleNodes(modules) {
-  const declaredModulesExist = modules.some((m) => m.kind === "declared");
-  return modules.map((module2) => ({ kind: "module", module: module2, declaredModulesExist }));
-}
-function bucketNodes(node) {
-  return orderedBuckets([...node.module.sets]).map((bucket) => ({
-    kind: "bucket",
-    moduleKey: moduleKeyOf(node.module),
-    bucketKey: bucket.key,
-    label: bucket.label,
-    sets: bucket.sets
-  }));
-}
-function setNodes(node) {
-  return node.sets.map((set) => ({ kind: "set", set }));
-}
-function sessionNodes(node) {
-  return [...node.set.sessions ?? []].sort((a, b2) => a.number - b2.number).map((session) => ({ kind: "session", set: node.set, session }));
-}
-function childrenOf(node) {
-  switch (node.kind) {
-    case "module":
-      return bucketNodes(node);
-    case "bucket":
-      return setNodes(node);
-    case "set":
-      return sessionNodes(node);
-    case "session":
-      return [];
-  }
-}
-var TOKEN_SEP = ";";
-function tokenString(tokens) {
-  return TOKEN_SEP + tokens.join(TOKEN_SEP) + TOKEN_SEP;
-}
-var NODE_TOKEN = {
-  module: "dabblerModule",
-  bucket: "dabblerBucket",
-  set: "dabblerSet",
-  session: "dabblerSession"
-};
-var MODULE_TOKEN = {
-  declared: "module-declared",
-  fallback: "module-fallback",
-  pseudo: "module-pseudo",
-  canOpenPlan: "can-open-plan",
-  canManage: "can-manage-module",
-  canAssignLegacy: "can-assign-legacy"
-};
-function actionToken(action) {
-  return `act-${action.id.replace(/^dabbler(SessionSets)?\./, "").replace(/\./g, "-")}`;
-}
-function verdictIsUnclean(verdict) {
-  if (typeof verdict !== "string" || verdict.trim() === "")
-    return false;
-  if (!isRecognizedVerdictToken(verdict))
-    return true;
-  const normalized = verdict.trim().toUpperCase();
-  return normalized.startsWith("ISSUES_FOUND") || normalized.startsWith("WAIVED");
-}
-function severityOf(set) {
-  if (blockedMarker(set) !== "")
-    return "blocked";
-  if (set.needsMigration)
-    return "migration";
-  if (verdictIsUnclean(set.liveSession?.verificationVerdict))
-    return "verification";
-  if (set.duplicateNameError)
-    return "duplicate-name";
-  if (tierMarkerIsMismatch(set))
-    return "tier-mismatch";
-  return null;
-}
-function tierMarkerIsMismatch(set) {
-  return tierMarker(set) === TIER_MISMATCH_MARKER;
-}
-var SEVERITY_ICON = {
-  blocked: { kind: "theme", id: "error", color: "problemsErrorIcon.foreground" },
-  migration: { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
-  verification: { kind: "theme", id: "unverified", color: "problemsWarningIcon.foreground" },
-  "duplicate-name": { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
-  "tier-mismatch": { kind: "theme", id: "info", color: "problemsInfoIcon.foreground" }
-};
-function setIcon(set) {
-  const severity = severityOf(set);
-  if (severity)
-    return SEVERITY_ICON[severity];
-  return { kind: "file", slug: ICON_FILES[set.state] };
-}
-function sessionIcon(status) {
-  return { kind: "file", slug: ICON_FILES[status] };
-}
-var MODULE_WARNING_TEXT = {
-  "manifest-missing": "No `docs/modules.yaml` in this root \u2014 these sets are ungrouped.",
-  "manifest-invalid": "`docs/modules.yaml` is invalid; showing the last good module tree. Fix the file by hand.",
-  "unstamped-sets": "Some sets carry no `module:` attribution.",
-  "undeclared-slug": "This module is stamped on sets but is not declared in `docs/modules.yaml`."
-};
-function moduleDescriptor(node) {
-  const { module: module2 } = node;
-  const setCount = module2.sets.length;
-  const warning = module2.warning;
-  const tokens = [NODE_TOKEN.module];
-  if (module2.kind === "declared") {
-    tokens.push(MODULE_TOKEN.declared, MODULE_TOKEN.canOpenPlan, MODULE_TOKEN.canManage);
-  } else if (module2.kind === "pseudo") {
-    tokens.push(MODULE_TOKEN.pseudo, MODULE_TOKEN.canOpenPlan);
-    if (node.declaredModulesExist)
-      tokens.push(MODULE_TOKEN.canAssignLegacy);
-  } else {
-    tokens.push(MODULE_TOKEN.fallback);
-  }
-  const tooltipLines = [`**${module2.displayName}**`, "", `${setCount} session set${setCount === 1 ? "" : "s"}`];
-  if (warning) {
-    tooltipLines.push("", `$(warning) ${MODULE_WARNING_TEXT[warning.code] ?? warning.code}`);
-  }
-  return {
-    id: `module:${moduleKeyOf(module2)}`,
-    label: module2.displayName,
-    description: `${setCount} set${setCount === 1 ? "" : "s"}`,
-    tooltip: tooltipLines.join("\n"),
-    icon: warning ? { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" } : { kind: "theme", id: "folder" },
-    contextValue: tokenString(tokens),
-    collapsible: "collapsed"
-  };
-}
-function bucketDescriptor(node) {
-  const count = node.sets.length;
-  return {
-    // Scoped by module: "In Progress" exists under every module row.
-    id: `bucket:${node.moduleKey}/${node.bucketKey}`,
-    label: node.label,
-    // Session 1 recorded this as PROPOSED, not operator-confirmed:
-    // bucket labels are short, so `description` survives truncation
-    // where a set row's does not. Session 4's walk confirms or drops it.
-    description: `${count} set${count === 1 ? "" : "s"}`,
-    contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucketKey}`]),
-    // The three default buckets render even when EMPTY — a declared
-    // module with no work yet still shows where that work will land
-    // (never hide work). But an empty one is a LEAF: offering a twisty
-    // that opens onto nothing is the same dead affordance a
-    // session-less set row would be, and the count in `description`
-    // already says why it will not expand.
-    collapsible: count > 0 ? "collapsed" : "none"
-  };
-}
-function setTooltip(set) {
-  const lines = [`**${set.name}**`];
-  const progress = set.totalSessions && set.totalSessions > 0 ? `${set.sessionsCompleted}/${set.totalSessions}${set.plusFraction ? "+" : ""}` : `${set.sessionsCompleted}/?`;
-  const state = set.state.replace("-", " ");
-  lines.push("", `${state} \xB7 ${progress} sessions complete`);
-  const markers = [];
-  const blocked = blockedTooltip(set);
-  if (blocked)
-    markers.push(blocked);
-  if (set.needsMigration)
-    markers.push(migrationTooltip(set));
-  const tier = tierTooltip(set);
-  if (tier)
-    markers.push(tier);
-  const verification = verificationTooltip(set);
-  if (verification)
-    markers.push(verification);
-  const verdict = set.liveSession?.verificationVerdict;
-  if (typeof verdict === "string" && verdict.trim() !== "") {
-    markers.push(
-      isRecognizedVerdictToken(verdict) ? `Verification: ${verdict}` : `Verification: "${verdict}" is not a recognized verdict`
-    );
-  }
-  if (set.duplicateNameError) {
-    markers.push(
-      `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.`
-    );
-  }
-  const kind = kindTooltip(set);
-  if (kind)
-    markers.push(kind);
-  const owed = verificationOwedText(set);
-  if (owed)
-    markers.push(owed);
-  const uat = uatBadge(set);
-  if (uat)
-    markers.push(`UAT: ${uat.replace(/^\[|\]$/g, "")}`);
-  const forced = forceClosedBadge(set);
-  if (forced)
-    markers.push("Closed via the --force bypass, not the deterministic gate.");
-  if (markers.length > 0) {
-    lines.push("", ...markers.map((m) => `- ${m}`));
-  }
-  const touched = touchedDate(set);
-  if (touched)
-    lines.push("", `_last touched ${touched}_`);
-  return lines.join("\n");
-}
-function setDescriptor(set, supports) {
-  const tokens = [NODE_TOKEN.set, `state-${set.state}`];
-  const severity = severityOf(set);
-  if (severity)
-    tokens.push(`severity-${severity}`);
-  for (const action of ROW_ACTIONS) {
-    if (action.when(set, supports))
-      tokens.push(actionToken(action));
-  }
-  const sessionCount = (set.sessions ?? []).length;
-  return {
-    // Set names are globally unique by repo invariant (Set 087), which
-    // is exactly why they are also the identity every row action keys on.
-    id: `set:${set.name}`,
-    label: set.name,
-    tooltip: setTooltip(set),
-    icon: setIcon(set),
-    contextValue: tokenString(tokens),
-    // Operator-notes wrinkle 5: a set node MUST report Collapsed, never
-    // Expanded, or the fourth level is paid on every refresh — the exact
-    // cost the migration exists to remove. A set with no readable ledger
-    // is a leaf, so expanding never opens onto nothing.
-    collapsible: sessionCount > 0 ? "collapsed" : "none"
-  };
-}
-function sessionDescriptor(node) {
-  const { session } = node;
-  return {
-    id: `session:${node.set.name}/${session.number}`,
-    label: session.title || `Session ${session.number}`,
-    // Short labels, so `description` survives truncation here. Only the
-    // in-flight session says anything — quiet is the default state.
-    description: session.status === "in-progress" ? "in flight" : void 0,
-    tooltip: `**${session.title || `Session ${session.number}`}** \u2014 ${session.status.replace("-", " ")}`,
-    icon: sessionIcon(session.status),
-    contextValue: tokenString([NODE_TOKEN.session, `session-${session.status}`]),
-    collapsible: "none"
-  };
-}
-function descriptorFor(node, supports) {
-  switch (node.kind) {
-    case "module":
-      return moduleDescriptor(node);
-    case "bucket":
-      return bucketDescriptor(node);
-    case "set":
-      return setDescriptor(node.set, supports);
-    case "session":
-      return sessionDescriptor(node);
-  }
-}
-
-// src/wizard/planImport.ts
-var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
-function buildPlanningPrompt(module2, destPosix) {
-  const subject = module2 ? `the "${module2.title}" module (\`${module2.slug}\`) of my software project` : "my software project";
-  const moduleNote = module2 ? `
-This plan covers ONLY the ${module2.slug} module (its scope is declared in
-docs/modules.yaml); the project's other modules have their own plans.
-` : "";
-  return `You are a project planning assistant for an AI-led development workflow.
-
-Help me create a project plan in Markdown format for ${subject}.
-${moduleNote}
-The plan should include:
-1. Project overview (2-3 sentences)
-2. Goals and success criteria
-3. High-level phases or feature areas
-4. For each phase: a brief description and the key deliverables
-
-Keep it concise and focused \u2014 this plan will be used to generate AI session sets, so each
-distinct feature area or phase should be something that can be implemented in 2-6 focused AI
-sessions.
-
-Format as a clean Markdown document I can save as ${destPosix}.`;
-}
-function defaultUi() {
-  return {
-    showOpenDialog: vscode3.window.showOpenDialog,
-    showWarningMessage: vscode3.window.showWarningMessage,
-    showInformationMessage: vscode3.window.showInformationMessage,
-    showErrorMessage: vscode3.window.showErrorMessage,
-    showQuickPick: (items, opts) => vscode3.window.showQuickPick(items, opts),
-    writeClipboard: (text) => vscode3.env.clipboard.writeText(text),
-    executeCommand: (command, ...args) => vscode3.commands.executeCommand(command, ...args),
-    workspaceRoot: () => vscode3.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
-}
-async function resolvePlanTarget(root, ui, opts) {
-  if (!root)
-    return { entry: null, destPosix: PLAN_DEST_POSIX };
-  const pick2 = await pickModuleForAuthoring(
-    root,
-    {
-      showQuickPick: ui.showQuickPick,
-      showInformationMessage: ui.showInformationMessage,
-      showErrorMessage: ui.showErrorMessage
-    },
-    opts && opts.preselectedSlug !== void 0 ? { preselectedSlug: opts.preselectedSlug } : void 0
-  );
-  if (pick2.kind === "cancelled" || pick2.kind === "invalid-manifest" || pick2.kind === "unknown-module") {
-    return null;
-  }
-  return {
-    entry: pick2.entry,
-    destPosix: pick2.entry ? modulePlanRelPath(pick2.entry) : PLAN_DEST_POSIX
-  };
-}
-async function copyPlanningPrompt(ui = defaultUi(), opts) {
-  const target = await resolvePlanTarget(ui.workspaceRoot(), ui, opts);
-  if (!target)
-    return;
-  await ui.writeClipboard(buildPlanningPrompt(target.entry, target.destPosix));
-  void ui.showInformationMessage(
-    `Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as ${target.destPosix} \u2014 or import it with 'Import project-plan.md'.`
-  );
-}
-async function importPlanFromFile(ui = defaultUi(), opts) {
-  const root = ui.workspaceRoot();
-  const target = await resolvePlanTarget(root, ui, opts);
-  if (!target)
-    return false;
-  const picked = await ui.showOpenDialog({
-    canSelectFiles: true,
-    canSelectFolders: false,
-    canSelectMany: false,
-    filters: { "Markdown": ["md"] },
-    openLabel: "Import Plan"
-  });
-  if (!picked?.[0])
-    return false;
-  if (!root) {
-    void ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const destPath = path10.join(root, ...target.destPosix.split("/"));
-  const containment = path10.relative(path10.resolve(root), path10.resolve(destPath));
-  if (containment === "" || containment.startsWith("..") || path10.isAbsolute(containment)) {
-    void ui.showErrorMessage(
-      `Refusing to write outside the workspace: ${target.destPosix}`
-    );
-    return false;
-  }
-  const destDir = path10.dirname(destPath);
-  try {
-    if (!fs9.existsSync(destDir))
-      fs9.mkdirSync(destDir, { recursive: true });
-  } catch (err) {
-    void ui.showErrorMessage(
-      `Failed to create ${destDir}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  if (fs9.existsSync(destPath)) {
-    const overwrite = await ui.showWarningMessage(
-      `${target.destPosix} already exists. Overwrite it?`,
-      { modal: true },
-      "Overwrite"
-    );
-    if (overwrite !== "Overwrite")
-      return false;
-  }
-  try {
-    fs9.copyFileSync(picked[0].fsPath, destPath);
-  } catch (err) {
-    void ui.showErrorMessage(
-      `Failed to write ${target.destPosix}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  void ui.executeCommand("vscode.open", vscode3.Uri.file(destPath));
-  void ui.showInformationMessage(
-    `Plan imported to ${target.destPosix}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
-  );
-  return true;
-}
-async function openModulePlan(ui = defaultUi(), opts) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    void ui.showErrorMessage("No workspace folder is open.");
-    return;
-  }
-  const target = await resolvePlanTarget(root, ui, opts);
-  if (!target)
-    return;
-  const destPath = path10.join(root, ...target.destPosix.split("/"));
-  const containment = path10.relative(path10.resolve(root), path10.resolve(destPath));
-  if (containment === "" || containment.startsWith("..") || path10.isAbsolute(containment)) {
-    void ui.showErrorMessage(
-      `Refusing to open outside the workspace: ${target.destPosix}`
-    );
-    return;
-  }
-  if (!fs9.existsSync(destPath)) {
-    const action = await ui.showWarningMessage(
-      `No plan found at ${target.destPosix}. Import one first?`,
-      "Import Plan"
-    );
-    if (action === "Import Plan") {
-      const importOpts = opts ?? { preselectedSlug: target.entry ? target.entry.slug : "" };
-      await importPlanFromFile(ui, importOpts);
-    }
-    return;
-  }
-  await ui.executeCommand("vscode.open", vscode3.Uri.file(destPath));
-}
-function registerPlanImportCommand(context) {
-  context.subscriptions.push(
-    vscode3.commands.registerCommand("dabbler.importPlan", async () => {
-      const action = await vscode3.window.showQuickPick(
-        [
-          { label: "$(file) Import existing plan from file", value: "file" },
-          { label: "$(clippy) Get a prompt to create a plan with AI", value: "prompt" }
-        ],
-        { placeHolder: "How would you like to add a project plan?" }
-      );
-      if (!action)
-        return;
-      if (action.value === "prompt") {
-        await copyPlanningPrompt();
-        return;
-      }
-      await importPlanFromFile();
-    })
-  );
-  context.subscriptions.push(
-    vscode3.commands.registerCommand("dabbler.openModulePlan", async (arg) => {
-      await openModulePlan(void 0, preselectFromTreeNode(arg));
-    })
-  );
-}
-
-// src/commands/assignLegacySets.ts
-var vscode4 = __toESM(require("vscode"));
-function defaultUi2() {
-  return {
-    pickTargetModule: async (entries) => {
-      const picked = await vscode4.window.showQuickPick(
-        entries.map((e) => ({
-          label: e.title,
-          description: e.slug,
-          entry: e
-        })),
-        {
-          placeHolder: "Assign the selected sets to which module?",
-          ignoreFocusOut: true
-        }
-      );
-      return picked?.entry;
-    },
-    pickSets: async (candidates) => {
-      const picked = await vscode4.window.showQuickPick(
-        candidates.map((s) => ({ label: s.name, set: s })),
-        {
-          placeHolder: "Select the legacy (unassigned) sets to assign",
-          canPickMany: true,
-          ignoreFocusOut: true
-        }
-      );
-      return picked?.map((p2) => p2.set);
-    },
-    showInformationMessage: (m) => vscode4.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode4.window.showErrorMessage(m),
-    workspaceRoot: () => vscode4.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    readSets: () => readAllSessionSets()
-  };
-}
-async function runAssignLegacySetsFlow(ui = defaultUi2()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return false;
-  }
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (entries.length === 0) {
-    ui.showInformationMessage(
-      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one, then assign sets to it.`
-    );
-    return false;
-  }
-  const candidates = ui.readSets().filter((s) => s.root === root && !s.config?.module);
-  if (candidates.length === 0) {
-    ui.showInformationMessage(
-      "No unassigned session sets to assign \u2014 every set already declares a module."
-    );
-    return false;
-  }
-  const target = await ui.pickTargetModule(entries);
-  if (!target)
-    return false;
-  const chosen = await ui.pickSets(candidates);
-  if (!chosen || chosen.length === 0)
-    return false;
-  const report = assignLegacySetsToModule(
-    root,
-    target.slug,
-    chosen.map((s) => ({ name: s.name, specAbs: s.specPath }))
-  );
-  if (report.refused) {
-    ui.showErrorMessage(
-      `No sets were assigned \u2014 ${report.refused.reason}. Every spec.md was left untouched.`
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    const tail = wf.written.length ? `Already stamped before the failure: ${wf.written.join(", ")}.` : "No files were changed.";
-    ui.showErrorMessage(
-      `Assigning to "${target.title}" failed on ${wf.setName}: ${wf.reason}. ${tail}`
-    );
-    return wf.written.length > 0;
-  }
-  const parts = [];
-  if (report.stamped.length) {
-    parts.push(
-      `Stamped module: ${target.slug} into ${report.stamped.length} set(s) (${report.stamped.join(", ")})`
-    );
-  }
-  if (report.alreadyAssigned.length) {
-    parts.push(
-      `${report.alreadyAssigned.length} already assigned (${report.alreadyAssigned.join(", ")})`
-    );
-  }
-  ui.showInformationMessage(
-    parts.length ? `${parts.join("; ")}.` : `Nothing to change \u2014 the selected sets already declare module: ${target.slug}.`
-  );
-  return report.stamped.length > 0;
-}
-function registerAssignLegacySetsCommand(context) {
-  context.subscriptions.push(
-    vscode4.commands.registerCommand(
-      "dabbler.assignLegacySetsToModule",
-      async () => {
-        await runAssignLegacySetsFlow();
-      }
-    )
-  );
-}
-
-// src/commands/newModule.ts
-var vscode5 = __toESM(require("vscode"));
+// src/providers/systemStatus.ts
+var import_module = require("module");
 var path11 = __toESM(require("path"));
-function defaultUi3() {
-  return {
-    showInputBox: vscode5.window.showInputBox,
-    showInformationMessage: (m) => vscode5.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode5.window.showErrorMessage(m),
-    openFile: (absPath) => vscode5.commands.executeCommand("vscode.open", vscode5.Uri.file(absPath)),
-    workspaceRoot: () => vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
-}
-async function runNewModuleFlow(ui = defaultUi3()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
-  const slug = await ui.showInputBox({
-    title: "New module (1/2): slug",
-    prompt: "Machine identity for the module (kebab-case). Session sets declare module: <slug> and the Explorer groups them under it.",
-    placeHolder: "greeter",
-    ignoreFocusOut: true,
-    validateInput: (v) => validateNewModuleSlug(v, existingSlugs)
-  });
-  if (slug === void 0 || slug.trim() === "")
-    return false;
-  const title = await ui.showInputBox({
-    title: "New module (2/2): display title",
-    prompt: `Shown as the module's group header in the Session Set Explorer. Press Enter to use "${slug.trim()}".`,
-    placeHolder: slug.trim(),
-    ignoreFocusOut: true
-  });
-  if (title === void 0)
-    return false;
-  let result;
-  try {
-    result = scaffoldNewModule(root, slug, title);
-  } catch (err) {
-    ui.showErrorMessage(
-      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  const declared = {
-    slug: slug.trim(),
-    title: title.trim() || slug.trim(),
-    codeRoots: [],
-    planPath: result.planRel,
-    touches: []
-  };
-  let lifecycleNote;
-  try {
-    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
-    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
-  } catch (err) {
-    lifecycleNote = ` The module's lifecycle sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}) \u2014 the module is still declared; scaffold them later.`;
-  }
-  await ui.openFile(path11.join(root, ...result.planRel.split("/")));
-  ui.showInformationMessage(
-    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`) + lifecycleNote
-  );
-  return true;
-}
-function registerNewModuleCommand(context) {
-  context.subscriptions.push(
-    vscode5.commands.registerCommand("dabbler.newModule", async () => {
-      await runNewModuleFlow();
-    })
-  );
-}
-
-// src/commands/renameModule.ts
-var vscode6 = __toESM(require("vscode"));
-function defaultUi4() {
-  return {
-    pickModule: async (entries) => {
-      const picked = await vscode6.window.showQuickPick(
-        entries.map((e) => ({
-          label: e.title,
-          description: e.slug,
-          entry: e
-        })),
-        { placeHolder: "Which module do you want to rename?", ignoreFocusOut: true }
-      );
-      return picked?.entry;
-    },
-    promptNewSlug: (currentSlug, validate) => vscode6.window.showInputBox({
-      prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
-      value: currentSlug,
-      ignoreFocusOut: true,
-      validateInput: (v) => validate(v) ?? null
-    }),
-    promptNewTitle: (currentTitle) => vscode6.window.showInputBox({
-      prompt: "New module title (display name) \u2014 leave unchanged to keep it",
-      value: currentTitle,
-      ignoreFocusOut: true
-    }),
-    confirm: async (summary, detail) => {
-      const choice = await vscode6.window.showWarningMessage(
-        summary,
-        { modal: true, detail },
-        "Rename Module"
-      );
-      return choice === "Rename Module";
-    },
-    showInformationMessage: (m) => vscode6.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode6.window.showErrorMessage(m),
-    workspaceRoot: () => vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    readSets: () => readAllSessionSets()
-  };
-}
-async function runRenameModuleFlow(ui = defaultUi4(), opts) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return false;
-  }
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (entries.length === 0) {
-    ui.showInformationMessage(
-      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one.`
-    );
-    return false;
-  }
-  let target;
-  if (opts && opts.preselectedSlug !== void 0) {
-    target = entries.find((e) => e.slug === opts.preselectedSlug);
-    if (!target) {
-      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
-      return false;
-    }
-  } else {
-    target = await ui.pickModule(entries);
-    if (!target)
-      return false;
-  }
-  const otherSlugs = entries.map((e) => e.slug).filter((s) => s !== target.slug);
-  const rawSlug = await ui.promptNewSlug(target.slug, (value) => {
-    const v = (value ?? "").trim();
-    if (v === target.slug)
-      return void 0;
-    return validateNewModuleSlug(v, otherSlugs) ?? void 0;
-  });
-  if (rawSlug === void 0)
-    return false;
-  const rawTitle = await ui.promptNewTitle(target.title);
-  if (rawTitle === void 0)
-    return false;
-  const newSlug = rawSlug.trim();
-  const newTitle = rawTitle.trim();
-  const slugChanging = newSlug !== "" && newSlug !== target.slug;
-  const titleChanging = newTitle !== "" && newTitle !== target.title;
-  if (!slugChanging && !titleChanging) {
-    ui.showInformationMessage(
-      `Nothing to change \u2014 the slug and title are unchanged for "${target.slug}".`
-    );
-    return false;
-  }
-  const affected = slugChanging ? ui.readSets().filter((s) => s.root === root && s.config?.module === target.slug).map((s) => s.name).sort() : [];
-  const changeLines = [];
-  if (slugChanging)
-    changeLines.push(`slug: ${target.slug} \u2192 ${newSlug}`);
-  if (titleChanging)
-    changeLines.push(`title: "${target.title}" \u2192 "${newTitle}"`);
-  const restampNote = slugChanging ? affected.length > 0 ? `Restamps module: in ${affected.length} set(s): ${affected.join(", ")}.` : `No session sets are stamped module: ${target.slug} \u2014 only the manifest changes.` : "Title-only change \u2014 no session sets are touched.";
-  const confirmed = await ui.confirm(
-    `Rename module "${target.slug}"?`,
-    `${changeLines.join("\n")}
-
-${restampNote}
-
-Every file is rewritten transactionally; any failure rolls the whole change back.`
-  );
-  if (!confirmed)
-    return false;
-  const report = renameModule(root, target.slug, {
-    newSlug: slugChanging ? newSlug : void 0,
-    newTitle: titleChanging ? newTitle : void 0
-  });
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Rename refused \u2014 ${report.refused.reason} Every file was left untouched.`
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    ui.showErrorMessage(
-      wf.rolledBack ? `Rename failed: ${wf.reason}. All changes were rolled back \u2014 the workspace is unchanged.` : `Rename failed: ${wf.reason}. Rollback ALSO failed \u2014 reconcile docs/modules.yaml and the affected spec.md files from git.`
-    );
-    return false;
-  }
-  const parts = [];
-  if (report.slugChanged)
-    parts.push(`slug \u2192 ${report.newSlug}`);
-  if (report.titleChanged)
-    parts.push(`title \u2192 "${report.newTitle}"`);
-  const restampSummary = report.restamped.length ? ` Restamped ${report.restamped.length} set(s): ${report.restamped.join(", ")}.` : "";
-  ui.showInformationMessage(
-    `Renamed module (${parts.join(", ")}).${restampSummary}`
-  );
-  return true;
-}
-function registerRenameModuleCommand(context) {
-  context.subscriptions.push(
-    vscode6.commands.registerCommand("dabbler.renameModule", async (arg) => {
-      await runRenameModuleFlow(void 0, preselectFromTreeNode(arg));
-    })
-  );
-}
-
-// src/commands/deleteModule.ts
-var vscode7 = __toESM(require("vscode"));
-function defaultUi5() {
-  return {
-    pickModule: async (entries) => {
-      const picked = await vscode7.window.showQuickPick(
-        entries.map((e) => ({
-          label: e.title,
-          description: e.slug,
-          entry: e
-        })),
-        { placeHolder: "Which module do you want to delete?", ignoreFocusOut: true }
-      );
-      return picked?.entry;
-    },
-    confirm: async (summary, detail) => {
-      const choice = await vscode7.window.showWarningMessage(
-        summary,
-        { modal: true, detail },
-        "Delete Module"
-      );
-      return choice === "Delete Module";
-    },
-    showInformationMessage: (m) => vscode7.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode7.window.showErrorMessage(m),
-    workspaceRoot: () => vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
-}
-function summarizeGroup(label, names) {
-  return names.length > 0 ? `${label} (${names.length}): ${names.join(", ")}` : `${label}: none`;
-}
-async function runDeleteModuleFlow(ui = defaultUi5(), opts) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return false;
-  }
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (entries.length === 0) {
-    ui.showInformationMessage(
-      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet.`
-    );
-    return false;
-  }
-  let target;
-  if (opts && opts.preselectedSlug !== void 0) {
-    target = entries.find((e) => e.slug === opts.preselectedSlug);
-    if (!target) {
-      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
-      return false;
-    }
-  } else {
-    target = await ui.pickModule(entries);
-    if (!target)
-      return false;
-  }
-  const classification = classifyModuleSetsForDeletion(root, target.slug);
-  const toCancel = classification.filter((c3) => c3.disposition === "cancel").map((c3) => c3.name).sort();
-  const toRemove = classification.filter((c3) => c3.disposition === "remove").map((c3) => c3.name).sort();
-  const terminal = classification.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
-  const detailLines = [
-    summarizeGroup("Cancelled", toCancel),
-    summarizeGroup("Removed outright", toRemove),
-    summarizeGroup("Left untouched (completed / already cancelled)", terminal)
-  ];
-  const confirmed = await ui.confirm(
-    `Delete module "${target.slug}"?`,
-    `Removes the ${MODULES_MANIFEST_DISPLAY} entry.
-
-${detailLines.join("\n")}
-
-Re-declaring "${target.slug}" later restores this grouping for any untouched history.`
-  );
-  if (!confirmed)
-    return false;
-  const report = await deleteModule(root, target.slug);
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Delete refused \u2014 ${report.refused.reason} Every file was left untouched.`
-    );
-    return false;
-  }
-  if (report.partialFailure) {
-    ui.showErrorMessage(
-      `Delete stopped partway: ${report.partialFailure.reason} ${report.cancelled.length} set(s) cancelled and ${report.removed.length} scaffold(s) removed so far \u2014 re-run "Dabbler: Delete Module" to finish (already-applied steps are skipped on retry).`
-    );
-    return report.cancelled.length > 0 || report.removed.length > 0;
-  }
-  ui.showInformationMessage(
-    `Deleted module "${target.slug}" \u2014 ${report.cancelled.length} set(s) cancelled, ${report.removed.length} scaffold(s) removed, ${report.terminal.length} left untouched.`
-  );
-  return true;
-}
-function registerDeleteModuleCommand(context) {
-  context.subscriptions.push(
-    vscode7.commands.registerCommand("dabbler.deleteModule", async (arg) => {
-      await runDeleteModuleFlow(void 0, preselectFromTreeNode(arg));
-    })
-  );
-}
-
-// src/utils/moduleActionNarrowing.ts
-var DECLARED_ONLY_ACTIONS = /* @__PURE__ */ new Set([
-  "add-module",
-  "rename-module",
-  "delete-module"
-]);
-var MODULE_ACTIONS = /* @__PURE__ */ new Set([
-  "open-plan",
-  "add-module",
-  "rename-module",
-  "delete-module",
-  "assign-legacy"
-]);
-function narrowModuleIdentity(moduleSlug, moduleKind) {
-  if (typeof moduleSlug !== "string")
-    return null;
-  if (moduleKind !== "declared" && moduleKind !== "pseudo")
-    return null;
-  if (moduleKind === "pseudo" && moduleSlug !== "")
-    return null;
-  if (moduleKind === "declared" && moduleSlug === "")
-    return null;
-  return { slug: moduleSlug, kind: moduleKind };
-}
-function narrowModuleAction(action, moduleSlug, moduleKind) {
-  if (typeof action !== "string" || !MODULE_ACTIONS.has(action))
-    return null;
-  const identity = narrowModuleIdentity(moduleSlug, moduleKind);
-  if (!identity)
-    return null;
-  if (action === "assign-legacy" && identity.kind !== "pseudo")
-    return null;
-  if (DECLARED_ONLY_ACTIONS.has(action) && identity.kind !== "declared")
-    return null;
-  return { action, slug: identity.slug, kind: identity.kind };
-}
-async function dispatchModuleAction(narrowed, exec) {
-  switch (narrowed.action) {
-    case "assign-legacy": {
-      if (await exec.assignLegacy())
-        exec.refresh();
-      return;
-    }
-    case "open-plan":
-      await exec.openPlan(narrowed.slug);
-      return;
-    case "add-module": {
-      if (await exec.addModule())
-        exec.refresh();
-      return;
-    }
-    case "rename-module": {
-      if (await exec.renameModule(narrowed.slug))
-        exec.refresh();
-      return;
-    }
-    case "delete-module": {
-      if (await exec.deleteModule(narrowed.slug))
-        exec.refresh();
-      return;
-    }
-  }
-}
-
-// src/providers/rowMenuHelpers.ts
-function buildTopLevelItems(categorized) {
-  const items = [];
-  if (categorized.openFile.length > 0) {
-    items.push({ label: "Open File \u25B8", dabblerKind: "openFile" });
-  }
-  if (categorized.copyEval.length > 0) {
-    items.push({ label: "Copy Prompt \u25B8", dabblerKind: "copyEval" });
-  }
-  for (const action of categorized.flat) {
-    items.push({ label: action.label, detail: action.detail, dabblerKind: "action", action });
-  }
-  return items;
-}
-function buildSubmenuItems(submenu) {
-  return submenu.map((action) => ({ label: action.label, detail: action.detail, action }));
-}
-function planLeftClickActivation(setName, state) {
-  const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
-  if (state !== "in-progress" && state !== "not-started") {
-    return { openCommand, clipboardWrite: null };
-  }
-  const sanitized = setName.replace(/`/g, "'");
-  return {
-    openCommand,
-    clipboardWrite: {
-      text: `Start the next session of \`${sanitized}\`.`,
-      toast: `Copied: Start the next session of ${setName}`
-    }
-  };
-}
-
-// src/providers/suppressionState.ts
-function suppress(state, slug, markerUpdatedAt) {
-  return { ...state, [slug]: markerUpdatedAt };
-}
-function clearSuppression(state, slug) {
-  if (!(slug in state))
-    return state;
-  const next = { ...state };
-  delete next[slug];
-  return next;
-}
-function prune(state, visibleSlugs) {
-  let changed = false;
-  const next = {};
-  for (const slug of Object.keys(state)) {
-    if (visibleSlugs.has(slug)) {
-      next[slug] = state[slug];
-    } else {
-      changed = true;
-    }
-  }
-  return changed ? next : state;
-}
+var vscode4 = __toESM(require("vscode"));
 
 // src/utils/gettingStartedDetection.ts
-var fs10 = __toESM(require("fs"));
-var path12 = __toESM(require("path"));
+var fs6 = __toESM(require("fs"));
+var path7 = __toESM(require("path"));
 var ENGINE_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
 function routerInstalled(root, fsi) {
-  const venvDir = path12.join(root, ".venv");
+  const venvDir = path7.join(root, ".venv");
   if (!fsi.isDirectory(venvDir))
     return false;
   const siteCandidates = [
     // Windows venv
-    path12.join(venvDir, "Lib", "site-packages")
+    path7.join(venvDir, "Lib", "site-packages")
   ];
-  const libDir = path12.join(venvDir, "lib");
+  const libDir = path7.join(venvDir, "lib");
   if (fsi.isDirectory(libDir)) {
     for (const entry of fsi.readdir(libDir)) {
-      siteCandidates.push(path12.join(libDir, entry, "site-packages"));
+      siteCandidates.push(path7.join(libDir, entry, "site-packages"));
     }
   }
-  return siteCandidates.some((sp) => fsi.isDirectory(path12.join(sp, "ai_router")));
+  return siteCandidates.some((sp) => fsi.isDirectory(path7.join(sp, "ai_router")));
 }
 function fileExists(p2, fsi) {
   return fsi.exists(p2) && !fsi.isDirectory(p2);
 }
 function engineFilesPresent(root, fsi) {
-  return ENGINE_FILES.every((f) => fileExists(path12.join(root, f), fsi));
+  return ENGINE_FILES.every((f) => fileExists(path7.join(root, f), fsi));
 }
 function detectCompletion(root, fsi) {
   return {
@@ -20129,9 +17128,9 @@ var PROVIDER_KEY_VARS = [
   "DABBLER_OPENAI_API_KEY",
   "DABBLER_GEMINI_API_KEY"
 ];
-function providerKeyPresent(env12) {
+function providerKeyPresent(env11) {
   return PROVIDER_KEY_VARS.some((k2) => {
-    const v = env12[k2];
+    const v = env11[k2];
     return typeof v === "string" && v.trim().length > 0;
   });
 }
@@ -20159,21 +17158,21 @@ function computeGettingStarted(hasFolder, root, hasAnySets, fsi, resolveTierSeed
 var nodeDetectionFs = {
   exists(p2) {
     try {
-      return fs10.existsSync(p2);
+      return fs6.existsSync(p2);
     } catch {
       return false;
     }
   },
   isDirectory(p2) {
     try {
-      return fs10.statSync(p2).isDirectory();
+      return fs6.statSync(p2).isDirectory();
     } catch {
       return false;
     }
   },
   readdir(p2) {
     try {
-      return fs10.readdirSync(p2);
+      return fs6.readdirSync(p2);
     } catch {
       return [];
     }
@@ -20181,30 +17180,30 @@ var nodeDetectionFs = {
 };
 
 // src/utils/pythonInterpreter.ts
-var fs11 = __toESM(require("fs"));
-var path13 = __toESM(require("path"));
-var vscode8 = __toESM(require("vscode"));
+var fs7 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
+var vscode2 = __toESM(require("vscode"));
 var realExists = (p2) => {
   try {
-    return fs11.statSync(p2).isFile();
+    return fs7.statSync(p2).isFile();
   } catch {
     return false;
   }
 };
 function venvInterpreterCandidate(workspaceRoot2) {
-  return process.platform === "win32" ? path13.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path13.join(workspaceRoot2, ".venv", "bin", "python");
+  return process.platform === "win32" ? path8.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path8.join(workspaceRoot2, ".venv", "bin", "python");
 }
 function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2 = realExists) {
   if (!workspaceRoot2)
     return null;
-  const venvRoot = path13.join(workspaceRoot2, ".venv");
-  if (!fileExists2(path13.join(venvRoot, "pyvenv.cfg")))
+  const venvRoot = path8.join(workspaceRoot2, ".venv");
+  if (!fileExists2(path8.join(venvRoot, "pyvenv.cfg")))
     return null;
   const interp = venvInterpreterCandidate(workspaceRoot2);
   return fileExists2(interp) ? interp : null;
 }
 function explicitPythonPathSetting() {
-  const inspected = vscode8.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
+  const inspected = vscode2.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
@@ -20212,10 +17211,10 @@ function explicitPythonPathSetting() {
   return trimmed2 === "" ? void 0 : trimmed2;
 }
 function normalizeExplicit(value, workspaceRoot2) {
-  if (path13.isAbsolute(value))
+  if (path8.isAbsolute(value))
     return value;
-  if (value.includes(path13.sep) || value.includes("/")) {
-    return path13.resolve(workspaceRoot2, value);
+  if (value.includes(path8.sep) || value.includes("/")) {
+    return path8.resolve(workspaceRoot2, value);
   }
   return value;
 }
@@ -20229,12 +17228,12 @@ function resolvePythonInterpreter(workspaceRoot2, fileExists2 = realExists) {
     return normalizeExplicit(explicit, workspaceRoot2);
   return detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2) ?? "python";
 }
-function findCommandOnPath(cmd, env12 = process.env, fileExists2 = realExists, platform = process.platform) {
-  const rawPath = env12.PATH ?? env12.Path ?? "";
+function findCommandOnPath(cmd, env11 = process.env, fileExists2 = realExists, platform = process.platform) {
+  const rawPath = env11.PATH ?? env11.Path ?? "";
   if (!rawPath)
     return null;
   const isWin = platform === "win32";
-  const p2 = isWin ? path13.win32 : path13.posix;
+  const p2 = isWin ? path8.win32 : path8.posix;
   const delimiter = isWin ? ";" : ":";
   for (const dir of rawPath.split(delimiter)) {
     const entry = dir.trim();
@@ -20250,18 +17249,18 @@ function findCommandOnPath(cmd, env12 = process.env, fileExists2 = realExists, p
   }
   return null;
 }
-function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env12 = process.env, fileExists2 = realExists, platform = process.platform) {
-  const p2 = platform === "win32" ? path13.win32 : path13.posix;
+function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env11 = process.env, fileExists2 = realExists, platform = process.platform) {
+  const p2 = platform === "win32" ? path8.win32 : path8.posix;
   if (explicitSetting) {
     const normalized = normalizeExplicit(explicitSetting, workspaceRoot2);
     if (p2.isAbsolute(normalized)) {
       return fileExists2(normalized) ? normalized : null;
     }
-    return findCommandOnPath(normalized, env12, fileExists2, platform) !== null ? normalized : null;
+    return findCommandOnPath(normalized, env11, fileExists2, platform) !== null ? normalized : null;
   }
-  const commands38 = platform === "win32" ? ["python"] : ["python3", "python"];
-  for (const cmd of commands38) {
-    if (findCommandOnPath(cmd, env12, fileExists2, platform) !== null)
+  const commands37 = platform === "win32" ? ["python"] : ["python3", "python"];
+  for (const cmd of commands37) {
+    if (findCommandOnPath(cmd, env11, fileExists2, platform) !== null)
       return cmd;
   }
   return null;
@@ -20274,12 +17273,12 @@ function resolveScaffoldBootstrapPython(workspaceRoot2, fileExists2 = realExists
     fileExists2
   );
 }
-function probePythonPresenceCore(explicitSetting, workspaceRoot2, env12 = process.env, fileExists2 = realExists, platform = process.platform) {
+function probePythonPresenceCore(explicitSetting, workspaceRoot2, env11 = process.env, fileExists2 = realExists, platform = process.platform) {
   if (explicitSetting) {
     return resolveBootstrapPythonCore(
       explicitSetting,
       workspaceRoot2,
-      env12,
+      env11,
       fileExists2,
       platform
     ) !== null;
@@ -20290,21 +17289,21 @@ function probePythonPresenceCore(explicitSetting, workspaceRoot2, env12 = proces
   return resolveBootstrapPythonCore(
     void 0,
     workspaceRoot2,
-    env12,
+    env11,
     fileExists2,
     platform
   ) !== null;
 }
-function interpreterResolves(pythonPath, env12 = process.env, fileExists2 = realExists, platform = process.platform) {
+function interpreterResolves(pythonPath, env11 = process.env, fileExists2 = realExists, platform = process.platform) {
   if (!pythonPath)
     return false;
-  const p2 = platform === "win32" ? path13.win32 : path13.posix;
+  const p2 = platform === "win32" ? path8.win32 : path8.posix;
   if (p2.isAbsolute(pythonPath))
     return fileExists2(pythonPath);
   if (pythonPath.includes("\\") || pythonPath.includes("/")) {
-    return fileExists2(path13.resolve(pythonPath));
+    return fileExists2(path8.resolve(pythonPath));
   }
-  return findCommandOnPath(pythonPath, env12, fileExists2, platform) !== null;
+  return findCommandOnPath(pythonPath, env11, fileExists2, platform) !== null;
 }
 function probePythonPresence(workspaceRoot2, fileExists2 = realExists) {
   return probePythonPresenceCore(
@@ -20319,36 +17318,36 @@ function describeMissingPython(actionLabel) {
 }
 
 // src/utils/copilotCli.ts
-var fs12 = __toESM(require("fs"));
-var path14 = __toESM(require("path"));
-var vscode9 = __toESM(require("vscode"));
+var fs8 = __toESM(require("fs"));
+var path9 = __toESM(require("path"));
+var vscode3 = __toESM(require("vscode"));
 var COPILOT_CLI_COMMAND = "copilot";
 var realExists2 = (p2) => {
   try {
-    return fs12.statSync(p2).isFile();
+    return fs8.statSync(p2).isFile();
   } catch {
     return false;
   }
 };
 function explicitCopilotCliPathSetting() {
-  const inspected = vscode9.workspace.getConfiguration("dabblerSessionSets").inspect("copilotCliPath");
+  const inspected = vscode3.workspace.getConfiguration("dabblerSessionSets").inspect("copilotCliPath");
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
   const trimmed2 = (value ?? "").trim();
   return trimmed2 === "" ? void 0 : trimmed2;
 }
-function probeCopilotCliPresenceCore(explicitSetting, workspaceRoot2, env12 = process.env, fileExists2, platform = process.platform) {
-  const p2 = platform === "win32" ? path14.win32 : path14.posix;
+function probeCopilotCliPresenceCore(explicitSetting, workspaceRoot2, env11 = process.env, fileExists2, platform = process.platform) {
+  const p2 = platform === "win32" ? path9.win32 : path9.posix;
   if (explicitSetting) {
     if (p2.isAbsolute(explicitSetting))
       return fileExists2(explicitSetting);
     if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
       return fileExists2(p2.resolve(workspaceRoot2, explicitSetting));
     }
-    return findCommandOnPath(explicitSetting, env12, fileExists2, platform) !== null;
+    return findCommandOnPath(explicitSetting, env11, fileExists2, platform) !== null;
   }
-  return findCommandOnPath(COPILOT_CLI_COMMAND, env12, fileExists2, platform) !== null;
+  return findCommandOnPath(COPILOT_CLI_COMMAND, env11, fileExists2, platform) !== null;
 }
 function probeCopilotCliPresence(workspaceRoot2, fileExists2 = realExists2) {
   return probeCopilotCliPresenceCore(
@@ -20362,7 +17361,7 @@ function probeCopilotCliPresence(workspaceRoot2, fileExists2 = realExists2) {
 function resolveCopilotCliBinaryCore(explicitSetting, workspaceRoot2, platform = process.platform) {
   if (!explicitSetting)
     return void 0;
-  const p2 = platform === "win32" ? path14.win32 : path14.posix;
+  const p2 = platform === "win32" ? path9.win32 : path9.posix;
   if (p2.isAbsolute(explicitSetting))
     return explicitSetting;
   if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
@@ -20379,21 +17378,21 @@ function resolveCopilotCliBinary(workspaceRoot2) {
 }
 
 // src/utils/copilotSeatSetup.ts
-var crypto3 = __toESM(require("crypto"));
-var fs13 = __toESM(require("fs"));
+var crypto2 = __toESM(require("crypto"));
+var fs9 = __toESM(require("fs"));
 var os = __toESM(require("os"));
-var path15 = __toESM(require("path"));
-var CATALOG_LOCKFILE_REL = path15.posix.join(
+var path10 = __toESM(require("path"));
+var CATALOG_LOCKFILE_REL = path10.posix.join(
   "ai_router",
   "copilot-catalog.lock"
 );
 function deriveSeatId(hostname2, username) {
   const canonical = `${hostname2.trim().toLowerCase()}|${username.trim().toLowerCase()}`;
-  const digest = crypto3.createHash("sha256").update(canonical, "utf8").digest("hex");
+  const digest = crypto2.createHash("sha256").update(canonical, "utf8").digest("hex");
   return `seat-${digest.slice(0, 12)}`;
 }
 function deriveSeatLabel(projectDir) {
-  const base = path15.basename(projectDir);
+  const base = path10.basename(projectDir);
   return base === "" ? "workspace" : base;
 }
 function currentUsername() {
@@ -20496,17 +17495,17 @@ function renderTransportProfile(configText, profile) {
 var nodeSeedReadOps = {
   exists(p2) {
     try {
-      return fs13.existsSync(p2);
+      return fs9.existsSync(p2);
     } catch {
       return false;
     }
   },
   readFile(p2) {
-    return fs13.readFileSync(p2, "utf8");
+    return fs9.readFileSync(p2, "utf8");
   }
 };
 function readTransportProfile(root, ops = nodeSeedReadOps) {
-  const abs = path15.join(root, ROUTER_CONFIG_REL);
+  const abs = path10.join(root, ROUTER_CONFIG_REL);
   if (!ops.exists(abs))
     return null;
   let text;
@@ -20520,12 +17519,12 @@ function readTransportProfile(root, ops = nodeSeedReadOps) {
     return null;
   return loc.value === "api" || loc.value === "copilot-cli" ? loc.value : null;
 }
-var SEAT_STATUS_MARKER_REL = path15.posix.join(
+var SEAT_STATUS_MARKER_REL = path10.posix.join(
   ".dabbler",
   "copilot-seat-status"
 );
 function readCopilotSeatStatusMarker(root, ops = nodeSeedReadOps) {
-  const abs = path15.join(root, SEAT_STATUS_MARKER_REL);
+  const abs = path10.join(root, SEAT_STATUS_MARKER_REL);
   if (!ops.exists(abs))
     return null;
   let text;
@@ -20537,10 +17536,10 @@ function readCopilotSeatStatusMarker(root, ops = nodeSeedReadOps) {
   return text.trim().toLowerCase() === "unconfirmed" ? "unconfirmed" : null;
 }
 function writeCopilotSeatStatusMarker(root, ops) {
-  ops.writeFile(path15.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
+  ops.writeFile(path10.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
 }
 function clearCopilotSeatStatusMarker(root, ops) {
-  const abs = path15.join(root, SEAT_STATUS_MARKER_REL);
+  const abs = path10.join(root, SEAT_STATUS_MARKER_REL);
   if (!ops.exists(abs))
     return;
   ops.removeRecursive(abs);
@@ -20550,7 +17549,7 @@ function deriveCopilotSeatChosenUnconfirmed(marker, durableProfile) {
 }
 var DEFAULT_KILL_SETTLE_TIMEOUT_MS = 1e4;
 function runCatalogRefresh(deps) {
-  const lockfileAbs = path15.join(deps.projectDir, CATALOG_LOCKFILE_REL);
+  const lockfileAbs = path10.join(deps.projectDir, CATALOG_LOCKFILE_REL);
   const existedBefore = deps.fileOps.exists(lockfileAbs);
   let priorContent = null;
   if (existedBefore) {
@@ -20802,7 +17801,7 @@ async function performCopilotSeatSetup(deps) {
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path15.join(deps.projectDir, ROUTER_CONFIG_REL);
+      const configAbs = path10.join(deps.projectDir, ROUTER_CONFIG_REL);
       if (!deps.fileOps.exists(configAbs)) {
         return {
           kind: "config-write-failed",
@@ -20837,14 +17836,172 @@ async function performCopilotSeatSetup(deps) {
   }
 }
 
+// src/providers/systemStatus.ts
+function buildSystemStatus(hasAnySets) {
+  const root = vscode4.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  if (!root) {
+    return {
+      workspaceOpen: false,
+      workspaceInitialized: true,
+      providerKeyPresent: true,
+      pythonPresent: true,
+      copilotCliPresent: true,
+      tier: "full",
+      transportProfile: "api",
+      copilotSeatChosenUnconfirmed: false,
+      copilotSeatRerunHint: "",
+      manifestFaults: []
+    };
+  }
+  const durableTransportProfile = readTransportProfile(root);
+  return {
+    workspaceOpen: true,
+    // Set 092 S2 (UAT Walk 4): a workspace that already has session sets is
+    // initialized by construction — the sets could not have been authored
+    // without a working setup — so `hasAnySets` alone clears the fault. The
+    // `structureBuilt` scaffold proxy is only consulted before the first set,
+    // where it is the right signal; it under-reports an editable
+    // `pip install -e .` (this repo), and that false negative must never
+    // surface a workspace-init fault on a working repo.
+    workspaceInitialized: hasAnySets || detectCompletion(root, nodeDetectionFs).structureBuilt,
+    providerKeyPresent: providerKeyPresent(process.env),
+    pythonPresent: probePythonPresence(root),
+    copilotCliPresent: probeCopilotCliPresence(root),
+    tier: resolveDurableTier(root)?.tier ?? "full",
+    transportProfile: durableTransportProfile ?? "api",
+    copilotSeatChosenUnconfirmed: deriveCopilotSeatChosenUnconfirmed(
+      readCopilotSeatStatusMarker(root),
+      durableTransportProfile
+    ),
+    copilotSeatRerunHint: rerunRefreshHint(),
+    manifestFaults: []
+  };
+}
+var cachedRenderer;
+function statusRenderer(extensionPath) {
+  if (cachedRenderer !== void 0)
+    return cachedRenderer;
+  try {
+    const requireFromExtension = (0, import_module.createRequire)(
+      path11.join(extensionPath, "package.json")
+    );
+    cachedRenderer = requireFromExtension(
+      "./media/session-sets-tree/systemStatusHtml.js"
+    );
+  } catch (err) {
+    console.warn(
+      "[dabbler-ai-orchestration] could not load systemStatusHtml.js in the host; the Setup & Status view will be shown unconditionally.",
+      err
+    );
+    cachedRenderer = null;
+  }
+  return cachedRenderer;
+}
+function isSetupNeeded(extensionPath, hasAnySets) {
+  const status = buildSystemStatus(hasAnySets);
+  if (!status.workspaceOpen)
+    return true;
+  if (!hasAnySets)
+    return true;
+  const renderer = statusRenderer(extensionPath);
+  if (!renderer)
+    return true;
+  try {
+    return renderer.renderSystemStatus(status, {
+      tier: status.tier,
+      transportProfile: status.transportProfile
+    }) !== "";
+  } catch (err) {
+    console.warn(
+      "[dabbler-ai-orchestration] systemStatusHtml.renderSystemStatus threw in the host; showing the Setup & Status view.",
+      err
+    );
+    return true;
+  }
+}
+
+// src/utils/startupTiming.ts
+var fs10 = __toESM(require("fs"));
+var path12 = __toESM(require("path"));
+var marks = {
+  moduleLoadedAtUptimeMs: null,
+  moduleLoadedAt: null,
+  activateStart: null,
+  activateEnd: null,
+  webviewResolveStart: null,
+  webviewResolveEnd: null,
+  treeFirstChildrenServed: null,
+  treeFirstChildrenCount: null
+};
+try {
+  marks.moduleLoadedAt = Date.now();
+  marks.moduleLoadedAtUptimeMs = Math.round(process.uptime() * 1e3);
+} catch {
+}
+function markActivateStart() {
+  marks.activateStart = Date.now();
+}
+function markActivateEnd() {
+  marks.activateEnd = Date.now();
+  emitIfRequested();
+}
+function markWebviewResolveStart() {
+  if (marks.webviewResolveStart !== null)
+    return;
+  marks.webviewResolveStart = Date.now();
+}
+function markWebviewResolveEnd() {
+  if (marks.webviewResolveEnd !== null)
+    return;
+  marks.webviewResolveEnd = Date.now();
+  emitIfRequested();
+}
+function markFirstChildrenServed(count) {
+  if (marks.treeFirstChildrenServed !== null)
+    return;
+  marks.treeFirstChildrenServed = Date.now();
+  marks.treeFirstChildrenCount = count;
+  emitIfRequested();
+}
+function readStartupMarks() {
+  return { ...marks };
+}
+var delta = (from, to) => from === null || to === null ? null : to - from;
+function startupDurations(m = marks) {
+  return {
+    activateMs: delta(m.activateStart, m.activateEnd),
+    webviewResolveMs: delta(m.webviewResolveStart, m.webviewResolveEnd),
+    activateEndToTreeRootsMs: delta(m.activateEnd, m.treeFirstChildrenServed)
+  };
+}
+function emitIfRequested() {
+  const target = process.env.DABBLER_STARTUP_TIMING_PATH;
+  if (!target)
+    return;
+  const payload = {
+    marks: readStartupMarks(),
+    durations: startupDurations(),
+    note: "Host-side buckets only. First paint is NOT here \u2014 it is observed from the DOM by the Layer 3 harness, because the host cannot see when a row becomes visible."
+  };
+  try {
+    fs10.mkdirSync(path12.dirname(target), { recursive: true });
+    fs10.writeFileSync(target, JSON.stringify(payload, null, 2), { encoding: "utf-8" });
+  } catch (err) {
+    console.error(
+      `[dabbler-ai-orchestration] startup timing: could not write DABBLER_STARTUP_TIMING_PATH (${target}) \u2014 the harness will find no file, which must NOT be read as "startup was not instrumented".`,
+      err
+    );
+  }
+}
+
 // src/commands/gettingStartedActions.ts
-var vscode14 = __toESM(require("vscode"));
+var vscode9 = __toESM(require("vscode"));
 
 // src/commands/gitScaffold.ts
-var vscode11 = __toESM(require("vscode"));
+var vscode6 = __toESM(require("vscode"));
 var cp3 = __toESM(require("child_process"));
 var os3 = __toESM(require("os"));
-var path19 = __toESM(require("path"));
+var path17 = __toESM(require("path"));
 
 // node_modules/simple-git/dist/esm/index.js
 var import_file_exists = __toESM(require_dist2(), 1);
@@ -21436,8 +18593,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path47) {
-  return (0, import_file_exists.exists)(path47, import_file_exists.FOLDER);
+function folderExists(path48) {
+  return (0, import_file_exists.exists)(path48, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -21675,9 +18832,9 @@ var init_simple_git_options = __esm({
     };
   }
 });
-function appendTaskOptions(options, commands38 = []) {
+function appendTaskOptions(options, commands37 = []) {
   if (!filterPlainObject(options)) {
-    return commands38;
+    return commands37;
   }
   return Object.keys(options).reduce((commands210, key) => {
     const value = options[key];
@@ -21695,7 +18852,7 @@ function appendTaskOptions(options, commands38 = []) {
       commands210.push(key);
     }
     return commands210;
-  }, commands38);
+  }, commands37);
 }
 function getTrailingOptions(args, initialPrimitive = 0, objectOnly = false) {
   const command = [];
@@ -21825,29 +18982,29 @@ function checkIsRepoTask(action) {
     case "root":
       return checkIsRepoRootTask();
   }
-  const commands38 = ["rev-parse", "--is-inside-work-tree"];
+  const commands37 = ["rev-parse", "--is-inside-work-tree"];
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     onError,
     parser
   };
 }
 function checkIsRepoRootTask() {
-  const commands38 = ["rev-parse", "--git-dir"];
+  const commands37 = ["rev-parse", "--git-dir"];
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     onError,
-    parser(path47) {
-      return /^\.(git)?$/.test(path47.trim());
+    parser(path48) {
+      return /^\.(git)?$/.test(path48.trim());
     }
   };
 }
 function checkIsBareRepoTask() {
-  const commands38 = ["rev-parse", "--is-bare-repository"];
+  const commands37 = ["rev-parse", "--is-bare-repository"];
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     onError,
     parser
@@ -21937,18 +19094,18 @@ function configurationErrorTask(error) {
     }
   };
 }
-function straightThroughStringTask(commands38, trimmed2 = false) {
+function straightThroughStringTask(commands37, trimmed2 = false) {
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(text) {
       return trimmed2 ? String(text).trim() : text;
     }
   };
 }
-function straightThroughBufferTask(commands38) {
+function straightThroughBufferTask(commands37) {
   return {
-    commands: commands38,
+    commands: commands37,
     format: "buffer",
     parser(buffer) {
       return buffer;
@@ -21994,9 +19151,9 @@ function cleanWithOptionsTask(mode, customArgs) {
   return cleanTask(cleanMode, options);
 }
 function cleanTask(mode, customArgs) {
-  const commands38 = ["clean", `-${mode}`, ...customArgs];
+  const commands37 = ["clean", `-${mode}`, ...customArgs];
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(text) {
       return cleanSummaryParser(mode === "n", text);
@@ -22159,13 +19316,13 @@ function asConfigScope(scope, fallback) {
   return fallback;
 }
 function addConfigTask(key, value, append2, scope) {
-  const commands38 = ["config", `--${scope}`];
+  const commands37 = ["config", `--${scope}`];
   if (append2) {
-    commands38.push("--add");
+    commands37.push("--add");
   }
-  commands38.push(key, value);
+  commands37.push(key, value);
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(text) {
       return text;
@@ -22173,12 +19330,12 @@ function addConfigTask(key, value, append2, scope) {
   };
 }
 function getConfigTask(key, scope) {
-  const commands38 = ["config", "--null", "--show-origin", "--get-all", key];
+  const commands37 = ["config", "--null", "--show-origin", "--get-all", key];
   if (scope) {
-    commands38.splice(1, 0, `--${scope}`);
+    commands37.splice(1, 0, `--${scope}`);
   }
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(text) {
       return configGetParser(text, key);
@@ -22186,12 +19343,12 @@ function getConfigTask(key, scope) {
   };
 }
 function listConfigTask(scope) {
-  const commands38 = ["config", "--list", "--show-origin", "--null"];
+  const commands37 = ["config", "--list", "--show-origin", "--null"];
   if (scope) {
-    commands38.push(`--${scope}`);
+    commands37.push(`--${scope}`);
   }
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(text) {
       return configListParser(text);
@@ -22274,11 +19431,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path47, line, preview] = input.split(NULL);
-    paths.add(path47);
-    (results[path47] = results[path47] || []).push({
+    const [path48, line, preview] = input.split(NULL);
+    paths.add(path48);
+    (results[path48] = results[path48] || []).push({
       line: asNumber(line),
-      path: path47,
+      path: path48,
       preview
     });
   });
@@ -22303,10 +19460,10 @@ function grep_default() {
       if (typeof searchTerm === "string") {
         searchTerm = grepQueryBuilder().param(searchTerm);
       }
-      const commands38 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
+      const commands37 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
       return this._runTask(
         {
-          commands: commands38,
+          commands: commands37,
           format: "utf-8",
           parser(stdOut) {
             return parseGrep(stdOut);
@@ -22355,12 +19512,12 @@ __export2(reset_exports, {
   resetTask: () => resetTask
 });
 function resetTask(mode, customArgs) {
-  const commands38 = ["reset"];
+  const commands37 = ["reset"];
   if (isValidResetMode(mode)) {
-    commands38.push(`--${mode}`);
+    commands37.push(`--${mode}`);
   }
-  commands38.push(...customArgs);
-  return straightThroughStringTask(commands38);
+  commands37.push(...customArgs);
+  return straightThroughStringTask(commands37);
 }
 function getResetMode(mode) {
   if (isValidResetMode(mode)) {
@@ -22529,10 +19686,10 @@ var init_tasks_pending_queue = __esm({
     };
   }
 });
-function pluginContext(task, commands38) {
+function pluginContext(task, commands37) {
   return {
     method: first(task.commands) || "",
-    commands: commands38
+    commands: commands37
   };
 }
 function onErrorReceived(target, logger) {
@@ -22833,11 +19990,11 @@ var init_change_working_directory = __esm({
   }
 });
 function checkoutTask(args) {
-  const commands38 = ["checkout", ...args];
-  if (commands38[1] === "-b" && commands38.includes("-B")) {
-    commands38[1] = remove(commands38, "-B");
+  const commands37 = ["checkout", ...args];
+  if (commands37[1] === "-b" && commands37.includes("-B")) {
+    commands37[1] = remove(commands37, "-B");
   }
-  return straightThroughStringTask(commands38);
+  return straightThroughStringTask(commands37);
 }
 function checkout_default() {
   return {
@@ -22969,7 +20126,7 @@ var init_parse_commit = __esm({
   }
 });
 function commitTask(message, files, customArgs) {
-  const commands38 = [
+  const commands37 = [
     "-c",
     "core.abbrev=40",
     "commit",
@@ -22978,7 +20135,7 @@ function commitTask(message, files, customArgs) {
     ...customArgs
   ];
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser: parseCommitResult
   };
@@ -23030,11 +20187,11 @@ var init_first_commit = __esm({
   }
 });
 function hashObjectTask(filePath, write) {
-  const commands38 = ["hash-object", filePath];
+  const commands37 = ["hash-object", filePath];
   if (write) {
-    commands38.push("-w");
+    commands37.push("-w");
   }
-  return straightThroughStringTask(commands38, true);
+  return straightThroughStringTask(commands37, true);
 }
 var init_hash_object = __esm({
   "src/lib/tasks/hash-object.ts"() {
@@ -23042,14 +20199,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path47, text) {
+function parseInit(bare, path48, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path47, false, result[1]);
+    return new InitSummary(bare, path48, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path47, true, result[1]);
+    return new InitSummary(bare, path48, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -23060,7 +20217,7 @@ function parseInit(bare, path47, text) {
       break;
     }
   }
-  return new InitSummary(bare, path47, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path48, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -23069,9 +20226,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path47, existing, gitDir) {
+      constructor(bare, path48, existing, gitDir) {
         this.bare = bare;
-        this.path = path47;
+        this.path = path48;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -23083,16 +20240,16 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path47, customArgs) {
-  const commands38 = ["init", ...customArgs];
-  if (bare && !hasBareCommand(commands38)) {
-    commands38.splice(1, 0, bareCommand);
+function initTask(bare = false, path48, customArgs) {
+  const commands37 = ["init", ...customArgs];
+  if (bare && !hasBareCommand(commands37)) {
+    commands37.splice(1, 0, bareCommand);
   }
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands38.includes("--bare"), path47, text);
+      return parseInit(commands37.includes("--bare"), path48, text);
     }
   };
 }
@@ -23324,14 +20481,14 @@ __export2(diff_exports, {
 });
 function diffSummaryTask(customArgs) {
   let logFormat = logFormatFromCommand(customArgs);
-  const commands38 = ["diff"];
+  const commands37 = ["diff"];
   if (logFormat === "") {
     logFormat = "--stat";
-    commands38.push("--stat=4096");
+    commands37.push("--stat=4096");
   }
-  commands38.push(...customArgs);
-  return validateLogFormatConfig(commands38) || {
-    commands: commands38,
+  commands37.push(...customArgs);
+  return validateLogFormatConfig(commands37) || {
+    commands: commands37,
     format: "utf-8",
     parser: getDiffParser(logFormat)
   };
@@ -23849,18 +21006,18 @@ function pushTagsTask(ref = {}, customArgs) {
   return pushTask(ref, customArgs);
 }
 function pushTask(ref = {}, customArgs) {
-  const commands38 = ["push", ...customArgs];
+  const commands37 = ["push", ...customArgs];
   if (ref.branch) {
-    commands38.splice(1, 0, ref.branch);
+    commands37.splice(1, 0, ref.branch);
   }
   if (ref.remote) {
-    commands38.splice(1, 0, ref.remote);
+    commands37.splice(1, 0, ref.remote);
   }
-  remove(commands38, "-v");
-  append(commands38, "--verbose");
-  append(commands38, "--porcelain");
+  remove(commands37, "-v");
+  append(commands37, "--verbose");
+  append(commands37, "--porcelain");
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser: parsePushResult
   };
@@ -23875,19 +21032,19 @@ var init_push = __esm({
 function show_default() {
   return {
     showBuffer() {
-      const commands38 = ["show", ...getTrailingOptions(arguments, 1)];
-      if (!commands38.includes("--binary")) {
-        commands38.splice(1, 0, "--binary");
+      const commands37 = ["show", ...getTrailingOptions(arguments, 1)];
+      if (!commands37.includes("--binary")) {
+        commands37.splice(1, 0, "--binary");
       }
       return this._runTask(
-        straightThroughBufferTask(commands38),
+        straightThroughBufferTask(commands37),
         trailingFunctionArgument(arguments)
       );
     },
     show() {
-      const commands38 = ["show", ...getTrailingOptions(arguments, 1)];
+      const commands37 = ["show", ...getTrailingOptions(arguments, 1)];
       return this._runTask(
-        straightThroughStringTask(commands38),
+        straightThroughStringTask(commands37),
         trailingFunctionArgument(arguments)
       );
     }
@@ -23907,12 +21064,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path47, index, working_dir) {
-        this.path = path47;
+      constructor(path48, index, working_dir) {
+        this.path = path48;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path47) || [null, path47, path47];
+          const detail = fromPathRegex.exec(path48) || [null, path48, path48];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -23943,14 +21100,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path47) {
+  function data(index, workingDir, path48) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path47);
+      handler(result, path48);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path47, index, workingDir));
+      result.files.push(new FileStatusSummary(path48, index, workingDir));
     }
   }
 }
@@ -24097,7 +21254,7 @@ var init_StatusSummary = __esm({
   }
 });
 function statusTask(customArgs) {
-  const commands38 = [
+  const commands37 = [
     "status",
     "--porcelain",
     "-b",
@@ -24107,7 +21264,7 @@ function statusTask(customArgs) {
   ];
   return {
     format: "utf-8",
-    commands: commands38,
+    commands: commands37,
     parser(text) {
       return parseStatusSummary(text);
     }
@@ -24222,10 +21379,10 @@ var init_clone = __esm({
     init_task();
     init_utils();
     cloneTask = (repo, directory, customArgs) => {
-      const commands38 = ["clone", ...customArgs];
-      filterString(repo) && commands38.push(c(repo));
-      filterString(directory) && commands38.push(c(directory));
-      return straightThroughStringTask(commands38);
+      const commands37 = ["clone", ...customArgs];
+      filterString(repo) && commands37.push(c(repo));
+      filterString(directory) && commands37.push(c(directory));
+      return straightThroughStringTask(commands37);
     };
     cloneMirrorTask = (repo, directory, customArgs) => {
       append(customArgs, "--mirror");
@@ -24301,9 +21458,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path47, write) {
+      hashObject(path48, write) {
         return this._runTask(
-          hashObjectTask(path47, write === true),
+          hashObjectTask(path48, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -24579,23 +21736,23 @@ __export2(branch_exports, {
   deleteBranchTask: () => deleteBranchTask,
   deleteBranchesTask: () => deleteBranchesTask
 });
-function containsDeleteBranchCommand(commands38) {
+function containsDeleteBranchCommand(commands37) {
   const deleteCommands = ["-d", "-D", "--delete"];
-  return commands38.some((command) => deleteCommands.includes(command));
+  return commands37.some((command) => deleteCommands.includes(command));
 }
 function branchTask(customArgs) {
   const isDelete = containsDeleteBranchCommand(customArgs);
   const isCurrentOnly = customArgs.includes("--show-current");
-  const commands38 = ["branch", ...customArgs];
-  if (commands38.length === 1) {
-    commands38.push("-a");
+  const commands37 = ["branch", ...customArgs];
+  if (commands37.length === 1) {
+    commands37.push("-a");
   }
-  if (!commands38.includes("-v")) {
-    commands38.splice(1, 0, "-v");
+  if (!commands37.includes("-v")) {
+    commands37.splice(1, 0, "-v");
   }
   return {
     format: "utf-8",
-    commands: commands38,
+    commands: commands37,
     parser(stdOut, stdErr) {
       if (isDelete) {
         return parseBranchDeletions(stdOut, stdErr).all[0];
@@ -24657,8 +21814,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path47 = input.trim().replace(/^["']|["']$/g, "");
-  return path47 && (0, import_node_path.normalize)(path47);
+  const path48 = input.trim().replace(/^["']|["']$/g, "");
+  return path48 && (0, import_node_path.normalize)(path48);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -24745,16 +21902,16 @@ function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
-  const commands38 = ["fetch", ...customArgs];
+  const commands37 = ["fetch", ...customArgs];
   if (remote && branch) {
-    commands38.push(remote, branch);
+    commands37.push(remote, branch);
   }
-  const banned = commands38.find(disallowedCommand);
+  const banned = commands37.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser: parseFetchResult
   };
@@ -24804,12 +21961,12 @@ __export2(pull_exports, {
   pullTask: () => pullTask
 });
 function pullTask(remote, branch, customArgs) {
-  const commands38 = ["pull", ...customArgs];
+  const commands37 = ["pull", ...customArgs];
   if (remote && branch) {
-    commands38.splice(1, 0, remote, branch);
+    commands37.splice(1, 0, remote, branch);
   }
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser(stdOut, stdErr) {
       return parsePullResult(stdOut, stdErr);
@@ -24875,29 +22032,29 @@ function addRemoteTask(remoteName, remoteRepo, customArgs) {
   return straightThroughStringTask(["remote", "add", ...customArgs, remoteName, remoteRepo]);
 }
 function getRemotesTask(verbose) {
-  const commands38 = ["remote"];
+  const commands37 = ["remote"];
   if (verbose) {
-    commands38.push("-v");
+    commands37.push("-v");
   }
   return {
-    commands: commands38,
+    commands: commands37,
     format: "utf-8",
     parser: verbose ? parseGetRemotesVerbose : parseGetRemotes
   };
 }
 function listRemotesTask(customArgs) {
-  const commands38 = [...customArgs];
-  if (commands38[0] !== "ls-remote") {
-    commands38.unshift("ls-remote");
+  const commands37 = [...customArgs];
+  if (commands37[0] !== "ls-remote") {
+    commands37.unshift("ls-remote");
   }
-  return straightThroughStringTask(commands38);
+  return straightThroughStringTask(commands37);
 }
 function remoteTask(customArgs) {
-  const commands38 = [...customArgs];
-  if (commands38[0] !== "remote") {
-    commands38.unshift("remote");
+  const commands37 = [...customArgs];
+  if (commands37[0] !== "remote") {
+    commands37.unshift("remote");
   }
-  return straightThroughStringTask(commands38);
+  return straightThroughStringTask(commands37);
 }
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
@@ -24915,14 +22072,14 @@ __export2(stash_list_exports, {
 });
 function stashListTask(opt = {}, customArgs) {
   const options = parseLogOptions(opt);
-  const commands38 = ["stash", "list", ...options.commands, ...customArgs];
+  const commands37 = ["stash", "list", ...options.commands, ...customArgs];
   const parser4 = createListLogSummaryParser(
     options.splitter,
     options.fields,
-    logFormatFromCommand(commands38)
+    logFormatFromCommand(commands37)
   );
-  return validateLogFormatConfig(commands38) || {
-    commands: commands38,
+  return validateLogFormatConfig(commands37) || {
+    commands: commands37,
     format: "utf-8",
     parser: parser4
   };
@@ -24943,18 +22100,18 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path47) {
-  return subModuleTask(["add", repo, path47]);
+function addSubModuleTask(repo, path48) {
+  return subModuleTask(["add", repo, path48]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
 }
 function subModuleTask(customArgs) {
-  const commands38 = [...customArgs];
-  if (commands38[0] !== "submodule") {
-    commands38.unshift("submodule");
+  const commands37 = [...customArgs];
+  if (commands37[0] !== "submodule") {
+    commands37.unshift("submodule");
   }
-  return straightThroughStringTask(commands38);
+  return straightThroughStringTask(commands37);
 }
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
@@ -25239,9 +22396,9 @@ var require_git = __commonJS2({
     Git2.prototype.branchLocal = function(then) {
       return this._runTask(branchLocalTask2(), trailingFunctionArgument2(arguments));
     };
-    Git2.prototype.raw = function(commands38) {
-      const createRestCommands = !Array.isArray(commands38);
-      const command = [].slice.call(createRestCommands ? arguments : commands38, 0);
+    Git2.prototype.raw = function(commands37) {
+      const createRestCommands = !Array.isArray(commands37);
+      const command = [].slice.call(createRestCommands ? arguments : commands37, 0);
       for (let i2 = 0; i2 < command.length && createRestCommands; i2++) {
         if (!filterPrimitives2(command[i2])) {
           command.splice(i2, command.length - i2);
@@ -25258,8 +22415,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path47, then) {
-      return this._runTask(addSubModuleTask2(repo, path47), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path48, then) {
+      return this._runTask(addSubModuleTask2(repo, path48), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -25376,9 +22533,9 @@ var require_git = __commonJS2({
       return this._runTask(task, trailingFunctionArgument2(arguments));
     };
     Git2.prototype.revparse = function() {
-      const commands38 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
+      const commands37 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
       return this._runTask(
-        straightThroughStringTask2(commands38, true),
+        straightThroughStringTask2(commands37, true),
         trailingFunctionArgument2(arguments)
       );
     };
@@ -25479,8 +22636,8 @@ function abortPlugin(signal) {
 function blockUnsafeOperationsPlugin(options = {}) {
   return {
     type: "spawn.args",
-    action(args, { env: env12 }) {
-      for (const vulnerability of ne(args, env12)) {
+    action(args, { env: env11 }) {
+      for (const vulnerability of ne(args, env11)) {
         if (options[vulnerability.category] !== true) {
           throw new GitPluginError(void 0, "unsafe", vulnerability.message);
         }
@@ -25810,10 +22967,10 @@ var esm_default = gitInstanceFactory;
 
 // src/commands/installAiRouterCommands.ts
 var cp2 = __toESM(require("child_process"));
-var fs14 = __toESM(require("fs"));
+var fs11 = __toESM(require("fs"));
 var os2 = __toESM(require("os"));
-var path16 = __toESM(require("path"));
-var vscode10 = __toESM(require("vscode"));
+var path13 = __toESM(require("path"));
+var vscode5 = __toESM(require("vscode"));
 
 // src/utils/utf8ChunkDecoder.ts
 var import_string_decoder = require("string_decoder");
@@ -25828,27 +22985,27 @@ function makeUtf8ChunkDecoder() {
 // src/commands/installAiRouterCommands.ts
 function registerInstallAiRouterCommands(context) {
   context.subscriptions.push(
-    vscode10.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
+    vscode5.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
       await runInstallFlow("install");
     }),
-    vscode10.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
+    vscode5.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
       await runInstallFlow("update");
     })
   );
 }
 async function runInstallFlow(mode) {
-  const root = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode10.window.showErrorMessage(
+    vscode5.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Install ai-router."
     );
     return;
   }
   const pythonPath = resolveExplicitPythonPath(root);
   const repoUrl = resolveAiRouterRepoUrl();
-  const outcome = await vscode10.window.withProgress(
+  const outcome = await vscode5.window.withProgress(
     {
-      location: vscode10.ProgressLocation.Notification,
+      location: vscode5.ProgressLocation.Notification,
       title: mode === "update" ? "Updating ai_router\u2026" : "Installing ai_router\u2026",
       cancellable: false
     },
@@ -25866,16 +23023,16 @@ async function runInstallFlow(mode) {
     }
   );
   if (!outcome.ok) {
-    vscode10.window.showErrorMessage(outcome.message);
+    vscode5.window.showErrorMessage(outcome.message);
     return;
   }
-  vscode10.window.showInformationMessage(outcome.message);
-  const routerConfig = path16.join(root, ROUTER_CONFIG_REL);
-  if (fs14.existsSync(routerConfig)) {
+  vscode5.window.showInformationMessage(outcome.message);
+  const routerConfig = path13.join(root, ROUTER_CONFIG_REL);
+  if (fs11.existsSync(routerConfig)) {
     try {
-      const doc = await vscode10.workspace.openTextDocument(routerConfig);
-      await vscode10.window.showTextDocument(doc, { preview: false });
-      vscode10.window.showInformationMessage(
+      const doc = await vscode5.workspace.openTextDocument(routerConfig);
+      await vscode5.window.showTextDocument(doc, { preview: false });
+      vscode5.window.showInformationMessage(
         "Tune router-config.yaml for your project \u2014 per-task-type effort, the cost guard, and delegation.always_route_task_types live here."
       );
     } catch {
@@ -25883,7 +23040,7 @@ async function runInstallFlow(mode) {
   }
 }
 function resolveAiRouterRepoUrl() {
-  const cfg = vscode10.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode5.workspace.getConfiguration("dabblerSessionSets");
   const raw = (cfg.get("aiRouterRepoUrl") ?? "").trim();
   return raw === "" ? void 0 : raw;
 }
@@ -25941,8 +23098,8 @@ function makeSpawner() {
 }
 function makeFileOps() {
   return {
-    exists: (p2) => fs14.existsSync(p2),
-    readFile: (p2) => fs14.readFileSync(p2, "utf8"),
+    exists: (p2) => fs11.existsSync(p2),
+    readFile: (p2) => fs11.readFileSync(p2, "utf8"),
     // Always ensure the parent directory exists before writing. The
     // GitHub-fallback flow can momentarily leave the destination
     // ai_router/ directory missing (between `removeRecursive(dst)` and
@@ -25952,8 +23109,8 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs14.mkdirSync(path16.dirname(p2), { recursive: true });
-      fs14.writeFileSync(p2, content, "utf8");
+      fs11.mkdirSync(path13.dirname(p2), { recursive: true });
+      fs11.writeFileSync(p2, content, "utf8");
     },
     // Set 094: atomic, symlink-safe exclusive create (temp-write → hard-link
     // publish) — fails EEXIST when the path already exists, INCLUDING a
@@ -25961,31 +23118,31 @@ function makeFileOps() {
     // (round-4 verifier catch). The caller (ensureModulesManifest) mkdirps the
     // parent first.
     writeFileExclusive: (p2, content) => writeFileExclusiveSync(p2, content),
-    mkdirp: (p2) => fs14.mkdirSync(p2, { recursive: true }),
+    mkdirp: (p2) => fs11.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
-      if (fs14.existsSync(p2))
-        fs14.rmSync(p2, { recursive: true, force: true });
+      if (fs11.existsSync(p2))
+        fs11.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs14.mkdtempSync(path16.join(os2.tmpdir(), prefix)),
+    mkdtemp: (prefix) => fs11.mkdtempSync(path13.join(os2.tmpdir(), prefix)),
     // Set 079 S3: same-directory atomic replace for the seat-setup config
     // write (fs.rename replaces an existing destination file on both NTFS
     // and POSIX filesystems).
-    rename: (oldP, newP) => fs14.renameSync(oldP, newP)
+    rename: (oldP, newP) => fs11.renameSync(oldP, newP)
   };
 }
 function copyDirSync(src, dst) {
-  fs14.mkdirSync(dst, { recursive: true });
-  for (const entry of fs14.readdirSync(src, { withFileTypes: true })) {
-    const s = path16.join(src, entry.name);
-    const d = path16.join(dst, entry.name);
+  fs11.mkdirSync(dst, { recursive: true });
+  for (const entry of fs11.readdirSync(src, { withFileTypes: true })) {
+    const s = path13.join(src, entry.name);
+    const d = path13.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
-      const target = fs14.readlinkSync(s);
-      fs14.symlinkSync(target, d);
+      const target = fs11.readlinkSync(s);
+      fs11.symlinkSync(target, d);
     } else {
-      fs14.copyFileSync(s, d);
+      fs11.copyFileSync(s, d);
     }
   }
 }
@@ -26007,14 +23164,14 @@ function makePrompts() {
         }
       ];
       items.sort((a, b2) => a.value === defaultSource ? -1 : b2.value === defaultSource ? 1 : 0);
-      const picked = await vscode10.window.showQuickPick(items, {
+      const picked = await vscode5.window.showQuickPick(items, {
         placeHolder: "Choose how to install ai_router",
         ignoreFocusOut: true
       });
       return picked?.value;
     },
     confirmCreateVenv: async (venvAbsPath) => {
-      const choice = await vscode10.window.showInformationMessage(
+      const choice = await vscode5.window.showInformationMessage(
         `No venv found in this workspace. Create one at ${venvAbsPath}?`,
         { modal: true, detail: "ai_router needs a Python environment to install into. The recommended location is .venv at the workspace root." },
         "Create venv",
@@ -26023,7 +23180,7 @@ function makePrompts() {
       return choice === "Create venv";
     },
     promptGitHubRef: async (defaultRef) => {
-      const ref = await vscode10.window.showInputBox({
+      const ref = await vscode5.window.showInputBox({
         prompt: "Git ref for the sparse checkout (tag or branch). Leave blank for the latest released tag.",
         placeHolder: defaultRef,
         ignoreFocusOut: true
@@ -26034,8 +23191,8 @@ function makePrompts() {
 }
 
 // src/utils/consumerBootstrap.ts
-var fs15 = __toESM(require("fs"));
-var path17 = __toESM(require("path"));
+var fs12 = __toESM(require("fs"));
+var path14 = __toESM(require("path"));
 var DEFAULT_VERIFICATION_MODE = "out-of-band-or-none";
 var BUNDLE_FILES = {
   specTemplate: "spec.md.template",
@@ -26056,10 +23213,10 @@ var BUNDLE_FILES = {
 };
 var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
 function resolveBundledTemplateDir(extensionPath) {
-  return path17.join(extensionPath, "dist", "templates", "consumer-bootstrap");
+  return path14.join(extensionPath, "dist", "templates", "consumer-bootstrap");
 }
 function loadTemplateBundle(bundleDir) {
-  const read = (name) => fs15.readFileSync(path17.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
+  const read = (name) => fs12.readFileSync(path14.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
   return {
     specTemplate: read(BUNDLE_FILES.specTemplate),
     sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
@@ -26196,18 +23353,18 @@ function renderStartHere(bundle, ctx) {
   return substituteTokens(bundle.startHereTemplate, ctx);
 }
 function specRelPath(ctx) {
-  return path17.posix.join("docs", "session-sets", ctx.slug, "spec.md");
+  return path14.posix.join("docs", "session-sets", ctx.slug, "spec.md");
 }
 function sessionStateRelPath(ctx) {
-  return path17.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
+  return path14.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
 }
-var START_HERE_REL_PATH = path17.posix.join("docs", "dabbler", "start-here.md");
-var GETTING_STARTED_REL_PATH = path17.posix.join(
+var START_HERE_REL_PATH = path14.posix.join("docs", "dabbler", "start-here.md");
+var GETTING_STARTED_REL_PATH = path14.posix.join(
   "docs",
   "dabbler",
   "getting-started.md"
 );
-var CROSS_PROVIDER_VERIFICATION_REL_PATH = path17.posix.join(
+var CROSS_PROVIDER_VERIFICATION_REL_PATH = path14.posix.join(
   "docs",
   "dabbler",
   "cross-provider-verification.md"
@@ -26215,11 +23372,11 @@ var CROSS_PROVIDER_VERIFICATION_REL_PATH = path17.posix.join(
 function renderCrossProviderVerification(bundle, ctx) {
   return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
 }
-var LESSONS_LEARNED_REL_PATH = path17.posix.join("docs", "planning", "lessons-learned.md");
-var PROJECT_GUIDANCE_REL_PATH = path17.posix.join("docs", "planning", "project-guidance.md");
-var LESSONS_ARCHIVE_REL_PATH = path17.posix.join("docs", "planning", "lessons-archive.md");
-var CODEOWNERS_REL_PATH = path17.posix.join(".github", "CODEOWNERS");
-var MONOREPO_CI_REL_PATH = path17.posix.join(
+var LESSONS_LEARNED_REL_PATH = path14.posix.join("docs", "planning", "lessons-learned.md");
+var PROJECT_GUIDANCE_REL_PATH = path14.posix.join("docs", "planning", "project-guidance.md");
+var LESSONS_ARCHIVE_REL_PATH = path14.posix.join("docs", "planning", "lessons-archive.md");
+var CODEOWNERS_REL_PATH = path14.posix.join(".github", "CODEOWNERS");
+var MONOREPO_CI_REL_PATH = path14.posix.join(
   ".github",
   "workflows",
   "monorepo-ci.yml"
@@ -26321,8 +23478,8 @@ function structureOnlyContext(repoName, tier, created, verificationMode = DEFAUL
 }
 
 // src/utils/budgetYaml.ts
-var path18 = __toESM(require("path"));
-var BUDGET_YAML_REL = path18.join("ai_router", "budget.yaml");
+var path15 = __toESM(require("path"));
+var BUDGET_YAML_REL = path15.join("ai_router", "budget.yaml");
 function deriveBudgetMode(thresholdUsd) {
   if (thresholdUsd === 0)
     return "zero-budget";
@@ -26369,7 +23526,7 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
   const method = resolveVerificationMethod(budget.thresholdUsd, budget.zeroMethod);
   if (!method)
     return { outcome: "skipped-unresolved", relPath };
-  const abs = path18.join(projectDir, relPath);
+  const abs = path15.join(projectDir, relPath);
   if (fileOps.exists(abs))
     return { outcome: "skipped-exists", relPath };
   fileOps.writeFile(
@@ -26383,6 +23540,1419 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
   return { outcome: "written", relPath };
 }
 
+// src/utils/moduleAuthoring.ts
+var crypto3 = __toESM(require("crypto"));
+var fs13 = __toESM(require("fs"));
+var path16 = __toESM(require("path"));
+var YAML2 = __toESM(require_dist());
+
+// src/utils/resolveSetNumber.ts
+var PREFIX_RE = /^(\d+)-/;
+function numericPrefix(slug) {
+  const m = PREFIX_RE.exec(slug);
+  return m ? parseInt(m[1], 10) : null;
+}
+function resolveSetNumber(slugs, n) {
+  const matches = slugs.filter((s) => numericPrefix(s) === n);
+  if (matches.length === 0) {
+    const available = Array.from(
+      new Set(
+        slugs.map(numericPrefix).filter((p2) => p2 !== null)
+      )
+    ).sort((a, b2) => a - b2);
+    return { kind: "no-match", available };
+  }
+  if (matches.length > 1) {
+    return { kind: "collision", matches: matches.slice().sort() };
+  }
+  return { kind: "match", slug: matches[0] };
+}
+function parseSetHandle(raw) {
+  const trimmed2 = raw.trim().replace(/^set\s+/i, "");
+  if (!/^\d+$/.test(trimmed2))
+    return null;
+  return parseInt(trimmed2, 10);
+}
+function prefixWidth(slug) {
+  const m = PREFIX_RE.exec(slug);
+  return m ? m[1].length : 0;
+}
+function nextSessionSetNumberFrom(dirNames) {
+  const numbered = dirNames.map(numericPrefix).filter((p2) => p2 !== null);
+  const n = numbered.length ? Math.max(...numbered) + 1 : 1;
+  const widest = dirNames.reduce((w, name) => Math.max(w, prefixWidth(name)), 0);
+  const width = Math.max(3, widest);
+  return { n, padded: String(n).padStart(width, "0") };
+}
+
+// src/utils/moduleAuthoring.ts
+var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
+var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+function validateNewModuleSlug(raw, existingSlugs) {
+  const slug = (raw ?? "").trim();
+  if (slug === "") {
+    return "Enter a module slug (kebab-case, e.g. greeter).";
+  }
+  if (!MODULE_SLUG_RE.test(slug)) {
+    return 'Module slugs are kebab-case: lowercase letters and digits, joined by single hyphens (e.g. "greeter", "payment-api").';
+  }
+  if (existingSlugs.includes(slug)) {
+    return `Module "${slug}" already exists in ${MODULES_MANIFEST_DISPLAY}.`;
+  }
+  return null;
+}
+function defaultModulePlanPath(slug) {
+  return `docs/modules/${slug}/project-plan.md`;
+}
+var LEGACY_ROOT_PLAN_REL = "docs/planning/project-plan.md";
+function classifyModulesManifest(root) {
+  const entries = readModulesManifest(root);
+  if (entries !== null)
+    return { kind: "present", entries };
+  return manifestEntryExists(path16.join(root, MODULES_MANIFEST_REL)) ? { kind: "invalid" } : { kind: "absent" };
+}
+function manifestEntryExists(abs) {
+  try {
+    fs13.lstatSync(abs);
+    return true;
+  } catch {
+    return false;
+  }
+}
+var INVALID_MANIFEST_MESSAGE = `${MODULES_MANIFEST_DISPLAY} exists but is not a valid module manifest (expected a YAML mapping with a "modules:" list). Fix the file by hand before using the module-aware flows.`;
+var MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml \u2014 the module manifest (Dabbler module-organized projects).
+#
+# Each entry declares one module of this repo:
+#   slug:      machine identity (kebab-case). Session sets declare
+#              \`module: <slug>\` in their spec.md configuration block and the
+#              Session Set Explorer groups them under this module.
+#   title:     the display name the Explorer shows for the group.
+#   codeRoots: the code paths this module owns ([] for an integration
+#              module that only composes other modules).
+#   planPath:  the module's project plan (decomposed into session sets).
+#   touches:   optional \u2014 the modules an integration module is sanctioned
+#              to work across; owners of every touched module review its PRs.
+#
+# Explorer display order = this file's order. Session-set NAMES stay
+# globally unique across ALL modules \u2014 \`module\` is a grouping attribute,
+# never part of a set's identity.
+#
+# To have an AI assistant decompose this project into modules and fill this
+# file in, run the "Dabbler: Copy Module Decomposition Prompt" command
+# (Command Palette) \u2014 or the "Copy AI decomposition prompt" button in the
+# Getting Started form \u2014 then paste the copied prompt into your assistant.
+#
+# Renaming, deleting, splitting, or merging modules later (and adopting
+# modules in an older repo) is covered in the module reorganization guide:
+# https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/module-reorganization.md
+`;
+var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
+# Example entries (copy below \`modules:\`, uncommented, to declare this
+# repo's modules \u2014 or leave the list empty for a single-module repo):
+#
+# - slug: payment-api
+#   title: "Payment API"
+#   codeRoots:
+#     - src/payment
+#   planPath: docs/modules/payment-api/project-plan.md
+# - slug: integration
+#   title: "Cross-Module Integration"
+#   codeRoots: []
+#   planPath: docs/modules/integration/project-plan.md
+#   touches:
+#     - payment-api
+
+modules: []
+`;
+var NODE_ENSURE_MANIFEST_IO = {
+  mkdirp: (dir) => fs13.mkdirSync(dir, { recursive: true }),
+  writeFileExclusive: (abs, data) => writeFileExclusiveSync(abs, data)
+};
+function ensureModulesManifest(root, io = NODE_ENSURE_MANIFEST_IO) {
+  const abs = path16.join(root, MODULES_MANIFEST_REL);
+  io.mkdirp(path16.dirname(abs));
+  try {
+    io.writeFileExclusive(abs, MODULES_YAML_TEMPLATE);
+    return { created: true, manifestRel: MODULES_MANIFEST_DISPLAY };
+  } catch (err) {
+    if (err.code === "EEXIST") {
+      return { created: false, manifestRel: MODULES_MANIFEST_DISPLAY };
+    }
+    throw err;
+  }
+}
+function renderModuleManifestEntry(slug, title, planRelPath) {
+  return `  - slug: ${slug}
+    title: ${JSON.stringify(title)}
+    codeRoots: []                # TODO: the code paths this module owns, e.g. [src/${slug}]
+    planPath: ${planRelPath}
+`;
+}
+function renderModulePlanStub(slug, title) {
+  return `# ${title} \u2014 module project plan
+
+> Module: \`${slug}\` (declared in \`docs/modules.yaml\`)
+> Owner: TODO \u2014 name the developer(s) who own this module.
+
+TODO: describe this module's goals, phases, and key deliverables. When the
+plan is ready, decompose it into session sets: run "Dabbler: Generate
+Session-Set Prompt" and pick this module \u2014 each generated set is stamped
+\`module: ${slug}\` and grouped under this module in the Session Set
+Explorer. Session-set names stay globally unique across all modules; we
+recommend including \`${slug}\` in each set's name.
+`;
+}
+var EMPTY_MODULES_LINE_RE = /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
+function replaceEmptyModulesList(text, entryBlock) {
+  const out = [];
+  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
+    const indent = m[1];
+    const quote = m[2];
+    const comment = m[3] ? ` ${m[3]}` : "";
+    const after = text.slice(m.index + m[0].length);
+    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock).split("\n").map((line) => indent + line).join("\n");
+    out.push(
+      text.slice(0, m.index) + `${indent}${quote}modules${quote}:${comment}
+` + block + (after === "" ? "\n" : after)
+    );
+  }
+  return out;
+}
+function scaffoldNewModule(root, rawSlug, rawTitle) {
+  const slug = (rawSlug ?? "").trim();
+  const classified = classifyModulesManifest(root);
+  const existing = classified.kind === "present" ? classified.entries : [];
+  const slugError = validateNewModuleSlug(
+    slug,
+    existing.map((e) => e.slug)
+  );
+  if (slugError)
+    throw new Error(slugError);
+  const manifestAbs = path16.join(root, MODULES_MANIFEST_REL);
+  if (classified.kind === "invalid") {
+    throw new Error(INVALID_MANIFEST_MESSAGE);
+  }
+  const title = (rawTitle ?? "").trim() || slug;
+  const planRel = defaultModulePlanPath(slug);
+  const entryBlock = renderModuleManifestEntry(slug, title, planRel);
+  const manifestCreated = classified.kind === "absent";
+  const sourceText = manifestCreated ? MODULES_YAML_TEMPLATE : fs13.readFileSync(manifestAbs, "utf8");
+  let candidate = null;
+  if (existing.length === 0) {
+    for (const replaced of replaceEmptyModulesList(sourceText, entryBlock)) {
+      try {
+        assertAppendedManifestParses(
+          replaced,
+          slug,
+          existing.length + 1,
+          entryBlock
+        );
+        candidate = replaced;
+        break;
+      } catch {
+      }
+    }
+  }
+  if (candidate === null) {
+    candidate = (sourceText.endsWith("\n") ? sourceText : sourceText + "\n") + entryBlock;
+  }
+  assertAppendedManifestParses(
+    candidate,
+    slug,
+    existing.length + 1,
+    entryBlock
+  );
+  const planAbs = path16.join(root, ...planRel.split("/"));
+  let planCreated = false;
+  if (!fs13.existsSync(planAbs)) {
+    fs13.mkdirSync(path16.dirname(planAbs), { recursive: true });
+    fs13.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
+      encoding: "utf8"
+    });
+    planCreated = true;
+  }
+  fs13.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
+  return {
+    manifestRel: MODULES_MANIFEST_DISPLAY,
+    planRel,
+    manifestCreated,
+    planCreated
+  };
+}
+function assertAppendedManifestParses(candidate, slug, expectedCount, entryBlock) {
+  const refuse = (why) => {
+    throw new Error(
+      `Could not append the module entry to ${MODULES_MANIFEST_DISPLAY} automatically (${why}). Add this entry to the "modules:" list by hand:
+${entryBlock}`
+    );
+  };
+  let doc;
+  try {
+    doc = YAML2.parse(candidate);
+  } catch {
+    return refuse(
+      'appending requires the "modules:" block list to be the last top-level key'
+    );
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return refuse("the result is not a YAML mapping");
+  }
+  const modules = doc.modules;
+  if (!Array.isArray(modules))
+    return refuse('no "modules:" list survived');
+  const slugs = modules.filter(
+    (m) => m !== null && typeof m === "object" && !Array.isArray(m)
+  ).map((m) => typeof m.slug === "string" ? m.slug.trim() : "").filter((s) => s !== "");
+  if (modules.length !== expectedCount || !slugs.includes(slug)) {
+    return refuse(
+      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style, holds entries the manifest reader dropped, or is not the last top-level key'
+    );
+  }
+}
+function resolveModuleTarget(entries) {
+  if (!entries || entries.length === 0)
+    return { kind: "none" };
+  if (entries.length === 1)
+    return { kind: "auto", entry: entries[0] };
+  return { kind: "pick", entries };
+}
+function isSafeRepoRelativePath(p2) {
+  if (p2 === "")
+    return false;
+  if (p2.startsWith("/"))
+    return false;
+  if (/^[A-Za-z]:/.test(p2))
+    return false;
+  return p2.split("/").every((seg) => seg !== ".." && seg !== "");
+}
+function resolveModulePlanRelPath(entry) {
+  const fallback = defaultModulePlanPath(entry.slug);
+  const raw = entry.planPath && entry.planPath.trim() !== "" ? entry.planPath.trim().replace(/\\/g, "/") : "";
+  if (raw === "")
+    return { path: fallback, degraded: false };
+  if (!isSafeRepoRelativePath(raw))
+    return { path: fallback, degraded: true };
+  return { path: raw, degraded: false };
+}
+function modulePlanRelPath(entry) {
+  const resolved = resolveModulePlanRelPath(entry);
+  if (resolved.degraded) {
+    console.warn(
+      `[dabblerSessionSets] module "${entry.slug}" declares planPath ${JSON.stringify(entry.planPath)}, which is not a safe repo-relative path \u2014 using the default ${resolved.path} instead.`
+    );
+  }
+  return resolved.path;
+}
+function unknownModuleMessage(slug) {
+  return `Module "${slug}" is no longer declared in ${MODULES_MANIFEST_DISPLAY} (it may have been removed or renamed). Refresh the Work Explorer and try again.`;
+}
+async function pickModuleForAuthoring(root, ui, opts) {
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return { kind: "invalid-manifest", entry: null };
+  }
+  if (opts && opts.preselectedSlug !== void 0) {
+    const slug = opts.preselectedSlug;
+    if (slug === "")
+      return { kind: "none", entry: null };
+    const entries = classified.kind === "present" ? classified.entries : [];
+    const entry = entries.find((e) => e.slug === slug);
+    if (!entry) {
+      ui.showErrorMessage(unknownModuleMessage(slug));
+      return { kind: "unknown-module", entry: null };
+    }
+    return { kind: "picked", entry };
+  }
+  const target = resolveModuleTarget(
+    classified.kind === "present" ? classified.entries : null
+  );
+  if (target.kind === "none")
+    return { kind: "none", entry: null };
+  if (target.kind === "auto") {
+    ui.showInformationMessage(
+      `Using module "${target.entry.title}" (${target.entry.slug}) \u2014 the only module in ${MODULES_MANIFEST_DISPLAY}.`
+    );
+    return { kind: "picked", entry: target.entry };
+  }
+  const picked = await ui.showQuickPick(
+    target.entries.map((e) => ({
+      label: e.title,
+      description: e.slug,
+      detail: `plan: ${modulePlanRelPath(e)}`,
+      entry: e
+    })),
+    { placeHolder: "Which module is this for?", ignoreFocusOut: true }
+  );
+  if (!picked)
+    return { kind: "cancelled", entry: null };
+  return { kind: "picked", entry: picked.entry };
+}
+var CONFIG_HEADING_RE = /^##[ \t]+Session Set Configuration[ \t]*$/im;
+var CONFIG_YAML_FENCE_OPEN_RE = /^```ya?ml[ \t]*\r?\n/im;
+var CONFIG_FENCE_CLOSE_RE = /^```[ \t]*$/m;
+var CONFIG_TOP_LEVEL_MODULE_RE = /^module[ \t]*:/gm;
+function stampModuleIntoSpecText(text, slug) {
+  const heading = CONFIG_HEADING_RE.exec(text);
+  if (!heading)
+    return { kind: "refused", reason: { code: "no-config-block" } };
+  const afterHeading = heading.index + heading[0].length;
+  const rest = text.slice(afterHeading);
+  const nextHeadingRel = rest.search(/^##[ \t]/m);
+  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
+  const section = text.slice(afterHeading, sectionEnd);
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen)
+    return { kind: "refused", reason: { code: "no-yaml-fence" } };
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  const boundedTail = text.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1)
+    return { kind: "refused", reason: { code: "no-yaml-fence" } };
+  const blockContent = boundedTail.slice(0, closeRel);
+  let parsedBlock;
+  try {
+    parsedBlock = YAML2.parse(blockContent);
+  } catch {
+    parsedBlock = void 0;
+  }
+  if (parsedBlock !== null && typeof parsedBlock === "object" && !Array.isArray(parsedBlock) && "module" in parsedBlock) {
+    const existingModule = parsedBlock.module;
+    if (existingModule === slug)
+      return { kind: "noop" };
+    return {
+      kind: "refused",
+      reason: {
+        code: "already-assigned",
+        existing: typeof existingModule === "string" ? existingModule : String(existingModule)
+      }
+    };
+  }
+  const inserted = `module: ${slug}
+`;
+  const newText = text.slice(0, blockContentStart) + inserted + text.slice(blockContentStart);
+  return { kind: "written", text: newText, inserted, insertAt: blockContentStart };
+}
+function extractConfigBlock(text) {
+  const heading = CONFIG_HEADING_RE.exec(text);
+  if (!heading)
+    return null;
+  const afterHeading = heading.index + heading[0].length;
+  const rest = text.slice(afterHeading);
+  const nextHeadingRel = rest.search(/^##[ \t]/m);
+  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
+  const section = text.slice(afterHeading, sectionEnd);
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen)
+    return null;
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  const boundedTail = text.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1)
+    return null;
+  return boundedTail.slice(0, closeRel);
+}
+function assertStampedTextValid(originalText, newText, slug) {
+  const refuse = (why) => {
+    throw new Error(`Refusing the module stamp (${why}).`);
+  };
+  const expected = stampModuleIntoSpecText(originalText, slug);
+  if (expected.kind !== "written") {
+    return refuse(
+      expected.kind === "noop" ? "the original is already stamped to this module" : "the original has no spliceable config block"
+    );
+  }
+  if (newText !== expected.text) {
+    return refuse("the result is not the exact canonical single-line splice");
+  }
+  const block = extractConfigBlock(newText);
+  if (block === null)
+    return refuse("the config block no longer parses");
+  let doc;
+  try {
+    doc = YAML2.parse(block);
+  } catch {
+    return refuse("the config block is not valid YAML after the stamp");
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return refuse("the config block is not a YAML mapping");
+  }
+  const parsedModule = doc.module;
+  if (parsedModule !== slug) {
+    return refuse(`module resolved to ${JSON.stringify(parsedModule)}, not ${JSON.stringify(slug)}`);
+  }
+  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
+  if (moduleLineCount !== 1) {
+    return refuse(`${moduleLineCount} top-level module: lines in the block`);
+  }
+}
+var NODE_SPEC_IO = {
+  readFileSync: (p2) => fs13.readFileSync(p2, "utf8"),
+  writeFileSync: (p2, d) => fs13.writeFileSync(p2, d, { encoding: "utf8" }),
+  renameSync: (from, to) => fs13.renameSync(from, to),
+  rmSync: (p2) => fs13.rmSync(p2, { force: true })
+};
+function assignLegacySetsToModule(root, targetSlug, sets, io = NODE_SPEC_IO) {
+  const slug = (targetSlug ?? "").trim();
+  if (slug === "" || slug.toLowerCase() === "default") {
+    return {
+      stamped: [],
+      alreadyAssigned: [],
+      refused: { reason: `"${targetSlug}" is not a valid module target.` }
+    };
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    return { stamped: [], alreadyAssigned: [], refused: { reason: INVALID_MANIFEST_MESSAGE } };
+  }
+  const declaredSlugs = classified.kind === "present" ? classified.entries.map((e) => e.slug) : [];
+  if (!declaredSlugs.includes(slug)) {
+    return {
+      stamped: [],
+      alreadyAssigned: [],
+      refused: { reason: unknownModuleMessage(slug) }
+    };
+  }
+  const queued = [];
+  const alreadyAssigned = [];
+  for (const set of sets) {
+    let original;
+    try {
+      original = io.readFileSync(set.specAbs);
+    } catch (err) {
+      return {
+        stamped: [],
+        alreadyAssigned: [],
+        refused: {
+          reason: `could not read ${set.name}'s spec.md: ${err instanceof Error ? err.message : String(err)}`,
+          setName: set.name
+        }
+      };
+    }
+    const result = stampModuleIntoSpecText(original, slug);
+    if (result.kind === "noop") {
+      alreadyAssigned.push(set.name);
+      continue;
+    }
+    if (result.kind === "refused") {
+      const why = result.reason.code === "already-assigned" ? `${set.name} is already stamped module: ${result.reason.existing} \u2014 reassigning is not a legacy stamp` : result.reason.code === "no-config-block" ? `${set.name}'s spec.md has no "Session Set Configuration" block to stamp` : `${set.name}'s Session Set Configuration block has no \`\`\`yaml fence to stamp`;
+      return {
+        stamped: [],
+        alreadyAssigned: [],
+        refused: { reason: why, setName: set.name }
+      };
+    }
+    try {
+      assertStampedTextValid(original, result.text, slug);
+    } catch (err) {
+      return {
+        stamped: [],
+        alreadyAssigned: [],
+        refused: {
+          reason: `${set.name}: ${err instanceof Error ? err.message : String(err)}`,
+          setName: set.name
+        }
+      };
+    }
+    queued.push({ name: set.name, specAbs: set.specAbs, original, next: result.text });
+  }
+  const stamped = [];
+  const fail = (setName, reason) => ({
+    stamped,
+    alreadyAssigned,
+    writeFailed: { setName, reason, written: [...stamped] }
+  });
+  const revalidateTarget = () => {
+    const c3 = classifyModulesManifest(root);
+    if (c3.kind === "invalid")
+      return INVALID_MANIFEST_MESSAGE;
+    const slugs = c3.kind === "present" ? c3.entries.map((e) => e.slug) : [];
+    return slugs.includes(slug) ? null : unknownModuleMessage(slug);
+  };
+  for (const item of queued) {
+    const manifestErr = revalidateTarget();
+    if (manifestErr) {
+      return stamped.length > 0 ? fail(
+        item.name,
+        `the target module "${slug}" is no longer declared in the manifest after ${stamped.length} set(s) were already stamped \u2014 ${manifestErr}`
+      ) : {
+        stamped: [],
+        alreadyAssigned,
+        refused: { reason: manifestErr, setName: item.name }
+      };
+    }
+    let current;
+    try {
+      current = io.readFileSync(item.specAbs);
+    } catch (err) {
+      return fail(
+        item.name,
+        `could not re-read ${item.name}'s spec.md before writing: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+    if (current !== item.original) {
+      return fail(
+        item.name,
+        `${item.name}'s spec.md changed after it was validated (a concurrent edit) \u2014 refused to overwrite it`
+      );
+    }
+    const tmp = `${item.specAbs}.${process.pid}.${crypto3.randomBytes(6).toString("hex")}.dabbler-assign-tmp`;
+    let staged = false;
+    try {
+      io.writeFileSync(tmp, item.next);
+      staged = true;
+      if (io.readFileSync(tmp) !== item.next) {
+        throw new Error("the staged temp file did not verify");
+      }
+      if (io.readFileSync(item.specAbs) !== item.original) {
+        io.rmSync(tmp);
+        return fail(
+          item.name,
+          `${item.name}'s spec.md changed during the staged write (a concurrent edit) \u2014 refused to overwrite it`
+        );
+      }
+      io.renameSync(tmp, item.specAbs);
+    } catch (err) {
+      if (staged) {
+        try {
+          io.rmSync(tmp);
+        } catch {
+        }
+      }
+      return fail(
+        item.name,
+        `writing ${item.name}'s spec.md failed; the original was left intact (${err instanceof Error ? err.message : String(err)})`
+      );
+    }
+    stamped.push(item.name);
+  }
+  return { stamped, alreadyAssigned };
+}
+function restampModuleInSpecText(text, expectedOldSlug, newSlug) {
+  const heading = CONFIG_HEADING_RE.exec(text);
+  if (!heading) {
+    return { kind: "refused", reason: 'no "Session Set Configuration" block' };
+  }
+  const afterHeading = heading.index + heading[0].length;
+  const rest = text.slice(afterHeading);
+  const nextHeadingRel = rest.search(/^##[ \t]/m);
+  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
+  const section = text.slice(afterHeading, sectionEnd);
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen) {
+    return { kind: "refused", reason: "the config block has no ```yaml fence" };
+  }
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  const boundedTail = text.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1) {
+    return { kind: "refused", reason: "the config block has no closing fence" };
+  }
+  const blockContent = boundedTail.slice(0, closeRel);
+  let parsed;
+  try {
+    parsed = YAML2.parse(blockContent);
+  } catch {
+    return { kind: "refused", reason: "the config block is not valid YAML" };
+  }
+  const parsedModule = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.module : void 0;
+  if (parsedModule === void 0) {
+    return { kind: "refused", reason: "no top-level module: key to rewrite" };
+  }
+  if (parsedModule === newSlug)
+    return { kind: "noop" };
+  if (parsedModule !== expectedOldSlug) {
+    return {
+      kind: "refused",
+      reason: `stamped module: ${JSON.stringify(parsedModule)}, not ${JSON.stringify(expectedOldSlug)}`
+    };
+  }
+  const lineRe = /^(module[ \t]*:[ \t]*)([^\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
+  const lm = lineRe.exec(blockContent);
+  if (!lm) {
+    return { kind: "refused", reason: "could not locate the module: line to rewrite" };
+  }
+  const valueAbs = blockContentStart + lm.index + lm[1].length;
+  const valueLen = lm[2].length;
+  const newText = text.slice(0, valueAbs) + newSlug + text.slice(valueAbs + valueLen);
+  return { kind: "written", text: newText };
+}
+function assertRestampedTextValid(originalText, newText, oldSlug, newSlug) {
+  const refuse = (why) => {
+    throw new Error(`Refusing the module restamp (${why}).`);
+  };
+  const expected = restampModuleInSpecText(originalText, oldSlug, newSlug);
+  if (expected.kind !== "written") {
+    return refuse(
+      expected.kind === "noop" ? "the original is already stamped to the new module" : `the original cannot be restamped (${expected.reason})`
+    );
+  }
+  if (newText !== expected.text) {
+    return refuse("the result is not the exact canonical single-value rewrite");
+  }
+  const heading = CONFIG_HEADING_RE.exec(newText);
+  const afterHeading = heading ? heading.index + heading[0].length : -1;
+  if (afterHeading < 0)
+    return refuse("the config block no longer parses");
+  const restText = newText.slice(afterHeading);
+  const nextHeadingRel = restText.search(/^##[ \t]/m);
+  const sectionEnd = nextHeadingRel === -1 ? newText.length : afterHeading + nextHeadingRel;
+  const section = newText.slice(afterHeading, sectionEnd);
+  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
+  if (!fenceOpen)
+    return refuse("the config block no longer parses");
+  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
+  const boundedTail = newText.slice(blockContentStart, sectionEnd);
+  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
+  if (closeRel === -1)
+    return refuse("the config block no longer parses");
+  const block = boundedTail.slice(0, closeRel);
+  let doc;
+  try {
+    doc = YAML2.parse(block);
+  } catch {
+    return refuse("the config block is not valid YAML after the restamp");
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return refuse("the config block is not a YAML mapping");
+  }
+  if (doc.module !== newSlug) {
+    return refuse(
+      `module resolved to ${JSON.stringify(doc.module)}, not ${JSON.stringify(newSlug)}`
+    );
+  }
+  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
+  if (moduleLineCount !== 1) {
+    return refuse(`${moduleLineCount} top-level module: lines in the block`);
+  }
+}
+function parseManifestEntriesFromText(text) {
+  let doc;
+  try {
+    doc = YAML2.parse(text);
+  } catch {
+    return null;
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc))
+    return null;
+  const rawModules = doc.modules;
+  if (rawModules === null)
+    return [];
+  if (!Array.isArray(rawModules))
+    return null;
+  const stringList = (v) => Array.isArray(v) ? v.filter((x2) => typeof x2 === "string" && x2.trim() !== "").map((s) => s.trim()) : [];
+  const out = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const raw of rawModules) {
+    if (raw === null || typeof raw !== "object" || Array.isArray(raw))
+      continue;
+    const obj = raw;
+    const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
+    if (!slug || seen.has(slug))
+      continue;
+    seen.add(slug);
+    const title = typeof obj.title === "string" && obj.title.trim() !== "" ? obj.title.trim() : slug;
+    const planPath = typeof obj.planPath === "string" && obj.planPath.trim() !== "" ? obj.planPath.trim() : null;
+    out.push({
+      slug,
+      title,
+      codeRoots: stringList(obj.codeRoots),
+      planPath,
+      touches: stringList(obj.touches)
+    });
+  }
+  return out;
+}
+function entriesEqual(a, b2) {
+  return a.slug === b2.slug && a.title === b2.title && a.planPath === b2.planPath && a.codeRoots.length === b2.codeRoots.length && a.codeRoots.every((v, i2) => v === b2.codeRoots[i2]) && a.touches.length === b2.touches.length && a.touches.every((v, i2) => v === b2.touches[i2]);
+}
+function unquoteScalar(raw) {
+  const t2 = raw.trim();
+  if (t2.length >= 2 && (t2[0] === '"' || t2[0] === "'") && t2[t2.length - 1] === t2[0]) {
+    return t2.slice(1, -1);
+  }
+  return t2;
+}
+function rewriteManifestEntryText(text, oldSlug, opts) {
+  const markerRe = /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
+  let target = null;
+  for (const m of text.matchAll(markerRe)) {
+    if (unquoteScalar(m[4]) === oldSlug) {
+      target = m;
+      break;
+    }
+  }
+  if (target === null)
+    return null;
+  const entryIndent = target[1].length;
+  const keyIndent = target[1].length + 1 + target[2].length;
+  const slugValueStart = target.index + target[1].length + 1 + target[2].length + 4 + target[3].length;
+  const slugValueEnd = slugValueStart + target[4].length;
+  const slugLineEnd = target.index + target[0].length;
+  let spanEnd = text.length;
+  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
+  boundaryRe.lastIndex = slugLineEnd;
+  let bm;
+  while ((bm = boundaryRe.exec(text)) !== null) {
+    if (bm[1].length <= entryIndent) {
+      spanEnd = bm.index;
+      break;
+    }
+  }
+  const edits = [];
+  if (opts.newSlug !== void 0 && opts.newSlug !== oldSlug) {
+    edits.push({ start: slugValueStart, end: slugValueEnd, replacement: opts.newSlug });
+  }
+  if (opts.newTitle !== void 0) {
+    const titleRe = /^([ \t]+)title([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
+    const span = text.slice(slugLineEnd, spanEnd);
+    const tm = titleRe.exec(span);
+    if (tm) {
+      const titleValueStart = slugLineEnd + tm.index + tm[1].length + 5 + tm[2].length;
+      const titleValueEnd = titleValueStart + tm[3].length;
+      edits.push({
+        start: titleValueStart,
+        end: titleValueEnd,
+        replacement: JSON.stringify(opts.newTitle)
+      });
+    } else {
+      const nl = text.includes("\r\n") ? "\r\n" : "\n";
+      const insertion = `${nl}${" ".repeat(keyIndent)}title: ${JSON.stringify(opts.newTitle)}`;
+      edits.push({ start: slugLineEnd, end: slugLineEnd, replacement: insertion });
+    }
+  }
+  if (edits.length === 0)
+    return text;
+  edits.sort((a, b2) => b2.start - a.start);
+  let out = text;
+  for (const e of edits) {
+    out = out.slice(0, e.start) + e.replacement + out.slice(e.end);
+  }
+  return out;
+}
+function assertRenamedManifestParses(originalEntries, candidateText, oldSlug, expected) {
+  const refuse = (why) => {
+    throw new Error(`Could not rename the module entry (${why}).`);
+  };
+  const arrEq = (a, b2) => a.length === b2.length && a.every((v, i2) => v === b2[i2]);
+  const candidate = parseManifestEntriesFromText(candidateText);
+  if (candidate === null)
+    return refuse("the result is not a valid module manifest");
+  if (candidate.length !== originalEntries.length) {
+    return refuse(
+      `entry count changed (${originalEntries.length} -> ${candidate.length})`
+    );
+  }
+  const targetIndex = originalEntries.findIndex((e) => e.slug === oldSlug);
+  if (targetIndex < 0)
+    return refuse(`the original had no "${oldSlug}" entry`);
+  for (let i2 = 0; i2 < originalEntries.length; i2++) {
+    const before = originalEntries[i2];
+    const after = candidate[i2];
+    if (i2 === targetIndex) {
+      if (after.slug !== expected.newSlug) {
+        return refuse(
+          `entry ${i2} slug is ${JSON.stringify(after.slug)}, expected ${JSON.stringify(expected.newSlug)}`
+        );
+      }
+      if (after.planPath !== before.planPath || !arrEq(after.codeRoots, before.codeRoots) || !arrEq(after.touches, before.touches)) {
+        return refuse(`entry ${i2} changed a field other than slug/title`);
+      }
+      if (expected.newTitle !== null) {
+        if (after.title !== expected.newTitle) {
+          return refuse(
+            `entry ${i2} title is ${JSON.stringify(after.title)}, expected ${JSON.stringify(expected.newTitle)}`
+          );
+        }
+      } else if (after.title !== before.title && after.title !== expected.newSlug) {
+        return refuse(
+          `entry ${i2} title changed unexpectedly to ${JSON.stringify(after.title)}`
+        );
+      }
+    } else if (!entriesEqual(after, before)) {
+      return refuse(`entry ${i2} (${before.slug}) changed unexpectedly`);
+    }
+  }
+  const newSlugCount = candidate.filter((e) => e.slug === expected.newSlug).length;
+  if (newSlugCount !== 1) {
+    return refuse(`the new slug appears ${newSlugCount} times`);
+  }
+  if (expected.newSlug !== oldSlug && candidate.some((e) => e.slug === oldSlug)) {
+    return refuse(`the old slug "${oldSlug}" still appears`);
+  }
+}
+var NODE_RENAME_IO = {
+  readFileSync: (p2) => fs13.readFileSync(p2, "utf8"),
+  writeFileSync: (p2, data) => {
+    const tmp = `${p2}.${process.pid}.${crypto3.randomBytes(6).toString("hex")}.dabbler-rename-tmp`;
+    try {
+      fs13.writeFileSync(tmp, data, { encoding: "utf8" });
+      fs13.renameSync(tmp, p2);
+    } catch (err) {
+      try {
+        fs13.rmSync(tmp, { force: true });
+      } catch {
+      }
+      throw err;
+    }
+  }
+};
+function inferLegacyStatus(dir) {
+  if (fs13.existsSync(path16.join(dir, "change-log.md")))
+    return "complete";
+  if (fs13.existsSync(path16.join(dir, "activity-log.json")))
+    return "in-progress";
+  return "not-started";
+}
+function hasRunningSessionAt(setDir, io) {
+  let raw;
+  try {
+    raw = io.readFileSync(path16.join(setDir, "session-state.json"));
+  } catch {
+    return inferLegacyStatus(setDir) === "in-progress";
+  }
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return inferLegacyStatus(setDir) === "in-progress";
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
+    return inferLegacyStatus(setDir) === "in-progress";
+  }
+  const d = doc;
+  if (d.status === "in-progress")
+    return true;
+  if (Array.isArray(d.sessions)) {
+    return d.sessions.some(
+      (s) => s !== null && typeof s === "object" && s.status === "in-progress"
+    );
+  }
+  return false;
+}
+function renameModule(root, oldSlugRaw, changes, io = NODE_RENAME_IO) {
+  const oldSlug = (oldSlugRaw ?? "").trim();
+  const msg = (e) => e instanceof Error ? e.message : String(e);
+  const refuse = (reason) => ({
+    oldSlug,
+    newSlug: oldSlug,
+    newTitle: null,
+    slugChanged: false,
+    titleChanged: false,
+    restamped: [],
+    refused: { reason }
+  });
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid")
+    return refuse(INVALID_MANIFEST_MESSAGE);
+  const entries = classified.kind === "present" ? classified.entries : [];
+  const targetEntry = entries.find((e) => e.slug === oldSlug);
+  if (!targetEntry) {
+    return refuse(
+      `Module "${oldSlug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`
+    );
+  }
+  const requestedSlug = changes.newSlug === void 0 ? void 0 : changes.newSlug.trim();
+  const requestedTitle = changes.newTitle === void 0 ? void 0 : changes.newTitle.trim();
+  const slugChanging = requestedSlug !== void 0 && requestedSlug !== "" && requestedSlug !== oldSlug;
+  const newSlug = slugChanging ? requestedSlug : oldSlug;
+  const currentTitle = targetEntry.title;
+  const titleChanging = requestedTitle !== void 0 && requestedTitle !== "" && requestedTitle !== currentTitle;
+  const newTitle = titleChanging ? requestedTitle : null;
+  if (!slugChanging && !titleChanging) {
+    return refuse(
+      "no change requested \u2014 the new slug and title match the current module."
+    );
+  }
+  if (slugChanging) {
+    const declaredSlugs = entries.map((e) => e.slug);
+    const slugErr = validateNewModuleSlug(newSlug, declaredSlugs);
+    if (slugErr)
+      return refuse(slugErr);
+  }
+  const setsRoot = path16.join(root, SESSION_SETS_REL);
+  const affected = [];
+  const newSlugCollisions = [];
+  for (const name of listSessionSetDirNames(root)) {
+    const dir = path16.join(setsRoot, name);
+    const specAbs = path16.join(dir, "spec.md");
+    const mod = parseSessionSetConfig(specAbs).module;
+    if (mod === oldSlug)
+      affected.push({ name, dir, specAbs });
+    else if (slugChanging && mod === newSlug)
+      newSlugCollisions.push(name);
+  }
+  if (slugChanging && newSlugCollisions.length > 0) {
+    return refuse(
+      `Renaming to "${newSlug}" would merge histories: ${newSlugCollisions.length} set(s) already declare module: ${newSlug}, which is not a declared module (${newSlugCollisions.join(", ")}). Pick a different name.`
+    );
+  }
+  if (slugChanging) {
+    const running = affected.filter((a) => hasRunningSessionAt(a.dir, io));
+    if (running.length > 0) {
+      return refuse(
+        `Refusing to rename "${oldSlug}" while ${running.length} affected set(s) have a running session (${running.map((r2) => r2.name).join(", ")}). Finish or close them first.`
+      );
+    }
+  }
+  const writes = [];
+  const restampedNames = [];
+  if (slugChanging) {
+    for (const a of affected) {
+      let original;
+      try {
+        original = io.readFileSync(a.specAbs);
+      } catch (e) {
+        return refuse(`could not read ${a.name}'s spec.md: ${msg(e)}`);
+      }
+      const res = restampModuleInSpecText(original, oldSlug, newSlug);
+      if (res.kind === "noop")
+        continue;
+      if (res.kind === "refused")
+        return refuse(`${a.name}: ${res.reason}`);
+      try {
+        assertRestampedTextValid(original, res.text, oldSlug, newSlug);
+      } catch (e) {
+        return refuse(`${a.name}: ${msg(e)}`);
+      }
+      writes.push({ abs: a.specAbs, original, next: res.text, label: a.name });
+      restampedNames.push(a.name);
+    }
+  }
+  const manifestAbs = path16.join(root, MODULES_MANIFEST_REL);
+  let manifestOriginal;
+  try {
+    manifestOriginal = io.readFileSync(manifestAbs);
+  } catch (e) {
+    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  const manifestNext = rewriteManifestEntryText(manifestOriginal, oldSlug, {
+    newSlug: slugChanging ? newSlug : void 0,
+    newTitle: titleChanging ? newTitle : void 0
+  });
+  if (manifestNext === null) {
+    return refuse(
+      `could not rewrite the ${MODULES_MANIFEST_DISPLAY} entry for "${oldSlug}" while preserving formatting \u2014 edit the slug/title by hand.`
+    );
+  }
+  try {
+    assertRenamedManifestParses(entries, manifestNext, oldSlug, {
+      newSlug,
+      // null = title not explicitly changed — the guard then tolerates a
+      // slug-derived implicit default (a title-less entry's display name
+      // follows its slug), so a slug-only rename of a title-less entry is not
+      // spuriously refused.
+      newTitle: titleChanging ? newTitle : null
+    });
+  } catch (e) {
+    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  writes.push({
+    abs: manifestAbs,
+    original: manifestOriginal,
+    next: manifestNext,
+    label: MODULES_MANIFEST_DISPLAY
+  });
+  const written = [];
+  for (const w of writes) {
+    try {
+      io.writeFileSync(w.abs, w.next);
+      written.push({ abs: w.abs, original: w.original });
+      if (io.readFileSync(w.abs) !== w.next) {
+        throw new Error("did not verify after write");
+      }
+    } catch (e) {
+      let rolledBack = true;
+      for (const done of written) {
+        try {
+          io.writeFileSync(done.abs, done.original);
+        } catch {
+          rolledBack = false;
+        }
+      }
+      return {
+        oldSlug,
+        newSlug,
+        newTitle,
+        slugChanged: false,
+        titleChanged: false,
+        restamped: [],
+        writeFailed: { reason: `writing ${w.label} failed: ${msg(e)}`, rolledBack }
+      };
+    }
+  }
+  return {
+    oldSlug,
+    newSlug,
+    newTitle,
+    slugChanged: slugChanging,
+    titleChanged: titleChanging,
+    restamped: restampedNames
+  };
+}
+var EXECUTION_ARTIFACT_FILENAMES = [
+  "activity-log.json",
+  "session-events.jsonl",
+  "change-log.md",
+  "ai-assignment.md",
+  "disposition.json",
+  "CANCELLED.md",
+  "RESTORED.md"
+];
+function hasExecutionArtifacts(dir) {
+  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs13.existsSync(path16.join(dir, f)));
+}
+function rawSessionSetStatus(dir) {
+  let raw;
+  try {
+    raw = fs13.readFileSync(path16.join(dir, "session-state.json"), "utf8");
+  } catch {
+    return inferLegacyStatus(dir);
+  }
+  let doc;
+  try {
+    doc = JSON.parse(raw);
+  } catch {
+    return inferLegacyStatus(dir);
+  }
+  if (doc === null || typeof doc !== "object" || Array.isArray(doc))
+    return inferLegacyStatus(dir);
+  const status = doc.status;
+  if (typeof status !== "string")
+    return inferLegacyStatus(dir);
+  const canon = status === "completed" || status === "done" ? "complete" : status;
+  return canon === "complete" || canon === "in-progress" ? canon : "not-started";
+}
+function classifyOneSetForDeletion(dir, kind) {
+  const cancellation = readCancellationState(dir);
+  if (cancellation === "cancelled" || cancellation === "unknown" && isCancelled(dir)) {
+    return "terminal";
+  }
+  const status = rawSessionSetStatus(dir);
+  if (status === "complete")
+    return "terminal";
+  if (status === "not-started") {
+    const k2 = (kind ?? "").toLowerCase();
+    const isLifecycleScaffold = k2 === "plan" || k2 === "decomposition";
+    if (isLifecycleScaffold && !hasExecutionArtifacts(dir))
+      return "remove";
+  }
+  return "cancel";
+}
+function classifyModuleSetsForDeletion(root, slug) {
+  const setsRoot = path16.join(root, SESSION_SETS_REL);
+  const out = [];
+  for (const name of listSessionSetDirNames(root)) {
+    const dir = path16.join(setsRoot, name);
+    const specAbs = path16.join(dir, "spec.md");
+    const config = parseSessionSetConfig(specAbs);
+    if (config.module !== slug)
+      continue;
+    out.push({ name, dir, disposition: classifyOneSetForDeletion(dir, config.kind) });
+  }
+  return out;
+}
+function removeManifestEntryText(text, slug) {
+  const markerRe = /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
+  let target = null;
+  for (const m of text.matchAll(markerRe)) {
+    if (unquoteScalar(m[4]) === slug) {
+      target = m;
+      break;
+    }
+  }
+  if (target === null)
+    return null;
+  const entryIndent = target[1].length;
+  const slugLineEnd = target.index + target[0].length;
+  let spanEnd = text.length;
+  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|#|[^ \t\r\n#])/g;
+  boundaryRe.lastIndex = slugLineEnd;
+  let bm;
+  while ((bm = boundaryRe.exec(text)) !== null) {
+    if (bm[1].length <= entryIndent) {
+      spanEnd = bm.index;
+      break;
+    }
+  }
+  const nlMatch = /^\r?\n/.exec(text.slice(spanEnd));
+  const deleteEnd = spanEnd + (nlMatch ? nlMatch[0].length : 0);
+  return text.slice(0, target.index) + text.slice(deleteEnd);
+}
+function assertManifestEntryRemoved(originalEntries, candidateText, slug) {
+  const refuse = (why) => {
+    throw new Error(`Could not remove the module entry (${why}).`);
+  };
+  const candidate = parseManifestEntriesFromText(candidateText);
+  if (candidate === null)
+    return refuse("the result is not a valid module manifest");
+  if (candidate.length !== originalEntries.length - 1) {
+    return refuse(
+      `entry count changed (${originalEntries.length} -> ${candidate.length}, expected ${originalEntries.length - 1})`
+    );
+  }
+  if (candidate.some((e) => e.slug === slug)) {
+    return refuse(`the removed slug "${slug}" still appears`);
+  }
+  const remainingOriginal = originalEntries.filter(
+    (e) => e.slug !== slug
+  );
+  for (let i2 = 0; i2 < remainingOriginal.length; i2++) {
+    if (!entriesEqual(remainingOriginal[i2], candidate[i2])) {
+      return refuse(`entry ${i2} (${remainingOriginal[i2].slug}) changed unexpectedly`);
+    }
+  }
+}
+async function deleteModule(root, slugRaw, io = NODE_RENAME_IO) {
+  const slug = (slugRaw ?? "").trim();
+  const msg = (e) => e instanceof Error ? e.message : String(e);
+  const refuse = (reason2) => ({
+    slug,
+    cancelled: [],
+    removed: [],
+    terminal: [],
+    refused: { reason: reason2 }
+  });
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid")
+    return refuse(INVALID_MANIFEST_MESSAGE);
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (!entries.some((e) => e.slug === slug)) {
+    return refuse(`Module "${slug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`);
+  }
+  const classifications = classifyModuleSetsForDeletion(root, slug);
+  const running = classifications.filter((c3) => hasRunningSessionAt(c3.dir, io));
+  if (running.length > 0) {
+    return refuse(
+      `Refusing to delete "${slug}" while ${running.length} affected set(s) have a running session (${running.map((r2) => r2.name).join(", ")}). Finish or close them first.`
+    );
+  }
+  const terminalNames = classifications.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
+  const toCancel = classifications.filter((c3) => c3.disposition === "cancel");
+  const toRemove = classifications.filter((c3) => c3.disposition === "remove");
+  const manifestAbs = path16.join(root, MODULES_MANIFEST_REL);
+  let manifestOriginal;
+  try {
+    manifestOriginal = io.readFileSync(manifestAbs);
+  } catch (e) {
+    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  const manifestNext = removeManifestEntryText(manifestOriginal, slug);
+  if (manifestNext === null) {
+    return refuse(
+      `could not remove the ${MODULES_MANIFEST_DISPLAY} entry for "${slug}" while preserving formatting \u2014 remove it by hand.`
+    );
+  }
+  try {
+    assertManifestEntryRemoved(entries, manifestNext, slug);
+  } catch (e) {
+    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
+  }
+  const cancelled = [];
+  const removed = [];
+  const reason = `module ${slug} deleted`;
+  for (const c3 of toCancel) {
+    try {
+      await cancelSessionSet(c3.dir, reason);
+      cancelled.push(c3.name);
+    } catch (e) {
+      return {
+        slug,
+        cancelled,
+        removed,
+        terminal: terminalNames,
+        partialFailure: { reason: `cancelling ${c3.name} failed: ${msg(e)}` }
+      };
+    }
+  }
+  for (const c3 of toRemove) {
+    try {
+      fs13.rmSync(c3.dir, { recursive: true, force: true });
+      removed.push(c3.name);
+    } catch (e) {
+      return {
+        slug,
+        cancelled,
+        removed,
+        terminal: terminalNames,
+        partialFailure: { reason: `removing ${c3.name} failed: ${msg(e)}` }
+      };
+    }
+  }
+  try {
+    io.writeFileSync(manifestAbs, manifestNext);
+  } catch (e) {
+    return {
+      slug,
+      cancelled,
+      removed,
+      terminal: terminalNames,
+      partialFailure: {
+        reason: `${cancelled.length} set(s) cancelled and ${removed.length} scaffold(s) removed, but writing ${MODULES_MANIFEST_DISPLAY} failed: ${msg(e)} \u2014 re-run to finish removing the manifest entry.`
+      }
+    };
+  }
+  return { slug, cancelled, removed, terminal: terminalNames };
+}
+var MODULE_PLAN_SET_TEMPLATE_FILENAME = "module-plan-set.spec.md.template";
+var MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME = "module-decomposition-set.spec.md.template";
+function resolveModuleLifecycleTemplatesDir() {
+  const candidates = [
+    path16.join(__dirname, "templates", "consumer-bootstrap"),
+    path16.join(__dirname, "..", "..", "..", "..", "docs", "templates", "consumer-bootstrap")
+  ];
+  for (const c3 of candidates) {
+    if (fs13.existsSync(path16.join(c3, MODULE_PLAN_SET_TEMPLATE_FILENAME)))
+      return c3;
+  }
+  return candidates[candidates.length - 1];
+}
+function loadModuleLifecycleTemplate(filename) {
+  const dir = resolveModuleLifecycleTemplatesDir();
+  return fs13.readFileSync(path16.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
+}
+function substituteLifecycleTokens(text, table) {
+  return text.replace(
+    /{{([A-Z_]+)}}/g,
+    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
+  );
+}
+function assertNoUnsubstitutedTokens(rendered, filename) {
+  const leftover = rendered.match(/{{[A-Z_]+}}/g);
+  if (leftover) {
+    throw new Error(
+      `${filename}: unsubstituted token(s) ${leftover.join(", ")} \u2014 a template/writer token-table mismatch.`
+    );
+  }
+}
+function renderModulePlanSetSpec(ctx) {
+  const rendered = substituteLifecycleTokens(
+    loadModuleLifecycleTemplate(MODULE_PLAN_SET_TEMPLATE_FILENAME),
+    {
+      MODULE_TITLE: ctx.moduleTitle,
+      MODULE_SLUG: ctx.moduleSlug,
+      SLUG: ctx.slug,
+      CREATED: ctx.created,
+      PLAN_REL_PATH: ctx.planRelPath
+    }
+  );
+  assertNoUnsubstitutedTokens(rendered, MODULE_PLAN_SET_TEMPLATE_FILENAME);
+  return rendered;
+}
+function renderModuleDecompositionSetSpec(ctx) {
+  const rendered = substituteLifecycleTokens(
+    loadModuleLifecycleTemplate(MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME),
+    {
+      MODULE_TITLE: ctx.moduleTitle,
+      MODULE_SLUG: ctx.moduleSlug,
+      SLUG: ctx.slug,
+      CREATED: ctx.created,
+      PLAN_REL_PATH: ctx.planRelPath,
+      PLAN_SLUG: ctx.planSlug
+    }
+  );
+  assertNoUnsubstitutedTokens(rendered, MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME);
+  return rendered;
+}
+function findExistingLifecycleSetSlug(dirNames, moduleSlug, kind) {
+  const suffix = `-${moduleSlug}-${kind}`;
+  const matches = dirNames.filter((n) => n.endsWith(suffix) && numericPrefix(n) !== null).sort();
+  return matches.length > 0 ? matches[0] : null;
+}
+function writeSpecSkipExisting(abs, text) {
+  if (fs13.existsSync(abs))
+    return false;
+  fs13.mkdirSync(path16.dirname(abs), { recursive: true });
+  fs13.writeFileSync(abs, text, { encoding: "utf8" });
+  if (fs13.readFileSync(abs, "utf8") !== text) {
+    throw new Error(`${abs} did not verify after writing (concurrent modification?).`);
+  }
+  return true;
+}
+function assertLifecycleSpecWritten(abs, expectedKind, expectedPrereqSlug) {
+  const config = parseSessionSetConfig(abs);
+  if (config.kind !== expectedKind) {
+    throw new Error(
+      `${abs}: expected kind "${expectedKind}", parsed "${config.kind}" \u2014 refusing (template/parser drift).`
+    );
+  }
+  if (expectedPrereqSlug !== null) {
+    const prereqs = parsePrerequisites(abs);
+    const ok = prereqs !== null && prereqs.some(
+      (p2) => p2.slug === expectedPrereqSlug && p2.condition === "complete"
+    );
+    if (!ok) {
+      throw new Error(
+        `${abs}: expected a prerequisites: entry for "${expectedPrereqSlug}" \u2014 refusing (template/parser drift).`
+      );
+    }
+  }
+}
+function scaffoldModuleLifecycleSets(root, module2) {
+  const moduleSlug = (module2.slug ?? "").trim();
+  if (!MODULE_SLUG_RE.test(moduleSlug)) {
+    throw new Error(
+      `Cannot scaffold lifecycle sets: "${module2.slug}" is not a valid module slug.`
+    );
+  }
+  const dirNames = listSessionSetDirNames(root);
+  const existingPlanSlug = findExistingLifecycleSetSlug(dirNames, moduleSlug, "plan");
+  const existingDecompositionSlug = findExistingLifecycleSetSlug(
+    dirNames,
+    moduleSlug,
+    "decomposition"
+  );
+  const planSlug = existingPlanSlug ?? `${nextSessionSetNumberFrom(dirNames).padded}-${moduleSlug}-plan`;
+  const reservedDirNames = existingPlanSlug || dirNames.includes(planSlug) ? dirNames : [...dirNames, planSlug];
+  const decompositionSlug = existingDecompositionSlug ?? `${nextSessionSetNumberFrom(reservedDirNames).padded}-${moduleSlug}-decomposition`;
+  const created = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  const planRelPath = modulePlanRelPath(module2);
+  const moduleTitle = (module2.title ?? "").trim() || moduleSlug;
+  const planAbs = path16.join(root, SESSION_SETS_REL, planSlug, "spec.md");
+  const decompositionAbs = path16.join(
+    root,
+    SESSION_SETS_REL,
+    decompositionSlug,
+    "spec.md"
+  );
+  let planCreated = false;
+  if (!existingPlanSlug) {
+    const planText = renderModulePlanSetSpec({
+      slug: planSlug,
+      moduleSlug,
+      moduleTitle,
+      created,
+      planRelPath
+    });
+    planCreated = writeSpecSkipExisting(planAbs, planText);
+    if (planCreated)
+      assertLifecycleSpecWritten(planAbs, "plan", null);
+  }
+  let decompositionCreated = false;
+  if (!existingDecompositionSlug) {
+    const decompositionText = renderModuleDecompositionSetSpec({
+      slug: decompositionSlug,
+      moduleSlug,
+      moduleTitle,
+      created,
+      planRelPath,
+      planSlug
+    });
+    decompositionCreated = writeSpecSkipExisting(decompositionAbs, decompositionText);
+    if (decompositionCreated) {
+      assertLifecycleSpecWritten(decompositionAbs, "decomposition", planSlug);
+    }
+  }
+  return {
+    planSlug,
+    planSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${planSlug}/spec.md`,
+    planCreated,
+    decompositionSlug,
+    decompositionSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${decompositionSlug}/spec.md`,
+    decompositionCreated
+  };
+}
+
 // src/commands/gitScaffold.ts
 async function scaffoldConsumerRepo(deps) {
   const report = deps.reportProgress ?? (() => {
@@ -26391,7 +24961,7 @@ async function scaffoldConsumerRepo(deps) {
   const written = [];
   const skipped = [];
   for (const [rel, content] of Object.entries(files)) {
-    const abs = path19.join(deps.projectDir, rel);
+    const abs = path17.join(deps.projectDir, rel);
     if (deps.fileOps.exists(abs)) {
       skipped.push(rel);
       continue;
@@ -26414,7 +24984,7 @@ async function scaffoldConsumerRepo(deps) {
   const install = await deps.installRouter();
   let routerConfigRemoved = false;
   if (deps.ctx.tier === "lightweight") {
-    const cfg = path19.join(deps.projectDir, ROUTER_CONFIG_REL);
+    const cfg = path17.join(deps.projectDir, ROUTER_CONFIG_REL);
     if (deps.fileOps.exists(cfg)) {
       deps.fileOps.removeRecursive(cfg);
       routerConfigRemoved = true;
@@ -26465,7 +25035,7 @@ function scaffoldDefaultModuleAndLifecycleSets(projectDir) {
   }
 }
 async function pickDirectory() {
-  const picked = await vscode11.window.showOpenDialog({
+  const picked = await vscode6.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -26486,7 +25056,7 @@ function asTier(value) {
   );
 }
 async function promptTier(placeHolder) {
-  const picked = await vscode11.window.showQuickPick(
+  const picked = await vscode6.window.showQuickPick(
     [
       {
         label: "Full",
@@ -26515,8 +25085,8 @@ function isoDate() {
 }
 function registerGitScaffoldCommand(context) {
   context.subscriptions.push(
-    vscode11.commands.registerCommand("dabbler.setupNewProject", async (arg) => {
-      const openRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode6.commands.registerCommand("dabbler.setupNewProject", async (arg) => {
+      const openRoot = vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const projectDir = openRoot ?? await pickDirectory();
       if (!projectDir)
         return;
@@ -26524,7 +25094,7 @@ function registerGitScaffoldCommand(context) {
       try {
         preselected = asTier(arg?.tier);
       } catch (err) {
-        vscode11.window.showErrorMessage(
+        vscode6.window.showErrorMessage(
           `Could not set up the project: ${err instanceof Error ? err.message : String(err)}`
         );
         return;
@@ -26534,9 +25104,9 @@ function registerGitScaffoldCommand(context) {
         return;
       await buildProjectStructureNoPrompt(context, projectDir, tier);
       if (!openRoot) {
-        await vscode11.commands.executeCommand(
+        await vscode6.commands.executeCommand(
           "vscode.openFolder",
-          vscode11.Uri.file(projectDir)
+          vscode6.Uri.file(projectDir)
         );
       }
     })
@@ -26551,7 +25121,7 @@ function makeScaffoldInstallPrompts() {
 }
 async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, verificationMode, transportProfile, seams = {}) {
   if (!(seams.probePython ?? probePythonPresence)(projectDir)) {
-    vscode11.window.showErrorMessage(
+    vscode6.window.showErrorMessage(
       describeMissingPython("Build project structure")
     );
     return void 0;
@@ -26572,13 +25142,13 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
   try {
     bundle = seams.loadBundle ? seams.loadBundle() : loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
-    vscode11.window.showErrorMessage(
+    vscode6.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
     );
     return void 0;
   }
   const ctx = structureOnlyContext(
-    path19.basename(projectDir),
+    path17.basename(projectDir),
     tier,
     isoDate(),
     verificationMode
@@ -26587,9 +25157,9 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
   const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
   const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython, scaffoldBudget) => {
     let installOutcome2 = null;
-    const scaffolded = await vscode11.window.withProgress(
+    const scaffolded = await vscode6.window.withProgress(
       {
-        location: vscode11.ProgressLocation.Notification,
+        location: vscode6.ProgressLocation.Notification,
         title: "Building project structure\u2026",
         cancellable: false
       },
@@ -26627,8 +25197,8 @@ async function buildProjectStructureNoPrompt(context, projectDir, tier, budget, 
     projectDir
   ).note : "";
   const summary = `Project structure built (${tier} tier): ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote + defaultModuleNote;
-  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode6.window.showWarningMessage(m));
   if (result.installOk) {
     showInfo(summary);
   } else {
@@ -26736,15 +25306,15 @@ function makeRefreshChildSpawner() {
   };
 }
 async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, seams = {}) {
-  const withProgress = seams.withProgress ?? vscode11.window.withProgress.bind(vscode11.window);
+  const withProgress = seams.withProgress ?? vscode6.window.withProgress.bind(vscode6.window);
   const perform = seams.perform ?? performCopilotSeatSetup;
-  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode6.window.showWarningMessage(m));
   const seatId = deriveSeatId(os3.hostname(), currentUsername());
   const seatLabel = deriveSeatLabel(projectDir);
   const outcome = await withProgress(
     {
-      location: vscode11.ProgressLocation.Notification,
+      location: vscode6.ProgressLocation.Notification,
       title: "Setting up the Copilot seat \u2014 probing the seat's models (about 1\u20132 minutes)\u2026",
       cancellable: true
     },
@@ -26758,7 +25328,7 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
       fileOps: makeFileOps(),
       cancellation: token,
       registerDisposal: (dispose) => {
-        const d = new vscode11.Disposable(dispose);
+        const d = new vscode6.Disposable(dispose);
         context.subscriptions.push(d);
         return {
           // S2 review Minor 4: also splice the Disposable back out of
@@ -26785,17 +25355,17 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
 }
 
 // src/commands/openModulesManifest.ts
-var vscode12 = __toESM(require("vscode"));
-var path20 = __toESM(require("path"));
-function defaultUi6() {
+var vscode7 = __toESM(require("vscode"));
+var path18 = __toESM(require("path"));
+function defaultUi() {
   return {
-    showInformationMessage: (m) => vscode12.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode12.window.showErrorMessage(m),
-    openFile: (absPath) => vscode12.commands.executeCommand("vscode.open", vscode12.Uri.file(absPath)),
-    workspaceRoot: () => vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: (m) => vscode7.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode7.window.showErrorMessage(m),
+    openFile: (absPath) => vscode7.commands.executeCommand("vscode.open", vscode7.Uri.file(absPath)),
+    workspaceRoot: () => vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
-async function openModulesManifestFlow(ui = defaultUi6()) {
+async function openModulesManifestFlow(ui = defaultUi()) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -26810,7 +25380,7 @@ async function openModulesManifestFlow(ui = defaultUi6()) {
     );
     return false;
   }
-  const abs = path20.join(root, MODULES_MANIFEST_REL);
+  const abs = path18.join(root, MODULES_MANIFEST_REL);
   try {
     await ui.openFile(abs);
   } catch (err) {
@@ -26828,16 +25398,16 @@ async function openModulesManifestFlow(ui = defaultUi6()) {
 }
 function registerOpenModulesManifestCommand(context) {
   context.subscriptions.push(
-    vscode12.commands.registerCommand("dabbler.openModulesManifest", async () => {
+    vscode7.commands.registerCommand("dabbler.openModulesManifest", async () => {
       await openModulesManifestFlow();
     })
   );
 }
 
 // src/commands/copyModuleDecompositionPrompt.ts
-var vscode13 = __toESM(require("vscode"));
-var fs16 = __toESM(require("fs"));
-var path21 = __toESM(require("path"));
+var vscode8 = __toESM(require("vscode"));
+var fs14 = __toESM(require("fs"));
+var path19 = __toESM(require("path"));
 function buildModuleDecompositionPrompt(planPresent) {
   const planLine = planPresent ? `Read the repository directly \u2014 its folders and code, and the project plan at \`${LEGACY_ROOT_PLAN_REL}\` (read that file for the project's goals and scope). Nothing is inlined here.` : `Read the repository directly \u2014 its folders and code \u2014 to understand the project's areas of work. Nothing is inlined here (there is no \`${LEGACY_ROOT_PLAN_REL}\` yet).`;
   return `Module-decomposition request (Dabbler module-organized project).
@@ -26862,17 +25432,17 @@ Hard invariants (do NOT violate):
 If the project is a single area of work, one module (or none \u2014 leave \`modules: []\`) is correct; do not invent modules to fill the file. Save \`${MODULES_MANIFEST_DISPLAY}\` when done \u2014 the Work Explorer regroups your session sets as soon as you save.
 `;
 }
-function defaultUi7() {
+function defaultUi2() {
   return {
-    workspaceRoot: () => vscode13.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    workspaceRoot: () => vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath,
     // fs.existsSync never throws — swallows errors, returns false.
-    fileExists: (abs) => fs16.existsSync(abs),
-    copyToClipboard: (text) => vscode13.env.clipboard.writeText(text),
-    showInformationMessage: (m) => vscode13.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode13.window.showErrorMessage(m)
+    fileExists: (abs) => fs14.existsSync(abs),
+    copyToClipboard: (text) => vscode8.env.clipboard.writeText(text),
+    showInformationMessage: (m) => vscode8.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode8.window.showErrorMessage(m)
   };
 }
-async function runCopyModuleDecompositionPromptFlow(ui = defaultUi7()) {
+async function runCopyModuleDecompositionPromptFlow(ui = defaultUi2()) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -26888,7 +25458,7 @@ async function runCopyModuleDecompositionPromptFlow(ui = defaultUi7()) {
     return false;
   }
   const planPresent = ui.fileExists(
-    path21.join(root, ...LEGACY_ROOT_PLAN_REL.split("/"))
+    path19.join(root, ...LEGACY_ROOT_PLAN_REL.split("/"))
   );
   const prompt = buildModuleDecompositionPrompt(planPresent);
   try {
@@ -26906,7 +25476,7 @@ async function runCopyModuleDecompositionPromptFlow(ui = defaultUi7()) {
 }
 function registerCopyModuleDecompositionPromptCommand(context) {
   context.subscriptions.push(
-    vscode13.commands.registerCommand(
+    vscode8.commands.registerCommand(
       "dabbler.copyModuleDecompositionPrompt",
       async () => {
         await runCopyModuleDecompositionPromptFlow();
@@ -26978,7 +25548,7 @@ async function routeGettingStartedAction(msg, handlers) {
         verificationMode = resolveVerificationMode(msg, tier);
         transportProfile = resolveTransportProfile(msg, tier);
       } catch (err) {
-        vscode14.window.showErrorMessage(
+        vscode9.window.showErrorMessage(
           `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`
         );
         console.warn(
@@ -27015,7 +25585,7 @@ function makeGettingStartedHandlers(context) {
     // it. vscode.openFolder reopens the window on that folder; the
     // Getting Started form (now with build steps) renders there.
     async openFolder() {
-      const picked = await vscode14.window.showOpenDialog({
+      const picked = await vscode9.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -27024,7 +25594,7 @@ function makeGettingStartedHandlers(context) {
       });
       if (!picked?.[0])
         return;
-      await vscode14.commands.executeCommand("vscode.openFolder", picked[0]);
+      await vscode9.commands.executeCommand("vscode.openFolder", picked[0]);
     },
     // Step 1: scaffold into the OPEN workspace folder (D5) with no
     // prompts. Folder-picker fallback when none is open (spec S2 step 1)
@@ -27032,7 +25602,7 @@ function makeGettingStartedHandlers(context) {
     // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
     // budget pick rides through to the scaffold's budget.yaml write.
     async buildStructure(tier, budget, verificationMode, transportProfile) {
-      const openRoot = vscode14.workspace.workspaceFolders?.[0]?.uri.fsPath;
+      const openRoot = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
       if (openRoot) {
         await buildProjectStructureNoPrompt(
           context,
@@ -27044,7 +25614,7 @@ function makeGettingStartedHandlers(context) {
         );
         return;
       }
-      const picked = await vscode14.window.showOpenDialog({
+      const picked = await vscode9.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -27063,7 +25633,7 @@ function makeGettingStartedHandlers(context) {
       );
       if (!result)
         return;
-      await vscode14.commands.executeCommand("vscode.openFolder", picked[0]);
+      await vscode9.commands.executeCommand("vscode.openFolder", picked[0]);
     },
     // Set 094 (spec D1 + adjudication A): the Define-modules button —
     // create docs/modules.yaml from the canonical template if it does not
@@ -27083,28 +25653,28 @@ function makeGettingStartedHandlers(context) {
 }
 
 // src/commands/gettingStartedDoc.ts
-var vscode15 = __toESM(require("vscode"));
-var fs17 = __toESM(require("fs"));
-var path22 = __toESM(require("path"));
+var vscode10 = __toESM(require("vscode"));
+var fs15 = __toESM(require("fs"));
+var path20 = __toESM(require("path"));
 function workspaceGettingStartedDoc(workspaceRoot2) {
   if (!workspaceRoot2)
     return void 0;
-  const abs = path22.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
+  const abs = path20.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
   try {
-    return fs17.statSync(abs).isFile() ? abs : void 0;
+    return fs15.statSync(abs).isFile() ? abs : void 0;
   } catch {
     return void 0;
   }
 }
 function materializeBundledDoc(context) {
-  const src = path22.join(
+  const src = path20.join(
     resolveBundledTemplateDir(context.extensionPath),
     GETTING_STARTED_TEMPLATE_FILENAME
   );
   const dstDir = context.globalStorageUri.fsPath;
-  fs17.mkdirSync(dstDir, { recursive: true });
-  const dst = path22.join(dstDir, "getting-started.md");
-  fs17.copyFileSync(src, dst);
+  fs15.mkdirSync(dstDir, { recursive: true });
+  const dst = path20.join(dstDir, "getting-started.md");
+  fs15.copyFileSync(src, dst);
   return dst;
 }
 function tierCalloutMarkdown(tier) {
@@ -27136,20 +25706,20 @@ ${docText}`;
 }
 async function openGettingStartedDoc(context) {
   try {
-    const root = vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const workspaceDoc = workspaceGettingStartedDoc(root);
     const durable = root ? resolveDurableTier(root) : null;
     let docPath;
     if (durable) {
-      const src = workspaceDoc ?? path22.join(
+      const src = workspaceDoc ?? path20.join(
         resolveBundledTemplateDir(context.extensionPath),
         GETTING_STARTED_TEMPLATE_FILENAME
       );
-      const text = fs17.readFileSync(src, "utf8");
+      const text = fs15.readFileSync(src, "utf8");
       const dstDir = context.globalStorageUri.fsPath;
-      fs17.mkdirSync(dstDir, { recursive: true });
-      docPath = path22.join(dstDir, "getting-started.md");
-      fs17.writeFileSync(
+      fs15.mkdirSync(dstDir, { recursive: true });
+      docPath = path20.join(dstDir, "getting-started.md");
+      fs15.writeFileSync(
         docPath,
         renderTierAwareGettingStarted(text, durable.tier),
         "utf8"
@@ -27157,9 +25727,9 @@ async function openGettingStartedDoc(context) {
     } else {
       docPath = workspaceDoc ?? materializeBundledDoc(context);
     }
-    await vscode15.commands.executeCommand(
+    await vscode10.commands.executeCommand(
       "markdown.showPreview",
-      vscode15.Uri.file(docPath)
+      vscode10.Uri.file(docPath)
     );
   } catch (err) {
     console.warn("[gettingStarted] could not open the instructions doc", err);
@@ -27167,9 +25737,9 @@ async function openGettingStartedDoc(context) {
 }
 function registerGetStartedCommand(context) {
   context.subscriptions.push(
-    vscode15.commands.registerCommand("dabbler.getStarted", async () => {
+    vscode10.commands.registerCommand("dabbler.getStarted", async () => {
       try {
-        await vscode15.commands.executeCommand("dabblerSessionSets.focus");
+        await vscode10.commands.executeCommand("dabblerSessionSets.focus");
       } catch (err) {
         console.warn("[gettingStarted] could not focus the Work Explorer view", err);
       }
@@ -27178,61 +25748,18 @@ function registerGetStartedCommand(context) {
   );
 }
 
-// src/providers/CustomSessionSetsView.ts
-var SUPPRESSION_KEY = "dabbler.sessionSets.suppressedExpand";
+// src/providers/SetupStatusView.ts
 var RENDER_DEBOUNCE_MS = 50;
-var COMMAND_ALLOWLIST = /* @__PURE__ */ new Set([
-  "dabblerSessionSets.openSpec"
-]);
-function contextValueFor(set) {
-  const parts = [`sessionSet:${set.state}`];
-  if (set.config?.requiresUAT)
-    parts.push("uat");
-  if (set.config?.requiresE2E)
-    parts.push("e2e");
-  if (set.needsMigration)
-    parts.push("needs-migration");
-  if (set.blockedByPrereqs && set.state !== "complete" && set.state !== "cancelled") {
-    parts.push("blocked-by-prereqs");
-  }
-  return parts.join(":");
-}
-function descriptionFor(set) {
-  const bits = [];
-  if (set.state === "in-progress" && set.liveSession?.currentSession != null) {
-    bits.push(`session ${set.liveSession.currentSession} in flight`);
-  }
-  const owed = verificationOwedText(set);
-  if (owed)
-    bits.push(owed);
-  const extras = [
-    touchedDate(set),
-    uatBadge(set),
-    forceClosedBadge(set)
-  ].filter(Boolean);
-  bits.push(...extras);
-  return bits.join("  \xB7  ");
-}
-function fractionFor(set) {
-  if (set.totalSessions && set.totalSessions > 0) {
-    const plus = set.plusFraction ? "+" : "";
-    return `${set.sessionsCompleted}/${set.totalSessions}${plus}`;
-  }
-  return `${set.sessionsCompleted}/?`;
-}
-var CustomSessionSetsView = class {
+var SetupStatusView = class {
   constructor(context, scanState, gettingStartedHandlers, openInstructions) {
     this.context = context;
     this.scanState = scanState;
     this.version = 0;
     this.cache = null;
-    this.lastKnownGoodModules = /* @__PURE__ */ new Map();
-    this.collisionNotificationShown = false;
-    // Set 060 Session 3 (D8): the static instructions doc auto-opens
-    // ONCE per extension session, the first time a snapshot ships a
-    // non-"list" Getting Started surface. One-shot so watcher ticks and
-    // post-action refreshes don't re-steal editor focus; the
-    // dabbler.getStarted command re-opens it explicitly any time.
+    // Set 060 Session 3 (D8): the static instructions doc auto-opens ONCE per
+    // extension session, the first time a snapshot ships a non-"list" Getting
+    // Started surface. One-shot so watcher ticks and post-action refreshes do
+    // not re-steal editor focus; `dabbler.getStarted` re-opens it any time.
     this.instructionsOpened = false;
     this.gettingStartedHandlers = gettingStartedHandlers ?? makeGettingStartedHandlers(context);
     this.openInstructions = openInstructions ?? (() => openGettingStartedDoc(context));
@@ -27241,6 +25768,7 @@ var CustomSessionSetsView = class {
     );
   }
   static {
+    /** Unchanged from the pre-110 webview — a user's saved layout keys on it. */
     this.viewType = "dabblerSessionSets";
   }
   dispose() {
@@ -27251,7 +25779,6 @@ var CustomSessionSetsView = class {
   }
   refresh() {
     this.cache = null;
-    this.collisionNotificationShown = false;
     this.scheduleRender();
   }
   resolveWebviewView(webviewView, _context, _token) {
@@ -27261,7 +25788,9 @@ var CustomSessionSetsView = class {
     webview.options = {
       enableScripts: true,
       enableCommandUris: true,
-      localResourceRoots: [vscode16.Uri.joinPath(this.context.extensionUri, "media")]
+      localResourceRoots: [
+        vscode11.Uri.joinPath(this.context.extensionUri, "media")
+      ]
     };
     webview.onDidReceiveMessage((msg) => this.onMessage(msg));
     webviewView.onDidDispose(() => {
@@ -27270,229 +25799,30 @@ var CustomSessionSetsView = class {
     webview.html = this.renderShell();
     markWebviewResolveEnd();
   }
-  // ----- Message dispatch (webview → host) -----
+  // ----- Message dispatch (webview -> host) -----
+  //
+  // Two messages, down from eight. Everything the tree needed is gone with
+  // the tree, and with it the `executeCommand` channel that had to be
+  // allowlisted.
   onMessage(msg) {
     if (!msg || typeof msg !== "object")
       return;
-    switch (msg.type) {
-      case "ready":
-        this.postSuppressionEcho();
-        this.scheduleRender();
-        return;
-      case "executeCommand":
-        this.dispatchCommand(msg.commandId, msg.args);
-        return;
-      case "showRowContextMenu":
-        void this.showContextMenu(msg.slug);
-        return;
-      case "moduleAction":
-        void this.handleModuleAction(msg.action, msg.moduleSlug, msg.moduleKind);
-        return;
-      case "showModuleContextMenu":
-        void this.showModuleContextMenu(msg.moduleSlug, msg.moduleKind);
-        return;
-      case "toggleRow":
-        this.handleToggle(msg.slug, msg.expanded, msg.accordionUpdatedAt);
-        return;
-      case "activateRow":
-        void this.handleActivateRow(msg.slug);
-        return;
-      case "gettingStartedAction":
-        void routeGettingStartedAction(msg, this.gettingStartedHandlers).then((handled) => {
-          if (handled)
-            this.refresh();
-        }).catch((err) => {
-          console.warn("[CustomSessionSetsView] Getting Started action failed", err);
+    const type = msg.type;
+    if (type === "ready") {
+      this.scheduleRender();
+      return;
+    }
+    if (type === "gettingStartedAction") {
+      void routeGettingStartedAction(
+        msg,
+        this.gettingStartedHandlers
+      ).then((handled) => {
+        if (handled)
           this.refresh();
-        });
-        return;
-    }
-  }
-  async handleActivateRow(slug) {
-    const set = this.findSetBySlug(slug);
-    if (!set)
-      return;
-    const plan = planLeftClickActivation(set.name, set.state);
-    this.dispatchCommand(plan.openCommand.commandId, [{ set }]);
-    if (!plan.clipboardWrite)
-      return;
-    try {
-      await vscode16.env.clipboard.writeText(plan.clipboardWrite.text);
-      vscode16.window.showInformationMessage(plan.clipboardWrite.toast);
-    } catch (err) {
-      console.warn(`[CustomSessionSetsView] left-click clipboard write failed for "${slug}"`, err);
-    }
-  }
-  // Set 093 S2 (routed ruling D1/D2/D3): dispatch a module-row action. The
-  // module is IMPLIED by the row, so the authoring flows run with an
-  // explicit `preselectedSlug` — NO module QuickPick and NO auto-select
-  // notice fires (amendment 1's QuickPick retirement). Dispatch is driven by
-  // the AUTHORITATIVE slug (`""` → repo-level for a pseudo row; a declared
-  // slug → that module; the picker fails loud on an unresolvable one);
-  // `moduleKind` is only an untrusted cross-check that drops a fallback
-  // message (a fallback row renders no strip, so it must never send one).
-  async handleModuleAction(action, moduleSlug, moduleKind) {
-    const narrowed = narrowModuleAction(action, moduleSlug, moduleKind);
-    if (!narrowed) {
-      console.warn(
-        `[CustomSessionSetsView] dropped malformed module action ${JSON.stringify({ action, moduleSlug, moduleKind })}`
-      );
-      return;
-    }
-    await dispatchModuleAction(narrowed, this.moduleActionExec());
-  }
-  /** Set 093 S2 (extended Set 100 S2): bind the module-action dispatch to
-   * the real flows. `renameModule` / `deleteModule` thread the narrowed
-   * slug as the writer's explicit target (no QuickPick); `addModule`
-   * ignores it (it targets a brand-new module, not the clicked row). */
-  moduleActionExec() {
-    return {
-      openPlan: (slug) => openModulePlan(void 0, { preselectedSlug: slug }),
-      addModule: () => runNewModuleFlow(),
-      renameModule: (slug) => runRenameModuleFlow(void 0, { preselectedSlug: slug }),
-      deleteModule: (slug) => runDeleteModuleFlow(void 0, { preselectedSlug: slug }),
-      assignLegacy: () => runAssignLegacySetsFlow(),
-      refresh: () => this.refresh()
-    };
-  }
-  // Set 093 S2 (routed ruling D3): the module-row context menu — an
-  // action-SELECTION QuickPick (which of the actions). The module is already
-  // carried, so no module-selection QuickPick and no auto-select notice fire
-  // (amendment 1 bans re-picking the MODULE, not the menu mechanism). Each
-  // pick dispatches through the same `handleModuleAction` seam.
-  async showModuleContextMenu(moduleSlug, moduleKind) {
-    const identity = narrowModuleIdentity(moduleSlug, moduleKind);
-    if (!identity)
-      return;
-    const { slug, kind } = identity;
-    const items = [
-      { label: "$(go-to-file) Open Plan", action: "open-plan" }
-    ];
-    if (kind === "declared") {
-      items.push(
-        { label: "$(add) Add Module\u2026", action: "add-module" },
-        { label: "$(edit) Rename Module\u2026", action: "rename-module" },
-        { label: "$(trash) Delete Module\u2026", action: "delete-module" }
-      );
-    }
-    if (kind === "pseudo") {
-      const root = vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      const classified = root ? classifyModulesManifest(root) : { kind: "absent" };
-      if (classified.kind === "present" && classified.entries.length > 0) {
-        items.push({
-          label: "$(arrow-right) Assign legacy sets to module\u2026",
-          action: "assign-legacy"
-        });
-      }
-    }
-    const picked = await vscode16.window.showQuickPick(items, {
-      placeHolder: "Module actions"
-    });
-    if (!picked)
-      return;
-    await this.handleModuleAction(picked.action, slug, kind);
-  }
-  dispatchCommand(commandId, args) {
-    if (!COMMAND_ALLOWLIST.has(commandId)) {
-      console.warn(`[CustomSessionSetsView] rejected command "${commandId}" \u2014 not in allowlist`);
-      return;
-    }
-    void vscode16.commands.executeCommand(commandId, ...args ?? []);
-  }
-  // Set 048 S3 (spec §3.3, audit Bias 3 flip): the Set 034 cursor-
-  // anchored HTML popup is retired. The right-click menu is rebuilt
-  // on `vscode.window.showQuickPick` as a two-step flow:
-  //
-  //   Level 1 → top-level items:
-  //     - "Open File ▸"   (if any openFile entries are applicable)
-  //     - "Copy Prompt ▸" (if any copyEval entries are applicable; was
-  //       "Copy Eval ▸" through Set 048; relabeled Set 049 S1)
-  //     - each flat action as its own item
-  //
-  //   Level 2 → submenu items for the chosen "▸" branch. Escape /
-  //   dismiss cancels the second-level pick and is treated as "no
-  //   selection" (the operator returns to whatever they were doing).
-  //
-  // Native QuickPick handles click-outside, Escape, and focus-loss
-  // (L4 close-on-blur is a free byproduct) and respects theme +
-  // accessibility settings.
-  async showContextMenu(slug, opts) {
-    const set = this.findSetBySlug(slug);
-    if (!set)
-      return;
-    const supports = await this.readSupports();
-    const categorized = categorizedActions(set, supports);
-    const totalActions = categorized.openFile.length + categorized.copyEval.length + categorized.flat.length;
-    if (totalActions === 0)
-      return;
-    const showQuickPick = opts?.showQuickPick ?? vscode16.window.showQuickPick;
-    const topLevelChoice = await this.pickTopLevel(categorized, set.name, showQuickPick);
-    if (!topLevelChoice)
-      return;
-    if (topLevelChoice.kind === "action") {
-      this.executeRowAction(topLevelChoice.action, set);
-      return;
-    }
-    const submenu = topLevelChoice.kind === "openFile" ? categorized.openFile : categorized.copyEval;
-    const placeHolder = topLevelChoice.kind === "openFile" ? `Open File \u2014 ${set.name}` : `Copy Prompt \u2014 ${set.name}`;
-    const submenuChoice = await this.pickSubmenu(submenu, placeHolder, showQuickPick);
-    if (!submenuChoice)
-      return;
-    this.executeRowAction(submenuChoice, set);
-  }
-  async pickTopLevel(categorized, slug, showQuickPick) {
-    const items = buildTopLevelItems(categorized);
-    const picked = await showQuickPick(items, { placeHolder: slug, matchOnDescription: false });
-    if (!picked)
-      return void 0;
-    if (picked.dabblerKind === "action" && picked.action) {
-      return { kind: "action", action: picked.action };
-    }
-    return { kind: picked.dabblerKind === "openFile" ? "openFile" : "copyEval" };
-  }
-  async pickSubmenu(submenu, placeHolder, showQuickPick) {
-    const items = buildSubmenuItems(submenu);
-    const picked = await showQuickPick(items, { placeHolder });
-    return picked?.action;
-  }
-  executeRowAction(action, set) {
-    void vscode16.commands.executeCommand(action.id, { set });
-  }
-  async readSupports() {
-    const cfg = vscode16.workspace.getConfiguration("dabblerSessionSets");
-    const uatPref = cfg.get("uatSupport.enabled", "auto");
-    const e2ePref = cfg.get("e2eSupport.enabled", "auto");
-    const all = this.cache ?? readAllSessionSets();
-    const anyUat = all.some((s) => s.config?.requiresUAT);
-    const anyE2e = all.some((s) => s.config?.requiresE2E);
-    return {
-      uat: uatPref === "always" || uatPref === "auto" && anyUat,
-      e2e: e2ePref === "always" || e2ePref === "auto" && anyE2e
-    };
-  }
-  findSetBySlug(slug) {
-    const all = this.cache ?? readAllSessionSets();
-    return all.find((s) => s.name === slug);
-  }
-  // ----- Suppression state -----
-  getSuppression() {
-    return this.context.workspaceState.get(SUPPRESSION_KEY, {});
-  }
-  async setSuppression(next) {
-    await this.context.workspaceState.update(SUPPRESSION_KEY, next);
-  }
-  handleToggle(slug, expanded, accordionUpdatedAt) {
-    const current = this.getSuppression();
-    if (expanded) {
-      const next = clearSuppression(current, slug);
-      if (next !== current) {
-        void this.setSuppression(next);
-        this.postSuppressionEcho();
-      }
-    } else if (accordionUpdatedAt) {
-      const next = suppress(current, slug, accordionUpdatedAt);
-      void this.setSuppression(next);
-      this.postSuppressionEcho();
+      }).catch((err) => {
+        console.warn("[SetupStatusView] Getting Started action failed", err);
+        this.refresh();
+      });
     }
   }
   // ----- Render scheduling + snapshot fire -----
@@ -27505,37 +25835,18 @@ var CustomSessionSetsView = class {
     if (!this.view)
       return;
     this.version++;
-    if (!this.cache) {
+    if (!this.cache)
       this.cache = readAllSessionSets();
-    }
     const all = this.cache;
-    const duplicate = all.find((set) => set.duplicateNameError)?.duplicateNameError;
-    if (duplicate && !this.collisionNotificationShown) {
-      this.collisionNotificationShown = true;
-      void vscode16.window.showWarningMessage(
-        `Duplicate session-set name "${duplicate.name}" exists in ${duplicate.conflictingDirs.length} locations. Showing ${duplicate.chosenDir}; rename one copy to restore unique actions.`
-      );
-    }
-    const visibleSlugs = new Set(all.map((s) => s.name));
-    const current = this.getSuppression();
-    const pruned = prune(current, visibleSlugs);
-    if (pruned !== current) {
-      void this.setSuppression(pruned);
-    }
-    const moduleSnapshot = this.buildModules(all);
     const payload = {
-      modules: moduleSnapshot.modules,
       hasAnySets: all.length > 0,
       gettingStarted: this.buildGettingStarted(all),
-      systemStatus: this.buildSystemStatus(
-        moduleSnapshot.manifestFaults,
-        all.length > 0
-      )
+      systemStatus: buildSystemStatus(all.length > 0)
     };
-    if (payload.gettingStarted?.mode !== "list" && !this.instructionsOpened) {
+    if (payload.gettingStarted.mode !== "list" && !this.instructionsOpened) {
       this.instructionsOpened = true;
       void Promise.resolve(this.openInstructions()).catch(
-        (err) => console.warn("[CustomSessionSetsView] instructions open failed", err)
+        (err) => console.warn("[SetupStatusView] instructions open failed", err)
       );
     }
     const msg = {
@@ -27556,197 +25867,47 @@ var CustomSessionSetsView = class {
       state: this.toProtocolScanState()
     };
     this.view.webview.postMessage(msg);
-    if (this.scanState.phase === "ready") {
+    if (this.scanState.phase === "ready")
       this.scheduleRender();
-    }
-  }
-  postSuppressionEcho() {
-    if (!this.view)
-      return;
-    this.version++;
-    const msg = {
-      type: "suppressionEcho",
-      version: this.version,
-      suppressed: this.getSuppression()
-    };
-    this.view.webview.postMessage(msg);
   }
   toProtocolScanState() {
     return this.scanState.phase === "loading" ? "loading" : "ready";
   }
-  // Set 060 Session 1 (spec D1/D3/D5): compute the dual-mode Getting
-  // Started payload. The mode is derived from (is a folder open?, does
-  // any root carry a session set?). Completion detection only runs in
-  // the one mode where the form renders — "getting-started" (a folder
-  // is open but it has no session sets) — so the no-folder and list
-  // surfaces pay nothing for the fs probe. The detection root is the
-  // first workspace folder (D5: "build into the open workspace
-  // folder"); the across-roots `hasAnySets` signal (which includes
-  // worktrees) still drives the list-mode flip.
+  // Set 060 Session 1 (spec D1/D3/D5): the dual-mode Getting Started
+  // payload. The mode derives from (is a folder open?, does any root carry a
+  // session set?). Completion detection runs only in "getting-started" mode,
+  // so the no-folder and list surfaces pay nothing for the fs probe.
   //
-  // S1 verifier Issue 1 (dispositioned — intentional design): the
-  // getting-started -> list flip is keyed on `hasAnySets` (a MATERIALIZED
-  // set, which `readAllSessionSets` only counts once `spec.md` is
-  // present), NOT on the looser D3-step-3 "a NNN- directory exists"
-  // probe. This is deliberate and consistent on three fronts: (1) D1
-  // defines "a session set" as the existing Explorer notion — a row the
-  // list can actually render, which requires spec.md; (2) the file
-  // watcher fires on `docs/session-sets/**/{spec.md,...}`, so the refresh
-  // that drives the flip happens exactly when a renderable set lands, not
-  // on a bare directory; (3) flipping to "list" on a bare NNN- directory
-  // would render an EMPTY list (no spec.md => no row), worse UX than
-  // keeping the form. The form's step-3 indicator still uses the D3
-  // dir-probe per the operator-locked spec; in the happy path (the
-  // decomposition writes the dir WITH spec.md) both signals flip
-  // together. Do not "consolidate" these onto the bare-dir probe.
+  // S1 verifier Issue 1 (dispositioned — intentional): the
+  // getting-started -> list flip keys on `hasAnySets` (a MATERIALIZED set,
+  // which `readAllSessionSets` only counts once `spec.md` is present), NOT on
+  // the looser "a NNN- directory exists" probe. Flipping on a bare directory
+  // would render an empty list. Do not consolidate these onto the bare-dir
+  // probe.
   buildGettingStarted(all) {
-    const folders = vscode16.workspace.workspaceFolders ?? [];
+    const folders = vscode11.workspace.workspaceFolders ?? [];
     return computeGettingStarted(
       folders.length > 0,
       folders[0]?.uri.fsPath,
       all.length > 0,
       nodeDetectionFs,
-      // Set 077 S2 (Feature 1, A1): the durable tier seed for the form —
-      // `.dabbler/tier` marker first, router-config inference second.
-      // Runs only in "getting-started" mode (computeGettingStarted gates
-      // the thunk), so list-mode snapshots pay nothing.
       (root) => resolveDurableTier(root)?.tier ?? null,
-      // Set 077 S3 (Feature 2): the durable verification-mode seed —
-      // the `.dabbler/verification-mode` marker (no inference rung).
       (root) => readVerificationModeMarker(root),
-      // Set 079 S2 (Feature 1): the durable seat-profile seed — the
-      // workspace router-config.yaml's transport.profile value (the
-      // durable source the scaffold's config write creates). Tolerant:
-      // missing/unparseable reads as null and the form's volatile
-      // default applies. Same getting-started-only gating.
       (root) => readTransportProfile(root)
     );
   }
-  buildSystemStatus(manifestFaults, hasAnySets) {
-    const root = vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      return {
-        workspaceOpen: false,
-        workspaceInitialized: true,
-        providerKeyPresent: true,
-        pythonPresent: true,
-        copilotCliPresent: true,
-        tier: "full",
-        transportProfile: "api",
-        copilotSeatChosenUnconfirmed: false,
-        copilotSeatRerunHint: "",
-        manifestFaults
-      };
-    }
-    const durableTransportProfile = readTransportProfile(root);
-    return {
-      workspaceOpen: true,
-      // Set 092 S2 (UAT Walk 4): a workspace that already has session
-      // sets is initialized by construction — the sets could not have
-      // been authored without a working setup — so `hasAnySets` alone
-      // clears the fault. The `structureBuilt` scaffold proxy is only
-      // consulted for the pre-first-set getting-started state, where it
-      // is the right signal; it under-reports an editable `pip install
-      // -e .` (this repo), which put no `ai_router` dir under
-      // site-packages, and that false negative must never surface a
-      // workspace-init fault on a working repo.
-      workspaceInitialized: hasAnySets || detectCompletion(root, nodeDetectionFs).structureBuilt,
-      providerKeyPresent: providerKeyPresent(process.env),
-      pythonPresent: probePythonPresence(root),
-      copilotCliPresent: probeCopilotCliPresence(root),
-      tier: resolveDurableTier(root)?.tier ?? "full",
-      transportProfile: durableTransportProfile ?? "api",
-      copilotSeatChosenUnconfirmed: deriveCopilotSeatChosenUnconfirmed(
-        readCopilotSeatStatusMarker(root),
-        durableTransportProfile
-      ),
-      copilotSeatRerunHint: rerunRefreshHint(),
-      manifestFaults
-    };
-  }
-  // Set 092 Session 1: compute the settled Q8 visible-module model for
-  // each discovered root, then merge those root-scoped results into the
-  // global Explorer list.
-  //
-  // Set 110 Session 2: the assembly itself moved to
-  // `moduleAssembly.assembleVisibleModules`, which the new native
-  // `TreeDataProvider` also calls — one implementation, so the two
-  // surfaces Session 2 ships side by side cannot disagree about which
-  // modules are visible. Everything below is unchanged behaviour: this
-  // method now supplies the host-shaped IO and maps the result onto the
-  // webview payload.
-  buildModules(all) {
-    const assembly = assembleVisibleModules(
-      all,
-      nodeModuleAssemblyIo(),
-      this.lastKnownGoodModules
-    );
-    return {
-      modules: buildVisibleModulePayloads(
-        assembly.modules,
-        (set) => this.buildRow(set)
-      ),
-      manifestFaults: assembly.manifestFaults
-    };
-  }
-  buildRow(set) {
-    const fraction = fractionFor(set);
-    return {
-      slug: set.name,
-      name: set.name,
-      state: set.state,
-      fraction,
-      fractionTooltip: fraction.endsWith("+") ? fractionTooltip(set) : verdictFractionTooltip(set),
-      description: descriptionFor(set),
-      contextValue: contextValueFor(set),
-      iconSlug: ICON_FILES[set.state] ?? "",
-      needsMigration: set.needsMigration,
-      // Set 050 S4: unobtrusive asterisk + tooltip replacing the old
-      // "(needs migration)" description label.
-      migrationMarker: migrationMarker(set),
-      migrationTooltip: migrationTooltip(set),
-      // Set 061 S1 (D2): quiet "lw" marker + tooltip on Lightweight rows.
-      tierMarker: tierMarker(set),
-      tierTooltip: tierTooltip(set),
-      // Set 061 S2 (D3): quiet blocked marker + tooltip naming each
-      // unsatisfied prerequisite; replaces the description badge.
-      blockedMarker: blockedMarker(set),
-      blockedTooltip: blockedTooltip(set),
-      // Set 062 S1 (D1): quiet verification-posture marker (`v?` /
-      // `v+`) + state-specific tooltip; click opens the row QuickPick.
-      verificationMarker: verificationMarker(set),
-      verificationTooltip: verificationTooltip(set),
-      duplicateNameBadge: set.duplicateNameError ? "!" : "",
-      duplicateNameTooltip: set.duplicateNameError ? `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.` : "",
-      // Set 100 S1: the kind-aware row badge — "plan" / "decomposition"
-      // on Set 098 lifecycle sets, "" on every ordinary work set.
-      kindBadge: kindBadge(set),
-      kindTooltip: kindTooltip(set),
-      accordionHtml: null,
-      accordionUpdatedAt: null
-    };
-  }
   // ----- Webview shell HTML -----
-  // The host-side webview HTML only sets up the document chrome +
-  // CSP + the empty <main> the client.js mounts into. Snapshot
-  // messages drive all subsequent rendering — keeps the protocol
-  // single-source-of-truth and avoids host/webview state divergence.
   renderShell() {
     if (!this.view)
       return "";
     const webview = this.view.webview;
-    const cssUri = webview.asWebviewUri(
-      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "tree.css")
+    const asset = (...parts) => webview.asWebviewUri(
+      vscode11.Uri.joinPath(this.context.extensionUri, ...parts)
     );
-    const jsUri = webview.asWebviewUri(
-      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "client.js")
-    );
-    const gsHtmlUri = webview.asWebviewUri(
-      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "gettingStartedHtml.js")
-    );
-    const statusHtmlUri = webview.asWebviewUri(
-      vscode16.Uri.joinPath(this.context.extensionUri, "media", "session-sets-tree", "systemStatusHtml.js")
-    );
+    const cssUri = asset("media", "session-sets-tree", "tree.css");
+    const jsUri = asset("media", "session-sets-tree", "client.js");
+    const gsHtmlUri = asset("media", "session-sets-tree", "gettingStartedHtml.js");
+    const statusHtmlUri = asset("media", "session-sets-tree", "systemStatusHtml.js");
     const nonce = crypto4.randomBytes(16).toString("hex");
     const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
     return `<!DOCTYPE html>
@@ -27755,7 +25916,7 @@ var CustomSessionSetsView = class {
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy" content="${csp}">
   <link rel="stylesheet" href="${cssUri}">
-  <title>Work Explorer</title>
+  <title>Setup &amp; Status</title>
 </head>
 <body>
   <main id="root" role="presentation"></main>
@@ -27768,11 +25929,11 @@ var CustomSessionSetsView = class {
 };
 
 // src/providers/scanState.ts
-var vscode17 = __toESM(require("vscode"));
+var vscode12 = __toESM(require("vscode"));
 var ScanState = class {
   constructor() {
     this._phase = "idle";
-    this._emitter = new vscode17.EventEmitter();
+    this._emitter = new vscode12.EventEmitter();
     /** Fires when the phase transitions. Listeners get the new phase. */
     this.onDidChange = this._emitter.event;
   }
@@ -27797,11 +25958,11 @@ var ScanState = class {
 };
 
 // src/commands/migrateSet.ts
-var vscode18 = __toESM(require("vscode"));
+var vscode13 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionState.ts
-var fs18 = __toESM(require("fs"));
-var path23 = __toESM(require("path"));
+var fs16 = __toESM(require("fs"));
+var path21 = __toESM(require("path"));
 var SESSION_STATE_FILENAME3 = "session-state.json";
 function isStrictPositiveInt2(v) {
   return typeof v === "number" && Number.isInteger(v) && v > 0 && !Number.isNaN(v);
@@ -27888,23 +26049,23 @@ function deriveLegacyTriple(sessions) {
   return { current, total: sessions.length, completed };
 }
 function atomicWriteJson2(filePath, data) {
-  const dir = path23.dirname(filePath);
-  const base = path23.basename(filePath);
-  const tmp = path23.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
-  const fd = fs18.openSync(tmp, "w");
+  const dir = path21.dirname(filePath);
+  const base = path21.basename(filePath);
+  const tmp = path21.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
+  const fd = fs16.openSync(tmp, "w");
   try {
-    fs18.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs18.fsyncSync(fd);
+    fs16.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs16.fsyncSync(fd);
   } finally {
-    fs18.closeSync(fd);
+    fs16.closeSync(fd);
   }
-  fs18.renameSync(tmp, filePath);
+  fs16.renameSync(tmp, filePath);
 }
 function migrateOneSet(setDir, options = {}) {
   const strategy = options.strategy ?? "regex";
   const dryRun = options.dryRun ?? false;
-  const statePath = path23.join(setDir, SESSION_STATE_FILENAME3);
-  if (!fs18.existsSync(statePath)) {
+  const statePath = path21.join(setDir, SESSION_STATE_FILENAME3);
+  if (!fs16.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -27913,7 +26074,7 @@ function migrateOneSet(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs18.readFileSync(statePath, "utf-8");
+    raw = fs16.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -27966,7 +26127,7 @@ function migrateOneSet(setDir, options = {}) {
       reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a v2 file. Hand-repair or restore from git."
     };
   }
-  const specMdPath = path23.join(setDir, "spec.md");
+  const specMdPath = path21.join(setDir, "spec.md");
   const specTitlesArr = extractSessionTitlesFromSpec(specMdPath);
   const specTitles = new Map(
     specTitlesArr.map((t2) => [t2.number, t2.title])
@@ -28041,23 +26202,23 @@ var STRATEGY_CHOICES = [
 ];
 function registerMigrateSetCommand(context, deps) {
   context.subscriptions.push(
-    vscode18.commands.registerCommand(
+    vscode13.commands.registerCommand(
       "dabblerSessionSets.migrate",
       async (treeItem) => {
         const set = treeItem?.set;
         if (!set) {
-          vscode18.window.showErrorMessage(
+          vscode13.window.showErrorMessage(
             "Migrate to v3 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
           );
           return;
         }
         if (!set.needsMigration) {
-          vscode18.window.showInformationMessage(
+          vscode13.window.showInformationMessage(
             `${set.name} is already on schema v3 \u2014 nothing to migrate.`
           );
           return;
         }
-        const choice = await vscode18.window.showQuickPick(STRATEGY_CHOICES, {
+        const choice = await vscode13.window.showQuickPick(STRATEGY_CHOICES, {
           title: `Migrate ${set.name} to v3 schema`,
           placeHolder: "Choose how session titles should be derived",
           ignoreFocusOut: true
@@ -28070,9 +26231,9 @@ function registerMigrateSetCommand(context, deps) {
   );
 }
 async function runMigrator(set, strategy, deps) {
-  await vscode18.window.withProgress(
+  await vscode13.window.withProgress(
     {
-      location: vscode18.ProgressLocation.Notification,
+      location: vscode13.ProgressLocation.Notification,
       title: `Migrating ${set.name} to v3 schema (${strategy})\u2026`,
       cancellable: false
     },
@@ -28082,7 +26243,7 @@ async function runMigrator(set, strategy, deps) {
         result = migrateOneSet(set.dir, { strategy });
       } catch (exc) {
         const msg = exc instanceof Error ? exc.message : String(exc);
-        vscode18.window.showErrorMessage(
+        vscode13.window.showErrorMessage(
           `Migration of ${set.name} failed with an unexpected error: ${msg}`
         );
         return;
@@ -28093,36 +26254,36 @@ async function runMigrator(set, strategy, deps) {
 }
 function handleMigrationResult(set, strategy, result, deps) {
   if (result.action === "migrated") {
-    vscode18.window.showInformationMessage(
+    vscode13.window.showInformationMessage(
       `${set.name} migrated to v3 schema (${strategy}). The tree will refresh shortly; the (needs migration) badge clears on the next read.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "skipped-v3") {
-    vscode18.window.showInformationMessage(
+    vscode13.window.showInformationMessage(
       `${set.name} is already v3 \u2014 no changes written.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "would-violate") {
-    vscode18.window.showWarningMessage(
+    vscode13.window.showWarningMessage(
       `Migration of ${set.name} stopped: the resulting v3 file would violate schema invariants. Reason: ${result.reason}. Try the other strategy (regex \u2194 generic) or hand-repair the state file before retrying.`
     );
     return;
   }
-  vscode18.window.showWarningMessage(
+  vscode13.window.showWarningMessage(
     `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
   );
 }
 
 // src/commands/migrateSetV4.ts
-var vscode19 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 
 // src/utils/migrateSessionStateV4.ts
-var fs19 = __toESM(require("fs"));
-var path24 = __toESM(require("path"));
+var fs17 = __toESM(require("fs"));
+var path22 = __toESM(require("path"));
 var SESSION_STATE_FILENAME4 = "session-state.json";
 var BACKUP_FILENAME = "session-state.v3.bak.json";
 var SWEEP_BACKUP_FILENAME = "session-state.pre-049-sweep.bak.json";
@@ -28236,38 +26397,38 @@ function buildV4OnDiskShape(normalized, original) {
   return out;
 }
 function atomicWriteJson3(filePath, data) {
-  const dir = path24.dirname(filePath);
-  const base = path24.basename(filePath);
-  const tmp = path24.join(
+  const dir = path22.dirname(filePath);
+  const base = path22.basename(filePath);
+  const tmp = path22.join(
     dir,
     `.${base}.tmp.${process.pid}.${Date.now()}`
   );
-  const fd = fs19.openSync(tmp, "w");
+  const fd = fs17.openSync(tmp, "w");
   try {
-    fs19.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs19.fsyncSync(fd);
+    fs17.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs17.fsyncSync(fd);
   } finally {
-    fs19.closeSync(fd);
+    fs17.closeSync(fd);
   }
   try {
-    fs19.renameSync(tmp, filePath);
+    fs17.renameSync(tmp, filePath);
   } catch (exc) {
     try {
-      fs19.unlinkSync(tmp);
+      fs17.unlinkSync(tmp);
     } catch {
     }
     throw exc;
   }
 }
 function atomicCopyJson(src, dst) {
-  const raw = JSON.parse(fs19.readFileSync(src, "utf-8"));
+  const raw = JSON.parse(fs17.readFileSync(src, "utf-8"));
   atomicWriteJson3(dst, raw);
 }
 function migrateOneSetV4(setDir, options = {}) {
   const dryRun = options.dryRun ?? false;
-  const statePath = path24.join(setDir, SESSION_STATE_FILENAME4);
-  const backupPath = path24.join(setDir, BACKUP_FILENAME);
-  if (!fs19.existsSync(statePath)) {
+  const statePath = path22.join(setDir, SESSION_STATE_FILENAME4);
+  const backupPath = path22.join(setDir, BACKUP_FILENAME);
+  if (!fs17.existsSync(statePath)) {
     return {
       setDir,
       action: "skipped-no-state",
@@ -28276,7 +26437,7 @@ function migrateOneSetV4(setDir, options = {}) {
   }
   let raw;
   try {
-    raw = fs19.readFileSync(statePath, "utf-8");
+    raw = fs17.readFileSync(statePath, "utf-8");
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {
@@ -28336,7 +26497,7 @@ function migrateOneSetV4(setDir, options = {}) {
         after: sweptState
       };
     }
-    const sweepBackupPath = path24.join(setDir, SWEEP_BACKUP_FILENAME);
+    const sweepBackupPath = path22.join(setDir, SWEEP_BACKUP_FILENAME);
     try {
       atomicCopyJson(statePath, sweepBackupPath);
     } catch (exc) {
@@ -28387,7 +26548,7 @@ function migrateOneSetV4(setDir, options = {}) {
       before: state
     };
   }
-  const specMdPath = path24.join(setDir, "spec.md");
+  const specMdPath = path22.join(setDir, "spec.md");
   let normalized;
   try {
     normalized = normalizeToV4Shape(stateObj, specMdPath);
@@ -28474,29 +26635,29 @@ function migrateOneSetV4(setDir, options = {}) {
 // src/commands/migrateSetV4.ts
 function registerMigrateSetV4Command(context, deps) {
   context.subscriptions.push(
-    vscode19.commands.registerCommand(
+    vscode14.commands.registerCommand(
       "dabblerSessionSets.migrateToV4",
       async (treeItem) => {
         const set = treeItem?.set;
         if (!set) {
-          vscode19.window.showErrorMessage(
+          vscode14.window.showErrorMessage(
             "Migrate to v4 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
           );
           return;
         }
         if (set.migrationTargetSchemaVersion !== 4) {
           if (set.migrationTargetSchemaVersion === 3) {
-            vscode19.window.showInformationMessage(
+            vscode14.window.showInformationMessage(
               `${set.name} is at v1/v2 (or broken v3) \u2014 run "Migrate to v3 schema" first, then re-run this command.`
             );
           } else {
-            vscode19.window.showInformationMessage(
+            vscode14.window.showInformationMessage(
               `${set.name} is already on schema v4 \u2014 nothing to migrate.`
             );
           }
           return;
         }
-        const confirm = await vscode19.window.showInformationMessage(
+        const confirm = await vscode14.window.showInformationMessage(
           `Migrate ${set.name} to v4 schema? This will rewrite session-state.json in v4 shape and write a backup at session-state.v3.bak.json alongside it for rollback.`,
           { modal: true },
           "Migrate"
@@ -28509,9 +26670,9 @@ function registerMigrateSetV4Command(context, deps) {
   );
 }
 async function runMigratorV4(set, deps) {
-  await vscode19.window.withProgress(
+  await vscode14.window.withProgress(
     {
-      location: vscode19.ProgressLocation.Notification,
+      location: vscode14.ProgressLocation.Notification,
       title: `Migrating ${set.name} to v4 schema\u2026`,
       cancellable: false
     },
@@ -28521,7 +26682,7 @@ async function runMigratorV4(set, deps) {
         result = migrateOneSetV4(set.dir, { dryRun: false });
       } catch (exc) {
         const msg = exc instanceof Error ? exc.message : String(exc);
-        vscode19.window.showErrorMessage(
+        vscode14.window.showErrorMessage(
           `Migration of ${set.name} to v4 failed with an unexpected error: ${msg}`
         );
         return;
@@ -28532,65 +26693,65 @@ async function runMigratorV4(set, deps) {
 }
 function handleMigrationResultV4(set, result, deps) {
   if (result.action === "migrated") {
-    vscode19.window.showInformationMessage(
+    vscode14.window.showInformationMessage(
       `${set.name} migrated to v4 schema. Backup at session-state.v3.bak.json. The tree will refresh shortly; the (needs migration) badge clears on the next read.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "skipped-v4") {
-    vscode19.window.showInformationMessage(
+    vscode14.window.showInformationMessage(
       `${set.name} is already v4 \u2014 no changes written.`
     );
     deps.refreshView();
     return;
   }
   if (result.action === "skipped-not-v3") {
-    vscode19.window.showWarningMessage(
+    vscode14.window.showWarningMessage(
       `Migration of ${set.name} to v4 was skipped: ${result.reason}`
     );
     return;
   }
   if (result.action === "would-violate") {
-    vscode19.window.showWarningMessage(
+    vscode14.window.showWarningMessage(
       `Migration of ${set.name} stopped: the resulting v4 file would violate schema invariants. Reason: ${result.reason}. Hand-repair the state file before retrying.`
     );
     return;
   }
   if (result.action === "failed-backup") {
     if (result.backupPath) {
-      vscode19.window.showErrorMessage(
+      vscode14.window.showErrorMessage(
         `Migration of ${set.name} failed AFTER backup was written at ${result.backupPath}. ${result.reason} See docs/v3-to-v4-rollback-procedure.md to restore.`
       );
     } else {
-      vscode19.window.showErrorMessage(
+      vscode14.window.showErrorMessage(
         `Migration of ${set.name} could not write its backup: ${result.reason}. The state file was not modified \u2014 fix the filesystem issue (permissions / disk space) and re-run. No rollback needed.`
       );
     }
     return;
   }
-  vscode19.window.showWarningMessage(
+  vscode14.window.showWarningMessage(
     `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
   );
 }
 
 // src/commands/openFile.ts
-var vscode20 = __toESM(require("vscode"));
-var fs20 = __toESM(require("fs"));
-var path25 = __toESM(require("path"));
+var vscode15 = __toESM(require("vscode"));
+var fs18 = __toESM(require("fs"));
+var path23 = __toESM(require("path"));
 function openIfExists(filePath, label) {
-  if (!filePath || !fs20.existsSync(filePath)) {
-    vscode20.window.showInformationMessage(
-      `${label} does not exist yet: ${filePath ? path25.basename(filePath) : "<unknown>"}`
+  if (!filePath || !fs18.existsSync(filePath)) {
+    vscode15.window.showInformationMessage(
+      `${label} does not exist yet: ${filePath ? path23.basename(filePath) : "<unknown>"}`
     );
     return;
   }
-  vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(filePath));
+  vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(filePath));
 }
 async function openPrerequisiteSpec(set) {
   const unsatisfied = set.unsatisfiedPrereqs ?? [];
   if (unsatisfied.length === 0) {
-    vscode20.window.showInformationMessage(
+    vscode15.window.showInformationMessage(
       `"${set.name}" has no unsatisfied prerequisites.`
     );
     return;
@@ -28599,7 +26760,7 @@ async function openPrerequisiteSpec(set) {
   const bySlug = new Map(allSets.map((s) => [s.name, s]));
   const openTarget = (p2) => {
     if (p2.targetState === "unknown") {
-      vscode20.window.showInformationMessage(
+      vscode15.window.showInformationMessage(
         `Prerequisite "${p2.slug}" does not match any session set \u2014 check the slug in ${set.name}/spec.md.`
       );
       return;
@@ -28610,7 +26771,7 @@ async function openPrerequisiteSpec(set) {
     openTarget(unsatisfied[0]);
     return;
   }
-  const picked = await vscode20.window.showQuickPick(
+  const picked = await vscode15.window.showQuickPick(
     unsatisfied.map((p2) => ({
       label: p2.slug,
       description: p2.targetState === "unknown" ? "unknown set \u2014 check the slug" : p2.targetState.replace("-", " "),
@@ -28622,10 +26783,10 @@ async function openPrerequisiteSpec(set) {
     openTarget(picked.prereq);
 }
 function findPlaywrightTests(set) {
-  const cfg = vscode20.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
   const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
-  const playwrightDir = path25.join(set.root, testDirRel);
-  if (!fs20.existsSync(playwrightDir))
+  const playwrightDir = path23.join(set.root, testDirRel);
+  if (!fs18.existsSync(playwrightDir))
     return [];
   const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
   const testRefs = set.uatSummary?.e2eRefs ?? [];
@@ -28635,12 +26796,12 @@ function findPlaywrightTests(set) {
       return;
     let entries;
     try {
-      entries = fs20.readdirSync(dir, { withFileTypes: true });
+      entries = fs18.readdirSync(dir, { withFileTypes: true });
     } catch {
       return;
     }
     for (const e of entries) {
-      const p2 = path25.join(dir, e.name);
+      const p2 = path23.join(dir, e.name);
       if (e.isDirectory()) {
         if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
           continue;
@@ -28656,7 +26817,7 @@ function findPlaywrightTests(set) {
       }
       if (testRefs.length > 0) {
         try {
-          const txt = fs20.readFileSync(p2, "utf8");
+          const txt = fs18.readFileSync(p2, "utf8");
           for (const ref of testRefs) {
             const short = String(ref).split(".").pop();
             if (short && txt.includes(short)) {
@@ -28674,15 +26835,15 @@ function findPlaywrightTests(set) {
 }
 function registerOpenFileCommands(context) {
   context.subscriptions.push(
-    vscode20.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerSessionSets.openSpec",
       (item) => openIfExists(item?.set?.specPath, "Spec")
     ),
-    vscode20.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerSessionSets.openActivityLog",
       (item) => openIfExists(item?.set?.activityPath, "Activity log")
     ),
-    vscode20.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerSessionSets.openChangeLog",
       (item) => openIfExists(item?.set?.changeLogPath, "Change log")
     ),
@@ -28690,59 +26851,59 @@ function registerOpenFileCommands(context) {
     // removed. The `ai-assignment.md` file on disk continues to exist
     // for any consumer that reads it directly; the menu / palette
     // entry to open it does not.
-    vscode20.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerSessionSets.openUatChecklist",
       (item) => openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
     ),
-    vscode20.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerSessionSets.openSessionState",
       (item) => openIfExists(item?.set?.statePath, "Session state")
     ),
     // Set 061 S2 (spec D3): blocked-marker companion. Tolerates a
     // bare Command Palette invocation (no row context) with an
     // informational no-op, matching the other openFile commands.
-    vscode20.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
+    vscode15.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
       if (!item?.set) {
-        vscode20.window.showInformationMessage(
+        vscode15.window.showInformationMessage(
           "Open Prerequisite Spec is available from a session-set row's context menu."
         );
         return;
       }
       void openPrerequisiteSpec(item.set);
     }),
-    vscode20.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
+    vscode15.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;
-      vscode20.commands.executeCommand("revealInExplorer", vscode20.Uri.file(item.set.dir));
+      vscode15.commands.executeCommand("revealInExplorer", vscode15.Uri.file(item.set.dir));
     }),
-    vscode20.commands.registerCommand(
+    vscode15.commands.registerCommand(
       "dabblerSessionSets.revealPlaywrightTests",
       async (item) => {
         if (!item?.set)
           return;
         const tests = findPlaywrightTests(item.set);
         if (tests.length === 0) {
-          const cfg = vscode20.workspace.getConfiguration("dabblerSessionSets");
+          const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
           const dir = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT);
-          vscode20.window.showInformationMessage(
+          vscode15.window.showInformationMessage(
             `No Playwright tests found for "${item.set.name}". Search root: ${dir}`
           );
           return;
         }
         if (tests.length === 1) {
-          vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(tests[0]));
+          vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(tests[0]));
           return;
         }
-        const picked = await vscode20.window.showQuickPick(
+        const picked = await vscode15.window.showQuickPick(
           tests.map((p2) => ({
-            label: path25.basename(p2),
-            description: path25.relative(item.set.root, p2),
+            label: path23.basename(p2),
+            description: path23.relative(item.set.root, p2),
             absolute: p2
           })),
           { placeHolder: `Playwright tests matching "${item.set.name}"` }
         );
         if (picked) {
-          vscode20.commands.executeCommand("vscode.open", vscode20.Uri.file(picked.absolute));
+          vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(picked.absolute));
         }
       }
     )
@@ -28750,10 +26911,10 @@ function registerOpenFileCommands(context) {
 }
 
 // src/commands/copyCommand.ts
-var vscode21 = __toESM(require("vscode"));
+var vscode16 = __toESM(require("vscode"));
 async function copy(text, label) {
-  await vscode21.env.clipboard.writeText(text);
-  vscode21.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
+  await vscode16.env.clipboard.writeText(text);
+  vscode16.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
 }
 var startCommandPresets = {
   default: (slug) => `Start the next session of \`${slug}\`.`,
@@ -28766,7 +26927,7 @@ var presetLabels = {
 function registerCopyCommands(context) {
   for (const [key, builder] of Object.entries(startCommandPresets)) {
     context.subscriptions.push(
-      vscode21.commands.registerCommand(
+      vscode16.commands.registerCommand(
         `dabblerSessionSets.copyStartCommand.${key}`,
         async (item) => {
           if (!item?.set)
@@ -28777,7 +26938,7 @@ function registerCopyCommands(context) {
     );
   }
   context.subscriptions.push(
-    vscode21.commands.registerCommand(
+    vscode16.commands.registerCommand(
       "dabblerSessionSets.copySlug",
       async (item) => {
         if (!item?.set)
@@ -28789,9 +26950,9 @@ function registerCopyCommands(context) {
 }
 
 // src/commands/copyPromptCommands.ts
-var fs21 = __toESM(require("fs"));
-var path26 = __toESM(require("path"));
-var vscode22 = __toESM(require("vscode"));
+var fs19 = __toESM(require("fs"));
+var path24 = __toESM(require("path"));
+var vscode17 = __toESM(require("vscode"));
 var REVIEW_CRITERIA_DIRNAME = "review-criteria";
 var REVIEW_CRITERIA_MAX_CHARS = 8e3;
 var defaultBuildContext = {
@@ -28799,21 +26960,21 @@ var defaultBuildContext = {
   fileExists: defaultFileExists
 };
 function defaultFileExists(filePath) {
-  return fs21.existsSync(filePath);
+  return fs19.existsSync(filePath);
 }
 function defaultReadReviewCriteria(root, kind) {
-  const candidate = path26.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
+  const candidate = path24.join(root, "docs", REVIEW_CRITERIA_DIRNAME, `${kind}.md`);
   try {
-    if (!fs21.existsSync(candidate))
+    if (!fs19.existsSync(candidate))
       return null;
-    const text = fs21.readFileSync(candidate, "utf8");
+    const text = fs19.readFileSync(candidate, "utf8");
     return text.length > 0 ? text : null;
   } catch {
     return null;
   }
 }
 function relFromRoot(root, abs) {
-  return path26.relative(root, abs).split(path26.sep).join("/");
+  return path24.relative(root, abs).split(path24.sep).join("/");
 }
 function reviewCriteriaTrailer(root, kind, ctx) {
   const content = ctx.readReviewCriteria(root, kind);
@@ -28841,7 +27002,7 @@ First read \`${CROSS_PROVIDER_VERIFICATION_REL_PATH}\` (repo root) \u2014 it car
 function verificationArtifactClose(set, kind) {
   const artifactRel = relFromRoot(
     set.root,
-    path26.join(set.dir, "external-verification.md")
+    path24.join(set.dir, "external-verification.md")
   );
   const scopeLine = kind === "spec" ? ` Because this is a pre-work SPECIFICATION review, put the line \`Scope: specification\` directly under your round header \u2014 a spec-only verdict must not read as work verification.` : "";
   return `Non-negotiable final step: YOU (the reviewing engine) must write your verdict as a new dated round section appended to \`${artifactRel}\` (UTF-8, append-only \u2014 never rewrite earlier rounds).${scopeLine} A verdict that exists only in this chat does not count.`;
@@ -28850,26 +27011,26 @@ function ensureCrossProviderVerificationDoc(extensionPath, root) {
   try {
     const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
     const ctx = structureOnlyContext(
-      path26.basename(root),
+      path24.basename(root),
       "lightweight",
       (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
     );
     const rendered = renderCrossProviderVerification(bundle, ctx);
-    const target = path26.join(
+    const target = path24.join(
       root,
       ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/")
     );
     let existing = null;
     try {
-      existing = fs21.readFileSync(target, "utf8");
+      existing = fs19.readFileSync(target, "utf8");
     } catch {
       existing = null;
     }
     if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
       return true;
     }
-    fs21.mkdirSync(path26.dirname(target), { recursive: true });
-    fs21.writeFileSync(target, rendered, { encoding: "utf8" });
+    fs19.mkdirSync(path24.dirname(target), { recursive: true });
+    fs19.writeFileSync(target, rendered, { encoding: "utf8" });
     return true;
   } catch {
     return false;
@@ -29054,16 +27215,16 @@ function buildStartNextParallelSessionPrompt(set) {
 }
 async function copyToClipboard(text, statusMessage) {
   try {
-    await vscode22.env.clipboard.writeText(text);
-    vscode22.window.setStatusBarMessage(statusMessage, 4e3);
+    await vscode17.env.clipboard.writeText(text);
+    vscode17.window.setStatusBarMessage(statusMessage, 4e3);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    vscode22.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
+    vscode17.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
   }
 }
 function registerCopyPromptCommands(context) {
   context.subscriptions.push(
-    vscode22.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabbler.copySpecReviewPrompt",
       async (item) => {
         if (!item?.set)
@@ -29076,7 +27237,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Spec-review prompt for ${item.set.name}`);
       }
     ),
-    vscode22.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabbler.copySessionAccomplishmentsPrompt",
       async (item) => {
         if (!item?.set)
@@ -29089,7 +27250,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Session-accomplishments prompt for ${item.set.name}`);
       }
     ),
-    vscode22.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabbler.copySetAccomplishmentsPrompt",
       async (item) => {
         if (!item?.set)
@@ -29102,7 +27263,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Set-accomplishments prompt for ${item.set.name}`);
       }
     ),
-    vscode22.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabbler.copyStartNextSessionPrompt",
       async (item) => {
         if (!item?.set)
@@ -29111,7 +27272,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, message);
       }
     ),
-    vscode22.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabbler.copyStartNextParallelSessionPrompt",
       async (item) => {
         if (!item?.set)
@@ -29120,7 +27281,7 @@ function registerCopyPromptCommands(context) {
         await copyToClipboard(prompt, `Copied: Start the next parallel session of ${item.set.name}`);
       }
     ),
-    vscode22.commands.registerCommand(
+    vscode17.commands.registerCommand(
       "dabbler.copyVerificationKickoffPrompt",
       async (item) => {
         if (!item?.set)
@@ -29133,14 +27294,14 @@ function registerCopyPromptCommands(context) {
 }
 
 // src/commands/trySampleProject.ts
-var fs22 = __toESM(require("fs"));
-var path28 = __toESM(require("path"));
-var vscode23 = __toESM(require("vscode"));
+var fs20 = __toESM(require("fs"));
+var path26 = __toESM(require("path"));
+var vscode18 = __toESM(require("vscode"));
 
 // src/utils/sampleProject.ts
-var path27 = __toESM(require("path"));
+var path25 = __toESM(require("path"));
 function resolveBundledSampleDir(extensionPath) {
-  return path27.join(extensionPath, "dist", "templates", "sample-project");
+  return path25.join(extensionPath, "dist", "templates", "sample-project");
 }
 function renderedBasename(name) {
   return name.startsWith("dot-") ? `.${name.slice(4)}` : name;
@@ -29149,7 +27310,7 @@ function renderedRelPath(relPath) {
   return relPath.split(/[\\/]/).filter((s) => s.length > 0).map(renderedBasename).join("/");
 }
 function loadSampleBundle(bundleDir, io) {
-  const metaRaw = io.readFile(path27.join(bundleDir, "bundle.json"));
+  const metaRaw = io.readFile(path25.join(bundleDir, "bundle.json"));
   const meta = JSON.parse(metaRaw);
   for (const key of [
     "bundleVersion",
@@ -29165,10 +27326,10 @@ function loadSampleBundle(bundleDir, io) {
       throw new Error(`sample bundle: bundle.json is missing "${key}"`);
     }
   }
-  const filesDir = path27.join(bundleDir, "files");
+  const filesDir = path25.join(bundleDir, "files");
   const files = {};
   for (const rel of io.listFilesRecursive(filesDir)) {
-    const content = io.readFile(path27.join(filesDir, rel)).replace(/\r\n/g, "\n");
+    const content = io.readFile(path25.join(filesDir, rel)).replace(/\r\n/g, "\n");
     files[renderedRelPath(rel)] = content;
   }
   if (Object.keys(files).length === 0) {
@@ -29206,7 +27367,7 @@ function sampleOwnedTopLevelEntries(bundle) {
   return [...owned].sort();
 }
 function classifyTargetFolder(targetDir, bundleVersion, io) {
-  const markerAbs = path27.join(targetDir, SAMPLE_MARKER_REL);
+  const markerAbs = path25.join(targetDir, SAMPLE_MARKER_REL);
   if (io.exists(markerAbs)) {
     let marker = null;
     try {
@@ -29248,7 +27409,7 @@ async function createSampleProject(deps) {
       startedAt
     };
     deps.fileOps.writeFile(
-      path27.join(deps.targetDir, SAMPLE_MARKER_REL),
+      path25.join(deps.targetDir, SAMPLE_MARKER_REL),
       `${JSON.stringify(marker, null, 2)}
 `
     );
@@ -29271,7 +27432,7 @@ async function createSampleProject(deps) {
     report(SAMPLE_PROGRESS.render);
     try {
       for (const [rel, content] of Object.entries(deps.bundle.files)) {
-        deps.fileOps.writeFile(path27.join(deps.targetDir, rel), content);
+        deps.fileOps.writeFile(path25.join(deps.targetDir, rel), content);
         written.push(rel);
       }
     } catch (err) {
@@ -29303,7 +27464,7 @@ async function createSampleProject(deps) {
     report(SAMPLE_PROGRESS.marker);
     try {
       deps.fileOps.writeFile(
-        path27.join(deps.targetDir, LOCAL_ONLY_REL),
+        path25.join(deps.targetDir, LOCAL_ONLY_REL),
         renderLocalOnlyMarker(nowIso())
       );
       await deps.git.commitAll(deps.targetDir, MARKER_COMMIT);
@@ -29322,14 +27483,14 @@ async function createSampleProject(deps) {
     }
     if (!Object.keys(deps.bundle.files).some((rel) => rel.startsWith(`${SEEDED_ROUTER_DIR}/`))) {
       try {
-        deps.fileOps.removeRecursive(path27.join(deps.targetDir, SEEDED_ROUTER_DIR));
+        deps.fileOps.removeRecursive(path25.join(deps.targetDir, SEEDED_ROUTER_DIR));
       } catch {
       }
     }
     done.add("install");
   }
   try {
-    deps.fileOps.removeRecursive(path27.join(deps.targetDir, SAMPLE_MARKER_REL));
+    deps.fileOps.removeRecursive(path25.join(deps.targetDir, SAMPLE_MARKER_REL));
   } catch {
   }
   return {
@@ -29392,12 +27553,12 @@ function renderManualInstallCommands(targetDir, bootstrapPython, venvPythonPath)
     `"${venvPythonPath}" -m pip install dabbler-ai-router`
   ];
 }
-function renderInstallFailureLog(folder, reason, commands38) {
+function renderInstallFailureLog(folder, reason, commands37) {
   return [
     describeInstallFailure(folder, reason),
     "",
     MANUAL_COMMANDS_HEADING,
-    ...commands38.map((c3) => `  ${c3}`),
+    ...commands37.map((c3) => `  ${c3}`),
     "",
     PROXY_HINT
   ].join("\n");
@@ -29433,7 +27594,7 @@ async function pickTargetFolder(bundle, io) {
       }
       if (answer2 === RESUME_START_OVER_ACTION) {
         for (const rel of sampleOwnedTopLevelEntries(bundle)) {
-          io.removeRecursive(path28.join(folder, rel));
+          io.removeRecursive(path26.join(folder, rel));
         }
         return { folder, resumeFrom: [] };
       }
@@ -29452,10 +27613,10 @@ async function pickTargetFolder(bundle, io) {
 function listFilesRecursiveSync(absDir) {
   const out = [];
   const walk2 = (dir, prefix) => {
-    for (const entry of fs22.readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of fs20.readdirSync(dir, { withFileTypes: true })) {
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory())
-        walk2(path28.join(dir, entry.name), rel);
+        walk2(path26.join(dir, entry.name), rel);
       else if (entry.isFile())
         out.push(rel);
     }
@@ -29474,7 +27635,7 @@ function makeSampleGitOps() {
       }
     },
     init: async (dir) => {
-      if (!fs22.existsSync(path28.join(dir, ".git"))) {
+      if (!fs20.existsSync(path26.join(dir, ".git"))) {
         await esm_default(dir).init();
       }
     },
@@ -29500,7 +27661,7 @@ async function showPendingSampleLanding(context, io) {
   if (!pending)
     return false;
   const matches = io.openFolders.some(
-    (f) => path28.resolve(f) === path28.resolve(pending.folder)
+    (f) => path26.resolve(f) === path26.resolve(pending.folder)
   );
   if (!matches)
     return false;
@@ -29514,23 +27675,23 @@ async function showPendingSampleLanding(context, io) {
 }
 function registerTrySampleProjectCommand(context) {
   context.subscriptions.push(
-    vscode23.commands.registerCommand("dabbler.trySampleProject", async () => {
+    vscode18.commands.registerCommand("dabbler.trySampleProject", async () => {
       await runTrySampleProject(context);
     })
   );
   void showPendingSampleLanding(context, {
-    openFolders: (vscode23.workspace.workspaceFolders ?? []).map(
+    openFolders: (vscode18.workspace.workspaceFolders ?? []).map(
       (f) => f.uri.fsPath
     ),
-    showInfo: (msg, ...actions) => Promise.resolve(vscode23.window.showInformationMessage(msg, ...actions)),
-    copyToClipboard: (text) => Promise.resolve(vscode23.env.clipboard.writeText(text)),
-    setStatus: (msg) => vscode23.window.setStatusBarMessage(msg, 5e3)
+    showInfo: (msg, ...actions) => Promise.resolve(vscode18.window.showInformationMessage(msg, ...actions)),
+    copyToClipboard: (text) => Promise.resolve(vscode18.env.clipboard.writeText(text)),
+    setStatus: (msg) => vscode18.window.setStatusBarMessage(msg, 5e3)
   });
 }
 var sampleChannel;
 function sampleOutputChannel() {
   if (!sampleChannel) {
-    sampleChannel = vscode23.window.createOutputChannel("Dabbler: Sample Project");
+    sampleChannel = vscode18.window.createOutputChannel("Dabbler: Sample Project");
   }
   return sampleChannel;
 }
@@ -29538,18 +27699,18 @@ async function runTrySampleProject(context) {
   let bundle;
   try {
     bundle = loadSampleBundle(resolveBundledSampleDir(context.extensionPath), {
-      readFile: (p2) => fs22.readFileSync(p2, "utf8"),
+      readFile: (p2) => fs20.readFileSync(p2, "utf8"),
       listFilesRecursive: listFilesRecursiveSync
     });
   } catch (err) {
-    vscode23.window.showErrorMessage(
+    vscode18.window.showErrorMessage(
       `The sample project could not be loaded from the installed extension: ${describeError(err)}`
     );
     return;
   }
   const picked = await pickTargetFolder(bundle, {
     showOpenDialog: async () => {
-      const chosen = await vscode23.window.showOpenDialog({
+      const chosen = await vscode18.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -29558,28 +27719,28 @@ async function runTrySampleProject(context) {
       });
       return chosen?.[0]?.fsPath;
     },
-    showWarning: (msg, ...actions) => Promise.resolve(vscode23.window.showWarningMessage(msg, ...actions)),
-    exists: (p2) => fs22.existsSync(p2),
-    readFile: (p2) => fs22.readFileSync(p2, "utf8"),
-    listDir: (p2) => fs22.readdirSync(p2),
+    showWarning: (msg, ...actions) => Promise.resolve(vscode18.window.showWarningMessage(msg, ...actions)),
+    exists: (p2) => fs20.existsSync(p2),
+    readFile: (p2) => fs20.readFileSync(p2, "utf8"),
+    listDir: (p2) => fs20.readdirSync(p2),
     removeRecursive: (p2) => {
-      if (fs22.existsSync(p2))
-        fs22.rmSync(p2, { recursive: true, force: true });
+      if (fs20.existsSync(p2))
+        fs20.rmSync(p2, { recursive: true, force: true });
     }
   });
   if (!picked)
     return;
   const { folder, resumeFrom } = picked;
   if (!probePythonPresence(folder)) {
-    vscode23.window.showErrorMessage(
+    vscode18.window.showErrorMessage(
       describeMissingPython("Try a sample project")
     );
     return;
   }
   const bootstrapPython = resolveScaffoldBootstrapPython(folder) ?? resolveExplicitPythonPath(folder);
-  const result = await vscode23.window.withProgress(
+  const result = await vscode18.window.withProgress(
     {
-      location: vscode23.ProgressLocation.Notification,
+      location: vscode18.ProgressLocation.Notification,
       title: "Creating your sample project...",
       cancellable: false
     },
@@ -29620,31 +27781,31 @@ async function runTrySampleProject(context) {
     folder,
     slug: bundle.meta.sampleSetSlug
   });
-  const alreadyOpen = (vscode23.workspace.workspaceFolders ?? []).some(
-    (f) => path28.resolve(f.uri.fsPath) === path28.resolve(folder)
+  const alreadyOpen = (vscode18.workspace.workspaceFolders ?? []).some(
+    (f) => path26.resolve(f.uri.fsPath) === path26.resolve(folder)
   );
   if (alreadyOpen) {
     await showPendingSampleLanding(context, {
       openFolders: [folder],
-      showInfo: (msg, ...actions) => Promise.resolve(vscode23.window.showInformationMessage(msg, ...actions)),
-      copyToClipboard: (text) => Promise.resolve(vscode23.env.clipboard.writeText(text)),
-      setStatus: (msg) => vscode23.window.setStatusBarMessage(msg, 5e3)
+      showInfo: (msg, ...actions) => Promise.resolve(vscode18.window.showInformationMessage(msg, ...actions)),
+      copyToClipboard: (text) => Promise.resolve(vscode18.env.clipboard.writeText(text)),
+      setStatus: (msg) => vscode18.window.setStatusBarMessage(msg, 5e3)
     });
     return;
   }
-  await vscode23.commands.executeCommand(
+  await vscode18.commands.executeCommand(
     "vscode.openFolder",
-    vscode23.Uri.file(folder)
+    vscode18.Uri.file(folder)
   );
 }
 async function reportSampleFailure(folder, bootstrapPython, result) {
   const reason = result.failureReason ?? "no further detail available";
   if (result.failedStep === "git") {
-    vscode23.window.showErrorMessage(GIT_MISSING_MESSAGE);
+    vscode18.window.showErrorMessage(GIT_MISSING_MESSAGE);
     return;
   }
   if (result.failedStep !== "install") {
-    vscode23.window.showErrorMessage(
+    vscode18.window.showErrorMessage(
       `The sample project could not be created in '${folder}': ${reason}`
     );
     return;
@@ -29657,11 +27818,11 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
       renderManualInstallCommands(
         folder,
         bootstrapPython,
-        venvPython(path28.join(folder, ".venv"))
+        venvPython(path26.join(folder, ".venv"))
       )
     )
   );
-  const answer = await vscode23.window.showWarningMessage(
+  const answer = await vscode18.window.showWarningMessage(
     describeInstallFailure(folder, reason),
     INSTALL_FAILED_SHOW_LOG_ACTION,
     INSTALL_FAILED_RETRY_ACTION
@@ -29669,18 +27830,18 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
   if (answer === INSTALL_FAILED_SHOW_LOG_ACTION) {
     channel.show(true);
   } else if (answer === INSTALL_FAILED_RETRY_ACTION) {
-    await vscode23.commands.executeCommand("dabbler.trySampleProject");
+    await vscode18.commands.executeCommand("dabbler.trySampleProject");
   }
 }
 
 // src/commands/gitWorkflow.ts
-var vscode26 = __toESM(require("vscode"));
+var vscode21 = __toESM(require("vscode"));
 var cp4 = __toESM(require("child_process"));
-var fs24 = __toESM(require("fs"));
-var path30 = __toESM(require("path"));
+var fs22 = __toESM(require("fs"));
+var path28 = __toESM(require("path"));
 
 // src/utils/gitHost.ts
-var vscode24 = __toESM(require("vscode"));
+var vscode19 = __toESM(require("vscode"));
 var GIT_SUFFIX = /\.git$/i;
 function stripGitSuffix(s) {
   return s.replace(GIT_SUFFIX, "");
@@ -29802,7 +27963,7 @@ function resolveGitHostFromUrl(url, setting) {
   return auto.kind === "azure-devops" ? auto : { kind: "unknown", host: auto.host, owner: "", repo: "" };
 }
 function gitHostSetting() {
-  const v = vscode24.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
+  const v = vscode19.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
   return v === "github" || v === "azure-devops" ? v : "auto";
 }
 function createPrWebUrl(info, branch, targetBranch) {
@@ -29837,12 +27998,12 @@ function adoPrWebUrl(info, prId) {
 }
 
 // src/utils/hostCli.ts
-var fs23 = __toESM(require("fs"));
-var path29 = __toESM(require("path"));
-var vscode25 = __toESM(require("vscode"));
+var fs21 = __toESM(require("fs"));
+var path27 = __toESM(require("path"));
+var vscode20 = __toESM(require("vscode"));
 var realExists3 = (p2) => {
   try {
-    return fs23.statSync(p2).isFile();
+    return fs21.statSync(p2).isFile();
   } catch {
     return false;
   }
@@ -29854,12 +28015,12 @@ function hostCliCommand(kind) {
     return { command: "az", settingKey: "azCliPath" };
   return null;
 }
-function findHostCliOnPath(cmd, env12 = process.env, fileExists2 = realExists3, platform = process.platform) {
-  const rawPath = env12.PATH ?? env12.Path ?? "";
+function findHostCliOnPath(cmd, env11 = process.env, fileExists2 = realExists3, platform = process.platform) {
+  const rawPath = env11.PATH ?? env11.Path ?? "";
   if (!rawPath)
     return null;
   const isWin = platform === "win32";
-  const p2 = isWin ? path29.win32 : path29.posix;
+  const p2 = isWin ? path27.win32 : path27.posix;
   const dirs = rawPath.split(isWin ? ";" : ":").filter((d) => d.trim() !== "");
   const names = isWin ? [`${cmd}.exe`, `${cmd}.cmd`, `${cmd}.bat`] : [cmd];
   for (const dir of dirs) {
@@ -29871,8 +28032,8 @@ function findHostCliOnPath(cmd, env12 = process.env, fileExists2 = realExists3, 
   }
   return null;
 }
-function probeHostCliCore(command, explicitSetting, workspaceRoot2, env12 = process.env, fileExists2 = realExists3, platform = process.platform) {
-  const p2 = platform === "win32" ? path29.win32 : path29.posix;
+function probeHostCliCore(command, explicitSetting, workspaceRoot2, env11 = process.env, fileExists2 = realExists3, platform = process.platform) {
+  const p2 = platform === "win32" ? path27.win32 : path27.posix;
   if (explicitSetting) {
     if (p2.isAbsolute(explicitSetting)) {
       return fileExists2(explicitSetting) ? { present: true, resolved: explicitSetting } : { present: false, resolved: null };
@@ -29881,14 +28042,14 @@ function probeHostCliCore(command, explicitSetting, workspaceRoot2, env12 = proc
       const abs = p2.resolve(workspaceRoot2, explicitSetting);
       return fileExists2(abs) ? { present: true, resolved: abs } : { present: false, resolved: null };
     }
-    const found2 = findHostCliOnPath(explicitSetting, env12, fileExists2, platform);
+    const found2 = findHostCliOnPath(explicitSetting, env11, fileExists2, platform);
     return found2 ? { present: true, resolved: found2 } : { present: false, resolved: null };
   }
-  const found = findHostCliOnPath(command, env12, fileExists2, platform);
+  const found = findHostCliOnPath(command, env11, fileExists2, platform);
   return found ? { present: true, resolved: found } : { present: false, resolved: null };
 }
 function explicitCliPathSetting(key) {
-  const inspected = vscode25.workspace.getConfiguration("dabblerSessionSets").inspect(key);
+  const inspected = vscode20.workspace.getConfiguration("dabblerSessionSets").inspect(key);
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
@@ -29947,27 +28108,27 @@ function defaultRunner() {
     );
   });
 }
-function defaultUi8() {
+function defaultUi3() {
   return {
     confirm: async (message, detail, button) => {
-      const picked = await vscode26.window.showWarningMessage(
+      const picked = await vscode21.window.showWarningMessage(
         message,
         { modal: true, detail },
         button
       );
       return picked === button;
     },
-    showInputBox: vscode26.window.showInputBox,
+    showInputBox: vscode21.window.showInputBox,
     showQuickPickLabels: (labels, placeHolder) => Promise.resolve(
-      vscode26.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
+      vscode21.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
     ),
-    showInfo: (m) => void vscode26.window.showInformationMessage(m),
-    showWarning: (m) => void vscode26.window.showWarningMessage(m),
-    showError: (m) => void vscode26.window.showErrorMessage(m),
+    showInfo: (m) => void vscode21.window.showInformationMessage(m),
+    showWarning: (m) => void vscode21.window.showWarningMessage(m),
+    showError: (m) => void vscode21.window.showErrorMessage(m),
     openExternal: async (url) => {
-      await vscode26.env.openExternal(vscode26.Uri.parse(url));
+      await vscode21.env.openExternal(vscode21.Uri.parse(url));
     },
-    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath
+    workspaceRoot: () => vscode21.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 var SESSION_BRANCH_PREFIX = "session-set/";
@@ -29980,7 +28141,7 @@ function cmdArgProblem(arg) {
 }
 function displayCommand(file, args) {
   const show = (s) => /[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s;
-  return [show(path30.basename(file)), ...args.map(show)].join(" ");
+  return [show(path28.basename(file)), ...args.map(show)].join(" ");
 }
 function toRunnableInvocation(file, args, platform = process.platform) {
   const display = displayCommand(file, args);
@@ -30107,7 +28268,7 @@ async function primaryRoot(run, cwd) {
   );
   if (!common)
     return null;
-  return path30.dirname(common);
+  return path28.dirname(common);
 }
 async function listLinkedWorktrees(run, cwd) {
   const r2 = await git(run, cwd, "worktree", "list", "--porcelain");
@@ -30267,7 +28428,7 @@ async function runFinalizeMergedSetFlow(deps) {
     return;
   }
   const toplevel = await gitLine(run, root, "rev-parse", "--show-toplevel");
-  if (!toplevel || path30.resolve(toplevel) !== path30.resolve(primary)) {
+  if (!toplevel || path28.resolve(toplevel) !== path28.resolve(primary)) {
     ui.showError(
       `Finalize runs from the main checkout (${primary}), not from inside a worktree \u2014 open the main checkout and re-run, so the worktree you are in can be removed.`
     );
@@ -30351,10 +28512,10 @@ async function runFinalizeMergedSetFlow(deps) {
     steps.push({
       display: `git worktree remove ${wtPath}`,
       exec: async () => {
-        const exists2 = (deps.fileExists ?? ((p2) => fs24.existsSync(p2)))(wtPath);
+        const exists2 = (deps.fileExists ?? ((p2) => fs22.existsSync(p2)))(wtPath);
         if (!exists2) {
-          const prune2 = await git(run, primary, "worktree", "prune");
-          return prune2.code === 0 ? "worktree already gone (pruned stale registration)" : "worktree already gone";
+          const prune = await git(run, primary, "worktree", "prune");
+          return prune.code === 0 ? "worktree already gone (pruned stale registration)" : "worktree already gone";
         }
         const r2 = await git(run, primary, "worktree", "remove", wtPath);
         if (r2.code !== 0) {
@@ -30434,17 +28595,17 @@ ${notes.join("\n")}`);
 }
 function registerGitWorkflowCommands(context) {
   context.subscriptions.push(
-    vscode26.commands.registerCommand("dabbler.openPrForSet", async () => {
-      await runOpenPrFlow({ ui: defaultUi8(), run: defaultRunner() });
+    vscode21.commands.registerCommand("dabbler.openPrForSet", async () => {
+      await runOpenPrFlow({ ui: defaultUi3(), run: defaultRunner() });
     }),
-    vscode26.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
-      await runFinalizeMergedSetFlow({ ui: defaultUi8(), run: defaultRunner() });
+    vscode21.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
+      await runFinalizeMergedSetFlow({ ui: defaultUi3(), run: defaultRunner() });
     })
   );
 }
 
 // src/commands/gitRelease.ts
-var vscode27 = __toESM(require("vscode"));
+var vscode22 = __toESM(require("vscode"));
 var HOTFIX_BRANCH_PREFIX = "hotfix/";
 var REF_VISIBLE_UNSAFE = /[ ~^:?*[\\]/;
 function refNameProblem(name, kind) {
@@ -30762,30 +28923,30 @@ ${(checkedOut.stderr || checkedOut.stdout).trim()}`);
   );
 }
 function registerGitReleaseCommands(context) {
-  const deps = () => ({ ui: defaultUi8(), run: defaultRunner() });
+  const deps = () => ({ ui: defaultUi3(), run: defaultRunner() });
   context.subscriptions.push(
-    vscode27.commands.registerCommand("dabbler.cutReleaseTag", async () => {
+    vscode22.commands.registerCommand("dabbler.cutReleaseTag", async () => {
       await runCutReleaseTagFlow(deps());
     }),
-    vscode27.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
+    vscode22.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
       await runStartHotfixFromTagFlow(deps());
     }),
-    vscode27.commands.registerCommand("dabbler.rollBackToTag", async () => {
+    vscode22.commands.registerCommand("dabbler.rollBackToTag", async () => {
       await runRollBackToTagFlow(deps());
     })
   );
 }
 
 // src/commands/troubleshoot.ts
-var vscode28 = __toESM(require("vscode"));
-var fs25 = __toESM(require("fs"));
-var path31 = __toESM(require("path"));
+var vscode23 = __toESM(require("vscode"));
+var fs23 = __toESM(require("fs"));
+var path29 = __toESM(require("path"));
 var cp5 = __toESM(require("child_process"));
 function workspaceRoot() {
-  return vscode28.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 function outputChannel() {
-  return vscode28.window.createOutputChannel("Dabbler Diagnostics");
+  return vscode23.window.createOutputChannel("Dabbler Diagnostics");
 }
 function checkActivation() {
   const ch = outputChannel();
@@ -30795,8 +28956,8 @@ function checkActivation() {
     ch.show();
     return;
   }
-  const dir = path31.join(root, SESSION_SETS_REL);
-  const exists2 = fs25.existsSync(dir);
+  const dir = path29.join(root, SESSION_SETS_REL);
+  const exists2 = fs23.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -30882,15 +29043,15 @@ function checkLayout() {
     return;
   }
   const dirs = [
-    path31.join("docs", "session-sets"),
-    path31.join("docs", "planning"),
+    path29.join("docs", "session-sets"),
+    path29.join("docs", "planning"),
     "ai_router"
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
   for (const d of dirs) {
-    const full = path31.join(root, d);
-    const exists2 = fs25.existsSync(full);
+    const full = path29.join(root, d);
+    const exists2 = fs23.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -30899,7 +29060,7 @@ function checkLayout() {
 }
 function registerTroubleshootCommand(context) {
   context.subscriptions.push(
-    vscode28.commands.registerCommand("dabbler.troubleshoot", async () => {
+    vscode23.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items = [
         {
           label: "$(warning) Extension not activating",
@@ -30932,7 +29093,7 @@ function registerTroubleshootCommand(context) {
           run: checkLayout
         }
       ];
-      const picked = await vscode28.window.showQuickPick(
+      const picked = await vscode23.window.showQuickPick(
         items.map((i2) => ({ label: i2.label, detail: i2.detail, _run: i2.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
@@ -30943,16 +29104,16 @@ function registerTroubleshootCommand(context) {
 }
 
 // src/commands/cancelLifecycleCommands.ts
-var vscode29 = __toESM(require("vscode"));
+var vscode24 = __toESM(require("vscode"));
 function registerCancelLifecycleCommands(context, deps) {
   context.subscriptions.push(
-    vscode29.commands.registerCommand(
+    vscode24.commands.registerCommand(
       "dabblerSessionSets.cancel",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode29.window.showInformationMessage(
+        const choice = await vscode24.window.showInformationMessage(
           `Cancel session set "${set.name}"?`,
           { modal: true, detail: "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later." },
           "Cancel Session Set",
@@ -30960,7 +29121,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Cancel Session Set")
           return;
-        const reason = await vscode29.window.showInputBox({
+        const reason = await vscode24.window.showInputBox({
           prompt: `Reason for cancelling "${set.name}" (optional)`,
           placeHolder: "e.g. scope rolled into another set",
           ignoreFocusOut: true
@@ -30968,24 +29129,24 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await cancelSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode29.window.showErrorMessage(
+          vscode24.window.showErrorMessage(
             `Failed to cancel "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode29.window.showInformationMessage(
+        vscode24.window.showInformationMessage(
           `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`
         );
       }
     ),
-    vscode29.commands.registerCommand(
+    vscode24.commands.registerCommand(
       "dabblerSessionSets.restore",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode29.window.showInformationMessage(
+        const choice = await vscode24.window.showInformationMessage(
           `Restore session set "${set.name}"?`,
           { modal: true, detail: "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status." },
           "Restore",
@@ -30993,7 +29154,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Restore")
           return;
-        const reason = await vscode29.window.showInputBox({
+        const reason = await vscode24.window.showInputBox({
           prompt: `Reason for restoring "${set.name}" (optional)`,
           placeHolder: "e.g. scope is back in plan",
           ignoreFocusOut: true
@@ -31001,13 +29162,13 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await restoreSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode29.window.showErrorMessage(
+          vscode24.window.showErrorMessage(
             `Failed to restore "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode29.window.showInformationMessage(
+        vscode24.window.showInformationMessage(
           `Restored "${set.name}". RESTORED.md kept as audit trail.`
         );
       }
@@ -31016,28 +29177,28 @@ function registerCancelLifecycleCommands(context, deps) {
 }
 
 // src/commands/copilotSeatSetupCommand.ts
-var fs26 = __toESM(require("fs"));
-var path32 = __toESM(require("path"));
-var vscode30 = __toESM(require("vscode"));
+var fs24 = __toESM(require("fs"));
+var path30 = __toESM(require("path"));
+var vscode25 = __toESM(require("vscode"));
 function registerCopilotSeatSetupCommand(context) {
   context.subscriptions.push(
-    vscode30.commands.registerCommand(
+    vscode25.commands.registerCommand(
       "dabblerSessionSets.setUpCopilotSeat",
       () => runSetUpCopilotSeat(context)
     )
   );
 }
 async function runSetUpCopilotSeat(context) {
-  const root = vscode30.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode30.window.showErrorMessage(
+    vscode25.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Set Up Copilot Seat."
     );
     return;
   }
-  const venvPath = path32.join(root, ".venv");
-  if (!fs26.existsSync(venvPath)) {
-    vscode30.window.showErrorMessage(
+  const venvPath = path30.join(root, ".venv");
+  if (!fs24.existsSync(venvPath)) {
+    vscode25.window.showErrorMessage(
       'No .venv found in this workspace \u2014 run "Build project structure" (Getting Started form) or "Dabbler: Install ai-router" first, then re-run this command.'
     );
     return;
@@ -31046,9 +29207,1307 @@ async function runSetUpCopilotSeat(context) {
   await runCopilotSeatSetupWithProgress(context, root, venvPath);
 }
 
+// src/commands/newModule.ts
+var vscode26 = __toESM(require("vscode"));
+var path31 = __toESM(require("path"));
+function defaultUi4() {
+  return {
+    showInputBox: vscode26.window.showInputBox,
+    showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode26.window.showErrorMessage(m),
+    openFile: (absPath) => vscode26.commands.executeCommand("vscode.open", vscode26.Uri.file(absPath)),
+    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+async function runNewModuleFlow(ui = defaultUi4()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
+  const slug = await ui.showInputBox({
+    title: "New module (1/2): slug",
+    prompt: "Machine identity for the module (kebab-case). Session sets declare module: <slug> and the Explorer groups them under it.",
+    placeHolder: "greeter",
+    ignoreFocusOut: true,
+    validateInput: (v) => validateNewModuleSlug(v, existingSlugs)
+  });
+  if (slug === void 0 || slug.trim() === "")
+    return false;
+  const title = await ui.showInputBox({
+    title: "New module (2/2): display title",
+    prompt: `Shown as the module's group header in the Session Set Explorer. Press Enter to use "${slug.trim()}".`,
+    placeHolder: slug.trim(),
+    ignoreFocusOut: true
+  });
+  if (title === void 0)
+    return false;
+  let result;
+  try {
+    result = scaffoldNewModule(root, slug, title);
+  } catch (err) {
+    ui.showErrorMessage(
+      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  const declared = {
+    slug: slug.trim(),
+    title: title.trim() || slug.trim(),
+    codeRoots: [],
+    planPath: result.planRel,
+    touches: []
+  };
+  let lifecycleNote;
+  try {
+    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
+    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
+  } catch (err) {
+    lifecycleNote = ` The module's lifecycle sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}) \u2014 the module is still declared; scaffold them later.`;
+  }
+  await ui.openFile(path31.join(root, ...result.planRel.split("/")));
+  ui.showInformationMessage(
+    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`) + lifecycleNote
+  );
+  return true;
+}
+function registerNewModuleCommand(context) {
+  context.subscriptions.push(
+    vscode26.commands.registerCommand("dabbler.newModule", async () => {
+      await runNewModuleFlow();
+    })
+  );
+}
+
+// src/commands/assignLegacySets.ts
+var vscode27 = __toESM(require("vscode"));
+function defaultUi5() {
+  return {
+    pickTargetModule: async (entries) => {
+      const picked = await vscode27.window.showQuickPick(
+        entries.map((e) => ({
+          label: e.title,
+          description: e.slug,
+          entry: e
+        })),
+        {
+          placeHolder: "Assign the selected sets to which module?",
+          ignoreFocusOut: true
+        }
+      );
+      return picked?.entry;
+    },
+    pickSets: async (candidates) => {
+      const picked = await vscode27.window.showQuickPick(
+        candidates.map((s) => ({ label: s.name, set: s })),
+        {
+          placeHolder: "Select the legacy (unassigned) sets to assign",
+          canPickMany: true,
+          ignoreFocusOut: true
+        }
+      );
+      return picked?.map((p2) => p2.set);
+    },
+    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
+    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    readSets: () => readAllSessionSets()
+  };
+}
+async function runAssignLegacySetsFlow(ui = defaultUi5()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return false;
+  }
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (entries.length === 0) {
+    ui.showInformationMessage(
+      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one, then assign sets to it.`
+    );
+    return false;
+  }
+  const candidates = ui.readSets().filter((s) => s.root === root && !s.config?.module);
+  if (candidates.length === 0) {
+    ui.showInformationMessage(
+      "No unassigned session sets to assign \u2014 every set already declares a module."
+    );
+    return false;
+  }
+  const target = await ui.pickTargetModule(entries);
+  if (!target)
+    return false;
+  const chosen = await ui.pickSets(candidates);
+  if (!chosen || chosen.length === 0)
+    return false;
+  const report = assignLegacySetsToModule(
+    root,
+    target.slug,
+    chosen.map((s) => ({ name: s.name, specAbs: s.specPath }))
+  );
+  if (report.refused) {
+    ui.showErrorMessage(
+      `No sets were assigned \u2014 ${report.refused.reason}. Every spec.md was left untouched.`
+    );
+    return false;
+  }
+  if (report.writeFailed) {
+    const wf = report.writeFailed;
+    const tail = wf.written.length ? `Already stamped before the failure: ${wf.written.join(", ")}.` : "No files were changed.";
+    ui.showErrorMessage(
+      `Assigning to "${target.title}" failed on ${wf.setName}: ${wf.reason}. ${tail}`
+    );
+    return wf.written.length > 0;
+  }
+  const parts = [];
+  if (report.stamped.length) {
+    parts.push(
+      `Stamped module: ${target.slug} into ${report.stamped.length} set(s) (${report.stamped.join(", ")})`
+    );
+  }
+  if (report.alreadyAssigned.length) {
+    parts.push(
+      `${report.alreadyAssigned.length} already assigned (${report.alreadyAssigned.join(", ")})`
+    );
+  }
+  ui.showInformationMessage(
+    parts.length ? `${parts.join("; ")}.` : `Nothing to change \u2014 the selected sets already declare module: ${target.slug}.`
+  );
+  return report.stamped.length > 0;
+}
+function registerAssignLegacySetsCommand(context) {
+  context.subscriptions.push(
+    vscode27.commands.registerCommand(
+      "dabbler.assignLegacySetsToModule",
+      async () => {
+        await runAssignLegacySetsFlow();
+      }
+    )
+  );
+}
+
+// src/commands/renameModule.ts
+var vscode28 = __toESM(require("vscode"));
+
+// src/providers/ActionRegistry.ts
+var inFlightLike = (s) => s.state === "in-progress" || s.state === "not-started";
+var cancellable = (s) => s.state === "in-progress" || s.state === "not-started" || s.state === "complete";
+var isCancelled2 = (s) => s.state === "cancelled";
+var hasCompletedSession = (s) => s.sessionsCompleted > 0;
+var isCompleteState = (s) => s.state === "complete";
+var needsMigrationToV3 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 3;
+var needsMigrationToV4 = (s) => s.needsMigration && s.migrationTargetSchemaVersion === 4;
+var hasUnsatisfiedPrereqs = (s) => inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
+var isNotStarted = (s) => s.state === "not-started";
+var kickoffEligible = (s) => s.config.tier === "lightweight" && s.config.verificationMode === "dedicated-sessions" && s.completedVerification === null && s.state !== "cancelled";
+var setupVerificationEligible = (s) => s.config.tier === "lightweight" && (isNotStarted(s) || isCompleteState(s) && s.config.verificationMode === "out-of-band-or-none");
+var showsOutOfBandMarker = (s) => s.verificationMarker === "v?";
+var ROW_ACTIONS = [
+  // Open File ▸ submenu. L2 locks the four entries to: Spec, Activity
+  // Log, Change Log, Session State. "Open AI Assignment" removed per
+  // L3. Open UAT Checklist / Reveal Playwright Tests / Reveal Folder
+  // remain registered as Command-Palette-only commands — they are not
+  // surfaced on the right-click menu under L2.
+  { id: "dabblerSessionSets.openSpec", label: "Spec", group: 101, category: "openFile", when: () => true },
+  { id: "dabblerSessionSets.openActivityLog", label: "Activity Log", group: 102, category: "openFile", when: () => true },
+  { id: "dabblerSessionSets.openChangeLog", label: "Change Log", group: 103, category: "openFile", when: () => true },
+  { id: "dabblerSessionSets.openSessionState", label: "Session State", group: 104, category: "openFile", when: () => true },
+  // Copy Prompt ▸ submenu — L2 labels match the spec §3.3 table (the
+  // submenu was renamed Set 049 S1 to better reflect its contents,
+  // which include action prompts like "Start Next Session" not just
+  // evaluation prompts).
+  { id: "dabbler.copySpecReviewPrompt", label: "Evaluate Specification", group: 301, category: "copyEval", when: () => true },
+  {
+    id: "dabbler.copySessionAccomplishmentsPrompt",
+    label: "Evaluate Most Recent Session",
+    group: 302,
+    category: "copyEval",
+    when: (s) => hasCompletedSession(s)
+  },
+  {
+    id: "dabbler.copySetAccomplishmentsPrompt",
+    label: "Evaluate Session Set",
+    group: 303,
+    category: "copyEval",
+    when: (s) => isCompleteState(s)
+  },
+  {
+    id: "dabbler.copyStartNextSessionPrompt",
+    label: "Start Next Session",
+    group: 304,
+    category: "copyEval",
+    when: (s) => inFlightLike(s)
+  },
+  // Set 049 S1 hygiene: surface the parallel-session command in the
+  // submenu. Gated identically to "Start Next Session" — the parallel
+  // pattern is only meaningful on non-terminal rows.
+  {
+    id: "dabbler.copyStartNextParallelSessionPrompt",
+    label: "Start New Parallel Session",
+    group: 305,
+    category: "copyEval",
+    when: (s) => inFlightLike(s)
+  },
+  // Set 062 S2 (spec D2): paste-ready agent handoff into the Set 057
+  // dedicated-verification flow (typed session, different engine).
+  {
+    id: "dabbler.copyVerificationKickoffPrompt",
+    label: "Verification Kickoff",
+    group: 306,
+    category: "copyEval",
+    when: kickoffEligible
+  },
+  // Flat actions — appear at the top level of the QuickPick. The
+  // spec §3.3 table lists v4 only because v4 is the canonical target;
+  // the v3 entry is kept here for legacy v1/v2 sets (mutually exclusive
+  // with v4 — at most one of the two ever appears per row).
+  //
+  // Set 049 S4 (rip-out): `dabbler.checkOutOrchestrator` ("Set
+  // Orchestrator…") retired alongside the check-out / check-in
+  // coordination layer. The writer-log opener stays as a diagnostic
+  // surface (the log itself is preserved provisionally per T5).
+  { id: "dabblerSessionSets.copySlug", label: "Copy Slug", group: 501, category: "flat", when: () => true },
+  { id: "dabbler.openOrchestratorWriterLog", label: "Open Orchestrator Writer Log", group: 502, category: "flat", when: () => true },
+  // Set 061 S2 (spec D3): companion to the blocked marker — jumps to
+  // the spec of whichever unsatisfied prerequisite is blocking this
+  // row (QuickPick when more than one). Reuses the openSpec plumbing
+  // in commands/openFile.ts.
+  { id: "dabblerSessionSets.openPrerequisiteSpec", label: "Open Prerequisite Spec", group: 503, category: "flat", when: hasUnsatisfiedPrereqs },
+  // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
+  // QuickPick; not-started rows only. See commands/switchTier.ts.
+  { id: "dabblerSessionSets.switchTier", label: "Switch Tier\u2026", group: 504, category: "flat", when: isNotStarted },
+  // Set 062 S2+S3 (spec D3): not-started Lightweight rows get the
+  // confirmed spec-seed rewrite; completed Mode-A rows get the
+  // blessed-writer transition (A->B only). See
+  // commands/setupVerification.ts.
+  {
+    id: "dabblerSessionSets.setupVerification",
+    label: "Set Up Dedicated Verification\u2026",
+    group: 505,
+    category: "flat",
+    when: setupVerificationEligible
+  },
+  // Set 062 S2 (spec step 4): reuse the existing out-of-band note
+  // command on exactly the rows that render `v?` — the sanctioned
+  // recording path; the detail names the marker-clearing consequence.
+  {
+    id: "dabbler.openExternalVerificationDoc",
+    label: "Open External Verification Note",
+    group: 506,
+    category: "flat",
+    detail: "Record the out-of-band verdict \u2014 creating external-verification.md clears the v? marker.",
+    when: showsOutOfBandMarker
+  },
+  { id: "dabblerSessionSets.migrate", label: "Migrate to v3 schema", group: 801, category: "flat", when: needsMigrationToV3 },
+  { id: "dabblerSessionSets.migrateToV4", label: "Migrate to v4 schema", group: 802, category: "flat", when: needsMigrationToV4 },
+  {
+    id: "dabblerSessionSets.cancel",
+    label: "Cancel Session Set",
+    group: 901,
+    category: "flat",
+    when: (s) => cancellable(s)
+  },
+  {
+    id: "dabblerSessionSets.restore",
+    label: "Restore Session Set",
+    group: 902,
+    category: "flat",
+    when: (s) => isCancelled2(s)
+  }
+];
+
+// src/providers/inProgressSetsService.ts
+function listInProgressSets(all) {
+  const sets = all ?? readAllSessionSets();
+  return sets.filter((s) => s.state === "in-progress").sort((a, b2) => {
+    const aStart = a.liveSession?.startedAt ?? "";
+    const bStart = b2.liveSession?.startedAt ?? "";
+    return aStart.localeCompare(bStart);
+  });
+}
+
+// src/providers/SessionSetsModel.ts
+function migrationTooltip(set) {
+  if (!set.needsMigration)
+    return "";
+  const v = set.schemaVersionOnDisk;
+  return typeof v === "number" ? `Ran under schema v${v}` : "Ran under an older schema";
+}
+function hasSubCurrentSets(allSets) {
+  return allSets.some((s) => s.needsMigration);
+}
+function tierMarker(set) {
+  const specTier = set.config?.tier ?? "full";
+  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
+    return TIER_MISMATCH_MARKER;
+  }
+  return tierMarkerFor(specTier);
+}
+function tierTooltip(set) {
+  const specTier = set.config?.tier ?? "full";
+  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
+    return tierMismatchTooltipFor(specTier, set.workspaceTierMarker);
+  }
+  return tierTooltipFor(specTier);
+}
+function verificationTooltip(set) {
+  return verificationMarkerTooltipFor(set.verificationMarker ?? "");
+}
+var ICON_FILES = {
+  complete: "done.svg",
+  "in-progress": "in-progress.svg",
+  "not-started": "not-started.svg",
+  cancelled: "cancelled.svg"
+};
+function verificationOwedText(set) {
+  if (set.state === "cancelled")
+    return "";
+  if (set.workflowState === "awaiting-verification")
+    return "verification owed";
+  if (set.workflowState === "awaiting-remediation")
+    return "remediation owed";
+  return "";
+}
+function touchedDate(set) {
+  if (!set.lastTouched)
+    return "";
+  return new Date(set.lastTouched).toLocaleDateString("en-CA");
+}
+function uatBadge(set) {
+  if (!set.config?.requiresUAT || !set.uatSummary)
+    return "";
+  if (set.uatSummary.pendingItems > 0)
+    return `[UAT ${set.uatSummary.pendingItems}]`;
+  if (set.uatSummary.totalItems > 0)
+    return "[UAT done]";
+  return "";
+}
+function forceClosedBadge(set) {
+  return set.liveSession?.forceClosed === true ? "[FORCED]" : "";
+}
+var BLOCKED_MARKER = "\u26D3\uFE0E";
+function targetStateLabel(state) {
+  switch (state) {
+    case "in-progress":
+      return "in progress";
+    case "not-started":
+      return "not started";
+    case "unknown":
+      return "unknown set \u2014 check the slug";
+    default:
+      return state;
+  }
+}
+function blockedMarker(set) {
+  if (set.unsatisfiedPrereqs.length === 0)
+    return "";
+  if (set.state === "complete" || set.state === "cancelled")
+    return "";
+  return BLOCKED_MARKER;
+}
+function blockedTooltip(set) {
+  if (blockedMarker(set) === "")
+    return "";
+  const parts = set.unsatisfiedPrereqs.map(
+    (p2) => `${p2.slug} (${targetStateLabel(p2.targetState)})`
+  );
+  return `Blocked by prerequisites: ${parts.join(", ")} \u2014 all must complete first.`;
+}
+function kindTooltip(set) {
+  if (set.kind === "plan") {
+    return "Module lifecycle set: creates or imports this module's project plan.";
+  }
+  if (set.kind === "decomposition") {
+    return "Module lifecycle set: decomposes the module's plan into session sets.";
+  }
+  return "";
+}
+function bucketSets(all) {
+  return {
+    inProgress: all.filter((s) => s.state === "in-progress"),
+    notStarted: all.filter((s) => s.state === "not-started"),
+    complete: all.filter((s) => s.state === "complete"),
+    cancelled: all.filter((s) => s.state === "cancelled")
+  };
+}
+function sortBucket(subset, groupKey) {
+  const out = subset.slice();
+  if (groupKey === "not-started") {
+    out.sort((a, b2) => a.name.localeCompare(b2.name));
+  } else {
+    out.sort((a, b2) => (b2.lastTouched || "").localeCompare(a.lastTouched || ""));
+  }
+  return out;
+}
+function orderedBuckets(subset) {
+  const buckets = bucketSets(subset);
+  const groups = [
+    {
+      key: "in-progress",
+      label: "In Progress",
+      sets: listInProgressSets(buckets.inProgress)
+    },
+    {
+      key: "not-started",
+      label: "Not Started",
+      sets: sortBucket(buckets.notStarted, "not-started")
+    },
+    {
+      key: "complete",
+      label: "Complete",
+      sets: sortBucket(buckets.complete, "complete")
+    }
+  ];
+  if (buckets.cancelled.length > 0) {
+    groups.push({
+      key: "cancelled",
+      label: "Cancelled",
+      sets: sortBucket(buckets.cancelled, "cancelled")
+    });
+  }
+  return groups;
+}
+function mergeVisibleModules(roots) {
+  const declared = /* @__PURE__ */ new Map();
+  const fallback = /* @__PURE__ */ new Map();
+  let pseudo = null;
+  let firstSeen = 0;
+  const warningRank = (warning) => {
+    if (!warning)
+      return 0;
+    if (warning.code === "manifest-invalid")
+      return 3;
+    if (warning.code === "manifest-missing")
+      return 2;
+    return 1;
+  };
+  for (const modules of roots) {
+    let declaredOrder = 0;
+    for (const module2 of modules) {
+      if (module2.kind === "declared") {
+        const slug = module2.slug;
+        const existing = declared.get(slug);
+        if (existing) {
+          existing.module = {
+            ...existing.module,
+            sets: [...existing.module.sets, ...module2.sets]
+          };
+          existing.order = Math.min(existing.order, declaredOrder);
+        } else {
+          declared.set(slug, {
+            module: { ...module2, sets: [...module2.sets] },
+            order: declaredOrder,
+            firstSeen: firstSeen++
+          });
+        }
+        declaredOrder++;
+        continue;
+      }
+      if (module2.kind === "fallback") {
+        const slug = module2.slug;
+        const existing = fallback.get(slug);
+        fallback.set(
+          slug,
+          existing ? { ...existing, sets: [...existing.sets, ...module2.sets] } : { ...module2, sets: [...module2.sets] }
+        );
+        continue;
+      }
+      if (!pseudo) {
+        pseudo = { ...module2, sets: [...module2.sets] };
+      } else {
+        const existingPseudo = pseudo;
+        pseudo = {
+          ...existingPseudo,
+          warning: warningRank(module2.warning) > warningRank(existingPseudo.warning) ? module2.warning : existingPseudo.warning,
+          sets: [...existingPseudo.sets, ...module2.sets]
+        };
+      }
+    }
+  }
+  const out = Array.from(declared.values()).sort((a, b2) => a.order - b2.order || a.firstSeen - b2.firstSeen).map((entry) => entry.module);
+  out.push(...Array.from(fallback.values()).sort((a, b2) => a.slug.localeCompare(b2.slug)));
+  const mergedPseudo = pseudo;
+  if (mergedPseudo) {
+    out.push({
+      ...mergedPseudo,
+      displayName: out.length === 0 ? PSEUDO_MODULE_SOLE_NAME : PSEUDO_MODULE_COEXIST_NAME
+    });
+  }
+  return out;
+}
+var PSEUDO_MODULE_SOLE_NAME = "Default";
+var PSEUDO_MODULE_COEXIST_NAME = "Unassigned";
+function chooseRenderableModuleSnapshot(classification, current, lastKnownGood) {
+  if (classification.kind === "invalid" && lastKnownGood) {
+    return { modules: lastKnownGood, retainedLastKnownGood: true };
+  }
+  return { modules: current, retainedLastKnownGood: false };
+}
+function computeVisibleModules(classification, allSets, opts) {
+  const declared = classification.kind === "present" ? classification.entries : [];
+  const declaredSlugs = new Set(declared.map((e) => e.slug));
+  const declaredSets = /* @__PURE__ */ new Map();
+  const fallbackSets = /* @__PURE__ */ new Map();
+  const unstamped = [];
+  for (const s of allSets) {
+    const raw = s.config?.module ?? null;
+    if (raw === null) {
+      unstamped.push(s);
+    } else if (declaredSlugs.has(raw)) {
+      const list = declaredSets.get(raw);
+      if (list)
+        list.push(s);
+      else
+        declaredSets.set(raw, [s]);
+    } else {
+      const list = fallbackSets.get(raw);
+      if (list)
+        list.push(s);
+      else
+        fallbackSets.set(raw, [s]);
+    }
+  }
+  const out = declared.map((entry) => ({
+    kind: "declared",
+    slug: entry.slug,
+    displayName: entry.title,
+    warning: null,
+    planPath: resolveModulePlanRelPath(entry).path,
+    sets: declaredSets.get(entry.slug) ?? []
+  }));
+  for (const rawSlug of Array.from(fallbackSets.keys()).sort()) {
+    out.push({
+      kind: "fallback",
+      slug: rawSlug,
+      displayName: rawSlug,
+      warning: { code: "undeclared-slug", rawSlug },
+      planPath: null,
+      sets: fallbackSets.get(rawSlug)
+    });
+  }
+  const otherGroupsVisible = out.length > 0;
+  const pseudoVisible = unstamped.length > 0 || opts.legacyRootPlanExists || !otherGroupsVisible;
+  if (pseudoVisible) {
+    let warning = null;
+    if (classification.kind === "invalid") {
+      warning = { code: "manifest-invalid" };
+    } else if (classification.kind === "absent" && allSets.length > 0) {
+      warning = { code: "manifest-missing" };
+    } else if (unstamped.length > 0 && otherGroupsVisible) {
+      warning = { code: "unstamped-sets" };
+    }
+    out.push({
+      kind: "pseudo",
+      slug: null,
+      displayName: otherGroupsVisible ? PSEUDO_MODULE_COEXIST_NAME : PSEUDO_MODULE_SOLE_NAME,
+      warning,
+      planPath: LEGACY_ROOT_PLAN_REL,
+      sets: unstamped
+    });
+  }
+  return out;
+}
+
+// src/providers/workExplorerTreeModel.ts
+function moduleKeyOf(module2) {
+  return `${module2.kind}:${module2.slug ?? ""}`;
+}
+function preselectFromTreeNode(arg) {
+  if (arg === null || typeof arg !== "object")
+    return void 0;
+  const node = arg;
+  if (node.kind !== "module" || !node.module)
+    return void 0;
+  return { preselectedSlug: node.module.slug ?? "" };
+}
+function moduleNodes(modules) {
+  const declaredModulesExist = modules.some((m) => m.kind === "declared");
+  return modules.map((module2) => ({ kind: "module", module: module2, declaredModulesExist }));
+}
+function bucketNodes(node) {
+  return orderedBuckets([...node.module.sets]).map((bucket) => ({
+    kind: "bucket",
+    moduleKey: moduleKeyOf(node.module),
+    bucketKey: bucket.key,
+    label: bucket.label,
+    sets: bucket.sets
+  }));
+}
+function setNodes(node) {
+  return node.sets.map((set) => ({ kind: "set", set }));
+}
+function sessionNodes(node) {
+  return [...node.set.sessions ?? []].sort((a, b2) => a.number - b2.number).map((session) => ({ kind: "session", set: node.set, session }));
+}
+function childrenOf(node) {
+  switch (node.kind) {
+    case "module":
+      return bucketNodes(node);
+    case "bucket":
+      return setNodes(node);
+    case "set":
+      return sessionNodes(node);
+    case "session":
+      return [];
+  }
+}
+var TOKEN_SEP = ";";
+function tokenString(tokens) {
+  return TOKEN_SEP + tokens.join(TOKEN_SEP) + TOKEN_SEP;
+}
+var NODE_TOKEN = {
+  module: "dabblerModule",
+  bucket: "dabblerBucket",
+  set: "dabblerSet",
+  session: "dabblerSession"
+};
+var MODULE_TOKEN = {
+  declared: "module-declared",
+  fallback: "module-fallback",
+  pseudo: "module-pseudo",
+  canOpenPlan: "can-open-plan",
+  canManage: "can-manage-module",
+  canAssignLegacy: "can-assign-legacy"
+};
+function actionToken(action) {
+  return `act-${action.id.replace(/^dabbler(SessionSets)?\./, "").replace(/\./g, "-")}`;
+}
+function verdictIsUnclean(verdict) {
+  if (typeof verdict !== "string" || verdict.trim() === "")
+    return false;
+  if (!isRecognizedVerdictToken(verdict))
+    return true;
+  const normalized = verdict.trim().toUpperCase();
+  return normalized.startsWith("ISSUES_FOUND") || normalized.startsWith("WAIVED");
+}
+function severityOf(set) {
+  if (blockedMarker(set) !== "")
+    return "blocked";
+  if (set.needsMigration)
+    return "migration";
+  if (verdictIsUnclean(set.liveSession?.verificationVerdict))
+    return "verification";
+  if (set.duplicateNameError)
+    return "duplicate-name";
+  if (tierMarkerIsMismatch(set))
+    return "tier-mismatch";
+  return null;
+}
+function tierMarkerIsMismatch(set) {
+  return tierMarker(set) === TIER_MISMATCH_MARKER;
+}
+var SEVERITY_ICON = {
+  blocked: { kind: "theme", id: "error", color: "problemsErrorIcon.foreground" },
+  migration: { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
+  verification: { kind: "theme", id: "unverified", color: "problemsWarningIcon.foreground" },
+  "duplicate-name": { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
+  "tier-mismatch": { kind: "theme", id: "info", color: "problemsInfoIcon.foreground" }
+};
+function setIcon(set) {
+  const severity = severityOf(set);
+  if (severity)
+    return SEVERITY_ICON[severity];
+  return { kind: "file", slug: ICON_FILES[set.state] };
+}
+function sessionIcon(status) {
+  return { kind: "file", slug: ICON_FILES[status] };
+}
+var MODULE_WARNING_TEXT = {
+  "manifest-missing": "No `docs/modules.yaml` in this root \u2014 these sets are ungrouped.",
+  "manifest-invalid": "`docs/modules.yaml` is invalid; showing the last good module tree. Fix the file by hand.",
+  "unstamped-sets": "Some sets carry no `module:` attribution.",
+  "undeclared-slug": "This module is stamped on sets but is not declared in `docs/modules.yaml`."
+};
+function moduleDescriptor(node) {
+  const { module: module2 } = node;
+  const setCount = module2.sets.length;
+  const warning = module2.warning;
+  const tokens = [NODE_TOKEN.module];
+  if (module2.kind === "declared") {
+    tokens.push(MODULE_TOKEN.declared, MODULE_TOKEN.canOpenPlan, MODULE_TOKEN.canManage);
+  } else if (module2.kind === "pseudo") {
+    tokens.push(MODULE_TOKEN.pseudo, MODULE_TOKEN.canOpenPlan);
+    if (node.declaredModulesExist)
+      tokens.push(MODULE_TOKEN.canAssignLegacy);
+  } else {
+    tokens.push(MODULE_TOKEN.fallback);
+  }
+  const tooltipLines = [`**${module2.displayName}**`, "", `${setCount} session set${setCount === 1 ? "" : "s"}`];
+  if (warning) {
+    tooltipLines.push("", `$(warning) ${MODULE_WARNING_TEXT[warning.code] ?? warning.code}`);
+  }
+  return {
+    id: `module:${moduleKeyOf(module2)}`,
+    label: module2.displayName,
+    description: `${setCount} set${setCount === 1 ? "" : "s"}`,
+    tooltip: tooltipLines.join("\n"),
+    icon: warning ? { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" } : { kind: "theme", id: "folder" },
+    contextValue: tokenString(tokens),
+    collapsible: "collapsed"
+  };
+}
+function bucketDescriptor(node) {
+  const count = node.sets.length;
+  return {
+    // Scoped by module: "In Progress" exists under every module row.
+    id: `bucket:${node.moduleKey}/${node.bucketKey}`,
+    label: node.label,
+    // Session 1 recorded this as PROPOSED, not operator-confirmed:
+    // bucket labels are short, so `description` survives truncation
+    // where a set row's does not. Session 4's walk confirms or drops it.
+    description: `${count} set${count === 1 ? "" : "s"}`,
+    contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucketKey}`]),
+    // The three default buckets render even when EMPTY — a declared
+    // module with no work yet still shows where that work will land
+    // (never hide work). But an empty one is a LEAF: offering a twisty
+    // that opens onto nothing is the same dead affordance a
+    // session-less set row would be, and the count in `description`
+    // already says why it will not expand.
+    collapsible: count > 0 ? "collapsed" : "none"
+  };
+}
+function setTooltip(set) {
+  const lines = [`**${set.name}**`];
+  const progress = set.totalSessions && set.totalSessions > 0 ? `${set.sessionsCompleted}/${set.totalSessions}${set.plusFraction ? "+" : ""}` : `${set.sessionsCompleted}/?`;
+  const state = set.state.replace("-", " ");
+  lines.push("", `${state} \xB7 ${progress} sessions complete`);
+  const markers = [];
+  const blocked = blockedTooltip(set);
+  if (blocked)
+    markers.push(blocked);
+  if (set.needsMigration)
+    markers.push(migrationTooltip(set));
+  const tier = tierTooltip(set);
+  if (tier)
+    markers.push(tier);
+  const verification = verificationTooltip(set);
+  if (verification)
+    markers.push(verification);
+  const verdict = set.liveSession?.verificationVerdict;
+  if (typeof verdict === "string" && verdict.trim() !== "") {
+    markers.push(
+      isRecognizedVerdictToken(verdict) ? `Verification: ${verdict}` : `Verification: "${verdict}" is not a recognized verdict`
+    );
+  }
+  if (set.duplicateNameError) {
+    markers.push(
+      `Duplicate session-set name in ${set.duplicateNameError.conflictingDirs.length} locations. Showing ${set.duplicateNameError.chosenDir}; rename one copy.`
+    );
+  }
+  const kind = kindTooltip(set);
+  if (kind)
+    markers.push(kind);
+  const owed = verificationOwedText(set);
+  if (owed)
+    markers.push(owed);
+  const uat = uatBadge(set);
+  if (uat)
+    markers.push(`UAT: ${uat.replace(/^\[|\]$/g, "")}`);
+  const forced = forceClosedBadge(set);
+  if (forced)
+    markers.push("Closed via the --force bypass, not the deterministic gate.");
+  if (markers.length > 0) {
+    lines.push("", ...markers.map((m) => `- ${m}`));
+  }
+  const touched = touchedDate(set);
+  if (touched)
+    lines.push("", `_last touched ${touched}_`);
+  return lines.join("\n");
+}
+function setDescriptor(set, supports) {
+  const tokens = [NODE_TOKEN.set, `state-${set.state}`];
+  const severity = severityOf(set);
+  if (severity)
+    tokens.push(`severity-${severity}`);
+  for (const action of ROW_ACTIONS) {
+    if (action.when(set, supports))
+      tokens.push(actionToken(action));
+  }
+  const sessionCount = (set.sessions ?? []).length;
+  return {
+    // Set names are globally unique by repo invariant (Set 087), which
+    // is exactly why they are also the identity every row action keys on.
+    id: `set:${set.name}`,
+    label: set.name,
+    tooltip: setTooltip(set),
+    icon: setIcon(set),
+    contextValue: tokenString(tokens),
+    // Operator-notes wrinkle 5: a set node MUST report Collapsed, never
+    // Expanded, or the fourth level is paid on every refresh — the exact
+    // cost the migration exists to remove. A set with no readable ledger
+    // is a leaf, so expanding never opens onto nothing.
+    collapsible: sessionCount > 0 ? "collapsed" : "none"
+  };
+}
+function sessionDescriptor(node) {
+  const { session } = node;
+  return {
+    id: `session:${node.set.name}/${session.number}`,
+    label: session.title || `Session ${session.number}`,
+    // Short labels, so `description` survives truncation here. Only the
+    // in-flight session says anything — quiet is the default state.
+    description: session.status === "in-progress" ? "in flight" : void 0,
+    tooltip: `**${session.title || `Session ${session.number}`}** \u2014 ${session.status.replace("-", " ")}`,
+    icon: sessionIcon(session.status),
+    contextValue: tokenString([NODE_TOKEN.session, `session-${session.status}`]),
+    collapsible: "none"
+  };
+}
+function descriptorFor(node, supports) {
+  switch (node.kind) {
+    case "module":
+      return moduleDescriptor(node);
+    case "bucket":
+      return bucketDescriptor(node);
+    case "set":
+      return setDescriptor(node.set, supports);
+    case "session":
+      return sessionDescriptor(node);
+  }
+}
+
+// src/commands/renameModule.ts
+function defaultUi6() {
+  return {
+    pickModule: async (entries) => {
+      const picked = await vscode28.window.showQuickPick(
+        entries.map((e) => ({
+          label: e.title,
+          description: e.slug,
+          entry: e
+        })),
+        { placeHolder: "Which module do you want to rename?", ignoreFocusOut: true }
+      );
+      return picked?.entry;
+    },
+    promptNewSlug: (currentSlug, validate) => vscode28.window.showInputBox({
+      prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
+      value: currentSlug,
+      ignoreFocusOut: true,
+      validateInput: (v) => validate(v) ?? null
+    }),
+    promptNewTitle: (currentTitle) => vscode28.window.showInputBox({
+      prompt: "New module title (display name) \u2014 leave unchanged to keep it",
+      value: currentTitle,
+      ignoreFocusOut: true
+    }),
+    confirm: async (summary, detail) => {
+      const choice = await vscode28.window.showWarningMessage(
+        summary,
+        { modal: true, detail },
+        "Rename Module"
+      );
+      return choice === "Rename Module";
+    },
+    showInformationMessage: (m) => vscode28.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode28.window.showErrorMessage(m),
+    workspaceRoot: () => vscode28.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    readSets: () => readAllSessionSets()
+  };
+}
+async function runRenameModuleFlow(ui = defaultUi6(), opts) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return false;
+  }
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (entries.length === 0) {
+    ui.showInformationMessage(
+      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one.`
+    );
+    return false;
+  }
+  let target;
+  if (opts && opts.preselectedSlug !== void 0) {
+    target = entries.find((e) => e.slug === opts.preselectedSlug);
+    if (!target) {
+      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
+      return false;
+    }
+  } else {
+    target = await ui.pickModule(entries);
+    if (!target)
+      return false;
+  }
+  const otherSlugs = entries.map((e) => e.slug).filter((s) => s !== target.slug);
+  const rawSlug = await ui.promptNewSlug(target.slug, (value) => {
+    const v = (value ?? "").trim();
+    if (v === target.slug)
+      return void 0;
+    return validateNewModuleSlug(v, otherSlugs) ?? void 0;
+  });
+  if (rawSlug === void 0)
+    return false;
+  const rawTitle = await ui.promptNewTitle(target.title);
+  if (rawTitle === void 0)
+    return false;
+  const newSlug = rawSlug.trim();
+  const newTitle = rawTitle.trim();
+  const slugChanging = newSlug !== "" && newSlug !== target.slug;
+  const titleChanging = newTitle !== "" && newTitle !== target.title;
+  if (!slugChanging && !titleChanging) {
+    ui.showInformationMessage(
+      `Nothing to change \u2014 the slug and title are unchanged for "${target.slug}".`
+    );
+    return false;
+  }
+  const affected = slugChanging ? ui.readSets().filter((s) => s.root === root && s.config?.module === target.slug).map((s) => s.name).sort() : [];
+  const changeLines = [];
+  if (slugChanging)
+    changeLines.push(`slug: ${target.slug} \u2192 ${newSlug}`);
+  if (titleChanging)
+    changeLines.push(`title: "${target.title}" \u2192 "${newTitle}"`);
+  const restampNote = slugChanging ? affected.length > 0 ? `Restamps module: in ${affected.length} set(s): ${affected.join(", ")}.` : `No session sets are stamped module: ${target.slug} \u2014 only the manifest changes.` : "Title-only change \u2014 no session sets are touched.";
+  const confirmed = await ui.confirm(
+    `Rename module "${target.slug}"?`,
+    `${changeLines.join("\n")}
+
+${restampNote}
+
+Every file is rewritten transactionally; any failure rolls the whole change back.`
+  );
+  if (!confirmed)
+    return false;
+  const report = renameModule(root, target.slug, {
+    newSlug: slugChanging ? newSlug : void 0,
+    newTitle: titleChanging ? newTitle : void 0
+  });
+  if (report.refused) {
+    ui.showErrorMessage(
+      `Rename refused \u2014 ${report.refused.reason} Every file was left untouched.`
+    );
+    return false;
+  }
+  if (report.writeFailed) {
+    const wf = report.writeFailed;
+    ui.showErrorMessage(
+      wf.rolledBack ? `Rename failed: ${wf.reason}. All changes were rolled back \u2014 the workspace is unchanged.` : `Rename failed: ${wf.reason}. Rollback ALSO failed \u2014 reconcile docs/modules.yaml and the affected spec.md files from git.`
+    );
+    return false;
+  }
+  const parts = [];
+  if (report.slugChanged)
+    parts.push(`slug \u2192 ${report.newSlug}`);
+  if (report.titleChanged)
+    parts.push(`title \u2192 "${report.newTitle}"`);
+  const restampSummary = report.restamped.length ? ` Restamped ${report.restamped.length} set(s): ${report.restamped.join(", ")}.` : "";
+  ui.showInformationMessage(
+    `Renamed module (${parts.join(", ")}).${restampSummary}`
+  );
+  return true;
+}
+function registerRenameModuleCommand(context) {
+  context.subscriptions.push(
+    vscode28.commands.registerCommand("dabbler.renameModule", async (arg) => {
+      await runRenameModuleFlow(void 0, preselectFromTreeNode(arg));
+    })
+  );
+}
+
+// src/commands/deleteModule.ts
+var vscode29 = __toESM(require("vscode"));
+function defaultUi7() {
+  return {
+    pickModule: async (entries) => {
+      const picked = await vscode29.window.showQuickPick(
+        entries.map((e) => ({
+          label: e.title,
+          description: e.slug,
+          entry: e
+        })),
+        { placeHolder: "Which module do you want to delete?", ignoreFocusOut: true }
+      );
+      return picked?.entry;
+    },
+    confirm: async (summary, detail) => {
+      const choice = await vscode29.window.showWarningMessage(
+        summary,
+        { modal: true, detail },
+        "Delete Module"
+      );
+      return choice === "Delete Module";
+    },
+    showInformationMessage: (m) => vscode29.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode29.window.showErrorMessage(m),
+    workspaceRoot: () => vscode29.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+function summarizeGroup(label, names) {
+  return names.length > 0 ? `${label} (${names.length}): ${names.join(", ")}` : `${label}: none`;
+}
+async function runDeleteModuleFlow(ui = defaultUi7(), opts) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return false;
+  }
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (entries.length === 0) {
+    ui.showInformationMessage(
+      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet.`
+    );
+    return false;
+  }
+  let target;
+  if (opts && opts.preselectedSlug !== void 0) {
+    target = entries.find((e) => e.slug === opts.preselectedSlug);
+    if (!target) {
+      ui.showErrorMessage(unknownModuleMessage(opts.preselectedSlug));
+      return false;
+    }
+  } else {
+    target = await ui.pickModule(entries);
+    if (!target)
+      return false;
+  }
+  const classification = classifyModuleSetsForDeletion(root, target.slug);
+  const toCancel = classification.filter((c3) => c3.disposition === "cancel").map((c3) => c3.name).sort();
+  const toRemove = classification.filter((c3) => c3.disposition === "remove").map((c3) => c3.name).sort();
+  const terminal = classification.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
+  const detailLines = [
+    summarizeGroup("Cancelled", toCancel),
+    summarizeGroup("Removed outright", toRemove),
+    summarizeGroup("Left untouched (completed / already cancelled)", terminal)
+  ];
+  const confirmed = await ui.confirm(
+    `Delete module "${target.slug}"?`,
+    `Removes the ${MODULES_MANIFEST_DISPLAY} entry.
+
+${detailLines.join("\n")}
+
+Re-declaring "${target.slug}" later restores this grouping for any untouched history.`
+  );
+  if (!confirmed)
+    return false;
+  const report = await deleteModule(root, target.slug);
+  if (report.refused) {
+    ui.showErrorMessage(
+      `Delete refused \u2014 ${report.refused.reason} Every file was left untouched.`
+    );
+    return false;
+  }
+  if (report.partialFailure) {
+    ui.showErrorMessage(
+      `Delete stopped partway: ${report.partialFailure.reason} ${report.cancelled.length} set(s) cancelled and ${report.removed.length} scaffold(s) removed so far \u2014 re-run "Dabbler: Delete Module" to finish (already-applied steps are skipped on retry).`
+    );
+    return report.cancelled.length > 0 || report.removed.length > 0;
+  }
+  ui.showInformationMessage(
+    `Deleted module "${target.slug}" \u2014 ${report.cancelled.length} set(s) cancelled, ${report.removed.length} scaffold(s) removed, ${report.terminal.length} left untouched.`
+  );
+  return true;
+}
+function registerDeleteModuleCommand(context) {
+  context.subscriptions.push(
+    vscode29.commands.registerCommand("dabbler.deleteModule", async (arg) => {
+      await runDeleteModuleFlow(void 0, preselectFromTreeNode(arg));
+    })
+  );
+}
+
+// src/wizard/planImport.ts
+var vscode30 = __toESM(require("vscode"));
+var fs25 = __toESM(require("fs"));
+var path32 = __toESM(require("path"));
+var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
+function buildPlanningPrompt(module2, destPosix) {
+  const subject = module2 ? `the "${module2.title}" module (\`${module2.slug}\`) of my software project` : "my software project";
+  const moduleNote = module2 ? `
+This plan covers ONLY the ${module2.slug} module (its scope is declared in
+docs/modules.yaml); the project's other modules have their own plans.
+` : "";
+  return `You are a project planning assistant for an AI-led development workflow.
+
+Help me create a project plan in Markdown format for ${subject}.
+${moduleNote}
+The plan should include:
+1. Project overview (2-3 sentences)
+2. Goals and success criteria
+3. High-level phases or feature areas
+4. For each phase: a brief description and the key deliverables
+
+Keep it concise and focused \u2014 this plan will be used to generate AI session sets, so each
+distinct feature area or phase should be something that can be implemented in 2-6 focused AI
+sessions.
+
+Format as a clean Markdown document I can save as ${destPosix}.`;
+}
+function defaultUi8() {
+  return {
+    showOpenDialog: vscode30.window.showOpenDialog,
+    showWarningMessage: vscode30.window.showWarningMessage,
+    showInformationMessage: vscode30.window.showInformationMessage,
+    showErrorMessage: vscode30.window.showErrorMessage,
+    showQuickPick: (items, opts) => vscode30.window.showQuickPick(items, opts),
+    writeClipboard: (text) => vscode30.env.clipboard.writeText(text),
+    executeCommand: (command, ...args) => vscode30.commands.executeCommand(command, ...args),
+    workspaceRoot: () => vscode30.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+async function resolvePlanTarget(root, ui, opts) {
+  if (!root)
+    return { entry: null, destPosix: PLAN_DEST_POSIX };
+  const pick2 = await pickModuleForAuthoring(
+    root,
+    {
+      showQuickPick: ui.showQuickPick,
+      showInformationMessage: ui.showInformationMessage,
+      showErrorMessage: ui.showErrorMessage
+    },
+    opts && opts.preselectedSlug !== void 0 ? { preselectedSlug: opts.preselectedSlug } : void 0
+  );
+  if (pick2.kind === "cancelled" || pick2.kind === "invalid-manifest" || pick2.kind === "unknown-module") {
+    return null;
+  }
+  return {
+    entry: pick2.entry,
+    destPosix: pick2.entry ? modulePlanRelPath(pick2.entry) : PLAN_DEST_POSIX
+  };
+}
+async function copyPlanningPrompt(ui = defaultUi8(), opts) {
+  const target = await resolvePlanTarget(ui.workspaceRoot(), ui, opts);
+  if (!target)
+    return;
+  await ui.writeClipboard(buildPlanningPrompt(target.entry, target.destPosix));
+  void ui.showInformationMessage(
+    `Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as ${target.destPosix} \u2014 or import it with 'Import project-plan.md'.`
+  );
+}
+async function importPlanFromFile(ui = defaultUi8(), opts) {
+  const root = ui.workspaceRoot();
+  const target = await resolvePlanTarget(root, ui, opts);
+  if (!target)
+    return false;
+  const picked = await ui.showOpenDialog({
+    canSelectFiles: true,
+    canSelectFolders: false,
+    canSelectMany: false,
+    filters: { "Markdown": ["md"] },
+    openLabel: "Import Plan"
+  });
+  if (!picked?.[0])
+    return false;
+  if (!root) {
+    void ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const destPath = path32.join(root, ...target.destPosix.split("/"));
+  const containment = path32.relative(path32.resolve(root), path32.resolve(destPath));
+  if (containment === "" || containment.startsWith("..") || path32.isAbsolute(containment)) {
+    void ui.showErrorMessage(
+      `Refusing to write outside the workspace: ${target.destPosix}`
+    );
+    return false;
+  }
+  const destDir = path32.dirname(destPath);
+  try {
+    if (!fs25.existsSync(destDir))
+      fs25.mkdirSync(destDir, { recursive: true });
+  } catch (err) {
+    void ui.showErrorMessage(
+      `Failed to create ${destDir}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  if (fs25.existsSync(destPath)) {
+    const overwrite = await ui.showWarningMessage(
+      `${target.destPosix} already exists. Overwrite it?`,
+      { modal: true },
+      "Overwrite"
+    );
+    if (overwrite !== "Overwrite")
+      return false;
+  }
+  try {
+    fs25.copyFileSync(picked[0].fsPath, destPath);
+  } catch (err) {
+    void ui.showErrorMessage(
+      `Failed to write ${target.destPosix}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  void ui.executeCommand("vscode.open", vscode30.Uri.file(destPath));
+  void ui.showInformationMessage(
+    `Plan imported to ${target.destPosix}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
+  );
+  return true;
+}
+async function openModulePlan(ui = defaultUi8(), opts) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    void ui.showErrorMessage("No workspace folder is open.");
+    return;
+  }
+  const target = await resolvePlanTarget(root, ui, opts);
+  if (!target)
+    return;
+  const destPath = path32.join(root, ...target.destPosix.split("/"));
+  const containment = path32.relative(path32.resolve(root), path32.resolve(destPath));
+  if (containment === "" || containment.startsWith("..") || path32.isAbsolute(containment)) {
+    void ui.showErrorMessage(
+      `Refusing to open outside the workspace: ${target.destPosix}`
+    );
+    return;
+  }
+  if (!fs25.existsSync(destPath)) {
+    const action = await ui.showWarningMessage(
+      `No plan found at ${target.destPosix}. Import one first?`,
+      "Import Plan"
+    );
+    if (action === "Import Plan") {
+      const importOpts = opts ?? { preselectedSlug: target.entry ? target.entry.slug : "" };
+      await importPlanFromFile(ui, importOpts);
+    }
+    return;
+  }
+  await ui.executeCommand("vscode.open", vscode30.Uri.file(destPath));
+}
+function registerPlanImportCommand(context) {
+  context.subscriptions.push(
+    vscode30.commands.registerCommand("dabbler.importPlan", async () => {
+      const action = await vscode30.window.showQuickPick(
+        [
+          { label: "$(file) Import existing plan from file", value: "file" },
+          { label: "$(clippy) Get a prompt to create a plan with AI", value: "prompt" }
+        ],
+        { placeHolder: "How would you like to add a project plan?" }
+      );
+      if (!action)
+        return;
+      if (action.value === "prompt") {
+        await copyPlanningPrompt();
+        return;
+      }
+      await importPlanFromFile();
+    })
+  );
+  context.subscriptions.push(
+    vscode30.commands.registerCommand("dabbler.openModulePlan", async (arg) => {
+      await openModulePlan(void 0, preselectFromTreeNode(arg));
+    })
+  );
+}
+
 // src/wizard/sessionGenPrompt.ts
 var vscode31 = __toESM(require("vscode"));
-var fs27 = __toESM(require("fs"));
+var fs26 = __toESM(require("fs"));
 var path33 = __toESM(require("path"));
 var PLAN_PATH = path33.join("docs", "planning", "project-plan.md");
 var PLAN_REL_POSIX = "docs/planning/project-plan.md";
@@ -31207,7 +30666,7 @@ async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
   } : void 0;
   const planRelPosix = moduleOpt?.planPath ?? PLAN_REL_POSIX;
   const planPath = path33.join(root, ...planRelPosix.split("/"));
-  if (!fs27.existsSync(planPath)) {
+  if (!fs26.existsSync(planPath)) {
     const action = await vscode31.window.showWarningMessage(
       moduleOpt ? `No project plan found at ${planRelPosix} for module "${moduleOpt.slug}". Create it (the New Module command writes a stub) or import one first?` : `No project plan found at ${PLAN_PATH}. Import one first?`,
       "Import Plan"
@@ -31265,14 +30724,14 @@ function registerSessionGenPromptCommand(context) {
 
 // src/dashboard/CostDashboard.ts
 var vscode32 = __toESM(require("vscode"));
-var fs30 = __toESM(require("fs"));
+var fs29 = __toESM(require("fs"));
 var path35 = __toESM(require("path"));
 
 // src/utils/metrics.ts
-var fs29 = __toESM(require("fs"));
+var fs28 = __toESM(require("fs"));
 
 // src/utils/routerConfig.ts
-var fs28 = __toESM(require("fs"));
+var fs27 = __toESM(require("fs"));
 var path34 = __toESM(require("path"));
 var YAML3 = __toESM(require_dist());
 var DEFAULT_METRICS_FILENAME = "router-metrics.jsonl";
@@ -31280,7 +30739,7 @@ var DEFAULT_REVIEW_FREQUENCY_DAYS = 30;
 function findAiRouterDir(workspaceRoot2) {
   const candidate = path34.join(workspaceRoot2, "ai_router");
   try {
-    if (fs28.existsSync(path34.join(candidate, "router-config.yaml"))) {
+    if (fs27.existsSync(path34.join(candidate, "router-config.yaml"))) {
       return candidate;
     }
   } catch {
@@ -31297,7 +30756,7 @@ function readRouterConfig(workspaceRoot2) {
   const configPath = path34.join(aiRouterDir, "router-config.yaml");
   let doc = {};
   try {
-    doc = YAML3.parse(fs28.readFileSync(configPath, "utf8")) ?? {};
+    doc = YAML3.parse(fs27.readFileSync(configPath, "utf8")) ?? {};
   } catch {
     doc = {};
   }
@@ -31361,10 +30820,10 @@ function sessionSetDisplayName(raw) {
   return name === "" ? "(no session set)" : name;
 }
 function readMetricsFromPath(metricsPath) {
-  if (!fs29.existsSync(metricsPath))
+  if (!fs28.existsSync(metricsPath))
     return [];
   try {
-    const lines = fs29.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
+    const lines = fs28.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
     return lines.map((line) => {
       try {
         return JSON.parse(line);
@@ -31583,7 +31042,7 @@ var CostDashboard = class _CostDashboard {
     const csv = exportToCsv(entries);
     const outPath = path35.join(root, "ai_router", "cost-export.csv");
     try {
-      fs30.writeFileSync(outPath, csv, "utf8");
+      fs29.writeFileSync(outPath, csv, "utf8");
       vscode32.commands.executeCommand("vscode.open", vscode32.Uri.file(outPath));
     } catch (err) {
       vscode32.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
@@ -31642,7 +31101,7 @@ var CostDashboard = class _CostDashboard {
     const banner = stalenessBannerHtml(computeStaleness(info));
     const htmlPath = vscode32.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
-      let html = fs30.readFileSync(htmlPath.fsPath, "utf8");
+      let html = fs29.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
         ([slug, d]) => `<tr><td>${esc(slug)}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
       ).join("\n");
@@ -31671,16 +31130,16 @@ function registerCostDashboardCommand(context) {
 // src/configEditor/ConfigEditorPanel.ts
 var cp6 = __toESM(require("child_process"));
 var vscode33 = __toESM(require("vscode"));
-var fs32 = __toESM(require("fs"));
+var fs31 = __toESM(require("fs"));
 var path36 = __toESM(require("path"));
 
 // src/configEditor/yamlReadWrite.ts
 var import_yaml = __toESM(require_dist());
-var fs31 = __toESM(require("fs"));
+var fs30 = __toESM(require("fs"));
 function readYamlFile(filePath) {
-  if (!fs31.existsSync(filePath))
+  if (!fs30.existsSync(filePath))
     return null;
-  const text = fs31.readFileSync(filePath, "utf8");
+  const text = fs30.readFileSync(filePath, "utf8");
   const doc = parseDocumentFromText(text);
   return { doc, text, parseErrors: collectParseErrors(doc) };
 }
@@ -31989,10 +31448,10 @@ function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
 function escapeHtml(str) {
   return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
 }
-function getByPath(obj, path47) {
+function getByPath(obj, path48) {
   if (!obj)
     return void 0;
-  const parts = path47.split(".");
+  const parts = path48.split(".");
   let cur = obj;
   for (const p2 of parts) {
     if (cur === null || cur === void 0 || typeof cur !== "object")
@@ -32433,9 +31892,9 @@ function collectOverrideRows(localOverrides, state) {
   if (!localOverrides)
     return [];
   const rows = [];
-  walk(localOverrides, [], (path47, value) => {
-    const dotted = path47.join(".");
-    const sharedSource = pickSharedSource(path47[0]);
+  walk(localOverrides, [], (path48, value) => {
+    const dotted = path48.join(".");
+    const sharedSource = pickSharedSource(path48[0]);
     const sharedVal = sharedSource === "routerConfig" ? getByPath(state.routerConfig, dotted) : sharedSource === "budget" ? getByPath(state.budget, dotted) : void 0;
     rows.push({
       path: dotted,
@@ -32467,11 +31926,11 @@ function formatValue(v) {
 }
 function walk(obj, prefix, emit) {
   for (const [k2, v] of Object.entries(obj)) {
-    const path47 = [...prefix, k2];
+    const path48 = [...prefix, k2];
     if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-      walk(v, path47, emit);
+      walk(v, path48, emit);
     } else {
-      emit(path47, v);
+      emit(path48, v);
     }
   }
 }
@@ -32606,40 +32065,40 @@ function applyPatch(routerConfigDoc, budgetDoc, localOverridesDoc, payload) {
   }
   return result;
 }
-function applyOverridableField(routerConfigDoc, localOverridesDoc, path47, value, source, result) {
+function applyOverridableField(routerConfigDoc, localOverridesDoc, path48, value, source, result) {
   if (source === "local") {
-    if (setIfChanged(localOverridesDoc, path47, value)) {
+    if (setIfChanged(localOverridesDoc, path48, value)) {
       result.localOverridesChanged = true;
     }
-    deleteIfPresent(routerConfigDoc, path47, result, "routerConfigChanged");
+    deleteIfPresent(routerConfigDoc, path48, result, "routerConfigChanged");
   } else {
-    if (setIfChanged(routerConfigDoc, path47, value)) {
+    if (setIfChanged(routerConfigDoc, path48, value)) {
       result.routerConfigChanged = true;
     }
-    deleteIfPresent(localOverridesDoc, path47, result, "localOverridesChanged");
+    deleteIfPresent(localOverridesDoc, path48, result, "localOverridesChanged");
   }
 }
-function setIfChanged(doc, path47, value) {
-  const current = doc.getIn(path47);
+function setIfChanged(doc, path48, value) {
+  const current = doc.getIn(path48);
   if (current === value)
     return false;
-  doc.setIn(path47, value);
+  doc.setIn(path48, value);
   return true;
 }
-function deleteIfPresent(doc, path47, result, flag) {
-  if (doc.hasIn(path47)) {
-    doc.deleteIn(path47);
+function deleteIfPresent(doc, path48, result, flag) {
+  if (doc.hasIn(path48)) {
+    doc.deleteIn(path48);
     result[flag] = true;
   }
 }
-function pruneEmptyContainer(doc, path47, result, flag) {
-  if (!doc.hasIn(path47))
+function pruneEmptyContainer(doc, path48, result, flag) {
+  if (!doc.hasIn(path48))
     return;
-  const node = doc.getIn(path47);
+  const node = doc.getIn(path48);
   if (node && typeof node === "object" && "items" in node) {
     const items = node.items;
     if (Array.isArray(items) && items.length === 0) {
-      doc.deleteIn(path47);
+      doc.deleteIn(path48);
       result[flag] = true;
     }
   }
@@ -32747,7 +32206,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
       return null;
     for (const folder of roots) {
       const candidate = path36.join(folder.uri.fsPath, "ai_router");
-      if (fs32.existsSync(candidate))
+      if (fs31.existsSync(candidate))
         return candidate;
     }
     return null;
@@ -32944,13 +32403,13 @@ ${msgs}`,
     const writeAtomic = (file, target, content) => {
       const tmp = target + ".tmp";
       try {
-        fs32.writeFileSync(tmp, content, "utf8");
-        fs32.renameSync(tmp, target);
+        fs31.writeFileSync(tmp, content, "utf8");
+        fs31.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs32.existsSync(tmp))
-            fs32.unlinkSync(tmp);
+          if (fs31.existsSync(tmp))
+            fs31.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -33048,13 +32507,13 @@ ${msgs}`,
       }
       const tmp = target + ".tmp";
       try {
-        fs32.writeFileSync(tmp, cachedContent, "utf8");
-        fs32.renameSync(tmp, target);
+        fs31.writeFileSync(tmp, cachedContent, "utf8");
+        fs31.renameSync(tmp, target);
         newSucceeded.push(f.file);
       } catch (err) {
         try {
-          if (fs32.existsSync(tmp))
-            fs32.unlinkSync(tmp);
+          if (fs31.existsSync(tmp))
+            fs31.unlinkSync(tmp);
         } catch {
         }
         stillFailed.push({ file: f.file, reason: err instanceof Error ? err.message : String(err) });
@@ -33121,13 +32580,13 @@ ${msgs}`,
       pendingContents[file] = content;
       const tmp = target + ".tmp";
       try {
-        fs32.writeFileSync(tmp, content, "utf8");
-        fs32.renameSync(tmp, target);
+        fs31.writeFileSync(tmp, content, "utf8");
+        fs31.renameSync(tmp, target);
         succeeded.push(file);
       } catch (err) {
         try {
-          if (fs32.existsSync(tmp))
-            fs32.unlinkSync(tmp);
+          if (fs31.existsSync(tmp))
+            fs31.unlinkSync(tmp);
         } catch {
         }
         failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
@@ -33137,9 +32596,9 @@ ${msgs}`,
     reapply("budget.yaml", this._loaded.budgetPath, this._lastSaveSnapshot.budgetText);
     if (this._lastSaveSnapshot.localOverridesText !== null) {
       reapply("local-overrides.yaml", this._loaded.localOverridesPath, this._lastSaveSnapshot.localOverridesText);
-    } else if (fs32.existsSync(this._loaded.localOverridesPath)) {
+    } else if (fs31.existsSync(this._loaded.localOverridesPath)) {
       try {
-        fs32.unlinkSync(this._loaded.localOverridesPath);
+        fs31.unlinkSync(this._loaded.localOverridesPath);
         succeeded.push("local-overrides.yaml");
       } catch (err) {
         failed.push({
@@ -33210,10 +32669,10 @@ ${msgs}`,
       "except Exception as e:",
       "  print(json.dumps({'ok': False, 'error': str(e)}))"
     ].join("\n");
-    const env12 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
+    const env11 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
     const child = cp6.spawn(pythonPath, ["-c", script], {
       cwd: path36.dirname(aiRouterDir),
-      env: env12,
+      env: env11,
       windowsHide: true
     });
     let stdout = "";
@@ -33261,7 +32720,7 @@ ${msgs}`,
     if (!this._loaded)
       return;
     const target = this._loaded.localOverridesPath;
-    if (!fs32.existsSync(target)) {
+    if (!fs31.existsSync(target)) {
       vscode33.window.showInformationMessage(
         "local-overrides.yaml does not exist yet. Save any per-operator override and the file is created automatically."
       );
@@ -33657,13 +33116,13 @@ var vscode34 = __toESM(require("vscode"));
 var path38 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
-var fs33 = __toESM(require("fs"));
+var fs32 = __toESM(require("fs"));
 var path37 = __toESM(require("path"));
 var QUEUE_FILENAME = "decision-review-queue.jsonl";
 function appendQueueEntry(sessionSetDir, entry) {
   const queuePath = path37.join(sessionSetDir, QUEUE_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  fs33.appendFileSync(queuePath, line, "utf8");
+  fs32.appendFileSync(queuePath, line, "utf8");
 }
 function findActiveSessionSetDir(provider) {
   const all = provider();
@@ -33725,7 +33184,7 @@ function registerFlagDecisionForReview(context) {
 
 // src/commands/scanAnnotationsForActiveSet.ts
 var vscode35 = __toESM(require("vscode"));
-var fs35 = __toESM(require("fs"));
+var fs34 = __toESM(require("fs"));
 var path40 = __toESM(require("path"));
 
 // src/configEditor/annotationParser.ts
@@ -33804,7 +33263,7 @@ function unescapeReason(raw) {
 }
 
 // src/commands/annotationScanner.ts
-var fs34 = __toESM(require("fs"));
+var fs33 = __toESM(require("fs"));
 var path39 = __toESM(require("path"));
 var SCAN_EXTENSIONS = [
   "ts",
@@ -33839,7 +33298,7 @@ var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**
 function toPosixPath(p2) {
   return p2.replace(/\\/g, "/");
 }
-function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs34.readFileSync(p2, "utf8")) {
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs33.readFileSync(p2, "utf8")) {
   const out = [];
   for (const abs of files) {
     let text;
@@ -33868,9 +33327,9 @@ function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
     return v;
   return true;
 }
-function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs34.readFileSync(p2, "utf8")) {
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs33.readFileSync(p2, "utf8")) {
   const queuePath = path39.join(sessionSetDir, QUEUE_FILENAME);
-  if (!fs34.existsSync(queuePath))
+  if (!fs33.existsSync(queuePath))
     return [];
   let text;
   try {
@@ -33896,7 +33355,7 @@ function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs34.readFil
 
 // src/commands/scanAnnotationsForActiveSet.ts
 function defaultReadYaml(absPath) {
-  if (!fs35.existsSync(absPath))
+  if (!fs34.existsSync(absPath))
     return null;
   try {
     const result = readYamlFile(absPath);
@@ -33969,14 +33428,14 @@ function registerScanAnnotationsForActiveSet(context) {
 
 // src/commands/openOrchestratorWriterLog.ts
 var vscode36 = __toESM(require("vscode"));
-var fs36 = __toESM(require("fs"));
+var fs35 = __toESM(require("fs"));
 var os4 = __toESM(require("os"));
 var path41 = __toESM(require("path"));
 function registerOpenOrchestratorWriterLog(context) {
   context.subscriptions.push(
     vscode36.commands.registerCommand("dabbler.openOrchestratorWriterLog", async () => {
       const logPath = path41.join(os4.homedir(), ".dabbler", "orchestrator-writer.log");
-      if (!fs36.existsSync(logPath)) {
+      if (!fs35.existsSync(logPath)) {
         vscode36.window.showInformationMessage(
           `No writer log yet \u2014 ${logPath} hasn't been touched. Logged entries appear on every start_session call: successful check-outs, H3 hard-coordination refusals, and --force overrides.`
         );
@@ -33990,7 +33449,7 @@ function registerOpenOrchestratorWriterLog(context) {
 
 // src/commands/regenerateNarrationTemplates.ts
 var cp7 = __toESM(require("child_process"));
-var fs37 = __toESM(require("fs"));
+var fs36 = __toESM(require("fs"));
 var path42 = __toESM(require("path"));
 var vscode37 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
@@ -34021,7 +33480,7 @@ async function runRegenerate() {
     return;
   const pythonPath = resolvePythonInterpreter(set.root);
   const outDir = path42.join(set.dir, "narration-templates");
-  fs37.mkdirSync(outDir, { recursive: true });
+  fs36.mkdirSync(outDir, { recursive: true });
   const claudeOut = path42.join(outDir, "CLAUDE.md");
   const agentsOut = path42.join(outDir, "AGENTS.md");
   const render7 = await vscode37.window.withProgress(
@@ -34095,7 +33554,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
     return;
   const destDir = dirUri[0].fsPath;
   const destPath = path42.join(destDir, pick2.target);
-  if (fs37.existsSync(destPath)) {
+  if (fs36.existsSync(destPath)) {
     const overwrite = await vscode37.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
@@ -34105,7 +33564,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
       return;
   }
   try {
-    fs37.copyFileSync(pick2.source, destPath);
+    fs36.copyFileSync(pick2.source, destPath);
   } catch (err) {
     vscode37.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
@@ -34169,7 +33628,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
       message: `python -m ai_router.narration exited ${result.status}: ${stderr}`
     };
   }
-  if (!fs37.existsSync(args.outputPath)) {
+  if (!fs36.existsSync(args.outputPath)) {
     return {
       ok: false,
       message: `python -m ai_router.narration exited 0 but did not write ${args.outputPath}`
@@ -34180,7 +33639,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
 
 // src/commands/externalVerification.ts
 var vscode38 = __toESM(require("vscode"));
-var fs38 = __toESM(require("fs"));
+var fs37 = __toESM(require("fs"));
 var path43 = __toESM(require("path"));
 var FILE_NAME = "external-verification.md";
 function buildExternalVerificationTemplate(setName, date) {
@@ -34219,13 +33678,13 @@ async function pickSet2(sets) {
 }
 async function openOrCreate(set) {
   const filePath = path43.join(set.dir, FILE_NAME);
-  if (!fs38.existsSync(filePath)) {
+  if (!fs37.existsSync(filePath)) {
     const template = buildExternalVerificationTemplate(
       set.name,
       (/* @__PURE__ */ new Date()).toISOString().slice(0, 10)
     );
     try {
-      fs38.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
+      fs37.writeFileSync(filePath, template, { encoding: "utf-8", flag: "wx" });
     } catch (err) {
       const e = err;
       if (e?.code !== "EEXIST") {
@@ -34351,7 +33810,7 @@ async function presentActions(slug, set) {
 var vscode40 = __toESM(require("vscode"));
 var cp8 = __toESM(require("child_process"));
 var path44 = __toESM(require("path"));
-var fs39 = __toESM(require("fs"));
+var fs38 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
   "ai_router.migrate_session_state",
   "ai_router.migrate_lightweight_to_canonical_v4",
@@ -34425,7 +33884,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
-          (r2) => fs39.existsSync(path44.join(r2, SESSION_SETS_REL2))
+          (r2) => fs38.existsSync(path44.join(r2, SESSION_SETS_REL2))
         );
         if (roots.length === 0) {
           vscode40.window.showInformationMessage(
@@ -34482,7 +33941,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 
 // src/commands/switchTier.ts
 var vscode41 = __toESM(require("vscode"));
-var fs40 = __toESM(require("fs"));
+var fs39 = __toESM(require("fs"));
 var path45 = __toESM(require("path"));
 
 // src/utils/tierRewrite.ts
@@ -34518,9 +33977,9 @@ function rewriteSpecTier(specText, target) {
   return { text, changed: true, outcome: "rewritten", previousTier };
 }
 var ROUTER_CONFIG_REL2 = "ai_router/router-config.yaml";
-function switchToFullWarnings(routerConfigExists, env12) {
+function switchToFullWarnings(routerConfigExists, env11) {
   const warnings = [];
-  if (!providerKeyPresent(env12)) {
+  if (!providerKeyPresent(env11)) {
     warnings.push(
       "No provider API key (DABBLER_ANTHROPIC_API_KEY / DABBLER_OPENAI_API_KEY / DABBLER_GEMINI_API_KEY) is visible to VS Code \u2014 Full-tier routing needs at least one. Set a key, then reload the window."
     );
@@ -34549,7 +34008,7 @@ async function switchTier(set) {
     return;
   let specText;
   try {
-    specText = fs40.readFileSync(set.specPath, "utf8");
+    specText = fs39.readFileSync(set.specPath, "utf8");
   } catch {
     vscode41.window.showErrorMessage(
       `Could not read ${set.specPath} \u2014 tier not switched.`
@@ -34570,7 +34029,7 @@ async function switchTier(set) {
     return;
   }
   try {
-    fs40.writeFileSync(set.specPath, result.text, "utf8");
+    fs39.writeFileSync(set.specPath, result.text, "utf8");
   } catch {
     vscode41.window.showErrorMessage(
       `Could not write ${set.specPath} \u2014 tier not switched.`
@@ -34591,7 +34050,7 @@ async function switchTier(set) {
     result.previousTier === target ? `Repaired "${set.name}"'s malformed tier declaration \u2014 now explicitly ${target}.` : `Switched "${set.name}" to the ${target} tier.`
   );
   if (target === "full") {
-    const routerConfigExists = fs40.existsSync(
+    const routerConfigExists = fs39.existsSync(
       path45.join(setRoot, ROUTER_CONFIG_REL2)
     );
     for (const warning of switchToFullWarnings(routerConfigExists, process.env)) {
@@ -34619,7 +34078,7 @@ function registerSwitchTierCommand(context) {
 // src/commands/setupVerification.ts
 var vscode42 = __toESM(require("vscode"));
 var cp9 = __toESM(require("child_process"));
-var fs41 = __toESM(require("fs"));
+var fs40 = __toESM(require("fs"));
 
 // src/utils/verificationModeRewrite.ts
 var CONFIG_BLOCK_RE2 = /(##\s*Session Set Configuration[\s\S]*?```ya?ml\s*)([\s\S]*?)(```)/i;
@@ -34834,8 +34293,8 @@ async function applyCompletedSetTransition(set, pythonPath, deps) {
 function realCompletedSetDeps() {
   return {
     runWriter: runChangeWriter,
-    readFile: (p2) => fs41.readFileSync(p2, "utf8"),
-    writeFile: (p2, text) => fs41.writeFileSync(p2, text, "utf8"),
+    readFile: (p2) => fs40.readFileSync(p2, "utf8"),
+    writeFile: (p2, text) => fs40.writeFileSync(p2, text, "utf8"),
     copyToClipboard: (text) => Promise.resolve(vscode42.env.clipboard.writeText(text)),
     showInfo: (m) => void vscode42.window.showInformationMessage(m),
     showWarning: (m) => void vscode42.window.showWarningMessage(m),
@@ -34882,10 +34341,10 @@ async function setupVerification(set) {
     );
     return;
   }
-  if (fs41.existsSync(set.activityPath)) {
+  if (fs40.existsSync(set.activityPath)) {
     let activityLogText = null;
     try {
-      activityLogText = fs41.readFileSync(set.activityPath, "utf8");
+      activityLogText = fs40.readFileSync(set.activityPath, "utf8");
     } catch {
       activityLogText = null;
     }
@@ -34921,7 +34380,7 @@ async function setupVerification(set) {
   }
   let specText;
   try {
-    specText = fs41.readFileSync(set.specPath, "utf8");
+    specText = fs40.readFileSync(set.specPath, "utf8");
   } catch {
     vscode42.window.showErrorMessage(
       `Could not read ${set.specPath} \u2014 verification mode not changed.`
@@ -34942,7 +34401,7 @@ async function setupVerification(set) {
     return;
   }
   try {
-    fs41.writeFileSync(set.specPath, result.text, "utf8");
+    fs40.writeFileSync(set.specPath, result.text, "utf8");
   } catch {
     vscode42.window.showErrorMessage(
       `Could not write ${set.specPath} \u2014 verification mode not changed.`
@@ -34972,11 +34431,61 @@ function registerSetupVerificationCommand(context) {
 }
 
 // src/providers/WorkExplorerTreeProvider.ts
+var vscode44 = __toESM(require("vscode"));
+
+// src/providers/moduleAssembly.ts
+var fs41 = __toESM(require("fs"));
+var path46 = __toESM(require("path"));
 var vscode43 = __toESM(require("vscode"));
+function nodeModuleAssemblyIo() {
+  return {
+    workspaceRoots: () => (vscode43.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
+    classify: (root) => classifyModulesManifest(root),
+    // Set 100 S1: the 093-era per-module plan-existence resolution retired
+    // with the persistent `Plan` child node it fed. This probe stays — it
+    // drives pseudo-module VISIBILITY (the legacy root plan keeps the
+    // pseudo-module rendered even when every set is stamped).
+    legacyRootPlanExists: (root) => fs41.existsSync(path46.join(root, LEGACY_ROOT_PLAN_REL)),
+    rootLabel: (root) => path46.basename(root)
+  };
+}
+var INVALID_MANIFEST_MESSAGE2 = "docs/modules.yaml is invalid (expected a YAML mapping with a modules list). Fix the file by hand; Work Explorer never overwrites it.";
+function assembleVisibleModules(allSets, io, lastKnownGood) {
+  const roots = new Set(io.workspaceRoots());
+  for (const set of allSets)
+    roots.add(set.root);
+  const manifestFaults = [];
+  const byRoot = Array.from(roots).map((root) => {
+    const classification = io.classify(root);
+    const current = computeVisibleModules(
+      classification,
+      allSets.filter((set) => set.root === root),
+      { legacyRootPlanExists: io.legacyRootPlanExists(root) }
+    );
+    const selected = chooseRenderableModuleSnapshot(
+      classification,
+      current,
+      lastKnownGood.get(root)
+    );
+    if (classification.kind === "invalid") {
+      manifestFaults.push({
+        rootLabel: io.rootLabel(root),
+        message: INVALID_MANIFEST_MESSAGE2,
+        retainedLastKnownGood: selected.retainedLastKnownGood
+      });
+    } else {
+      lastKnownGood.set(root, current);
+    }
+    return selected.modules;
+  });
+  return { modules: mergeVisibleModules(byRoot), manifestFaults };
+}
+
+// src/providers/WorkExplorerTreeProvider.ts
 var WorkExplorerTreeProvider = class {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
-    this.onDidChangeEmitter = new vscode43.EventEmitter();
+    this.onDidChangeEmitter = new vscode44.EventEmitter();
     this.onDidChangeTreeData = this.onDidChangeEmitter.event;
     /** Memoised scan for the current refresh generation; cleared by `refresh()`. */
     this.scanCache = null;
@@ -34989,6 +34498,13 @@ var WorkExplorerTreeProvider = class {
   }
   static {
     this.viewType = "dabblerWorkExplorerTree";
+  }
+  /**
+   * Register the sink that renders manifest faults. Called once, by
+   * `extension.ts`, immediately after `createTreeView`.
+   */
+  onDiagnostic(sink) {
+    this.diagnostic = sink;
   }
   dispose() {
     this.onDidChangeEmitter.dispose();
@@ -35033,11 +34549,13 @@ var WorkExplorerTreeProvider = class {
   }
   modules() {
     if (!this.modulesCache) {
-      this.modulesCache = assembleVisibleModules(
+      const assembly = assembleVisibleModules(
         this.sets(),
         nodeModuleAssemblyIo(),
         this.lastKnownGoodModules
-      ).modules;
+      );
+      this.modulesCache = assembly.modules;
+      this.diagnostic?.(describeManifestFaults(assembly.manifestFaults));
     }
     return this.modulesCache;
   }
@@ -35050,7 +34568,7 @@ var WorkExplorerTreeProvider = class {
   supports() {
     if (this.supportsCache)
       return this.supportsCache;
-    const cfg = vscode43.workspace.getConfiguration("dabblerSessionSets");
+    const cfg = vscode44.workspace.getConfiguration("dabblerSessionSets");
     const uatPref = cfg.get("uatSupport.enabled", "auto");
     const e2ePref = cfg.get("e2eSupport.enabled", "auto");
     const all = this.sets();
@@ -35061,15 +34579,15 @@ var WorkExplorerTreeProvider = class {
     return this.supportsCache;
   }
   toTreeItem(descriptor, node) {
-    const item = new vscode43.TreeItem(
+    const item = new vscode44.TreeItem(
       descriptor.label,
-      descriptor.collapsible === "collapsed" ? vscode43.TreeItemCollapsibleState.Collapsed : vscode43.TreeItemCollapsibleState.None
+      descriptor.collapsible === "collapsed" ? vscode44.TreeItemCollapsibleState.Collapsed : vscode44.TreeItemCollapsibleState.None
     );
     item.id = descriptor.id;
     item.description = descriptor.description;
     item.contextValue = descriptor.contextValue;
     if (descriptor.tooltip !== void 0) {
-      const md = new vscode43.MarkdownString(descriptor.tooltip, true);
+      const md = new vscode44.MarkdownString(descriptor.tooltip, true);
       item.tooltip = md;
     }
     if (descriptor.icon)
@@ -35085,17 +34603,43 @@ var WorkExplorerTreeProvider = class {
   }
   toIconPath(icon) {
     if (icon.kind === "theme") {
-      return icon.color ? new vscode43.ThemeIcon(icon.id, new vscode43.ThemeColor(icon.color)) : new vscode43.ThemeIcon(icon.id);
+      return icon.color ? new vscode44.ThemeIcon(icon.id, new vscode44.ThemeColor(icon.color)) : new vscode44.ThemeIcon(icon.id);
     }
     return {
-      light: vscode43.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
-      dark: vscode43.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
+      light: vscode44.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
+      dark: vscode44.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
     };
   }
 };
+function describeManifestFaults(faults) {
+  if (faults.length === 0)
+    return void 0;
+  return faults.map((fault) => {
+    const shown = fault.retainedLastKnownGood ? "Showing the last-known-good module tree." : "No prior valid module tree is available; showing recoverable fallback groups.";
+    return `${fault.rootLabel}: ${fault.message} ${shown}`;
+  }).join("  ");
+}
 
 // src/commands/workExplorerTreeCommands.ts
-var vscode44 = __toESM(require("vscode"));
+var vscode45 = __toESM(require("vscode"));
+
+// src/providers/rowMenuHelpers.ts
+function planLeftClickActivation(setName, state) {
+  const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
+  if (state !== "in-progress" && state !== "not-started") {
+    return { openCommand, clipboardWrite: null };
+  }
+  const sanitized = setName.replace(/`/g, "'");
+  return {
+    openCommand,
+    clipboardWrite: {
+      text: `Start the next session of \`${sanitized}\`.`,
+      toast: `Copied: Start the next session of ${setName}`
+    }
+  };
+}
+
+// src/commands/workExplorerTreeCommands.ts
 function asSetNode(arg) {
   if (arg === null || typeof arg !== "object")
     return void 0;
@@ -35107,12 +34651,12 @@ async function activateSetRow(arg) {
   if (!node)
     return;
   const plan = planLeftClickActivation(node.set.name, node.set.state);
-  await vscode44.commands.executeCommand(plan.openCommand.commandId, node);
+  await vscode45.commands.executeCommand(plan.openCommand.commandId, node);
   if (!plan.clipboardWrite)
     return;
   try {
-    await vscode44.env.clipboard.writeText(plan.clipboardWrite.text);
-    vscode44.window.showInformationMessage(plan.clipboardWrite.toast);
+    await vscode45.env.clipboard.writeText(plan.clipboardWrite.text);
+    vscode45.window.showInformationMessage(plan.clipboardWrite.toast);
   } catch (err) {
     console.warn(
       `[WorkExplorerTree] left-click clipboard write failed for "${node.set.name}"`,
@@ -35122,7 +34666,7 @@ async function activateSetRow(arg) {
 }
 function registerWorkExplorerTreeCommands(context) {
   context.subscriptions.push(
-    vscode44.commands.registerCommand(
+    vscode45.commands.registerCommand(
       "dabblerWorkExplorer.activateSet",
       (arg) => activateSetRow(arg)
     )
@@ -35130,28 +34674,44 @@ function registerWorkExplorerTreeCommands(context) {
 }
 
 // src/extension.ts
-var SESSION_SETS_REL3 = path46.join("docs", "session-sets");
+var SESSION_SETS_REL3 = path47.join("docs", "session-sets");
 function evaluateRouterCapabilityContextKey() {
-  const folders = vscode45.workspace.workspaceFolders ?? [];
+  const folders = vscode46.workspace.workspaceFolders ?? [];
   let routes = false;
   try {
     routes = folders.some((f) => routesCost(f.uri.fsPath));
   } catch {
     routes = false;
   }
-  vscode45.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
+  vscode46.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
+}
+function evaluateSetupNeededContextKey(extensionPath, allSets) {
+  let needed = true;
+  try {
+    needed = isSetupNeeded(extensionPath, allSets.length > 0);
+  } catch (err) {
+    console.error(
+      "[dabbler-ai-orchestration] setup-needed evaluation threw; showing the Setup & Status view.",
+      err
+    );
+  }
+  vscode46.commands.executeCommand(
+    "setContext",
+    "dabblerSessionSets.setupNeeded",
+    needed
+  );
 }
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode45.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode46.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode45.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode45.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
-  vscode45.commands.executeCommand(
+  vscode46.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode46.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode46.commands.executeCommand(
     "setContext",
     "dabblerSessionSets.hasSubCurrentSets",
     hasSubCurrentSets(allSets)
@@ -35162,21 +34722,28 @@ function activate(context) {
   const scanState = new ScanState();
   context.subscriptions.push({ dispose: () => scanState.dispose() });
   scanState.setLoading();
-  const provider = new CustomSessionSetsView(context, scanState);
+  const provider = new SetupStatusView(context, scanState);
   context.subscriptions.push({ dispose: () => provider.dispose() });
   context.subscriptions.push(
-    vscode45.window.registerWebviewViewProvider(CustomSessionSetsView.viewType, provider)
+    vscode46.window.registerWebviewViewProvider(SetupStatusView.viewType, provider)
   );
   const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
   context.subscriptions.push({ dispose: () => treeProvider.dispose() });
-  const treeView = vscode45.window.createTreeView(WorkExplorerTreeProvider.viewType, {
+  const treeView = vscode46.window.createTreeView(WorkExplorerTreeProvider.viewType, {
     treeDataProvider: treeProvider,
     showCollapseAll: true
   });
   context.subscriptions.push(treeView);
+  treeProvider.onDiagnostic((message) => {
+    treeView.message = message;
+  });
   const evaluateContextKeys = () => {
-    evaluateSupportContextKeys(readAllSessionSets());
+    const allSets = readAllSessionSets();
+    evaluateSupportContextKeys(allSets);
     evaluateRouterCapabilityContextKey();
+    setImmediate(
+      () => evaluateSetupNeededContextKey(context.extensionPath, allSets)
+    );
   };
   try {
     evaluateContextKeys();
@@ -35187,7 +34754,7 @@ function activate(context) {
     );
   }
   context.subscriptions.push(
-    vscode45.workspace.onDidChangeConfiguration((e) => {
+    vscode46.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -35206,12 +34773,12 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path46.join(root, SESSION_SETS_REL3);
-      const pattern = new vscode45.RelativePattern(
+      const sessionSetsAbs = path47.join(root, SESSION_SETS_REL3);
+      const pattern = new vscode46.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
       );
-      const watcher = vscode45.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode46.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {
         provider.refresh();
         treeProvider.refresh();
@@ -35221,11 +34788,11 @@ function activate(context) {
       watcher.onDidChange(onEvent);
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
-      const gsPattern = new vscode45.RelativePattern(
+      const gsPattern = new vscode46.RelativePattern(
         root,
         "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**}"
       );
-      const gsWatcher = vscode45.workspace.createFileSystemWatcher(gsPattern);
+      const gsWatcher = vscode46.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);
       gsWatcher.onDidDelete(onEvent);
       gsWatcher.onDidChange(onEvent);
@@ -35247,11 +34814,11 @@ function activate(context) {
       err
     );
   }
-  context.subscriptions.push(vscode45.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode46.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode45.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode46.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const safeRegister = (name, fn) => {
     try {
@@ -35370,18 +34937,18 @@ function activate(context) {
     scanState.setReady();
   });
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
-  if (!hasSeenOnboarding && (vscode45.workspace.workspaceFolders?.length ?? 0) > 0) {
+  if (!hasSeenOnboarding && (vscode46.workspace.workspaceFolders?.length ?? 0) > 0) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs42.existsSync(path46.join(r2, SESSION_SETS_REL3));
+        return fs42.existsSync(path47.join(r2, SESSION_SETS_REL3));
       } catch {
         return false;
       }
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode45.commands.executeCommand("dabbler.getStarted");
+      vscode46.commands.executeCommand("dabbler.getStarted");
     }
   }
   markActivateEnd();

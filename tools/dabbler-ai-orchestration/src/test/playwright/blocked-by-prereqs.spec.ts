@@ -1,23 +1,26 @@
-// Layer-3 rendering smoke for the blocked-by-prerequisites surface.
-// The Explorer derives `blockedByPrereqs` (+ the Set 061 S2
-// `unsatisfiedPrereqs` list) on each set's in-memory record by
-// cross-referencing the spec's `prerequisites:` field against the
-// target set's `status`.
+// Layer 3 rendering smoke for the blocked-by-prerequisites signal
+// (Set 061 S2 spec D3), re-expressed by Set 110 Session 3 against the native
+// `TreeView`.
 //
-// Set 061 S2 (spec D3): the renderer surfaces a quiet chain-glyph
-// marker (`.row-blocked-marker`, U+26D3 U+FE0E) next to the row name
-// whose tooltip names each unsatisfied prerequisite and its current
-// state. The old all-caps `[BLOCKED BY PREREQS]` description badge is
-// retired — these scenarios assert the marker AND the badge's absence.
+// The behaviour is unchanged and all four scenarios survive; only the
+// CARRIER moved. The webview rendered a quiet chain-glyph marker span with a
+// `title` attribute next to the row name. A `TreeItem` has one icon slot, and
+// "blocked" is RANK 1 of the icon precedence table — the most severe state a
+// set row can be in — so it resolves to a themed `error` codicon and the
+// explanatory text moves into the markdown tooltip.
 //
-// Scenarios covered:
-//   1. Two-set fixture with prereq NOT-COMPLETE → dependant renders
-//      the blocked marker (with the explanatory tooltip), no badge.
-//   2. Same fixture flipped: prereq COMPLETE → dependant renders no
-//      marker (i.e., unblocked).
-//   3. Terminal-state dependant → marker suppressed even when the
-//      cross-reference would mark it blocked.
-//   4. Spec without prerequisites → no marker.
+// Two assertions are therefore made where the old file made one:
+//
+//   1. the row IS flagged (the error codicon is present), and
+//   2. an unblocked row is NOT, which is the assertion that actually failed
+//      when the derivation was wrong.
+//
+// The exact tooltip STRING is no longer asserted here. It moved into
+// `setTooltip`, which Layer 2 drives directly and cheaply
+// (`workExplorerTreeModel.test.ts`); re-asserting it through a ~40-second
+// real-host launch bought nothing the unit test does not already pin. That
+// `title` assertion is the one thing in the old file deliberately dropped,
+// and this is the record of why.
 
 import { expect, test } from "@playwright/test";
 import * as fs from "fs";
@@ -25,17 +28,15 @@ import * as path from "path";
 import {
   cleanupTmpDir,
   closeVSCode,
-  launchVSCode,
+  expandTreeRow,
   LaunchedVSCode,
+  launchVSCode,
   makeAdditionalSet,
   makeSet,
   makeTmpDir,
-  openSessionSetsView,
-  triggerRefresh,
+  openWorkExplorerTree,
+  treeRow,
 } from "./electronLaunch";
-
-// Must match BLOCKED_MARKER in src/providers/SessionSetsModel.ts.
-const BLOCKED_MARKER = "⛓︎";
 
 interface PerTest {
   tmpPath?: string;
@@ -43,67 +44,43 @@ interface PerTest {
 }
 
 async function teardown(per: PerTest): Promise<void> {
-  const errs: unknown[] = [];
   if (per.launch) {
     try {
       await closeVSCode(per.launch);
-    } catch (e) {
-      errs.push(e);
+    } catch {
+      /* best effort */
     }
   }
-  if (per.tmpPath) {
-    try {
-      cleanupTmpDir(per.tmpPath);
-    } catch (e) {
-      errs.push(e);
-    }
-  }
-  if (errs.length > 0) {
-    // eslint-disable-next-line no-console
-    console.warn("teardown encountered cleanup errors:", errs);
-  }
+  if (per.tmpPath) cleanupTmpDir(per.tmpPath);
 }
 
-async function treeitemTexts(
-  tree: import("@playwright/test").FrameLocator,
-): Promise<string[]> {
-  const items = tree.locator('[data-testid^="session-set-"]');
-  const count = await items.count();
-  const out: string[] = [];
-  for (let i = 0; i < count; i++) {
-    const item = items.nth(i);
-    const t = (await item.textContent()) || "";
-    out.push(t.trim().replace(/\s+/g, " "));
-  }
-  return out;
-}
-
-function appendPrerequisitesToSpec(
-  setDir: string,
-  prereqSlugs: string[],
-): void {
+function appendPrerequisitesToSpec(setDir: string, prereqSlugs: string[]): void {
   // The harness emits a spec.md with a fenced ``yaml`` Session Set
-  // Configuration block. Append `prerequisites:` lines INSIDE that
-  // block so the parser picks them up.
+  // Configuration block. Append `prerequisites:` INSIDE that block so the
+  // parser picks them up.
   const specPath = path.join(setDir, "spec.md");
   const original = fs.readFileSync(specPath, "utf8");
   const prereqsBlock = [
     "prerequisites:",
     ...prereqSlugs.map((slug) => `  - slug: ${slug}\n    condition: complete`),
   ].join("\n");
-  // Insert the prereqs block right before the closing ``` fence of
-  // the Session Set Configuration yaml block. Regex anchored to the
-  // first ``` after `## Session Set Configuration`.
   const updated = original.replace(
     /(##\s*Session Set Configuration[\s\S]*?```ya?ml[\s\S]*?)(\n```)/i,
-    (_full, before: string, fenceClose: string) => `${before}\n${prereqsBlock}${fenceClose}`,
+    (_full, before: string, fenceClose: string) =>
+      `${before}\n${prereqsBlock}${fenceClose}`,
   );
+  // A silently no-op fixture edit is how this class of test fails several
+  // steps later looking like a product bug (the lesson `stampModule` in
+  // native-tree.spec.ts already carries).
+  if (updated === original) {
+    throw new Error(
+      `appendPrerequisitesToSpec: no config block in ${specPath}; the fixture template changed`,
+    );
+  }
   fs.writeFileSync(specPath, updated, "utf8");
 }
 
 function setStatusToComplete(setDir: string): void {
-  // Forge a v4-shape complete state on disk so the cross-reference
-  // resolves the prereq's condition.
   const statePath = path.join(setDir, "session-state.json");
   const state = JSON.parse(fs.readFileSync(statePath, "utf8")) as Record<
     string,
@@ -118,135 +95,85 @@ function setStatusToComplete(setDir: string): void {
   fs.writeFileSync(statePath, JSON.stringify(state, null, 2) + "\n", "utf8");
 }
 
-// ---------------------------------------------------------------------
-// Scenario 1: dependant renders the quiet blocked marker (and not the
-// retired badge) when the prereq is not-yet-complete.
-// ---------------------------------------------------------------------
-test("renders the blocked marker + tooltip when prereq target is not complete", async () => {
+/** Drill to a set row in whichever bucket its state puts it. */
+async function setRow(
+  pane: import("@playwright/test").Locator,
+  bucket: string,
+  slug: string,
+) {
+  await expandTreeRow(pane, "Default");
+  await expandTreeRow(pane, bucket);
+  const row = treeRow(pane, slug);
+  await row.waitFor({ state: "visible", timeout: 15_000 });
+  return row;
+}
+
+test.describe("Set 061 S2 — blocked-by-prerequisites, on the native tree", () => {
   const per: PerTest = {};
-  try {
-    per.tmpPath = makeTmpDir("dabbler-pw-prereq-blocked");
-    // Prereq set — stays at the harness's default "not-started" /
-    // sessions[].status = "not-started"; that's "not complete" from
-    // the cross-reference's point of view.
-    const prereqHandle = makeSet(per.tmpPath, "044-prereq", 1);
-    // Dependant set — declares the prereq above. Second set in the
-    // SAME fixture repo, so it must go through makeAdditionalSet:
-    // makeSet creates `<tmp>/repo` and fails on an existing one.
-    const depHandle = makeAdditionalSet(prereqHandle, "047-dependant", 2);
-    appendPrerequisitesToSpec(depHandle.set_dir, ["044-prereq"]);
-
-    per.launch = await launchVSCode(depHandle.repo_root);
-    const tree = await openSessionSetsView(per.launch.page);
-    await triggerRefresh(per.launch.page);
-
-    const texts = await treeitemTexts(tree);
-    const joined = texts.join("\n");
-    expect(joined).toContain("047-dependant");
-    // Quiet marker on the dependant row; badge text retired.
-    const depRow = texts.find((t) => t.includes("047-dependant"));
-    expect(depRow).toBeDefined();
-    expect(depRow!).toContain(BLOCKED_MARKER);
-    expect(joined).not.toContain("[BLOCKED BY PREREQS]");
-    // The tooltip (title attribute) names the blocking prereq and its
-    // current state.
-    const markerEl = tree
-      .locator('[role="treeitem"]', { hasText: "047-dependant" })
-      .locator(".row-blocked-marker");
-    await expect(markerEl).toHaveAttribute(
-      "title",
-      "Blocked by prerequisites: 044-prereq (not started) — all must complete first.",
-    );
-    // Sanity: the prereq row itself should NOT carry the marker
-    // (it has no prereqs of its own).
-    const prereqRow = texts.find((t) => t.includes("044-prereq"));
-    expect(prereqRow).toBeDefined();
-    expect(prereqRow!).not.toContain(BLOCKED_MARKER);
-  } finally {
+  test.afterEach(async () => {
     await teardown(per);
-  }
-});
+    per.tmpPath = undefined;
+    per.launch = undefined;
+  });
 
-// ---------------------------------------------------------------------
-// Scenario 2: same dependant, with the prereq flipped to complete →
-// no marker.
-// ---------------------------------------------------------------------
-test("no blocked marker when prereq target is complete", async () => {
-  const per: PerTest = {};
-  try {
-    per.tmpPath = makeTmpDir("dabbler-pw-prereq-unblocked");
-    const prereqHandle = makeSet(per.tmpPath, "044-prereq-done", 1);
-    setStatusToComplete(prereqHandle.set_dir);
-    const depHandle = makeAdditionalSet(prereqHandle, "047-unblocked", 2);
-    appendPrerequisitesToSpec(depHandle.set_dir, ["044-prereq-done"]);
+  test("flags the dependant when the prereq target is not complete", async () => {
+    per.tmpPath = makeTmpDir("dabbler-prereq-blocked");
+    const prereq = makeSet(per.tmpPath, "044-prereq", 1);
+    const dep = makeAdditionalSet(prereq, "047-dependant", 2);
+    appendPrerequisitesToSpec(dep.set_dir, ["044-prereq"]);
 
-    per.launch = await launchVSCode(depHandle.repo_root);
-    const tree = await openSessionSetsView(per.launch.page);
-    await triggerRefresh(per.launch.page);
+    per.launch = await launchVSCode(dep.repo_root);
+    const pane = await openWorkExplorerTree(per.launch.page);
 
-    const texts = await treeitemTexts(tree);
-    const depRow = texts.find((t) => t.includes("047-unblocked"));
-    expect(depRow).toBeDefined();
-    expect(depRow!).not.toContain(BLOCKED_MARKER);
-  } finally {
-    await teardown(per);
-  }
-});
+    const depRow = await setRow(pane, "Not Started", "047-dependant");
+    await expect(depRow.locator(".codicon-error")).toHaveCount(1);
 
-// ---------------------------------------------------------------------
-// Scenario 3 (S5 verifier Nice-to-have-2, carried forward): marker
-// suppressed when the dependant itself is in a terminal state
-// (complete / cancelled). The cross-reference still derives
-// blocked, but the renderer suppresses the marker — once a set is
-// closed, its dependency status is no longer actionable.
-// ---------------------------------------------------------------------
-test("no blocked marker on terminal-state row even when the cross-reference derives blocked", async () => {
-  const per: PerTest = {};
-  try {
-    per.tmpPath = makeTmpDir("dabbler-pw-prereq-terminal");
-    // Prereq target stays not-started (so blockedByPrereqs would be
-    // true for any depending set under the cross-reference rule).
-    const prereqHandle = makeSet(per.tmpPath, "044-still-not-started", 1);
-    // Dependant is COMPLETE on disk; marker must be suppressed on the
-    // terminal row even though the cross-reference would otherwise
-    // mark it blocked.
-    const depHandle = makeAdditionalSet(prereqHandle, "047-completed-dep", 1);
-    appendPrerequisitesToSpec(depHandle.set_dir, ["044-still-not-started"]);
-    setStatusToComplete(depHandle.set_dir);
+    // The prereq itself declares no prerequisites, so it must not be
+    // flagged — the assertion that catches an over-broad derivation.
+    const prereqRow = treeRow(pane, "044-prereq");
+    await expect(prereqRow.locator(".codicon-error")).toHaveCount(0);
+  });
 
-    per.launch = await launchVSCode(depHandle.repo_root);
-    const tree = await openSessionSetsView(per.launch.page);
-    await triggerRefresh(per.launch.page);
+  test("does not flag the dependant when the prereq target is complete", async () => {
+    per.tmpPath = makeTmpDir("dabbler-prereq-unblocked");
+    const prereq = makeSet(per.tmpPath, "044-prereq-done", 1);
+    setStatusToComplete(prereq.set_dir);
+    const dep = makeAdditionalSet(prereq, "047-unblocked", 2);
+    appendPrerequisitesToSpec(dep.set_dir, ["044-prereq-done"]);
 
-    const texts = await treeitemTexts(tree);
-    const depRow = texts.find((t) => t.includes("047-completed-dep"));
-    expect(depRow).toBeDefined();
-    expect(depRow!).not.toContain(BLOCKED_MARKER);
-  } finally {
-    await teardown(per);
-  }
-});
+    per.launch = await launchVSCode(dep.repo_root);
+    const pane = await openWorkExplorerTree(per.launch.page);
 
-// ---------------------------------------------------------------------
-// Scenario 4: a set without prerequisites declared never carries the
-// marker.
-// ---------------------------------------------------------------------
-test("no blocked marker when prerequisites field is absent", async () => {
-  const per: PerTest = {};
-  try {
-    per.tmpPath = makeTmpDir("dabbler-pw-prereq-absent");
+    const depRow = await setRow(pane, "Not Started", "047-unblocked");
+    await expect(depRow.locator(".codicon-error")).toHaveCount(0);
+  });
+
+  test("suppresses the flag on a terminal-state row", async () => {
+    // Set 077 S5 carry-forward: the cross-reference still DERIVES blocked,
+    // but once a set is closed its dependency status is not actionable, so
+    // the marker is suppressed. That is a suppression rule in our own code,
+    // not the platform's, which is why it stays at Layer 3.
+    per.tmpPath = makeTmpDir("dabbler-prereq-terminal");
+    const prereq = makeSet(per.tmpPath, "044-still-not-started", 1);
+    const dep = makeAdditionalSet(prereq, "047-completed-dep", 1);
+    appendPrerequisitesToSpec(dep.set_dir, ["044-still-not-started"]);
+    setStatusToComplete(dep.set_dir);
+
+    per.launch = await launchVSCode(dep.repo_root);
+    const pane = await openWorkExplorerTree(per.launch.page);
+
+    const depRow = await setRow(pane, "Complete", "047-completed-dep");
+    await expect(depRow.locator(".codicon-error")).toHaveCount(0);
+  });
+
+  test("never flags a set that declares no prerequisites", async () => {
+    per.tmpPath = makeTmpDir("dabbler-prereq-absent");
     const handle = makeSet(per.tmpPath, "047-standalone", 1);
-    // No appendPrerequisitesToSpec call — spec ships without the field.
 
     per.launch = await launchVSCode(handle.repo_root);
-    const tree = await openSessionSetsView(per.launch.page);
-    await triggerRefresh(per.launch.page);
+    const pane = await openWorkExplorerTree(per.launch.page);
 
-    const texts = await treeitemTexts(tree);
-    const row = texts.find((t) => t.includes("047-standalone"));
-    expect(row).toBeDefined();
-    expect(row!).not.toContain(BLOCKED_MARKER);
-  } finally {
-    await teardown(per);
-  }
+    const row = await setRow(pane, "Not Started", "047-standalone");
+    await expect(row.locator(".codicon-error")).toHaveCount(0);
+  });
 });

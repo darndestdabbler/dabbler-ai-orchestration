@@ -300,6 +300,53 @@ cannot eliminate the final delta review.**
   is a real cost, not a free benefit.
 - **Verification must not silently weaken.** The loop earned its cost in Set 109
   S4: five real Majors, one found *after* it had already returned VERIFIED.
+- **The capability-scaling test** *(operator-elevated to a guiding principle
+  for Set 111, 2026-08-05)*. Judge every piece of machinery this set adds,
+  keeps, or removes by one question: **does it become more valuable, or less
+  necessary, as models improve — or does it stay equally costly?** Machinery
+  built around weak verifiers fails the test: sequential round-grinding, dedup
+  ledgers, no-resurrection tracking, adjudication chains, and count-based caps
+  are fixed ceremony a stronger model cannot shrink. Machinery that absorbs
+  upgrades passes: a deep tool-provisioned discovery pass (capability arrives
+  as a registry pin), executable acceptance criteria with baseline
+  discrimination (ground truth is capability-independent, and criterion
+  quality *improves* with the writer), measurement close-gates, and
+  consequence-weighted budgets in place of round counts (better models finish
+  under them, so the stop is economic rather than arbitrary — and when rounds
+  keep yielding agreed Majors, a budget lets them run while they earn their
+  cost). Two structures are exempt from being scored as weak-model
+  scaffolding: **cross-provider exclusion** and **ground-truth anchoring** —
+  correlated blind spots are not known to decay with capability. Evidence
+  anchors: 110 S1, where the decisive verification act was a real-host
+  measurement (stub figures off by 10×) that no review round could have
+  produced; and Set 109 S4, where a tool-using critique found a Major after
+  the bundle-only loop had returned VERIFIED.
+- **Decision-rights rubric + education mode** *(operator-directed,
+  2026-08-05)*. Operator-gated adjudication assumes an operator who can
+  responsibly decide; in an AI-led workflow the operator usually lacks the
+  surfaced context, and most will not rebuild it. Route decisions by whose
+  **authority or preferences** they need, not how much judgment they need.
+  Human-required: external or hard-to-reverse consequences (publish, spend,
+  delete — beyond version control's undo horizon), underivable value
+  trade-offs, accountability sign-offs. Everything judgment-shaped —
+  spec-vs-reality conflicts, waiver adjudications, severity disputes — is
+  **AI-decidable under an ordered rubric**: (1) the spec's goal over its
+  unmeetable letter; (2) prefer reversible; (3) tied → the option that makes
+  the code simpler (fewer branches, fewer tests to hold it true); (4) prefer
+  deferring evidence to an existing later gate over inventing a new one;
+  (5) still tied → cross-provider consensus (extend the existing
+  `decision_consensus` machinery — 111 re-draws its human-only split per this
+  test); (6) consensus splits → human. Every AI-made call is journaled for
+  after-the-fact operator audit — **the human moves from gate to auditor**.
+  Hard carve-out: decisions that *reduce verification* stay outside AI
+  authority (no-skip mandate; the agent never authors its own permission).
+  When a human genuinely is required, the ask runs in **education mode**: a
+  self-contained brief — where the set stands, the question in one sentence,
+  options with likely consequences and costs, a recommendation with
+  confidence, the default on no-answer — written for a developer who has not
+  been watching. Both halves pass the capability-scaling test: a rubric
+  executed by models improves with models; an operator gate is a fixed
+  bottleneck that does not.
 
 ## 12. Provenance
 

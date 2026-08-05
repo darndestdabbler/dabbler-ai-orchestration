@@ -28,9 +28,9 @@ python -m ai_router.copilot_catalog --refresh  →
 Three families: excluding any orchestrator's family still leaves two
 independent verifier families, so the Copilot-seat profile carries the full
 exclusion guarantee for staff. Every known user of the framework is covered
-by the Full tier (keyed or seat-profile). When authoring begins, add the
-probe's `copilot-catalog.lock` (or its output line) to this set's folder as
-`probe-evidence`.
+by the Full tier (keyed or seat-profile). The probe's lockfile is preserved
+at **`D:\copilot-catalog.lock`** (operator, 2026-08-05); when authoring
+begins, copy it into this set's folder as `probe-evidence`.
 
 ## Kill list / keep list
 

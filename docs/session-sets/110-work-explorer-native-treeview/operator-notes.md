@@ -229,3 +229,32 @@ follows is *conduct within the existing machinery*, applied from S2 onward.
    blocking, and remediation-review run exactly as the constitution
    requires (no-skip mandate untouched). This note governs when the loop
    *stops*, not whether it runs.
+
+---
+
+## 2026-08-05 — Operator UX threshold: S4's startup gate has a number
+
+On seeing the real-host baseline (5,102 ms from view open to first visible
+row, webview implementation): *"5 seconds is way too long for a tree to
+appear. By any UX metric, that is horrible."* The operator expects lazy
+child-node loading on the native tree to deliver **sub-second** initial
+paint, and warns developers will reject the tool otherwise.
+
+**Recorded as an explicit S4 release-gate criterion:** view-open → first
+visible row **< 1,000 ms**, measured by the *same protocol* as
+`s1-real-host-baseline.json` — real Extension Development Host, shipping
+build, fresh profile per rep, natural cold paint, **no forced refresh**,
+same 8-set × 4-session fixture, median of ≥3 reps. The 5,102 ms webview
+figure is the before-number; a miss does not silently ship — it stops to
+the operator with an education-mode brief (what was measured, what the
+remaining cost is attributed to, options).
+
+Honest framing for S4, learned the hard way in S1: sub-second is an
+**expectation, not evidence**. The only attributed cost so far is ~102 ms
+of host-side work (dominated by a synchronous `git worktree list`); the
+rest of the 5.1 s aggregate is unattributed. No structural floor near 5 s
+is in evidence, and the migration deletes the plausible bulk suspects
+(webview process spin-up, renderer bootstrap, IPC, polling) — but S4
+measures before anyone claims. If the native tree misses the gate, the
+first suspect to decompose is that git subprocess going async so first
+paint does not wait on it.

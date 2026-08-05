@@ -116,6 +116,22 @@
       "dateTime": "2026-08-04T18:40:58.584359-04:00",
       "description": "Authored disposition.json (status completed, verdict VERIFIED, next_orchestrator recorded with the routed recommendation and its budget caveat); committed and pushed; ran close_session.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 15,
+      "stepKey": "session-001/close-backstop-round-4",
+      "dateTime": "2026-08-04T20:39:05.586529-04:00",
+      "description": "close_session gate FAILED: the Set-084 close backstop ran round 4 over the whole session diff and found 3 Majors - three of four startup buckets unmeasured, the withdrawn over-claim surviving in four echoes, and the required before/after never produced.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 16,
+      "stepKey": "session-001/remediate-round-2",
+      "dateTime": "2026-08-04T20:39:05.586529-04:00",
+      "description": "Accepted all 3. Built scripts/activation-harness.ts: activate() 338.8ms, resolveWebviewView() 0.1ms, renderer payload 110376 bytes -> 3 of 4 buckets now measured. Rewrote all four over-claim echoes (L-065-1, which this session had cited without applying). Captured the shipping renderer as the before image, which revealed the webview WRAPS set names where a TreeView truncates; operator confirmed the final mapping a second time, accepting truncation.",
+      "status": "complete"
     }
   ]
 }

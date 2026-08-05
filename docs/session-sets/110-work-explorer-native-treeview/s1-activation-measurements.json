@@ -1,0 +1,42 @@
+{
+  "generatedBy": "scripts/activation-harness.ts (Set 110 S1, round-4 remedy)",
+  "platform": "win32 10.0.26200",
+  "node": "v25.8.1",
+  "reps": 5,
+  "caveat": "Measured in-process against the vscode stub. These are the EXTENSION'S OWN synchronous costs on the host side — real. They EXCLUDE extension-host startup overhead and all renderer-side work (webview process spawn, HTML/CSS parse, script evaluation, first paint), which a Node harness cannot reach. Layer 3 owns first paint in S4, against both implementations.",
+  "buckets": {
+    "activateMs": {
+      "median": 338.84,
+      "raw": [
+        338.84,
+        398.08,
+        322.75,
+        307.17,
+        401.79
+      ],
+      "covers": "extension activate(): provider construction, command registration, watchers, context keys"
+    },
+    "resolveWebviewViewMs": {
+      "median": 0.11,
+      "raw": [
+        0.28,
+        0.09,
+        0.11,
+        0.09,
+        0.12
+      ],
+      "covers": "host half of showing the view: HTML assembly, message wiring, options. A TreeDataProvider removes this entirely."
+    },
+    "webviewPayloadBytes": {
+      "htmlBytes": 643,
+      "assetBytes": 110376,
+      "assets": {
+        "session-sets-tree/client.js": 53756,
+        "session-sets-tree/gettingStartedHtml.js": 28632,
+        "session-sets-tree/systemStatusHtml.js": 4459,
+        "session-sets-tree/tree.css": 23529
+      },
+      "covers": "what the renderer must fetch/parse/execute before first paint. Reported as BYTES, not ms, because timing it needs a renderer. This is the bucket the migration deletes outright."
+    }
+  }
+}

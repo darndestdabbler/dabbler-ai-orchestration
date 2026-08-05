@@ -1,12 +1,17 @@
 # Set 110 Session 1 — Migration decision
 
-> **Verdict: GO.** Confirmed by an operator decision on the density trade
-> (2026-08-04), a three-model panel run on the corrected registry, measured
-> startup costs at four scales, and four API spikes answered by running code
-> rather than by reading documentation.
+> **Verdict: GO.** Confirmed by two operator decisions on the density trade
+> (2026-08-04, the second covering the final mapping), a three-model panel run
+> on the corrected registry, startup measured at four scales plus three of the
+> spec's four buckets, a rendered before/after against the shipping renderer,
+> and four API spikes answered by running code rather than by reading
+> documentation.
 >
-> **But not for the reason the set was pitched.** The migration does **not**
-> fix the symptom that motivated it. See *The performance case is false*.
+> **But not for the reason the set was pitched.** There is a ~102 ms startup
+> floor the migration provably cannot remove, so the set's original performance
+> pitch does not hold as stated. Whether replacing the webview improves
+> perceived startup *on top of* that floor is **unknown and unmeasured** — see
+> §2, which is careful to separate the two.
 
 ---
 
@@ -46,7 +51,10 @@ question" as *the same question as recorded*, not as a byte-identical replay.
    CSS-only change broke interaction while the unit suite and every static gate
    stayed green. Sonnet: *"not a fluke, it's the natural failure mode of
    hand-rolled hover strips over reflowing DOM."*
-3. **The performance case is not real** (details below).
+3. **The performance case as pitched does not hold** — none of the three
+   expected the migration to remove the startup floor (details below). Note
+   that the panel was reasoning about the *floor*, not about webview
+   activation cost, which nobody measured.
 4. **The density trade is the operator's call, not an engineering one.** All
    three refused to decide it. Sol: *"cannot be settled from API capability
    alone."*
@@ -75,13 +83,17 @@ because it deserves to survive into S4's retrospective:
 > the scan turns out to be the fix, this whole migration may be solving the
 > wrong problem well."*
 
-The measurement below shows the scan **is** essentially the whole cost. The
-set proceeds anyway, on the correctness argument, with the performance claim
-withdrawn rather than defended.
+The measurement below shows the discovery subprocess **is** essentially the
+whole cost of an *empty* tree, and that it is immovable — so the pitch as
+stated does not hold. It also shows the migration deletes a ~110 KB renderer
+payload, which may yet buy a real first-paint win nobody has measured. The set
+proceeds on the correctness argument, with the performance claim **withdrawn
+rather than defended, and not quietly re-smuggled** as a payload-size
+insinuation.
 
 ---
 
-## 2. The performance case is false — measured, not argued
+## 2. The startup floor is real and immovable — measured, not argued
 
 Harness: [`scripts/perf-harness.ts`](../../../tools/dabbler-ai-orchestration/scripts/perf-harness.ts).
 Raw: [`s1-perf-measurements.json`](s1-perf-measurements.json). Medians of 5
@@ -141,12 +153,57 @@ not. Lazy `getChildren` removes the DOM half. It does not remove the scan half.
 - This is the single most likely candidate for **Set 111**, and it is now backed
   by a number rather than a hunch.
 
-### What was NOT measured — and the claim this session is NOT entitled to make
+### The other startup buckets — measured after the close backstop called this out
 
-`resolveWebviewView`, extension activation, and webview cold-start-to-first-paint
-need a running extension host and are not measurable from Node. The spec asked
-for four buckets; this session honestly delivers two, plus a decomposition of
-the dominant measured one.
+The first cut of this session measured only the host pipeline above and
+deferred the other three buckets to S4. **The close backstop was right that
+this defeated the session's own purpose**: the buckets a webview→TreeView
+migration can actually *change* were precisely the ones missing, and the
+session had a real Extension Development Host running for the API spikes, so
+"not measurable" was overstated.
+
+Harness: [`scripts/activation-harness.ts`](../../../tools/dabbler-ai-orchestration/scripts/activation-harness.ts).
+Raw: [`s1-activation-measurements.json`](s1-activation-measurements.json).
+Medians of 5, against this repo (109 sets).
+
+| bucket | measured | what it covers |
+| --- | ---: | --- |
+| `activate()` | **338.8 ms** (307–402) | the extension's own synchronous activation: provider construction, command registration, watcher creation, context keys — **and the ~124 ms host pipeline above, which is nested inside it** |
+| `resolveWebviewView()` | **0.1 ms** | the host half of showing the view: HTML assembly, message wiring, options |
+| webview renderer payload | **110,376 bytes** of JS/CSS + 643 bytes HTML | what the renderer must fetch, parse and execute before first paint |
+| renderer first paint | **still unmeasured** | needs a real renderer; Layer 3 owns it in S4 |
+
+Payload breakdown: `client.js` 53,756 B, `gettingStartedHtml.js` 28,632 B,
+`tree.css` 23,529 B, `systemStatusHtml.js` 4,459 B.
+
+**Three things follow, and two of them cut against the earlier draft:**
+
+1. **The host side of the webview is already free.** `resolveWebviewView()`
+   costs 0.1 ms. The migration saves essentially nothing there, so any startup
+   win must come from the renderer, not the host.
+2. **The renderer payload is the migration's real performance prize, and it is
+   substantial** — ~110 KB of script and CSS that a native `TreeView` deletes
+   outright, along with the webview process that parses and executes it. This
+   is a *credible* first-paint win. It is **not yet a measured one**, and this
+   document does not claim it as one.
+3. **`activate()` at ~339 ms dwarfs the ~124 ms pipeline**, so roughly 215 ms of
+   activation is something this session did **not** decompose — module loading,
+   watcher creation, command registration, or all three. Naming that honestly
+   rather than attributing it is the point; S4 or the follow-on set should
+   decompose it before anyone optimises it.
+
+**Measured under the vscode stub**, in-process. These are the extension's own
+synchronous costs and they are real, but they exclude extension-host startup
+overhead and every renderer-side cost. That exclusion is why bucket 4 stays
+open.
+
+### What is STILL not measured — and the claim this session is NOT entitled to make
+
+**One** bucket remains unmeasured: renderer cold-start to first paint. It needs
+a real renderer process, which a Node harness cannot reach. The spec asked for
+four buckets; three are now measured (two of them after the close backstop
+insisted), and the fourth is reported in bytes rather than milliseconds so the
+gap is visible instead of glossed.
 
 **An earlier draft of this document overreached here, and the verification round
 was right to block it.** It instructed S4 to "report empty-startup as
@@ -161,12 +218,16 @@ What is actually established:
 | A ~102 ms discovery floor exists and the migration cannot remove it | **measured** |
 | Reading session sets is not the empty-tree cost (0.3 ms) | **measured** |
 | Lazy children remove DOM construction for collapsed sets at scale | **measured** (scan is linear; DOM build is unconditional today) |
-| Whether removing the webview improves activation / view creation | **UNKNOWN — not measured** |
+| `activate()` costs ~339 ms, only ~124 ms of which is the pipeline | **measured** |
+| The host half of the webview (`resolveWebviewView`) is ~free | **measured** — 0.1 ms |
+| The renderer must load ~110 KB of JS/CSS the migration deletes | **measured, in bytes** |
+| Whether deleting that payload improves first paint, and by how much | **UNKNOWN — needs a renderer** |
 | Whether total perceived startup improves | **UNKNOWN — depends on the above** |
 
-The webview being replaced is a real cost centre — it loads HTML, CSS and
-~1,100 lines of script into a renderer — so it is entirely possible the
-migration *does* improve perceived startup on top of an unchanged floor.
+The webview being replaced is a real cost centre — ~110 KB of script and CSS
+parsed and executed in a separate renderer process — so it is entirely
+plausible the migration *does* improve perceived startup on top of an unchanged
+floor. Plausible is not measured, and this document does not upgrade it.
 
 **S4's obligation is therefore to measure, not to confirm.** It must report the
 activation and first-paint numbers for both the old and new views, and state
@@ -297,7 +358,43 @@ four statuses is invisible on a light theme.
 
 ---
 
-## 4. The density trade — operator-confirmed, and one premise overturned
+## 4. The density trade — operator-confirmed twice, and two premises overturned
+
+### The before/after, produced after the close gate insisted on it
+
+The spec's step 5 required putting the trade to the operator *"with a rendered
+before/after of a real row carrying several markers"*. The first cut showed
+only the **after** — the native spike at two widths — and never rendered the
+**before**. The close backstop refused the session for it, correctly.
+
+The real current renderer, captured by running the shipping extension in an
+Extension Development Host against this repo:
+[`00-BEFORE-current-webview-renderer.png`](s1-spike-evidence/00-BEFORE-current-webview-renderer.png).
+
+**Producing it surfaced a consequence none of the earlier spike work had
+identified**, and it matters more than the fraction:
+
+| | today (webview) | native `TreeView` |
+| --- | --- | --- |
+| long set name | **wraps across up to 3 lines — always fully readable** | **truncates to one line with an ellipsis** |
+| fraction | colour-coded column, left of the name | removed (operator decision) |
+| date / UAT status | inline after the name (`2026-08-04 · [UAT 4]`) | tooltip |
+| vertical cost | ~3 lines per in-progress set | 1 line per set |
+
+The current view never hides a set name. A `TreeView` row cannot wrap, so it
+always can. That is not a mapping choice — it is a platform property, and it
+applies to **every** set name rather than to one optional field.
+
+**Operator decision, 2026-08-04 (second confirmation, post-remediation):
+accept the truncation.** The compensating gain is density in the other
+direction — roughly three times as many sets visible per screen — and the full
+name remains in the tooltip. The numeric prefix was deliberately kept in the
+label rather than stripped, so the left edge stays scannable.
+
+This second confirmation covers the **final** mapping, including the pieces
+introduced during remediation (the icon precedence table and the two-action
+inline cap), which the first confirmation predated. That gap was the close
+gate's third finding.
 
 The spike rendered the spec's worst-case row (five markers + fraction + kind
 badge) at the default panel width and produced a finding that **changes the
@@ -347,7 +444,7 @@ has.
 
 | today | native | status |
 | --- | --- | --- |
-| session-set name | `label` | confirmed |
+| session-set name | `label` — one line, truncates; full name in tooltip | **operator-confirmed twice** (2026-08-04; the second confirmation covers truncation, which the webview's wrapping hid) |
 | `3/5` fraction column | **removed entirely** | **operator-decided 2026-08-04** |
 | the single most severe marker | `iconPath`, per the precedence below | confirmed, spike-proven |
 | the remaining markers, in full | markdown `tooltip` | confirmed |
@@ -445,9 +542,11 @@ rather than preference:
 
 The walk stays in S4. Both routed voices wanted it earlier; the operator's
 choice to keep four sessions means S3's internal ordering is the mitigation
-instead. S4's re-measurement **must report empty-startup as unchanged** and
-attribute it to discovery, not treat it as a disappointment to be explained
-away.
+instead. S4's re-measurement **must report what it measures**, in both
+directions: the ~102 ms discovery floor will not have moved (nothing in this
+plan touches it, and saying otherwise would be false), but whether activation
+and first paint improved is an open question S4 answers with numbers. If the
+native tree is faster to first paint, S4 says so and quantifies it.
 
 ---
 
@@ -481,6 +580,8 @@ Recorded residuals, none blocking:
    is the strongest candidate for the next set.
 5. Two inline actions were proven safe at *default* width; minimum width with
    two was not separately captured. S4's walk closes it.
+6. Renderer first paint is still unmeasured in time (reported in bytes). Layer 3
+   owns it in S4, against both implementations.
 
 ### What the verification round changed
 
@@ -498,5 +599,32 @@ claims this document had already made:
    the spike had rendered a blocked set as a generic in-progress dot. A ranked
    precedence table now exists and is spike-proven at minimum width.
 
-The set's verdict did not change. Two of its supporting claims did, and one
-spike result was reversed.
+### What the close backstop changed (round 4)
+
+The close gate then refused the session on three further Majors, all real:
+
+5. **Three of the four startup buckets were never measured**, which defeated
+   the session's own "measure before committing" purpose — and the objection
+   landed harder because the session had a real Extension Development Host
+   running for the API spikes, so "not measurable" was overstated. Two more
+   buckets are now measured (`activate()` 338.8 ms, `resolveWebviewView()`
+   0.1 ms) and the fourth is quantified in bytes (~110 KB of renderer payload).
+   That work changed the picture materially: the webview's *host* half is
+   already free, so any startup win must come from the renderer.
+6. **The withdrawn over-claim survived in four other echoes** — the opening
+   verdict block, the §1 agreement list, the §2 heading, and worst, a mandatory
+   §5 instruction telling S4 to "report empty-startup as unchanged" that flatly
+   contradicted the correction two sections earlier. All four rewritten. This
+   is L-065-1 exactly, and the lesson was cited by this very session before the
+   echoes were found — a fix is not done at the first site.
+7. **The required before/after was never produced and the operator's
+   confirmation predated the final mapping.** The shipping renderer is now
+   captured, and it revealed that the current webview **wraps** long set names
+   across up to three lines while a `TreeView` truncates them — a consequence
+   affecting every set name, which no earlier spike had surfaced. Put to the
+   operator, who accepted truncation in exchange for roughly three times the
+   sets per screen.
+
+The set's verdict did not change through any of it. Five supporting claims did,
+one spike result was reversed, and one platform consequence was found only
+because a gate insisted on evidence the session had skipped.

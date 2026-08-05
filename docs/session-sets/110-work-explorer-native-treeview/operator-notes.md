@@ -291,3 +291,42 @@ round, same pathology). Candidate Set 111 policy, applied to this set now:
 - **CI stays the push-time backstop, never the session gate.** Close
   evidence is local and in-session; do not block a close on a remote
   queue.
+
+---
+
+## 2026-08-05 — UAT for S3/S4: the guided-look format, and no silent bypass
+
+Operator-directed. S2 closed without its UAT walk — part of a long
+pattern (the operator: *"We often bypass UAT. I haven't complained
+because it totally sucks, but we shouldn't bypass it. It should be a
+pleasurable experience."*). Candidate Set 111 policy, applied to this
+set's remaining sessions now.
+
+**Format — a guided look, not a test script.** Two sections only:
+
+- **Look** (≤5 items): confidence glances derived from the acceptance
+  criteria and from surfaces automation is blind to (rendering, theming,
+  timing, feel). Three lines max per item: one line to get there, one
+  line what to look at, one question. Every item self-contained for a
+  reader who has not watched the work.
+- **Decide** (≤3 items): provisional UX calls the AI made that only the
+  operator can ratify, judged while looking at the real UI. Answers are
+  choices, never essays. The next session opens by showing each call
+  applied (or reversed).
+
+The whole walk fits in ten minutes. **It starts itself**: stage the walk
+with the existing real-host harness (the Playwright `launchVSCode` +
+fixture machinery) so VS Code opens already on the thing to look at —
+the operator stages nothing. Lead with the strongest moment (the native
+tree painting where the webview lagged), end with a visible finish.
+
+**S3's walk inherits S2's unwalked debt.** Fold in: the light-theme
+eyeball of all four status icons at real 16px on the operator's authored
+art (S2's gates prove the files differ and avoid white; only eyes prove
+they look right), and the cancelled-icon inversion as a Decide item.
+
+**No silent bypass.** A `requiresUAT` session that closes without its
+walk does so only on an explicit operator-attested waiver (the
+`--manual-verify` pattern) recorded in the disposition — never by the
+walk simply not happening. Skipping becomes a visible operator decision,
+not an evaporation.

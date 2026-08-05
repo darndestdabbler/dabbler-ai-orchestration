@@ -132,6 +132,22 @@
       "dateTime": "2026-08-04T20:39:05.586529-04:00",
       "description": "Accepted all 3. Built scripts/activation-harness.ts: activate() 338.8ms, resolveWebviewView() 0.1ms, renderer payload 110376 bytes -> 3 of 4 buckets now measured. Rewrote all four over-claim echoes (L-065-1, which this session had cited without applying). Captured the shipping renderer as the before image, which revealed the webview WRAPS set names where a TreeView truncates; operator confirmed the final mapping a second time, accepting truncation.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 17,
+      "stepKey": "session-001/round-5-and-adjudication",
+      "dateTime": "2026-08-04T20:52:11.087061-04:00",
+      "description": "Round 5 remediation-review REJECTED the activation fix (1 Major). Disputed the part demanding a native-tree measurement that cannot exist until S2; spent the operator-preauthorized third-provider round on it. gemini-2.5-pro (neither anthropic nor openai) UPHELD the verifier and ruled against the orchestrator: the impossible half was answered while the possible half - real cold activation of the current extension - was left undone. Dispute withdrawn.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 18,
+      "stepKey": "session-001/remediate-round-3",
+      "dateTime": "2026-08-04T20:52:11.092762-04:00",
+      "description": "Built scripts/cold-activation.js: fresh Node process per rep, module load inside the measurement, real dist bundle. module load 54.3ms, activate() 336.5ms, cold total 389.9ms. activate() cold ~= warm (vindicating that figure) but module load was a real 54.3ms the warm harness excluded. Superseded the warm activateMs; corrected the doc guess that module loading explained the undecomposed time. Two attempts at renderer first paint abandoned rather than faked.",
+      "status": "complete"
     }
   ]
 }

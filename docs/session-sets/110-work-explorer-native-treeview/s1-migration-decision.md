@@ -168,10 +168,22 @@ Medians of 5, against this repo (109 sets).
 
 | bucket | measured | what it covers |
 | --- | ---: | --- |
-| `activate()` | **338.8 ms** (307–402) | the extension's own synchronous activation: provider construction, command registration, watcher creation, context keys — **and the ~124 ms host pipeline above, which is nested inside it** |
+| module load | **54.3 ms** | `require()` of the real `dist/extension.js` bundle, cold, per process |
+| `activate()` | **336.5 ms** cold | the extension's own synchronous activation: provider construction, command registration, watcher creation, context keys — **and the ~124 ms host pipeline above, which is nested inside it** |
+| **cold bootstrap total** | **389.9 ms** | module load + activate, five **cold processes**, median |
 | `resolveWebviewView()` | **0.1 ms** | the host half of showing the view: HTML assembly, message wiring, options |
 | webview renderer payload | **110,376 bytes** of JS/CSS + 643 bytes HTML | what the renderer must fetch, parse and execute before first paint |
 | renderer first paint | **still unmeasured** | needs a real renderer; Layer 3 owns it in S4 |
+
+> **These cold figures supersede an earlier warm, in-process set**
+> ([`s1-activation-baseline.json`](s1-activation-baseline.json) supersedes the
+> `activateMs` in [`s1-activation-measurements.json`](s1-activation-measurements.json)).
+> Round 5 rejected the warm numbers and a third-provider adjudication upheld
+> that rejection — see §7. Two things are worth noting from the correction:
+> `activate()` itself measured almost identically cold (336.5 ms) and warm
+> (338.8 ms), so that figure survived scrutiny; but **module loading was a real
+> 54.3 ms the warm harness excluded by construction**, so the honest cold
+> bootstrap is ~390 ms rather than ~339 ms.
 
 Payload breakdown: `client.js` 53,756 B, `gettingStartedHtml.js` 28,632 B,
 `tree.css` 23,529 B, `systemStatusHtml.js` 4,459 B.
@@ -186,16 +198,19 @@ Payload breakdown: `client.js` 53,756 B, `gettingStartedHtml.js` 28,632 B,
    outright, along with the webview process that parses and executes it. This
    is a *credible* first-paint win. It is **not yet a measured one**, and this
    document does not claim it as one.
-3. **`activate()` at ~339 ms dwarfs the ~124 ms pipeline**, so roughly 215 ms of
-   activation is something this session did **not** decompose — module loading,
-   watcher creation, command registration, or all three. Naming that honestly
-   rather than attributing it is the point; S4 or the follow-on set should
-   decompose it before anyone optimises it.
+3. **`activate()` at ~336 ms dwarfs the ~124 ms pipeline**, so roughly 212 ms of
+   activation is something this session did **not** decompose — watcher
+   creation, command registration, context-key setup, or all three. It is
+   **not** module loading: that is separately measured at 54.3 ms and sits
+   outside `activate()`. (An earlier draft guessed module loading might explain
+   the gap; it was measured instead, and it does not.) S4 or the follow-on set
+   should decompose the remainder before anyone optimises it.
 
-**Measured under the vscode stub**, in-process. These are the extension's own
-synchronous costs and they are real, but they exclude extension-host startup
-overhead and every renderer-side cost. That exclusion is why bucket 4 stays
-open.
+**Measured under the vscode stub, in-process, and warm.** Read these as *the
+shape of the extension's own synchronous work*, not as cold-start figures: the
+modules are already loaded, the five reps share one process, and the real
+extension host is not involved. Round 5 rejected them as a substitute for real
+activation measurement and was right to. The real numbers are below.
 
 ### What is STILL not measured — and the claim this session is NOT entitled to make
 

@@ -1,0 +1,7 @@
+VERIFIED — The provider hierarchy, lazy expansion, stable identities, command argument flow, menu/context gating, refresh caching, and test coverage satisfy the Session 2 contract. The remaining defects are low-probability preview/evidence issues and do not justify blocking close.
+
+#### NITS
+
+- **Nit:** Invalid-manifest diagnostics are dropped by the native preview, so it can show retained stale modules without explaining why. → **Location:** `WorkExplorerTreeProvider.modules()` consumes only `.modules` from `assembleVisibleModules(...)` and discards `.manifestFaults`. → **Fix:** Retain the faults and expose `INVALID_MANIFEST_MESSAGE` through `TreeView.message`, a diagnostic row, or equivalent. This is non-blocking because it requires an invalid hand-edited manifest and the diagnostic remains available in the default webview during Session 2.
+
+- **Nit:** The executable icon probe still generates the disproven claim that a `{light, dark}` pair is “required.” → **Location:** `src/test/playwright/icon-render-mechanism.spec.ts`, the `usesBackground` verdict branch. → **Fix:** State that authored colors render and `currentColor` cannot inherit the workbench foreground; describe the pair as the selected solution, not the only possible solution.

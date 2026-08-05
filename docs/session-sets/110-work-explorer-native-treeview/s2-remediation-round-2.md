@@ -113,6 +113,21 @@ not concessions.
 
 ---
 
+## The close backstop agreed, independently
+
+`close_session` ran its own in-process verification (round 3,
+`gpt-5-6-sol`, anthropic excluded, $0.5645) and returned **VERIFIED**.
+Its nits are **exactly the two assigned to Session 3 above** — the
+dropped `manifestFaults` and the icon probe's generated verdict string —
+reached without sight of this document.
+
+That is the corroboration worth having: a third independent read
+converged on the same two residuals *and* graded them non-blocking, so
+the decision to record them with an owner rather than fix them during a
+close run was the right call rather than a convenient one.
+
+---
+
 ## Suite and gate state at close
 
 | gate | result |

@@ -7,16 +7,18 @@
 > running code in a real Extension Development Host, and the host-side startup
 > pipeline measured at four scales.
 >
-> **The migration-specific startup buckets are NOT measured** — activation,
-> `resolveWebviewView` and first paint were only ever run against a Node stub,
-> and two authorized attempts at a real-host measurement failed. That residual
-> is adjudicated and owed to S4; see §6.
+> **The real-host measurement finally succeeded, and it changed the picture.**
+> In a launched Extension Development Host the shipping view takes **~5.1 s from
+> opening the view to painting its first row**, and ~11.6 s from launch. The
+> stub harnesses reported ~390 ms for the extension's cold bootstrap — off by
+> more than an order of magnitude from what a user experiences. The verifier
+> refused those figures three times and was right to. See §2.
 >
-> **But not for the reason the set was pitched.** There is a ~102 ms startup
-> floor the migration provably cannot remove, so the set's original performance
-> pitch does not hold as stated. Whether replacing the webview improves
-> perceived startup *on top of* that floor is **unknown and unmeasured** — see
-> §2, which is careful to separate the two.
+> **The pitch was wrong about the mechanism, not the symptom.** A ~102 ms
+> host-pipeline floor survives the migration, and the original "the tree
+> re-renders too much" framing does not explain an empty tree. But the view
+> genuinely is slow — ~5.1 s to first row — and most of that is webview cost
+> the migration deletes. §2 separates what is measured from what is not.
 
 ---
 
@@ -88,17 +90,20 @@ because it deserves to survive into S4's retrospective:
 > the scan turns out to be the fix, this whole migration may be solving the
 > wrong problem well."*
 
-The measurement below shows the discovery subprocess **is** essentially the
-whole cost of an *empty* tree, and that it is immovable — so the pitch as
-stated does not hold. It also shows the migration deletes a ~110 KB renderer
-payload, which may yet buy a real first-paint win nobody has measured. The set
-proceeds on the correctness argument, with the performance claim **withdrawn
-rather than defended, and not quietly re-smuggled** as a payload-size
-insinuation.
+Sonnet's worry was that the set might be "solving the wrong problem well". The
+measurements below say: partly, and not in the direction anyone expected. The
+*empty-tree* cost really is a ~102 ms git subprocess the migration cannot
+touch, so that half of the worry stands and the scan fix is owed to a follow-on
+set. But the *view-open* cost is ~5.1 s in a real host, most of it webview work
+the migration deletes outright — so the migration is not merely a correctness
+play after all. The set proceeds on correctness as its **primary** justification
+because that is what three panelists independently ranked first and what is
+proven today; the performance upside is real but remains **unquantified on the
+native side**, which does not exist yet.
 
 ---
 
-## 2. The startup floor is real and immovable — measured, not argued
+## 2. What startup actually costs — measured three ways, and the first two were misleading
 
 Harness: [`scripts/perf-harness.ts`](../../../tools/dabbler-ai-orchestration/scripts/perf-harness.ts).
 Raw: [`s1-perf-measurements.json`](s1-perf-measurements.json). Medians of 5
@@ -157,6 +162,50 @@ not. Lazy `getChildren` removes the DOM half. It does not remove the scan half.
   smuggled in.
 - This is the single most likely candidate for **Set 111**, and it is now backed
   by a number rather than a hunch.
+
+### The real-host numbers — what a user actually waits for
+
+Harness: [`real-host-baseline.spec.ts`](../../../tools/dabbler-ai-orchestration/src/test/playwright/real-host-baseline.spec.ts).
+Raw: [`s1-real-host-baseline.json`](s1-real-host-baseline.json). A launched VS
+Code Extension Development Host, shipping extension, fresh profile per rep,
+8-set fixture, **no forced refresh** — the view's natural cold paint.
+
+| | median of 3 | samples |
+| --- | ---: | --- |
+| launch → first row visible | **11,582 ms** | 11586 / 11545 / 11582 |
+| **view opened → first row visible** | **5,102 ms** | 5083 / 5102 / 5221 |
+
+**This is the number that matters, and nothing else in this session came close
+to it.** Every earlier harness ran Node against a `vscode` stub and reported the
+extension's cold bootstrap at ~390 ms. The real host says a user who clicks the
+Work Explorer waits **~5 seconds** to see a row. The stub figures were not
+merely incomplete — they were wrong by more than 10×, and this document spent
+three verification rounds defending them.
+
+**What the 5.1 s contains** (not separable without instrumenting the product,
+which this session may not do): webview process spawn, ~110 KB of JS/CSS
+fetched, parsed and executed, the host-side scan (~124 ms measured), the
+message round-trip, and the full `innerHTML` tree build.
+
+**What this does to the migration's case.** It *strengthens* it, in the one
+direction this document had ruled out. A native `TreeView` deletes the webview
+process, its payload and its render path entirely. Of the ~5.1 s, only the
+~124 ms scan provably survives the migration. **That is not a promise of a 40×
+win** — the native tree's own paint cost is unmeasured because the native tree
+does not exist — but the earlier framing, that startup was immovable and the
+migration could only be justified on correctness, was **too pessimistic and is
+withdrawn**.
+
+**Caveats, stated so nobody over-reads this.** An Extension Development Host is
+slower to start than a packaged install, so `launch → first row` (11.6 s) is not
+a user-facing figure. `view opened → first row` (5.1 s) is measured after VS
+Code is already up and is the more defensible number. Both are on an 8-set
+fixture, not an empty tree, so they do not contradict the ~102 ms empty-tree
+pipeline finding — they measure a different thing: what the user waits for,
+rather than what the host computes.
+
+**S4 must measure the native tree the same way** — same harness, no forced
+refresh — or the comparison is invalid.
 
 ### The other startup buckets — measured after the close backstop called this out
 
@@ -584,18 +633,44 @@ native tree is faster to first paint, S4 says so and quantifies it.
 
 **GO.**
 
-**Defect-class elimination is the sole primary justification for this
-migration.** Not performance, not line count. All three panelists ranked it
-first independently, and the Set 108 specimen — a CSS-only change that broke
-interaction while the unit suite and every static gate stayed green — makes it
-concrete. The performance claim is **withdrawn in writing** before any code is
-migrated, and nothing in this set may be sold on a startup number.
+**Defect-class elimination is the primary justification for this migration** —
+it is what all three panelists independently ranked first, and the Set 108
+specimen (a CSS-only change that broke interaction while the unit suite and
+every static gate stayed green) makes it concrete.
 
-That framing is not a retreat dressed up as a decision; it is what survived
-contact with the measurements. The startup pitch was tested and did not hold;
-the correctness argument was tested by three independent panelists and did.
+**Performance is a real secondary justification, but it is not yet earned.**
+The real-host measurement shows the shipping view takes ~5.1 s from open to
+first row, most of it webview cost the migration deletes. That is a genuine
+reason to expect an improvement. It is **not** a measured improvement, because
+the native tree does not exist yet, and **no CHANGELOG line in this set may
+claim one** until S4 measures both implementations through the same harness.
 
-### Adjudicated residual: the startup buckets are stub-measured
+An earlier draft of this section said performance was withdrawn outright and
+defect-class elimination was the *sole* justification. That was written when
+the only figures available were stub-measured, and it was too pessimistic. The
+correction is recorded rather than silently applied.
+
+### The residual, as it actually stands
+
+The second adjudication ruled MAY_CLOSE on the basis that the stub figures
+would never be fixed. **They were then fixed**, on a fifth attempt, after the
+operator authorized one more try. So the residual is smaller than the
+adjudication assumed, and honesty requires saying which parts remain:
+
+- **Measured, in a real host:** launch → first row (11.6 s) and view open →
+  first row (5.1 s), three cold reps, tight variance.
+- **Still stub-measured:** the *decomposition* — `activate()`,
+  `resolveWebviewView()` and module load individually. Those remain Node-stub
+  figures and are labelled as such; they under-report reality by more than 10×
+  in aggregate, so treat them as shape, not size.
+- **Still unmeasured, and unmeasurable here:** the native tree's equivalent.
+  It does not exist until S2.
+
+**S4 must** run [`real-host-baseline.spec.ts`](../../../tools/dabbler-ai-orchestration/src/test/playwright/real-host-baseline.spec.ts)
+against both implementations, with no forced refresh, and report the delta
+whichever way it falls.
+
+### How the stub figures misled, recorded so it is not repeated
 
 Recorded on the instruction of the second third-party adjudication
 ([`s1-third-provider-adjudication-2.json`](s1-third-provider-adjudication-2.json)),

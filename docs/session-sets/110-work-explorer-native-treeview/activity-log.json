@@ -172,6 +172,14 @@
       "dateTime": "2026-08-05T01:24:14.669475-04:00",
       "description": "Operator instruction: route the issue to a third party. Routed to gemini-3.1-pro-preview (Google; third party to the anthropic orchestrator and openai verifier, and a DIFFERENT model from the first adjudicator). Verdict MAY_CLOSE, endangers_s2_s4=false: the 102ms floor is the operative finding, the perf claim is withdrawn, S3 deletion is reversible and S4 is the release gate. It also judged the verifier and first adjudicator to have conflated literal spec compliance with the go/no-go requirement. Recorded its four mandatory disclosures in the decision doc.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 22,
+      "stepKey": "session-001/real-host-measured",
+      "dateTime": "2026-08-05T01:36:31.077510-04:00",
+      "description": "Real-host baseline SUCCEEDED on the fifth attempt. Two distinct bugs were mine: launchVSCode was given tmpPath instead of handle.repo_root (so VS Code opened a workspace with no session sets), and the run depended on triggerRefresh, whose command palette flaked in 3 of 4 attempts. Dropping the forced refresh was also the more correct measurement. Results: launch->first row 11582ms, view open->first row 5102ms, medians of 3, tight variance. The stub harnesses had reported ~390ms cold bootstrap - understating the user-visible cost by more than 10x. The verifier refused those figures three times and was right on the merits, not on a technicality. Decision doc corrected throughout: performance is now a real but unquantified SECONDARY justification rather than withdrawn.",
+      "status": "complete"
     }
   ]
 }

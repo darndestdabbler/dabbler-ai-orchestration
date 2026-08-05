@@ -32,7 +32,6 @@ import {
   makeSet,
   makeTmpDir,
   openSessionSetsView,
-  triggerRefresh,
 } from "./electronLaunch";
 
 const REPS = 3;
@@ -57,36 +56,13 @@ function median(xs: number[]): number {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-// ---------------------------------------------------------------------------
-// SKIPPED, DELIBERATELY, AND NOT BECAUSE IT IS INCONVENIENT.
-//
-// S1 attempted this twice under operator authorization and failed both times:
-//
-//   attempt 1 — `triggerRefresh` timed out: the command palette never opened
-//               (`.quick-input-widget input` not visible within 10 s).
-//   attempt 2 — the palette opened and the refresh ran, but no
-//               `[role="treeitem"]` ever became visible in 60 s, so the tree
-//               painted no rows against this fixture.
-//
-// The fixture is built exactly as the passing specs build theirs
-// (`makeSet` + `makeAdditionalSet`), so the likeliest cause is that those specs
-// assert on a *specific* known slug in a known bucket state while this one
-// waits for ANY row, and something about the 8-set all-not-started fixture
-// leaves the tree in a state where no treeitem is visible — an empty-state or
-// all-collapsed shell.
-//
-// It is left SKIPPED rather than deleted because the measurement is genuinely
-// owed and S4 needs it: S4 must produce the AFTER number for the native tree,
-// and this file is the BEFORE half, already written and already carrying the
-// comparability caveat below. It is skipped rather than left failing because a
-// red spec in the Layer 3 suite would rot the one gate this repo relies on
-// (L-064-12).
-//
-// S4: fix the row-visibility wait first (mirror `session-sets-tree.spec.ts`,
-// which waits on a specific `[data-slug=...]`), then un-skip and run BOTH
-// implementations through it.
-// ---------------------------------------------------------------------------
-test.describe.skip("Set 110 S1 — real Extension Development Host baseline", () => {
+// Two earlier attempts failed and the cause was mine, not the harness's:
+// `launchVSCode(tmpPath)` opened the tmp PARENT directory rather than the
+// fixture's repo root, so VS Code opened a workspace with no session sets in
+// it and the tree correctly painted nothing. The passing specs pass
+// `handle.repo_root`. Fixed, and the row wait now mirrors
+// `session-sets-tree.spec.ts` — the tree test id, then a SPECIFIC data-slug.
+test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
   test.describe.configure({ timeout: 900_000 });
 
   test("measures cold launch-to-first-row for the shipping webview", async () => {
@@ -106,23 +82,27 @@ test.describe.skip("Set 110 S1 — real Extension Development Host baseline", ()
         }
 
         const tLaunch = Date.now();
-        launch = await launchVSCode(tmpPath);
+        // launchVSCode must open the fixture's REPO ROOT, not the tmp parent.
+        // Passing tmpPath opened a workspace containing no session sets, which
+        // is why attempt 2 waited 60 s for a row that could never exist.
+        launch = await launchVSCode(handle.repo_root);
 
         const tOpen = Date.now();
         const inner = await openSessionSetsView(launch.page);
-        // Matches how every passing Layer 3 spec drives this view: the tree
-        // paints its rows after the refresh command runs. Waiting on the row
-        // WITHOUT this is what made two earlier attempts time out.
-        await triggerRefresh(launch.page);
+        // NO triggerRefresh. The passing specs use it for DETERMINISM, but
+        // forcing a refresh would measure a refresh, not a first paint — the
+        // artifact said as much, and it is also the step that flaked in 3 of 4
+        // earlier attempts (the command palette failing to open). Waiting for
+        // the view's NATURAL paint is both the more correct measurement and the
+        // one that does not depend on driving VS Code's command palette.
 
-        const firstRow = inner.locator('[role="treeitem"]').first();
-        await firstRow.waitFor({ state: "visible", timeout: 60_000 });
+        const tree = inner.getByTestId("work-explorer-tree");
+        await expect(tree).toBeVisible({ timeout: 60_000 });
+        const firstRow = inner.locator(
+          '[role="treeitem"][data-slug="001-real-host-baseline"]',
+        );
+        await firstRow.waitFor({ state: "visible", timeout: 120_000 });
         const tRow = Date.now();
-
-        // Prove it is a real populated tree, not an empty-state shell.
-        await expect(
-          inner.locator('[role="treeitem"][data-slug="001-real-host-baseline"]'),
-        ).toBeVisible({ timeout: 30_000 });
 
         samples.push({
           rep,
@@ -149,10 +129,11 @@ test.describe.skip("Set 110 S1 — real Extension Development Host baseline", ()
         "instrumenting the product, and this session ships no product code. This is the " +
         "real-host BEFORE baseline, measured the same way S4 will measure the native " +
         "tree AFTER, which is what makes the comparison valid.",
-      includesRefresh:
-        "launchToFirstRowMs includes the 'Dabbler: Refresh Work Explorer' command and its " +
-        "750ms settle, because that is how this view paints rows in the Layer 3 harness. " +
-        "S4 must measure the native tree the SAME way or the comparison is invalid.",
+      naturalPaint:
+        "NO refresh command is issued. This is the view's natural cold paint after the " +
+        "extension's own scan completes, which is the honest first-paint number. S4 must " +
+        "measure the native tree the SAME way — no forced refresh — or the comparison is " +
+        "invalid.",
       fixture: `${SETS} session sets x 4 sessions`,
       reps: REPS,
       medians: {

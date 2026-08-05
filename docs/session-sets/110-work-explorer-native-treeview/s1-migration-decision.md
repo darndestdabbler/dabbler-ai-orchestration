@@ -175,6 +175,16 @@ Medians of 5, against this repo (109 sets).
 | webview renderer payload | **110,376 bytes** of JS/CSS + 643 bytes HTML | what the renderer must fetch, parse and execute before first paint |
 | renderer first paint | **still unmeasured** | needs a real renderer; Layer 3 owns it in S4 |
 
+> **A real Extension Development Host measurement was attempted, under
+> operator authorization, and FAILED TWICE.** Both attempts are recorded in
+> [`src/test/playwright/real-host-baseline.spec.ts`](../../../tools/dabbler-ai-orchestration/src/test/playwright/real-host-baseline.spec.ts),
+> which is left **skipped** (not deleted, not left red) with the exact failure
+> modes in its header. Attempt 1 died with the command palette never opening;
+> attempt 2 ran the refresh but no tree row ever became visible. **So every
+> number in this section remains stub-measured, and the verifier was right
+> about that through three rounds.** What is below is the honest best available,
+> not a rebuttal.
+>
 > **These cold figures supersede an earlier warm, in-process set**
 > ([`s1-activation-baseline.json`](s1-activation-baseline.json) supersedes the
 > `activateMs` in [`s1-activation-measurements.json`](s1-activation-measurements.json)).

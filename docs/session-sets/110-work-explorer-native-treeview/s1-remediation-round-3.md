@@ -102,9 +102,11 @@ the number would have measured a refresh, not a first paint. A second attempt
 to read VS Code's own *Show Running Extensions* activation figure failed on DOM
 selectors. Neither attempt is presented as a result.
 
-That leaves exactly one bucket open, for the native tree that does not exist
-yet. S4 owns the comparison and now has a real cold baseline to compare
-against instead of a warm stub figure.
+**This paragraph was overtaken by events — see the addendum below.** Round 6
+rejected the cold-Node harness too, on the ground that it still never launches
+VS Code, and the operator-authorized real-host attempt then failed twice. The
+accurate statement is the addendum's: every activation figure here is
+stub-measured, and the real-host baseline is owed to S4.
 
 ---
 
@@ -118,3 +120,52 @@ against instead of a warm stub figure.
 | `s1-migration-decision.md` | §2 bucket table + supersession note; decomposition paragraph corrected |
 
 No product code changed.
+
+---
+
+# Addendum — the operator-authorized real-host attempt, and its failure
+
+Round 6 rejected the cold-Node harness for the same reason rounds 5 and 4 did:
+`cold-activation.js` spawns fresh **Node** processes with `vscode-stub.js` and
+never launches VS Code, so Electron spawn, the extension-host bootstrap, the
+real vscode API and IPC stay excluded — exactly the surface the migration
+changes.
+
+The bounded loop was exhausted at that point (2 remediation-review cycles plus
+the pre-authorized third-provider round), so the session **stopped to the
+operator** rather than opening another cycle, as the constitution requires.
+
+**The operator authorized one bounded real-host attempt.** It failed, twice:
+
+| attempt | how far it got | what stopped it |
+| ---: | --- | --- |
+| 1 | launched a real EDH, opened the view | `triggerRefresh` timed out — the command palette never opened (`.quick-input-widget input` not visible in 10 s) |
+| 2 | launched, opened the view, ran the refresh | no `[role="treeitem"]` ever became visible in 60 s — the tree painted no rows against the fixture |
+
+Attempt 2 is the more informative failure: the fixture is built exactly as the
+passing Layer 3 specs build theirs, but those specs wait on a **specific**
+`[data-slug=...]` in a known state, while this one waited for *any* row. The
+8-set all-not-started fixture evidently leaves the view in a state — empty
+shell or fully collapsed — where no treeitem is visible.
+
+**Disposition of the spec:** left in the repo, **skipped**, with both failure
+modes written into its header and a concrete instruction for S4 (mirror
+`session-sets-tree.spec.ts`'s specific-slug wait, then un-skip and run both
+implementations through it). Not deleted, because the measurement is genuinely
+owed and S4 needs the BEFORE half. Not left failing, because a red spec rots
+the one gate this repo depends on (L-064-12).
+
+**Consequence, stated without hedging:** every activation figure in this
+session is stub-measured. The verifier was right about that through three
+rounds, the third-provider adjudication was right to uphold it, and two
+authorized attempts to fix it did not succeed. The residual is real and it is
+now the largest single gap in S1's evidence.
+
+**What it does and does not undermine.** It does not touch the host-pipeline
+measurements, which are plain Node fs/subprocess work and need no extension
+host — the ~102 ms empty-tree discovery floor and its `git worktree list` cause
+stand. It does not touch the four API spikes, which ran in a real EDH. It does
+not touch the density decisions, which the operator confirmed twice against
+rendered evidence. What it undermines is precisely the claim that S1 measured
+the migration-specific startup surface — and this session no longer makes that
+claim.

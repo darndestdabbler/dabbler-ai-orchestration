@@ -148,6 +148,22 @@
       "dateTime": "2026-08-04T20:52:11.092762-04:00",
       "description": "Built scripts/cold-activation.js: fresh Node process per rep, module load inside the measurement, real dist bundle. module load 54.3ms, activate() 336.5ms, cold total 389.9ms. activate() cold ~= warm (vindicating that figure) but module load was a real 54.3ms the warm harness excluded. Superseded the warm activateMs; corrected the doc guess that module loading explained the undecomposed time. Two attempts at renderer first paint abandoned rather than faked.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 19,
+      "stepKey": "session-001/round-6-stop-to-operator",
+      "dateTime": "2026-08-04T21:01:56.172892-04:00",
+      "description": "Round 6 rejected the cold-Node harness on the same ground (never launches VS Code). Bounded loop exhausted -> STOPPED to the operator per the constitution rather than opening another cycle. Operator authorized one bounded real-host attempt.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 20,
+      "stepKey": "session-001/real-host-attempt-failed",
+      "dateTime": "2026-08-04T21:01:56.174399-04:00",
+      "description": "Real-EDH baseline attempted TWICE and failed both times (palette timeout; then no treeitem visible in 60s). Spec left SKIPPED with both failure modes and an S4 fix instruction, not deleted and not left red (L-064-12). Recorded honestly: all activation figures remain stub-measured; the verifier was right through three rounds.",
+      "status": "complete"
     }
   ]
 }

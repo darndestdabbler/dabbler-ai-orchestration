@@ -174,3 +174,58 @@ moves information from text to an icon, and one moves the fraction from a
 custom column into `description`. Folding them into that table is the
 sanctioned path; wiring them in S2 without the mapping would be inventing
 display policy at implementation time.
+
+---
+
+## 2026-08-05 — Verification-loop discipline for Sessions 2–4
+
+Operator-directed process guidance, recorded 2026-08-05 while S1's close was
+still in flight. S1 first closed WAIVED after **seven verification rounds**
+and two third-party adjudications; the close-backstop then re-raised the
+unmeasured-baseline Major, and the fifth real-host attempt (commit `dcb1270`)
+vindicated it — the stub figures were off by 10×. That history motivates both
+halves of this note: the rounds were expensive, *and* the finding was real.
+Background: the decision brief at
+`docs/proposals/2026-08-04-verification-loop-parallelisation-vs-acceptance-criteria.md`
+(candidate scope for Set 111). Set 110 does **not** implement any of it —
+`ai_router` verification machinery is out of this set's scope, and changing
+the harness mid-set would taint this set's own verification record. What
+follows is *conduct within the existing machinery*, applied from S2 onward.
+
+1. **Treat the phased bounds as hard.** `verify_session` only *prints* the
+   ≤2-discovery / ≤2-remediation-review bound; nothing refuses a run past it
+   (`ai_router/verify_session.py` — `count_phase_rounds` feeds the advisory
+   message only). Obey the printed suspension as if it were enforced: at the
+   bound with unresolved Critical/Major findings, stop to the operator. Do
+   not open a round past the bound on your own authority, for any reason.
+
+2. **At the bound, one adjudication — and it settles the stop, not the
+   truth.** When what remains is disputed or judgment-shaped, go directly to
+   a single third-provider adjudication instead of further rounds. But S1 is
+   the cautionary tale on both sides: two MAY_CLOSE adjudications reasoned
+   the unmeasured renderer cost immaterial, and the real measurement proved
+   them wrong by an order of magnitude. An adjudication licenses *closing*;
+   it does not falsify the finding. A finding waived at the bound is
+   recorded as an owed residual with a named owner session — never argued
+   down to nothing.
+
+3. **Severity-gated stop applies** (existing guidance, L-095-1 lineage):
+   when remaining findings are Minor-only with no plausible failure
+   scenario, close rather than grind. Alert the operator in the disposition
+   notes; do not spend rounds polishing Minors.
+
+4. **Acceptance checks in remediation sidecars ("B-lite").** For each
+   Critical/Major accepted for fix, the remediation sidecar must state an
+   explicit acceptance check — a command plus expected output/exit code
+   where executable, one prose sentence only where genuinely
+   judgment-based — and record it **run against the pre-fix state (fails)
+   and the fixed state (passes)** before `remediation-review` is invoked.
+   Paste the actual outputs. Honest limitation, stated so nobody
+   over-claims: these are orchestrator-authored, so they are a convergence
+   aid to cut fix-rejected cycles, **not** a substitute for the routed
+   review — `remediation-review` still adjudicates every fix.
+
+5. **Nothing here reduces verification.** Discovery, supplementary-on-
+   blocking, and remediation-review run exactly as the constitution
+   requires (no-skip mandate untouched). This note governs when the loop
+   *stops*, not whether it runs.

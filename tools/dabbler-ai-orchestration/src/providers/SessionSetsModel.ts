@@ -1,4 +1,3 @@
-import * as vscode from "vscode";
 import { SessionSet, SessionState } from "../types";
 import {
   LEGACY_ROOT_PLAN_REL,
@@ -142,13 +141,13 @@ export const ICON_FILES: Record<SessionState, string> = {
   cancelled: "cancelled.svg",
 };
 
-export function iconUriFor(
-  extensionUri: vscode.Uri,
-  state: SessionState,
-): vscode.Uri | undefined {
-  const file = ICON_FILES[state];
-  return file ? vscode.Uri.joinPath(extensionUri, "media", file) : undefined;
-}
+// Set 110 Session 2: `iconUriFor` is REMOVED. It resolved
+// `media/<slug>`, had no consumers anywhere in the extension, and after
+// the status glyphs moved into `media/light/` and `media/dark/` it
+// pointed at files that no longer exist — dead code that would have
+// silently produced a broken URI for the first caller to trust it.
+// The native tree resolves its own {light, dark} pair in
+// `WorkExplorerTreeProvider.toIconPath`; see `media/status-icon-theming.md`.
 
 // Set 030 Session 3: the v3 "in-flight" predicate is a direct read of
 // the canonical `liveSession.currentSession` field, which `fileSystem.ts`
@@ -401,37 +400,57 @@ export function buildBucketPayloads(
   subset: SessionSet[],
   rowFor: (set: SessionSet) => RowPayload,
 ): BucketPayload[] {
+  return orderedBuckets(subset).map((bucket) => ({
+    key: bucket.key,
+    label: bucket.label,
+    count: bucket.sets.length,
+    rows: bucket.sets.map(rowFor),
+  }));
+}
+
+// Set 110 Session 2: the renderer-agnostic half of `buildBucketPayloads`
+// — which buckets exist, in what order, with their sets already sorted.
+// Extracted so the native `TreeDataProvider` builds its bucket level
+// from the SAME ordering the webview renders, rather than a second
+// implementation that happens to agree today. `buildBucketPayloads` is
+// now a thin map over this, so a change to bucket order or emptiness
+// necessarily reaches both surfaces.
+//
+// Semantics are the pre-110 host logic verbatim: the three default
+// buckets always render (empty ones included), Cancelled only when
+// non-empty, in-progress ordered by `listInProgressSets`, the other
+// buckets by `sortBucket`.
+export interface OrderedBucket {
+  key: BucketPayload["key"];
+  label: string;
+  sets: SessionSet[];
+}
+
+export function orderedBuckets(subset: SessionSet[]): OrderedBucket[] {
   const buckets = bucketSets(subset);
-  const build = (
-    key: BucketPayload["key"],
-    label: string,
-    sets: SessionSet[],
-    sorted: SessionSet[],
-  ): BucketPayload => ({
-    key,
-    label,
-    count: sets.length,
-    rows: sorted.map(rowFor),
-  });
-  const groups: BucketPayload[] = [
-    build(
-      "in-progress",
-      "In Progress",
-      buckets.inProgress,
-      listInProgressSets(buckets.inProgress),
-    ),
-    build(
-      "not-started",
-      "Not Started",
-      buckets.notStarted,
-      sortBucket(buckets.notStarted, "not-started"),
-    ),
-    build("complete", "Complete", buckets.complete, sortBucket(buckets.complete, "complete")),
+  const groups: OrderedBucket[] = [
+    {
+      key: "in-progress",
+      label: "In Progress",
+      sets: listInProgressSets(buckets.inProgress),
+    },
+    {
+      key: "not-started",
+      label: "Not Started",
+      sets: sortBucket(buckets.notStarted, "not-started"),
+    },
+    {
+      key: "complete",
+      label: "Complete",
+      sets: sortBucket(buckets.complete, "complete"),
+    },
   ];
   if (buckets.cancelled.length > 0) {
-    groups.push(
-      build("cancelled", "Cancelled", buckets.cancelled, sortBucket(buckets.cancelled, "cancelled")),
-    );
+    groups.push({
+      key: "cancelled",
+      label: "Cancelled",
+      sets: sortBucket(buckets.cancelled, "cancelled"),
+    });
   }
   return groups;
 }

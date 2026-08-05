@@ -710,19 +710,41 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
 suite("Set 092 S1 — visible-module renderer assembly", () => {
   const extRoot = path.resolve(__dirname, "..", "..", "..");
 
-  test("the shipping host consumes computeVisibleModules", () => {
-    const view = fs.readFileSync(
-      path.join(extRoot, "src", "providers", "CustomSessionSetsView.ts"),
+  // Set 110 S2: the assembly moved out of `CustomSessionSetsView` into
+  // `providers/moduleAssembly.ts`, which the native `TreeDataProvider`
+  // also calls — the point being that the two Explorer surfaces shipped
+  // side by side cannot disagree about which modules are visible. This
+  // scan follows it there, and now additionally asserts that BOTH
+  // consumers go through the shared function rather than re-deriving.
+  test("the shipping assembly consumes computeVisibleModules", () => {
+    const assembly = fs.readFileSync(
+      path.join(extRoot, "src", "providers", "moduleAssembly.ts"),
       "utf8",
     );
     assert.ok(
-      view.includes("computeVisibleModules("),
-      "the host must consume the Set 091 model",
+      assembly.includes("computeVisibleModules("),
+      "the assembly must consume the Set 091 model",
     );
     assert.ok(
-      view.includes("mergeVisibleModules(byRoot)"),
+      assembly.includes("mergeVisibleModules(byRoot)"),
       "root-scoped results must pass through the global merge",
     );
+  });
+
+  test("both Explorer surfaces go through the shared assembly", () => {
+    for (const file of ["CustomSessionSetsView.ts", "WorkExplorerTreeProvider.ts"]) {
+      const src = fs.readFileSync(path.join(extRoot, "src", "providers", file), "utf8");
+      assert.ok(
+        src.includes("assembleVisibleModules("),
+        `${file} must build its module list through the shared assembly, ` +
+          `not re-derive one`,
+      );
+      assert.ok(
+        !src.includes("computeVisibleModules("),
+        `${file} re-derives the module list instead of calling the shared ` +
+          `assembly — the two surfaces will drift`,
+      );
+    }
   });
 
   test("multi-root merge keeps declared/fallback identities separate and pseudo last", () => {

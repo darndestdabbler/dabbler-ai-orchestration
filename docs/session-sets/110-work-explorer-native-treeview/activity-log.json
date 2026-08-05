@@ -1,7 +1,7 @@
 {
   "sessionSetName": "110-work-explorer-native-treeview",
   "createdDate": "2026-08-04T21:44:46.601470+00:00",
-  "totalSessions": 0,
+  "totalSessions": 4,
   "entries": [
     {
       "sessionNumber": 1,
@@ -204,6 +204,165 @@
       "dateTime": "2026-08-05T02:10:35.084916-04:00",
       "description": "Operator adjudicated 2026-08-05: accept the delivered evidence (bucketed stub at four scales + real-host aggregate baseline). Closing WAIVED on operator attestation with the residual recorded, not VERIFIED.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-05T02:28:40.369947-04:00",
+      "description": "Registered Session 2 via start_session (claude/anthropic/claude-opus-5/high); preload read; provider keys confirmed present.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "read-spec",
+      "dateTime": "2026-08-05T02:28:40.369947-04:00",
+      "description": "Read spec Session 2 plan, operator-notes (2026-08-04 four-level tree + status icons + fraction; 2026-08-05 verification-loop discipline and the S4 sub-second startup gate), and s1-migration-decision.md in full.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "prerequisites",
+      "dateTime": "2026-08-05T02:28:40.369947-04:00",
+      "description": "Confirmed Session 1 complete (verdict WAIVED) and its go/no-go: GO. Surveyed SessionSetsModel, CustomSessionSetsView, ActionRegistry, types.ts, fileSystem.ts, package.json contributions, the S1 spike extension, and the Layer 2/3 harnesses.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-08-05T02:28:40.369947-04:00",
+      "description": "Routed step-3.5 analysis (analysis, excl. anthropic -> gemini-2.5-pro, $0.0164, truncation-clean); appended the Session 2 block to ai-assignment.md recording three departures from the analyst.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gemini-2.5-pro",
+          "task_type": "analysis",
+          "cost_usd": 0.0164
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "model-field",
+      "dateTime": "2026-08-05T02:59:51.505597-04:00",
+      "description": "Carried the already-parsed sessions[] ledger onto SessionSet via normalizeLedgerSessions (tolerant, per-entry drop); optional field so Layer-2 fixtures need no update. Enables the fourth tree level with no additional disk read.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "shared-assembly",
+      "dateTime": "2026-08-05T02:59:51.506596-04:00",
+      "description": "Extracted CustomSessionSetsView.buildModules into providers/moduleAssembly.assembleVisibleModules and refactored buildBucketPayloads onto a new shared orderedBuckets(), so both Explorer surfaces compute one module list and one bucket ordering.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "tree-model",
+      "dateTime": "2026-08-05T02:59:51.507591-04:00",
+      "description": "Wrote providers/workExplorerTreeModel.ts (pure, no vscode): four-level node union, per-level children, row descriptors, the ranked icon-precedence table, and the semicolon-delimited contextValue vocabulary.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "provider",
+      "dateTime": "2026-08-05T02:59:51.508130-04:00",
+      "description": "Wrote providers/WorkExplorerTreeProvider.ts (lazy getChildren, per-refresh scan memoisation, getParent for reveal, set-row activation command); registered via createTreeView ALONGSIDE the webview, which stays default and first.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "menus",
+      "dateTime": "2026-08-05T02:59:51.508513-04:00",
+      "description": "Generated package.json contributions from ROW_ACTIONS: second view (collapsed), two submenus, 20 view/item/context entries, 2 inline module actions (S1 cap). Taught 3 existing module palette commands to accept an optional tree node rather than minting new command ids.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "instrumentation",
+      "dateTime": "2026-08-05T02:59:51.508513-04:00",
+      "description": "Added utils/startupTiming.ts (module load / activate / resolveWebviewView / first tree roots), emitted only when DABBLER_STARTUP_TIMING_PATH is set. First paint deliberately left to Layer 3 rather than instrumenting a webview S3 deletes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "icon-mechanism",
+      "dateTime": "2026-08-05T02:59:51.509536-04:00",
+      "description": "Settled the status-icon theme question by RUNNING code: icon-render-mechanism.spec.ts measured a real Extension Development Host and found TreeItem.iconPath renders as background-image with mask-image:none, so currentColor cannot work - overturning both S1 and the step-3.5 analyst. Repointed to media/light + media/dark (operator authored both sets mid-session).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "tests",
+      "dateTime": "2026-08-05T02:59:51.510536-04:00",
+      "description": "Added 5 Layer-2 suites (tree model, provider, menu parity, module assembly, ledger rows, startup timing, icon assets) and a Layer-3 native-tree spec. Updated two pre-existing source-scan/allowlist tests the refactor legitimately moved.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "build-test",
+      "dateTime": "2026-08-05T03:22:10.380963-04:00",
+      "description": "Build clean; typecheck clean; lint 7 errors/61 warnings ALL pre-existing (none in new or changed files). Layer 2: 1907 passing, 0 failing. Layer 3 FULL suite: 32 passed, 0 failed (16.9 min), including both new native-tree specs.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 14,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-08-05T03:22:10.381966-04:00",
+      "description": "Phased discovery round 1 (fan-out 2, both gpt-5-6-sol, anthropic auto-excluded, $1.3364): VERDICT VERIFIED, ZERO blocking findings, 12 nits across the two calls with five raised convergently by both.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-6-sol",
+          "task_type": "session-verification",
+          "cost_usd": 0.698385
+        },
+        {
+          "model": "gpt-5-6-sol",
+          "task_type": "session-verification",
+          "cost_usd": 0.638055
+        }
+      ]
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 15,
+      "stepKey": "remediation",
+      "dateTime": "2026-08-05T03:22:10.382963-04:00",
+      "description": "Fixed all 12 nits despite the round being non-blocking (two were real correctness defects: duplicate/non-positive session numbers colliding row identity, and webview resolve marks not first-wins). Recorded a 13th found by running the suite: real-host-baseline.spec.ts was overwriting S1 committed measurement of record - S1 artifact restored, re-run kept as S2 evidence, write gated behind DABBLER_WRITE_EVIDENCE=1 (same class as the icon-probe nit, fixed at every sibling site).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 16,
+      "stepKey": "verify-round-2",
+      "dateTime": "2026-08-05T03:30:01.884034-04:00",
+      "description": "Discovery round 2 over the SHIPPED state (fan-out 2, both gpt-5-6-sol, $1.1802, cross-round ledger carried): VERDICT VERIFIED, 0 blocking. Round 1 remediation held - nothing reappeared. Raw artifacts carry 4 nits (CLI structured parse said 0); dispositioned in s2-remediation-round-2.md. Two doc claims corrected; two code nits assigned to S3 with the fix spelled out, because S3 owns that surface, the round is Minor-only, and touching code mid-close-run is the invalidation pattern the operator just banned.",
+      "status": "complete",
+      "routedApiCalls": [
+        {
+          "model": "gpt-5-6-sol",
+          "task_type": "session-verification",
+          "cost_usd": 0.60377
+        },
+        {
+          "model": "gpt-5-6-sol",
+          "task_type": "session-verification",
+          "cost_usd": 0.57644
+        }
+      ]
     }
   ]
 }

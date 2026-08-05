@@ -57,6 +57,12 @@
           "id": "dabblerSessionSets",
           "name": "Work Explorer",
           "contextualTitle": "Dabbler AI Orchestration"
+        },
+        {
+          "id": "dabblerWorkExplorerTree",
+          "name": "Work Explorer (native preview)",
+          "contextualTitle": "Dabbler AI Orchestration",
+          "visibility": "collapsed"
         }
       ]
     },
@@ -218,7 +224,8 @@
       {
         "command": "dabbler.newModule",
         "title": "New Module",
-        "category": "Dabbler"
+        "category": "Dabbler",
+        "icon": "$(add)"
       },
       {
         "command": "dabbler.assignLegacySetsToModule",
@@ -238,7 +245,8 @@
       {
         "command": "dabbler.openModulePlan",
         "title": "Open Module Plan",
-        "category": "Dabbler"
+        "category": "Dabbler",
+        "icon": "$(go-to-file)"
       },
       {
         "command": "dabbler.openModulesManifest",
@@ -349,6 +357,11 @@
         "title": "Upgrade Older Session Sets",
         "category": "Dabbler",
         "icon": "$(arrow-up)"
+      },
+      {
+        "command": "dabblerWorkExplorer.activateSet",
+        "title": "Open Session Set",
+        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -364,6 +377,10 @@
         {
           "command": "dabbler.showCostDashboard",
           "when": "dabblerSessionSets.routesCost"
+        },
+        {
+          "command": "dabblerWorkExplorer.activateSet",
+          "when": "false"
         }
       ],
       "view/title": [
@@ -393,7 +410,157 @@
           "group": "navigation@5"
         }
       ],
-      "view/item/context": []
+      "view/item/context": [
+        {
+          "command": "dabbler.openModulePlan",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-open-plan;/",
+          "group": "inline@1"
+        },
+        {
+          "command": "dabbler.newModule",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
+          "group": "inline@2"
+        },
+        {
+          "command": "dabbler.openModulePlan",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-open-plan;/",
+          "group": "1_module@1"
+        },
+        {
+          "command": "dabbler.newModule",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
+          "group": "2_module_lifecycle@1"
+        },
+        {
+          "command": "dabbler.renameModule",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-manage-module;/",
+          "group": "2_module_lifecycle@2"
+        },
+        {
+          "command": "dabbler.deleteModule",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-manage-module;/",
+          "group": "2_module_lifecycle@3"
+        },
+        {
+          "command": "dabbler.assignLegacySetsToModule",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-assign-legacy;/",
+          "group": "3_module_legacy@1"
+        },
+        {
+          "submenu": "dabblerWorkExplorer.openFile",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerSet;/",
+          "group": "1_open@1"
+        },
+        {
+          "submenu": "dabblerWorkExplorer.copyPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerSet;/",
+          "group": "1_open@2"
+        },
+        {
+          "command": "dabblerSessionSets.copySlug",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySlug;/",
+          "group": "5_actions@501"
+        },
+        {
+          "command": "dabbler.openOrchestratorWriterLog",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openOrchestratorWriterLog;/",
+          "group": "5_actions@502"
+        },
+        {
+          "command": "dabblerSessionSets.openPrerequisiteSpec",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openPrerequisiteSpec;/",
+          "group": "5_actions@503"
+        },
+        {
+          "command": "dabblerSessionSets.switchTier",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-switchTier;/",
+          "group": "5_actions@504"
+        },
+        {
+          "command": "dabblerSessionSets.setupVerification",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-setupVerification;/",
+          "group": "5_actions@505"
+        },
+        {
+          "command": "dabbler.openExternalVerificationDoc",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openExternalVerificationDoc;/",
+          "group": "5_actions@506"
+        },
+        {
+          "command": "dabblerSessionSets.migrate",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-migrate;/",
+          "group": "8_migrate@801"
+        },
+        {
+          "command": "dabblerSessionSets.migrateToV4",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-migrateToV4;/",
+          "group": "8_migrate@802"
+        },
+        {
+          "command": "dabblerSessionSets.cancel",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-cancel;/",
+          "group": "9_lifecycle@901"
+        },
+        {
+          "command": "dabblerSessionSets.restore",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-restore;/",
+          "group": "9_lifecycle@902"
+        }
+      ],
+      "dabblerWorkExplorer.openFile": [
+        {
+          "command": "dabblerSessionSets.openSpec",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openSpec;/",
+          "group": "1@101"
+        },
+        {
+          "command": "dabblerSessionSets.openActivityLog",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openActivityLog;/",
+          "group": "1@102"
+        },
+        {
+          "command": "dabblerSessionSets.openChangeLog",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openChangeLog;/",
+          "group": "1@103"
+        },
+        {
+          "command": "dabblerSessionSets.openSessionState",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openSessionState;/",
+          "group": "1@104"
+        }
+      ],
+      "dabblerWorkExplorer.copyPrompt": [
+        {
+          "command": "dabbler.copySpecReviewPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySpecReviewPrompt;/",
+          "group": "1@301"
+        },
+        {
+          "command": "dabbler.copySessionAccomplishmentsPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionAccomplishmentsPrompt;/",
+          "group": "1@302"
+        },
+        {
+          "command": "dabbler.copySetAccomplishmentsPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySetAccomplishmentsPrompt;/",
+          "group": "1@303"
+        },
+        {
+          "command": "dabbler.copyStartNextSessionPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextSessionPrompt;/",
+          "group": "1@304"
+        },
+        {
+          "command": "dabbler.copyStartNextParallelSessionPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextParallelSessionPrompt;/",
+          "group": "1@305"
+        },
+        {
+          "command": "dabbler.copyVerificationKickoffPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyVerificationKickoffPrompt;/",
+          "group": "1@306"
+        }
+      ]
     },
     "configuration": {
       "title": "Dabbler AI Orchestration",
@@ -459,7 +626,17 @@
           "markdownDescription": "Git repo URL the `Dabbler: Install ai-router` command's GitHub-fallback path clones from. Leave blank to use the upstream Dabbler repository. Override to point at a fork — handy for fork-trackers who want the GitHub fallback to pull *their* tags / branches rather than upstream's."
         }
       }
-    }
+    },
+    "submenus": [
+      {
+        "id": "dabblerWorkExplorer.openFile",
+        "label": "Open File"
+      },
+      {
+        "id": "dabblerWorkExplorer.copyPrompt",
+        "label": "Copy Prompt"
+      }
+    ]
   },
   "scripts": {
     "compile": "node esbuild.js",

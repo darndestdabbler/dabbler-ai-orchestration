@@ -19,6 +19,7 @@ import { readTierMarker } from "./tierMarkerStore";
 import {
   DuplicateNameCollision,
   ModuleManifestEntry,
+  SessionRecord,
   SessionSet,
   SessionState,
   SessionSetConfig,
@@ -392,6 +393,61 @@ export function countDistinctCloseoutSessions(eventsPath: string): number {
     }
   }
   return seen.size;
+}
+
+// Set 110 Session 2: narrow the normalized `sessions[]` ledger down to
+// the three display fields the Work Explorer's fourth tree level needs.
+// Deliberately TOLERANT in exactly the way every other reader in this
+// file is: a non-array, a non-object entry, a missing/non-integer
+// `number` or an unrecognized `status` drops that entry rather than
+// failing the whole scan, because a malformed ledger must degrade to
+// "fewer session rows", never to "this set does not render".
+//
+// `title` falls back to `Session <n>` — the same label the blessed
+// Python writer emits — so a ledger written by an older schema (or
+// hand-edited to drop the field) still produces a legible row instead
+// of an empty one.
+const _SESSION_STATUSES: ReadonlySet<string> = new Set([
+  "not-started",
+  "in-progress",
+  "complete",
+  "cancelled",
+]);
+
+export function normalizeLedgerSessions(raw: unknown): SessionRecord[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SessionRecord[] = [];
+  // Session numbers are the row identity the Work Explorer's fourth level
+  // builds its `TreeItem.id` from (`session:<set>/<n>`), and VS Code keys
+  // selection and expansion state on that id. A DUPLICATE number in a
+  // hand-edited or corrupt ledger would therefore make two rows share one
+  // identity and move together, so the first occurrence wins and later
+  // ones are dropped rather than rendered. (Verification round 1 nit,
+  // raised independently by both fan-out calls.)
+  const seen = new Set<number>();
+  for (const entry of raw) {
+    if (entry === null || typeof entry !== "object") continue;
+    const e = entry as { number?: unknown; title?: unknown; status?: unknown };
+    // `typeof true === "boolean"`, so no bool/int confusion here — but
+    // guard the integer-ness explicitly anyway, since a float or a
+    // numeric string would otherwise produce a nonsense row number.
+    // Numbers are 1-indexed everywhere in the workflow, so zero and
+    // negatives are corrupt rather than merely unusual.
+    if (typeof e.number !== "number" || !Number.isInteger(e.number)) continue;
+    if (e.number < 1) continue;
+    if (seen.has(e.number)) continue;
+    if (typeof e.status !== "string" || !_SESSION_STATUSES.has(e.status)) continue;
+    const rawTitle = typeof e.title === "string" ? e.title.trim() : "";
+    seen.add(e.number);
+    out.push({
+      number: e.number,
+      // Trimmed, not just trim-TESTED: a whitespace-padded ledger title
+      // would otherwise render with the padding intact.
+      title: rawTitle.length > 0 ? rawTitle : `Session ${e.number}`,
+      status: e.status as SessionRecord["status"],
+    });
+  }
+  return out;
 }
 
 export function parseSessionSetConfig(specPath: string): SessionSetConfig {
@@ -1302,6 +1358,9 @@ export function readSessionSets(root: string): SessionSet[] {
       verificationMarker,
       workspaceTierMarker,
       workflowState,
+      // Set 110 S2: the fourth tree level's data, taken from the ledger
+      // this scan already parsed — no extra read, no extra stat.
+      sessions: normalizeLedgerSessions(ledgerSessions),
     });
   }
 

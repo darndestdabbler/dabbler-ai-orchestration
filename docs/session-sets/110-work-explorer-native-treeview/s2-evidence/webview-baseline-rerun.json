@@ -1,0 +1,59 @@
+{
+  "what": "Set 110 S2 \u2014 an INDEPENDENT re-run of S1 real-host baseline harness, captured because the full Layer 3 suite ran it and it overwrote S1 committed artifact. S1 artifact has been restored; these are the re-run numbers, recorded here instead.",
+  "why_it_matters": "Third independent reproduction of the webview before-number S4 measures against. S1 ran it twice; this is a third, on the post-remediation build, and it agrees.",
+  "perScale": [
+    {
+      "sets": 10,
+      "launchToFirstRowMs": 11770.5,
+      "viewOpenToFirstRowMs": 5250.5
+    },
+    {
+      "sets": 100,
+      "launchToFirstRowMs": 11815,
+      "viewOpenToFirstRowMs": 5185.5
+    },
+    {
+      "sets": 500,
+      "launchToFirstRowMs": 12149,
+      "viewOpenToFirstRowMs": 5429
+    }
+  ],
+  "samples": [
+    {
+      "scale": 10,
+      "rep": 1,
+      "launchToFirstRowMs": 11779,
+      "viewOpenToFirstRowMs": 5282
+    },
+    {
+      "scale": 10,
+      "rep": 2,
+      "launchToFirstRowMs": 11762,
+      "viewOpenToFirstRowMs": 5219
+    },
+    {
+      "scale": 100,
+      "rep": 1,
+      "launchToFirstRowMs": 11908,
+      "viewOpenToFirstRowMs": 5119
+    },
+    {
+      "scale": 100,
+      "rep": 2,
+      "launchToFirstRowMs": 11722,
+      "viewOpenToFirstRowMs": 5252
+    },
+    {
+      "scale": 500,
+      "rep": 1,
+      "launchToFirstRowMs": 12117,
+      "viewOpenToFirstRowMs": 5509
+    },
+    {
+      "scale": 500,
+      "rep": 2,
+      "launchToFirstRowMs": 12181,
+      "viewOpenToFirstRowMs": 5349
+    }
+  ]
+}

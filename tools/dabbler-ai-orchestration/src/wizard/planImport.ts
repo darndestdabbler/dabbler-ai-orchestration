@@ -7,6 +7,7 @@ import {
   pickModuleForAuthoring,
 } from "../utils/moduleAuthoring";
 import { ModuleManifestEntry } from "../types";
+import { preselectFromTreeNode } from "../providers/workExplorerTreeModel";
 
 /** Repo-level plan destination (forward-slashed, repo-relative). */
 const PLAN_DEST_POSIX = "docs/planning/project-plan.md";
@@ -309,8 +310,10 @@ export function registerPlanImportCommand(context: vscode.ExtensionContext): voi
   // QuickPick (no preselect) so keyboard-driven use picks the module; the
   // row/context strip supplies the module directly.
   context.subscriptions.push(
-    vscode.commands.registerCommand("dabbler.openModulePlan", async () => {
-      await openModulePlan();
+    vscode.commands.registerCommand("dabbler.openModulePlan", async (arg?: unknown) => {
+      // Set 110 S2: see the note on `dabbler.renameModule` — palette use is
+      // unchanged; a tree row supplies its module as an explicit target.
+      await openModulePlan(undefined, preselectFromTreeNode(arg));
     }),
   );
 }

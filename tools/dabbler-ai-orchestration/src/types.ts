@@ -394,6 +394,28 @@ export interface SessionSet {
   // Start-Next-Session copy-action auto-route. Optional so
   // fixture-shaped records without the field read as "not derived".
   workflowState?: WorkflowState | null;
+  // Set 110 Session 2 (operator ask 1, 2026-08-04): the normalized
+  // `sessions[]` ledger, surfaced so the Work Explorer's FOURTH tree
+  // level (the sessions inside a set) can be built from memory. The
+  // scanner already parses and normalizes this array to derive
+  // `plusFraction` / `completedVerification` / `verificationMarker`
+  // and then discards it — carrying it costs **no additional disk
+  // read**, which is what keeps the fourth level off the startup path
+  // S1 measured. Empty array when the state file is unreadable or
+  // carries no usable ledger. A set with NO state file is not one of
+  // those cases: `ensureSessionStateFile` lazily synthesizes a
+  // not-started state from the spec, so such a set lists its PLANNED
+  // sessions, all `not-started`. Entries are narrowed to
+  // the three display fields; per-session extras the ledger carries
+  // (`type`, `verificationVerdict`, …) are deliberately NOT lifted here
+  // — their consumers read the ledger through `tierLegibility`.
+  //
+  // Optional for the same reason `workflowState` and `duplicateNameError`
+  // are: fixture-shaped records built by the Layer-2 suite need no update,
+  // and absent reads identically to empty (no session rows). The single
+  // production construction site — `readSessionSets` in `fileSystem.ts` —
+  // always populates it.
+  sessions?: SessionRecord[];
   // Set 087 Session 1: the fail-loud duplicate-set-name flag, set by
   // `readAllSessionSetsWithDiagnostics` on the ONE merged row shown for
   // a collided name. Undefined everywhere else (and always on the

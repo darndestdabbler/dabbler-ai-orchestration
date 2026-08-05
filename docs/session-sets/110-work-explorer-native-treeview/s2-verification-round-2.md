@@ -1,0 +1,5 @@
+VERIFIED — I checked the provider hierarchy and laziness, command/menu gating, row identities, refresh behavior, icon handling, ledger normalization, and the native/webview integration. No Critical or Major defect is substantiated by the supplied diff.
+
+#### NITS
+
+- **Nit:** Invalid-manifest diagnostics can disappear from the native tree when last-known-good modules are retained. → **Location:** `WorkExplorerTreeProvider.modules()` discards `assembleVisibleModules(...).manifestFaults`, while `CustomSessionSetsView.buildModules()` preserves them. Because retained modules come from the previous valid snapshot, they may carry no `manifest-invalid` warning. A user who opens the native preview after making `docs/modules.yaml` invalid can therefore see stale modules without explanation, and the two surfaces can disagree despite the “cannot disagree” claim. This is non-blocking because it requires an invalid hand-edited manifest and the webview remains the default this session. → **Fix:** Surface `manifestFaults` through a native status row, view message/badge, or warning decoration on retained module rows.

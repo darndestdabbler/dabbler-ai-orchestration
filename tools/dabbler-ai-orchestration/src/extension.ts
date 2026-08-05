@@ -46,6 +46,12 @@ import { registerSetupVerificationCommand } from "./commands/setupVerification";
 import { hasSubCurrentSets } from "./providers/SessionSetsModel";
 import { routesCost } from "./utils/routerConfig";
 import { SessionSet } from "./types";
+// Set 110 Session 2: the native TreeView, shipped alongside the webview
+// so the two can be compared before Session 3 switches over.
+import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
+import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
+// Set 110 Session 2: host-side startup buckets (S1's assigned residual).
+import { markActivateEnd, markActivateStart } from "./utils/startupTiming";
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
 
@@ -92,6 +98,9 @@ function evaluateSupportContextKeys(allSets: SessionSet[]): void {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
+  // Set 110 S2: first statement of activation, last statement below —
+  // the `activate()` bucket S1 could only measure against a Node stub.
+  markActivateStart();
   // Set 059: activation must NOT bail when no folder is open. The previous
   // `if (!workspaceFolders?.length) return;` guard left the webview view
   // provider AND every command unregistered in exactly the case "Set up a new
@@ -139,6 +148,25 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(CustomSessionSetsView.viewType, provider),
   );
+
+  // Set 110 Session 2: the native `TreeView`, registered ALONGSIDE the
+  // webview — not instead of it. The webview stays the default surface
+  // for this session so the two can be compared before Session 3
+  // switches over and deletes the hand-rolled renderer; the native view
+  // is contributed collapsed, below it, in the same container.
+  //
+  // `createTreeView` rather than `registerTreeDataProvider` because the
+  // former returns the `TreeView` handle that `TreeView.message`,
+  // `TreeView.badge` and `reveal()` live on — Session 3 re-homes the
+  // empty state onto those, and Layer 3 drives expansion through
+  // `reveal()`.
+  const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
+  context.subscriptions.push({ dispose: () => treeProvider.dispose() });
+  const treeView = vscode.window.createTreeView(WorkExplorerTreeProvider.viewType, {
+    treeDataProvider: treeProvider,
+    showCollapseAll: true,
+  });
+  context.subscriptions.push(treeView);
 
   const evaluateContextKeys = () => {
     evaluateSupportContextKeys(readAllSessionSets());
@@ -208,7 +236,10 @@ export function activate(context: vscode.ExtensionContext): void {
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
       );
       const watcher = vscode.workspace.createFileSystemWatcher(pattern);
-      const onEvent = () => provider.refresh();
+      const onEvent = () => {
+        provider.refresh();
+        treeProvider.refresh();
+      };
       watcher.onDidCreate(onEvent);
       watcher.onDidDelete(onEvent);
       watcher.onDidChange(onEvent);
@@ -255,6 +286,10 @@ export function activate(context: vscode.ExtensionContext): void {
   const refreshAll = () => {
     bindWatchers();
     provider.refresh();
+    // Set 110 S2: both surfaces refresh from the same signal while they
+    // coexist, so a drift between them is never explained by one having
+    // seen a watcher tick the other missed.
+    treeProvider.refresh();
     setImmediate(evaluateContextKeys);
   };
 
@@ -306,6 +341,9 @@ export function activate(context: vscode.ExtensionContext): void {
     }
   };
 
+  safeRegister("registerWorkExplorerTreeCommands", () =>
+    registerWorkExplorerTreeCommands(context),
+  );
   safeRegister("registerOpenFileCommands", () => registerOpenFileCommands(context));
   safeRegister("registerCopyCommands", () => registerCopyCommands(context));
   safeRegister("registerCopyPromptCommands", () => registerCopyPromptCommands(context));
@@ -447,6 +485,10 @@ export function activate(context: vscode.ExtensionContext): void {
       vscode.commands.executeCommand("dabbler.getStarted");
     }
   }
+
+  // Set 110 S2: closes the `activate()` bucket. Deliberately the last
+  // statement — everything above is what VS Code charges to activation.
+  markActivateEnd();
 }
 
 export function deactivate(): void {}

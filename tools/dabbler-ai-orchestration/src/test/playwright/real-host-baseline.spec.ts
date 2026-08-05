@@ -155,8 +155,22 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
       samples,
     };
 
-    fs.mkdirSync(path.dirname(OUT), { recursive: true });
-    fs.writeFileSync(OUT, JSON.stringify(payload, null, 2), "utf8");
+    // Set 110 S2: writing the tracked artifact is now OPT-IN.
+    //
+    // This spec is part of the standing Layer 3 suite, so every full run
+    // re-measured and OVERWROTE `s1-real-host-baseline.json` — Session
+    // 1's committed measurement of record, quoted by
+    // `s1-migration-decision.md` and by the operator's Session 4 startup
+    // gate. A later session silently rewriting a prior session's recorded
+    // evidence is the wrong default no matter how close the numbers land
+    // (S2's re-run agreed with S1 to within ~2%, which is beside the
+    // point). The measurement still runs and is still printed; only the
+    // write to the tracked file is gated.
+    const writeTracked = process.env.DABBLER_WRITE_EVIDENCE === "1";
+    if (writeTracked) {
+      fs.mkdirSync(path.dirname(OUT), { recursive: true });
+      fs.writeFileSync(OUT, JSON.stringify(payload, null, 2), "utf8");
+    }
 
     // eslint-disable-next-line no-console
     const lines = payload.perScale.map(
@@ -165,7 +179,15 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
         `viewopen->row ${r.viewOpenToFirstRowMs} ms`,
     );
     console.log(
-      ["", "[110 S1] REAL HOST, per scale:", ...lines, `[110 S1] wrote ${OUT}`, ""].join(
+      [
+        "",
+        "[110 S1] REAL HOST, per scale:",
+        ...lines,
+        writeTracked
+          ? `[110 S1] wrote ${OUT}`
+          : `[110 S1] measured only — set DABBLER_WRITE_EVIDENCE=1 to update ${OUT}`,
+        "",
+      ].join(
         "\n",
       ),
     );

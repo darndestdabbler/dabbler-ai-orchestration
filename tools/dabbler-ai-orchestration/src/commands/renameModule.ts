@@ -20,6 +20,7 @@ import {
 } from "../utils/moduleAuthoring";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { ModuleManifestEntry, SessionSet } from "../types";
+import { preselectFromTreeNode } from "../providers/workExplorerTreeModel";
 
 export interface RenameModuleUi {
   /** Pick the module to rename (a QuickPick of declared modules). */
@@ -222,8 +223,12 @@ export function registerRenameModuleCommand(
   context: vscode.ExtensionContext,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("dabbler.renameModule", async () => {
-      await runRenameModuleFlow();
+    vscode.commands.registerCommand("dabbler.renameModule", async (arg?: unknown) => {
+      // Set 110 S2: invoked from the palette (no argument) this keeps its
+      // own module QuickPick, exactly as before. Invoked from a native
+      // Work Explorer module row it targets that row's module directly —
+      // the Set 093 explicit-target seam, with no new command id.
+      await runRenameModuleFlow(undefined, preselectFromTreeNode(arg));
     }),
   );
 }

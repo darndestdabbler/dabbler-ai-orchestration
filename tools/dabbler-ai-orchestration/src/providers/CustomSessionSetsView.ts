@@ -27,18 +27,18 @@
 // name / fraction / description only.
 
 import * as crypto from "crypto";
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { SessionSet } from "../types";
 import { ScanState } from "./scanState";
 import {
+  assembleVisibleModules,
+  nodeModuleAssemblyIo,
+} from "./moduleAssembly";
+import {
   blockedMarker,
   blockedTooltip,
   buildVisibleModulePayloads,
-  chooseRenderableModuleSnapshot,
-  computeVisibleModules,
   forceClosedBadge,
   fractionTooltip,
   ICON_FILES,
@@ -47,7 +47,6 @@ import {
   kindTooltip,
   migrationMarker,
   migrationTooltip,
-  mergeVisibleModules,
   tierMarker,
   tierTooltip,
   touchedDate,
@@ -58,10 +57,12 @@ import {
   verificationTooltip,
   VisibleModule,
 } from "./SessionSetsModel";
+import { classifyModulesManifest } from "../utils/moduleAuthoring";
+// Set 110 Session 2: host-side startup buckets (S1's assigned residual).
 import {
-  LEGACY_ROOT_PLAN_REL,
-  classifyModulesManifest,
-} from "../utils/moduleAuthoring";
+  markWebviewResolveEnd,
+  markWebviewResolveStart,
+} from "../utils/startupTiming";
 // Set 093 Session 2: the module-row action handlers (verdict amendments
 // 1 + 2). `Open Plan` reuses the existing plan flow with an explicit module
 // target (routed ruling D1); the assign-legacy flow is its own command.
@@ -292,6 +293,12 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     _context: vscode.WebviewViewResolveContext,
     _token: vscode.CancellationToken,
   ): void {
+    // Set 110 S2: the `resolveWebviewView()` bucket. S1 measured this at
+    // 0.1 ms against a Node stub and concluded the webview's HOST half is
+    // already free; this is the same measurement taken inside a real
+    // extension host, so S4 can compare like with like instead of
+    // carrying a stub figure into a real-host table.
+    markWebviewResolveStart();
     this.view = webviewView;
     const webview = webviewView.webview;
     webview.options = {
@@ -306,6 +313,7 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
     webview.html = this.renderShell();
     // First snapshot fires after the ready handshake from client.js
     // (see onMessage("ready") below).
+    markWebviewResolveEnd();
   }
 
   // ----- Message dispatch (webview → host) -----
@@ -809,55 +817,30 @@ export class CustomSessionSetsView implements vscode.WebviewViewProvider, vscode
 
   // Set 092 Session 1: compute the settled Q8 visible-module model for
   // each discovered root, then merge those root-scoped results into the
-  // global Explorer list. The pure merge/payload helpers stay Layer-2
-  // testable; the host owns filesystem classification and plan presence.
+  // global Explorer list.
+  //
+  // Set 110 Session 2: the assembly itself moved to
+  // `moduleAssembly.assembleVisibleModules`, which the new native
+  // `TreeDataProvider` also calls — one implementation, so the two
+  // surfaces Session 2 ships side by side cannot disagree about which
+  // modules are visible. Everything below is unchanged behaviour: this
+  // method now supplies the host-shaped IO and maps the result onto the
+  // webview payload.
   private buildModules(all: SessionSet[]): {
     modules: ModulePayload[];
     manifestFaults: SystemStatusPayload["manifestFaults"];
   } {
-    const roots = new Set(
-      (vscode.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
+    const assembly = assembleVisibleModules(
+      all,
+      nodeModuleAssemblyIo(),
+      this.lastKnownGoodModules,
     );
-    for (const set of all) roots.add(set.root);
-    const manifestFaults: SystemStatusPayload["manifestFaults"] = [];
-    const byRoot = Array.from(roots).map((root) => {
-      const classification = classifyModulesManifest(root);
-      // Set 100 S1: the 093-era per-module plan-existence resolution
-      // retired with the persistent `Plan` child node it fed.
-      // `legacyRootPlanExists` stays — it drives pseudo-module VISIBILITY
-      // (the legacy root plan keeps the pseudo-module rendered even when
-      // every set is stamped).
-      const current = computeVisibleModules(
-        classification,
-        all.filter((set) => set.root === root),
-        {
-          legacyRootPlanExists: fs.existsSync(path.join(root, LEGACY_ROOT_PLAN_REL)),
-        },
-      );
-      const selected = chooseRenderableModuleSnapshot(
-        classification,
-        current,
-        this.lastKnownGoodModules.get(root),
-      );
-      if (classification.kind === "invalid") {
-        manifestFaults.push({
-          rootLabel: path.basename(root),
-          message:
-            "docs/modules.yaml is invalid (expected a YAML mapping with a modules list). " +
-            "Fix the file by hand; Work Explorer never overwrites it.",
-          retainedLastKnownGood: selected.retainedLastKnownGood,
-        });
-      } else {
-        this.lastKnownGoodModules.set(root, current);
-      }
-      return selected.modules;
-    });
     return {
       modules: buildVisibleModulePayloads(
-        mergeVisibleModules(byRoot),
+        assembly.modules,
         (set) => this.buildRow(set),
       ),
-      manifestFaults,
+      manifestFaults: assembly.manifestFaults,
     };
   }
 

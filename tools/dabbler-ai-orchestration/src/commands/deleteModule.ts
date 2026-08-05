@@ -21,6 +21,7 @@ import {
   unknownModuleMessage,
 } from "../utils/moduleAuthoring";
 import { ModuleManifestEntry } from "../types";
+import { preselectFromTreeNode } from "../providers/workExplorerTreeModel";
 
 export interface DeleteModuleUi {
   /** Pick the module to delete (a QuickPick of declared modules). */
@@ -175,8 +176,10 @@ export function registerDeleteModuleCommand(
   context: vscode.ExtensionContext,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("dabbler.deleteModule", async () => {
-      await runDeleteModuleFlow();
+    vscode.commands.registerCommand("dabbler.deleteModule", async (arg?: unknown) => {
+      // Set 110 S2: see the note on `dabbler.renameModule` — palette use is
+      // unchanged; a tree row supplies its module as an explicit target.
+      await runDeleteModuleFlow(undefined, preselectFromTreeNode(arg));
     }),
   );
 }

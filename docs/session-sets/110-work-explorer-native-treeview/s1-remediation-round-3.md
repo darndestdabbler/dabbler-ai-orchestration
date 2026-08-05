@@ -169,3 +169,53 @@ not touch the density decisions, which the operator confirmed twice against
 rendered evidence. What it undermines is precisely the claim that S1 measured
 the migration-specific startup surface — and this session no longer makes that
 claim.
+
+---
+
+# Addendum 2 — the measurement succeeded, and round 8's two findings
+
+**The real-host measurement was obtained on the fifth attempt** (operator
+authorized continuing after the fourth failed). Results, three cold reps,
+no forced refresh: **launch → first row 11,582 ms; view open → first row
+5,102 ms** (5083 / 5102 / 5221).
+
+Both earlier write-ups of *why* it kept failing were wrong. The actual causes:
+
+1. `launchVSCode(tmpPath)` opened the temp **parent** directory instead of
+   `handle.repo_root`, so VS Code opened a workspace with no session sets in it
+   and the tree correctly painted nothing. I had written this up as "the
+   fixture leaves the view in an empty-state or all-collapsed shell" — a guess
+   that sounded like analysis.
+2. The run depended on `triggerRefresh`, whose command palette failed to open
+   in three of four attempts. Dropping it was also the **more correct**
+   measurement: forcing a refresh measures a refresh, not a first paint.
+
+**The stub figures understated user-visible cost by more than 10×** (~390 ms
+vs ~5.1 s). Every refusal by the verifier across rounds 4, 5 and 6 was correct
+on the merits, and the first adjudication was right to uphold it.
+
+## Round 8's two findings, both accepted
+
+**F9 — the aggregate does not support the attribution I drew from it.** I wrote
+that "only the ~124 ms scan provably survives the migration; the rest is
+webview". The 5.1 s was never decomposed, so that attribution was unsupported —
+an over-claim in the *opposite* direction from the one this session started
+with. Withdrawn. The document now attributes none of the aggregate, says only
+that a webview process, ~110 KB payload and an `innerHTML` render path are
+inside it somewhere, and names the spec's four-buckets-at-four-scales
+requirement as **still undelivered** in the real host.
+
+**F10 — mutually exclusive instructions to S4.** §2 said "no forced refresh —
+or the comparison is invalid"; §6 still said "including the refresh command —
+or the comparison is invalid". §6 also still claimed the spec was skipped and
+that no number came from a real host. All three were pre-success text that
+survived because I replaced section **headings** without rewriting the bodies
+beneath them — **L-065-1 for the third time in this session**. Fixed: §6 now
+carries the single canonical instruction, §2 points at it rather than restating
+it, and the superseded text is called out as superseded rather than silently
+dropped.
+
+The lesson, stated plainly for whoever reads this next: in this session the
+echo-consistency failure was never a one-off. Citing L-065-1 did nothing;
+grepping for the old claim's key phrases is the only thing that worked, and it
+should be run *before* re-verifying, every time.

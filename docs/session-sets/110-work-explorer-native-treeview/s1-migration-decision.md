@@ -187,14 +187,25 @@ which this session may not do): webview process spawn, ~110 KB of JS/CSS
 fetched, parsed and executed, the host-side scan (~124 ms measured), the
 message round-trip, and the full `innerHTML` tree build.
 
-**What this does to the migration's case.** It *strengthens* it, in the one
-direction this document had ruled out. A native `TreeView` deletes the webview
-process, its payload and its render path entirely. Of the ~5.1 s, only the
-~124 ms scan provably survives the migration. **That is not a promise of a 40×
-win** — the native tree's own paint cost is unmeasured because the native tree
-does not exist — but the earlier framing, that startup was immovable and the
-migration could only be justified on correctness, was **too pessimistic and is
-withdrawn**.
+**What this does to the migration's case — carefully.** It removes the basis
+for the earlier claim that startup was immovable. It does **not** establish
+that the migration will improve it, and this document must not imply otherwise:
+
+- The 5.1 s is an **aggregate**. It was not decomposed, so **no part of it is
+  attributed here**. An earlier draft said "only the ~124 ms scan provably
+  survives the migration, the rest is webview" — that attribution is
+  **unsupported by this measurement** and is withdrawn. The scan is nested
+  inside the aggregate somewhere; everything else is inference.
+- What is fair to say: the native tree removes a webview process, ~110 KB of
+  payload and an `innerHTML` render path, all of which are inside that 5.1 s
+  somewhere. That is a **reason to expect** improvement, not evidence of it.
+- The native side is unmeasurable until S2 builds it.
+
+**The spec's step 3 asked for four buckets at four scales in the real host.
+That is still not delivered.** What exists is: host-pipeline scaling at
+0/10/100/500 (real, Node-measurable), stub-only figures for the individual
+buckets, and **one** real-host aggregate at 8 sets. The gap is named here rather
+than papered over, and it is the largest residual this session hands to S4.
 
 **Caveats, stated so nobody over-reads this.** An Extension Development Host is
 slower to start than a packaged install, so `launch → first row` (11.6 s) is not
@@ -204,8 +215,8 @@ fixture, not an empty tree, so they do not contradict the ~102 ms empty-tree
 pipeline finding — they measure a different thing: what the user waits for,
 rather than what the host computes.
 
-**S4 must measure the native tree the same way** — same harness, no forced
-refresh — or the comparison is invalid.
+S4's measurement instruction is stated **once**, canonically, in §6 (*How the
+stub figures misled*). It is not restated here, so it cannot drift.
 
 ### The other startup buckets — measured after the close backstop called this out
 
@@ -672,23 +683,31 @@ whichever way it falls.
 
 ### How the stub figures misled, recorded so it is not repeated
 
-Recorded on the instruction of the second third-party adjudication
-([`s1-third-provider-adjudication-2.json`](s1-third-provider-adjudication-2.json)),
-so a future reader is not misled:
+> **This section previously carried pre-success text** claiming the real-host
+> spec was skipped, that no number came from a real extension host, and that S4
+> should measure *including* a refresh. All three were true when written and are
+> false now. They are replaced rather than edited in place, because leaving a
+> stale mandatory instruction next to a live contradictory one is exactly the
+> defect round 8 caught.
 
-- **Extension activation, `resolveWebviewView`, and renderer first paint were
-  measured against a Node `vscode` STUB only.** No number in this session came
-  from a real extension host. The verifier raised this across rounds 4, 5 and
-  6; the first adjudicator upheld it; two operator-authorized attempts to fix
-  it failed on harness problems, not on principle.
-- **S4 must close it.** The skipped spec
-  [`real-host-baseline.spec.ts`](../../../tools/dabbler-ai-orchestration/src/test/playwright/real-host-baseline.spec.ts)
-  carries the fix in its header: wait on a **specific** `[data-slug=...]` the
-  way `session-sets-tree.spec.ts` does, instead of waiting for any row. Un-skip
-  it, run **both** implementations through it, and measure the native tree the
-  same way — including the refresh command — or the comparison is invalid.
-- The host-pipeline numbers are **not** affected: they are plain Node
-  filesystem and subprocess work that needs no extension host.
+- **The stub figures understated user-visible cost by more than 10×.**
+  ~390 ms cold bootstrap against ~5.1 s from view-open to first row in a real
+  host. The verifier refused them across rounds 4, 5 and 6 and was right every
+  time; the first adjudicator upheld it; the orchestrator's two write-ups of
+  *why* the real-host attempt kept failing were both wrong (the actual causes
+  were passing the tmp parent instead of `handle.repo_root`, and depending on a
+  flaky command palette).
+- **`activate()`, `resolveWebviewView()` and module load remain stub-only
+  figures.** Treat them as the shape of the extension's own synchronous work,
+  never as startup cost.
+- **The host-pipeline numbers are unaffected** — plain Node filesystem and
+  subprocess work that needs no extension host.
+
+**The single measurement instruction for S4** (this supersedes any other
+wording anywhere in this document): run
+[`real-host-baseline.spec.ts`](../../../tools/dabbler-ai-orchestration/src/test/playwright/real-host-baseline.spec.ts)
+against **both** implementations, **with no forced refresh**, on the **same
+fixture size**, and report the delta whichever way it falls.
 
 None of the three no-go conditions fired:
 

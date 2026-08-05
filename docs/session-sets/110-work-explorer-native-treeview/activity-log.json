@@ -180,6 +180,14 @@
       "dateTime": "2026-08-05T01:36:31.077510-04:00",
       "description": "Real-host baseline SUCCEEDED on the fifth attempt. Two distinct bugs were mine: launchVSCode was given tmpPath instead of handle.repo_root (so VS Code opened a workspace with no session sets), and the run depended on triggerRefresh, whose command palette flaked in 3 of 4 attempts. Dropping the forced refresh was also the more correct measurement. Results: launch->first row 11582ms, view open->first row 5102ms, medians of 3, tight variance. The stub harnesses had reported ~390ms cold bootstrap - understating the user-visible cost by more than 10x. The verifier refused those figures three times and was right on the merits, not on a technicality. Decision doc corrected throughout: performance is now a real but unquantified SECONDARY justification rather than withdrawn.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 23,
+      "stepKey": "session-001/remediate-round-8",
+      "dateTime": "2026-08-05T01:41:28.195893-04:00",
+      "description": "Round 8 raised 2 Majors, both accepted. F9: I attributed the 5.1s aggregate to webview cost (only ~124ms scan survives) without decomposing it - an over-claim in the opposite direction, withdrawn; the four-buckets-at-four-scales requirement is now named as still undelivered in the real host. F10: section 6 still carried pre-success text (spec skipped, no real-host number, measure INCLUDING the refresh) contradicting section 2 - L-065-1 for the third time in one session, caused by replacing headings without rewriting the bodies. S4 now has exactly one canonical measurement instruction.",
+      "status": "complete"
     }
   ]
 }

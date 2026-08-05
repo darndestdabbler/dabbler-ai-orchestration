@@ -17,8 +17,10 @@
 > **The pitch was wrong about the mechanism, not the symptom.** A ~102 ms
 > host-pipeline floor survives the migration, and the original "the tree
 > re-renders too much" framing does not explain an empty tree. But the view
-> genuinely is slow — ~5.1 s to first row — and most of that is webview cost
-> the migration deletes. §2 separates what is measured from what is not.
+> genuinely is slow — ~5.1 s to first row — and the webview process, its
+> ~110 KB payload and its render path all sit somewhere inside that number.
+> How much of it they account for is **not measured**. §2 separates what is
+> measured from what is inferred.
 
 ---
 
@@ -94,9 +96,9 @@ Sonnet's worry was that the set might be "solving the wrong problem well". The
 measurements below say: partly, and not in the direction anyone expected. The
 *empty-tree* cost really is a ~102 ms git subprocess the migration cannot
 touch, so that half of the worry stands and the scan fix is owed to a follow-on
-set. But the *view-open* cost is ~5.1 s in a real host, most of it webview work
-the migration deletes outright — so the migration is not merely a correctness
-play after all. The set proceeds on correctness as its **primary** justification
+set. But the *view-open* cost is ~5.1 s in a real host, and the webview work
+the migration deletes sits inside it — an unmeasured share, not a majority this
+session can claim. So the migration may not be merely a correctness play. The set proceeds on correctness as its **primary** justification
 because that is what three panelists independently ranked first and what is
 proven today; the performance upside is real but remains **unquantified on the
 native side**, which does not exist yet.
@@ -170,10 +172,38 @@ Raw: [`s1-real-host-baseline.json`](s1-real-host-baseline.json). A launched VS
 Code Extension Development Host, shipping extension, fresh profile per rep,
 8-set fixture, **no forced refresh** — the view's natural cold paint.
 
-| | median of 3 | samples |
-| --- | ---: | --- |
-| launch → first row visible | **11,582 ms** | 11586 / 11545 / 11582 |
-| **view opened → first row visible** | **5,102 ms** | 5083 / 5102 / 5221 |
+Measured at three populated scales (medians of 2 cold launches each; the empty
+scale has no row to wait for, so a first-paint probe has nothing to observe
+there — that scale is covered by the host-pipeline harness above):
+
+| sets | launch → first row | **view opened → first row** |
+| ---: | ---: | ---: |
+| 10 | 11,627 ms | **5,330 ms** |
+| 100 | 11,655 ms | **5,215 ms** |
+| 500 | 12,101 ms | **5,470 ms** |
+
+An earlier single-scale run at 8 sets gave 11,582 / 5,102 ms, consistent with
+these.
+
+**The finding is the flatness.** A 50× increase in set count moves
+view-open-to-first-row by roughly 3% — from 5,330 ms to 5,470 ms — which is
+inside the run-to-run spread. Launch-to-first-row is similarly flat.
+
+**What that rules out**, which is firmer ground than attribution:
+
+- It is **not** the per-set scan. That is measured, linear, and reaches 242 ms
+  at 500 sets — it would have to show up here and does not.
+- It is **not** per-row DOM construction. The renderer builds every row
+  unconditionally today (spec fact 3), so 500 sets build ~50× the rows of 10 —
+  and cost the same.
+- It is therefore **fixed cost**, paid once, independent of how much work there
+  is to display.
+
+**What it does not establish.** Which fixed cost. Webview process spawn, the
+~110 KB payload parse, the message channel handshake and VS Code's own view
+plumbing are all candidates, and this session did not separate them. The
+migration deletes the first three and not the fourth. That is a reason to
+expect improvement and still not a measurement of one.
 
 **This is the number that matters, and nothing else in this session came close
 to it.** Every earlier harness ran Node against a `vscode` stub and reported the
@@ -201,11 +231,45 @@ that the migration will improve it, and this document must not imply otherwise:
   somewhere. That is a **reason to expect** improvement, not evidence of it.
 - The native side is unmeasurable until S2 builds it.
 
-**The spec's step 3 asked for four buckets at four scales in the real host.
-That is still not delivered.** What exists is: host-pipeline scaling at
-0/10/100/500 (real, Node-measurable), stub-only figures for the individual
-buckets, and **one** real-host aggregate at 8 sets. The gap is named here rather
-than papered over, and it is the largest residual this session hands to S4.
+### What step 3 asked for, and what this session actually delivered
+
+The spec asked for **four buckets at four scales**. Delivered, precisely:
+
+| | 0 | 10 | 100 | 500 |
+| --- | :-: | :-: | :-: | :-: |
+| host pipeline (discovery + scan), real | ✅ | ✅ | ✅ | ✅ |
+| real-host aggregate to first row | n/a¹ | ✅ | ✅ | ✅ |
+| `activate()` / `resolveWebviewView()` / module load, **separately** | stub² | stub² | stub² | stub² |
+
+¹ An empty tree paints no row, so there is nothing for a first-paint probe to
+observe; the host-pipeline harness covers that scale.
+² Node `vscode` stub, warm-corrected to cold. Understates aggregate reality by
+more than 10×, so they describe **shape, not size**.
+
+**The one thing that remains genuinely undelivered is per-bucket separation
+inside a real host** — timing `activate()` apart from `resolveWebviewView()`
+apart from first paint, in a live extension host. That requires instrumenting
+the product (timestamps emitted from inside `activate()` and the webview), and
+this session's spec forbids touching product code: *"Touches: nothing shipping
+— this session changes no product behaviour."*
+
+**Those two spec lines are in direct conflict**, and the conflict is being
+recorded rather than resolved unilaterally.
+
+> **Operator adjudication, 2026-08-05:** *"accept the delivered evidence
+> (bucketed stub at four scales + real-host aggregate baseline)"*. The
+> outstanding verifier finding — that per-bucket timings were never obtained
+> inside a real extension host — is accepted as a **recorded residual** rather
+> than remediated further. The bucketed figures stand as stub-measured (shape,
+> not size) and the real-host aggregate stands as the comparison baseline. This
+> is an operator override of a machine gate, taken knowingly, and it is what
+> permits S1 to close. S1 chose to honour the
+no-product-code constraint, because a decide-and-measure session that edits the
+thing it is deciding about is worse than one with a named measurement gap.
+**S2 is the right place to add the instrumentation**, since it is already
+building the native provider and can emit the same timestamps from both
+implementations — which is also the only way S4's before/after comparison can
+be per-bucket rather than aggregate.
 
 **Caveats, stated so nobody over-reads this.** An Extension Development Host is
 slower to start than a packaged install, so `launch → first row` (11.6 s) is not
@@ -651,8 +715,9 @@ every static gate stayed green) makes it concrete.
 
 **Performance is a real secondary justification, but it is not yet earned.**
 The real-host measurement shows the shipping view takes ~5.1 s from open to
-first row, most of it webview cost the migration deletes. That is a genuine
-reason to expect an improvement. It is **not** a measured improvement, because
+first row, with the webview process, payload and render path inside that
+number by an unmeasured amount. That is a genuine reason to expect an
+improvement. It is **not** a measured improvement, because
 the native tree does not exist yet, and **no CHANGELOG line in this set may
 claim one** until S4 measures both implementations through the same harness.
 

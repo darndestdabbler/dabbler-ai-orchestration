@@ -34,8 +34,11 @@ import {
   openSessionSetsView,
 } from "./electronLaunch";
 
-const REPS = 3;
-const SETS = 8;
+const REPS = 2;
+// The spec's step 3 asks for the four scales. 0 is covered by the host-pipeline
+// harness (an empty tree has no row to wait for, so there is nothing for a
+// first-paint probe to observe); these are the populated scales.
+const SCALES = [10, 100, 500];
 const OUT = path.resolve(
   __dirname,
   "../../../../..",
@@ -43,6 +46,7 @@ const OUT = path.resolve(
 );
 
 interface Sample {
+  scale: number;
   rep: number;
   /** Electron spawn + host bootstrap + activation + view open + first paint. */
   launchToFirstRowMs: number;
@@ -68,12 +72,13 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
   test("measures cold launch-to-first-row for the shipping webview", async () => {
     const samples: Sample[] = [];
 
+    for (const scale of SCALES) {
     for (let rep = 1; rep <= REPS; rep++) {
       const tmpPath = makeTmpDir("dabbler-110-realhost");
       let launch: LaunchedVSCode | undefined;
       try {
         let handle = makeSet(tmpPath, "001-real-host-baseline", 4);
-        for (let i = 2; i <= SETS; i++) {
+        for (let i = 2; i <= scale; i++) {
           handle = makeAdditionalSet(
             handle,
             `${String(i).padStart(3, "0")}-real-host-baseline`,
@@ -105,6 +110,7 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
         const tRow = Date.now();
 
         samples.push({
+          scale,
           rep,
           launchToFirstRowMs: tRow - tLaunch,
           viewOpenToFirstRowMs: tRow - tOpen,
@@ -113,6 +119,7 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
         if (launch) await closeVSCode(launch);
         cleanupTmpDir(tmpPath);
       }
+    }
     }
 
     const payload = {
@@ -134,12 +141,17 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
         "extension's own scan completes, which is the honest first-paint number. S4 must " +
         "measure the native tree the SAME way — no forced refresh — or the comparison is " +
         "invalid.",
-      fixture: `${SETS} session sets x 4 sessions`,
+      fixture: "N session sets x 4 sessions, at each scale below",
+      scales: SCALES,
       reps: REPS,
-      medians: {
-        launchToFirstRowMs: median(samples.map((s) => s.launchToFirstRowMs)),
-        viewOpenToFirstRowMs: median(samples.map((s) => s.viewOpenToFirstRowMs)),
-      },
+      perScale: SCALES.map((sc) => {
+        const rows = samples.filter((x) => x.scale === sc);
+        return {
+          sets: sc,
+          launchToFirstRowMs: rows.length ? median(rows.map((x) => x.launchToFirstRowMs)) : null,
+          viewOpenToFirstRowMs: rows.length ? median(rows.map((x) => x.viewOpenToFirstRowMs)) : null,
+        };
+      }),
       samples,
     };
 
@@ -147,12 +159,23 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
     fs.writeFileSync(OUT, JSON.stringify(payload, null, 2), "utf8");
 
     // eslint-disable-next-line no-console
+    const lines = payload.perScale.map(
+      (r) =>
+        `  ${String(r.sets).padStart(4)} sets: launch->row ${r.launchToFirstRowMs} ms, ` +
+        `viewopen->row ${r.viewOpenToFirstRowMs} ms`,
+    );
     console.log(
-      `\n[110 S1] REAL HOST launch -> first row:  ${payload.medians.launchToFirstRowMs} ms` +
-      `\n[110 S1] REAL HOST view open -> first row: ${payload.medians.viewOpenToFirstRowMs} ms` +
-      `\n[110 S1] wrote ${OUT}\n`,
+      ["", "[110 S1] REAL HOST, per scale:", ...lines, `[110 S1] wrote ${OUT}`, ""].join(
+        "\n",
+      ),
     );
 
-    expect(samples).toHaveLength(REPS);
+    // One sample per (scale, rep). Asserting REPS here was a leftover from the
+    // single-scale version and failed the spec AFTER the measurements and the
+    // artifact had already been written.
+    expect(samples).toHaveLength(SCALES.length * REPS);
+    for (const r of payload.perScale) {
+      expect(r.viewOpenToFirstRowMs).toBeGreaterThan(0);
+    }
   });
 });

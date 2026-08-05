@@ -188,6 +188,22 @@
       "dateTime": "2026-08-05T01:41:28.195893-04:00",
       "description": "Round 8 raised 2 Majors, both accepted. F9: I attributed the 5.1s aggregate to webview cost (only ~124ms scan survives) without decomposing it - an over-claim in the opposite direction, withdrawn; the four-buckets-at-four-scales requirement is now named as still undelivered in the real host. F10: section 6 still carried pre-success text (spec skipped, no real-host number, measure INCLUDING the refresh) contradicting section 2 - L-065-1 for the third time in one session, caused by replacing headings without rewriting the bodies. S4 now has exactly one canonical measurement instruction.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 24,
+      "stepKey": "session-001/four-scale-real-host",
+      "dateTime": "2026-08-05T02:10:35.083911-04:00",
+      "description": "Real-host aggregate measured at 10/100/500 sets: view-open to first row 5330/5215/5470 ms, reproduced independently at 5297/5328/5495 ms. FLAT across a 50x set-count change, which rules out the per-set scan (242ms at 500 sets) and per-row DOM construction as the cause. Fixed startup cost, deliberately unattributed. Also recorded a direct conflict between spec step 3 (per-bucket real-host timings) and the session plan (Touches: nothing shipping) - honoured the latter, assigned instrumentation to S2.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 25,
+      "stepKey": "session-001/operator-adjudication-close",
+      "dateTime": "2026-08-05T02:10:35.084916-04:00",
+      "description": "Operator adjudicated 2026-08-05: accept the delivered evidence (bucketed stub at four scales + real-host aggregate baseline). Closing WAIVED on operator attestation with the residual recorded, not VERIFIED.",
+      "status": "complete"
     }
   ]
 }

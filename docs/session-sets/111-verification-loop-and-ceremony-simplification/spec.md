@@ -213,6 +213,13 @@ prerequisites:
    exactly once at session close after code freeze, selected by what the
    diff touched; full matrix once at the release boundary; rendering
    sessions always pay their own Layer 3; CI is backstop, never gate.
+   **Include an executable freshness check in the close gate**: the full
+   run-of-record must postdate the last change to the surfaces it covers —
+   a timestamp comparison, not a judgment call. Evidence basis: 110 S3
+   tried to close on a full run that predated three test fixes, disclosed
+   it in the sidecar, and was correctly refused by the backstop; the
+   orchestrator agreed with the policy and slipped anyway. Prose does not
+   survive end-of-session pressure; a check does.
 5. **Canonize the guided-look UAT format** (piloted in 110 operator-notes):
    Look ≤5 + Decide ≤3, three lines per item, ten minutes, self-contained
    items, Decide sourced from the decision journal. **Close gate:** a

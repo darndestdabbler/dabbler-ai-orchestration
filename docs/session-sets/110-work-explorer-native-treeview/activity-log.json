@@ -164,6 +164,14 @@
       "dateTime": "2026-08-04T21:01:56.174399-04:00",
       "description": "Real-EDH baseline attempted TWICE and failed both times (palette timeout; then no treeitem visible in 60s). Spec left SKIPPED with both failure modes and an S4 fix instruction, not deleted and not left red (L-064-12). Recorded honestly: all activation figures remain stub-measured; the verifier was right through three rounds.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 21,
+      "stepKey": "session-001/second-adjudication",
+      "dateTime": "2026-08-05T01:24:14.669475-04:00",
+      "description": "Operator instruction: route the issue to a third party. Routed to gemini-3.1-pro-preview (Google; third party to the anthropic orchestrator and openai verifier, and a DIFFERENT model from the first adjudicator). Verdict MAY_CLOSE, endangers_s2_s4=false: the 102ms floor is the operative finding, the perf claim is withdrawn, S3 deletion is reversible and S4 is the release gate. It also judged the verifier and first adjudicator to have conflated literal spec compliance with the go/no-go requirement. Recorded its four mandatory disclosures in the decision doc.",
+      "status": "complete"
     }
   ]
 }

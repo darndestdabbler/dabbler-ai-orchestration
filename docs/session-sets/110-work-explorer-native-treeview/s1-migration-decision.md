@@ -1,11 +1,16 @@
 # Set 110 Session 1 — Migration decision
 
-> **Verdict: GO.** Confirmed by two operator decisions on the density trade
-> (2026-08-04, the second covering the final mapping), a three-model panel run
-> on the corrected registry, startup measured at four scales plus three of the
-> spec's four buckets, a rendered before/after against the shipping renderer,
-> and four API spikes answered by running code rather than by reading
-> documentation.
+> **Verdict: GO**, on defect-class elimination alone. Confirmed by two operator
+> decisions on the density trade (2026-08-04, the second covering the final
+> mapping), a three-model panel on the corrected registry, a rendered
+> before/after against the shipping renderer, four API spikes answered by
+> running code in a real Extension Development Host, and the host-side startup
+> pipeline measured at four scales.
+>
+> **The migration-specific startup buckets are NOT measured** — activation,
+> `resolveWebviewView` and first paint were only ever run against a Node stub,
+> and two authorized attempts at a real-host measurement failed. That residual
+> is adjudicated and owed to S4; see §6.
 >
 > **But not for the reason the set was pitched.** There is a ~102 ms startup
 > floor the migration provably cannot remove, so the set's original performance
@@ -579,10 +584,36 @@ native tree is faster to first paint, S4 says so and quantifies it.
 
 **GO.**
 
-The set proceeds on the correctness and maintainability argument, which all
-three panelists ranked first, and which the Set 108 specimen makes concrete. It
-proceeds with the performance claim **withdrawn**, in writing, before any code
-is migrated.
+**Defect-class elimination is the sole primary justification for this
+migration.** Not performance, not line count. All three panelists ranked it
+first independently, and the Set 108 specimen — a CSS-only change that broke
+interaction while the unit suite and every static gate stayed green — makes it
+concrete. The performance claim is **withdrawn in writing** before any code is
+migrated, and nothing in this set may be sold on a startup number.
+
+That framing is not a retreat dressed up as a decision; it is what survived
+contact with the measurements. The startup pitch was tested and did not hold;
+the correctness argument was tested by three independent panelists and did.
+
+### Adjudicated residual: the startup buckets are stub-measured
+
+Recorded on the instruction of the second third-party adjudication
+([`s1-third-provider-adjudication-2.json`](s1-third-provider-adjudication-2.json)),
+so a future reader is not misled:
+
+- **Extension activation, `resolveWebviewView`, and renderer first paint were
+  measured against a Node `vscode` STUB only.** No number in this session came
+  from a real extension host. The verifier raised this across rounds 4, 5 and
+  6; the first adjudicator upheld it; two operator-authorized attempts to fix
+  it failed on harness problems, not on principle.
+- **S4 must close it.** The skipped spec
+  [`real-host-baseline.spec.ts`](../../../tools/dabbler-ai-orchestration/src/test/playwright/real-host-baseline.spec.ts)
+  carries the fix in its header: wait on a **specific** `[data-slug=...]` the
+  way `session-sets-tree.spec.ts` does, instead of waiting for any row. Un-skip
+  it, run **both** implementations through it, and measure the native tree the
+  same way — including the refresh command — or the comparison is invalid.
+- The host-pipeline numbers are **not** affected: they are plain Node
+  filesystem and subprocess work that needs no extension host.
 
 None of the three no-go conditions fired:
 

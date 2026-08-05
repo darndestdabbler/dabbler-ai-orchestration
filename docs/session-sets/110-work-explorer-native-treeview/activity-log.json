@@ -515,6 +515,14 @@
       "dateTime": "2026-08-05T05:43:16.046960-04:00",
       "description": "complete",
       "status": "remediation-review round 3 over the fix delta ($0.1244): VERIFIED, 1 fix accepted / 0 rejected / 0 accepted-with-modification, zero new findings. 2 of 2 permitted discovery passes used; no third round opened."
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 20,
+      "stepKey": "close-backstop",
+      "dateTime": "2026-08-05T06:06:21.294007-04:00",
+      "description": "complete",
+      "status": "The close backstop (round 4, gpt-5-6-sol, $0.9959) refused the close on one Major: 'the final tree has no successful full Layer 3 run.' ACCEPTED WITHOUT ARGUMENT - correct on the facts. The run of record was 32/1 and the one failure was fixed afterwards with TARGETED runs only, so no full suite had ever passed against the tree being closed, while the session's Ends-with says 'Layer 3 is green on the new view'. s3-remediation-round-1.md had disclosed exactly this and argued the test-run policy justified it; the disclosure was honest and the decision was WRONG. That policy has two halves - never start a run you might invalidate, AND run it once at close after the last code change - and this session used the first to excuse skipping an obligation the second creates. Ran the full suite: 33 passed / 0 failed (18.1m), no code changed to make it pass. Round 1's argument is left standing rather than edited out. SEPARATE FRAMEWORK GAP REPORTED NOT FIXED: close_session crashed with an unhandled EvidenceTooLargeError traceback because close_backstop catches VerifySessionError and that exception does not inherit from it - a fail-closed guard that takes the gate down with no remediation line. ai_router is out of this set's scope and changing the harness mid-set taints the record, so it goes to Step 9; the documented AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS override (768 KiB vs a 600 KiB default, bundle 2% over) was used and disclosed, with nothing filtered from the evidence."
     }
   ]
 }

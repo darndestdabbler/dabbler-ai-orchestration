@@ -18,7 +18,7 @@ concretely; a finding that cannot name one is a nit.
 | layer | command | result |
 | --- | --- | --- |
 | Layer 2 (unit) | `npm run test:unit` (mocha + ts-node + vscode-stub) | **1866 passing, 0 failing** |
-| Layer 3 (Playwright) | `npx playwright test` | full suite run once at close — count in `disposition.json` |
+| Layer 3 (Playwright) | `npx playwright test` | **33 passed / 0 failed (18.1m)**, on the final tree |
 | typecheck | `npx tsc --noEmit -p .` | clean |
 | build | `npm run compile` | clean |
 

@@ -297,6 +297,62 @@ argued down to nothing.
    there is no tree in it. Left alone deliberately (many references, low
    value, high churn) and recorded here rather than hidden.
 
+## 8a. A framework gap found at the close gate, reported not fixed
+
+`close_session` **crashed with an unhandled traceback** on its first
+invocation:
+
+```
+ai_router.verify_session.EvidenceTooLargeError:
+  assembled evidence is 627074 chars, over the 614400-char cap
+```
+
+`close_backstop.run_close_backstop` wraps `assemble_evidence` in
+`except _vs.VerifySessionError`, but `EvidenceTooLargeError` is **not a
+subclass of it** — confirmed by inspection. So a guard that exists precisely
+to fail closed *gracefully* instead takes the close gate down with a stack
+trace and no remediation line, on a session whose only sin is a large diff.
+Every other backstop failure path returns a `BackstopOutcome` with an
+operator-facing `remediation` string; this one does not.
+
+**Not fixed here, deliberately.** `ai_router` verification machinery is
+out of this set's scope by the spec's own non-goals, and the operator's
+2026-08-05 note is explicit that changing the harness mid-set taints the
+set's own verification record. Reported instead, with the fix being one line
+(make `EvidenceTooLargeError` inherit `VerifySessionError`, or catch it
+alongside) plus a remediation string naming the documented env override.
+
+**The workaround used, disclosed rather than buried:** the cap is
+operator-tunable by design — `verify_session`'s own error path tells the
+operator to set `AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS` — so the close ran with
+it at 768 KiB against a 600 KiB default. The bundle was **2% over**. Nothing
+about the evidence was reduced, filtered, or hidden; the verifier saw the
+whole thing.
+
+## 8b. The close backstop was right and this session was wrong
+
+The backstop's own round found one blocking Major: **"the final tree has no
+successful full Layer 3 run."**
+
+**Accepted without argument.** The full run of record was 32 passed / 1
+failed; the one failure was fixed afterwards and re-run *targeted*. So at the
+moment of the first close attempt, no full suite had ever passed against the
+tree being closed — and this session's Ends-with says, in the spec's own
+words, *"Layer 3 is green on the new view."*
+
+`s3-remediation-round-1.md` had already disclosed this and argued the
+operator's test-run policy justified it. **The disclosure was honest and the
+decision was wrong.** That policy has two halves — *do not start a full run
+you might invalidate*, and *run it once, at close, AFTER the last code
+change*. This session applied the first half to skip an obligation the second
+half creates. The last code change was the three test fixes; the full run
+belonged after them.
+
+Twenty-three minutes was the correct price for the central claim of the set.
+The sidecar's reasoning is superseded by `s3-remediation-round-2.md` rather
+than quietly edited — the original argument stays on the record because
+getting it wrong is the more useful artifact.
+
 ## 9. Honest limits of this session
 
 - **No performance claim is made or implied.** Session 1 withdrew the

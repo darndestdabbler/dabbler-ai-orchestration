@@ -258,3 +258,36 @@ is in evidence, and the migration deletes the plausible bulk suspects
 measures before anyone claims. If the native tree misses the gate, the
 first suspect to decompose is that git subprocess going async so first
 paint does not wait on it.
+
+---
+
+## 2026-08-05 — Test-run policy for Sessions 3–4
+
+Operator-directed, prompted by S2 starting the full Layer 3 suite
+mid-session and then owing a clean re-run because code changed after the
+run began — an invalidated ~13 minutes. The waste pattern is *invalidated*
+runs, not full runs (Set 109 S4 ran the full suite once per verification
+round, same pathology). Candidate Set 111 policy, applied to this set now:
+
+- **Cheap suites run freely.** The Layer 2 stub-mocha pass (~2 min) costs
+  less than deciding whether to run it. Run it whenever useful.
+- **Expensive suites (Layer 3 Playwright ~13 min) run in two modes only:**
+  *targeted* — the specific specs covering what you just changed, any time
+  (S2's native-tree spec run was exactly right); and *full* — **exactly
+  once per session, at session close, AFTER the last code change**. Never
+  start a full expensive run you might invalidate; if code moves after it
+  starts, the run bought nothing.
+- **Verification rounds do not each trigger suite runs.** The remediation
+  sidecar's acceptance checks are the targeted per-round evidence; the
+  full run belongs to the session close, once.
+- **Non-negotiable exception:** any session that touches the Explorer
+  rendering surface runs the full Layer 3 at its own close — Layer 2 and
+  every static gate stayed green while a real rendering regression was
+  live, and only Layer 3 caught it. S3 (the switch-over) is exactly such a
+  session. Do not defer its Layer 3 debt to S4.
+- **S4 (release boundary) runs the whole matrix once** against the final
+  build — the cross-surface regression backstop — plus the startup gate
+  above.
+- **CI stays the push-time backstop, never the session gate.** Close
+  evidence is local and in-session; do not block a close on a remote
+  queue.

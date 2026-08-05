@@ -1,11 +1,12 @@
 # Set 112 — remove the Lightweight tier (RESERVED)
 
-> **Status: number formally reserved by the operator, 2026-08-05. NOT
-> authored.** This document is the reservation record and the day-one scope
-> basis. It binds the number `112` to this purpose so no other set consumes
-> it, and it applies the two operator-elevated Set 111 principles from the
-> start, per operator direction. Author the set proper only after Set 110
-> completes and Set 111 lands.
+> **Status: number formally reserved by the operator, 2026-08-05; spec
+> AUTHORED same day** at
+> [`docs/session-sets/112-remove-lightweight-tier/spec.md`](../session-sets/112-remove-lightweight-tier/spec.md),
+> ahead of sequence on operator instruction (provisional — may be revisited).
+> This document remains the reservation record and decision basis; the spec
+> executes it. **Execution still waits for Set 110 to complete and Set 111
+> to land** — authoring early does not loosen the prerequisites.
 
 ## Purpose
 

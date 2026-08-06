@@ -148,6 +148,9 @@ jobs:
     permissions:
       contents: read
       actions: read
+      # Set 110 S4: the gate reads each failed job's ANNOTATIONS to tell a
+      # provider fault from a real test failure. Those live on the checks API.
+      checks: read
     steps:
       - name: Checkout tag (for the local composite action)
         uses: actions/checkout@v4
@@ -158,6 +161,10 @@ jobs:
         uses: ./.github/actions/require-green-test
         with:
           sha: ${{ github.sha }}
+          # Operator escape hatch for a GitHub outage; authorizes ONE commit
+          # and never tolerates a genuine test failure. Clear after release.
+          infra-override-sha: ${{ vars.RELEASE_INFRA_OVERRIDE_SHA }}
+          infra-override-reason: ${{ vars.RELEASE_INFRA_OVERRIDE_REASON }}
 
   # ---------------------------------------------------------------------------
   # TestPyPI publish — release-candidate tags only (`v[0-9]+.[0-9]+.[0-9]+-rcN`).

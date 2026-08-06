@@ -196,6 +196,10 @@ jobs:
     permissions:
       contents: read
       actions: read
+      # Set 110 S4: the gate reads each failed job's ANNOTATIONS to tell a
+      # provider fault ("Service Unavailable", "lost communication with the
+      # server") from a real test failure. Those live on the checks API.
+      checks: read
     steps:
       - name: Checkout tag (for the local composite action)
         uses: actions/checkout@v4
@@ -206,6 +210,13 @@ jobs:
         uses: ./.github/actions/require-green-test
         with:
           sha: ${{ github.sha }}
+          # Operator escape hatch for a GitHub outage. Set the repository
+          # variable to the exact commit being released -- it authorizes that
+          # ONE commit, so a variable left behind cannot silently disable the
+          # gate for every future release, and it never tolerates a genuine
+          # test failure. Clear it after the release.
+          infra-override-sha: ${{ vars.RELEASE_INFRA_OVERRIDE_SHA }}
+          infra-override-reason: ${{ vars.RELEASE_INFRA_OVERRIDE_REASON }}
 
   # ---------------------------------------------------------------------------
   # VS Code Marketplace publish — final tags only (`vsix-v[0-9]+.[0-9]+.[0-9]+`).

@@ -17678,6 +17678,42 @@ function runCatalogRefresh(deps) {
     }
   });
 }
+var GITIGNORE_REL = ".gitignore";
+var LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
+function isLocalOverridesIgnored(gitignoreText) {
+  const covering = /* @__PURE__ */ new Set([
+    LOCAL_OVERRIDES_REL,
+    `/${LOCAL_OVERRIDES_REL}`,
+    "local-overrides.yaml",
+    "/local-overrides.yaml",
+    "**/local-overrides.yaml"
+  ]);
+  return gitignoreText.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")).some((line) => covering.has(line));
+}
+function ensureLocalOverridesIgnored(ops, projectDir) {
+  const abs = path10.join(projectDir, GITIGNORE_REL);
+  try {
+    const existing = ops.exists(abs) ? ops.readFile(abs) : "";
+    if (isLocalOverridesIgnored(existing))
+      return { ok: true, added: false };
+    const prefix = existing === "" || existing.endsWith("\n") ? existing : `${existing}
+`;
+    ops.writeFile(
+      abs,
+      `${prefix}
+# Per-machine router overrides (Copilot seat transport profile).
+# Machine-specific by design \u2014 committing it breaks API-key-only clones.
+${LOCAL_OVERRIDES_IGNORE_RULE}
+`
+    );
+    return { ok: true, added: true };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err)
+    };
+  }
+}
 var CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
 function writeConfigAtomically(ops, configAbs, content) {
   if (!ops.rename) {
@@ -17735,8 +17771,8 @@ function describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) {
   switch (outcome.kind) {
     case "success":
       return {
-        level: "info",
-        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/local-overrides.yaml.`
+        level: outcome.ignoreWarning ? "warning" : "info",
+        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/local-overrides.yaml.` + (outcome.ignoreWarning ? ` Warning: ${outcome.ignoreWarning}.` : "")
       };
     case "insufficient-providers": {
       const cause = outcome.confirmed === 0 ? "No models responded at all \u2014 the Copilot CLI may be missing from PATH, not signed in, or blocked by policy. " : outcome.providers.length === 1 ? "This seat may expose only one provider family (an enterprise-managed seat can do this), in which case re-running will not change the result. " : "";
@@ -17806,13 +17842,19 @@ async function performCopilotSeatSetup(deps) {
         return { kind: "insufficient-providers", ...base };
       }
       const configAbs = path10.join(deps.projectDir, LOCAL_OVERRIDES_REL);
+      const ignored = ensureLocalOverridesIgnored(
+        deps.fileOps,
+        deps.projectDir
+      );
+      const ignoreWarning = ignored.ok ? void 0 : `could not confirm ${LOCAL_OVERRIDES_REL} is git-ignored (${ignored.reason}) \u2014 add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing, or an API-key-only clone will inherit this machine's Copilot seat profile`;
+      const succeeded = () => ignoreWarning === void 0 ? { kind: "success", ...base } : { kind: "success", ...base, ignoreWarning };
       if (!deps.fileOps.exists(configAbs)) {
         writeConfigAtomically(
           deps.fileOps,
           configAbs,
           "transport:\n  profile: copilot-cli\n"
         );
-        return { kind: "success", ...base };
+        return succeeded();
       }
       try {
         const text = deps.fileOps.readFile(configAbs);
@@ -17828,7 +17870,7 @@ async function performCopilotSeatSetup(deps) {
           }
           const newText = text + (text.endsWith("\n") ? "" : "\n") + "transport:\n  profile: copilot-cli\n";
           writeConfigAtomically(deps.fileOps, configAbs, newText);
-          return { kind: "success", ...base };
+          return succeeded();
         }
         const rendered = renderTransportProfile(text, "copilot-cli");
         if (!rendered.ok) {
@@ -17841,7 +17883,7 @@ async function performCopilotSeatSetup(deps) {
         if (rendered.changed) {
           writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
         }
-        return { kind: "success", ...base };
+        return succeeded();
       } catch (err) {
         return {
           kind: "config-write-failed",

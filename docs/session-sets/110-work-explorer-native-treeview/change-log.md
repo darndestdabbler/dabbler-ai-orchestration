@@ -10,8 +10,9 @@
 - The `0.49.0` CHANGELOG entry's claims are verified in two places, and the
   split is stated rather than blurred. `scripts/verify_vsix_claims.py` checks
   everything decidable **from the artifact** — manifest shape, per-row action
-  gating, submenu wiring, packaged assets, shipped and deleted code — and passes
-  14/14; it prints "ALL ARTIFACT CLAIMS VERIFIED", not "all claims verified",
+  gating, submenu wiring, packaged assets, shipped and deleted code, and that
+  the archive IS the current build rather than a stale one — and passes
+  **15/15**; it prints "ALL ARTIFACT CLAIMS VERIFIED", not "all claims verified",
   because a zip file cannot expand a tree row. The **behavioural** claims (lazy
   expansion, the fourth level, malformed/duplicate ledger handling, icon
   application, severity moving to tooltips) are verified by the Layer 2 and
@@ -27,8 +28,8 @@
 - Copilot seat preflight: passed; catalog refreshed with 11/18 models across
   Anthropic, Google, and OpenAI.
 - TypeScript typecheck: passed.
-- Layer 2: 1,870 passing, 1 pending.
-- Layer 3: 33/33 passed in 8.0 minutes on the final release-of-record run,
+- Layer 2: 1,883 passing, 1 pending.
+- Layer 3: 33/33 passed in 7.9 minutes on the final release-of-record run,
   taken after the last code change.
 - First full Layer 3 attempt: 32/33; the single failure was the performance
   fixture timing out while constructing 500 sets through hundreds of separate

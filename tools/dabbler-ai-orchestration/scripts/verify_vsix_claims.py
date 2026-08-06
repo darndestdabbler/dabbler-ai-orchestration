@@ -60,6 +60,7 @@ Run from the extension directory:
 from __future__ import annotations
 
 import json
+import pathlib
 import re
 import sys
 import zipfile
@@ -89,6 +90,7 @@ def main(argv: list[str]) -> int:
         pkg = json.loads(z.read("extension/package.json"))
         changelog = z.read("extension/CHANGELOG.md").decode("utf-8")
         bundle = z.read("extension/dist/extension.js").decode("utf-8", "replace")
+        bundle_raw = z.read("extension/dist/extension.js")
         status_assets = [
             f"extension/media/{theme}/{name}.svg"
             for name in STATUS_ICON_NAMES
@@ -101,6 +103,12 @@ def main(argv: list[str]) -> int:
     views = pkg["contributes"]["views"]["dabblerSessionSetsContainer"]
     tree = next(v for v in views if v["id"] == "dabblerWorkExplorerTree")
     setup = next(v for v in views if v["id"] == "dabblerSessionSets")
+    # The build this archive should have been cut from. Read from disk rather
+    # than from the archive, because the whole point is to compare the two.
+    disk_bundle_path = pathlib.Path("dist/extension.js")
+    disk_bundle = (
+        disk_bundle_path.read_bytes() if disk_bundle_path.is_file() else None
+    )
     activity_icon = pkg["contributes"]["viewsContainers"]["activitybar"][0]["icon"]
     menus = pkg["contributes"]["menus"]
     submenus = pkg["contributes"].get("submenus", [])
@@ -238,6 +246,25 @@ def main(argv: list[str]) -> int:
             "the session-level code the fourth level rests on is shipped",
             "normalizeLedgerSessions" in bundle,
             "normalizeLedgerSessions present in bundle",
+        ),
+        (
+            # ROUND 6's DEFECT, as a check. Every claim above reads the ARCHIVE,
+            # so all of them stay green on a stale archive built before the last
+            # source fix -- which is exactly what happened: the packaged bundle
+            # still carried the round-5 defect while the repo's own dist/ had
+            # already been fixed, and this script still said ALL CLAIMS
+            # VERIFIED. Nothing above can be trusted unless the thing verified
+            # is the thing that was built.
+            "the packaged bundle IS the current build (not a stale archive)",
+            disk_bundle is not None and disk_bundle == bundle_raw,
+            "packaged bundle matches dist/extension.js"
+            if disk_bundle == bundle_raw
+            else (
+                "dist/extension.js not found -- run from the extension directory"
+                if disk_bundle is None
+                else f"STALE: packaged {len(bundle_raw)} bytes vs built "
+                f"{len(disk_bundle)} bytes -- rebuild the VSIX"
+            ),
         ),
     ]
 

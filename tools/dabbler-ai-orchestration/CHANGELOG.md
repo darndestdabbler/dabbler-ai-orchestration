@@ -57,6 +57,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **The Copilot seat setup guarantees its ignore rule before it writes the
+  file.** `Dabbler: Set Up Copilot Seat` creates `ai_router/local-overrides.yaml`
+  to hold the per-machine `transport.profile`, and the config editor tells the
+  operator that file "is in your `.gitignore`" and that values there "never get
+  pushed" — but nothing ever wrote that rule, and the consumer scaffold emits no
+  `.gitignore` at all. In a scaffolded repo the file landed untracked and
+  committable, and a committed seat-local `copilot-cli` breaks every
+  API-key-only teammate exactly as a committed shared config would. Setup now
+  ensures the rule **first**, so the file never exists in an un-ignored state,
+  and if the rule cannot be written the success notice says so plainly instead
+  of repeating a promise it did not keep.
+
 - **The activity-bar container icon is contributed as a string again.** A
   `{ light, dark }` object was briefly authored here during this release's UAT
   pass, borrowing the idiom that is correct next door for `TreeItem.iconPath`.

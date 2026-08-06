@@ -709,12 +709,94 @@ export function runCatalogRefresh(
 // The full seat-setup step: refresh → provider check → config write
 // ---------------------------------------------------------------------------
 
+/** The repo-root ignore file the seat setup must keep honest. */
+export const GITIGNORE_REL = ".gitignore";
+
+/** The rule written when `ai_router/local-overrides.yaml` is not yet ignored. */
+export const LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
+
+/**
+ * Does this `.gitignore` text already cover `ai_router/local-overrides.yaml`?
+ *
+ * Deliberately conservative: it recognises the handful of literal patterns that
+ * unambiguously cover the file and treats anything else as "not covered". A
+ * false negative costs one duplicate ignore line, which git tolerates; a false
+ * POSITIVE would leave a seat-local `copilot-cli` committable while the UI
+ * promises it is ignored, which is the defect this exists to prevent. Negation
+ * (`!`) lines are ignored as coverage for the same reason — a re-include means
+ * NOT covered.
+ */
+export function isLocalOverridesIgnored(gitignoreText: string): boolean {
+  const covering = new Set([
+    LOCAL_OVERRIDES_REL,
+    `/${LOCAL_OVERRIDES_REL}`,
+    "local-overrides.yaml",
+    "/local-overrides.yaml",
+    "**/local-overrides.yaml",
+  ]);
+  return gitignoreText
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "" && !line.startsWith("#"))
+    .some((line) => covering.has(line));
+}
+
+export type EnsureIgnoredResult =
+  | { ok: true; added: boolean }
+  | { ok: false; reason: string };
+
+/**
+ * Guarantee the ignore rule BEFORE the local file is created.
+ *
+ * Set 110 S4 round 6: `performCopilotSeatSetup` creates
+ * `ai_router/local-overrides.yaml` and the config-editor UI tells the operator
+ * it "is in your .gitignore" and that values there "never get pushed" — but
+ * nothing ever wrote that rule. In a scaffolded consumer repo the file lands
+ * untracked and committable, and a committed seat-local `copilot-cli` recreates
+ * the round-4 failure for every API-key-only teammate: they skip provider
+ * API-key validation and then fail on the intentionally ignored catalog
+ * lockfile.
+ *
+ * Ordering is the whole point. The rule is written first, so there is no window
+ * in which the file exists un-ignored — a `git add -A` in that window is
+ * exactly how it would get committed.
+ */
+export function ensureLocalOverridesIgnored(
+  ops: SeatSetupFileOps,
+  projectDir: string,
+): EnsureIgnoredResult {
+  const abs = path.join(projectDir, GITIGNORE_REL);
+  try {
+    const existing = ops.exists(abs) ? ops.readFile(abs) : "";
+    if (isLocalOverridesIgnored(existing)) return { ok: true, added: false };
+    const prefix =
+      existing === "" || existing.endsWith("\n") ? existing : `${existing}\n`;
+    ops.writeFile(
+      abs,
+      `${prefix}\n# Per-machine router overrides (Copilot seat transport profile).\n` +
+        `# Machine-specific by design — committing it breaks API-key-only clones.\n` +
+        `${LOCAL_OVERRIDES_IGNORE_RULE}\n`,
+    );
+    return { ok: true, added: true };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 export type SeatSetupOutcome =
   | {
       kind: "success";
       providers: string[];
       confirmed: number;
       total: number;
+      /** Present only when the ignore rule could NOT be guaranteed. The seat
+       * itself is configured, so this is not a failure — but the promise that
+       * the file is ignored is now false, and saying so is the difference
+       * between a warning and a lie. */
+      ignoreWarning?: string;
     }
   | {
       /** Refresh completed but <2 distinct providers confirmed — routed
@@ -913,11 +995,12 @@ export function describeSeatSetupOutcome(
   switch (outcome.kind) {
     case "success":
       return {
-        level: "info",
+        level: outcome.ignoreWarning ? "warning" : "info",
         message:
           `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models ` +
           `confirmed (providers: ${outcome.providers.join(", ")}). ` +
-          "transport.profile: copilot-cli written to ai_router/local-overrides.yaml.",
+          "transport.profile: copilot-cli written to ai_router/local-overrides.yaml." +
+          (outcome.ignoreWarning ? ` Warning: ${outcome.ignoreWarning}.` : ""),
       };
     case "insufficient-providers": {
       // Reason-specific guidance: zero confirmations means the CLI never
@@ -1065,13 +1148,34 @@ export async function performCopilotSeatSetup(
         return { kind: "insufficient-providers", ...base };
       }
       const configAbs = path.join(deps.projectDir, LOCAL_OVERRIDES_REL);
+      // The ignore rule is written BEFORE the file, so the file never exists
+      // in an un-ignored state (round 6). A failure here does not abort the
+      // seat setup — the seat is still correctly configured — but it must be
+      // reported, because the UI otherwise promises an ignore that is absent.
+      const ignored = ensureLocalOverridesIgnored(
+        deps.fileOps,
+        deps.projectDir,
+      );
+      const ignoreWarning = ignored.ok
+        ? undefined
+        : `could not confirm ${LOCAL_OVERRIDES_REL} is git-ignored ` +
+          `(${ignored.reason}) — add "${LOCAL_OVERRIDES_IGNORE_RULE}" to ` +
+          ".gitignore before committing, or an API-key-only clone will " +
+          "inherit this machine's Copilot seat profile";
+      // Omit the key entirely when there is nothing to warn about, so the
+      // success outcome keeps its existing exact shape for callers (and tests)
+      // that compare it structurally.
+      const succeeded = (): SeatSetupOutcome =>
+        ignoreWarning === undefined
+          ? { kind: "success", ...base }
+          : { kind: "success", ...base, ignoreWarning };
       if (!deps.fileOps.exists(configAbs)) {
         writeConfigAtomically(
           deps.fileOps,
           configAbs,
           "transport:\n  profile: copilot-cli\n",
         );
-        return { kind: "success", ...base };
+        return succeeded();
       }
       try {
         const text = deps.fileOps.readFile(configAbs);
@@ -1092,7 +1196,7 @@ export async function performCopilotSeatSetup(
             (text.endsWith("\n") ? "" : "\n") +
             "transport:\n  profile: copilot-cli\n";
           writeConfigAtomically(deps.fileOps, configAbs, newText);
-          return { kind: "success", ...base };
+          return succeeded();
         }
 
         const rendered = renderTransportProfile(text, "copilot-cli");
@@ -1106,7 +1210,7 @@ export async function performCopilotSeatSetup(
         if (rendered.changed) {
           writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
         }
-        return { kind: "success", ...base };
+        return succeeded();
       } catch (err) {
         return {
           kind: "config-write-failed",

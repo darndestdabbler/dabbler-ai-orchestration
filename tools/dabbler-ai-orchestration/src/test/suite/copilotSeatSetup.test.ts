@@ -30,6 +30,8 @@ import {
   describeSeatSetupOutcome,
   describeSkipInstallIncompleteHonesty,
   dispatchKill,
+  ensureLocalOverridesIgnored,
+  isLocalOverridesIgnored,
   parseRefreshStdout,
   performCopilotSeatSetup,
   readCopilotSeatStatusMarker,
@@ -1337,3 +1339,167 @@ suite("copilotSeatSetup", () => {
     });
   });
 });
+
+
+  suite("local-overrides gitignore guarantee (Set 110 S4, round 6)", () => {
+    // WHY: performCopilotSeatSetup creates ai_router/local-overrides.yaml and
+    // the config-editor UI tells the operator it "is in your .gitignore" and
+    // that values there "never get pushed" -- but nothing wrote that rule. In a
+    // scaffolded consumer repo the file landed untracked and committable, and a
+    // committed seat-local `copilot-cli` recreates the round-4 failure for every
+    // API-key-only teammate.
+
+    test("recognises the patterns that genuinely cover the file", () => {
+      for (const rule of [
+        "ai_router/local-overrides.yaml",
+        "/ai_router/local-overrides.yaml",
+        "local-overrides.yaml",
+        "**/local-overrides.yaml",
+      ]) {
+        assert.ok(
+          isLocalOverridesIgnored(`node_modules/\n${rule}\n.venv/\n`),
+          `should treat "${rule}" as covering`,
+        );
+      }
+    });
+
+    test("does NOT treat a comment or a near-miss as coverage", () => {
+      // A false positive is the dangerous direction: it would leave the file
+      // committable while the UI promises it is ignored.
+      for (const notCovering of [
+        "# ai_router/local-overrides.yaml",
+        "ai_router/",
+        "local-overrides",
+        "ai_router/local-overrides.yml",
+        "!ai_router/local-overrides.yaml",
+        "",
+      ]) {
+        assert.strictEqual(
+          isLocalOverridesIgnored(`node_modules/\n${notCovering}\n`),
+          false,
+          `should NOT treat "${notCovering}" as covering`,
+        );
+      }
+    });
+
+    test("writes the rule when .gitignore does not exist at all", () => {
+      const ops = new FakeFileOps();
+      const res = ensureLocalOverridesIgnored(ops, "/project");
+      assert.deepStrictEqual(res, { ok: true, added: true });
+      const written = ops.files.get(path.join("/project", ".gitignore"));
+      assert.ok(written && isLocalOverridesIgnored(written));
+    });
+
+    test("appends to an existing .gitignore without destroying it", () => {
+      const ops = new FakeFileOps();
+      const gitignore = path.join("/project", ".gitignore");
+      ops.files.set(gitignore, "node_modules/\n.venv/\n");
+      const res = ensureLocalOverridesIgnored(ops, "/project");
+      assert.deepStrictEqual(res, { ok: true, added: true });
+      const written = ops.files.get(gitignore)!;
+      assert.ok(written.startsWith("node_modules/\n.venv/\n"));
+      assert.ok(isLocalOverridesIgnored(written));
+    });
+
+    test("is idempotent — an already-covered file is left byte-identical", () => {
+      const ops = new FakeFileOps();
+      const gitignore = path.join("/project", ".gitignore");
+      const before = "node_modules/\nai_router/local-overrides.yaml\n";
+      ops.files.set(gitignore, before);
+      const res = ensureLocalOverridesIgnored(ops, "/project");
+      assert.deepStrictEqual(res, { ok: true, added: false });
+      assert.strictEqual(ops.files.get(gitignore), before);
+    });
+
+    test("reports rather than throws when the ignore file cannot be written", () => {
+      const ops = new FakeFileOps();
+      ops.errors.writeFile = true;
+      const res = ensureLocalOverridesIgnored(ops, "/project");
+      assert.strictEqual(res.ok, false);
+    });
+  });
+
+  suite("performCopilotSeatSetup ensures the ignore rule (Set 110 S4, round 6)", () => {
+    const projectDir = "/project";
+    const gitignoreAbs = path.join(projectDir, ".gitignore");
+    const configAbs = path.join(projectDir, "ai_router", "local-overrides.yaml");
+
+    function makeDeps(fileOps: FakeFileOps, spawner: FakeSpawnerState) {
+      return {
+        venvPythonPath: "/venv/bin/python",
+        projectDir,
+        seatId: "seat-id",
+        seatLabel: "seat-label",
+        spawn: spawner.spawner,
+        fileOps,
+        cancellation: new FakeCancellation(),
+        registerDisposal: () => ({ dispose: () => {} }),
+      } as RunCatalogRefreshDeps;
+    }
+
+    async function runSeatSetup(fileOps: FakeFileOps): Promise<SeatSetupOutcome> {
+      const spawner = createFakeSpawner();
+      const promise = performCopilotSeatSetup(makeDeps(fileOps, spawner));
+      await new Promise((r) => setTimeout(r, 0));
+      spawner.child.callbacks!.onStdout(
+        "Wrote lock: 3/3 models confirmed, providers=['a', 'b']",
+      );
+      spawner.child.callbacks!.onClose(0);
+      return promise;
+    }
+
+    test("a repo with no .gitignore gets one, and the seat file is covered", async () => {
+      const fileOps = new FakeFileOps();
+      const outcome = await runSeatSetup(fileOps);
+
+      assert.strictEqual(outcome.kind, "success");
+      assert.ok(
+        fileOps.files.has(configAbs),
+        "the seat profile file should have been created",
+      );
+      const ignoreText = fileOps.files.get(gitignoreAbs);
+      assert.ok(ignoreText, ".gitignore should have been created");
+      assert.ok(
+        isLocalOverridesIgnored(ignoreText!),
+        "the created .gitignore must actually cover the seat file",
+      );
+    });
+
+    test("the ignore rule is written BEFORE the file it protects", async () => {
+      // Ordering is the invariant, not a detail: any window in which the file
+      // exists un-ignored is a window in which `git add -A` commits it.
+      const writeOrder: string[] = [];
+      class OrderingOps extends FakeFileOps {
+        writeFile(absPath: string, content: string): void {
+          writeOrder.push(absPath);
+          super.writeFile(absPath, content);
+        }
+      }
+      const fileOps = new OrderingOps();
+      await runSeatSetup(fileOps);
+
+      const ignoreAt = writeOrder.indexOf(gitignoreAbs);
+      const configAt = writeOrder.findIndex((p) => p.startsWith(configAbs));
+      assert.ok(ignoreAt >= 0, `.gitignore was never written: ${writeOrder}`);
+      assert.ok(configAt >= 0, `seat file was never written: ${writeOrder}`);
+      assert.ok(
+        ignoreAt < configAt,
+        `.gitignore (${ignoreAt}) must be written before the seat file (${configAt})`,
+      );
+    });
+
+    test("an already-correct .gitignore is not rewritten and raises no warning", async () => {
+      const fileOps = new FakeFileOps();
+      fileOps.files.set(gitignoreAbs, "ai_router/local-overrides.yaml\n");
+      const outcome = await runSeatSetup(fileOps);
+
+      assert.strictEqual(outcome.kind, "success");
+      if (outcome.kind === "success") {
+        assert.strictEqual(outcome.ignoreWarning, undefined);
+      }
+      assert.strictEqual(
+        fileOps.files.get(gitignoreAbs),
+        "ai_router/local-overrides.yaml\n",
+      );
+    });
+  });

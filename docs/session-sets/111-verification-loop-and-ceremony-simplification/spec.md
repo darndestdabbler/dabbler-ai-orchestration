@@ -236,13 +236,32 @@ prerequisites:
    the operator walk it — the walk *is* the acceptance test for
    pleasurability.
 8. Router CHANGELOG under `[Unreleased]`; **publish stays operator-gated.**
-9. Verify, close. Author `change-log.md`, Step 9 review, advisory
-   path-aware critique.
+9. **Guidance-doc streamlining pass, and raise the admission bar.**
+   `project-guidance.md` and `lessons-learned.md` are preload — read at every
+   session start — so every line in them is a tax on every future session.
+   Two things to settle, both operator decisions:
+   - **Streamline what is already there.** `project-guidance.md` currently sits
+     **+369 tokens over its 3,499-token ceiling** (Set 110 Step 9 measured it;
+     ~61 tokens of that predate Set 110). Prune, merge or demote to on-demand
+     references until it is under — the lifecycle rule is that ceilings ratchet
+     DOWN, so raising the number is the last resort and needs a stated reason.
+   - **Raise the bar for what gets in.** Set 110 Step 9 exposed a structural
+     problem the admission test does not currently catch: **promotion is
+     additive into a file that is already at its ceiling.** Three lessons were
+     promoted on overwhelming evidence (27, 14 and 9 citing sets) and the file
+     went further over, with no mechanism forcing anything out to make room.
+     Candidate rules for the operator: a promotion must name what it displaces;
+     an entry must be expressible in N tokens or it is a doc, not guidance; and
+     a rule with an executable gate is archived rather than carried as prose.
+   Evidence basis is in `docs/session-sets/110-work-explorer-native-treeview/`
+   and the Set 110 Step 9 commit.
+10. Verify, close. Author `change-log.md`, Step 9 review, advisory
+    path-aware critique.
 
 **Creates:** authoring-guide sections (size cap, test policy, UAT format), `requiresUAT` close gate, walk stager, this set's guided-look walk, `change-log.md`
-**Touches:** `docs/session-set-authoring-guide` (or its current home), `ai_router/close_session.py` / `gate_checks.py`, `docs/ai-led-session-workflow.md`
-**Ends with:** the required-artifact list is operator-pruned; oversized sessions are split at authoring; the test policy and UAT format are canonical; UAT cannot silently evaporate; the operator has walked a guided-look UAT and judged it — the word to beat is "pleasurable."
-**Progress keys:** `artifactTableDecided`, `sessionSizeCap`, `testPolicyCanonized`, `uatFormatCanonized`, `uatCloseGate`, `walkStager`, `dogfoodWalk`
+**Touches:** `docs/session-set-authoring-guide` (or its current home), `ai_router/close_session.py` / `gate_checks.py`, `docs/ai-led-session-workflow.md`, `docs/planning/project-guidance.md`, `docs/planning/lessons-learned.md`
+**Ends with:** the required-artifact list is operator-pruned; oversized sessions are split at authoring; the test policy and UAT format are canonical; UAT cannot silently evaporate; the preload docs are back under their ceilings with a raised admission bar that makes promotion displace rather than accumulate; the operator has walked a guided-look UAT and judged it — the word to beat is "pleasurable."
+**Progress keys:** `artifactTableDecided`, `sessionSizeCap`, `testPolicyCanonized`, `uatFormatCanonized`, `uatCloseGate`, `walkStager`, `dogfoodWalk`, `guidanceStreamlined`
 
 ---
 
@@ -252,6 +271,7 @@ prerequisites:
 - Verifier-emitted acceptance criteria with baseline discrimination, executed in disposable worktrees; one retained holistic remediation-review.
 - The decision-rights rubric canonized; decision journal; education-mode briefs at every operator stop; verification-reduction carve-out enforced.
 - Operator-pruned required-artifact list; authoring-time session-size cap; canonical test-run policy; guided-look UAT with a fail-closed close gate and a self-staging walk.
+- Preload guidance docs back under their ceilings, with an admission bar that makes promotion **displace** rather than accumulate.
 - Router changes staged under `[Unreleased]`; publish operator-gated.
 
 ## Risks this set should expect

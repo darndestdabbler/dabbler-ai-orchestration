@@ -136,11 +136,13 @@ see **Engine-specific bootstrap** at the end of this file.)
 
 ## Delegation Discipline (pointer)
 
-Your role is orchestrator, not solo coder. Reasoning tasks — code
-review, security review, architecture, analysis, documentation, test
-generation, session verification — **always** go through `route()`.
-Only handle work directly when it is mechanical, single-file, and
-under ~50 lines.
+For Set 110 Session 4 and Sets 111-112, you are the active orchestrator:
+implementation and architecture decisions are authored here. Only
+`session-verification` goes through `route()`, and it must use a different
+effective provider. Set 111 owns the next routing-policy revision; do not
+expand outsourcing before that set decides it. The general delegation
+discipline below remains the historical default outside this temporary
+window.
 
 See `docs/ai-led-session-workflow.md` → **Delegation Discipline** for
 the full criteria, the human-tunable thresholds (in

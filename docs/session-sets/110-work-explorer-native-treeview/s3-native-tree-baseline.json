@@ -1,0 +1,68 @@
+{
+  "generatedBy": "src/test/playwright/real-host-baseline.spec.ts (Set 110 S1, operator-authorized after rounds 5 and 6 rejected stub figures)",
+  "what": "REAL VS Code Extension Development Host, shipping extension, fresh profile per rep. Includes Electron spawn, extension-host bootstrap, real vscode API, IPC, activation, and the native TreeView's first getChildren + paint. Set 110 S3: this is the AFTER measurement; the BEFORE (the deleted webview) is s1-real-host-baseline.json and is not overwritten.",
+  "whyEndToEnd": "The individual buckets are not independently observable in a real host without instrumenting the product. Session 2 added utils/startupTiming.ts for the host-side buckets (DABBLER_STARTUP_TIMING_PATH); first paint stays a DOM observation because the host cannot see when a row becomes visible.",
+  "naturalPaint": "NO refresh command is issued. This is the view's natural cold paint after the extension's own scan completes, which is the honest first-paint number. This is the SAME protocol s1-real-host-baseline.json used, which is what makes the before/after comparison valid. Do not add a refresh.",
+  "fixture": "N session sets x 4 sessions, at each scale below",
+  "scales": [
+    10,
+    100,
+    500
+  ],
+  "reps": 2,
+  "perScale": [
+    {
+      "sets": 10,
+      "launchToFirstRowMs": 5964,
+      "viewOpenToFirstRowMs": 3069
+    },
+    {
+      "sets": 100,
+      "launchToFirstRowMs": 6968.5,
+      "viewOpenToFirstRowMs": 4042.5
+    },
+    {
+      "sets": 500,
+      "launchToFirstRowMs": 8960,
+      "viewOpenToFirstRowMs": 5114.5
+    }
+  ],
+  "samples": [
+    {
+      "scale": 10,
+      "rep": 1,
+      "launchToFirstRowMs": 5898,
+      "viewOpenToFirstRowMs": 3044
+    },
+    {
+      "scale": 10,
+      "rep": 2,
+      "launchToFirstRowMs": 6030,
+      "viewOpenToFirstRowMs": 3094
+    },
+    {
+      "scale": 100,
+      "rep": 1,
+      "launchToFirstRowMs": 6644,
+      "viewOpenToFirstRowMs": 3666
+    },
+    {
+      "scale": 100,
+      "rep": 2,
+      "launchToFirstRowMs": 7293,
+      "viewOpenToFirstRowMs": 4419
+    },
+    {
+      "scale": 500,
+      "rep": 1,
+      "launchToFirstRowMs": 8912,
+      "viewOpenToFirstRowMs": 5039
+    },
+    {
+      "scale": 500,
+      "rep": 2,
+      "launchToFirstRowMs": 9008,
+      "viewOpenToFirstRowMs": 5190
+    }
+  ]
+}

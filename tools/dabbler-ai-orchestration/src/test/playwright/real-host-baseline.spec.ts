@@ -46,7 +46,7 @@ import {
   closeVSCode,
   launchVSCode,
   LaunchedVSCode,
-  makeAdditionalSet,
+  makeAdditionalSets,
   makeSet,
   makeTmpDir,
   openWorkExplorerTree,
@@ -97,13 +97,13 @@ test.describe("Set 110 S1 — real Extension Development Host baseline", () => {
       let launch: LaunchedVSCode | undefined;
       try {
         let handle = makeSet(tmpPath, "001-real-host-baseline", 4);
-        for (let i = 2; i <= scale; i++) {
-          handle = makeAdditionalSet(
-            handle,
-            `${String(i).padStart(3, "0")}-real-host-baseline`,
-            4,
-          );
-        }
+        handle = makeAdditionalSets(
+          handle,
+          scale - 1,
+          "real-host-baseline-",
+          2,
+          4,
+        );
 
         const tLaunch = Date.now();
         // launchVSCode must open the fixture's REPO ROOT, not the tmp parent.

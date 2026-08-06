@@ -80,7 +80,7 @@ providers:
 # seat-profile contract and its explicitly degraded guarantees (asserted
 # provider provenance, no billed-usage accounting).
 transport:
-  profile: api   # api | copilot-cli
+  profile: copilot-cli   # api | copilot-cli
 
 # The copilot-cli profile's own settings. Only read/validated when
 # transport.profile == copilot-cli; otherwise inert. Roles are late-bound
@@ -499,7 +499,11 @@ models:
 routing:
   # outsourcing_mode: controls when cross-provider calls are made.
   # whenever-helpful (default) | verification-only | disabled
-  outsourcing_mode: whenever-helpful
+  # Temporary operator policy (2026-08-05): for Set 110 Session 4 and Sets
+  # 111-112, the active orchestrator owns implementation and architecture.
+  # Only session-verification is outsourced; Set 111 is expected to revisit
+  # the routing rules after its verification-loop simplification.
+  outsourcing_mode: verification-only
   tier1_max_complexity: 30    # score ≤ 30 → tier 1 (Flash)
   tier2_max_complexity: 65    # score 31–65 → tier 2 (Pro or Sonnet)
   default_tier: 2             # fallback when estimation is uncertain
@@ -584,18 +588,11 @@ routing:
 # task types must always go through route() rather than being handled
 # directly. The orchestrator reads this list at session start.
 delegation:
+  # Temporary operator policy (2026-08-05): implementation, architecture,
+  # analysis, documentation, and test authoring stay with the orchestrator.
+  # The list is intentionally verification-only until Set 111 changes it.
   always_route_task_types:
-    - code-review
-    - security-review
-    - architecture
-    - planning
-    - uat-plan-generation
-    - uat-coverage-review
-    - analysis
     - session-verification
-    - documentation
-    - test-generation
-    - session-close-out
 
   # decision_consensus: opt-in cross-engine consult for in-session design /
   # architecture / process decisions. When enabled, the orchestrator routes

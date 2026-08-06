@@ -17,6 +17,10 @@
 > **Prerequisite:** Set 109 — see *Prerequisites*, and it is a real gate, not a courtesy.
 > **Session Set:** `docs/session-sets/110-work-explorer-native-treeview/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
+> **Temporary execution policy (2026-08-05):** For Session 4, the active
+> Copilot Chat orchestrator owns implementation and architecture. Only the
+> final `session-verification` call is outsourced, and it must use a different
+> effective provider. Sets 111-112 own the next policy revision.
 > **Operator notes:** [`operator-notes.md`](operator-notes.md) — read it at
 > Session 1. The 2026-08-04 entry adds a **fourth tree level (sessions within
 > a set)**, moves per-session status onto the operator's own icons, and moves

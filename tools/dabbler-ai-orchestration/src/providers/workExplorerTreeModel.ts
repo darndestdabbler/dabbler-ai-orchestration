@@ -202,9 +202,9 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
  *
  * The distinction is not cosmetic: Session 1 found the four authored
  * status SVGs carry hardcoded `#ffffff` / `#000000`, leaving
- * `not-started.svg` nearly invisible on a light theme. Ranks 1-5 of the
- * precedence table below are therefore `ThemeIcon`s, and only the plain
- * run-state glyph (rank 6) uses the operator's assets.
+ * `not-started.svg` nearly invisible on a light theme. The operator's
+ * light/dark asset pairs now provide the consistent lifecycle language for
+ * every status-bearing row; marker severity remains in tooltips.
  */
 export type IconSpec =
   | { kind: "theme"; id: string; color?: string }
@@ -345,18 +345,9 @@ function tierMarkerIsMismatch(set: SessionSet): boolean {
   return tierMarker(set) === TIER_MISMATCH_MARKER;
 }
 
-const SEVERITY_ICON: Record<Exclude<SetSeverity, null>, IconSpec> = {
-  blocked: { kind: "theme", id: "error", color: "problemsErrorIcon.foreground" },
-  migration: { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
-  verification: { kind: "theme", id: "unverified", color: "problemsWarningIcon.foreground" },
-  "duplicate-name": { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
-  "tier-mismatch": { kind: "theme", id: "info", color: "problemsInfoIcon.foreground" },
-};
-
 export function setIcon(set: SessionSet): IconSpec {
-  const severity = severityOf(set);
-  if (severity) return SEVERITY_ICON[severity];
-  // Rank 6 — the plain run state, on the operator's own glyphs.
+  // Marker severity remains discoverable in the tooltip and context value;
+  // the row icon consistently communicates lifecycle status.
   return { kind: "file", slug: ICON_FILES[set.state] };
 }
 
@@ -413,9 +404,9 @@ export function moduleDescriptor(node: ModuleNode): RowDescriptor {
     label: module.displayName,
     description: `${setCount} set${setCount === 1 ? "" : "s"}`,
     tooltip: tooltipLines.join("\n"),
-    icon: warning
-      ? { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" }
-      : { kind: "theme", id: "folder" },
+    // Module rows are structural; lifecycle glyphs belong to buckets, sets,
+    // and sessions rather than competing with the module name.
+    icon: undefined,
     contextValue: tokenString(tokens),
     collapsible: "collapsed",
   };
@@ -431,6 +422,7 @@ export function bucketDescriptor(node: BucketNode): RowDescriptor {
     // bucket labels are short, so `description` survives truncation
     // where a set row's does not. Session 4's walk confirms or drops it.
     description: `${count} set${count === 1 ? "" : "s"}`,
+    icon: { kind: "file", slug: ICON_FILES[node.bucketKey] },
     contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucketKey}`]),
     // The three default buckets render even when EMPTY — a declared
     // module with no work yet still shows where that work will land

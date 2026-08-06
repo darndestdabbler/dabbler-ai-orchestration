@@ -7,6 +7,10 @@ verification at the end of each session. The full reference lives in
 [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md); this document
 gets you oriented in five minutes.
 
+> **Starting from a clone?** Follow [`docs/clone-setup.md`](clone-setup.md)
+> first. It records the local `.venv`, extension dependencies, provider access,
+> and the tracked-versus-machine-local boundary.
+
 ---
 
 ## Two adoption tiers

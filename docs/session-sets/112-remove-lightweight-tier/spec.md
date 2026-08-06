@@ -12,6 +12,10 @@
 > **Prerequisites:** Sets 110 AND 111 complete — both are real gates.
 > **Session Set:** `docs/session-sets/112-remove-lightweight-tier/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
+> **Temporary execution policy (2026-08-05):** Follow Set 111's routing
+> decision. Until that decision lands, the active orchestrator owns
+> implementation and architecture; only `session-verification` is outsourced
+> to a different effective provider.
 >
 > **Evidence basis (measured 2026-08-05, the gate that cleared this set):**
 > the operator probed their **enterprise** Copilot seat (same tenant as

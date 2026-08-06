@@ -16,13 +16,15 @@ import * as assert from "assert";
 import * as path from "path";
 import { createRequire } from "module";
 
-// mocha 10 is import-first; under Node >=22 native type-stripping a
-// test file with no relative TS imports loads as native ESM, where the
-// CJS `require` / `__dirname` globals don't exist. `createRequire`
-// anchored at the package root (the npm script's cwd) works in BOTH
-// load modes. Do not switch this to a bare `require` or `__dirname`.
+// Mocha 10 is import-first; use `createRequire` so this stays compatible
+// with both the ts-node unit runner and the compiled Extension Host runner.
+// Resolve from this test file rather than process.cwd(), which the Extension
+// Development Host changes before loading the suite.
 const requireFromPackageRoot = createRequire(
-  path.join(process.cwd(), "package.json"),
+  path.join(
+    process.env.DABBLER_EXTENSION_ROOT ?? process.cwd(),
+    "package.json",
+  ),
 );
 // Set 063 S2: budget controls ride the webview control state. Optional
 // here because most pre-063 assertions don't exercise them; the module

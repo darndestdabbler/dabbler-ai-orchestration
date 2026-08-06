@@ -41,6 +41,7 @@ import {
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
+  expectFileIcon,
   LaunchedVSCode,
   launchVSCode,
   makeAdditionalSet,
@@ -142,7 +143,7 @@ test.describe("Set 087 S2 — the module tier, on the native tree", () => {
     // The fallback module is visibly warned rather than silently dropped —
     // never hide work.
     const fallback = treeRow(pane, "not-in-manifest");
-    await expect(fallback.locator(".codicon-warning")).toHaveCount(1);
+    await expect(fallback.locator(".custom-view-tree-node-item-icon")).toHaveCount(0);
 
     // Sets group under their OWN module.
     await expandTreeRow(pane, "Greeter");

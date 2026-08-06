@@ -25,6 +25,7 @@ import {
   downgradeStateFileToV2,
   downgradeStateFileToV3,
   expandTreeRow,
+  expectFileIcon,
   LaunchedVSCode,
   launchVSCode,
   makeSet,
@@ -83,7 +84,7 @@ test.describe("Set 050 S4 — schema drift, on the native tree", () => {
 
       const row = treeRow(pane, scenario.slug);
       await row.waitFor({ state: "visible", timeout: 15_000 });
-      await expect(row.locator(".codicon-warning")).toHaveCount(1);
+      await expectFileIcon(row, "not-started.svg");
     });
   }
 
@@ -101,6 +102,6 @@ test.describe("Set 050 S4 — schema drift, on the native tree", () => {
 
     const row = treeRow(pane, "scenario-current-schema");
     await row.waitFor({ state: "visible", timeout: 15_000 });
-    await expect(row.locator(".codicon-warning")).toHaveCount(0);
+    await expectFileIcon(row, "not-started.svg");
   });
 });

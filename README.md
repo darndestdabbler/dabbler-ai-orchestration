@@ -1,5 +1,9 @@
 # Dabbler AI Orchestration
 
+> **Starting from a clone?** Follow [`docs/clone-setup.md`](docs/clone-setup.md)
+> for the `.venv` bootstrap, extension dependencies, provider access, and the
+> tracked-versus-machine-local setup boundary.
+
 An AI-led coding-session workflow for VS Code. Structured AI sessions
 with mandatory cross-provider verification, automatic cost tracking, git-
 worktree-aware session-set state, and a Work Explorer in the

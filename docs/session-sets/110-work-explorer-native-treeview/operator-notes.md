@@ -330,3 +330,23 @@ walk does so only on an explicit operator-attested waiver (the
 `--manual-verify` pattern) recorded in the disposition — never by the
 walk simply not happening. Skipping becomes a visible operator decision,
 not an evaporation.
+
+---
+
+## 2026-08-05 -- Progress notifications for long-running processes
+
+The orchestrator should eventually emit periodic, non-blocking progress
+notifications while a long-running command is active, especially the
+Playwright Electron suite, full test matrices, builds, and routed
+verification. A useful update names the process and reports concrete
+progress, for example:
+
+> Still waiting on Playwright Electron suite to finish. So far, 25/35 tests
+> have completed.
+
+The notification should be cadence-limited, avoid interrupting the running
+command, and stop when the process exits or needs operator input. Prefer
+structured progress when the process exposes counts; otherwise report
+elapsed time and the last observed phase. This is a follow-on orchestration
+capability for Set 111 or its successor, not a requirement to alter the
+current session runner.

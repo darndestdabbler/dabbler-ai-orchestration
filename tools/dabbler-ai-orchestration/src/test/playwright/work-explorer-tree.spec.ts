@@ -37,6 +37,7 @@ import {
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
+  expectFileIcon,
   LaunchedVSCode,
   launchVSCode,
   makeAdditionalSet,
@@ -211,10 +212,10 @@ test.describe("Set 110 S3 — native Work Explorer structure", () => {
     await expect(
       treeRows(pane).filter({ hasText: "092-collided" }),
     ).toHaveCount(1);
-    // And it is flagged: the duplicate-name rank resolves to a codicon
-    // warning glyph, so the row's icon is NOT the plain run-state asset.
+    // The duplicate-name marker remains in semantic metadata; the row icon
+    // consistently communicates lifecycle status.
     const row = treeRow(pane, "092-collided");
-    await expect(row.locator(".codicon-warning")).toHaveCount(1);
+    await expectFileIcon(row, "not-started.svg");
   });
 
   test("expansion survives a refresh", async () => {

@@ -123,10 +123,26 @@ async function acceptSoleQuickPickItem(
   page: import("@playwright/test").Page,
   placeholderSubstring: string,
 ): Promise<void> {
+  const input = page.locator(
+    `.quick-input-widget input[placeholder*="${placeholderSubstring}"]`,
+  );
+  await input.waitFor({ state: "visible", timeout: 15_000 });
+  // Set 110 S4: waiting only on the INPUT is a race. VS Code shows the
+  // quick-input widget as soon as the command opens it, and populates the item
+  // list a tick later; Enter pressed against an empty list is a silent no-op
+  // that leaves the picker sitting open. The failure then surfaces 4 lines
+  // later, at the InputBox that never arrived, naming the wrong cause — which
+  // is exactly how this read in the round-2 Layer 3 run: "expected 'default',
+  // received ''" against a locator still carrying the PICKER's placeholder.
+  // So wait for a row to exist, which is the thing Enter actually accepts.
   await page
-    .locator(`.quick-input-widget input[placeholder*="${placeholderSubstring}"]`)
+    .locator(".quick-input-widget .monaco-list-row")
+    .first()
     .waitFor({ state: "visible", timeout: 15_000 });
   await page.keyboard.press("Enter");
+  // And prove the picker advanced. A swallowed Enter now fails HERE, on the
+  // step that swallowed it, instead of poisoning a downstream assertion.
+  await input.waitFor({ state: "hidden", timeout: 15_000 });
 }
 
 test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add, driven through the extension's actual VS Code UI", async () => {

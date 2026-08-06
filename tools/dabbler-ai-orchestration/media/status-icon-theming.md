@@ -87,6 +87,51 @@ all eight files exist; light and dark are not the same bytes; and
 `media/light/not-started.svg` — the acute case, a bare ring with no disc
 behind it — carries no white at all.
 
+## The counterpart rule: the activity-bar icon is a STRING
+
+Everything above is about `TreeItem.iconPath`. The **inverse** applies to
+`contributes.viewsContainers`, and Set 110 Session 4 got it wrong in the
+opposite direction — it contributed `icon: { light, dark }` for the
+activity-bar container, borrowing the idiom this file justifies for the
+status glyphs.
+
+That is not a cosmetic mismatch. VS Code's `isValidViewsContainer`
+(`src/vs/workbench/api/browser/viewsExtensionPoint.ts`) does:
+
+```ts
+if (typeof descriptor.icon !== 'string') {
+  collector.error("property `icon` is mandatory and must be of type `string`");
+  return false;          // and the caller then skips the WHOLE array
+}
+```
+
+so the container is never registered and its views fall back into Explorer.
+Nothing in a build or a typecheck notices; the manifest is still valid JSON.
+
+And even legal, a pair would have bought nothing. The activity bar paints its
+icon through a **mask** — VS Code generates
+
+```css
+mask: url(...) no-repeat 50% 50%;
+mask-size: var(--activity-bar-icon-size, 24px);
+```
+
+— so only the silhouette survives and the colour comes from the theme's
+activity-bar foreground. The SVG's own fill is discarded. That is precisely why
+`currentColor` *is* the right idiom for this icon and the wrong one for the
+status glyphs: the two contribution points are painted by different mechanisms,
+which is the same trap recorded above, entered from the other side.
+
+The two files that were briefly contributed carried **byte-identical path
+data** and differed only in that discarded fill, so the "fix" could not have
+changed a pixel. The operator's underlying complaint — the mark reads as too
+dark on light themes — is therefore still open, and has to be answered from the
+silhouette or from theme colours.
+
+`src/test/suite/viewsContainerIcon.test.ts` pins the rule as an executable gate:
+every container icon must be a string, must resolve to a real non-empty file,
+and must not be reached out of a `light/` or `dark/` directory.
+
 ## Not applicable to the precedence icons
 
 Ranks 1–5 of the icon-precedence table (blocked, migration-required,

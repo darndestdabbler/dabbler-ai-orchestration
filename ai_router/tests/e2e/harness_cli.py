@@ -205,6 +205,21 @@ def cmd_make_additional_set(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_make_additional_sets(args: argparse.Namespace) -> int:
+    base = _load_handle(args)
+    slugs = [
+        f"{args.slug_prefix}{i:03d}"
+        for i in range(args.start_index, args.start_index + args.count)
+    ]
+    new_handle = fixtures.make_additional_sets(
+        base,
+        slugs,
+        args.new_total_sessions,
+    )
+    _emit(_handle_to_dict(new_handle))
+    return 0
+
+
 def cmd_make_sibling_worktree(args: argparse.Namespace) -> int:
     handle = _load_handle(args)
     wt_path = fixtures.make_sibling_worktree(handle, args.wt_slug)
@@ -282,6 +297,14 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--new-slug", required=True)
     p.add_argument("--new-total-sessions", type=int, required=True)
     p.set_defaults(func=cmd_make_additional_set)
+
+    p = sub.add_parser("make-additional-sets")
+    _add_handle_args(p)
+    p.add_argument("--slug-prefix", required=True)
+    p.add_argument("--start-index", type=int, required=True)
+    p.add_argument("--count", type=int, required=True)
+    p.add_argument("--new-total-sessions", type=int, required=True)
+    p.set_defaults(func=cmd_make_additional_sets)
 
     p = sub.add_parser("make-sibling-worktree")
     _add_handle_args(p)

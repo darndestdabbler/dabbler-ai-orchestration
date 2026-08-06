@@ -23,8 +23,9 @@ import * as path from "path";
 // exact regression — the panel states + banner are covered in
 // dashboardHtml.test.ts against the same builders the panel renders.
 
-const PKG = path.resolve(process.cwd(), "package.json");
-const EXTENSION_TS = path.resolve(process.cwd(), "src", "extension.ts");
+const EXTENSION_ROOT = process.env.DABBLER_EXTENSION_ROOT ?? process.cwd();
+const PKG = path.join(EXTENSION_ROOT, "package.json");
+const EXTENSION_TS = path.join(EXTENSION_ROOT, "src", "extension.ts");
 const CONTEXT_KEY = "dabblerSessionSets.routesCost";
 
 interface MenuItem { command?: string; when?: string; group?: string }

@@ -24,7 +24,7 @@ import * as cp from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { _electron, ElectronApplication, Page } from "@playwright/test";
+import { _electron, ElectronApplication, Page, expect } from "@playwright/test";
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..", "..", "..");
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, "..", "..");
@@ -36,7 +36,12 @@ const HARNESS_CLI = path.join(
   "harness_cli.py",
 );
 
-const PYTHON = process.env.HARNESS_PYTHON || "python";
+const WORKSPACE_PYTHON = process.platform === "win32"
+  ? path.join(REPO_ROOT, ".venv", "Scripts", "python.exe")
+  : path.join(REPO_ROOT, ".venv", "bin", "python");
+const PYTHON = process.env.HARNESS_PYTHON || (
+  fs.existsSync(WORKSPACE_PYTHON) ? WORKSPACE_PYTHON : "python"
+);
 
 // Mirror the Layer 2 harness's env hygiene rules — strip ambient
 // GIT_* and PYTHONPATH so a polluted parent shell can't redirect
@@ -76,6 +81,7 @@ function _filteredEnv(): NodeJS.ProcessEnv {
 const _ELECTRON_VAR_ALLOWLIST_UNIVERSAL = [
   "PATH", "PATHEXT",              // executable search path (Windows includes PATHEXT)
   "HOME", "USERPROFILE", "USER", "USERNAME",
+  "DABBLER_STARTUP_TIMING_PATH",  // opt-in host timing evidence
   "TEMP", "TMP", "TMPDIR",
   "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "LC_NUMERIC", "LC_TIME",
   "TERM", "COLORTERM",
@@ -403,6 +409,24 @@ export function makeAdditionalSet(
     ..._handleArgs(base),
     "--new-slug", newSlug,
     "--new-total-sessions", String(newTotalSessions),
+  ]) as FixtureHandle;
+}
+
+export function makeAdditionalSets(
+  base: FixtureHandle,
+  count: number,
+  slugPrefix: string,
+  startIndex: number,
+  totalSessions: number,
+): FixtureHandle {
+  if (count <= 0) return base;
+  return runHarness([
+    "make-additional-sets",
+    ..._handleArgs(base),
+    "--slug-prefix", slugPrefix,
+    "--start-index", String(startIndex),
+    "--count", String(count),
+    "--new-total-sessions", String(totalSessions),
   ]) as FixtureHandle;
 }
 
@@ -999,6 +1023,24 @@ export function treeRow(
   label: string | RegExp,
 ): import("@playwright/test").Locator {
   return pane.locator(".monaco-list-row").filter({ hasText: label }).first();
+}
+
+/** Assert the supplied lifecycle SVG is the row's rendered file-backed icon. */
+export async function expectFileIcon(
+  row: import("@playwright/test").Locator,
+  slug: string,
+): Promise<void> {
+  const icon = row.locator(".custom-view-tree-node-item-icon").first();
+  await expect(icon).toBeVisible();
+  await expect
+    .poll(
+      async () =>
+        icon.evaluate(
+          (element) => element.ownerDocument.defaultView?.getComputedStyle(element).backgroundImage ?? "",
+        ),
+      { timeout: 5_000 },
+    )
+    .toContain(slug);
 }
 
 /**

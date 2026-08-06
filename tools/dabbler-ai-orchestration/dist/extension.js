@@ -29902,17 +29902,7 @@ function severityOf(set) {
 function tierMarkerIsMismatch(set) {
   return tierMarker(set) === TIER_MISMATCH_MARKER;
 }
-var SEVERITY_ICON = {
-  blocked: { kind: "theme", id: "error", color: "problemsErrorIcon.foreground" },
-  migration: { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
-  verification: { kind: "theme", id: "unverified", color: "problemsWarningIcon.foreground" },
-  "duplicate-name": { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" },
-  "tier-mismatch": { kind: "theme", id: "info", color: "problemsInfoIcon.foreground" }
-};
 function setIcon(set) {
-  const severity = severityOf(set);
-  if (severity)
-    return SEVERITY_ICON[severity];
   return { kind: "file", slug: ICON_FILES[set.state] };
 }
 function sessionIcon(status) {
@@ -29947,7 +29937,9 @@ function moduleDescriptor(node) {
     label: module2.displayName,
     description: `${setCount} set${setCount === 1 ? "" : "s"}`,
     tooltip: tooltipLines.join("\n"),
-    icon: warning ? { kind: "theme", id: "warning", color: "problemsWarningIcon.foreground" } : { kind: "theme", id: "folder" },
+    // Module rows are structural; lifecycle glyphs belong to buckets, sets,
+    // and sessions rather than competing with the module name.
+    icon: void 0,
     contextValue: tokenString(tokens),
     collapsible: "collapsed"
   };
@@ -29962,6 +29954,7 @@ function bucketDescriptor(node) {
     // bucket labels are short, so `description` survives truncation
     // where a set row's does not. Session 4's walk confirms or drops it.
     description: `${count} set${count === 1 ? "" : "s"}`,
+    icon: { kind: "file", slug: ICON_FILES[node.bucketKey] },
     contextValue: tokenString([NODE_TOKEN.bucket, `bucket-${node.bucketKey}`]),
     // The three default buckets render even when EMPTY — a declared
     // module with no work yet still shows where that work will land

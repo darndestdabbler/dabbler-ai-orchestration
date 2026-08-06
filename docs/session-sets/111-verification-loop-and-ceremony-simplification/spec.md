@@ -19,6 +19,10 @@
 > this set canonizes; its S1–S3 history is the measured evidence).
 > **Session Set:** `docs/session-sets/111-verification-loop-and-ceremony-simplification/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
+> **Temporary execution policy (2026-08-05):** The active orchestrator owns
+> implementation and architecture decisions. Only `session-verification` is
+> outsourced, using a different effective provider. This set owns the next
+> routing-policy revision as part of its verification-loop simplification.
 >
 > **Context for an orchestrator new to this thread:** the operator's staff
 > may abandon the orchestrator for being too complicated. The standing rule

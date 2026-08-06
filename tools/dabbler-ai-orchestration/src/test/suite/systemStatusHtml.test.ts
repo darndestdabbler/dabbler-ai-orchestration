@@ -4,7 +4,10 @@ import * as path from "path";
 import { createRequire } from "module";
 
 const requireFromPackageRoot = createRequire(
-  path.join(process.cwd(), "package.json"),
+  path.join(
+    process.env.DABBLER_EXTENSION_ROOT ?? process.cwd(),
+    "package.json",
+  ),
 );
 const statusHtml = requireFromPackageRoot(
   "./media/session-sets-tree/systemStatusHtml.js",

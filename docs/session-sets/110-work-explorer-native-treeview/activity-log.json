@@ -523,6 +523,134 @@
       "dateTime": "2026-08-05T06:06:21.294007-04:00",
       "description": "complete",
       "status": "The close backstop (round 4, gpt-5-6-sol, $0.9959) refused the close on one Major: 'the final tree has no successful full Layer 3 run.' ACCEPTED WITHOUT ARGUMENT - correct on the facts. The run of record was 32/1 and the one failure was fixed afterwards with TARGETED runs only, so no full suite had ever passed against the tree being closed, while the session's Ends-with says 'Layer 3 is green on the new view'. s3-remediation-round-1.md had disclosed exactly this and argued the test-run policy justified it; the disclosure was honest and the decision was WRONG. That policy has two halves - never start a run you might invalidate, AND run it once at close after the last code change - and this session used the first to excuse skipping an obligation the second creates. Ran the full suite: 33 passed / 0 failed (18.1m), no code changed to make it pass. Round 1's argument is left standing rather than edited out. SEPARATE FRAMEWORK GAP REPORTED NOT FIXED: close_session crashed with an unhandled EvidenceTooLargeError traceback because close_backstop catches VerifySessionError and that exception does not inherit from it - a fail-closed guard that takes the gate down with no remediation line. ai_router is out of this set's scope and changing the harness mid-set taints the record, so it goes to Step 9; the documented AI_ROUTER_VERIFY_MAX_EVIDENCE_CHARS override (768 KiB vs a 600 KiB default, bundle 2% over) was used and disclosed, with nothing filtered from the evidence."
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-05T09:36:43.782785-04:00",
+      "description": "Registered Session 4 via start_session (copilot/openai/gpt-5.6-luna/high); Copilot preflight passed and the seat catalog refreshed 11/18 across anthropic/google/openai. Router transport profile set to copilot-cli.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "read-spec",
+      "dateTime": "2026-08-05T09:36:43.785416-04:00",
+      "description": "Read Session 4 plan, S3 implementation notes, operator walk requirements, and the temporary verification-only policy.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "prerequisites",
+      "dateTime": "2026-08-05T09:36:43.787851-04:00",
+      "description": "Confirmed Sessions 1-3 complete, extension 0.48.0 staged, native-tree Layer 3 harness present, and the session-local Copilot catalog is available.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "walk-and-performance",
+      "dateTime": "2026-08-05T10:21:38.644987-04:00",
+      "description": "Full native Explorer walk passed 32/33 before the performance fixture fix; the only failure was the baseline test timing out after 15 minutes while creating 500-set fixtures through 499 subprocess/commit/push operations per repetition. Added batched fixture construction. Focused baseline then passed in 1.5m: view-open to first row medians 2828/3434/4320 ms at 10/100/500 sets versus S1 webview 5344/5293/5606 ms. Evidence-writing rerun passed in 1.6m with 3043/3419/6520 ms. Native tree improves materially but misses the explicit <1000 ms S4 gate; stopping at operator decision after final suite.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "layer3-final",
+      "dateTime": "2026-08-05T10:32:42.268602-04:00",
+      "description": "Final full Layer 3 suite passed 33/33 in 10.2m after the batched performance-fixture fix. Native-tree view-open to first-row: 4044.5/4596.5/6427 ms at 10/100/500 sets; S1 webview before: 5344.5/5293/5605.5 ms. Functional suite is green, but the explicit <1000 ms S4 startup gate is missed at every scale; release decision must be surfaced to the operator.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "uat-and-release-staging",
+      "dateTime": "2026-08-05T10:54:05.313931-04:00",
+      "description": "Authored s4-walk-evidence.md, the four-item UAT checklist, and change-log.md. TypeScript clean; Layer 2 1865 passing/1 pending; guidance and dependency gates clean. Built dabbler-ai-orchestration-0.48.0.vsix: 62 files, 1.41MB; manifest 0.48.0 with Setup & Status webview above unconditional Work Explorer; required native assets present; deleted CustomSessionSetsView absent. Publishing/tagging remain operator-gated. Human UAT and the <1000 ms startup miss remain operator decisions.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "startup-attribution",
+      "dateTime": "2026-08-05T11:07:15.485404-04:00",
+      "description": "Instrumented one real-host run: launch->first row 5915ms; workbench/activity-bar ready->first row 2946ms; activate 504ms; activation end->first native root request 352ms; first root request returned exactly 1 module row; no bucket/set/session expansion and no Setup & Status text wait. Release clock excludes Electron launch but includes activity-bar click, pane reveal, root getChildren, and first paint. Remaining interval is workbench/tree paint or UI synchronization, not collapsed child construction. Attribution narrows follow-on work but does not claim root cause.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "layer3-release-of-record",
+      "dateTime": "2026-08-05T11:17:44.879501-04:00",
+      "description": "Final post-attribution full Layer 3 run passed 33/33 in 8.8m. Final native-tree view-open->first-row: 3069/4042.5/5114.5ms at 10/100/500 sets. Timing attribution confirms clock excludes Electron launch, child expansion, and Setup & Status text; it includes activity-bar click, pane reveal, root getChildren, and first paint. Evidence/change-log updated. Human UAT and startup-gate acceptance remain operator-owned.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "uat-remediation",
+      "dateTime": "2026-08-05T13:50:37.773410-04:00",
+      "description": "Imported operator UAT from C:/Users/Public/110-work-explorer-native-treeview-uat-checklist.json. UAT found invalid Set 108 fixture reference, supplied lifecycle SVGs not used consistently, unwanted module/severity icons, activity-bar icon too dark in light theme, and clearer session labels desired. Remediated native mapping: buckets/sets/sessions use supplied status SVGs, module rows have no icon, severity remains in tooltip/context. Focused typecheck and native-tree/icon tests: 87 passing. Activity-bar contrast, session labels, and startup-gate acceptance remain follow-ons/operator-owned.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "post-uat-layer3-final",
+      "dateTime": "2026-08-05T14:19:49.961435-04:00",
+      "description": "UAT-driven icon remediation validated: final full Layer 3 passed 33/33 in 8.9m; targeted migrated specs 16/16; focused native model/icon tests 87 passing; typecheck clean. Final non-writing performance samples 3073.5/3745.5/5531.5ms at 10/100/500 sets. Status buckets, sets, and sessions now use supplied lifecycle SVGs; module rows have no icon; severity remains tooltip/context metadata. Remaining UAT follow-ons: activity-bar icon light-theme contrast, clearer session labels, invalid-manifest human walk unavailable. Startup target <1000ms remains missed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 11,
+      "stepKey": "release-restaged",
+      "dateTime": "2026-08-05T14:54:50.856636-04:00",
+      "description": "Updated final evidence to post-UAT run: Layer 3 33/33 in 8.9m; final view-open->first-row 3073.5/3745.5/5531.5ms at 10/100/500 sets; Layer 2 1866 passing/1 pending; typecheck clean. Rebuilt and inspected 0.48.0 VSIX: 62 files, 1.41MB, lifecycle assets and native bundle present, deleted renderer absent. Remaining UAT follow-ons: activity-bar icon light-theme contrast and clearer session labels; invalid-manifest human path was unavailable. Startup target <1000ms remains missed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 12,
+      "stepKey": "deferred-residuals",
+      "dateTime": "2026-08-05T15:56:34.834822-04:00",
+      "description": "Operator decision recorded: activity-bar light/dark icon pair applied; clearer session-node labels deferred to its own follow-on session; startup target/performance investigation deferred to its own follow-on session. Rebuilt 0.48.0 VSIX with 64 files and verified both activity-bar assets plus manifest pair. UAT remains recorded with unwalked invalid-manifest path.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 13,
+      "stepKey": "verification-round-1-remediation",
+      "dateTime": "2026-08-06T03:12:14.192875-04:00",
+      "description": "Routed verification round 1 (google/gemini-3.1-pro-preview) returned ISSUES_FOUND with 2 blocking Majors. Both accepted and fixed: (1) release deliverables staged for real -- package.json 0.48.0 -> 0.49.0, a [0.49.0] CHANGELOG entry superseding the never-published 0.48.0, and the VSIX built with its contents checked against every CHANGELOG claim by the re-runnable scripts/verify_vsix_claims.py; (2) the missing 0-set scale measured via the pipeline harness at all four scales, twice (s4-perf-measurements.json, s4-perf-rerun.json). The honest answer: at 0 sets the pipeline is 99% one git worktree list subprocess, so the webview->TreeView migration did NOT fix the empty-tree sluggishness the set was opened for. Also found the before/after runs were taken on different environments (cpus 20/node v25.8.1 vs cpus 14/node v24.19.0), which retires the previously-unresolved ~3.7-4.3x scan anomaly as an environment candidate and voids cross-run absolute deltas. Nit fixed: empty UAT placeholders removed, the one carrying real operator feedback kept. Collateral: stale 0.48.0 references, a dangling 'Options are:' sentence, and a stale 'UAT not yet attested' line all corrected.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 14,
+      "stepKey": "verification-round-2-remediation",
+      "dateTime": "2026-08-06T03:12:14.196104-04:00",
+      "description": "Routed verification round 2 (gpt-5.5, anthropic excluded, s4-conventions.md as the up-front conventions block) returned ISSUES_FOUND with 1 Major, and it was a real shipping defect: contributes.viewsContainers rejects any non-string icon -- VS Code's isValidViewsContainer returns false and the caller skips the WHOLE activitybar array -- so the {light, dark} pair introduced by the UAT icon remediation would have made the Dabbler activity-bar container fail to register entirely. Confirmed against VS Code source and against the shipped 1.132.0 workbench bundle, which generates 'mask: url(...)' for the container icon: the icon is a stencil, its fill is discarded, and the colour comes from the theme. The two contributed SVGs had BYTE-IDENTICAL path data differing only in that discarded fill, so the UAT contrast complaint was never fixed and is reopened. Three gates were green over it: the last full Layer 3 predates the manifest edit; verify_vsix_claims.py ASSERTED the broken object as the expectation; and no Layer 2/typecheck/build path reads the manifest icon. Fixed: single string media/activity-bar-icon.svg (operator artwork, path data preserved byte-for-byte, per-theme copies deleted), a new falsified Layer 2 gate viewsContainerIcon.test.ts (4 tests), verify_vsix_claims.py corrected and its currentColor rule re-scoped to the 8 status assets, the false CHANGELOG 'Fixed' claim withdrawn to a Known issues entry, and status-icon-theming.md given the counterpart section.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 15,
+      "stepKey": "layer3-release-of-record",
+      "dateTime": "2026-08-06T03:12:14.198843-04:00",
+      "description": "Manifest is product, so the full Layer 3 suite was re-run. First run 32/33: vsix-first-run-walkthrough failed because acceptSoleQuickPickItem waited only on the quick-input INPUT being visible and pressed Enter before the item list existed, so a silent no-op left the picker open and the failure surfaced 4 lines later blaming the slug InputBox. Helper now waits for a .monaco-list-row, presses Enter, then waits for the picker's own placeholder to go hidden so a swallowed Enter fails on the step that swallowed it. Pre-existing flake shape -- the same spec failed the same way in Session 3. Targeted rerun green, then the FULL suite on the final tree: 33 passed / 0 failed (8.0m). Layer 2 1870 passing / 1 pending; typecheck clean. VSIX rebuilt (63 files, 1.42MB) and re-verified 11/11 claims. Final suite re-measured view-open->first-row at 2787/3395.5/4074 ms versus the written baseline's 3073.5/3745.5/5531.5 ms -- reported as run-to-run spread, not swapped in, since the baseline spec only writes under DABBLER_WRITE_EVIDENCE=1. Every scale remains multiples above the <1000 ms gate, which stays missed and stays deferred rather than waived.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 16,
+      "stepKey": "verification-round-3-remediation",
+      "dateTime": "2026-08-06T03:20:15.695182-04:00",
+      "description": "Routed verification round 3 (gpt-5.5, anthropic excluded, hint 85) returned ISSUES_FOUND with 1 Major + 1 nit. Major: the release gate overclaimed -- change-log.md said 'every claim in the 0.49.0 CHANGELOG entry is checked by verify_vsix_claims.py', but the script checked 11 coarse predicates while the entry also claims lazy expansion, the fourth level, contextValue gating, malformed/duplicate ledger handling, icon application and severity-in-tooltips. Fixed BOTH ways the verifier suggested. Expanded: 3 new artifact-decidable checks -- all 19 view/item/context entries gated on BOTH the view and a contextValue; the two submenus exist, are populated and are referenced; normalizeLedgerSessions ships in the bundle. Falsified by mutating a copy of the real VSIX (stripping one viewItem clause -> FAIL naming the command; emptying a submenu -> FAIL naming the size), 14/14 on the unmutated artifact. Narrowed: the script's docstring now carries a claim-by-claim map of the whole 0.49.0 entry against the gate that verifies each row, and the output says 'ALL ARTIFACT CLAIMS VERIFIED (14/14) -- artifact-decidable claims only', since a zip cannot expand a tree row. Nit: s4-walk-evidence.md's Status block still said the contrast finding was fixed and quoted the pre-round-2 8.9m run while later lines in the same file said the opposite (L-065-1 again -- a consistency fix is rarely local); the block now states 33/33 in 8.0m as the run of record and the withdrawal plainly. No product code changed, so the VSIX was re-verified rather than rebuilt.",
+      "status": "completed"
     }
   ]
 }

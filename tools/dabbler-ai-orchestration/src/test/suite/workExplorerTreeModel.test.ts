@@ -9,9 +9,8 @@
 //   * a set row has NO description. The fraction was removed outright,
 //     not moved — `TreeItem.description` is dropped when the label
 //     truncates, and every real set name truncates at working width.
-//   * the icon slot is decided by a RANKED table, not by "most severe".
-//     A row that is simultaneously blocked, migration-required and
-//     WAIVED must show the blocked icon, not a generic run-state dot.
+//   * status rows use the operator's supplied lifecycle icons consistently;
+//     marker severity remains in the tooltip and context value.
 //   * a session set reports Collapsed, never Expanded, so the fourth
 //     level costs nothing until it is opened.
 
@@ -363,8 +362,7 @@ suite("Set 110 S2 — icon precedence", () => {
     unsatisfiedPrereqs: [{ slug: "p", condition: "complete", targetState: "not-started" }],
   });
 
-  test("rank 1 beats every other marker on the same row", () => {
-    // The row S1's spike originally rendered as a generic in-progress dot.
+  test("marker severity does not replace the lifecycle icon", () => {
     const worstCase = fakeSet({
       ...blocked,
       needsMigration: true,
@@ -381,11 +379,7 @@ suite("Set 110 S2 — icon precedence", () => {
       },
     });
     assert.strictEqual(severityOf(worstCase), "blocked");
-    assert.deepStrictEqual(setIcon(worstCase), {
-      kind: "theme",
-      id: "error",
-      color: "problemsErrorIcon.foreground",
-    });
+    assert.deepStrictEqual(setIcon(worstCase), { kind: "file", slug: "in-progress.svg" });
   });
 
   test("ranks 2 to 5, each when nothing more severe applies", () => {
@@ -427,7 +421,7 @@ suite("Set 110 S2 — icon precedence", () => {
     );
   });
 
-  test("rank 6 — a plain row falls through to the operator's run-state glyph", () => {
+  test("a plain row uses the operator's run-state glyph", () => {
     assert.strictEqual(severityOf(fakeSet({ state: "complete" })), null);
     assert.deepStrictEqual(setIcon(fakeSet({ state: "complete" })), {
       kind: "file",
@@ -435,16 +429,13 @@ suite("Set 110 S2 — icon precedence", () => {
     });
   });
 
-  test("ranks 1-5 are ThemeIcons, so they recolour in both themes for free", () => {
-    // The reason the precedence table uses them at all: the operator's
-    // authored SVGs carry hardcoded fills and one is nearly invisible on
-    // a light theme (S1 finding (d)).
+  test("marker-bearing rows still use the operator's lifecycle glyphs", () => {
+    assert.deepStrictEqual(setIcon(blocked), { kind: "file", slug: "in-progress.svg" });
     for (const set of [
-      blocked,
       fakeSet({ needsMigration: true }),
       fakeSet({ duplicateNameError: { name: "x", chosenDir: "/a", conflictingDirs: ["/a", "/b"] } }),
     ]) {
-      assert.strictEqual(setIcon(set).kind, "theme");
+      assert.deepStrictEqual(setIcon(set), { kind: "file", slug: "not-started.svg" });
     }
   });
 
@@ -574,17 +565,27 @@ suite("Set 110 S2 — module rows and their capability gating", () => {
     );
   });
 
-  test("a module warning takes the icon slot and explains itself in the tooltip", () => {
+  test("a module warning stays in the tooltip without a module icon", () => {
     const node = moduleNodes([
       fakeModule({ warning: { code: "manifest-invalid" }, sets: [fakeSet()] }),
     ])[0];
     const d = moduleDescriptor(node);
-    assert.deepStrictEqual(d.icon, {
-      kind: "theme",
-      id: "warning",
-      color: "problemsWarningIcon.foreground",
-    });
+    assert.strictEqual(d.icon, undefined);
     assert.ok(d.tooltip && d.tooltip.includes("invalid"), d.tooltip);
+  });
+
+  test("status buckets use their matching lifecycle glyph", () => {
+    for (const bucketKey of ["in-progress", "not-started", "complete", "cancelled"] as const) {
+      const d = bucketDescriptor({
+        kind: "bucket",
+        moduleKey: "declared:core",
+        bucketKey,
+        label: bucketKey,
+        sets: [],
+      });
+      const expectedSlug = bucketKey === "complete" ? "done.svg" : `${bucketKey}.svg`;
+      assert.deepStrictEqual(d.icon, { kind: "file", slug: expectedSlug });
+    }
   });
 });
 

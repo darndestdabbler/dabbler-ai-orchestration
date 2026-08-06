@@ -3,7 +3,116 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.48.0] — 2026-08-04 (staged; publish operator-gated)
+## [0.49.0] — 2026-08-05 (staged; publish operator-gated)
+
+> **The Work Explorer is now a native VS Code tree.** Set 110 replaces the
+> hand-rolled webview tree with a `TreeDataProvider`, which is what buys
+> platform behaviour the webview could only imitate: real context menus and
+> submenus, native keyboard navigation and selection, and children built only
+> when a row is actually expanded. The tree gains a fourth level — a session
+> set now expands to its individual sessions.
+>
+> **This release supersedes `0.48.0`, which was staged but never published.**
+> Its narrow-panel fix and template link corrections are carried forward here
+> and ship for the first time in this artifact; the `0.48.0` section below
+> stands as the record of when that work was written.
+>
+> **Not yet published.** No tag, no publish run: the artifact is built and the
+> gates are green, and the Marketplace step is the operator's.
+
+### Changed
+
+- **The Work Explorer renders through a native `TreeView`
+  (`dabblerWorkExplorerTree`) instead of a webview.** Rows are built lazily:
+  the provider returns module rows, and buckets, session sets and sessions are
+  constructed only when their parent is expanded, so a collapsed tree no longer
+  pays to build rows nobody is looking at. Row actions are contributed as real
+  `view/item/context` menus — including two submenus (Copy Prompt, Open File) —
+  and are gated per row type by `contextValue`, so a row only ever offers the
+  actions that apply to it.
+
+- **A session set expands to its sessions.** The fourth level costs no extra
+  disk read: the scan already parsed the `sessions[]` ledger and then discarded
+  it, and it is now retained (`normalizeLedgerSessions`). A malformed ledger
+  degrades to fewer session rows rather than to a set that will not render, and
+  a duplicate session number is dropped rather than rendered as a second row
+  sharing one `TreeItem.id`.
+
+- **Setup & Status stays a webview, and is now conditionally present.** It is
+  contributed behind `when: dabblerSessionSets.setupNeeded`, so it occupies the
+  panel when there is setup to do and stays out of the way when there is not.
+
+- **Status icons are the authored per-theme SVG pairs, applied consistently.**
+  Status buckets, session-set rows and session rows all use the same
+  `light`/`dark` lifecycle glyphs (`not-started`, `in-progress`, `done`,
+  `cancelled`). Module rows carry no icon. Severity is still available, in
+  tooltips and in the row's context metadata, rather than as a competing icon
+  language.
+
+  `fill: currentColor` cannot work for these and a test now keeps it out
+  permanently: measured in a real Extension Development Host,
+  `TreeItem.iconPath` renders as a CSS `background-image` with `mask-image:
+  none`, so `currentColor` would resolve against the SVG's own document and
+  paint every glyph one fixed colour on both themes.
+
+### Fixed
+
+- **The activity-bar container icon is contributed as a string again.** A
+  `{ light, dark }` object was briefly authored here during this release's UAT
+  pass, borrowing the idiom that is correct next door for `TreeItem.iconPath`.
+  `contributes.viewsContainers` does not accept it: VS Code's
+  `isValidViewsContainer` requires `typeof icon === 'string'` and drops the
+  **entire container** when it is not, which would have removed the Dabbler
+  activity-bar entry and spilled its views into Explorer. The manifest now
+  contributes one shared `media/activity-bar-icon.svg`, and
+  `src/test/suite/viewsContainerIcon.test.ts` pins the shape so it cannot come
+  back.
+
+### Known issues
+
+- **(Operator UAT, 2026-08-05) The activity-bar mark still reads as too dark on
+  light themes, and this release does not fix it.** An earlier draft of these
+  notes claimed it did. It did not, and could not have: VS Code paints a view
+  container's icon through a CSS `mask`, so the SVG's own fill is discarded and
+  the glyph takes the theme's activity-bar foreground colour. The two files that
+  were contributed for it carried byte-identical path data and differed only in
+  that discarded fill, so they would have rendered the same pixels as the icon
+  they replaced even if the object shape had been legal. The complaint is real
+  and remains open; it has to be answered from the artwork's silhouette or the
+  theme's colours, not from a per-theme asset. Tracked with the other deferred
+  UAT residuals.
+
+### Removed
+
+- **The webview Work Explorer renderer (`providers/CustomSessionSetsView.ts`)
+  and its suppression-state helper are deleted**, taking the tree markup, its
+  message-passing layer and its inline styles with them. The renderer is not
+  left dormant behind a flag: the native view is the only Work Explorer
+  surface.
+
+### Performance
+
+Measured in a real Extension Development Host, shipping build, fresh profile
+per repetition, natural cold paint with no forced refresh — the same protocol
+used to take the pre-migration baseline, which is what makes the comparison
+valid. View-open to first visible row, median of two reps:
+
+| scale | webview before | native after |
+| ---: | ---: | ---: |
+| 10 sets | 5,344.5 ms | 3,073.5 ms |
+| 100 sets | 5,293.0 ms | 3,745.5 ms |
+| 500 sets | 5,605.5 ms | 5,531.5 ms |
+
+**The `< 1,000 ms` first-paint target this work was aimed at is not met at any
+scale, and the release does not claim otherwise.** The follow-on investigation
+is a named, deferred piece of work rather than a silent waiver.
+
+Empty-Explorer startup is **not** improved, and the measurement says why: at
+zero session sets the host-side pipeline is ~99% a single `git worktree list`
+subprocess, which no view technology can remove. The original "sluggish even
+when empty" report is a host-side discovery cost, not a rendering cost.
+
+## [0.48.0] — 2026-08-04 (staged; superseded by `0.49.0`, never published)
 
 > **A narrow-panel readability fix, plus the template link fix `0.47.0` missed.**
 > The Work Explorer's module action strip could paint over the module name in a

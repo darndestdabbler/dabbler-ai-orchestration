@@ -2914,6 +2914,20 @@ The log is append-only; rotate or archive manually when it gets large
 
 ## Delegation Discipline
 
+### Temporary verification-only policy (Set 110 S4 through Set 112)
+
+The operator has narrowed outsourcing for the current queue. The active
+orchestrating agent owns implementation, architecture decisions, analysis,
+documentation, test authoring, and close-out mechanics. The only task routed
+through the AI Router is `session-verification`, and it must be verified by a
+different effective provider. Set 111 owns the next revision of these routing
+rules; Set 112 follows that decision while removing the Lightweight tier.
+
+This temporary policy is represented by `routing.outsourcing_mode:
+verification-only` and the one-entry `delegation.always_route_task_types`
+list in `ai_router/router-config.yaml`. Do not infer a broader delegation
+requirement from the general guidance below during this queue window.
+
 The orchestrator's job is to plan, sequence, and dispatch — not to do
 every piece of reasoning itself. Orchestrators tend to hoard work
 because calling themselves "feels faster." In practice that means paying
@@ -2934,8 +2948,8 @@ The orchestrator does these **directly**, without calling `route()`:
   imports, formatting, trivial boilerplate the spec dictates verbatim)
 - Interpreting errors enough to decide which task to route next
 
-The orchestrator **always** routes these through `route()`, never
-performs them itself:
+Under the repository's normal policy, the orchestrator **always** routes
+these through `route()`, never performs them itself:
 
 - Code review
 - Security review

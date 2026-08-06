@@ -1,0 +1,71 @@
+{
+  "ProjectName": "Dabbler AI Orchestration",
+  "ReleaseLabel": "Extension 0.49.0 staged -- Set 110 native Work Explorer",
+  "DocumentDate": "2026-08-05",
+  "Notes": "This is a four-item guided look for the native Work Explorer. The automated Layer 3 counterpart for each item is named explicitly; the human walk covers rendering feel, theme legibility, density, and the startup timing decision that automation can measure but cannot ratify as acceptable. Quality bar: follow each HumanAction literally, inspect the named surface at normal and narrow widths, and record anything confusing or visually wrong in Feedback. These items are not attested until the operator walks them.",
+  "Configuration": {
+    "reviewWidths": [
+      "6%",
+      "14%",
+      "34%",
+      "10%",
+      "36%"
+    ]
+  },
+  "Review": [
+    {
+      "FunctionalArea": "Native Work Explorer",
+      "Subarea": "Tree density and lazy expansion",
+      "ItemLabel": "The native tree is readable at four levels without the old action strip",
+      "HumanAction": "Open the Set 108 walk repository with several modules and many session sets. Open the Dabbler AI Orchestration activity-bar container. Expand one module, one status bucket, and one session set. Repeat once in a narrow sidebar.",
+      "Expectation": "The first visible surface is the Work Explorer tree. Expanding a module reveals its buckets, expanding a bucket reveals session-set rows, and expanding a set reveals session rows. The set rows do not show the retired fraction column or a same-line action strip. The narrow sidebar remains usable: labels may truncate, but rows do not overlap, wrap into an unreadable layout, or lose their expand controls.",
+      "ProgrammaticVerification": "Layer 3: native-tree.spec.ts covers the four-level structure, lazy expansion, set-row activation, and refresh persistence; work-explorer-tree.spec.ts covers module grouping, bucket counts, and native rendering.",
+      "Result": "",
+      "Feedback": "The checklist referred to a Set 108 walk repository, but no such repository was available. After installing the new extension with a fresh VS Code profile, the view took a while to load. The status icons are wrong or inconsistent: the Not Started group does not use not-started.svg and resembles a built-in cancelled icon; Complete contains a mixture of supplied icons, question marks, and exclamation marks. The supplied status icons should be used consistently, and module rows do not need icons.",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Native Work Explorer",
+      "Subarea": "Status icons and density trade",
+      "ItemLabel": "Status glyphs remain legible in both themes and progress information is discoverable",
+      "HumanAction": "Use VS Code's light theme and inspect a not-started, in-progress, complete, and cancelled session row at normal tree size. Switch to a dark theme and inspect the same rows. Hover or open the item tooltip for a session set carrying several markers.",
+      "Expectation": "Each session status is distinguishable at a glance and remains visible in both themes. The set tooltip contains the progress and marker information that no longer appears as multiple inline row markers. No status icon is invisible, clipped, or visually mistaken for another status.",
+      "ProgrammaticVerification": "Layer 3: icon-render-mechanism.spec.ts verifies the real TreeItem SVG rendering mechanism and selected light/dark assets; native-tree.spec.ts verifies session status descriptors and tooltip content.",
+      "Result": "",
+      "Feedback": "The supplied status icons and tooltips look fine in both light and dark themes. Other icons do not. The activity-bar icon is too dark in the light theme and may need a different default color.",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Native Work Explorer",
+      "Subarea": "Menus and diagnostics",
+      "ItemLabel": "Native context menus work without swallowing tree interactions",
+      "HumanAction": "Right-click a module, a session-set row, and a session row. Inspect the available hierarchical actions. Then expand and collapse a bucket and a session set with ordinary clicks. Finally open a workspace with an invalid docs/modules.yaml manifest and repair the file.",
+      "Expectation": "The context menu is hierarchical and only shows actions that apply to the selected row. Session rows do not receive module or set actions. Ordinary expand/collapse clicks work. An invalid manifest produces a clear message above the tree, preserves the last-known-good rows, and clears the message after repair.",
+      "ProgrammaticVerification": "Layer 3: work-explorer-tree.spec.ts covers menus, expansion, and manifest diagnostics; overlay-click-swallow.spec.ts permanently proves the prior swallowed-click shape fails and the shipping surface passes.",
+      "Result": "",
+      "Feedback": "The hierarchical menu looks fine. No workspace with an invalid docs/modules.yaml was available, so that part was not walked.",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Native Work Explorer",
+      "Subarea": "Startup feel",
+      "ItemLabel": "The native tree's startup delay is acceptable to the operator",
+      "HumanAction": "Open the same populated walk repository from a fresh VS Code test profile. Time from opening the Work Explorer view until the first visible module row appears. Repeat at least once. Compare the feel with the prior webview Explorer and record whether the wait is acceptable at 10, 100, and 500-set scale.",
+      "Expectation": "Record the observed time rather than forcing a pass. The authored target is under 1,000 ms from view open to first visible row. The automated final run measured 3,073.5 ms, 3,745.5 ms, and 5,531.5 ms at 10, 100, and 500 sets; the operator must decide whether that miss blocks release or becomes an explicitly owned follow-on.",
+      "ProgrammaticVerification": "Layer 3: real-host-baseline.spec.ts measures the same view-open-to-first-row protocol against a real Extension Development Host, fresh profiles, natural paint, and 10/100/500 synthetic sets.",
+      "Result": "",
+      "Feedback": "A fresh-profile install was completed and the wait did not feel terrible, but the operator could not record the prescribed 10/100/500-set timings or make an acceptance judgment at those scales.",
+      "Passes": false
+    },
+    {
+      "FunctionalArea": "Native Work Explorer",
+      "Subarea": "Tree density and lazy expansion",
+      "ItemLabel": "Other",
+      "IsOtherItem": true,
+      "HumanAction": "",
+      "Expectation": "",
+      "Passes": false,
+      "Feedback": "Session nodes could have clearer labels."
+    }
+  ]
+}

@@ -5,6 +5,10 @@ __pycache__/
 node_modules/
 *.vsix
 router-metrics.jsonl
+# Set 110 S4: the copilot-cli transport's failure log is the same artifact class
+# as router-metrics.jsonl above — a per-machine runtime record that churns on
+# every failed call and carries no value in version control.
+copilot-transport-diagnostics.jsonl
 .vscode-test/
 .claude/
 *.egg-info/

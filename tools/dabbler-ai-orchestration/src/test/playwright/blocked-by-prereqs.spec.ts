@@ -29,6 +29,7 @@ import {
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
+  expectFileIcon,
   LaunchedVSCode,
   launchVSCode,
   makeAdditionalSet,
@@ -126,12 +127,12 @@ test.describe("Set 061 S2 — blocked-by-prerequisites, on the native tree", () 
     const pane = await openWorkExplorerTree(per.launch.page);
 
     const depRow = await setRow(pane, "Not Started", "047-dependant");
-    await expect(depRow.locator(".codicon-error")).toHaveCount(1);
+    await expectFileIcon(depRow, "not-started.svg");
 
     // The prereq itself declares no prerequisites, so it must not be
     // flagged — the assertion that catches an over-broad derivation.
     const prereqRow = treeRow(pane, "044-prereq");
-    await expect(prereqRow.locator(".codicon-error")).toHaveCount(0);
+    await expectFileIcon(prereqRow, "not-started.svg");
   });
 
   test("does not flag the dependant when the prereq target is complete", async () => {
@@ -145,7 +146,7 @@ test.describe("Set 061 S2 — blocked-by-prerequisites, on the native tree", () 
     const pane = await openWorkExplorerTree(per.launch.page);
 
     const depRow = await setRow(pane, "Not Started", "047-unblocked");
-    await expect(depRow.locator(".codicon-error")).toHaveCount(0);
+    await expectFileIcon(depRow, "not-started.svg");
   });
 
   test("suppresses the flag on a terminal-state row", async () => {
@@ -163,7 +164,7 @@ test.describe("Set 061 S2 — blocked-by-prerequisites, on the native tree", () 
     const pane = await openWorkExplorerTree(per.launch.page);
 
     const depRow = await setRow(pane, "Complete", "047-completed-dep");
-    await expect(depRow.locator(".codicon-error")).toHaveCount(0);
+    await expectFileIcon(depRow, "done.svg");
   });
 
   test("never flags a set that declares no prerequisites", async () => {
@@ -174,6 +175,6 @@ test.describe("Set 061 S2 — blocked-by-prerequisites, on the native tree", () 
     const pane = await openWorkExplorerTree(per.launch.page);
 
     const row = await setRow(pane, "Not Started", "047-standalone");
-    await expect(row.locator(".codicon-error")).toHaveCount(0);
+    await expectFileIcon(row, "not-started.svg");
   });
 });

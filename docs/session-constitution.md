@@ -48,14 +48,16 @@ Run every router CLI through the workspace venv
   at runtime, never re-litigate them mid-session; a wrong flag is fixed
   in the spec and surfaced at Step 9.
 - **3. Prerequisites.** Confirm prior sessions' Creates/Touches exist.
-  **3.5:** append this session's `ai-assignment.md` block; produce the
-  next-orchestrator / next-set recommendations via
-  `route(task_type="analysis")` — never self-opine on model choice.
-- **4. Execute.** Do the plan's steps; log every step to
-  `activity-log.json` (`log_step`). Delegate reasoning through
-  `route()` (code review, security review, architecture, analysis,
-  documentation, test generation); own the mechanics (file edits,
-  shell, git, and mechanical single-file edits under ~50 lines).
+  - **3.5:** append this session's `ai-assignment.md` block; record the
+    next-orchestrator / next-set recommendations directly during the temporary
+    verification-only policy window. Set 111 owns the next routing-policy
+    revision, so do not expand outsourcing before that set decides it.
+  - **4. Execute.** Do the plan's steps; log every step to
+    `activity-log.json` (`log_step`). The active orchestrator owns
+    implementation, architecture, analysis, documentation, and test authoring
+    for the temporary policy window. Route only `session-verification`, which
+    must use a different effective provider; own the mechanics (file edits,
+    shell, git, and mechanical single-file edits under ~50 lines).
 - **5. Build + test.** Run the repo's suite; log the result.
 - **6. Verify (mandatory, every Full-tier session).** Run the phased
   loop: `python -m ai_router.verify_session --phase discovery` for the

@@ -848,3 +848,48 @@ def make_additional_set(
         provider=base_handle.provider,
         effort=base_handle.effort,
     )
+
+
+def make_additional_sets(
+    base_handle: HarnessHandle,
+    new_slugs: list[str],
+    new_total_sessions: int,
+) -> "HarnessHandle":
+    """Add several session sets with one commit and push.
+
+    The real-host performance fixture uses hundreds of sets. Committing and
+    pushing each one separately measures Git history construction instead of
+    the Explorer and can exhaust the Playwright test timeout before VS Code
+    starts. Keep the single-set helper's semantics for other tests, but batch
+    this scale-building path into one repository operation.
+    """
+    if not new_slugs:
+        return base_handle
+
+    sets_root = base_handle.repo_root / "docs" / "session-sets"
+    for new_slug in new_slugs:
+        set_dir = sets_root / new_slug
+        set_dir.mkdir(parents=True)
+        _write_spec(set_dir, new_slug, new_total_sessions)
+        synthesize_not_started_state(str(set_dir))
+
+    _git(base_handle.repo_root, "add", "-A")
+    _git(
+        base_handle.repo_root,
+        "commit",
+        "-m",
+        f"add {len(new_slugs)} fixture session sets",
+    )
+    _git(base_handle.repo_root, "push", "origin", "main")
+    last_slug = new_slugs[-1]
+    return HarnessHandle(
+        repo_root=base_handle.repo_root,
+        set_dir=sets_root / last_slug,
+        bare_remote=base_handle.bare_remote,
+        slug=last_slug,
+        total_sessions=new_total_sessions,
+        engine=base_handle.engine,
+        model=base_handle.model,
+        provider=base_handle.provider,
+        effort=base_handle.effort,
+    )

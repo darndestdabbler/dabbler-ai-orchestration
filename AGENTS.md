@@ -135,11 +135,8 @@ see **Engine-specific bootstrap** at the end of this file.)
 
 ## Delegation Discipline (pointer)
 
-Your role is orchestrator, not solo coder. Reasoning tasks — code
-review, security review, architecture, analysis, documentation, test
-generation, session verification — **always** go through `route()`.
-Only handle work directly when it is mechanical, single-file, and
-under ~50 lines.
+110-112: orchestrator owns implementation/architecture; route
+cross-provider `session-verification`.
 
 See `docs/ai-led-session-workflow.md` → **Delegation Discipline** for
 the full criteria, the human-tunable thresholds (in
@@ -174,4 +171,7 @@ print('API keys OK')
 "
 ```
 
-If keys are missing, stop and tell the human.
+If the router profile is `api` and keys are missing, stop and tell the human.
+When the active profile is `copilot-cli`, use the authenticated Copilot CLI
+seat and its catalog instead; provider API keys are not required for that
+transport.

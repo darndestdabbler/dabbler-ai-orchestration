@@ -31,6 +31,7 @@ import {
   cleanupTmpDir,
   closeVSCode,
   expandTreeRow,
+  expectFileIcon,
   LaunchedVSCode,
   launchVSCode,
   makeAdditionalSet,
@@ -122,8 +123,8 @@ test("fresh default-module scaffold renders one declared module with the plan ga
 
     // The gate: the plan is ready (no prerequisites), the decomposition is
     // blocked on it until it completes.
-    await expect(planRow.locator(".codicon-error")).toHaveCount(0);
-    await expect(decompRow.locator(".codicon-error")).toHaveCount(1);
+    await expectFileIcon(planRow, "not-started.svg");
+    await expectFileIcon(decompRow, "not-started.svg");
   } finally {
     await teardown(per);
   }

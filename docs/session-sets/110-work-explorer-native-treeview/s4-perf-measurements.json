@@ -1,0 +1,217 @@
+{
+  "generatedBy": "scripts/perf-harness.ts (Set 110 S1)",
+  "platform": "win32 10.0.26200",
+  "cpus": 14,
+  "node": "v24.19.0",
+  "reps": 5,
+  "note": "Host-side buckets only. resolveWebviewView and webview cold-start-to-first-paint require a real extension host and are not measured here.",
+  "attribution": "pipelineMs is readAllSessionSetsWithDiagnostics(), the product entrypoint and the honest total. discoveryMs and scanMs are component probes run separately and are ALREADY CONTAINED IN pipelineMs — summing them double-counts.",
+  "samples": [
+    {
+      "scenario": "synthetic 0 sets",
+      "setsFound": 0,
+      "medians": {
+        "gitSubprocessMs": 127.03,
+        "discoveryMs": 125.71,
+        "scanMs": 0.59,
+        "pipelineMs": 133.67,
+        "discoveryShareOfPipeline": 0.94
+      },
+      "raw": {
+        "gitSubprocessMs": [
+          131.8075,
+          127.0346,
+          116.871,
+          125.6975,
+          128.9933
+        ],
+        "discoveryMs": [
+          125.1575,
+          125.7057,
+          125.3466,
+          131.2422,
+          135.2998
+        ],
+        "scanMs": [
+          0.7913,
+          0.5938,
+          0.429,
+          0.5701,
+          0.8851
+        ],
+        "pipelineMs": [
+          130.5386,
+          130.503,
+          136.277,
+          133.6707,
+          143.8687
+        ]
+      }
+    },
+    {
+      "scenario": "synthetic 10 sets",
+      "setsFound": 10,
+      "medians": {
+        "gitSubprocessMs": 132.36,
+        "discoveryMs": 135.28,
+        "scanMs": 19.92,
+        "pipelineMs": 159.48,
+        "discoveryShareOfPipeline": 0.848
+      },
+      "raw": {
+        "gitSubprocessMs": [
+          129.4532,
+          134.7845,
+          135.4984,
+          125.8052,
+          132.3578
+        ],
+        "discoveryMs": [
+          141.42,
+          128.0162,
+          135.2789,
+          133.9936,
+          147.3161
+        ],
+        "scanMs": [
+          19.4971,
+          19.9212,
+          22.895,
+          15.7227,
+          24.7194
+        ],
+        "pipelineMs": [
+          161.7195,
+          154.4351,
+          153.054,
+          159.4792,
+          160.7426
+        ]
+      }
+    },
+    {
+      "scenario": "synthetic 100 sets",
+      "setsFound": 100,
+      "medians": {
+        "gitSubprocessMs": 133.97,
+        "discoveryMs": 129.71,
+        "scanMs": 177.48,
+        "pipelineMs": 319.2,
+        "discoveryShareOfPipeline": 0.406
+      },
+      "raw": {
+        "gitSubprocessMs": [
+          133.7979,
+          132.7666,
+          134.1115,
+          134.2052,
+          133.9743
+        ],
+        "discoveryMs": [
+          130.9292,
+          126.4242,
+          129.7126,
+          131.8472,
+          125.0536
+        ],
+        "scanMs": [
+          135.5023,
+          142.0962,
+          177.4765,
+          207.7911,
+          193.5383
+        ],
+        "pipelineMs": [
+          307.3927,
+          266.4357,
+          319.202,
+          339.3224,
+          343.8524
+        ]
+      }
+    },
+    {
+      "scenario": "synthetic 500 sets",
+      "setsFound": 500,
+      "medians": {
+        "gitSubprocessMs": 134.06,
+        "discoveryMs": 130.11,
+        "scanMs": 890.42,
+        "pipelineMs": 1136.88,
+        "discoveryShareOfPipeline": 0.114
+      },
+      "raw": {
+        "gitSubprocessMs": [
+          140.9005,
+          128.4883,
+          138.0857,
+          134.0621,
+          132.8889
+        ],
+        "discoveryMs": [
+          146.3657,
+          124.8269,
+          130.5402,
+          129.7624,
+          130.1078
+        ],
+        "scanMs": [
+          890.4228,
+          872.9638,
+          1015.9137,
+          865.3438,
+          1001.9346
+        ],
+        "pipelineMs": [
+          900.9303,
+          1151.7725,
+          1143.788,
+          1019.8564,
+          1136.8796
+        ]
+      }
+    },
+    {
+      "scenario": "REAL repo",
+      "setsFound": 111,
+      "medians": {
+        "gitSubprocessMs": 133.02,
+        "discoveryMs": 135.89,
+        "scanMs": 239.59,
+        "pipelineMs": 372.44,
+        "discoveryShareOfPipeline": 0.365
+      },
+      "raw": {
+        "gitSubprocessMs": [
+          137.1759,
+          132.3707,
+          133.0189,
+          131.0957,
+          140.197
+        ],
+        "discoveryMs": [
+          131.1943,
+          138.1605,
+          133.1249,
+          135.8891,
+          144.8494
+        ],
+        "scanMs": [
+          247.2304,
+          227.3218,
+          228.2651,
+          239.5889,
+          296.2873
+        ],
+        "pipelineMs": [
+          372.4398,
+          307.0365,
+          318.871,
+          399.9064,
+          423.6518
+        ]
+      }
+    }
+  ],
+  "table": "scenario                 sets   git_spawn  discovery      scan   PIPELINE  discovery%\n-------------------------------------------------------------------------------------\nsynthetic 0 sets            0       127.0      125.7       0.6      133.7         94%\nsynthetic 10 sets          10       132.4      135.3      19.9      159.5         85%\nsynthetic 100 sets        100       134.0      129.7     177.5      319.2         41%\nsynthetic 500 sets        500       134.1      130.1     890.4     1136.9         11%\nREAL repo                 111       133.0      135.9     239.6      372.4         36%\n\nPIPELINE = readAllSessionSetsWithDiagnostics(), the real product call, and the\nhonest total. discovery/scan are component probes measured separately for\nattribution and are ALREADY INSIDE pipeline — do not add the columns.\n\nA discovery% at or above 100 is not a bug: at small set counts BOTH numbers are\none `git worktree list` spawn and nothing else, so they differ only by run-to-run\nnoise. Read it as 'discovery is the entire cost', which is the finding."
+}

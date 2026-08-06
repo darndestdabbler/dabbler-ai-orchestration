@@ -255,13 +255,52 @@ prerequisites:
      a rule with an executable gate is archived rather than carried as prose.
    Evidence basis is in `docs/session-sets/110-work-explorer-native-treeview/`
    and the Set 110 Step 9 commit.
-10. Verify, close. Author `change-log.md`, Step 9 review, advisory
+10. **CI hygiene: pin actions to commit SHAs, and re-decide what CI is FOR.**
+    Two operator-raised items from the Set 110 release attempt.
+    - **Pin `uses:` to full commit SHAs, not tags.** GitHub's own hardening
+      guidance: a mutable tag (`actions/checkout@v4`) can be repointed, so a
+      supply-chain compromise of an action reaches every workflow that
+      references it. Convert `.github/workflows/*.yml` to
+      `owner/action@<40-char-sha>  # vX.Y.Z` and state how they get bumped
+      (Dependabot handles SHA pins and rewrites the trailing comment). The
+      current surface is 31 references across the three workflows:
+      `actions/checkout@v4` ×10, `actions/setup-node@v4` ×6,
+      `actions/setup-python@v4` ×5 (plus one stray `@v5` — worth converging
+      while in here), `actions/download-artifact@v4` ×4,
+      `actions/upload-artifact@v4` ×3, and
+      `pypa/gh-action-pypi-publish@release/v1` ×2. That last one is the
+      sharpest: it is a **moving branch**, not even a tag, and it is on the
+      PyPI publish path.
+    - **Re-decide whether `require-green-test` should be a hard release
+      gate.** The operator's question, in their words: *"Do we really need to
+      do CI here? We ran all the tests locally."* The Set 110 evidence cuts
+      **both** ways and the set should weigh it rather than assume:
+      - **For CI.** It catches a class local runs structurally cannot. The
+        `drift-guards` job had been red on every commit while passing on the
+        developer machine *for the same commit* — because a dev machine has
+        `ai_router` installed and this repo's gitignored
+        `local-overrides.yaml` selects the `copilot-cli` profile, which skips
+        the API-key check the guard needs. That is exactly the fresh-clone /
+        wheel-consumer path, and it is invisible locally by construction.
+        macOS is the same argument: nobody here has a Mac.
+      - **Against the current wiring.** Two of the three red jobs in the
+        release run were GitHub infrastructure — `Failed to resolve action
+        download info / Service Unavailable`, and `The hosted runner lost
+        communication with the server` after 47 minutes. Neither is a defect,
+        yet both blocked a release whose full suite had already run green
+        locally, and the gate offers no way to say so.
+      The likely shape is to keep the coverage and change the gate's failure
+      semantics — distinguish an infrastructure failure from a test failure,
+      or allow an operator-attested override recorded in the disposition (the
+      `--manual-verify` pattern this repo already uses elsewhere) — rather
+      than choosing between "hard gate" and "no CI".
+11. Verify, close. Author `change-log.md`, Step 9 review, advisory
     path-aware critique.
 
 **Creates:** authoring-guide sections (size cap, test policy, UAT format), `requiresUAT` close gate, walk stager, this set's guided-look walk, `change-log.md`
-**Touches:** `docs/session-set-authoring-guide` (or its current home), `ai_router/close_session.py` / `gate_checks.py`, `docs/ai-led-session-workflow.md`, `docs/planning/project-guidance.md`, `docs/planning/lessons-learned.md`
-**Ends with:** the required-artifact list is operator-pruned; oversized sessions are split at authoring; the test policy and UAT format are canonical; UAT cannot silently evaporate; the preload docs are back under their ceilings with a raised admission bar that makes promotion displace rather than accumulate; the operator has walked a guided-look UAT and judged it — the word to beat is "pleasurable."
-**Progress keys:** `artifactTableDecided`, `sessionSizeCap`, `testPolicyCanonized`, `uatFormatCanonized`, `uatCloseGate`, `walkStager`, `dogfoodWalk`, `guidanceStreamlined`
+**Touches:** `docs/session-set-authoring-guide` (or its current home), `ai_router/close_session.py` / `gate_checks.py`, `docs/ai-led-session-workflow.md`, `docs/planning/project-guidance.md`, `docs/planning/lessons-learned.md`, `.github/workflows/*.yml`
+**Ends with:** the required-artifact list is operator-pruned; oversized sessions are split at authoring; the test policy and UAT format are canonical; UAT cannot silently evaporate; the preload docs are back under their ceilings with a raised admission bar that makes promotion displace rather than accumulate; CI actions are SHA-pinned and the release gate distinguishes an infrastructure failure from a test failure; the operator has walked a guided-look UAT and judged it — the word to beat is "pleasurable."
+**Progress keys:** `artifactTableDecided`, `sessionSizeCap`, `testPolicyCanonized`, `uatFormatCanonized`, `uatCloseGate`, `walkStager`, `dogfoodWalk`, `guidanceStreamlined`, `ciHygiene`
 
 ---
 

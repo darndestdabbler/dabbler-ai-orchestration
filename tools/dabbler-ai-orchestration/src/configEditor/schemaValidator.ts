@@ -141,6 +141,16 @@ const LOCAL_OVERRIDES_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    transport: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        profile: {
+          type: "string",
+          enum: ["api", "copilot-cli"],
+        },
+      },
+    },
     routing: {
       type: "object",
       additionalProperties: false,

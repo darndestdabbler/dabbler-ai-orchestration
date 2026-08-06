@@ -1,5 +1,5 @@
 import * as assert from "assert";
-import { validateBatch, ValidationResult } from "../../configEditor/schemaValidator";
+import { validateBatch } from "../../configEditor/schemaValidator";
 
 const VALID_ROUTER_CONFIG = {
   providers: {
@@ -282,6 +282,56 @@ suite("schemaValidator — local-overrides allowlist", () => {
       localOverrides: localOverrides as Record<string, unknown>,
     });
     assert.ok(result.valid, `Expected valid, got: ${JSON.stringify(result.errors)}`);
+  });
+
+  test("accepts allowed local overrides (transport.profile)", () => {
+    for (const profile of ["api", "copilot-cli"] as const) {
+      const result = validateBatch({
+        routerConfig: VALID_ROUTER_CONFIG as Record<string, unknown>,
+        budget: null,
+        localOverrides: {
+          transport: { profile },
+        } as Record<string, unknown>,
+      });
+      assert.ok(
+        result.valid,
+        `Expected ${profile} to be valid, got: ${JSON.stringify(result.errors)}`,
+      );
+    }
+  });
+
+  test("rejects invalid transport.profile in local-overrides", () => {
+    const result = validateBatch({
+      routerConfig: VALID_ROUTER_CONFIG as Record<string, unknown>,
+      budget: null,
+      localOverrides: {
+        transport: { profile: "custom-profile" },
+      } as Record<string, unknown>,
+    });
+    assert.ok(!result.valid);
+    assert.ok(
+      result.errors.some(
+        (e) => e.file === "local-overrides.yaml" && e.path === "/transport/profile",
+      ),
+      `Expected transport.profile enum error, got: ${JSON.stringify(result.errors)}`,
+    );
+  });
+
+  test("rejects unknown transport keys in local-overrides", () => {
+    const result = validateBatch({
+      routerConfig: VALID_ROUTER_CONFIG as Record<string, unknown>,
+      budget: null,
+      localOverrides: {
+        transport: { binary: "copilot" },
+      } as Record<string, unknown>,
+    });
+    assert.ok(!result.valid);
+    assert.ok(
+      result.errors.some(
+        (e) => e.file === "local-overrides.yaml" && e.path === "/transport/binary",
+      ),
+      `Expected transport binary rejection, got: ${JSON.stringify(result.errors)}`,
+    );
   });
 
   test("accepts notifications (local-only section)", () => {

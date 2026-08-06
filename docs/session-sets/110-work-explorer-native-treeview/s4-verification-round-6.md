@@ -1,0 +1,13 @@
+ISSUES FOUND
+
+- **Issue 1:** The staged `0.49.0` VSIX is stale and still contains the Round 5 defect.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Failure scenario:** The operator publishes the staged `dabbler-ai-orchestration-0.49.0.vsix`; users installing it still get the old Copilot-seat setup code that writes `transport.profile: copilot-cli` to shared `ai_router/router-config.yaml`.
+  - **Details:** **Violation:** the spec requires “vsix built and its contents verified,” and Round 5 claims the packaged extension matches the TypeScript source. **Impact:** the Round 5 fix is not in the installable artifact, so the original shared-config contamination bug ships. **Evidence:** the current `dist/extension.js` hash differs from `extension/dist/extension.js` inside the VSIX, and the VSIX still contains `transport.profile: copilot-cli written to ai_router/router-config.yaml` plus `const configAbs = path10.join(deps.projectDir, ROUTER_CONFIG_REL);`. Rebuild the VSIX from the current bundle and rerun the VSIX verifier against that archive.
+
+- **Issue 2:** The new `local-overrides.yaml` target is not actually protected from being committed in consumer scaffolds.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Failure scenario:** A typical user runs guided Full-tier Copilot setup in a consumer repo and commits the generated files. Because the scaffold does not create or update any ignore rule, `ai_router/local-overrides.yaml` appears as an untracked file and can be committed, recreating the same API-key-only teammate/fresh-clone failure via the local override file.
+  - **Details:** **Violation:** the remediation depends on the seat choice being in ignored, per-machine `local-overrides.yaml`; the UI says it is “in your `.gitignore`” and “never get pushed.” **Impact:** a committed `local-overrides.yaml` with `transport.profile: copilot-cli` makes fresh/API-key-only clones skip API-key validation and require the ignored catalog lockfile. **Evidence:** `performCopilotSeatSetup` creates `ai_router/local-overrides.yaml` when missing, but `renderConsumerBootstrap` emits no `.gitignore`, `scaffoldConsumerRepo` only writes the rendered bootstrap files/markers, and a fresh repo reports `?? ai_router/local-overrides.yaml` with `git check-ignore` exit `1`. Ensure the scaffold/seat setup writes an ignore rule before creating the local file, or stop claiming it is ignored and warn/block when it is not.

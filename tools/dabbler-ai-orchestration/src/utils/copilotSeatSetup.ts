@@ -50,13 +50,13 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { ROUTER_CONFIG_REL } from "./aiRouterInstall";
+import { LOCAL_OVERRIDES_REL } from "./aiRouterInstall";
 
 /** Where the refresh writes the seat-scoped lockfile, relative to the
  * project root. Mirrors `copilot_catalog.DEFAULT_LOCKFILE_PATH` (the
  * spawn runs with `cwd: projectDir` and leaves `--out` at its default,
  * per the pinned invocation) and `transports.copilot-cli.lockfile` in
- * the seeded router-config.yaml — all three must agree. */
+ * the seeded local-overrides.yaml — all three must agree. */
 export const CATALOG_LOCKFILE_REL = path.posix.join(
   "ai_router",
   "copilot-catalog.lock",
@@ -239,6 +239,10 @@ function locateTransportProfile(text: string): ProfileLocation | null {
   return null;
 }
 
+function hasTopLevelTransportBlock(text: string): boolean {
+  return /^transport:[ \t]*(?:#.*)?$/m.test(text);
+}
+
 export type RenderProfileResult =
   | { ok: true; text: string; changed: boolean }
   | { ok: false; reason: string };
@@ -265,7 +269,7 @@ export function renderTransportProfile(
       ok: false,
       reason:
         "no `transport:` block with a `profile:` field was found in " +
-        "router-config.yaml (the seeded template shape this write expects)",
+        "local-overrides.yaml (the seeded template shape this write expects)",
     };
   }
   if (loc.value === profile) return { ok: true, text: configText, changed: false };
@@ -307,7 +311,7 @@ const nodeSeedReadOps: SeedReadOps = {
 /**
  * The durable seat-profile seed source (S1 close-out note: "Session 2
  * creates the durable source alongside the transport.profile template
- * write"): the workspace `ai_router/router-config.yaml`'s
+ * write"): the workspace `ai_router/local-overrides.yaml`'s
  * `transport.profile` value. Tolerant like the marker readers — a
  * missing file, unreadable file, absent block, or unrecognized value
  * all read as null (the form falls back to its volatile default);
@@ -317,7 +321,7 @@ export function readTransportProfile(
   root: string,
   ops: SeedReadOps = nodeSeedReadOps,
 ): TransportProfile | null {
-  const abs = path.join(root, ROUTER_CONFIG_REL);
+  const abs = path.join(root, LOCAL_OVERRIDES_REL);
   if (!ops.exists(abs)) return null;
   let text: string;
   try {
@@ -459,7 +463,7 @@ export interface SeatSetupFileOps {
   removeRecursive(absPath: string): void;
   /** Atomic replace (S3, S2-residual): when present, the config write
    * goes through temp-file + rename so a mid-write crash can never leave
-   * a truncated router-config.yaml. Optional so existing structural
+   * a truncated local-overrides.yaml. Optional so existing structural
    * satisfiers (and older test fakes) keep compiling; absent, the write
    * falls back to the plain (non-atomic) writeFile. */
   rename?(oldAbsPath: string, newAbsPath: string): void;
@@ -741,7 +745,7 @@ export const CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
  * The config write, atomically when the ops support it (S3, the named S2
  * residual): stage the full new content in a sibling temp file, then
  * rename over the target — a PROCESS crash between the write and the
- * rename leaves the original router-config.yaml intact (plus an orphaned
+ * rename leaves the original local-overrides.yaml intact (plus an orphaned
  * temp), never a truncated config. (The guarantee is process-crash
  * atomic-replacement; sudden power loss without an fsync is out of scope
  * — S3 review finding 5, scoped deliberately.) When the injected ops
@@ -865,7 +869,7 @@ export interface SeatSetupMessage {
  * S1 discovery supplementary Major (Set 097): this used to be a
  * copy-pasteable `python -m ai_router.copilot_catalog --refresh …`
  * command — but that CLI invocation only refreshes the seat-scoped
- * lockfile (copilot_catalog.py has no knowledge of router-config.yaml at
+ * lockfile (copilot_catalog.py has no knowledge of local-overrides.yaml at
  * all); it never invokes performCopilotSeatSetup, so transport.profile
  * was NEVER promoted and the persistent "unconfirmed" note NEVER cleared,
  * no matter how many providers the refresh confirmed. The instruction now
@@ -913,7 +917,7 @@ export function describeSeatSetupOutcome(
         message:
           `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models ` +
           `confirmed (providers: ${outcome.providers.join(", ")}). ` +
-          "transport.profile: copilot-cli written to ai_router/router-config.yaml.",
+          "transport.profile: copilot-cli written to ai_router/local-overrides.yaml.",
       };
     case "insufficient-providers": {
       // Reason-specific guidance: zero confirmations means the CLI never
@@ -936,7 +940,7 @@ export function describeSeatSetupOutcome(
         message:
           `Copilot seat setup completed, but only ${outcome.providers.length} ` +
           `distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) — ` +
-          "routed dispatch would fail closed, so router-config.yaml keeps " +
+          "routed dispatch would fail closed, so local-overrides.yaml keeps " +
           `transport.profile: api. ${cause}` +
           (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) +
           "The probe lockfile was kept for inspection at " +
@@ -947,11 +951,11 @@ export function describeSeatSetupOutcome(
       return {
         level: "warning",
         message: providerKeysPresent
-          ? `Copilot seat setup failed: ${outcome.detail}. router-config.yaml ` +
+          ? `Copilot seat setup failed: ${outcome.detail}. local-overrides.yaml ` +
             `keeps transport.profile: api, and ${keyed}. To use the Copilot ` +
             `seat instead, fix the cause first. ${rerun}`
           : `Scaffold completed, but the Copilot seat setup did not: ` +
-            `${outcome.detail}. router-config.yaml keeps transport.profile: ` +
+            `${outcome.detail}. local-overrides.yaml keeps transport.profile: ` +
             `api, and ${keyless}. Fix the cause, then: ${rerun}`,
       };
     case "cancelled":
@@ -959,7 +963,7 @@ export function describeSeatSetupOutcome(
         level: "warning",
         message:
           "Copilot seat setup was cancelled — the lockfile was restored to " +
-          "its pre-run state and router-config.yaml keeps " +
+          "its pre-run state and local-overrides.yaml keeps " +
           "transport.profile: api. " +
           (providerKeysPresent
             ? `Meanwhile ${keyed}. `
@@ -972,7 +976,7 @@ export function describeSeatSetupOutcome(
         message:
           `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) ` +
           "and the lockfile is in place, but writing transport.profile to " +
-          `ai_router/router-config.yaml failed: ${outcome.detail}. Set ` +
+          `ai_router/local-overrides.yaml failed: ${outcome.detail}. Set ` +
           "`profile: copilot-cli` under the `transport:` block in that file " +
           "by hand — no re-probe is needed. Until then " +
           (providerKeysPresent
@@ -1014,9 +1018,11 @@ function outputTail(s: string): string {
 
 /**
  * The whole guided seat-setup step. Decides usability from the refresh's
- * PARSED result (never the exit code); on ≥2 distinct confirmed
- * providers renders `transport.profile: copilot-cli` into the workspace
- * router-config.yaml via the anchored template replacement above.
+ * PARSED result (never the exit code); on >=2 distinct confirmed
+ * providers writes `transport.profile: copilot-cli` into the workspace
+ * local-overrides.yaml, creating or extending that local file when needed
+ * and using the anchored template replacement when the profile already
+ * exists.
  */
 export async function performCopilotSeatSetup(
   deps: RunCatalogRefreshDeps,
@@ -1058,19 +1064,38 @@ export async function performCopilotSeatSetup(
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path.join(deps.projectDir, ROUTER_CONFIG_REL);
+      const configAbs = path.join(deps.projectDir, LOCAL_OVERRIDES_REL);
       if (!deps.fileOps.exists(configAbs)) {
-        return {
-          kind: "config-write-failed",
-          providers: distinct,
-          detail: `${ROUTER_CONFIG_REL} is missing from the workspace`,
-        };
+        writeConfigAtomically(
+          deps.fileOps,
+          configAbs,
+          "transport:\n  profile: copilot-cli\n",
+        );
+        return { kind: "success", ...base };
       }
       try {
-        const rendered = renderTransportProfile(
-          deps.fileOps.readFile(configAbs),
-          "copilot-cli",
-        );
+        const text = deps.fileOps.readFile(configAbs);
+        const loc = locateTransportProfile(text);
+        if (!loc) {
+          if (hasTopLevelTransportBlock(text)) {
+            const rendered = renderTransportProfile(text, "copilot-cli");
+            return {
+              kind: "config-write-failed",
+              providers: distinct,
+              detail: rendered.ok
+                ? "transport.profile could not be located for replacement"
+                : rendered.reason,
+            };
+          }
+          const newText =
+            text +
+            (text.endsWith("\n") ? "" : "\n") +
+            "transport:\n  profile: copilot-cli\n";
+          writeConfigAtomically(deps.fileOps, configAbs, newText);
+          return { kind: "success", ...base };
+        }
+
+        const rendered = renderTransportProfile(text, "copilot-cli");
         if (!rendered.ok) {
           return {
             kind: "config-write-failed",

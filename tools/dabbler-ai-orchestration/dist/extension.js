@@ -15767,6 +15767,7 @@ var path4 = __toESM(require("path"));
 var PYPI_PACKAGE_NAME = "dabbler-ai-router";
 var REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
 var ROUTER_CONFIG_REL = path4.posix.join("ai_router", "router-config.yaml");
+var LOCAL_OVERRIDES_REL = path4.posix.join("ai_router", "local-overrides.yaml");
 var INSTALL_METHOD_REL = path4.posix.join(".dabbler", "install-method");
 var GITHUB_CHECKOUT_REL = path4.posix.join(".dabbler", "ai-router-src");
 var DEFAULT_GITHUB_REF = "<latest released tag>";
@@ -17470,12 +17471,15 @@ function locateTransportProfile(text) {
   }
   return null;
 }
+function hasTopLevelTransportBlock(text) {
+  return /^transport:[ \t]*(?:#.*)?$/m.test(text);
+}
 function renderTransportProfile(configText, profile) {
   const loc = locateTransportProfile(configText);
   if (!loc) {
     return {
       ok: false,
-      reason: "no `transport:` block with a `profile:` field was found in router-config.yaml (the seeded template shape this write expects)"
+      reason: "no `transport:` block with a `profile:` field was found in local-overrides.yaml (the seeded template shape this write expects)"
     };
   }
   if (loc.value === profile)
@@ -17505,7 +17509,7 @@ var nodeSeedReadOps = {
   }
 };
 function readTransportProfile(root, ops = nodeSeedReadOps) {
-  const abs = path10.join(root, ROUTER_CONFIG_REL);
+  const abs = path10.join(root, LOCAL_OVERRIDES_REL);
   if (!ops.exists(abs))
     return null;
   let text;
@@ -17732,29 +17736,29 @@ function describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) {
     case "success":
       return {
         level: "info",
-        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/router-config.yaml.`
+        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/local-overrides.yaml.`
       };
     case "insufficient-providers": {
       const cause = outcome.confirmed === 0 ? "No models responded at all \u2014 the Copilot CLI may be missing from PATH, not signed in, or blocked by policy. " : outcome.providers.length === 1 ? "This seat may expose only one provider family (an enterprise-managed seat can do this), in which case re-running will not change the result. " : "";
       return {
         level: "warning",
-        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so router-config.yaml keeps transport.profile: api. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
+        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so local-overrides.yaml keeps transport.profile: api. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
       };
     }
     case "refresh-failed":
       return {
         level: "warning",
-        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. router-config.yaml keeps transport.profile: api, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. router-config.yaml keeps transport.profile: api, and ${keyless}. Fix the cause, then: ${rerun}`
+        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. local-overrides.yaml keeps transport.profile: api, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. local-overrides.yaml keeps transport.profile: api, and ${keyless}. Fix the cause, then: ${rerun}`
       };
     case "cancelled":
       return {
         level: "warning",
-        message: "Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and router-config.yaml keeps transport.profile: api. " + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
+        message: "Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and local-overrides.yaml keeps transport.profile: api. " + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
       };
     case "config-write-failed":
       return {
         level: "warning",
-        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/router-config.yaml failed: ${outcome.detail}. Set \`profile: copilot-cli\` under the \`transport:\` block in that file by hand \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? "the router keeps running on the api profile with the DABBLER_* key(s) already set." : "the router is not yet functional (transport.profile is still api and no DABBLER_* provider key is set).")
+        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/local-overrides.yaml failed: ${outcome.detail}. Set \`profile: copilot-cli\` under the \`transport:\` block in that file by hand \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? "the router keeps running on the api profile with the DABBLER_* key(s) already set." : "the router is not yet functional (transport.profile is still api and no DABBLER_* provider key is set).")
       };
     default: {
       const unreachable = outcome;
@@ -17801,19 +17805,32 @@ async function performCopilotSeatSetup(deps) {
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path10.join(deps.projectDir, ROUTER_CONFIG_REL);
+      const configAbs = path10.join(deps.projectDir, LOCAL_OVERRIDES_REL);
       if (!deps.fileOps.exists(configAbs)) {
-        return {
-          kind: "config-write-failed",
-          providers: distinct,
-          detail: `${ROUTER_CONFIG_REL} is missing from the workspace`
-        };
+        writeConfigAtomically(
+          deps.fileOps,
+          configAbs,
+          "transport:\n  profile: copilot-cli\n"
+        );
+        return { kind: "success", ...base };
       }
       try {
-        const rendered = renderTransportProfile(
-          deps.fileOps.readFile(configAbs),
-          "copilot-cli"
-        );
+        const text = deps.fileOps.readFile(configAbs);
+        const loc = locateTransportProfile(text);
+        if (!loc) {
+          if (hasTopLevelTransportBlock(text)) {
+            const rendered2 = renderTransportProfile(text, "copilot-cli");
+            return {
+              kind: "config-write-failed",
+              providers: distinct,
+              detail: rendered2.ok ? "transport.profile could not be located for replacement" : rendered2.reason
+            };
+          }
+          const newText = text + (text.endsWith("\n") ? "" : "\n") + "transport:\n  profile: copilot-cli\n";
+          writeConfigAtomically(deps.fileOps, configAbs, newText);
+          return { kind: "success", ...base };
+        }
+        const rendered = renderTransportProfile(text, "copilot-cli");
         if (!rendered.ok) {
           return {
             kind: "config-write-failed",
@@ -31261,6 +31278,16 @@ var LOCAL_OVERRIDES_SCHEMA = {
   type: "object",
   additionalProperties: false,
   properties: {
+    transport: {
+      type: "object",
+      additionalProperties: false,
+      properties: {
+        profile: {
+          type: "string",
+          enum: ["api", "copilot-cli"]
+        }
+      }
+    },
     routing: {
       type: "object",
       additionalProperties: false,

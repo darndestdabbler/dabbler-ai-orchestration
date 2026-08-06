@@ -21,6 +21,7 @@ import * as path from "path";
 export const PYPI_PACKAGE_NAME = "dabbler-ai-router";
 export const REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
 export const ROUTER_CONFIG_REL = path.posix.join("ai_router", "router-config.yaml");
+export const LOCAL_OVERRIDES_REL = path.posix.join("ai_router", "local-overrides.yaml");
 export const INSTALL_METHOD_REL = path.posix.join(".dabbler", "install-method");
 /**
  * Persistent location for the GitHub-path sparse checkout. Editable

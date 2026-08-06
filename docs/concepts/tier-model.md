@@ -265,7 +265,7 @@ zero typing) as a cancellable progress notification, parses the
 refresh's actual confirmed-provider result rather than its exit code,
 and only when the seat confirms at least two distinct provider families
 renders `transport.profile: copilot-cli` into
-`ai_router/router-config.yaml`. If seat setup fails and no `DABBLER_*`
+`ai_router/local-overrides.yaml`. If seat setup fails and no `DABBLER_*`
 key is present, the form says plainly that the scaffold completed but
 the router is **not yet functional**, with reason-specific guidance and
 the re-run command (re-run the refresh from the scaffolded `.venv`; no
@@ -273,7 +273,7 @@ re-scaffold is needed). `api` is offered as a working fallback only
 when `DABBLER_*` keys are actually present.
 
 **Activation (manual, the fallback path):** set `transport.profile:
-copilot-cli` in `ai_router/router-config.yaml` (default is `api`, the
+copilot-cli` in `ai_router/local-overrides.yaml` (default is `api`, the
 unchanged direct-HTTPS path) and build the seat's local model catalog —
 run `python -m ai_router.copilot_catalog --refresh` to discover the
 seat's dispatchable models and write `ai_router/copilot-catalog.lock`.

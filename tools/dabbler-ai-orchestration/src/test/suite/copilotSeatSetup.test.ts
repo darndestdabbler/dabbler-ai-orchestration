@@ -359,7 +359,7 @@ suite("copilotSeatSetup", () => {
 
   suite("readTransportProfile", () => {
     const projectRoot = "/proj";
-    const configPath = path.join(projectRoot, "ai_router", "router-config.yaml");
+    const configPath = path.join(projectRoot, "ai_router", "local-overrides.yaml");
 
     test("reads api", () => {
       const ops = new FakeFileOps();
@@ -753,7 +753,7 @@ suite("copilotSeatSetup", () => {
     let cancellation: FakeCancellation;
 
     const projectDir = "/project";
-    const configPath = path.join(projectDir, "ai_router", "router-config.yaml");
+    const configPath = path.join(projectDir, "ai_router", "local-overrides.yaml");
     const baseConfig = "transport:\n  profile: api   # api | copilot-cli\n";
 
     setup(() => {
@@ -807,21 +807,34 @@ suite("copilotSeatSetup", () => {
       assert.strictEqual(fileOps.readFile(configPath), baseConfig);
     });
 
-    test("config-write-failed: config file missing (refresh itself succeeded)", async () => {
+    test("success: creates local-overrides.yaml when it is missing", async () => {
       fileOps.files.delete(configPath);
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
       const outcome = await promise;
 
-      assert.strictEqual(outcome.kind, "config-write-failed");
-      if (outcome.kind === "config-write-failed") {
-        assert.ok(outcome.detail.includes("missing from the workspace"));
-        assert.deepStrictEqual(outcome.providers, ["a", "b"]);
-      }
+      assert.strictEqual(outcome.kind, "success");
+      assert.strictEqual(
+        fileOps.readFile(configPath),
+        "transport:\n  profile: copilot-cli\n",
+      );
     });
 
-    test("config-write-failed: anchor missing in the config", async () => {
-      fileOps.files.set(configPath, "wrong: shape\n");
+    test("success: appends transport block when local-overrides has no transport block", async () => {
+      fileOps.files.set(configPath, "routing:\n  outsourcing_mode: disabled\n");
+      const promise = performCopilotSeatSetup(deps);
+      closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      const outcome = await promise;
+
+      assert.strictEqual(outcome.kind, "success");
+      assert.strictEqual(
+        fileOps.readFile(configPath),
+        "routing:\n  outsourcing_mode: disabled\ntransport:\n  profile: copilot-cli\n",
+      );
+    });
+
+    test("config-write-failed: transport block exists without profile", async () => {
+      fileOps.files.set(configPath, "transport:\n  diagnostics: true\n");
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
       const outcome = await promise;
@@ -937,7 +950,7 @@ suite("copilotSeatSetup", () => {
     const rerunHint = 'run "Dabbler: Set Up Copilot Seat" from the Command Palette';
     const projectDir =
       process.platform === "win32" ? "C:\\Users\\test\\project" : "/home/test/project";
-    const configRel = path.join("ai_router", "router-config.yaml");
+    const configRel = path.join("ai_router", "local-overrides.yaml");
     const configAbs = path.join(projectDir, configRel);
     const baseConfigContent = "transport:\n  profile: api\n";
 
@@ -969,7 +982,7 @@ suite("copilotSeatSetup", () => {
         test("message is level:info, identical for keyed/keyless states", () => {
           const expected =
             "Copilot seat set up: 10/12 models confirmed (providers: p1, p2). " +
-            "transport.profile: copilot-cli written to ai_router/router-config.yaml.";
+            "transport.profile: copilot-cli written to ai_router/local-overrides.yaml.";
           const msgKeyless = describeSeatSetupOutcome(outcome, false, rerunHint);
           assert.strictEqual(msgKeyless.level, "info");
           assert.strictEqual(msgKeyless.message, expected);

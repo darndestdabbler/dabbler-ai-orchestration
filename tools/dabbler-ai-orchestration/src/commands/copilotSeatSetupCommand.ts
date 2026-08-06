@@ -7,7 +7,7 @@
 // deriveCopilotSeatChosenUnconfirmed) told the operator to re-run
 // `python -m ai_router.copilot_catalog --refresh ...` — but that bare CLI
 // invocation only refreshes the seat-scoped lockfile; it never invokes
-// performCopilotSeatSetup, so router-config.yaml's transport.profile is
+// performCopilotSeatSetup, so local-overrides.yaml's transport.profile is
 // NEVER promoted and the note NEVER clears. Worse, the Build action (the
 // only OTHER path to performCopilotSeatSetup) only renders while the
 // Getting Started form is showing — once the workspace has any session

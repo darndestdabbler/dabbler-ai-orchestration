@@ -179,6 +179,18 @@ alternative was not possible.
   they are written. On the current path this means root-level
   `sN-verification*.md`; legacy `session-reviews/` files remain read-only if
   encountered.
+- **Propagate a consistency fix to every echo before re-verifying.** The same
+  claim echoes in summary tables, body prose, per-row cells and quoting
+  artifacts; grep the *old* phrasing and fix every echo in one pass, or each
+  survivor costs another round. Applies to the cross-round issue ledger too.
+  Promoted from L-065-1 at Set 110 (27 sets).
+- **Grade verification severity by CONSEQUENCE.** Probability the stated failure
+  scenario hits a real user × impact on the deliverable. Low probability **or**
+  low impact is Minor even when technically correct; no nameable failure
+  scenario is a nit. Ungraded loops do not converge. Carry the rubric in each
+  round's conventions block until it ships in
+  `ai_router/prompt-templates/verification.md`. Promoted from L-095-1 at Set 110
+  (9 sets).
 - Log every AI-led session step in the active session set.
 - AI instruction documents (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) reference
   this file and `docs/ai-led-session-workflow.md` so future agent runs inherit
@@ -233,6 +245,16 @@ alternative was not possible.
   to `docs/planning/lessons-learned.md`.
 
 ### Build and Test
+
+- **Any session touching Explorer-rendering surfaces, state-file writers, the
+  extension MANIFEST, or the fixture harness runs the full
+  `npm run test:playwright` locally before close — after its last code change.**
+  Both halves bind: never start an expensive run you are about to invalidate,
+  **and** run it once at close after the final edit. Targeted re-runs of the
+  specs you think you touched are not a substitute. `package.json` counts as
+  product: no build, typecheck or unit test reads a manifest icon. When CI is
+  red, CANCELLED jobs are unknown coverage, not passing coverage. Promoted from
+  L-064-12 at Set 110 (14 sets), manifest clause added by Set 110.
 
 > **TODO:** Add build and test commands, gating rules, and CI/CD expectations.
 > Example (harvester): `dotnet build && dotnet test` (sequential, not parallel,

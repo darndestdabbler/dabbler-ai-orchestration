@@ -757,3 +757,62 @@ each id is in the active tier (D2: one id, one trailer).
   the admission test's "no executable-gate equivalent" criterion does not hold
   for the active tier. The diagnostic wisdom above is situational; search here
   at that trigger moment.
+
+## Propagate A Consistency Fix To Every Echo Before Re-Verifying
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="110" status="archived" scope="portable" -->
+
+- A consistency finding is rarely local: the same claim echoes in the
+  summary table, body prose, per-row cells, and the bottom line, and each
+  missed echo costs another verification round (Set 065 spent two rounds
+  chasing residual echoes). After fixing, grep the document for the key
+  phrases of the *old* claim and update every echo in one pass before
+  re-verifying. The same discipline applies to the cross-round issue
+  ledger.
+
+**Promoted at Set 110 Step 9** after 27 sets cited it — the most-cited lesson in
+the file. Set 110 Session 4 hit it twice more in one session: round 3 found the
+walk evidence still claiming the activity-bar contrast finding was "fixed" after
+round 2 withdrew that claim in the same file's later paragraphs, and round 8
+found the same file still quoting an 8.0m Layer 3 run after the run of record had
+become 11.3m. The canonical rule now lives in `project-guidance.md`.
+
+## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="110" status="archived" scope="portable" -->
+
+- Reviewers are salience-limited, not context-limited: each pass returns
+  the most salient handful of technically-real findings, and fixing them
+  reshuffles salience for the next (Set 095: 17 rounds, 39 fresh Majors,
+  zero disputed, no convergence). Grade severity by CONSEQUENCE —
+  probability the stated failure scenario materializes for a real user ×
+  impact on the deliverable's objectives; low-probability OR low-impact
+  is Minor even when technically correct; no plausible failure scenario
+  => Minor by definition. The first rubric-graded round returned VERIFIED.
+  Until the rubric ships in the verification template, carry it in each
+  round's up-front conventions block.
+
+**Promoted at Set 110 Step 9** after 9 sets cited it. The carry-it-by-hand
+instruction is still live: the rubric has not shipped in
+`ai_router/prompt-templates/verification.md`, so Set 110 S4 carried it in
+`s4-conventions.md` for every round. The canonical rule now lives in
+`project-guidance.md`.
+
+## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="110" status="archived" scope="repo-specific" -->
+
+- The Layer-3 Playwright suite is the only gate that exercises the real
+  webview, and a test layer nobody runs rots silently — five rot families
+  accumulated while the workflow was never green, and fail-fast then hid
+  both the OS-independent rot and a Linux-only env bug. Any session that
+  changes Explorer-rendering surfaces, the state-file writers, or the
+  fixture harness runs `npm run test:playwright` locally before close.
+  When CI is red, treat CANCELLED jobs as unknown coverage, not passing
+  coverage — and fix a red workflow in-flight rather than letting a
+  standing failure re-accumulate.
+
+**Promoted at Set 110 Step 9** after 14 sets cited it, and broadened on the way:
+Set 110 S4 proved the extension MANIFEST belongs in the trigger list. Its
+`package.json` edit landed after the last full Layer 3 run and set
+`contributes.viewsContainers.icon` to an object, which VS Code rejects outright
+— dropping the entire activity-bar container — and it reached a staged VSIX
+because no build, typecheck or unit test reads a manifest icon. The canonical
+rule, with the manifest clause, now lives in `project-guidance.md`.

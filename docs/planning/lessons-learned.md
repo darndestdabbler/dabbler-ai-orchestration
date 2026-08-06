@@ -49,6 +49,26 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 | L-070-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (iterative dogfood is evidence) |
 | L-079-3 | `project-guidance.md` -> Conventions -> Workflow Expectations (dogfood the true cold start) |
 
+## Promoted lessons (Set 110 Step 9)
+<!-- lesson-pointer: archived-set="110" -->
+
+Set 110's Step 9 promoted three lessons whose citation counts had long since
+passed the two-context bar — 27, 14 and 9 sets respectively. Their canonical
+rules now live in `project-guidance.md`, which is also loaded at every session
+start, so the active-tier copies were pure redundancy. Full text moved to
+`lessons-archive.md` (never deleted; reactivated by `cite_lessons`).
+
+| id | rule now lives in |
+| :--- | :--- |
+| L-065-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (propagate a consistency fix to every echo) |
+| L-095-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (grade severity by consequence) |
+| L-064-12 | `project-guidance.md` -> Conventions -> Build and Test (Explorer / state-writer / fixture / **manifest** changes run full Layer 3 before close) |
+
+L-064-12 was **broadened** on promotion: Set 110 S4 proved the extension
+manifest belongs in the trigger list, after a `package.json` edit that landed
+after the last full Layer 3 run reached a staged VSIX carrying an icon shape VS
+Code rejects outright.
+
 ## Archived lessons (Set 085 preload triage)
 <!-- lesson-pointer: archived-set="085" -->
 
@@ -115,16 +135,6 @@ full text in `lessons-archive.md`:
   generating diff-based evidence, or include `git status --short`
   alongside the diff so additions are visible.
 
-## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="110" status="active" scope="portable" -->
-
-- A consistency finding is rarely local: the same claim echoes in the
-  summary table, body prose, per-row cells, and the bottom line, and each
-  missed echo costs another verification round (Set 065 spent two rounds
-  chasing residual echoes). After fixing, grep the document for the key
-  phrases of the *old* claim and update every echo in one pass before
-  re-verifying. The same discipline applies to the cross-round issue
-  ledger.
 
 ## A Dependency-Pin Bump Is Not Enablement
 <!-- lesson: id="L-075-1" added-set="075" last-used-set="084" status="active" scope="portable" -->
@@ -137,33 +147,13 @@ full text in `lessons-archive.md`:
   imports and parses the exact args the downstream step will pass. Record
   the resolved installed version at close, not just the declared floor.
 
-## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="110" status="active" scope="portable" -->
-
-- Reviewers are salience-limited, not context-limited: each pass returns
-  the most salient handful of technically-real findings, and fixing them
-  reshuffles salience for the next (Set 095: 17 rounds, 39 fresh Majors,
-  zero disputed, no convergence). Grade severity by CONSEQUENCE —
-  probability the stated failure scenario materializes for a real user ×
-  impact on the deliverable's objectives; low-probability OR low-impact
-  is Minor even when technically correct; no plausible failure scenario
-  ⇒ Minor by definition. The first rubric-graded round returned VERIFIED.
-  Until the rubric ships in the verification template, carry it in each
-  round's up-front conventions block.
 
 ---
 
 ## Repo-Specific Lessons
 
-## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="110" status="active" scope="repo-specific" -->
-
-- The Layer-3 Playwright suite is the only gate that exercises the real
-  webview, and a test layer nobody runs rots silently — five rot families
-  accumulated while the workflow was never green, and fail-fast then hid
-  both the OS-independent rot and a Linux-only env bug. Any session that
-  changes Explorer-rendering surfaces, the state-file writers, or the
-  fixture harness runs `npm run test:playwright` locally before close.
-  When CI is red, treat CANCELLED jobs as unknown coverage, not passing
-  coverage — and fix a red workflow in-flight rather than letting a
-  standing failure re-accumulate.
+> _No repo-specific lessons are currently in the active tier._ L-064-12
+> (Explorer / state-writer / fixture / **manifest** changes run the full
+> Layer 3 locally before close, after the last code change) was promoted at
+> Set 110 Step 9 to `project-guidance.md` -> Conventions -> Build and Test;
+> its full text is in `lessons-archive.md`.

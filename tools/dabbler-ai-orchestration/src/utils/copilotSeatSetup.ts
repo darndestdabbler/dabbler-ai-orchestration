@@ -725,13 +725,18 @@ export const LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
  * promises it is ignored, which is the defect this exists to prevent. Negation
  * (`!`) lines are ignored as coverage for the same reason — a re-include means
  * NOT covered.
+ *
+ * Round 7 nit: `/local-overrides.yaml` is NOT in the set. A leading slash
+ * anchors the pattern to the repository root, so it matches a root-level file
+ * of that name and never the one under `ai_router/` — counting it would have
+ * been exactly the false positive this comment warns about. `local-overrides.yaml`
+ * (no slash at all) DOES match at any depth, which is why it stays.
  */
 export function isLocalOverridesIgnored(gitignoreText: string): boolean {
   const covering = new Set([
     LOCAL_OVERRIDES_REL,
     `/${LOCAL_OVERRIDES_REL}`,
     "local-overrides.yaml",
-    "/local-overrides.yaml",
     "**/local-overrides.yaml",
   ]);
   return gitignoreText

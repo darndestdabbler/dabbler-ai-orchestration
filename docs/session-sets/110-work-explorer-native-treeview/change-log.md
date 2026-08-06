@@ -28,8 +28,8 @@
 - Copilot seat preflight: passed; catalog refreshed with 11/18 models across
   Anthropic, Google, and OpenAI.
 - TypeScript typecheck: passed.
-- Layer 2: 1,883 passing, 1 pending.
-- Layer 3: 33/33 passed in 7.9 minutes on the final release-of-record run,
+- Layer 2: 1,886 passing, 1 pending.
+- Layer 3: 33/33 passed in 11.3 minutes on the final release-of-record run,
   taken after the last code change.
 - First full Layer 3 attempt: 32/33; the single failure was the performance
   fixture timing out while constructing 500 sets through hundreds of separate

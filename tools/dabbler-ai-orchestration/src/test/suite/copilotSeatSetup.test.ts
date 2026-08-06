@@ -1372,6 +1372,11 @@ suite("copilotSeatSetup", () => {
         "local-overrides",
         "ai_router/local-overrides.yml",
         "!ai_router/local-overrides.yaml",
+        // Round 7 nit: a leading slash anchors to the REPO ROOT, so this
+        // matches a root-level local-overrides.yaml and never the one under
+        // ai_router/. Counting it would be the false positive this suite
+        // exists to rule out.
+        "/local-overrides.yaml",
         "",
       ]) {
         assert.strictEqual(

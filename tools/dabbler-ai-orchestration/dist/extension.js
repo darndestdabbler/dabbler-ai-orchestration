@@ -17685,7 +17685,6 @@ function isLocalOverridesIgnored(gitignoreText) {
     LOCAL_OVERRIDES_REL,
     `/${LOCAL_OVERRIDES_REL}`,
     "local-overrides.yaml",
-    "/local-overrides.yaml",
     "**/local-overrides.yaml"
   ]);
   return gitignoreText.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")).some((line) => covering.has(line));
@@ -32484,6 +32483,21 @@ ${msgs}`,
       writeAtomic("budget.yaml", this._loaded.budgetPath, pending["budget.yaml"]);
     }
     if (pending["local-overrides.yaml"] !== void 0) {
+      const workspaceRoot2 = path36.dirname(path36.dirname(this._loaded.localOverridesPath));
+      const ignored = ensureLocalOverridesIgnored(
+        {
+          exists: (p2) => fs31.existsSync(p2),
+          readFile: (p2) => fs31.readFileSync(p2, "utf8"),
+          writeFile: (p2, c3) => fs31.writeFileSync(p2, c3, "utf8"),
+          removeRecursive: (p2) => fs31.rmSync(p2, { recursive: true, force: true })
+        },
+        workspaceRoot2
+      );
+      if (!ignored.ok) {
+        vscode33.window.showWarningMessage(
+          `Saving ${LOCAL_OVERRIDES_REL}, but could not confirm it is git-ignored (${ignored.reason}). Add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing \u2014 these are per-machine settings.`
+        );
+      }
       writeAtomic("local-overrides.yaml", this._loaded.localOverridesPath, pending["local-overrides.yaml"]);
     }
     if (failed.length > 0 && succeeded.length > 0) {

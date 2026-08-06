@@ -19,6 +19,11 @@ import {
 import { resolvePythonInterpreter } from "../utils/pythonInterpreter";
 import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 import {
+  LOCAL_OVERRIDES_IGNORE_RULE,
+  ensureLocalOverridesIgnored,
+} from "../utils/copilotSeatSetup";
+import { LOCAL_OVERRIDES_REL } from "../utils/aiRouterInstall";
+import {
   isAiRouterNotInstalled,
   describeAiRouterImportFailure,
 } from "../utils/aiRouterInstall";
@@ -422,6 +427,37 @@ export class ConfigEditorPanel {
       writeAtomic("budget.yaml", this._loaded.budgetPath, pending["budget.yaml"]);
     }
     if (pending["local-overrides.yaml"] !== undefined) {
+      // Set 110 S4 round 7: this is the SECOND path that creates
+      // `ai_router/local-overrides.yaml`, and round 6 only guarded the first
+      // (`Dabbler: Set Up Copilot Seat`). The summary section above the editor
+      // tells the operator this file "is in `.gitignore` by design" and that
+      // values in it "never get pushed" — so creating it here without the rule
+      // recreates the same shared-state contamination through a different
+      // door. Guaranteed BEFORE the write, so the file never exists in an
+      // un-ignored state.
+      //
+      // The root is derived from the target rather than held as new state:
+      // localOverridesPath is always `<root>/ai_router/local-overrides.yaml`.
+      const workspaceRoot = path.dirname(path.dirname(this._loaded.localOverridesPath));
+      const ignored = ensureLocalOverridesIgnored(
+        {
+          exists: (p: string) => fs.existsSync(p),
+          readFile: (p: string) => fs.readFileSync(p, "utf8"),
+          writeFile: (p: string, c: string) => fs.writeFileSync(p, c, "utf8"),
+          removeRecursive: (p: string) => fs.rmSync(p, { recursive: true, force: true }),
+        },
+        workspaceRoot,
+      );
+      if (!ignored.ok) {
+        // Not fatal — the operator's edit is still theirs to save — but the
+        // promise the UI makes is now false, and saying so is the difference
+        // between a warning and a lie.
+        vscode.window.showWarningMessage(
+          `Saving ${LOCAL_OVERRIDES_REL}, but could not confirm it is ` +
+            `git-ignored (${ignored.reason}). Add "${LOCAL_OVERRIDES_IGNORE_RULE}" ` +
+            "to .gitignore before committing — these are per-machine settings.",
+        );
+      }
       writeAtomic("local-overrides.yaml", this._loaded.localOverridesPath, pending["local-overrides.yaml"]);
     }
 

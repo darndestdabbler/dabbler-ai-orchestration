@@ -109,8 +109,22 @@ For a Copilot-only Full-tier setup, follow
 2. Run a real headless model probe.
 3. Run `copilot_preflight` through this clone's `.venv`.
 4. Refresh the seat-local catalog.
-5. Set `transport.profile: copilot-cli` only as an intentional project
-   configuration change.
+5. Select the seat transport **in `ai_router/local-overrides.yaml`**, which is
+   ignored:
+
+   ```yaml
+   transport:
+     profile: copilot-cli
+   ```
+
+**Do not put `transport.profile: copilot-cli` in
+`ai_router/router-config.yaml`.** That file is package data — `pyproject.toml`
+ships it in the wheel — so a seat-local profile committed there makes the router
+fail to load for every API-key-only consumer: it skips the API-key validation
+they need and then tries to read a `copilot-catalog.lock` that is deliberately
+never tracked. Set 110 S4 committed exactly that and the close-out backstop
+caught it; `transport.profile` became a supported local override in the same
+change, and `test_local_overrides_merge.py` now pins the shipped file to `api`.
 
 The catalog at `ai_router/copilot-catalog.lock` is deliberately ignored. It
 is probed per seat and must not be committed or shared as project truth. The
@@ -122,7 +136,7 @@ profile.
 | Item | Git status | Reason |
 | --- | --- | --- |
 | `pyproject.toml`, `pytest.ini` | Track | Reproducible Python metadata and test configuration |
-| `ai_router/router-config.yaml` | Track | Shared project routing policy |
+| `ai_router/router-config.yaml` | Track | Shared project routing policy — and package data, so it must stay on the `api` transport profile |
 | `ai_router/budget.yaml` | Track when the project uses it | Shared budget policy |
 | `ai_router/model-inventory.lock` | Track | Shared provider-model availability evidence |
 | `.venv/` | Ignore | Machine-specific interpreter and installed packages |

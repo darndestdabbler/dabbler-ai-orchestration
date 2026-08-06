@@ -9,12 +9,35 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [Unreleased] (Sets 105, 107, 109 — router-side changes awaiting a publish)
+## [Unreleased] (Sets 105, 107, 109, 110 — router-side changes awaiting a publish)
 
 > Router-side, not yet published. A version bump / PyPI publish is
 > operator-gated and recorded at release time.
 
 ### Added
+
+- **(Set 110 S4) `transport.profile` is a supported `local-overrides.yaml`
+  key.** The transport profile is a per-**seat** fact, but `router-config.yaml`
+  is package data (`pyproject.toml` ships it) and the profile had no local home,
+  so the only way to run on a Copilot seat was to edit and commit the tracked,
+  shipped file. Doing so makes the wheel unusable for API-key-only consumers:
+  the `copilot-cli` profile skips provider API-key validation and then requires
+  a `copilot-catalog.lock` that is deliberately never tracked. A seat now
+  selects its transport locally:
+
+  ```yaml
+  # ai_router/local-overrides.yaml  (gitignored)
+  transport:
+    profile: copilot-cli
+  ```
+
+  The override is merged **before** validation, so selecting `copilot-cli`
+  locally still has to satisfy the `transports.copilot-cli` block check — a
+  local override buys a different default, not a way around validation. Only
+  `transport.profile` is overridable; any other `transport.*` key is rejected
+  with the same Appendix B error as every other disallowed path. A test pins the
+  shipped `router-config.yaml` to `api` so the seat-local value cannot be
+  committed again.
 
 - **(Set 109 S1) `ai_router.model_inventory` — provider model enumeration and a
   registry drift gate.** `--refresh` probes OpenAI's, Anthropic's, and Google's

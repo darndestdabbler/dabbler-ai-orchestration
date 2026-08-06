@@ -80,7 +80,18 @@ providers:
 # seat-profile contract and its explicitly degraded guarantees (asserted
 # provider provenance, no billed-usage accounting).
 transport:
-  profile: copilot-cli   # api | copilot-cli
+  profile: api   # api | copilot-cli
+  # This is PACKAGE DATA (pyproject.toml ships this file), so it must carry the
+  # profile that works for a fresh install with provider API keys. A machine
+  # that runs on a Copilot seat sets its own profile in the gitignored
+  # ai_router/local-overrides.yaml instead:
+  #
+  #     transport:
+  #       profile: copilot-cli
+  #
+  # Set 110 S4 learned this the hard way: a seat-local `copilot-cli` was edited
+  # into this file and committed, which would have made the router fail to load
+  # for every API-key-only consumer of the wheel.
 
 # The copilot-cli profile's own settings. Only read/validated when
 # transport.profile == copilot-cli; otherwise inert. Roles are late-bound

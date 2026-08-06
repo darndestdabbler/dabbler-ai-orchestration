@@ -234,3 +234,73 @@ def test_unknown_top_level_key_warns_and_ignores(
     captured = capsys.readouterr()
     assert "unknown key" in captured.err.lower() or "unknown" in captured.err
     assert "some_unknown_key" not in cfg
+
+
+# ---------------------------------------------------------------------------
+# transport.profile — the seat-local override (Set 110 S4)
+# ---------------------------------------------------------------------------
+
+
+def test_local_transport_profile_overrides_shared(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A Copilot-seat machine selects its transport WITHOUT touching shared data.
+
+    The defect this closes: `router-config.yaml` is package data (pyproject
+    ships it), there was no supported local home for the profile, so the only
+    way to run on a seat was to edit and commit the tracked file — which would
+    make the router fail to load for every API-key-only consumer of the wheel.
+    """
+    rc = _setup_workspace(tmp_path, overrides_yaml="""\
+        transport:
+          profile: copilot-cli
+    """)
+    # The copilot-cli profile requires its transports block, so the minimal
+    # fixture would fail _validate_transport. Supply the block, which also
+    # proves the override is merged BEFORE validation rather than after.
+    rc.write_text(
+        rc.read_text(encoding="utf-8")
+        + textwrap.dedent("""\
+            transports:
+              copilot-cli:
+                lockfile: ai_router/copilot-catalog.lock
+                roles:
+                  generator: {}
+            """),
+        encoding="utf-8",
+    )
+    # No API key is set: the copilot-cli profile must skip the key check, and
+    # it can only do that if the override was applied before validation.
+    cfg = config_mod.load_config(str(rc))
+    assert cfg["transport"]["profile"] == "copilot-cli"
+
+
+def test_local_transport_unknown_key_is_rejected(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Only `profile` is overridable — the allow-list is not a whole section."""
+    rc = _setup_workspace(tmp_path, overrides_yaml="""\
+        transport:
+          some_other_knob: true
+    """)
+    with pytest.raises(ValueError, match="transport.some_other_knob"):
+        _load(rc, monkeypatch)
+
+
+def test_shipped_router_config_is_on_the_api_profile() -> None:
+    """The TRACKED, PACKAGED config must never carry a seat-local profile.
+
+    This is the regression itself, as a gate. Set 110 S4 committed
+    `transport.profile: copilot-cli` into the file `pyproject.toml` ships; the
+    close-out backstop caught it. A fresh wheel install with provider API keys
+    and no Copilot catalog would have failed to load.
+    """
+    import yaml
+
+    shipped = Path(config_mod.__file__).parent / "router-config.yaml"
+    raw = yaml.safe_load(shipped.read_text(encoding="utf-8"))
+    assert raw["transport"]["profile"] == "api", (
+        "ai_router/router-config.yaml is package data and must ship the `api` "
+        "profile. Put a seat-local `copilot-cli` in the gitignored "
+        "ai_router/local-overrides.yaml instead."
+    )

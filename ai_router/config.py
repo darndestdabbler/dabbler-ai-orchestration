@@ -604,6 +604,14 @@ def _deep_merge(base: dict, override: dict) -> dict:
 # Paths NOT in this set are rejected with a clear error.
 _LOCAL_OVERRIDE_ALLOWED: frozenset[str] = frozenset({
     "routing.outsourcing_mode",
+    # Set 110 S4: the transport profile is a per-SEAT fact, not a project fact.
+    # router-config.yaml is package data (pyproject.toml ships it), so a machine
+    # that runs on a Copilot seat used to have no way to say so except by
+    # editing the tracked, shipped config -- which is exactly how a seat-local
+    # `copilot-cli` ended up committed, where it would have made the router
+    # unusable for every API-key-only consumer of the wheel. The seat choice
+    # now has a supported local home instead.
+    "transport.profile",
     # Per-provider fields — expressed as "providers.<id>.<field>"
     # but validated dynamically by _apply_local_overrides.
     # Also allow local-only sections entirely:
@@ -679,6 +687,21 @@ def _apply_local_overrides(config: dict, path: Path) -> None:
                 "overrides are not in the Appendix B allowed set; ignored.",
                 file=sys.stderr,
             )
+
+        # --- transport (Set 110 S4) ---
+        # Merged BEFORE _validate_transport runs, so selecting `copilot-cli`
+        # locally still has to satisfy the transports.copilot-cli block check
+        # and still skips the provider API-key requirement. A local override
+        # buys a different default, not a way around validation.
+        elif key == "transport" and isinstance(value, dict):
+            for tk, tv in value.items():
+                full_path = f"transport.{tk}"
+                if full_path not in _LOCAL_OVERRIDE_ALLOWED:
+                    raise ValueError(
+                        f"local-overrides.yaml: '{full_path}' is not allowed "
+                        "as a local override per Appendix B."
+                    )
+                config.setdefault("transport", {})[tk] = tv
 
         # --- local-only sections (notifications, decision_review) ---
         elif key in ("notifications", "decision_review"):

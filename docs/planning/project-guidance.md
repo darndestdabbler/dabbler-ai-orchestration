@@ -172,69 +172,51 @@ alternative was not possible.
   contract (what is bumped, what is deliberately pending), and any
   by-design exclusions (e.g. a research/proposal set ships no production
   code). This keeps Round 1 focused on real defects instead of burning
-  findings — and re-verify rounds — on the agreed baseline. Promoted from
-  `lessons-learned.md` (L-064-10) on 2026-06-15 after confirming across
-  Sets 062–065.
+  findings — and re-verify rounds — on the agreed baseline. (L-064-10)
 - Save verifier output raw and never edit saved verification artifacts after
   they are written. On the current path this means root-level
   `sN-verification*.md`; legacy `session-reviews/` files remain read-only if
   encountered.
 - **Propagate a consistency fix to every echo before re-verifying.** The same
-  claim echoes in summary tables, body prose, per-row cells and quoting
-  artifacts; grep the *old* phrasing and fix every echo in one pass, or each
-  survivor costs another round. Applies to the cross-round issue ledger too.
-  Promoted from L-065-1 at Set 110 (27 sets).
+  claim echoes in summary tables, prose, per-row cells and quoting artifacts;
+  grep the *old* phrasing and fix every echo in one pass. (L-065-1)
 - **Grade verification severity by CONSEQUENCE.** Probability the stated failure
-  scenario hits a real user × impact on the deliverable. Low probability **or**
-  low impact is Minor even when technically correct; no nameable failure
-  scenario is a nit. Ungraded loops do not converge. Carry the rubric in each
-  round's conventions block until it ships in
-  `ai_router/prompt-templates/verification.md`. Promoted from L-095-1 at Set 110
-  (9 sets).
+  scenario hits a real user × impact. Low probability **or** low impact is
+  Minor; no nameable failure scenario is a nit. Carry the rubric in each round's
+  conventions block until it ships in the verification template. (L-095-1)
 - Log every AI-led session step in the active session set.
 - AI instruction documents (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) reference
-  this file and `docs/ai-led-session-workflow.md` so future agent runs inherit
-  the same durable expectations.
+  this file and `docs/ai-led-session-workflow.md` so future runs inherit the
+  same durable expectations.
 - **Session-state.json is the single source of truth for in-progress
   detection.** Call `register_session_start()` at Step 1 before the first
   `log_step()`, and `mark_session_complete()` at Step 8.
-- **Author `ai-assignment.md` and the next-orchestrator / next-session-set
+- **Author `ai-assignment.md` and next-orchestrator / next-session-set
   recommendations via routed analysis — never self-opine.**
 - **When a set's `pathAwareCritique` is `advisory` or `required`, run the
-  end-of-set Path-Aware Critique stage before the set-terminal close.** It is
-  a multi-provider (`>= 2` distinct providers), path-aware review — each critic
-  reads the repo itself rather than a pasted snippet — driven by the reusable
-  template `ai_router/prompt-templates/path-aware-critique.md` and saved raw as
+  end-of-set Path-Aware Critique stage before the set-terminal close.** A
+  multi-provider (`>= 2` distinct providers), path-aware review — each critic
+  reads the repo itself, not a pasted snippet — driven by
+  `ai_router/prompt-templates/path-aware-critique.md` and saved raw as
   `path-aware-critique.json`. On `required` the close-out gate enforces a valid
-  artifact (Set 066). It is orthogonal to per-session routed verification, which
-  it does not replace. Stage mechanics:
+  artifact (Set 066). Orthogonal to per-session routed verification. Mechanics:
   `docs/ai-led-session-workflow.md` → *The end-of-set Path-Aware Critique stage*.
-- **An iterative end-of-set dogfood keeps its own gate artifact "pre-fix" — frame it
-  as evidence, not a clean snapshot.** When a `required` path-aware critique (or any
-  end-of-set dogfood) enters a fix→re-run loop because each round keeps catching real
-  defects, do **not** chase a pristine post-fix re-run — the next round re-stales it,
-  a treadmill. Commit the **final round as the gate artifact**, record the lineage +
-  **per-finding adjudication** (fixed / false-positive / deferred-residual) in
-  `disposition.json`, and rely on the **cross-provider session verification** — a
-  different surface — for the authoritative `VERIFIED` verdict. Converge the dogfood
-  when a round drives **no new code change** (only characterizations / false-positives
-  / by-design), not when it finally returns a clean verdict; only a *new code defect*
-  justifies another round. Promoted from `lessons-learned.md` (L-070-1) on 2026-06-19
-  after application across Sets 070 (origin), 071, and 072 (the S4 path-aware dogfood
-  caught + fixed a real Major in the S3 aggregator, then converged on no-new-code).
-- **Any set shipping provisioning must dogfood the true cold start.** A dogfood
-  or UAT walk that starts from a partially-provisioned fixture validates the
-  steady state, not the first run — and provisioning code is exactly where
-  silent fail-open paths hide (the Set 079 config-seed defect survived three
-  verified sessions and a path-aware critique; only the operator's empty-folder
-  walk caught it). For any set shipping provisioning (scaffold, install, seed,
-  migrate-from-empty), at least one dogfood/UAT walk must begin from the exact
-  cold-start state — a fresh empty folder, no pre-seeded config — and assert
-  the provisioned artifacts exist (or are correctly absent) afterward; name the
-  cold-start walk explicitly in the spec's "Ends with" line. Promoted from
-  `lessons-learned.md` (L-079-3) on 2026-07-06 after instrumental application
-  across Sets 079 (origin), 081 (budget.yaml write-matrix walks), and 082
-  (marker-set walks).
+- **An iterative end-of-set dogfood keeps its own gate artifact "pre-fix" —
+  frame it as evidence, not a clean snapshot.** Do not chase a pristine post-fix
+  re-run; the next round re-stales it. Commit the **final round** as the gate
+  artifact, record lineage + per-finding adjudication (fixed / false-positive /
+  deferred-residual) in `disposition.json`, and let cross-provider session
+  verification own the authoritative verdict. Converge when a round drives **no
+  new code change**, not when it returns a clean one. (L-070-1; full text and
+  the Sets 070–072 evidence in `lessons-archive.md`)
+- **Any set shipping provisioning must dogfood the true cold start.** A walk
+  starting from a partially-provisioned fixture validates the steady state, not
+  the first run, and provisioning is exactly where silent fail-open paths hide.
+  For any set shipping provisioning (scaffold, install, seed, migrate-from-
+  empty), at least one dogfood/UAT walk must begin from a fresh empty folder
+  with no pre-seeded config, assert the provisioned artifacts exist (or are
+  correctly absent), and be named in the spec's "Ends with" line. (L-079-3; full
+  text and the Sets 079–082 evidence in `lessons-archive.md`)
 - **Obey the spec's Session Set Configuration block at runtime.** Rules are
   conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
   re-litigate those flags during a session — if a flag is wrong, surface it
@@ -249,12 +231,10 @@ alternative was not possible.
 - **Any session touching Explorer-rendering surfaces, state-file writers, the
   extension MANIFEST, or the fixture harness runs the full
   `npm run test:playwright` locally before close — after its last code change.**
-  Both halves bind: never start an expensive run you are about to invalidate,
-  **and** run it once at close after the final edit. Targeted re-runs of the
-  specs you think you touched are not a substitute. `package.json` counts as
-  product: no build, typecheck or unit test reads a manifest icon. When CI is
-  red, CANCELLED jobs are unknown coverage, not passing coverage. Promoted from
-  L-064-12 at Set 110 (14 sets), manifest clause added by Set 110.
+  Never start an expensive run you are about to invalidate, **and** run it once
+  after the final edit; targeted re-runs are not a substitute. `package.json`
+  counts as product. When CI is red, CANCELLED jobs are unknown coverage, not
+  passing coverage. (L-064-12)
 
 > **TODO:** Add build and test commands, gating rules, and CI/CD expectations.
 > Example (harvester): `dotnet build && dotnet test` (sequential, not parallel,

@@ -17,6 +17,20 @@ jobs:
     # guard uses only the Python stdlib, so no install step is needed. The same
     # checks also run inside the pytest suite (ai_router/tests/test_drift_guard.py);
     # this job surfaces them as a clearly-named standalone gate.
+    #
+    # Set 110 S4: the dummy provider keys are REQUIRED, not decoration. `run_all`
+    # includes `check_model_registry_matches_providers`, which calls
+    # `config.load_config()`; under the tracked `api` transport profile that
+    # validates provider API keys, so with none set the check degrades to "the
+    # model-inventory check could not run" and reports it as a violation. That
+    # is why this job had been red on every commit: it was the only guard job
+    # without the env block its siblings (`guidance-ceiling`, `python-tests`)
+    # already carry. Reproduced locally by loading the tracked config with the
+    # keys unset, and fixed by matching them.
+    env:
+      DABBLER_ANTHROPIC_API_KEY: ci-dummy-anthropic-key
+      DABBLER_GEMINI_API_KEY: ci-dummy-gemini-key
+      DABBLER_OPENAI_API_KEY: ci-dummy-openai-key
     steps:
       - uses: actions/checkout@v4
 

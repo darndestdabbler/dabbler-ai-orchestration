@@ -5,7 +5,7 @@ sessions, mandatory cross-provider verification, cost tracking, and
 git-worktree-aware session-set state — all from the activity bar, in
 two tiers that let you trade API spend against your own attention.
 
-![The Work Explorer groups work by module: the Auth Service module is expanded, showing an in-progress session set, a not-started set, and two complete sets; the Billing, Notifications, and Platform Core modules are collapsed below](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/work-explorer-modules.png)
+![The native Work Explorer tree, four levels deep: the Auth Service module is expanded into In Progress, Not Started and Complete status buckets; the in-progress set 042-token-refresh-rotation is expanded again into its four sessions, with Session 1 complete and Session 2 in flight; the Billing, Notifications and Platform Core modules are collapsed below](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/work-explorer-modules.png)
 
 ---
 

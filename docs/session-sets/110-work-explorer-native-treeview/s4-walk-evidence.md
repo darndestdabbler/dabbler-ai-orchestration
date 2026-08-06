@@ -3,10 +3,10 @@
 ## Status
 
 The automated native Explorer walk is complete. The final release-of-record
-Layer 3 suite passed **33/33 in 8.0 minutes**, on the final tree, after the last
-code change — that last change being the round-2 manifest fix and the
-quick-pick helper repair it forced. (Earlier full runs passed 33/33 in 10.2 and
-8.9 minutes; both predate the manifest edit and neither is the run of record.)
+Layer 3 suite passed **33/33 in 11.3 minutes**, on the final tree, after the
+last code change — the round-7 config-editor fix and the coverage-matching
+correction it came with. (Earlier full runs passed 33/33 in 10.2, 8.9, 8.0 and
+7.9 minutes; each predates a later code change and none is the run of record.)
 
 The human UAT walk **has been performed** and its results are recorded in
 `110-work-explorer-native-treeview-uat-checklist.json`. All four items came back

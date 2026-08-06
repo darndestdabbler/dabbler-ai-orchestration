@@ -15,7 +15,18 @@ export default defineConfig({
   timeout: 90_000,
   workers: 1,
   fullyParallel: false,
-  reporter: [["list"]],
+  // Set 110 S4: add the `github` reporter in CI so each failure becomes a
+  // workflow ANNOTATION carrying the spec file, line and message.
+  //
+  // Why it matters beyond tidiness: the macOS leg had been red for days and
+  // nobody could say WHICH test failed, because job logs and the uploaded
+  // results artifact both require repo authentication to read, while
+  // annotations are readable from the public API. The failure was therefore
+  // diagnosable only by someone with both credentials and a Mac. With this,
+  // the run itself names the failing spec — the same reasoning as the macOS
+  // binary-lookup repair, which made the error report what it actually found
+  // instead of costing a CI round-trip per guess.
+  reporter: process.env.CI ? [["list"], ["github"]] : [["list"]],
   use: {
     actionTimeout: 15_000,
   },

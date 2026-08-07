@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** `decisions.jsonl` is self-excluded from phased verification under AI authority.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A normal phased verification session journals an AI-made waiver/adjudication after a round, which the new docs explicitly describe as sanctioned. Because `decisions.jsonl` is now in `WORK_DIFF_SET_BOOKKEEPING`, phased evidence excludes its content and the freshness hash ignores later edits, so the verifier cannot review the decision record that changed after the round. That is probable because the change is intentionally documented as the expected flow.\n  - **Acceptance criterion:** `JUDGMENT - The decision to classify decisions.jsonl as loop bookkeeping is either removed so journal content remains verification-binding, or is recorded and documented as a human-authority verification-reduction with non-empty operator_attestation.`\n  - **Details:** **Violation:** the spec says the hard carve-out is “decisions that reduce verification stay outside AI authority,” and the session goal says verification-reducing calls “structurally cannot be self-authorized.” **Impact:** this is a self-authorized reduction in verifier visibility, so it changes the merge decision for the core carve-out deliverable. **Evidence:** `verification_stamp.py` adds `decisions.jsonl` to `WORK_DIFF_SET_BOOKKEEPING` and explicitly states “on a --phase round the verifier does not see the journal”; `verify_session.py` applies that list to phased evidence exclusions; `work_diff_content_digest()` ignores those files for freshness; the journal’s own record for this decision declares `authority: \"ai\"` and `verification_effect: \"none\"`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A normal phased verification session journals an AI-made waiver/adjudication after a round, which the new docs explicitly describe as sanctioned. Because `decisions.jsonl` is now in `WORK_DIFF_SET_BOOKKEEPING`, phased evidence excludes its content and the freshness hash ignores later edits, so the verifier cannot review the decision record that changed after the round. That is probable because the change is intentionally documented as the expected flow.",
+      "acceptance": {
+        "kind": "executable",
+        "command": "JUDGMENT - The decision to classify decisions.jsonl as loop bookkeeping is either removed so journal content remains verification-binding, or is recorded and documented as a human-authority verification-reduction with non-empty operator_attestation.",
+        "expectedExitCode": 0
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "7167f9838705d24ae3fd2dadf1540052d68adced"
+}

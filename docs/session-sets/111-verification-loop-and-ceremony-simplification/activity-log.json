@@ -188,6 +188,86 @@
       "dateTime": "2026-08-07T08:30:31.139740-04:00",
       "description": "Dogfooded the harness on this session own findings, both rounds: 0 of 8 auto-closed. 5 criteria were judgment-form (verifier choice); all 3 executable ones named tests the remediation had to write, so test-asset-modified fired on its own author -- the guard working as designed. Recorded in the sidecar as the first live measurement of Proposal B yield (proposal SS10 Q4) for Session 4 to weigh.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-07T12:57:31.040136-04:00",
+      "description": "Registered session 3 via start_session (copilot / claude-opus-5 / high, anthropic). Read the preload (constitution, project-guidance, lessons-learned, AGENTS.md), the spec, proposal SS11 decision-rights bullet, operator-notes.md, and S2 disposition. copilot_preflight OK. decision-review-queue.jsonl absent - nothing to triage.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "prereqs",
+      "dateTime": "2026-08-07T12:57:31.042388-04:00",
+      "description": "Confirmed S1 (enforced bounds, varied lenses, severity-gated stop) and S2 (acceptance harness, envelope acceptance block, retained remediation-review) Creates/Touches exist on disk. S2 owed residual noted as this session first item: the close-backstop round 9 (stale acceptance evidence) and round 10 (baseline-mismatch) fixes carry tests but no routed cross-provider verdict.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-07T12:57:46.111549-04:00",
+      "description": "Registered session 3 via start_session (copilot / claude-opus-5 / high, anthropic). Read the preload (constitution, project-guidance, lessons-learned, AGENTS.md), the spec, proposal Section 11 decision-rights bullet, operator-notes.md, and the S2 disposition. copilot_preflight OK. decision-review-queue.jsonl absent - nothing to triage.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "prereqs",
+      "dateTime": "2026-08-07T12:57:46.114082-04:00",
+      "description": "Confirmed S1 (enforced bounds, varied discovery lenses, severity-gated stop) and S2 (acceptance harness, envelope acceptance block, retained remediation-review) Creates/Touches exist on disk. S2 owed residual taken as this session's first item: the close-backstop round 9 (stale acceptance evidence) and round 10 (baseline-mismatch) fixes carry executable regression tests and a green suite but no routed cross-provider verdict.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "rubric-canonized",
+      "dateTime": "2026-08-07T13:31:13.925300-04:00",
+      "description": "Canonized the decision-rights rubric in docs/ai-led-session-workflow.md as a new 'Decision rights - the rubric' section: route by AUTHORITY not judgment load; four human-required classes (external-consequence, value-trade-off, accountability-sign-off, verification-reduction) with the carve-out checked first; six ordered tiebreaks (goal-over-letter, prefer-reversible, simpler-code, defer-to-existing-gate, cross-provider-consensus, escalate-to-human); the human as auditor, not gate. The old human-only vs consensus-eligible split is REPLACED - decision-time consensus is now tiebreak 5 of the one rubric, and its category list is re-labelled a cost control.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "decision-journal",
+      "dateTime": "2026-08-07T13:31:13.927905-04:00",
+      "description": "Built ai_router/decision_journal.py - the blessed writer for a per-set decisions.jsonl. Records question, decision, authority, the rubric line that fired, options considered (each with consequence and reversibility), overall reversibility, declared verification_effect, and uat_decide for the S4 UAT Decide section. CLI: --rubric, --session-set-dir, --uat-decide-only, --append-json (exit 5 = refused). Added decisions.jsonl to verification_stamp.WORK_DIFF_SET_BOOKKEEPING so journaling a post-round adjudication cannot stale that round's evidence.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "education-mode",
+      "dateTime": "2026-08-07T13:31:13.929637-04:00",
+      "description": "Added the canonical 'Education-mode briefs' section to docs/ai-led-session-workflow.md: the required five-part format for ANY operator stop (where the set stands / the question in one sentence / options with consequences / recommendation with confidence / the default on no answer), a worked example, batch-do-not-trickle, and do-not-argue-an-answer-down. Pointers added to docs/session-constitution.md (with the per-step table row) and to AGENTS.md / CLAUDE.md / GEMINI.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "carve-out-enforced",
+      "dateTime": "2026-08-07T13:31:13.931421-04:00",
+      "description": "Enforced the verification-reduction carve-out structurally: record_decision() refuses a verification_effect='reduces' record under authority='ai' (VerificationReductionRefused, a refusal to WRITE - no partial line), and the operator's own record requires a non-empty operator_attestation. The mandatory no-default verification_effect field is the primary control; the text screen behind it is one verb-near-noun proximity rule that can only ever escalate, deliberately not a phrase list (S2's six-round lesson). Updated router-config.yaml's delegation.decision_consensus comments to match.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "tests",
+      "dateTime": "2026-08-07T13:31:13.933448-04:00",
+      "description": "ai_router/tests/test_decision_journal.py: 56 tests covering the journal round-trip (every rubric field, append order, one-bad-line tolerance, UAT filter, extras that cannot shadow), authority routing (each human class, carve-out named first, tiebreak order), the carve-out (self-authorization refused with nothing written, an existing journal not truncated, operator path with and without attestation), the escalate-only screen (spellings a phrase list would miss, ordinary engineering wording left alone, and the proof that a wording the screen misses is still caught by the declaration), field validation, the bookkeeping registration, and the CLI.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "dogfood",
+      "dateTime": "2026-08-07T13:31:13.935312-04:00",
+      "description": "Dogfooded the journal on this session's own five judgment-shaped calls, written through the blessed writer to decisions.jsonl: the bookkeeping placement (defer-to-existing-gate), the declaration-over-classifier carve-out design (simpler-code), folding consensus into the rubric (goal-over-letter), cutting AGENTS.md prose rather than raising its ceiling (prefer-reversible), and discharging S2's owed residual through this session's own routed round (defer-to-existing-gate).",
+      "status": "complete"
     }
   ]
 }

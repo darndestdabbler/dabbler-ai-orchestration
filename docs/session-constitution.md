@@ -144,6 +144,24 @@ Human-only, every time; never consensus-eligible, never self-authorized:
 - Spending beyond the declared verification budget, or anything that
   commits the operator's time or money.
 
+## Decision rights — route by authority, not judgment load
+
+Judgment-shaped calls (spec-vs-reality conflicts, waiver adjudications,
+severity disputes, placement/layout/scoping) are **yours**, resolved by
+ordered tiebreaks: goal over letter → prefer reversible → simpler code
+/ fewer tests → defer to an existing gate → cross-provider consensus →
+human. "This is hard" is not a routing signal. Four classes stay human:
+external or hard-to-reverse consequences, underivable value trade-offs,
+accountability sign-offs, and **anything that reduces verification**
+(hard carve-out — never self-authorized; `decision_journal` refuses to
+write it). Journal every call to the per-set `decisions.jsonl` via
+`python -m ai_router.decision_journal` — the operator is an **auditor**,
+not a gate. Every operator stop is an **education-mode brief**: where
+the set stands / the question in one sentence / options with
+consequences / recommendation with confidence / the default on no
+answer. Batch briefs; never trickle. Full rubric:
+`docs/ai-led-session-workflow.md` → *Decision rights*.
+
 ## Definition of done
 
 - **Full tier:** the session plan's Ends-with is satisfied; suite
@@ -211,7 +229,7 @@ Open the named reference at the step's trigger moment — not before.
 | 1 | `docs/planning/repo-worktree-layout.md` | Worktree layout, migration, drift recovery |
 | 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, sizing, slugs) |
 | 2 | `docs/ai-led-session-workflow.md` | The set declares `requiresUAT` / `requiresE2E` — the gated UAT/E2E procedures |
-| 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, decision-time consensus |
+| 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |
 | 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options, Lightweight modes |
 | 8 | `ai_router/docs/close-out.md` | Close failure, stranded session, mixed-mode drift, manual-flag matrix |
 | 8 | `docs/disposition-schema.md` | Authoring `disposition.json` |

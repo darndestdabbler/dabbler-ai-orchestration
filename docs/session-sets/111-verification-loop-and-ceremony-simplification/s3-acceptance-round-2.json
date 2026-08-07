@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "7167f9838705d24ae3fd2dadf1540052d68adced",
+  "fixedTree": "05a3e3a6a97a000b6ffedc5583db7034629146e1",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-07T17:53:54.812101+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `decisions.jsonl` is self-excluded from phased verification under AI authority. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A normal phased verification session journa ...",
+      "severity": "Major",
+      "criterion": "JUDGMENT - The decision to classify decisions.jsonl as loop bookkeeping is either removed so journal content remains verification-binding, or is recorded and documented as a human-authority verification-reduction with non-empty operator_attestation.",
+      "criterionSha256": "705ab0a7ae2a962a1d64c6edc8bbc3ab24a5f6dec688c87b93bda5f95ac290bd",
+      "expectedExitCode": 0,
+      "outcome": "criterion-changed",
+      "reason": "the criterion contract in the envelope does not match the one the verifier wrote (raw artifact b7f3c2ac3261, envelope 705ab0a7ae2a) -- an edited criterion or expectation invalidates the result and cannot auto-close"
+    }
+  ]
+}

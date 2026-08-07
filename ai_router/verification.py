@@ -228,8 +228,10 @@ def _parse_acceptance(block: str) -> Optional[dict]:
     The executable form requires a **backticked** command: unfenced prose
     is read as judgment, so a criterion the verifier did not deliberately
     mark as runnable is never handed to a shell-adjacent runner. The
-    ``JUDGMENT`` marker wins over a backticked span, so a judgment
-    sentence that quotes a command in backticks stays judgment.
+    ``JUDGMENT`` marker wins over a backticked span — whether it sits
+    **before** the backticks (a judgment sentence quoting a command) or
+    **inside** them (the whole criterion backticked, which is how the
+    template's own ``JUDGMENT - <sentence>`` example reads).
     """
     crit_match = re.search(
         r'Acceptance[\s*_-]*criterion[\s*:.\-_]*([^\n]+)', block, re.IGNORECASE
@@ -254,6 +256,20 @@ def _parse_acceptance(block: str) -> Optional[dict]:
     command = command_match.group(1).strip()
     if not command:
         return {"kind": "judgment", "statement": value}
+
+    # Set 111 S3: the marker also wins from INSIDE the backticks. The
+    # template offers "a single backticked command, or `JUDGMENT -
+    # <sentence>`", so a verifier that backticks the whole criterion --
+    # the first real round of this set did exactly that -- would
+    # otherwise hand a prose sentence to the runner as a command. It
+    # fails closed (the run errors and the finding stays blocking), but
+    # it mislabels the criterion and burns a harness run proving nothing.
+    inner_judgment = re.match(
+        r'(?i)^\**\s*judgment\b\**[\s:.\-\u2014\u2013]*(.*)$', command
+    )
+    if inner_judgment:
+        statement = inner_judgment.group(1).strip().strip("*").strip()
+        return {"kind": "judgment", "statement": statement or command}
 
     acceptance: dict = {
         "kind": "executable",

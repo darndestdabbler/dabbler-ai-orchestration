@@ -147,15 +147,13 @@ See `docs/ai-led-session-workflow.md` → **Delegation Discipline** for
 the full criteria, the human-tunable thresholds (in
 `ai_router/router-config.yaml` under `delegation:`), and the rationale.
 
-## Decision-time consensus (pointer)
+## Decision rights (pointer)
 
-When you hit an in-session design / architecture / process question
-that has more than one plausible answer, route it through cross-
-provider consensus *before* falling back to `AskUserQuestion`. The
-opt-in (`delegation.decision_consensus.enabled`), category gates,
-journal format, and the human-only vs consensus-eligible split are
-documented in `docs/ai-led-session-workflow.md` → **Decision-time
-consensus**.
+Route decisions by **authority, not judgment load**. Summary (the
+rubric, the four human-required classes, the verification-reduction
+carve-out, `decisions.jsonl`, education-mode briefs):
+`docs/session-constitution.md` → *Decision rights*, which is preload.
+Canonical: `docs/ai-led-session-workflow.md`.
 
 ## Engine-specific bootstrap (Gemini Code Assistant, Windows)
 

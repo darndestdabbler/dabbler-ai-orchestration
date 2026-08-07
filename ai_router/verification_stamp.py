@@ -225,6 +225,18 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # remediation and before the remediation-review reads it. Loop
     # bookkeeping like the envelopes it annotates.
     "s*-acceptance-round-*.json",
+    # Set 111 S3: the per-set decision journal
+    # (decision_journal.JOURNAL_FILENAME). FRESHNESS-exempt only. The
+    # rubric makes waiver adjudications AI-decidable and those happen
+    # AFTER a round by definition, so without this entry a journaled
+    # adjudication would stale its own round's stamp -- and a stale row
+    # sends the close backstop into a fresh, UNBOUNDED metered round
+    # (Set 111 S2's worked example: six of them). The exemption is safe
+    # because a journal line is a RECORD about work whose substance --
+    # the code and doc changes the decision produced -- binds the diff
+    # normally. It is NOT an evidence exclusion: see
+    # EVIDENCE_VISIBLE_BOOKKEEPING below.
+    "decisions.jsonl",
     "disposition.json",
     "session-events.jsonl",
     "session-state.json",
@@ -238,6 +250,33 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # gate's ignore patterns give it.
     ".lifecycle.lock",
     ".close_session.lock",
+)
+
+# Set 111 S3: freshness-exemption and evidence-exclusion are DIFFERENT
+# questions, and conflating them was a self-authorized reduction in
+# verifier visibility (caught by this session's own supplementary round).
+#
+# - Freshness asks "did the reviewed work change after the stamp?" A
+#   record ABOUT the work can be exempt, because the work it describes
+#   binds on its own.
+# - Evidence asks "what should the verifier read?" A record about
+#   AI-authority decisions is exactly what a reviewer should see, and
+#   suppressing it is a verification reduction no orchestrator may
+#   self-authorize (proposal SS11 hard carve-out).
+#
+# These entries are therefore freshness-exempt but stay VISIBLE in a
+# --phase round's evidence bundle.
+EVIDENCE_VISIBLE_BOOKKEEPING = ("decisions.jsonl",)
+
+# What a --phase round's evidence bundle excludes: the loop's own
+# immutable machinery (round artifacts, envelopes, sidecars, ledgers,
+# lifecycle state), which is review machinery rather than work under
+# review. Derived from the freshness list so the two cannot drift on
+# every shared entry (L-069-1), minus the entries above.
+PHASED_EVIDENCE_SET_EXCLUDES = tuple(
+    name
+    for name in WORK_DIFF_SET_BOOKKEEPING
+    if name not in EVIDENCE_VISIBLE_BOOKKEEPING
 )
 
 _HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")

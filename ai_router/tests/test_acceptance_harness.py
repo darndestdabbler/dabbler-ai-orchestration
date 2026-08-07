@@ -331,8 +331,40 @@ class TestCriterionParse:
         assert acceptance["kind"] == "judgment"
         assert "command" not in acceptance
 
+    def test_judgment_marker_wins_from_inside_the_backticks(self):
+        """Set 111 S3: the whole criterion backticked, marker inside.
+
+        Reproduces the real round-1 criterion of Set 111 S3, which the
+        verifier wrote as a single backticked span starting with the
+        JUDGMENT marker -- the shape the template's own
+        ``JUDGMENT - <sentence>`` example suggests. It used to parse as
+        executable, so the harness tried to RUN a prose sentence: it
+        failed closed, but it mislabelled the criterion and spent a
+        harness run establishing nothing.
+        """
+        body = (
+            "Issue 1: Inconsistent records are accepted.\n"
+            "  - Severity: Major\n"
+            "  - Acceptance criterion: `JUDGMENT - validate_record() must "
+            "reject authority=\"ai\" with rubric_line=\"escalate-to-human\".`\n"
+        )
+        acceptance = _parse_issue_blocks(body)[0]["acceptance"]
+        assert acceptance["kind"] == "judgment"
+        assert "command" not in acceptance
+        assert acceptance["statement"].startswith("validate_record() must")
+
+    def test_a_real_command_is_still_executable(self):
+        """The fix must not swallow ordinary backticked commands."""
+        body = (
+            "Issue 1: Broken.\n"
+            "  - Severity: Major\n"
+            "  - Acceptance criterion: `pytest ai_router/tests/test_x.py -q`\n"
+        )
+        acceptance = _parse_issue_blocks(body)[0]["acceptance"]
+        assert acceptance["kind"] == "executable"
+        assert acceptance["command"] == "pytest ai_router/tests/test_x.py -q"
+
     def test_unfenced_prose_is_never_executable(self):
-        """Only a deliberately backticked command may ever be run."""
         body = (
             "Issue 1: Broken.\n"
             "  - Severity: Major\n"

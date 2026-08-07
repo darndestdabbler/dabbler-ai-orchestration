@@ -628,14 +628,27 @@ delegation:
     - session-verification
 
   # decision_consensus: opt-in cross-engine consult for in-session design /
-  # architecture / process decisions. When enabled, the orchestrator routes
-  # an eligible question to the listed engines in parallel and synthesizes
-  # their responses into a single recommendation BEFORE falling back to
-  # AskUserQuestion. Default is opt-out (enabled: false) — every existing
+  # architecture / process decisions. Set 111 S3 re-drew what this IS: it is
+  # TIEBREAK 5 of the decision-rights rubric, not a parallel mechanism with
+  # its own eligibility split. The orchestrator applies the rubric first
+  # (four human-required classes, then tiebreaks 1-4); consensus is what it
+  # reaches for when an AI-decidable question is STILL tied, and tiebreak 6
+  # (an education-mode brief to the operator) is where a split lands.
+  # When enabled, the orchestrator routes an eligible question to the listed
+  # engines in parallel and synthesizes their responses into a single
+  # recommendation. Default is opt-out (enabled: false) - every existing
   # repo's behavior is unchanged until the operator explicitly flips it on.
-  # See docs/ai-led-session-workflow.md "Decision-time consensus" for the
-  # decision tree, eligible/human-only category examples, and the journal
-  # format. Design proposal: docs/planning/delegation-consensus-config.md.
+  #
+  # NOT laundering: consensus can never move a decision from human authority
+  # to AI authority. Two engines agreeing that a verification bound should be
+  # lowered does not make it the orchestrator's call - the verification-
+  # reduction carve-out is checked before this block is ever consulted, and
+  # ai_router/decision_journal.py REFUSES to write such a record.
+  #
+  # See docs/ai-led-session-workflow.md "Decision rights - the rubric" for the
+  # authority split and the ordered tiebreaks, and "Decision-time consensus"
+  # for the decision tree, category examples, and the journal format.
+  # Design proposal: docs/planning/delegation-consensus-config.md.
   decision_consensus:
     enabled: false
     # Engines the orchestrator consults in parallel. Each entry is a
@@ -650,14 +663,21 @@ delegation:
     # categories where engines reliably agree. Broader categories
     # (testing-strategy, api-surface, design, architecture) are V1.5+;
     # operators can opt in any category at any time by editing this list.
+    #
+    # Set 111 S3: this list is a COST control on tiebreak 5, not an authority
+    # split. A category absent from it is not "human-only" - it is resolved
+    # under tiebreak 6 (education-mode brief) instead of by a paid consult.
+    # Adding a category can never widen AI authority beyond what the rubric
+    # already grants.
     categories:
       - refactor-placement
       - file-layout
       - scoping
       - spec-clarification
     # What the orchestrator does when the engines disagree materially or
-    # the synthesis hinges on information neither engine has.
-    #   ask_user: surface the synthesized conflict via AskUserQuestion (safe default)
+    # the synthesis hinges on information neither engine has. Both branches
+    # are journaled to the per-set decisions.jsonl as well as here.
+    #   ask_user: tiebreak 6 - an education-mode brief to the operator (safe default)
     #   proceed_with_orchestrator_judgment: orchestrator picks a side (power-user)
     unresolved_action: ask_user
     # Per-call structured log line (append-only JSONL, one object per call).

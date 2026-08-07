@@ -2881,16 +2881,23 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         # dilutes the new-defects-only-within-fix-hunks scope. Exclude this
         # set's bookkeeping from PHASED evidence (the classic path is
         # unchanged for compat; exclusions are disclosed like every other
-        # exclude, never silent). One definition with the freshness hash:
-        # verification_stamp.WORK_DIFF_SET_BOOKKEEPING.
+        # exclude, never silent).
+        #
+        # S3 supplementary round: this uses PHASED_EVIDENCE_SET_EXCLUDES,
+        # NOT the freshness list. They are deliberately different: a file
+        # can be exempt from staling a stamp (it is a record ABOUT work
+        # that binds on its own) while still being something the verifier
+        # must READ. decisions.jsonl is the first such file — suppressing
+        # the AI-authority decision record from review is a verification
+        # reduction, and no orchestrator may self-authorize one.
         try:
             from .verification_stamp import (  # type: ignore[import-not-found]
-                WORK_DIFF_SET_BOOKKEEPING as _BOOKKEEPING,
+                PHASED_EVIDENCE_SET_EXCLUDES as _BOOKKEEPING,
                 repo_relative_posix as _rel_posix,
             )
         except ImportError:
             from verification_stamp import (  # type: ignore[no-redef]
-                WORK_DIFF_SET_BOOKKEEPING as _BOOKKEEPING,
+                PHASED_EVIDENCE_SET_EXCLUDES as _BOOKKEEPING,
                 repo_relative_posix as _rel_posix,
             )
         try:

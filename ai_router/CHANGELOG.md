@@ -16,6 +16,81 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 111 S3) `ai_router.decision_journal` — decision rights, routed by
+  authority, journaled for audit.** Operator-gated adjudication assumes an
+  operator who can responsibly decide; in an AI-led workflow the operator
+  usually lacks the surfaced context and will not rebuild it, so a stop that
+  asks them to adjudicate a *judgment* call is a context transfer they did
+  not ask for. The rubric therefore routes by **whose authority a decision
+  needs**, not by how much judgment it takes — difficulty is not a routing
+  signal.
+
+  **Four classes stay human**: external or hard-to-reverse consequences,
+  underivable value trade-offs, accountability sign-offs, and — the hard
+  carve-out — **anything that reduces verification**. Everything else that
+  is judgment-shaped (spec-vs-reality conflicts, waiver adjudications,
+  severity disputes, placement / layout / scoping) is the orchestrator's
+  call under **ordered tiebreaks**: goal over letter → prefer reversible →
+  simpler code / fewer tests → defer to an existing gate → cross-provider
+  consensus → human.
+
+  **The carve-out is enforced, not advised.** `record_decision()` refuses
+  to write a record whose `verification_effect` is `reduces` under
+  `authority="ai"` (`VerificationReductionRefused`), and the operator's own
+  record additionally requires a non-empty `operator_attestation`. Stated
+  precisely, because a docstring that overclaims is its own defect class
+  (L-064-8): `verification_effect` is **mandatory with no default**, so the
+  conscious declaration is the primary control; the phrase screen behind it
+  is a backstop that **can only ever escalate** — it refuses a careless
+  `none`, it never permits a write — and it is expressed as one
+  verb-near-noun proximity rule rather than a literal phrase list,
+  because S2 spent six verification rounds proving that such lists grow one
+  spelling per round forever (L-069-1).
+
+  **The artifact** is a per-set `decisions.jsonl` (append-only, git-tracked)
+  carrying the question, the decision, the authority, the **rubric line that
+  fired**, the **options considered** with each one's consequence and
+  reversibility, the overall reversibility, and the declared verification
+  effect. UX-preference deferrals are tagged `uat_decide: true` at the
+  moment they are deferred, so the UAT walk's *Decide* section is a query
+  (`--uat-decide-only`) rather than a memory exercise. CLI:
+  `python -m ai_router.decision_journal --rubric | --session-set-dir <dir>
+  [--uat-decide-only] [--append-json -]` (exit 5 = refused).
+
+  `decisions.jsonl` joins `verification_stamp.WORK_DIFF_SET_BOOKKEEPING`:
+  the rubric makes waiver adjudications AI-decidable and those happen after
+  a round by definition, so without it the sanctioned flow would stale its
+  own stamp and send the close backstop into a fresh, unbounded metered
+  round. **Freshness-exemption is not evidence-exclusion**, and this
+  session's own supplementary round caught the author conflating them — the
+  first draft suppressed the journal from a `--phase` round's evidence,
+  which is a verification reduction no orchestrator may self-authorize. The
+  two consumers now have two constants: the journal is freshness-exempt
+  (`EVIDENCE_VISIBLE_BOOKKEEPING`) but stays visible in the evidence bundle
+  (`PHASED_EVIDENCE_SET_EXCLUDES`, derived from the freshness list minus
+  those entries so shared entries cannot drift).
+
+  Cross-field coherence is validated too, because `authority`,
+  `rubric_line` and `verification_effect` describe one decision from three
+  angles and a hand-assembled record can be individually well-formed and
+  jointly false: a `verification-reduction` line must declare
+  `reduces` (or it slips past the attestation requirement), an
+  `escalate-to-human` line must carry `authority="human"` (or an operator
+  stop is recorded as an AI call), and `authority="human"` must cite a line
+  that routes to the operator.
+
+  Docs: `docs/ai-led-session-workflow.md` gains **Decision rights — the
+  rubric** and **Education-mode briefs** (the required five-part format for
+  every operator stop: where the set stands / the question in one sentence /
+  options with consequences / recommendation with confidence / default on no
+  answer), and *Decision-time consensus* is re-drawn as **tiebreak 5** of
+  that rubric rather than a parallel mechanism with its own eligibility
+  split — a consult can never move a decision from human to AI authority.
+  `docs/session-constitution.md`, `AGENTS.md`, `CLAUDE.md` and `GEMINI.md`
+  carry the pointer; `router-config.yaml`'s `delegation.decision_consensus`
+  comments now say the category list is a **cost** control on tiebreak 5,
+  not a second authority split.
+
 - **(Set 111 S2) Provider API keys are validated at DISPATCH, not at config
   load.** Operator decision, 2026-08-07. The framework has **two supported
   populations**, and a machine with no `DABBLER_*` keys is healthy in one of

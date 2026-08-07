@@ -119,3 +119,45 @@ convenience that removes steps for a user is adoption work, but per-session
 file surfacing only earns its keep if Set 111 Session 4's artifact-necessity
 pass leaves those artifacts standing. Sequence accordingly: decide what
 artifacts survive S4 before building a UI that lists them.
+
+---
+
+## 2026-08-07 — In-session progress is not visible to the operator
+
+Recorded during Session 3, on the operator's observation: *"Right now, it
+isn't clear where we are in the whole process."*
+
+**The gap.** The framework has a good **set-level** progress surface —
+`print_session_set_status()` prints `N/M` per set, and the Work Explorer
+renders the same tree. It has **no step-level surface**. Once a session is
+in flight, the operator can see that session 3 of 4 is in progress but not
+that it is, say, past the build and into the verification loop. The
+`activity-log.json` `log_step` entries are exactly this data, written as
+the session runs — they are simply never rendered anywhere the operator
+looks.
+
+**What the engines offer.** Claude Code shows a live to-do checklist.
+GitHub Copilot CLI (1.0.78) has no equivalent: `/tasks` lists running
+subagents, `/statusline` and `/footer` configure persistent status items,
+`/context` and `/usage` report tokens and spend. So this cannot be solved
+by picking the right engine feature — it is either an orchestrator
+convention or a Work Explorer feature.
+
+**Two candidate fixes, both cheap:**
+
+1. **Convention (zero code).** The orchestrator posts a compact checklist
+   at each phase transition — steps done, step in flight, steps remaining.
+   Adopted immediately for the rest of Set 111. This is a prompt-level
+   habit, so it costs nothing and works on every engine.
+2. **Work Explorer step rendering (a real feature).** Expand an in-flight
+   session node to show its `activity-log.json` steps, with the last
+   entry marked in-flight. Same data the tree already has a path to; no
+   new writer, no new artifact. Groups naturally with the two Work
+   Explorer convenience items above.
+
+**Sequencing, same caveat as the items above.** Session 4's
+artifact-necessity pass may retire or reshape per-session artifacts, and
+`activity-log.json` is on the candidate list. Decide what survives S4
+before building a UI that renders it. Candidate for the same future
+extension-facing set — **not Set 111's scope**.
+

@@ -3202,19 +3202,229 @@ never handle directly.
 
 ---
 
+## Decision rights — the rubric
+
+> **Canonical.** This section is the authority on **who decides what**
+> during a session. Proposal §11 of
+> [`docs/proposals/2026-08-04-verification-loop-parallelisation-vs-acceptance-criteria.md`](proposals/2026-08-04-verification-loop-parallelisation-vs-acceptance-criteria.md)
+> is the decision record; Set 111 Session 3 canonized it here and encoded
+> it in `ai_router/decision_journal.py`. *Decision-time consensus* below
+> is no longer a parallel mechanism with its own eligibility split — it is
+> **tiebreak 5** of this rubric.
+
+### Route by authority, not by judgment load
+
+Operator-gated adjudication assumes an operator who can responsibly
+decide. In an AI-led workflow the operator usually **lacks the surfaced
+context**, and most operators will not rebuild it — so a stop that asks
+them to adjudicate a judgment call is not a safety measure, it is a
+context transfer they did not ask for and cannot afford.
+
+So the question is never *"is this hard?"* — it is **"whose authority or
+preferences does this need?"** Difficulty is not a routing signal. A
+genuinely hard call the AI has more context on stays with the AI; a
+trivial call that spends the operator's money does not.
+
+This also passes the **capability-scaling test**: a rubric executed by
+models improves as models improve, whereas an operator gate is a fixed
+bottleneck that does not.
+
+### Human-required (four classes, no exceptions)
+
+| Class | `rubric_line` | What it covers |
+|---|---|---|
+| External or hard-to-reverse consequence | `external-consequence` | Publishing to a registry, pushing tags, spending money, deleting anything **beyond version control's undo horizon**, force-push |
+| Underivable value trade-off | `value-trade-off` | Business priority, taste, what the operator's staff will tolerate — the answer depends on what the operator *wants*, not on what is *true* |
+| Accountability sign-off | `accountability-sign-off` | Someone must be accountable for the sign-off itself (UAT attestation, release approval) |
+| **Reduces verification** | `verification-reduction` | **The hard carve-out.** See below |
+
+The **verification carve-out** is absolute: decisions that reduce
+verification stay outside AI authority, always. The agent never authors
+its own permission — that is the no-skip mandate stated as a decision
+right. It is checked **first**, so a decision that is both
+verification-reducing and externally consequential records the carve-out
+as the firing line: it is the one that can never be delegated back.
+
+Verification-reducing decisions include lowering or waiving a loop bound,
+narrowing the fan-out, dropping a phase, relaxing an enforced gate,
+`close_session --force`, `--manual-verify`, and same-provider
+verification. `ai_router.decision_journal.record_decision` **refuses to
+write** an AI-authority record whose `verification_effect` is `reduces`;
+the operator's own record additionally requires a non-empty
+`operator_attestation`.
+
+### Everything judgment-shaped is AI-decidable
+
+Spec-vs-reality conflicts, waiver adjudications, severity disputes,
+refactor placement, file layout, scoping, test-shape choices — all of it
+is the orchestrator's call, resolved by the **ordered tiebreaks**. Apply
+them in order and record the **first line that decides**:
+
+| # | `rubric_line` | The tiebreak |
+|---|---|---|
+| 1 | `goal-over-letter` | The spec's **goal** over its unmeetable **letter** |
+| 2 | `prefer-reversible` | Prefer the reversible option |
+| 3 | `simpler-code` | Tied → the option that makes the code simpler: fewer branches, fewer tests needed to hold it true |
+| 4 | `defer-to-existing-gate` | Prefer deferring evidence to an **existing later gate** over inventing a new one |
+| 5 | `cross-provider-consensus` | Still tied → cross-provider consensus (*Decision-time consensus*, below) |
+| 6 | `escalate-to-human` | Consensus splits → the human, as an **education-mode brief** |
+
+Ordering matters. Tiebreak 3 is reached only when 1 and 2 did not
+decide — "the simpler option" never overrides a correctness or
+reversibility argument, it breaks a genuine tie between options that are
+otherwise equally good.
+
+### The human is an auditor, not a gate
+
+Every AI-made call is **journaled** for after-the-fact operator audit.
+That is what makes the delegation safe: the operator is not asked to
+pre-approve judgment calls, they are given a reviewable record of them.
+
+- **Artifact:** `<session-set-dir>/decisions.jsonl`, append-only, one
+  JSON object per decision, git-tracked so the trail travels with the
+  repo.
+- **Blessed writer:** `ai_router/decision_journal.py`. Nothing else
+  writes the file — a hand-appended line is the decision-rights
+  equivalent of a freehand state edit.
+- **Every record carries** the question, the decision, the `authority`,
+  the **`rubric_line` that fired**, the **options considered** (each with
+  its consequence and reversibility), the overall `reversibility`, and
+  the declared `verification_effect` (`none` / `strengthens` /
+  `reduces` — mandatory, no default).
+- **UX-preference deferrals** are journaled with `uat_decide: true` at
+  the moment they are deferred, so the UAT walk's *Decide* section can be
+  assembled from
+  `python -m ai_router.decision_journal --session-set-dir <dir> --uat-decide-only`
+  instead of reconstructed from memory at the end of the set.
+
+```bash
+# The rubric lines the journal accepts (reads nothing from disk):
+.venv/Scripts/python.exe -m ai_router.decision_journal --rubric
+
+# Read a set's journal; --uat-decide-only filters to the UAT Decide items:
+.venv/Scripts/python.exe -m ai_router.decision_journal \
+    --session-set-dir docs/session-sets/<slug>
+
+# Append one decision (JSON object; '-' reads stdin). Exit 5 = REFUSED.
+.venv/Scripts/python.exe -m ai_router.decision_journal \
+    --session-set-dir docs/session-sets/<slug> --append-json -
+```
+
+`decisions.jsonl` is listed in
+`verification_stamp.WORK_DIFF_SET_BOOKKEEPING`, so journaling an
+adjudication **after** a verification round does not stale that round's
+evidence — necessary, because the rubric makes waiver adjudications
+AI-decidable and those happen after the round by definition, and a stale
+stamp sends the close backstop into a fresh, unbounded metered round.
+
+**Freshness-exemption is not evidence-exclusion**, and the two must not
+be confused — this session's own supplementary round caught the author
+conflating them:
+
+- *Freshness* asks "did the reviewed work change after the stamp?" A
+  record **about** the work can be exempt, because the code and doc
+  changes the decision produced bind the diff on their own.
+- *Evidence* asks "what should the verifier read?" The AI-authority
+  decision record is exactly what a reviewer should see. Suppressing it
+  would be a **verification reduction**, which no orchestrator may
+  self-authorize.
+
+So the journal is freshness-exempt but stays **visible** in a `--phase`
+round's evidence: `verification_stamp.EVIDENCE_VISIBLE_BOOKKEEPING`
+names it, and `PHASED_EVIDENCE_SET_EXCLUDES` (what the evidence bundle
+actually excludes) is derived from the freshness list minus those
+entries, so the two cannot drift on any shared entry.
+
+### What this does not change
+
+- **Cross-provider exclusion and ground-truth anchoring are exempt**
+  from simplification (capability-scaling test). No rubric line can trade
+  them away.
+- **The irreversible-actions list** in
+  [`docs/session-constitution.md`](session-constitution.md) → *Irreversible
+  actions* is the same bright line as the `external-consequence` and
+  `verification-reduction` classes above, phrased as actions rather than
+  decisions. When the two surfaces are read together, the constitution's
+  list wins on *what is irreversible*; this section wins on *how a
+  decision is routed and recorded*.
+- **An adjudication settles the stop, not the truth.** A finding waived
+  at a bound is an owed residual with a named owner — journal it as such.
+
+---
+
+## Education-mode briefs (every operator stop)
+
+When the rubric routes a decision to the human — a human-required class,
+or tiebreak 6 — the ask runs in **education mode**. This format is
+**required** for any operator stop, whether it is surfaced through
+`AskUserQuestion`, a CLI prompt, or prose in the session transcript.
+
+The reason is the same one that motivates the rubric: the operator has
+not been watching. A question that assumes shared context produces either
+a rubber stamp or a stall, and both are worse than no question.
+
+**The canonical five parts, in this order:**
+
+1. **Where the set stands** — one or two sentences. Which set, which
+   session, what has landed, what is blocked on this answer.
+2. **The question, in one sentence.** If it does not fit in one
+   sentence, it is more than one question — split it.
+3. **The options, each with its likely consequence and cost.** Name what
+   happens if it is chosen, including what it forecloses. Two to four
+   options; if there is only one, this is a notification, not a question.
+4. **A recommendation, with confidence.** State which option you would
+   take and how sure you are. Withholding a recommendation to seem
+   neutral pushes the context-rebuilding work back onto the operator,
+   which is the failure this format exists to prevent.
+5. **The default on no answer.** What happens if the operator does not
+   reply — including "the session stops here", which is a legitimate
+   default and must be stated when it is the true one.
+
+**Worked example:**
+
+> **Where the set stands.** Set 111 S3 (decision rights) is complete
+> except for the journal's placement in the verification stamp's
+> bookkeeping list. Everything else is committed.
+>
+> **The question.** Should `decisions.jsonl` count as loop bookkeeping
+> (excluded from a `--phase` round's evidence) or as session work?
+>
+> **Options.** (a) Bookkeeping — journaling an adjudication after a round
+> cannot stale the evidence, but a phased verifier never reviews the
+> journal. (b) Session work — the verifier reviews it, but any
+> post-round adjudication stales the stamp and blocks the close on a
+> loop bounded at two cycles.
+>
+> **Recommendation.** (a), high confidence — the journal's reader is the
+> operator, and (b) makes the sanctioned adjudication flow unusable.
+>
+> **Default on no answer.** (a) ships; the trade-off is recorded in the
+> journal and in the disposition, so reversing it later is a one-line
+> change.
+
+**Batch, do not trickle.** When several decisions are owed at once — the
+artifact-necessity pass is the canonical case — present them as one
+batched brief with a table, not as a sequence of individual prompts. A
+trickle of questions is the ceremony this workflow is trying to remove.
+
+**Do not argue an answer down.** The operator's call settles the stop.
+If the orchestrator believes the decision is wrong on the merits, that is
+an owed residual to record — not a re-ask under fresh wording.
+
+---
+
 ## Decision-time consensus
 
 `delegation.always_route_task_types` covers **task** delegation —
 which kinds of work the orchestrator must route to the router rather
-than perform itself. Decision-time consensus is the parallel
-mechanism for **in-session decisions** — design / architecture /
-process questions the orchestrator hits mid-session, the kind that
-historically surfaced as `AskUserQuestion` prompts to the operator.
+than perform itself. Decision-time consensus is **tiebreak 5 of the
+decision-rights rubric** above: the mechanism the orchestrator reaches
+for when an AI-decidable question is still tied after tiebreaks 1–4.
 When the `delegation.decision_consensus.enabled` flag is `true`, the
-orchestrator first routes eligible questions to a configured pair of
-engines in parallel, synthesizes their responses, and only falls back
-to `AskUserQuestion` if the engines disagree materially or the
-synthesis hinges on information neither engine has.
+orchestrator routes the question to a configured pair of engines in
+parallel, synthesizes their responses, and escalates to the human
+(tiebreak 6, as an education-mode brief) only if the engines disagree
+materially or the synthesis hinges on information neither engine has.
 
 The behavior is **opt-out by default** (`enabled: false`). Every
 existing repo's `AskUserQuestion`-first behavior is preserved until an
@@ -3222,44 +3432,58 @@ operator explicitly flips the flag in their `router-config.yaml`.
 
 ### When to consult the engines (decision tree)
 
-1. **Is this a human-only question?** Some decisions are
-   operator-only by their nature. Skip consensus and go straight to
-   `AskUserQuestion`. Examples:
-   - Business priority ("ship now vs. polish first")
-   - Taste calls the operator owns ("which name reads better")
-   - Irreversible or high-blast-radius actions (force-push, drop
-     table, delete branch, publish to PyPI)
-   - Anything that asks the operator to commit time or money
-2. **Is the category in `decision_consensus.categories`?** If not,
-   `AskUserQuestion` is still the path. The category whitelist is the
-   declarative gate that keeps the consult mechanism scoped to
-   questions where engines reliably converge.
-3. **Route the question to both engines in parallel.** Use
+1. **Does the rubric route this to the human?** Apply *Decision rights*
+   above first. If any of the four human-required classes fires —
+   `external-consequence`, `value-trade-off`,
+   `accountability-sign-off`, or the `verification-reduction`
+   carve-out — skip consensus entirely and write an education-mode
+   brief. Consensus is not a way to launder a human-authority decision
+   into an AI-authority one: two engines agreeing that a bound should be
+   lowered does not make it the orchestrator's call.
+2. **Did tiebreaks 1–4 already decide?** If they did, decide, journal
+   the firing line, and move on. Consulting engines on a question the
+   rubric has already answered is spend without a decision attached —
+   and on the `copilot-cli` transport that spend is real but recorded as
+   `$0.0000`, so no automated guard will stop you.
+3. **Is the category in `decision_consensus.categories`?** If not,
+   resolve it under tiebreak 6 (education-mode brief). The category
+   whitelist scopes the consult to question shapes where engines
+   reliably converge; it is a **cost** control on tiebreak 5, not a
+   second authority split.
+4. **Route the question to both engines in parallel.** Use
    `ai_router.query()` once per engine (V1 has no `consensus()`
    helper; orchestrator manages the two calls itself). Pass the same
    prompt verbatim; do not nudge either engine toward a preferred
    answer.
-4. **Synthesize the two responses into ONE concrete recommendation.**
+5. **Synthesize the two responses into ONE concrete recommendation.**
    The orchestrator's job is judgment, not just relay. Write the
    recommendation as a single sentence that the next step in the
    session can act on directly.
-5. **Apply the synthesis OR fall back per `unresolved_action`.** When
-   the engines converge and the synthesis is concrete, apply it. When
+6. **Apply the synthesis OR fall back per `unresolved_action`.** When
+   the engines converge and the synthesis is concrete, apply it and
+   journal it with `rubric_line: cross-provider-consensus`. When
    they disagree materially (different architectural sides, different
    file-layout proposals) or the synthesis depends on information
    neither engine has (operator-specific deadline, internal policy),
    honor `unresolved_action`:
-   - `ask_user` (default, recommended) — surface the synthesized
-     conflict to the operator via `AskUserQuestion` with both
-     positions clearly stated.
+   - `ask_user` (default, recommended) — tiebreak 6: surface the
+     synthesized conflict to the operator as an **education-mode
+     brief** with both positions stated, and journal it with
+     `rubric_line: escalate-to-human`.
    - `proceed_with_orchestrator_judgment` — the orchestrator picks a
      side and records it in the journal with `applied: true` and a
      reasoned `chosen_recommendation_summary`. Reserved for
      power-user setups that have accepted the autonomy trade.
-6. **Write one journal record per call.** Whether the synthesis was
+7. **Write one journal record per call.** Whether the synthesis was
    applied or punted to the operator, every consensus call appends
    one line to `journal_path`. The journal is the audit trail; a
    skipped write is a missing decision.
+
+Two journals, deliberately: `consensus-decisions.jsonl` records the
+**consult** (which engines, what they said, what it cost), while the
+per-set `decisions.jsonl` records the **decision** (which rubric line
+fired, what was chosen). A consensus-resolved decision writes both — the
+decision record's `consensus` field carries the pointer.
 
 ### Prompt-framing discipline
 
@@ -3325,19 +3549,25 @@ The preamble is always on. The devil's-advocate pass is scoped to
 high-leverage decisions where the framing-bias cost would outweigh
 the routing cost.
 
-### Eligible (V1) vs. human-only categories — examples
+### Eligible (V1) vs. rubric-escalated categories — examples
 
 The four V1 categories are intentionally **mechanical** — placement,
 layout, scoping. They are the highest-convergence questions, where
 engines reliably reach the same answer because the choice is
 structural rather than aesthetic.
 
-| Category | Engine-eligible examples | Human-only escalation |
+The right-hand column is **not** a second human-only split — it is the
+same *Decision rights* rubric applied to a neighbouring question. Each
+escalated example fires a named human class; the class is given so the
+mapping is checkable rather than intuitive.
+
+| Category | Engine-eligible (tiebreak 5) | Rubric-escalated, and why |
 |---|---|---|
-| `refactor-placement` | "Where should this helper live — `utils.py` or a new `parsers/` module?" | "Should we refactor at all, or ship this as-is?" |
-| `file-layout` | "One file per provider, or one file with sections?" | "Should we adopt the company-wide src layout?" |
-| `scoping` | "Is this change spec-scoped, or does it belong in a follow-on session?" | "Should we cut scope to make Friday's deadline?" |
-| `spec-clarification` | "The spec says `X`; given the surrounding context, does it mean X1 or X2?" | "The spec says X; do we want X or Y?" |
+| `refactor-placement` | "Where should this helper live — `utils.py` or a new `parsers/` module?" | "Should we refactor at all, or ship this as-is?" → `value-trade-off` when it trades the operator's schedule; otherwise it is AI-decidable at tiebreak 3 |
+| `file-layout` | "One file per provider, or one file with sections?" | "Should we adopt the company-wide src layout?" → `value-trade-off` (an org preference, not a derivable fact) |
+| `scoping` | "Is this change spec-scoped, or does it belong in a follow-on session?" | "Should we cut scope to make Friday's deadline?" → `value-trade-off` |
+| `spec-clarification` | "The spec says `X`; given the surrounding context, does it mean X1 or X2?" | "The spec says X; do we want X or Y?" → `value-trade-off` |
+| *(never eligible)* | — | "Can we run one discovery pass instead of two?" → `verification-reduction`. Engine agreement is irrelevant; this is the hard carve-out |
 
 V1.5 and V2 categories (`testing-strategy`, `api-surface`, `design`,
 `architecture`) are accepted at load time so a consumer repo can opt
@@ -3409,10 +3639,11 @@ converge on a wrong answer — particularly on questions whose answer
 depends on local context the engines have not been shown. Four
 guardrails apply:
 
-- **Human-only categories.** The decision tree's step 1 is the
-  bright line: business priority, taste, irreversibility, time/money
-  commitments are not consensus-eligible regardless of what the
-  flags allow.
+- **The rubric's human classes.** The decision tree's step 1 is the
+  bright line: `external-consequence`, `value-trade-off`,
+  `accountability-sign-off` and the `verification-reduction` carve-out
+  are not consensus-eligible regardless of what the flags allow. Two
+  engines agreeing does not create authority neither of them has.
 - **Synthesis discipline.** The orchestrator's job is to read both
   responses and write ONE concrete recommendation, not to relay
   "Engine A says X, Engine B says Y, what do you want?". A relay is

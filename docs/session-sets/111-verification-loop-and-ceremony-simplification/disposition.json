@@ -37,7 +37,8 @@
     "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-6.md",
     "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-7.md",
     "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-8.md",
-    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-9.md"
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-9.md",
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-close-reason.md"
   ],
   "next_orchestrator": {
     "engine": "copilot",
@@ -70,6 +71,7 @@
     "Suite: 3,589 passed / 0 failed / 10 skipped, full run of record after the last code change, with NOTHING deselected or excused. Targeted: test_acceptance_harness.py 76 passed.",
     "Template version bumped FOUR times this session, each deliberate and each pinned: v4 (the acceptance-criterion lines), v5 (corrected containment wording after the supplementary round found the template claiming a no-network/no-credentials boundary the harness does not enforce -- the L-064-8 class in a security sentence), v6 (test-runner scope inverted to whole-repo), and v7 (test-runner criteria are not attributable at all; the guidance now tells verifiers to write a by-path product probe instead).",
     "Deferred to later sessions by the spec, not by omission: the decision-rights rubric and decision journal (S3), and the ceremony pass -- artifact-necessity review, session-size cap, test-run policy, guided-look UAT, walk stager, guidance streamlining, CI hygiene (S4). requiresUAT is a set-level flag S4 dogfoods; S2 ships no UI surface, which is why requiresE2E is false.",
-    "Recorded for a future set, not built here: docs/session-sets/111-.../operator-notes.md carries the operator's 2026-08-07 instruction on unaccounted verification work (treat as third-party, never edit, close only on your own stamped evidence) and two Work Explorer context-menu convenience items; the Set 112 reservation doc gains a note to relabel the two Full-tier transports 'Direct APIs' and 'Copilot CLI' (new labels, same config values -- renaming transport.profile on disk is a breaking change)."
+    "Recorded for a future set, not built here: docs/session-sets/111-.../operator-notes.md carries the operator's 2026-08-07 instruction on unaccounted verification work (treat as third-party, never edit, close only on your own stamped evidence) and two Work Explorer context-menu convenience items; the Set 112 reservation doc gains a note to relabel the two Full-tier transports 'Direct APIs' and 'Copilot CLI' (new labels, same config values -- renaming transport.profile on disk is a breaking change).",
+    "CLOSED VIA OPERATOR-ATTESTED --manual-verify (2026-08-07), attestation in s2-close-reason.md. The operator chose this over another normal close after the backstop refused six consecutive attempts, each with a correct but successively narrower finding. OWED RESIDUAL, stated plainly because an adjudication settles the stop and not the truth: the fixes for backstop rounds 9 (stale acceptance evidence) and 10 (baseline-mismatch) carry executable regression tests and a green full suite but have NOT been reviewed by a routed cross-provider round. Owner: Session 3, first item."
   ]
 }

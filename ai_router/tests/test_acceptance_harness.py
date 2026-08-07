@@ -1132,8 +1132,15 @@ class TestWorktreeCleanup:
         assert victim["baselinePassed"] is True
         assert victim["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
 
-    def test_a_criterion_cannot_touch_the_live_working_tree(self, repo):
-        """A destructive criterion damages only its disposable checkout."""
+    def test_a_relative_write_lands_in_the_disposable_checkout(self, repo):
+        """The narrow, true containment claim: a criterion's ORDINARY
+        RELATIVE writes hit a throwaway checkout, not the live tree.
+
+        Deliberately NOT claiming more (close-backstop round 8): the
+        checkout is the child's working directory, not a filesystem
+        confinement -- an absolute-path write is not prevented, and the
+        docs say so rather than implying a guarantee the code lacks.
+        """
         baseline = vs.snapshot_worktree_tree(repo)
         _write_envelope(
             _set_dir(repo), 1,

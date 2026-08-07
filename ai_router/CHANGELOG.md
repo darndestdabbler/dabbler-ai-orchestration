@@ -73,15 +73,18 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   `judgment`, `no-criterion`, `error` — leaves the finding blocking and
   judgment-based. Results are written to `sN-acceptance-round-<R>.json`.
 
-  **Containment:** verifier-authored shell is untrusted input, so criteria
-  never run in the live working tree. Each criterion gets its **own fresh
-  pair** of disposable git worktrees checked out from the captured tree
-  objects, with **no shell** (shell operators refused rather than
-  interpreted; a shell or fetch tool as `argv[0]` refused outright), a
-  credential-stripped process environment, a wall-clock timeout, and
+  **Containment:** verifier-authored shell is untrusted input, so a
+  criterion's ordinary relative reads and writes land in a throwaway
+  checkout rather than the live working tree. Each criterion gets its
+  **own fresh pair** of disposable git worktrees checked out from the
+  captured tree objects, with **no shell** (shell operators refused rather
+  than interpreted; a shell or fetch tool as `argv[0]` refused outright),
+  a credential-stripped process environment, a wall-clock timeout, and
   cleanup on every path including errors. It is **containment, not a
-  sandbox**, and the docs now say so: the network is not blocked and
-  OS-level credential stores are still reachable. A venv or bare `python`
+  sandbox**, and the docs say so narrowly: the network is not blocked,
+  OS-level credential stores remain reachable, and the disposable checkout
+  is a working DIRECTORY rather than a filesystem confinement — an
+  absolute-path write is not prevented. A venv or bare `python`
   in `argv[0]` is rewritten to the harness's own interpreter, so the
   documented `.venv/Scripts/python.exe` form works inside a checkout where
   `.venv/` is gitignored.

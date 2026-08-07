@@ -33,14 +33,21 @@ pre-fix; a fresh ``snapshot_worktree_tree`` for post-fix), with
 - **cleanup on every path**, including errors.
 
 **This is containment, NOT a sandbox — do not read it as one.** The
-harness does not block network access, and on Windows a child process can
+harness does not block network access; on Windows a child process can
 still read User- or Machine-scope environment variables (and any OS
 credential store) regardless of what was stripped from its own
-environment. A criterion is untrusted code running with the developer's
-own privileges. Treat the criteria in a round's raw artifact as code to
-be read, not as inputs that have been made safe. The honest boundary is:
-*a criterion cannot damage your working tree, cannot silently use a shell,
-and cannot inherit your keys through the process environment.*
+environment; and the disposable checkout is only the child's **working
+directory**, not a filesystem confinement — a criterion that writes to an
+**absolute path**, or that reaches the main checkout through the shared
+git directory, is not prevented from doing so. A criterion is untrusted
+code running with the developer's own privileges.
+
+What is actually true, stated narrowly: a criterion's **ordinary relative
+reads and writes land in a throwaway checkout** rather than your working
+tree, it **cannot silently use a shell**, and it **cannot inherit your
+keys through the process environment**. Nothing stronger. Treat the
+criteria in a round's raw artifact as code to be read, not as inputs that
+have been made safe.
 
 What this module never does: decide that a finding is *sufficiently*
 addressed. Baseline discrimination proves a criterion is *related* to the

@@ -1810,12 +1810,17 @@ not interpreted; a shell or fetch tool as `argv[0]` is refused too), a
 cleanup on every path including errors.
 
 **It is containment, not a sandbox — and the docs must not claim
-otherwise.** The harness does not block the network, and on Windows a
-child can still read User/Machine-scope environment variables and OS
-credential stores whatever was stripped from its own environment. The
-honest boundary: a criterion cannot damage your working tree, cannot
-silently use a shell, and cannot inherit your keys through the process
-environment. Read the criteria in a round's raw artifact as code.
+otherwise.** The harness does not block the network; on Windows a child
+can still read User/Machine-scope environment variables and OS credential
+stores whatever was stripped from its own environment; and the disposable
+checkout is only the child's **working directory**, not a filesystem
+confinement — an **absolute-path** write, or a reach into the main
+checkout through the shared git directory, is not prevented. What is
+actually true, narrowly: a criterion's ordinary **relative** reads and
+writes land in a throwaway checkout rather than your working tree, it
+cannot silently use a shell, and it cannot inherit your keys through the
+process environment. Nothing stronger. Read the criteria in a round's raw
+artifact as code.
 
 **Two further limits, stated because they bound what a pass proves.**
 Criteria run under the harness's own interpreter — so a venv or bare

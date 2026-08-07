@@ -233,19 +233,24 @@ decision stay human. Setup and the raw commands each action runs:
   `ai_router/budget.yaml`, or manually create `ai_router/router-config.yaml`
   and `ai_router/budget.yaml` (see [`docs/budget-yaml-schema.md`](budget-yaml-schema.md)).
   The form is the recommended path.
-- [ ] **Provider API keys set** — `DABBLER_ANTHROPIC_API_KEY`,
-  `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` must be in your
-  environment for the cross-provider verification step
-  (`python -m ai_router.verify_session`) to work. These hold the normal
-  provider-issued keys from Anthropic, Google, and OpenAI; only the environment
-  variable names are Dabbler-prefixed.
-  Optional: `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for completion notifications.
-- [ ] **Copilot-seat path (no direct provider keys)?** — if your shop runs
-  Full tier through a **GitHub Copilot CLI seat** instead of `DABBLER_*` keys,
-  follow [`docs/copilot-seat-setup-checklist.md`](copilot-seat-setup-checklist.md)
-  once per machine first (install + `copilot login` + the auth-preflight). An
-  unauthenticated seat is blocked at session start rather than silently faking
-  verification.
+- [ ] **Pick your transport, then set only what it needs.** There are two
+  supported populations and neither is a degraded version of the other:
+  - **Direct APIs** — set `DABBLER_ANTHROPIC_API_KEY`,
+    `DABBLER_GEMINI_API_KEY`, and `DABBLER_OPENAI_API_KEY` in your
+    environment. These hold the normal provider-issued keys from Anthropic,
+    Google, and OpenAI; only the environment variable names are
+    Dabbler-prefixed.
+  - **Copilot CLI** — a **GitHub Copilot CLI seat** instead of `DABBLER_*`
+    keys. Set `transport.profile: copilot-cli` in the gitignored
+    `ai_router/local-overrides.yaml` and follow
+    [`docs/copilot-seat-setup-checklist.md`](copilot-seat-setup-checklist.md)
+    once per machine (install + `copilot login` + the auth-preflight). An
+    unauthenticated seat is blocked at session start rather than silently
+    faking verification. **Provider API keys are not required, and their
+    absence is not an error on this path** — nothing warns about them.
+
+  Optional either way: `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` for
+  completion notifications.
 - [ ] **Instruction file present** — your repo needs a provider-specific
   instruction file (`CLAUDE.md` for Claude Code, `AGENTS.md` for Codex,
   `GEMINI.md` for Gemini Code Assist) at the repo root. This repo's own

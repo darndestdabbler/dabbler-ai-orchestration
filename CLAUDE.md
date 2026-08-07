@@ -160,10 +160,16 @@ consensus**.
 
 ## Engine-specific bootstrap (Claude Code)
 
-Claude Code inherits the Windows User environment, so the provider API
-keys (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
+**Only on the Direct APIs transport** (`transport.profile: api`). Claude
+Code inherits the Windows User environment, so the provider API keys
+(`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
 `DABBLER_OPENAI_API_KEY`) are
 normally already present — no export step is needed. If a routed call
 fails on a missing key, confirm it is set in the Windows User environment
 before retrying, then run the router as described in **Running the router**
 above.
+
+When the active profile is `copilot-cli`, **skip this entirely**: that
+seat uses the authenticated Copilot CLI and its catalog, carries no
+provider API keys by design, and their absence is not an error — nothing
+in the router warns about it.

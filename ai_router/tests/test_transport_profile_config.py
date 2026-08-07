@@ -1,7 +1,10 @@
 """Tests for transport profile validation in ai_router.config.load_config.
 
-Covers the Set 078 Session 2 code-review finding: API key validation
-must be skipped when transport.profile is "copilot-cli".
+Covers the Set 078 Session 2 code-review finding (API key validation must
+be skipped when transport.profile is "copilot-cli") and the Set 111 S2
+operator decision (2026-08-07): API keys are validated at **dispatch**,
+not at config load, so a keyless Copilot-CLI seat never sees a complaint
+about credentials nothing in its code path would use.
 """
 
 import textwrap
@@ -24,7 +27,7 @@ def _write_config_yaml(target_dir: Path, content: str) -> Path:
 def test_load_config_default_api_profile_requires_api_keys(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Regression: Default 'api' profile must check for provider API keys."""
+    """The 'api' profile checks provider keys when the caller will DISPATCH."""
     monkeypatch.delenv(_TEST_API_KEY_ENV, raising=False)
     config_path = _write_config_yaml(
         tmp_path,
@@ -41,9 +44,66 @@ def test_load_config_default_api_profile_requires_api_keys(
     )
 
     with pytest.raises(EnvironmentError) as excinfo:
-        config_mod.load_config(str(config_path))
+        config_mod.load_config(str(config_path), require_api_keys=True)
 
     assert f"Missing environment variable {_TEST_API_KEY_ENV}" in str(excinfo.value)
+
+
+def test_reading_the_config_does_not_require_api_keys(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Set 111 S2: absence of keys is a DISPATCH problem, never a read one.
+
+    A drift guard, a guidance report or a registry check reads
+    router-config.yaml and touches no provider at all. Complaining about
+    credentials there fails on a perfectly healthy Copilot-CLI seat --
+    which is one of the framework's two supported populations, not a
+    misconfiguration.
+    """
+    monkeypatch.delenv(_TEST_API_KEY_ENV, raising=False)
+    config_path = _write_config_yaml(
+        tmp_path,
+        f"""
+        providers:
+          anthropic:
+            api_key_env: {_TEST_API_KEY_ENV}
+            enabled: true
+        models: {{}}
+        routing:
+          tier_assignments: {{}}
+        # No transport block -> defaults to profile: api
+        """,
+    )
+
+    config = config_mod.load_config(str(config_path))
+    assert config["providers"]["anthropic"]["enabled"] is True
+
+
+def test_validate_provider_api_keys_is_a_noop_for_the_copilot_profile(
+    monkeypatch,
+) -> None:
+    """Even at dispatch, a Copilot seat is exempt: it has no keys by design."""
+    monkeypatch.delenv(_TEST_API_KEY_ENV, raising=False)
+    config = {
+        "transport": {"profile": "copilot-cli"},
+        "providers": {
+            "anthropic": {"api_key_env": _TEST_API_KEY_ENV, "enabled": True}
+        },
+    }
+    config_mod.validate_provider_api_keys(config)  # must not raise
+
+
+def test_validate_provider_api_keys_skips_disabled_providers(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv(_TEST_API_KEY_ENV, raising=False)
+    config = {
+        "transport": {"profile": "api"},
+        "providers": {
+            "anthropic": {"api_key_env": _TEST_API_KEY_ENV, "enabled": False}
+        },
+    }
+    config_mod.validate_provider_api_keys(config)  # must not raise
 
 
 def test_load_config_copilot_cli_profile_skips_api_key_check(
@@ -71,7 +131,7 @@ def test_load_config_copilot_cli_profile_skips_api_key_check(
     )
 
     # This must NOT raise an EnvironmentError, even with the key missing.
-    config = config_mod.load_config(str(config_path))
+    config = config_mod.load_config(str(config_path), require_api_keys=True)
     assert config.get("transport", {}).get("profile") == "copilot-cli"
 
 
@@ -157,5 +217,5 @@ def test_load_config_respects_local_override_disabling_a_provider(
 
     # Must NOT raise, even though the key is genuinely absent: the local
     # override disabling anthropic must be applied before the key check.
-    config = config_mod.load_config(str(config_path))
+    config = config_mod.load_config(str(config_path), require_api_keys=True)
     assert config["providers"]["anthropic"]["enabled"] is False

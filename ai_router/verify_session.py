@@ -1217,6 +1217,34 @@ def assemble_cross_round_ledger(
     return text
 
 
+def blocking_ledger_id_map(
+    session_set_dir: Path, session_number: int, current_round: int
+) -> dict:
+    """``{(round, issue_index): "L<k>"}`` in the ledger's encounter order.
+
+    The SINGLE assignment of ledger ids: rounds ascending, envelope order
+    within a round, blocking findings only, unreadable envelopes skipped.
+    :func:`assemble_cross_round_ledger_with_ids` renders from this map and
+    the Set 111 S2 acceptance block keys its harness results off it, so a
+    harness result and a ledger line can never disagree about which
+    finding ``L3`` is.
+    """
+    ids: dict = {}
+    for prior_round in range(1, current_round):
+        envelope = _read_round_envelope(
+            session_set_dir, session_number, prior_round
+        )
+        if envelope is None:
+            continue
+        issues = [
+            i for i in (envelope.get("issues") or []) if isinstance(i, dict)
+        ]
+        for issue_index, issue in enumerate(issues):
+            if is_blocking_issue(issue):
+                ids[(prior_round, issue_index)] = f"L{len(ids) + 1}"
+    return ids
+
+
 def assemble_cross_round_ledger_with_ids(
     session_set_dir: Path, session_number: int, current_round: int
 ) -> "tuple[str, List[str]]":
@@ -1263,6 +1291,9 @@ def assemble_cross_round_ledger_with_ids(
     settled_sections: List[str] = []
     unresolved_sections: List[str] = []
     blocking_ids: List[str] = []
+    ledger_id_map = blocking_ledger_id_map(
+        session_set_dir, session_number, current_round
+    )
     for prior_round in range(1, current_round):
         settled_lines: List[str] = []
         unresolved_lines: List[str] = []
@@ -1300,7 +1331,7 @@ def assemble_cross_round_ledger_with_ids(
                     "settlement evidence)."
                 )
             else:
-                for issue in issues:
+                for issue_index, issue in enumerate(issues):
                     status = (
                         str(issue.get("resolution_status") or "")
                         .strip()
@@ -1310,9 +1341,8 @@ def assemble_cross_round_ledger_with_ids(
                         settled = status in _SETTLED_RESOLUTION_STATUSES
                     else:
                         settled = round_has_settlement_note
-                    ledger_id = ""
-                    if is_blocking_issue(issue):
-                        ledger_id = f"L{len(blocking_ids) + 1}"
+                    ledger_id = ledger_id_map.get((prior_round, issue_index), "")
+                    if ledger_id:
                         blocking_ids.append(ledger_id)
                     (settled_lines if settled else unresolved_lines).extend(
                         _render_ledger_issue(issue, ledger_id=ledger_id)
@@ -1865,6 +1895,136 @@ def assemble_prior_findings_block(
     )
 
 
+def assemble_acceptance_block(
+    session_set_dir: Path, session_number: int, current_round: int
+) -> str:
+    """The remediation-review's acceptance-criteria block (Set 111 S2).
+
+    Renders the harness results for every prior round into two lists —
+    findings CLOSED by baseline discrimination (with both runs' evidence)
+    and criteria that did NOT close their finding (with the reason) —
+    keyed by the same ledger ids the fix-verdict coverage check uses.
+
+    The block REDIRECTS the reviewer's attention; it never removes work
+    from the round. Coverage is unchanged: every ledger id still gets a
+    fix-verdict line every cycle (the Set 096 S2 round-11 operator
+    decision — an exemption forfeits the regression check). What changes
+    is that a criteria-closed id costs one line instead of a re-derivation,
+    so the round's attention goes where no criterion could reach: what
+    the fixes BROKE, and what the criteria MISSED (proposal §9's
+    counterexample is exactly that case).
+
+    Returns ``""`` when no acceptance artifact exists — the phase behaves
+    exactly as it did before Proposal B.
+    """
+    try:
+        from .acceptance_harness import (
+            OUTCOME_AUTO_CLOSED,
+            read_acceptance_results,
+        )
+    except ImportError:  # pragma: no cover - test/bare context
+        from acceptance_harness import (  # type: ignore[no-redef]
+            OUTCOME_AUTO_CLOSED,
+            read_acceptance_results,
+        )
+
+    artifacts = read_acceptance_results(
+        session_set_dir, session_number, current_round
+    )
+    if not artifacts:
+        return ""
+    ledger_id_map = blocking_ledger_id_map(
+        session_set_dir, session_number, current_round
+    )
+
+    closed_lines: List[str] = []
+    open_lines: List[str] = []
+    for artifact in artifacts:
+        artifact_round = artifact.get("verificationRound")
+        for result in artifact.get("results") or []:
+            if not isinstance(result, dict):
+                continue
+            index = result.get("issueIndex")
+            ledger_id = ledger_id_map.get((artifact_round, index), "")
+            id_note = f"{ledger_id} " if ledger_id else ""
+            severity = str(result.get("severity") or "unrated")
+            summary = _squash(
+                result.get("summary"), _LEDGER_DESCRIPTION_CAP
+            )
+            head = f"- {id_note}[{severity}] {summary}"
+            criterion = str(result.get("criterion") or "").strip()
+            if result.get("outcome") == OUTCOME_AUTO_CLOSED:
+                baseline = result.get("baseline") or {}
+                fixed = result.get("fixed") or {}
+                closed_lines.append(head)
+                if criterion:
+                    closed_lines.append(
+                        f"  - Criterion (verifier-authored, run unchanged): "
+                        f"`{_squash(criterion, _LEDGER_SCENARIO_CAP)}` "
+                        f"-- expected exit "
+                        f"{result.get('expectedExitCode')}"
+                    )
+                closed_lines.append(
+                    f"  - Pre-fix tree: exit {baseline.get('exitCode')} "
+                    "-- FAILED, as baseline discrimination requires"
+                )
+                closed_lines.append(
+                    f"  - Fixed tree: exit {fixed.get('exitCode')} -- PASSED"
+                )
+            else:
+                reason = _squash(
+                    result.get("reason") or "", _LEDGER_SCENARIO_CAP
+                )
+                open_lines.append(
+                    f"{head}\n  - Criterion outcome: "
+                    f"{result.get('outcome')} -- {reason}"
+                )
+
+    if not closed_lines and not open_lines:
+        return ""
+
+    parts: List[str] = [
+        "#### Acceptance-criteria harness results (auto-assembled from the "
+        "harness artifacts)\n\n"
+        "Each blocking finding carried an acceptance criterion the verifier "
+        "wrote AT FINDING TIME. A harness -- not the remediator -- ran each "
+        "UNCHANGED criterion in disposable checkouts of the pre-fix tree and "
+        "the fixed tree. A finding is CRITERIA-CLOSED only where the "
+        "criterion FAILED before and PASSED after; anything else proved "
+        "nothing and is fully yours to judge."
+    ]
+    if closed_lines:
+        parts.append(
+            "##### Criteria-closed findings -- evidence recorded, do not "
+            "re-derive\n\n"
+            "Give each of these its one required `Fix verdict:` line (the "
+            "coverage check is unchanged, and the restatement is the "
+            "regression check). Do NOT re-litigate the underlying finding: "
+            "the executable evidence below already settles whether it was "
+            "addressed. Contradict it ONLY if the fix delta as it now "
+            "stands proves the recorded runs wrong -- and then say exactly "
+            "how.\n\n"
+            + "\n".join(closed_lines)
+        )
+    if open_lines:
+        parts.append(
+            "##### Criteria that did NOT close their finding -- judge these "
+            "normally\n\n"
+            "A vacuous, unrunnable, invalidated or still-failing criterion "
+            "is NOT evidence of a fix. Review these findings exactly as you "
+            "would with no criterion at all.\n\n"
+            + "\n\n".join(open_lines)
+        )
+    parts.append(
+        "**Where your attention belongs on this round:** what the fixes "
+        "BROKE, and what the criteria MISSED. A criterion is written before "
+        "the fix exists, so it cannot anticipate a fix that satisfies it "
+        "while breaking an adjacent deliverable -- that is precisely the "
+        "hole this holistic pass exists to cover."
+    )
+    return "\n\n".join(parts)
+
+
 def discovery_lens_for_call(call_index: int) -> str:
     """The discovery lens call *call_index* (1-based) reviews under.
 
@@ -2005,6 +2165,14 @@ def build_phase_framing(phase: Optional[str], lens: Optional[str] = None) -> str
             "below (a defect the remediation itself introduced). Anything "
             "outside the fix delta is OUT OF SCOPE for this round: record "
             "it under NITS at most, never as an Issue.\n"
+            "- This is the ONE holistic look at the whole fix delta, and "
+            "the only place two things can be caught: what the fixes BROKE "
+            "(a fix that satisfies its own acceptance criterion while "
+            "breaking an adjacent deliverable), and what the criteria "
+            "MISSED (a criterion written before the fix existed cannot "
+            "anticipate either). Where an acceptance-criteria block appears "
+            "below, spend the attention it frees HERE -- not on "
+            "re-deriving findings whose criteria already discriminated.\n"
             "- Minors are recorded, never re-rounded. The verdict token: "
             "ISSUES FOUND only when a fix is rejected or a new in-hunk "
             "Critical/Major exists; otherwise VERIFIED."
@@ -2705,6 +2873,17 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             session_set_dir, session_number, round_number
         )
         framing = build_phase_framing(phase)
+        # -- Set 111 S2: the remediation-review reads the acceptance
+        #    harness's results, so criteria-closed findings arrive with
+        #    their executable evidence attached instead of as open
+        #    questions. Empty (and the phase is unchanged) when no
+        #    harness artifact exists.
+        if phase == PHASE_REMEDIATION_REVIEW:
+            acceptance_block = assemble_acceptance_block(
+                session_set_dir, session_number, round_number
+            )
+            if acceptance_block:
+                framing = framing + "\n\n" + acceptance_block
 
     # -- Discovery-family rounds snapshot the working tree so a later
     #    remediation-review can diff the fix delta from it. Fails OPEN
@@ -3433,7 +3612,11 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                       "passes are now used -- a supplementary pass would be "
                       "REFUSED. Remediate the Critical/Major findings, "
                       f"write the s{session_number}-remediation-round-<R>.md "
-                      "sidecar(s), then review the fix delta:")
+                      "sidecar(s), then run the acceptance harness and "
+                      "review the fix delta:")
+                print(f"  python -m ai_router.acceptance_harness "
+                      f"--session-set-dir {set_dir_arg} "
+                      f"--round {round_number}")
                 print(f"  python -m ai_router.verify_session "
                       f"--session-set-dir {set_dir_arg} "
                       "--phase remediation-review")
@@ -3446,7 +3629,11 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                       f"--session-set-dir {set_dir_arg} --phase supplementary")
                 print("  Then remediate the merged Critical/Major findings, "
                       f"write the s{session_number}-remediation-round-<R>.md "
-                      "sidecar(s), and review the fix delta:")
+                      "sidecar(s), run the acceptance harness for each "
+                      "findings-bearing round, and review the fix delta:")
+                print(f"  python -m ai_router.acceptance_harness "
+                      f"--session-set-dir {set_dir_arg} "
+                      f"--round {round_number}")
                 print(f"  python -m ai_router.verify_session "
                       f"--session-set-dir {set_dir_arg} "
                       "--phase remediation-review")
@@ -3454,7 +3641,10 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             print("\nNext action: discovery is complete. Remediate the "
                   "merged Critical/Major findings from BOTH discovery "
                   f"passes, write the s{session_number}-remediation-round-"
-                  "<R>.md sidecar(s), then review the fix delta:")
+                  "<R>.md sidecar(s), then run the acceptance harness for "
+                  "each findings-bearing round and review the fix delta:")
+            print(f"  python -m ai_router.acceptance_harness "
+                  f"--session-set-dir {set_dir_arg} --round {round_number}")
             print(f"  python -m ai_router.verify_session --session-set-dir "
                   f"{set_dir_arg} --phase remediation-review")
         elif phase == PHASE_REMEDIATION_REVIEW:

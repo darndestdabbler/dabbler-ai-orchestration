@@ -1001,8 +1001,13 @@ class TestR1ExclusionUnion:
         return fake_call_model
 
     @pytest.fixture()
-    def routed(self, monkeypatch, tmp_path):
-        """route() with the network + metrics seams faked out."""
+    def routed(self, monkeypatch, tmp_path, direct_api_transport):
+        """route() with the network + metrics seams faked out.
+
+        ``direct_api_transport`` (Set 111 S2) pins the shipped api-profile
+        config, so a Copilot-CLI seat cannot route past the faked
+        ``call_model`` into the real CLI.
+        """
         monkeypatch.setattr(ai_router, "_config", None)
         monkeypatch.setattr(ai_router, "_rate_limiters", {})
         monkeypatch.setattr(

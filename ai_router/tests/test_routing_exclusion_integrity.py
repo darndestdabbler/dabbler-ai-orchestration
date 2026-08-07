@@ -178,15 +178,17 @@ class _ApiEnv:
 
 
 @pytest.fixture
-def api_env(monkeypatch, tmp_path):
+def api_env(monkeypatch, tmp_path, direct_api_transport):
     """The real router-config.yaml and the real provider callers, with every
     socket replaced. Using the live registry is deliberate: the invariant is a
     property of the SHIPPING configuration, not of a hand-built fixture that
-    could drift away from it."""
-    for key in ("DABBLER_ANTHROPIC_API_KEY", "DABBLER_GEMINI_API_KEY",
-                "DABBLER_OPENAI_API_KEY"):
-        monkeypatch.setenv(key, "test-key")
+    could drift away from it.
 
+    ``direct_api_transport`` (Set 111 S2) supplies that shipping config from
+    a scratch directory and sets placeholder keys, so a Copilot-CLI seat's
+    ``local-overrides.yaml`` cannot redirect these calls into the real CLI —
+    which used to make every test here hang until the CLI's total-timeout.
+    """
     metrics_path = tmp_path / "router-metrics.jsonl"
     monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
 

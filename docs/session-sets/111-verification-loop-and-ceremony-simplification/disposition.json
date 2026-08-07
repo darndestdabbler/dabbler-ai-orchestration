@@ -2,7 +2,7 @@
   "status": "completed",
   "summary": "Set 111 Session 1: made the verification loop's bounds real. verify_session now REFUSES the round that would pass a bounded total (2 discovery-family passes, 2 remediation-review cycles, 2 classic rounds) before any metered call, unless the operator's --operator-authorized-round attestation is recorded in the new append-only per-session round ledger sN-rounds.jsonl; the K=2 discovery fan-out now sends two differently-framed prompts (spec-conformance / failure-scenario) over the same evidence instead of identical ones, with per-call evidence stamps and a discoveryLens recorded per finding; and a Minor-only round is a structural stop that is offered only the close command. Scope extension, operator-authorized mid-session: transports.copilot-cli.timeouts became a validated config block (total 300s -> 1200s) because this session's own MANDATORY verification could not complete inside the hardcoded ceiling.",
   "verification_method": "api",
-  "verification_verdict": "VERIFIED",
+  "verification_verdict": "ISSUES_FOUND",
   "verification_message_ids": [],
   "files_changed": [
     "ai_router/verify_session.py",

@@ -92,7 +92,26 @@ If ISSUES FOUND, list each issue:
   - **Category:** Correctness / Completeness / False Positive
   - **Severity:** Critical / Major (a blocking Issue is never Minor — Minor goes under NITS)
   - **Failure scenario:** MANDATORY — the concrete scenario in which the consequence materializes for a real user of the deliverable, plus why that scenario is **probable rather than merely possible**. An Issue whose failure scenario you cannot state plausibly is Minor by definition and belongs under NITS, not here.
+  - **Acceptance criterion:** MANDATORY — the **closed question** that settles whether this finding is fixed, so a later reviewer asks "does it pass?" instead of "is it right yet?". See **Writing an acceptance criterion** below for the two allowed forms and the rules a command must obey.
+  - **Acceptance expectation:** executable criteria only — `exit 0` (or `exit <n>`), optionally followed by `output contains "<substring>"`. Omit this line entirely for a JUDGMENT criterion.
   - **Details:** the three-part "so what?": the **violation** (quote it), the concrete **impact** (which merge decision it changes), and the **evidence** that proves it, plus the correct answer
+
+#### Writing an acceptance criterion
+
+Your criterion is **run by a harness, not by the person who wrote the fix**, against two throwaway checkouts: the tree **as it stands now** (unfixed) and the tree **after remediation**. It can close the finding without another review round **only if it fails now and passes after** — so a criterion that would pass on today's unfixed tree proves nothing and closes nothing.
+
+**Prefer the executable form.** Put a single command in backticks:
+
+- It must **fail on the tree in front of you** and **pass once the finding is fixed**. A criterion that passes either way is worthless; prefer one that drives the real entrypoint with the input that breaks.
+- **One command, no shell operators** — no `&&`, `||`, `|`, `;`, `>`, `<`, `$(...)`, or nested backticks. The harness refuses them and falls back to judgment.
+- It runs from the **repository root** in a disposable checkout with **no network and no credentials**. Use **forward slashes** in paths. Assume nothing is installed that the repo does not already vendor or declare.
+- Prefer a check over the **product** code (a probe that drives the public entrypoint, a targeted existing test) over one that depends on a **test file the fix is expected to add or change**: the harness invalidates any criterion whose test assets the remediation modified, because a criterion that can be edited by the person it judges is not evidence.
+
+**Use the judgment form only when no command can express it.** Write:
+
+`JUDGMENT - <one sentence naming exactly what a reviewer must see to consider this fixed>`
+
+Do **not** invent a command you are unsure of just to look executable — an invalid or vacuous command is worse than an honest judgment sentence, because it manufactures false closure. Judgment criteria are reviewed by a human-directed reviewer, never auto-closed.
 
 #### NITS (optional, non-blocking)
 

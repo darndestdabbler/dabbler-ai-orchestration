@@ -111,6 +111,40 @@ no tier question; docs tell one story; a `tier: lightweight` spec fails
 loud with a helpful message — plus any Decide items the journal accrues.
 Ten minutes, staged, no bypass without an attested waiver.
 
+## Operator notes recorded during Set 111
+
+### 2026-08-07 — Relabel the Full tier's two transports in user-facing surfaces
+
+With Lightweight gone, "Full tier" is the only tier, and the choice a user
+actually makes is **which transport dispatches the work**. The internal
+config values are `transport.profile: api | copilot-cli`. The operator's
+ask: **relabel the two options in user-facing surfaces to "Direct APIs" and
+"Copilot CLI"** — because that is what a user is choosing between, and
+`api` reads like a generic word rather than one half of a pair.
+
+There are two clean populations, and the labels should say so:
+
+- **Copilot CLI** — the operator and staff: a GitHub Copilot seat, **no
+  provider API keys at all**, every call dispatched through the Copilot
+  CLI's headless mode.
+- **Direct APIs** — users with `DABBLER_*` provider keys and no Copilot
+  seat, calling the providers directly.
+
+**Scope note (decide at authoring):** this is a *labelling* change in
+user-facing surfaces (Getting Started / setup docs / any picker the
+extension grows), not necessarily a rename of the config value. Renaming
+`transport.profile: api` on disk is a breaking config change for every
+consumer that already set it, so the default assumption is: **new labels,
+same values**, with the value named alongside the label wherever a user
+must type it. Reversing that is the operator's call, not the session's.
+
+**Related, same theme (Set 111 S2 fix, already landed):** absence of
+provider API keys must never produce a complaint or a warning unless
+something is actually attempting a **direct-API** dispatch. The two
+populations above mean a keyless machine is a perfectly healthy Copilot-CLI
+seat, not a misconfigured one. See `ai_router/CHANGELOG.md` → *(Set 111 S2)
+provider API keys are validated at dispatch, not at config load*.
+
 ## Sequencing
 
 110 (finish S3/S4 and release) → 111 (config values and authoring-guide

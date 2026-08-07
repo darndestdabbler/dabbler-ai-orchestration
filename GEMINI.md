@@ -159,9 +159,10 @@ consensus**.
 
 ## Engine-specific bootstrap (Gemini Code Assistant, Windows)
 
-Gemini Code Assistant runs in a shell that does not inherit the Windows
-User environment, so export the provider API keys explicitly before
-running the router (see **Running the router** above):
+**Only on the Direct APIs transport** (`transport.profile: api`). Gemini
+Code Assistant runs in a shell that does not inherit the Windows User
+environment, so export the provider API keys explicitly before running the
+router (see **Running the router** above):
 
 ```bash
 export DABBLER_GEMINI_API_KEY=$(powershell -Command "[System.Environment]::GetEnvironmentVariable('DABBLER_GEMINI_API_KEY', 'User')" | tr -d '\r')
@@ -176,4 +177,7 @@ print('API keys OK')
 "
 ```
 
-If keys are missing, stop and tell the human.
+If the router profile is `api` and keys are missing, stop and tell the
+human. When the active profile is `copilot-cli`, **skip this step
+entirely**: that seat carries no provider API keys by design, their
+absence is not an error, and nothing in the router warns about it.

@@ -469,6 +469,32 @@ def test_model_registry_drift_passes_on_a_real_id(tmp_path):
     assert drift_guard.check_model_registry_matches_providers(repo) == []
 
 
+def test_model_registry_drift_needs_no_provider_api_keys(tmp_path, monkeypatch):
+    """Set 111 S2 (operator, 2026-08-07): a guard that touches no provider
+    must not demand provider credentials.
+
+    This check reads only ``router-config.yaml`` and the committed
+    lockfile -- it never probes. It used to load the config through the
+    path that validated API keys, so on a Copilot-CLI seat (no
+    ``DABBLER_*`` keys at all, which is one of the two supported
+    populations, not a misconfiguration) the guard failed with a
+    credentials complaint about a network call it was never going to
+    make.
+    """
+    monkeypatch.delenv("DABBLER_OPENAI_API_KEY", raising=False)
+    repo = _registry_repo(
+        tmp_path, model_id="gpt-5.6-sol", offered=["gpt-5.6-sol"]
+    )
+    assert drift_guard.check_model_registry_matches_providers(repo) == []
+
+    drifted = _registry_repo(
+        tmp_path / "drifted", model_id="gpt-5.6", offered=["gpt-5.6-sol"]
+    )
+    violations = drift_guard.check_model_registry_matches_providers(drifted)
+    assert len(violations) == 1
+    assert "gpt-5.6" in violations[0].detail
+
+
 def test_model_registry_drift_is_silent_without_the_inputs(tmp_path):
     """A checkout carrying neither file has nothing to certify. Absent inputs
     are not a violation -- this guard also runs in consumer repos."""

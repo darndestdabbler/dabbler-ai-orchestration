@@ -211,6 +211,77 @@ def _strip_nits_section(text: str) -> str:
     return text[: nits_head.start()].rstrip() if nits_head else text
 
 
+def _parse_acceptance(block: str) -> Optional[dict]:
+    """Parse a finding's acceptance criterion (Set 111 S2, Proposal B).
+
+    TOLERANT, like every other field here: an absent, malformed, or
+    unparseable criterion returns ``None`` and never changes blocking
+    classification. Two shapes come out, mirroring the two forms the
+    template asks for:
+
+    - ``{"kind": "executable", "command": ..., "expectedExitCode": int,
+      "expectedOutputContains": str?}`` — a single backticked command the
+      acceptance harness may RUN against the pre-fix and fixed trees.
+    - ``{"kind": "judgment", "statement": ...}`` — a prose sentence a
+      reviewer settles. Never executed.
+
+    The executable form requires a **backticked** command: unfenced prose
+    is read as judgment, so a criterion the verifier did not deliberately
+    mark as runnable is never handed to a shell-adjacent runner. The
+    ``JUDGMENT`` marker wins over a backticked span, so a judgment
+    sentence that quotes a command in backticks stays judgment.
+    """
+    crit_match = re.search(
+        r'Acceptance[\s*_-]*criterion[\s*:.\-_]*([^\n]+)', block, re.IGNORECASE
+    )
+    if not crit_match:
+        return None
+    raw = crit_match.group(1).strip()
+    # Trailing emphasis only: a leading '*' would eat a globbed command.
+    value = raw.rstrip("*").strip()
+    if not value:
+        return None
+
+    judgment = re.match(r'(?i)^\**\s*judgment\b\**[\s:.\-\u2014\u2013]*(.*)$', value)
+    if judgment:
+        statement = judgment.group(1).strip().strip("*").strip()
+        return {"kind": "judgment", "statement": statement or value}
+
+    command_match = re.search(r'`([^`]+)`', value)
+    if not command_match:
+        # Unfenced prose: honest judgment, never a command.
+        return {"kind": "judgment", "statement": value}
+    command = command_match.group(1).strip()
+    if not command:
+        return {"kind": "judgment", "statement": value}
+
+    acceptance: dict = {
+        "kind": "executable",
+        "command": command,
+        "expectedExitCode": 0,
+    }
+    exp_match = re.search(
+        r'Acceptance[\s*_-]*expectation[\s*:.\-_]*([^\n]+)',
+        block,
+        re.IGNORECASE,
+    )
+    if exp_match:
+        expectation = exp_match.group(1).strip()
+        exit_match = re.search(
+            r'exit(?:\s*code)?[\s*:=]*(-?\d+)', expectation, re.IGNORECASE
+        )
+        if exit_match:
+            acceptance["expectedExitCode"] = int(exit_match.group(1))
+        contains = re.search(
+            r'contains?[\s*:=]*["\'\u201c\u2018`]([^"\'\u201d\u2019`]+)',
+            expectation,
+            re.IGNORECASE,
+        )
+        if contains and contains.group(1).strip():
+            acceptance["expectedOutputContains"] = contains.group(1).strip()
+    return acceptance
+
+
 def _parse_issue_blocks(body: str) -> list:
     """Parse explicit ``Issue N:`` blocks from a header/NITS-stripped body.
 
@@ -259,6 +330,12 @@ def _parse_issue_blocks(body: str) -> list:
             scenario = fs_match.group(1).strip().strip("*").strip()
             if scenario:
                 issue["failureScenario"] = scenario
+        # Acceptance criterion (Set 111 S2): the closed question that
+        # settles the finding. Tolerant, optional; the harness — never
+        # this parser — decides whether it discriminates.
+        acceptance = _parse_acceptance(match)
+        if acceptance:
+            issue["acceptance"] = acceptance
         if issue["description"]:
             issues.append(issue)
     return issues

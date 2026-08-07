@@ -33,6 +33,15 @@
 > the optional verifier-emitted `failureScenario` field is recognized on
 > the base issue object under **both** schema versions (additive; no
 > version bump — the issue object is open and the field is tolerant).
+>
+> **Extended by** Set 111
+> (`docs/session-sets/111-verification-loop-and-ceremony-simplification/`):
+> S1 adds the optional `discoveryLens`; S2 adds the optional `acceptance`
+> block (Proposal B, gated by baseline discrimination). Both are additive
+> on the open issue object under **both** schema versions. The design
+> record is
+> [`docs/proposals/2026-08-04-verification-loop-parallelisation-vs-acceptance-criteria.md`](proposals/2026-08-04-verification-loop-parallelisation-vs-acceptance-criteria.md)
+> §5–§6 and §9.
 
 ---
 
@@ -137,9 +146,45 @@ are tolerated (`additionalProperties` is open on the issue object).
 | `failureScenario` | string | no | verifier (Set 096). The concrete failure scenario + probability justification the consequence-graded severity rubric requires per blocking Issue. Parsed tolerantly from the `Failure scenario:` line; valid under both schema versions; its absence never changes blocking classification (`classify_blocking` semantics unchanged). |
 | `discoveryCall` | integer ≥ 1 | no | machinery (Set 096). On a fanned-out discovery round, which fan-out call reported the finding (call 1 = the canonical round artifact; call k = the `-fanout-<k>` sibling). Absent on single-call rounds. |
 | `discoveryLens` | string | no | machinery (Set 111 S1). The discovery **lens** the reporting call reviewed under — `spec-conformance` (plan → diff) or `failure-scenario` (code → the ways it breaks), cycled by call index. Written beside `discoveryCall` on fanned-out discovery rounds; absent on single-call rounds and on every non-discovery phase. Not enum-constrained: the lens list is code-side (`verify_session.DISCOVERY_LENSES`) and may grow without a schema bump. |
+| `acceptance` | object | no | verifier (Set 111 S2). The **closed question** that settles whether the finding is fixed. See [Acceptance criteria](#acceptance-criteria-set-111-s2) below. |
 | `resolution_status` | string | no | orchestrator annotation (advisory). v1: loose. v2: enum-enforced **when present** (see below). |
 | `resolution_notes` | string | no | orchestrator annotation (advisory) |
 | `resolved_in_round` | integer ≥ 1 | no | orchestrator annotation (advisory) |
+
+### Acceptance criteria (Set 111 S2)
+
+Re-verification is an **open** prompt ("look at this again"), which is why
+a salience-limited reviewer keeps returning fresh findings. An acceptance
+criterion is a **closed** question. The verifier writes one per
+Critical/Major finding, at finding time, and it is parsed tolerantly from
+the `Acceptance criterion:` / `Acceptance expectation:` lines of the Issue
+block. Its absence never changes blocking classification.
+
+| Field | Type | Required | Meaning |
+|---|---|---|---|
+| `kind` | `"executable"` \| `"judgment"` | yes | Which form the criterion takes. |
+| `command` | string | when `kind` is `executable` | The single command, verbatim from the verifier's backticked criterion. |
+| `expectedExitCode` | integer | no (default `0`) | The exit code that counts as PASS. |
+| `expectedOutputContains` | string | no | Substring required in combined stdout+stderr for a PASS. |
+| `statement` | string | when `kind` is `judgment` | The one sentence a reviewer settles. Never executed. |
+
+**A criterion is not evidence until it discriminates.** `python -m
+ai_router.acceptance_harness --session-set-dir <dir> --round <M>` runs each
+**unchanged** criterion against the round's `discoveryBaselineTree`
+(pre-fix) and a fresh snapshot of the working tree (fixed), each in a
+**disposable git worktree**, with no shell, no credentials, and a
+timeout. The finding auto-closes **only** when the criterion **fails
+before and passes after**. Everything else — a criterion that already
+passed pre-fix (vacuous), one whose test assets the remediation modified,
+one carrying a shell operator, one edited since a previous harness run,
+a judgment criterion, or a timeout — stays judgment-based and is settled
+by the retained `--phase remediation-review`, which reads the harness's
+`sN-acceptance-round-<M>.json` artifact and spends its attention on what
+the fixes **broke** and what the criteria **missed**.
+
+Baseline discrimination proves a criterion is *related* to the defect; it
+does not prove it is *sufficient*. No adequacy checker exists by design —
+sufficiency is delegated to that one holistic review.
 
 ### v2 promoted finding fields (Set 057)
 

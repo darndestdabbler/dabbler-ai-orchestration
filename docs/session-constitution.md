@@ -31,10 +31,12 @@ Run every router CLI through the workspace venv
 (`.venv/Scripts/python.exe` on Windows, `.venv/bin/python` on POSIX) —
 `No module named ai_router` means a bare `python`, not missing keys.
 
-- **0. Preload + keys.** Read the four preload files; confirm the
-  provider keys (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
-  `DABBLER_OPENAI_API_KEY`) are present. Missing key → stop, tell the
-  human.
+- **0. Preload + keys.** Read the four preload files. On the **Direct
+  APIs** transport (`transport.profile: api`), confirm the provider keys
+  (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
+  `DABBLER_OPENAI_API_KEY`); a missing key → stop, tell the human. On the
+  **Copilot CLI** transport a seat carries no provider keys by design —
+  their absence is not an error and nothing warns about it.
 - **1. Register first, work second.** Resolve the active set by reading
   each set's `session-state.json` `status` (never infer from file
   presence), then, as the first on-disk action, run
@@ -71,8 +73,11 @@ Run every router CLI through the workspace venv
   Minor-only round is effectively VERIFIED — record the nits and
   proceed. On a blocking discovery round: run `--phase supplementary`
   BEFORE remediating, fix the merged blockers once (write the per-round
-  remediation sidecar), then `--phase remediation-review` on the fix
-  delta. Bounds and no-resurrection: *Recovery and escalation* below.
+  remediation sidecar), run `python -m ai_router.acceptance_harness
+  --round <R>` (a finding auto-closes only when its unchanged criterion
+  fails pre-fix and passes post-fix), then `--phase remediation-review`
+  on the fix delta. Bounds and no-resurrection: *Recovery and escalation*
+  below.
 - **8. Close.** Author `disposition.json`
   (`verification_verdict` always; `next_orchestrator` on a mid-set
   completion), commit **and push**, run

@@ -232,7 +232,11 @@ def _init():
     global _config, _rate_limiters
     if _config is None:
         config_path = os.environ.get("AI_ROUTER_CONFIG")  # None → uses __file__-relative default
-        _config = load_config(config_path)
+        # require_api_keys=True: this is the DISPATCH entry point, so it is
+        # the one place a missing provider key is a real problem (Set 111
+        # S2). The copilot-cli profile stays exempt inside the validator --
+        # a Copilot seat has no provider keys by design.
+        _config = load_config(config_path, require_api_keys=True)
         for provider_name, provider_cfg in _config["providers"].items():
             _rate_limiters[provider_name] = RateLimiter(
                 provider_cfg["rate_limit"]["requests_per_minute"],

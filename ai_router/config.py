@@ -118,7 +118,41 @@ def _resolve_config_path(path: str | None = None) -> str:
     return resolved
 
 
-def load_config(path: str | None = None) -> dict:
+def validate_provider_api_keys(config: dict) -> None:
+    """Raise unless every enabled provider's API key is present.
+
+    **Called at DISPATCH, not at config load** (Set 111 S2, operator
+    decision 2026-08-07). There are two clean populations of user, and a
+    keyless machine is healthy in one of them:
+
+    - **Copilot CLI** — a GitHub Copilot seat with *no provider API keys
+      at all*; every call dispatches through the CLI, never
+      ``providers.call_model``. This function is a no-op there.
+    - **Direct APIs** — provider keys, no Copilot seat.
+
+    So absence of keys is only ever a problem when something is actually
+    attempting a **direct-API** dispatch. Making it a *load-time* error
+    made every read-only consumer of the config — drift guards, guidance
+    reports, registry checks that touch no provider at all — fail on a
+    perfectly healthy Copilot seat, complaining about credentials nothing
+    in that code path would have used.
+    """
+    if (config.get("transport") or {}).get("profile") == "copilot-cli":
+        return
+    for name, provider in (config.get("providers") or {}).items():
+        if not provider.get("enabled", True):
+            continue
+        env_var = provider["api_key_env"]
+        if not resolve_secret(env_var):
+            raise EnvironmentError(
+                f"Missing environment variable {env_var} "
+                f"for provider '{name}'. "
+                f"Set it with: export {env_var}=your-key-here"
+            )
+
+
+def load_config(path: str | None = None, *,
+                require_api_keys: bool = False) -> dict:
     path, config_source = _resolve_config_path_and_source(path)
     config_path = Path(path)
     if not config_path.exists():
@@ -155,23 +189,15 @@ def load_config(path: str | None = None) -> dict:
     if local_overrides_path.exists():
         _apply_local_overrides(config, local_overrides_path)
 
-    # Validate API keys exist in environment (only for enabled providers).
-    # Skipped entirely under the copilot-cli profile (Set 078 verification
+    # Validate API keys exist in environment (only for enabled providers,
+    # and only when the caller is about to DISPATCH -- Set 111 S2). The
+    # copilot-cli profile is exempt at any call site (Set 078 verification
     # finding): that profile's whole point is a seat with NO provider API
-    # keys at all — every call dispatches through the Copilot CLI, never
-    # providers.call_model. Requiring keys anyway would make the profile
-    # fail to load for its one stated use case.
-    if config["transport"]["profile"] != "copilot-cli":
-        for name, provider in config["providers"].items():
-            if not provider.get("enabled", True):
-                continue
-            env_var = provider["api_key_env"]
-            if not resolve_secret(env_var):
-                raise EnvironmentError(
-                    f"Missing environment variable {env_var} "
-                    f"for provider '{name}'. "
-                    f"Set it with: export {env_var}=your-key-here"
-                )
+    # keys at all. Read-only consumers (drift guards, guidance reports,
+    # registry checks) leave require_api_keys False and never complain
+    # about credentials they would not have used.
+    if require_api_keys:
+        validate_provider_api_keys(config)
 
     # Validate model references resolve against the providers block
     provider_names = set(config["providers"])

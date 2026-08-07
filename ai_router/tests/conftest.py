@@ -133,3 +133,60 @@ def _no_live_backstop_routing(monkeypatch):
             continue
         monkeypatch.setattr(module, "_default_route", _refuse_live_routing)
     yield
+
+
+@pytest.fixture()
+def placeholder_provider_keys(monkeypatch):
+    """Set placeholder ``DABBLER_*`` provider keys for a direct-API test.
+
+    Set 111 S2. A test that builds a provider request and mocks the HTTP
+    layer still runs the real key-resolution step, so on a **Copilot CLI**
+    seat — which carries no provider keys by design, and is one of the
+    two supported populations rather than a misconfiguration — it fails
+    on a credential it was never going to send. The key is a placeholder
+    precisely because the call is faked.
+    """
+    for key in (
+        "DABBLER_ANTHROPIC_API_KEY",
+        "DABBLER_GEMINI_API_KEY",
+        "DABBLER_OPENAI_API_KEY",
+    ):
+        monkeypatch.setenv(key, "test-key")
+
+
+@pytest.fixture()
+def direct_api_transport(monkeypatch, tmp_path_factory,
+                         placeholder_provider_keys):
+    """Run the test as the **Direct APIs** population, whatever this seat is.
+
+    Set 111 S2. The framework supports two populations — *Direct APIs*
+    (provider keys, no Copilot seat) and *Copilot CLI* (a seat, no
+    provider keys) — and a machine selects its own with
+    ``transport.profile`` in the **gitignored**
+    ``ai_router/local-overrides.yaml``.
+
+    A test that fakes the direct-API seam (``ai_router.call_model``, or
+    ``httpx``) is asserting a property of the *api* transport. On a
+    Copilot seat those fakes are simply never reached: ``route()`` reads
+    the seat's local override, dispatches through the **real Copilot
+    CLI**, and the test hangs until the CLI's total-timeout — a
+    seat-dependent failure that says nothing about the invariant under
+    test.
+
+    This fixture removes the seat from the equation by pointing
+    ``AI_ROUTER_CONFIG`` at a copy of the **shipped** ``router-config.yaml``
+    in a scratch directory, where no ``local-overrides.yaml`` sits beside
+    it. The shipped file is pinned to ``profile: api`` (a packaging
+    invariant with its own test), so the copy IS the shipping
+    configuration — which is what these tests mean by "the live
+    registry".
+    """
+    import shutil
+
+    source = AI_ROUTER_DIR / "router-config.yaml"
+    scratch = tmp_path_factory.mktemp("direct-api-config")
+    target = scratch / "router-config.yaml"
+    shutil.copyfile(source, target)
+    monkeypatch.setenv("AI_ROUTER_CONFIG", str(target))
+    return target
+

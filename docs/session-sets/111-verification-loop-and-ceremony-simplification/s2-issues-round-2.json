@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Disposable worktrees cannot run the repo-standard `.venv/Scripts/python.exe` criteria.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A verifier writes the normal Windows/router command form, e.g. `.venv/Scripts/python.exe -m pytest ...`. The harness checks out a tree object that excludes `.venv/`, then spawns that relative path from inside the disposable worktree, so the criterion records a spawn `error` instead of executing. This is probable because the workflow explicitly tells users to run router CLIs through `.venv/Scripts/python.exe`, and `.venv/` is gitignored.\n  - **Acceptance criterion:** JUDGMENT - A verifier-authored criterion using the documented workspace venv interpreter must execute inside the disposable worktree, or the template must stop recommending an unavailable interpreter path.\n  - **Details:** **Violation:** The deliverable promises executable criteria run in disposable worktrees, while repo docs say “Always run the router CLIs through the workspace venv” with `.venv/Scripts/python.exe`. **Impact:** Typical executable acceptance criteria fail closed as infrastructure errors and never auto-close, so the session’s core “criterion-execution plus one holistic review” path is not actually usable on the documented Windows path. **Evidence:** `.gitignore` excludes `.venv/`; `git check-ignore .venv/Scripts/python.exe` reports it ignored; `run_criterion_in()` spawns `argv[0]` relative to the disposable `cwd` and turns missing executables into `spawnError`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A verifier writes the normal Windows/router command form, e.g. `.venv/Scripts/python.exe -m pytest ...`. The harness checks out a tree object that excludes `.venv/`, then spawns that relative path from inside the disposable worktree, so the criterion records a spawn `error` instead of executing. This is probable because the workflow explicitly tells users to run router CLIs through `.venv/Scripts/python.exe`, and `.venv/` is gitignored.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A verifier-authored criterion using the documented workspace venv interpreter must execute inside the disposable worktree, or the template must stop recommending an unavailable interpreter path."
+      }
+    },
+    {
+      "description": "** The remediation-review block omits the output evidence needed to justify output-based auto-closures.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** A criterion uses `Acceptance expectation: exit 0, output contains \"fixed\"` and both baseline and fixed runs exit 0, with only the output substring discriminating. The harness can auto-close correctly, but the reviewer prompt shows only “exit 0 -- FAILED” and “exit 0 -- PASSED” with no expected substring or output excerpt, while the JSON artifact is excluded from the evidence bundle. This is probable because output expectations are an advertised criterion feature.\n  - **Acceptance criterion:** JUDGMENT - Criteria-closed findings whose verdict depends on `expectedOutputContains` must show the expected substring and baseline/fixed output evidence in the remediation-review block.\n  - **Details:** **Violation:** The session contract says `assemble_acceptance_block` renders criteria-closed findings “with both runs’ evidence.” **Impact:** The retained holistic reviewer is told not to re-derive closed findings but cannot audit the actual discriminating evidence, which can hide a bad or misleading auto-close. **Evidence:** `acceptance_harness.run_criterion_in()` records `output` and `outputContainsExpected`, but `verify_session.assemble_acceptance_block()` renders only the criterion, expected exit, and the two exit codes at lines 1960-1972.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A criterion uses `Acceptance expectation: exit 0, output contains \"fixed\"` and both baseline and fixed runs exit 0, with only the output substring discriminating. The harness can auto-close correctly, but the reviewer prompt shows only “exit 0 -- FAILED” and “exit 0 -- PASSED” with no expected substring or output excerpt, while the JSON artifact is excluded from the evidence bundle. This is probable because output expectations are an advertised criterion feature.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Criteria-closed findings whose verdict depends on `expectedOutputContains` must show the expected substring and baseline/fixed output evidence in the remediation-review block."
+      }
+    },
+    {
+      "description": "** The harness promises “no network and no credentials” but only filters process environment variables.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A verifier output influenced by untrusted repo content emits a backticked command that uses `curl`, `powershell`, or Python networking APIs. The harness accepts it if it has no banned shell metacharacters, runs it with normal network access, and on Windows the process can still read User-scope environment values that this repo documents for provider keys. This is probable because verifier-authored commands are explicitly treated as untrusted input and the verifier consumes untrusted code evidence.\n  - **Acceptance criterion:** JUDGMENT - The harness must either enforce the documented no-network/no-credentials containment boundary, including Windows User/Machine env and credential-agent paths, or stop claiming that boundary.\n  - **Details:** **Violation:** `verification.md` says criteria run with “no network and no credentials.” **Impact:** An untrusted acceptance command can exfiltrate source or credentials from the developer machine, which is exactly the containment class this session is supposed to make safe. **Evidence:** `run_criterion_in()` is a plain `subprocess.run()` with no sandbox or network denial, and `child_environment()` only removes regex-matching keys from `os.environ`; repo docs say provider keys are stored as Windows User environment variables, and repo helpers read those via PowerShell outside `os.environ`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A verifier output influenced by untrusted repo content emits a backticked command that uses `curl`, `powershell`, or Python networking APIs. The harness accepts it if it has no banned shell metacharacters, runs it with normal network access, and on Windows the process can still read User-scope environment values that this repo documents for provider keys. This is probable because verifier-authored commands are explicitly treated as untrusted input and the verifier consumes untrusted code evidence.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The harness must either enforce the documented no-network/no-credentials containment boundary, including Windows User/Machine env and credential-agent paths, or stop claiming that boundary."
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "00bc8d4a9ca7554a9fb531cd40fddb2725041ca8"
+}

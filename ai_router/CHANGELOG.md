@@ -16,6 +16,84 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 111 S2) Provider API keys are validated at DISPATCH, not at config
+  load.** Operator decision, 2026-08-07. The framework has **two supported
+  populations**, and a machine with no `DABBLER_*` keys is healthy in one of
+  them:
+
+  - **Copilot CLI** — a GitHub Copilot seat with *no provider API keys at
+    all*; every call dispatches through the CLI.
+  - **Direct APIs** — provider keys, no Copilot seat.
+
+  `load_config()` used to raise `EnvironmentError` for a missing key on any
+  `api`-profile config, which meant every **read-only** consumer — drift
+  guards, guidance reports, registry checks that touch no provider and make
+  no network call — failed on a perfectly healthy Copilot seat, complaining
+  about credentials nothing in that code path would have used. The
+  repository's own `check_model_registry_matches_providers` guard is the
+  worked example: its docstring says it "reads only local files ... and
+  never probes a provider", yet it could not run without an OpenAI key.
+
+  `load_config(path, *, require_api_keys=False)` now defaults to **not**
+  validating, and the router's dispatch entry point (`_init()`) passes
+  `require_api_keys=True` — so the complaint fires exactly where the
+  operator's rule puts it: when something is actually attempting a
+  direct-API dispatch. The validation itself is now a named, testable
+  function, `config.validate_provider_api_keys()`, and the `copilot-cli`
+  exemption still applies inside it. `providers.call_model` continues to
+  raise its own missing-key error at the true point of use, so the
+  direct-API path is not weakened — only the false alarms are gone. Docs
+  (`quick-start.md`, `session-constitution.md`, `CLAUDE.md`, `GEMINI.md`)
+  now state the two transports side by side instead of presenting keys as
+  universally required.
+
+- **(Set 111 S2) `ai_router.acceptance_harness` — verifier-authored acceptance
+  criteria, gated by baseline discrimination.** Fix-checking was an open-ended
+  re-review (*"look at this again"*), which is why a salience-limited reviewer
+  keeps returning fresh findings and why the orchestrator ended up writing its
+  own falsifier for its own fix. The verification template now asks for one
+  **acceptance criterion** per Critical/Major finding — a single backticked
+  command where possible, `JUDGMENT - <sentence>` where not — parsed tolerantly
+  into the round envelope's new optional per-issue `acceptance` block
+  (`kind` / `command` / `expectedExitCode` / `expectedOutputContains` /
+  `statement`; `docs/session-issues.schema.json`).
+
+  A criterion is **not evidence until it discriminates**:
+
+  ```
+  python -m ai_router.acceptance_harness --session-set-dir <set> --round <R>
+  ```
+
+  runs each **unchanged** criterion against the round's
+  `discoveryBaselineTree` (pre-fix) and a fresh working-tree snapshot
+  (fixed), and auto-closes a finding **only when it fails before and passes
+  after**. Every other outcome — `not-discriminating` (the criterion already
+  passed pre-fix, i.e. vacuous), `still-failing`, `test-asset-modified` (the
+  remediation edited the ruler), `criterion-changed`, `refused-unsafe`,
+  `judgment`, `no-criterion`, `error` — leaves the finding blocking and
+  judgment-based. Results are written to `sN-acceptance-round-<R>.json`.
+
+  **Containment:** verifier-authored shell is untrusted input, so criteria
+  never run in the live working tree. Both runs happen in **disposable git
+  worktrees** checked out from the captured tree objects, with **no shell**
+  (shell operators are refused rather than interpreted), a
+  credential-stripped environment, a wall-clock timeout, and cleanup on every
+  path including errors.
+
+  Template version bumped: `TEMPLATE_ID = session-verification-v4`, with the
+  new normalized hash pinned in `TEMPLATE_HASHES` (an edited-but-unbumped
+  template still fails closed at stamp time). `sN-acceptance-round-*.json` is
+  added to `WORK_DIFF_SET_BOOKKEEPING`, so a harness run between rounds cannot
+  stale an earlier round's stamped evidence.
+
+  Exactly one `--phase remediation-review` is retained as the final holistic
+  look: baseline discrimination proves a criterion is *related* to the defect,
+  never that it is *sufficient*. That round now reads the harness artifact, so
+  criteria-closed findings arrive with both runs' evidence attached and its
+  attention goes to what the fixes **broke** and what the criteria **missed**.
+  Fix-verdict coverage is unchanged — every ledger id still gets its line
+  every cycle.
+
 - **(Set 110 S4) `transport.profile` is a supported `local-overrides.yaml`
   key.** The transport profile is a per-**seat** fact, but `router-config.yaml`
   is package data (`pyproject.toml` ships it) and the profile had no local home,

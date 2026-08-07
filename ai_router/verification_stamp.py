@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v3"
+TEMPLATE_ID = "session-verification-v4"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -94,9 +94,16 @@ TEMPLATE_HASHES = {
     ),
     # Set 096: minted when the operator's consequence-graded severity rubric
     # (L-095-1, 2026-07-12) replaced the bare merge-decision anchor and the
-    # per-Issue "Failure scenario" line became mandatory. v3 is the active id.
+    # per-Issue "Failure scenario" line became mandatory.
     "session-verification-v3": (
         "3d3e946770b49bb7589e64e52db6b9cafbca22bf3ca05563a7bc781f99b8ad23"
+    ),
+    # Set 111 S2: minted when the per-Issue "Acceptance criterion" /
+    # "Acceptance expectation" lines and the "Writing an acceptance
+    # criterion" section were added (Proposal B, gated by baseline
+    # discrimination). v4 is the active id.
+    "session-verification-v4": (
+        "9592f1fe1ec0102d47be7dc0b44efa35c6f5acb71631a963280073f3d3c7ef66"
     ),
 }
 
@@ -183,6 +190,12 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # and a line appended mid-loop must not stale an earlier round's
     # stamped evidence.
     "s*-rounds.jsonl",
+    # Set 111 S2: the acceptance-harness artifact
+    # (acceptance_harness.acceptance_artifact_path) -- the recorded
+    # pre-fix/fixed runs of the verifier's own criteria, written after
+    # remediation and before the remediation-review reads it. Loop
+    # bookkeeping like the envelopes it annotates.
+    "s*-acceptance-round-*.json",
     "disposition.json",
     "session-events.jsonl",
     "session-state.json",

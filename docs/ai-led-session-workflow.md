@@ -1663,12 +1663,19 @@ compound. Run Step 6 as phases (`--phase`), not undifferentiated rounds:
    Critical/Major from both passes, graded by the consequence rubric;
    write the `sN-remediation-round-<R>.md` settlement sidecar(s). Minors
    are recorded, never re-rounded.
-4. **`--phase remediation-review`** — the reviewer's evidence is the
+4. **`python -m ai_router.acceptance_harness --round <R>`** (Set 111 S2)
+   — run the verifier's own acceptance criteria for round `R` against the
+   pre-fix and fixed trees. See *Acceptance criteria and the harness*
+   below. Optional in the sense that the round still works without it;
+   skipping it just means every finding arrives at step 5 as an open
+   question.
+5. **`--phase remediation-review`** — the reviewer's evidence is the
    **fix delta only** (a tree-to-tree diff from the discovery baseline to
-   the current working tree) plus the auto-assembled ledger; per-finding
-   verdicts `fix-accepted / fix-rejected / accepted-with-modification`;
-   **new defects are admissible only within the fix hunks** (out-of-delta
-   observations are NITS at most).
+   the current working tree) plus the auto-assembled ledger and, when the
+   harness ran, its results; per-finding verdicts `fix-accepted /
+   fix-rejected / accepted-with-modification`; **new defects are
+   admissible only within the fix hunks** (out-of-delta observations are
+   NITS at most).
 
 **Bounded totals (routed `api` path), ENFORCED since Set 111 S1:** at
 most **2 discovery passes** (the initial + one supplementary), at most
@@ -1722,6 +1729,75 @@ nothing less. Invoking `verify_session` **without `--phase` keeps the
 classic single-call behavior** (compat), subject to the same severity
 gate and the same enforced max-2-rounds rule; the Lightweight Mode-B
 typed loop keeps its own 1–2 automatic / 3+ human bound.
+
+#### Acceptance criteria and the harness (Set 111 S2)
+
+Re-verification is an **open** prompt — *"look at this again"* — which is
+why a salience-limited reviewer keeps returning fresh findings, and why
+the orchestrator ended up deciding when its own fix was adequate and
+writing its own falsifier (self-marking). An acceptance criterion is a
+**closed** question, written by the verifier at finding time, in the same
+Issue block as the finding:
+
+```
+  - Acceptance criterion: `<one command>`      (or)  JUDGMENT - <one sentence>
+  - Acceptance expectation: exit 0, output contains "..."
+```
+
+It lands in the round envelope as the optional per-issue `acceptance`
+block (`docs/session-issues-schema.md` → *Acceptance criteria*), parsed
+tolerantly: an absent or malformed criterion never changes blocking
+classification.
+
+**A criterion is not evidence until it discriminates.** The harness runs
+each **unchanged** criterion twice — against the round's
+`discoveryBaselineTree` (pre-fix) and a fresh snapshot of the working
+tree (fixed) — and a finding **auto-closes only when the criterion fails
+before and passes after**:
+
+```
+python -m ai_router.acceptance_harness --session-set-dir <set> --round <R>
+```
+
+Every other outcome leaves the finding blocking and judgment-based, which
+is the fail-closed direction:
+
+| Outcome | Meaning |
+|---|---|
+| `auto-closed` | Failed pre-fix, passed post-fix. The only closing outcome. |
+| `not-discriminating` | **Already passed pre-fix** — vacuous; passing after proves nothing. |
+| `still-failing` | The fix does not satisfy the verifier's own condition. |
+| `test-asset-modified` | The remediation edited a test asset the criterion runs on — the person being judged moved the ruler. |
+| `criterion-changed` | The criterion text changed since a previous harness run for this round. |
+| `refused-unsafe` | Carries a shell operator, or is empty/untokenizable. |
+| `judgment` / `no-criterion` | Never executed; settled by the review as before. |
+| `error` | Timeout or spawn failure — not evidence either way. |
+
+Results are written to `sN-acceptance-round-<R>.json` (loop bookkeeping,
+excluded from the work-diff freshness binding like the envelopes it
+annotates) and are read back into the remediation-review's framing, where
+criteria-closed findings arrive **with both runs' evidence attached**.
+
+**Containment — verifier-authored shell is untrusted input.** Criteria
+never run in the live working tree. Both runs happen in **disposable git
+worktrees** checked out from the captured tree objects, with **no shell**
+(shell operators are refused, not interpreted), a **credential-stripped
+environment**, a wall-clock timeout, and cleanup on every path including
+errors.
+
+**What this does NOT do.** Baseline discrimination proves a criterion is
+*related* to the defect; it does not prove it is *sufficient*, and no
+adequacy checker is built (proposal §10 Q2/Q3 — deliberately unresolved).
+That is why **exactly one `remediation-review` is retained**: Set 109 S4
+is the measured counterexample — a fix satisfied its finding's reasonable
+criterion cleanly and left an adjacent end-of-set deliverable unmet, a
+property of *what the fix broke* that no criterion written at finding
+time could anticipate. Coverage is unchanged: every ledger id still gets
+its `Fix verdict:` line every cycle (the Set 096 S2 round-11 operator
+decision — an exemption forfeits the regression check). What changes is
+that a criteria-closed id costs one line instead of a re-derivation, so
+the round's attention goes to what the fixes **broke** and what the
+criteria **missed**.
 
 #### Identity, dynamic exclusion, the stamp, and the close backstop (Set 084)
 
@@ -2370,14 +2446,21 @@ the branch below apply.
   prose in `sN-verification*.md` and `sN-close-reason.md` remains the
   canonical record. There is no required `issue-logs/` directory in the
   current workflow.
-5. Re-verify — **only when the round is blocking** (≥1 Critical/Major; a
+5. Run the acceptance harness for the findings-bearing round(s) —
+   `python -m ai_router.acceptance_harness --session-set-dir <set>
+   --round <R>` — so the fix-checking that CAN be settled by execution is
+   settled before a model is asked. A finding auto-closes only when its
+   unchanged criterion **fails pre-fix and passes post-fix**; everything
+   else stays blocking and judgment-based (see *Acceptance criteria and
+   the harness* under Step 6).
+6. Re-verify — **only when the round is blocking** (≥1 Critical/Major; a
    Minor-only round is not re-run, and the CLI now says so and offers
    only the close command). On the phased path this is
    `--phase remediation-review` (the fix delta + the auto-assembled
-   ledger; **at most 2 cycles**, ENFORCED — the third is refused without
-   the operator's `--operator-authorized-round` attestation — then
-   operator adjudication). On the classic path, a plain re-run (max 2
-   rounds, enforced the same way). The
+   ledger + the harness results; **at most 2 cycles**, ENFORCED — the
+   third is refused without the operator's `--operator-authorized-round`
+   attestation — then operator adjudication). On the classic path, a
+   plain re-run (max 2 rounds, enforced the same way). The
    auto-assembled ledger keeps a settled point from being resurrected
    under fresh wording (see *Materiality and the re-verify loop
    discipline* under Step 6). Phased rounds default to

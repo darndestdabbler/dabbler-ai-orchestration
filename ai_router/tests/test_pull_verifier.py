@@ -1074,6 +1074,11 @@ PARITY_TRANSCRIPT = [
 
 
 class TestOpenAIWireTranslation:
+    @pytest.fixture(autouse=True)
+    def _keys(self, placeholder_provider_keys):
+        """These build real provider requests over a faked HTTP layer, so
+        they need a placeholder key on a keyless Copilot seat (Set 111 S2)."""
+
     def test_to_input_items_sends_only_new_non_assistant_entries(self):
         # Assistant turns live server-side (previous_response_id); only the
         # user message + the tool results become input items.
@@ -1417,6 +1422,11 @@ class TestOpenAIWireTranslation:
 
 
 class TestGeminiWireTranslation:
+    @pytest.fixture(autouse=True)
+    def _keys(self, placeholder_provider_keys):
+        """These build real provider requests over a faked HTTP layer, so
+        they need a placeholder key on a keyless Copilot seat (Set 111 S2)."""
+
     def test_to_contents_roundtrips_function_call_and_response(self):
         contents = pv.GeminiBinding._to_contents(PARITY_TRANSCRIPT)
         assert contents[0] == {"role": "user", "parts": [{"text": "review the repo"}]}

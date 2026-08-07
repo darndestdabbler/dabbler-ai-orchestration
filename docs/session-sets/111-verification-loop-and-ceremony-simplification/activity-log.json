@@ -1,7 +1,7 @@
 {
   "sessionSetName": "111-verification-loop-and-ceremony-simplification",
   "createdDate": "2026-08-06T22:41:54.079265+00:00",
-  "totalSessions": 0,
+  "totalSessions": 4,
   "entries": [
     {
       "sessionNumber": 1,
@@ -84,6 +84,86 @@
       "dateTime": "2026-08-07T03:17:47.797705-04:00",
       "description": "Remediation-review round 4 on the fix delta: VERIFIED, 0 blocking, fix verdicts 1 accepted + 1 accepted-with-modification + 1 duplicate-of. One nit (a stale sN-round-authorizations.jsonl echo in s1-conventions.md) fixed in the same pass per L-065-1; the earlier activity-log entry describing the superseded design is left as the historical record it is.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-07T04:11:22.074959-04:00",
+      "description": "Registered session 2 via start_session (copilot / claude-opus-5 / high, provider anthropic). Read the preload (constitution, project-guidance, lessons-learned, AGENTS.md), the spec, and proposal SS5/SS6/SS9. Recorded the operator notes (2026-08-07) in operator-notes.md: unaccounted verification work is treated as third-party, and two Work Explorer context-menu convenience items are logged as future-set candidates.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "criteria-emitted",
+      "dateTime": "2026-08-07T04:40:47.783761-04:00",
+      "description": "Extended the verifier envelope with the acceptance block: verification.md gains per-Issue Acceptance criterion / Acceptance expectation lines plus a Writing an acceptance criterion section (template pin bumped to session-verification-v4 with its new pinned hash); verification._parse_acceptance parses executable (backticked command + exit/output expectation) vs judgment forms tolerantly; docs/session-issues.schema.json + session-issues-schema.md document the optional per-issue acceptance object.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "baseline-discrimination",
+      "dateTime": "2026-08-07T04:40:47.785564-04:00",
+      "description": "Built ai_router/acceptance_harness.py: runs each UNCHANGED criterion against the round discoveryBaselineTree (pre-fix) and a fresh working-tree snapshot (fixed). Auto-closes ONLY on fails-before AND passes-after. Vacuous (passes pre-fix), still-failing, test-asset-modified, criterion-changed (contract hash covers command + expectations), refused-unsafe (shell operators), judgment, no-criterion and error all stay judgment-based. Results written to sN-acceptance-round-<M>.json.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "worktree-execution",
+      "dateTime": "2026-08-07T04:40:47.787249-04:00",
+      "description": "Containment: both runs happen in disposable git worktrees checked out from captured tree objects via commit-tree, never the live working tree; no shell (metacharacters refused, not interpreted); credential-stripped environment with DABBLER_NO_ROUTER=1; wall-clock timeout; cleanup on every path including errors.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "single-final-review",
+      "dateTime": "2026-08-07T04:40:47.789400-04:00",
+      "description": "Retained exactly one remediation-review: verify_session.assemble_acceptance_block renders criteria-closed findings with both runs evidence and non-closing criteria with their reason, keyed by ledger ids from the new single-source blocking_ledger_id_map; the phase framing now directs attention to what the fixes BROKE and what the criteria MISSED. Fix-verdict coverage is unchanged (Set 096 S2 round-11 operator decision).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "key-warning-scope",
+      "dateTime": "2026-08-07T04:54:19.282673-04:00",
+      "description": "OPERATOR-AUTHORIZED SCOPE EXTENSION (2026-08-07): absence of provider API keys must never warn unless a direct-API dispatch is attempted. load_config gains require_api_keys (default False) and the validation moved to the named config.validate_provider_api_keys; ai_router.__init__._init() (the dispatch entry) passes require_api_keys=True; copilot-cli stays exempt inside the validator; providers.call_model still raises at the true point of use. Root-fixed the two drift-guard tests Session 1 had recorded as pre-existing environmental failures. Docs (quick-start, constitution Step 0, CLAUDE.md, GEMINI.md) now present Direct APIs and Copilot CLI side by side. Also recorded a Set 112 note to relabel the two transports in user-facing surfaces (new labels, same config values).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "seat-independent-tests",
+      "dateTime": "2026-08-07T05:50:56.590842-04:00",
+      "description": "Root-fixed the second environmental class Session 1 had excused: 14 tests in test_pull_verifier (6), test_routing_exclusion_integrity (6) and test_orchestrator_identity (2) fake the DIRECT-API seam but loaded the seat config, so on this copilot-cli seat route() sailed past the fakes into the real CLI and hung up to 20 min each (S1 raised the ceiling to 1200s). Two shared conftest fixtures -- placeholder_provider_keys and direct_api_transport (a copy of the SHIPPED api-pinned router-config.yaml in a scratch dir with no local-overrides beside it) -- make them seat-independent. 115 passed in 17s and 148 passed/3 skipped in 18s.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "build-test",
+      "dateTime": "2026-08-07T05:50:56.592845-04:00",
+      "description": "Full run of record after the last code change, NOTHING deselected: 3,563 passed / 0 failed / 10 skipped in 15m36s. First fully clean full run on this machine in the set.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-08-07T06:21:35.749812-04:00",
+      "description": "Routed cross-provider verification, anthropic excluded, verifier gpt-5.5. Discovery round 1 (K=2, lenses spec-conformance + failure-scenario): ISSUES_FOUND, 5 blocking. Supplementary round 2: ISSUES_FOUND, 3 blocking. 8 findings, 6 distinct defects (2 cross-lens duplicate pairs). Both discovery passes now spent.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 10,
+      "stepKey": "remediate-partial",
+      "dateTime": "2026-08-07T06:21:35.752284-04:00",
+      "description": "REMEDIATION ROUND 1 INCOMPLETE -- operator ended the working window. Fixed: broad test-runner/directory scope invalidation (is_test_runner, criterion_scopes, changed_paths_between, modified_test_assets_in_scope); .venv/bare-python interpreter rewrite (resolve_interpreter); shell/fetch program denylist. Built but NOT wired: raw_artifact_criteria + _call_key + OUTCOME_CRITERION_UNBOUND for the first-run-edit hole. NOT started: per-criterion worktree isolation, output evidence in the review block, correcting the over-claimed no-network/no-credentials wording (needs template v5). Full handoff in s2-remediation-round-1.md. Harness suite 61 passed.",
+      "status": "in-progress"
     }
   ]
 }

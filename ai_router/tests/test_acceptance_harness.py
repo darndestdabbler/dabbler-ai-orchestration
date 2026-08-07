@@ -871,8 +871,12 @@ class TestInvalidation:
         artifact = _run(repo)
         for index in (0, 1):
             result = _result_for(artifact, index)
-            assert result["outcome"] == ah.OUTCOME_TEST_ASSET_MODIFIED
-            assert "tests/test_widget.py" in result["modifiedTestAssets"]
+            # Subsumed by the stronger refusal (close-backstop round 7):
+            # a runner is not attributable at all, so it never reaches the
+            # asset comparison. The property under test is unchanged --
+            # editing tests cannot buy closure.
+            assert result["outcome"] == ah.OUTCOME_RUNNER_NOT_ATTRIBUTABLE
+            assert result["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
             assert "baseline" not in result
 
     def test_conftest_edit_invalidates_a_file_scoped_pytest_criterion(
@@ -905,8 +909,8 @@ class TestInvalidation:
             "PASS = True\n", encoding="utf-8"
         )
         result = _result_for(_run(repo), 0)
-        assert result["outcome"] == ah.OUTCOME_TEST_ASSET_MODIFIED
-        assert "tests/conftest.py" in result["modifiedTestAssets"]
+        assert result["outcome"] == ah.OUTCOME_RUNNER_NOT_ATTRIBUTABLE
+        assert result["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
         assert "baseline" not in result
 
     def test_root_scoped_runner_invalidates_on_any_test_edit(self, repo):
@@ -927,8 +931,53 @@ class TestInvalidation:
             "import sys\nsys.exit(0)\n", encoding="utf-8"
         )
         result = _result_for(_run(repo), 0)
-        assert result["outcome"] == ah.OUTCOME_TEST_ASSET_MODIFIED
-        assert "tests/test_widget.py" in result["modifiedTestAssets"]
+        assert result["outcome"] == ah.OUTCOME_RUNNER_NOT_ATTRIBUTABLE
+        assert "tests/test_widget.py" not in str(result.get("baseline", ""))
+        assert result["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
+
+    def test_a_test_runner_criterion_is_never_attributable(self, repo):
+        """Six rounds established that 'what a runner collects' and 'what
+        counts as a test asset' are both open-ended. A runner's pass
+        cannot be attributed to the fix, so it never closes -- whatever
+        the run does."""
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": f"{_python()} -m pytest tests/test_widget.py",
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        _remediate(repo)
+        result = _result_for(_run(repo), 0)
+        assert result["outcome"] == ah.OUTCOME_RUNNER_NOT_ATTRIBUTABLE
+        assert result["testRunner"] is True
+        # Not run at all: there is nothing a run could establish.
+        assert "baseline" not in result
+        assert result["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
+
+    def test_a_product_probe_still_closes(self, repo):
+        """The auto-closable path must survive: a by-path probe over
+        product code is unaffected by any of the runner reasoning."""
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": _value_probe("fixed"),
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        _remediate(repo)
+        # Even with test assets churning, a product probe is attributable.
+        (repo / "tests" / "test_widget.py").write_text(
+            "import sys\nsys.exit(0)\n", encoding="utf-8"
+        )
+        result = _result_for(_run(repo), 0)
+        assert result["outcome"] == ah.OUTCOME_AUTO_CLOSED
 
     def test_first_run_criterion_edit_invalidates(self, repo):
         """Round-1 finding: the FIRST harness run is the normal path.

@@ -1767,7 +1767,8 @@ is the fail-closed direction:
 | `auto-closed` | Failed pre-fix, passed post-fix. The only closing outcome. |
 | `not-discriminating` | **Already passed pre-fix** — vacuous; passing after proves nothing. |
 | `still-failing` | The fix does not satisfy the verifier's own condition. |
-| `test-asset-modified` | The remediation edited a test asset **inside the criterion's scope** — the person being judged moved the ruler. A path token scopes to its own subtree; **any test runner scopes to the whole repo**, because what a runner collects cannot be read off its argv. |
+| `test-asset-modified` | The remediation edited a test asset the criterion names — the person being judged moved the ruler. |
+| `runner-not-attributable` | The criterion invokes a **test runner**. A runner's result depends on both the product code and every test asset it collects, neither of which is knowable from the command line, so a pass cannot be attributed to the fix. Never run, never closes. |
 | `criterion-changed` | The criterion in the envelope does not match the one the **verifier wrote** in the round's raw artifact. |
 | `criterion-unbound` | The raw verification artifact could not be read, or carries no criterion for this finding — so there is no verifier-authored source to bind to. |
 | `refused-unsafe` | Carries a shell operator, names a shell or fetch tool, or is empty/untokenizable. |
@@ -1779,20 +1780,25 @@ excluded from the work-diff freshness binding like the envelopes it
 annotates) and are read back into the remediation-review's framing, where
 criteria-closed findings arrive **with both runs' evidence attached**.
 
-**Scope, and why a test runner is special.** A criterion that names paths
-is judged on those subtrees. A criterion that invokes a **test runner** —
-`pytest`, `go test`, `npm test`, `vitest`, … — is judged on the **whole
-repository**, because what a runner collects cannot be determined from its
-command line. Set 111 S2 established that the hard way: five consecutive
-verification rounds each found a different spelling a narrower rule missed
-(`pytest` with no path, then a targeted file versus the `conftest.py` it
-loads, then `./` versus the literal `"."`, then `tests/fixtures/` reached
-through an ancestor, then `go test ./...`). The rule was inverted rather
-than extended once more. The cost is only auto-closures that were never
-trustworthy: a criterion whose result depends on tests the remediator just
-rewrote proves nothing either way. **Criteria that drive product code by
-path keep precise scoping and are the auto-closable path** — which is what
-the template asks verifiers to prefer.
+**Scope, and why a test runner can never close a finding.** A criterion
+that names paths is judged on those subtrees. A criterion that invokes a
+**test runner** — `pytest`, `go test`, `npm test`, `vitest`, … — is
+**never attributable and never auto-closes**, whatever the run does: its
+result depends on both the product code and every test asset it collects,
+and the harness can determine neither from the command line.
+
+Set 111 S2 established this the hard way — **six consecutive verification
+rounds each found a different spelling** a narrower rule missed: `pytest`
+with no path, a targeted file versus the `conftest.py` it loads, `./`
+versus the literal `"."`, `tests/fixtures/` reached through an ancestor,
+`go test ./...` with `*_test.go` unrecognised, and colocated snapshot
+files. Every fix was correct and every one was followed by another
+spelling, because *"what counts as a test asset"* is an open-ended
+classification problem across every ecosystem. The rule was replaced
+rather than extended a seventh time. The practical cost is nil: every
+runner criterion this machinery has seen was invalidated anyway. **A
+probe that drives product code by path is the criterion that closes** —
+which is what the template now tells verifiers to write.
 
 **Containment — verifier-authored shell is untrusted input.** Criteria
 never run in the live working tree. Each criterion gets its **own fresh

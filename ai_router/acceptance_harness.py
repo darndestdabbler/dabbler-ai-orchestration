@@ -110,6 +110,7 @@ OUTCOME_AUTO_CLOSED = "auto-closed"
 OUTCOME_NOT_DISCRIMINATING = "not-discriminating"
 OUTCOME_STILL_FAILING = "still-failing"
 OUTCOME_TEST_ASSET_MODIFIED = "test-asset-modified"
+OUTCOME_RUNNER_NOT_ATTRIBUTABLE = "runner-not-attributable"
 OUTCOME_CRITERION_CHANGED = "criterion-changed"
 OUTCOME_CRITERION_UNBOUND = "criterion-unbound"
 OUTCOME_REFUSED_UNSAFE = "refused-unsafe"
@@ -890,10 +891,35 @@ def evaluate_criterion(
     runner = is_test_runner(argv)
     result["scopes"] = scopes
     if runner:
+        # A test runner's pass depends on the union of the product code
+        # and every test asset it collects -- and the harness can
+        # determine NEITHER set from the command line. Six consecutive
+        # verification rounds each found a different spelling of that
+        # gap (a pathless runner, a targeted file vs its own conftest,
+        # `./` vs `.`, an ancestor fixtures dir, `go test ./...` with
+        # `*_test.go` unrecognised, colocated snapshot files). Each fix
+        # was correct; each was followed by another spelling, because
+        # "what counts as a test asset" is an open-ended classification
+        # problem across every ecosystem.
+        #
+        # So a runner criterion is not attributable, full stop. This
+        # deletes the classification problem instead of enumerating it,
+        # and costs nothing measurable: every runner criterion this
+        # machinery has ever seen was invalidated anyway. Criteria that
+        # drive PRODUCT code by path remain precisely scoped and remain
+        # the auto-closable path -- which is what the template asks for.
+        result["outcome"] = OUTCOME_RUNNER_NOT_ATTRIBUTABLE
         result["testRunner"] = True
-    modified_assets = modified_test_assets_in_scope(
-        changed_paths, scopes, runner=runner
-    )
+        result["reason"] = (
+            "the criterion invokes a test runner, whose result depends on "
+            "both the product code and every test asset it collects -- "
+            "neither of which can be determined from the command line, so "
+            "a pass cannot be attributed to the fix. The finding stays "
+            "judgment-based; a probe that drives the product by path is "
+            "the criterion that can close."
+        )
+        return result
+    modified_assets = modified_test_assets_in_scope(changed_paths, scopes)
     if modified_assets:
         result["outcome"] = OUTCOME_TEST_ASSET_MODIFIED
         result["modifiedTestAssets"] = modified_assets

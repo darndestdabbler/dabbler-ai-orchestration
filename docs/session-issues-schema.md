@@ -175,13 +175,23 @@ ai_router.acceptance_harness --session-set-dir <dir> --round <M>` runs each
 own **disposable git worktree**, with no shell, no credentials in the
 process environment, and a timeout. The finding auto-closes **only** when
 the criterion **fails before and passes after**. Everything else — a
-criterion that already passed pre-fix (vacuous), one whose test assets the
-remediation modified anywhere in its scope, one that does not match what
+criterion that already passed pre-fix (vacuous), one that invokes a **test
+runner** (never attributable — see below), one whose named test assets the
+remediation modified, one that does not match what
 the verifier wrote in the immutable raw artifact, one carrying a shell
 operator, a judgment criterion, or a timeout — stays judgment-based and is
 settled by the retained `--phase remediation-review`, which reads the
 harness's `sN-acceptance-round-<M>.json` artifact and spends its attention
 on what the fixes **broke** and what the criteria **missed**.
+
+**A test-runner criterion never closes a finding.** Its result depends on
+both the product code and every test asset it collects, and neither set is
+knowable from the command line. Set 111 S2 spent six verification rounds
+learning that every narrower rule leaks (a pathless runner, a targeted
+file versus its `conftest.py`, `./` versus `"."`, an ancestor
+`fixtures/`, `go test ./...`, colocated snapshots), and replaced the rule
+rather than extending it a seventh time. **Write a probe that drives
+product code by path** — that is the criterion that can close.
 
 "Unchanged" is measured against the **raw `sN-verification*.md`
 artifact**, not the envelope and not a previous harness run: the envelope

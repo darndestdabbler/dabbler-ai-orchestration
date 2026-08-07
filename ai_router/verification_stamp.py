@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v6"
+TEMPLATE_ID = "session-verification-v7"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -124,6 +124,15 @@ TEMPLATE_HASHES = {
     # that will actually close. v6 is the active id.
     "session-verification-v6": (
         "28ac19934edd93f91c14a7a6c4f1e1764bdbb5c3e16716b20ab5122fff3f9cd2"
+    ),
+    # Set 111 S2, close-backstop round 7: minted when a SIXTH spelling of
+    # the same class (colocated snapshot files) established that "what
+    # counts as a test asset" is an open-ended classification problem.
+    # A test-runner criterion is now not attributable at all, and the
+    # guidance says so plainly: use a probe that drives the product by
+    # path. v7 is the active id.
+    "session-verification-v7": (
+        "f3d3a418c34faff47c7960b5801c6b1248fd237bbb7f6c870ff8ab4123779fc3"
     ),
 }
 

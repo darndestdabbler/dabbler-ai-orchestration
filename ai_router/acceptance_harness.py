@@ -145,8 +145,9 @@ _REFUSED_PROGRAMS = frozenset({
 # names no path but runs every test in the tree, so a criterion using one
 # is invalidated by ANY test-asset edit inside its scope.
 _TEST_RUNNER_TOKENS = frozenset({
-    "pytest", "py.test", "unittest", "nose2", "tox",
-    "jest", "vitest", "mocha", "ava", "karma", "playwright",
+    "pytest", "py.test", "unittest", "nose2", "tox", "nox",
+    "jest", "vitest", "mocha", "ava", "karma", "playwright", "cypress",
+    "rspec", "minitest", "phpunit", "cargo", "gradle", "maven", "mvn",
     "test",  # `npm test`, `yarn test`, `pnpm test`, `go test`, `dotnet test`
 })
 
@@ -173,12 +174,17 @@ _CREDENTIAL_PATTERN = re.compile(
 # not comparable — the person being judged edited the ruler.
 _TEST_ASSET_PATTERNS = (
     re.compile(r"(^|/)tests?/"),
+    re.compile(r"(^|/)spec/"),
     re.compile(r"(^|/)test_[^/]*\.py$"),
-    re.compile(r"[^/]*_test\.py$"),
+    re.compile(r"[^/]*_test\.(py|go|rs|rb|ts|js|exs?)$"),
     re.compile(r"(^|/)conftest\.py$"),
     re.compile(r"\.(test|spec)\.[jt]sx?$"),
+    re.compile(r"[^/]*(Test|Tests|Spec)\.(java|kt|cs|scala)$"),
+    re.compile(r"[^/]*_spec\.rb$"),
     re.compile(r"(^|/)fixtures?/"),
     re.compile(r"(^|/)__fixtures__/"),
+    re.compile(r"(^|/)__tests__/"),
+    re.compile(r"(^|/)testdata/"),
 )
 
 _OUTPUT_TAIL_CHARS = 4000
@@ -333,20 +339,38 @@ def criterion_scopes(argv: Sequence[str]) -> List[str]:
     """The repo areas a criterion's result actually depends on.
 
     A path token names its own subtree (so ``ai_router/tests`` covers
-    every file under it). A **test runner** with no path token collects
-    the whole tree, so its scope is the whole repo (``""``) — that is the
-    case plain ``referenced_paths`` could not see, and the one a
-    remediator would reach for: ``python -m pytest`` names no test file
-    while depending on every one of them. A token that normalizes to the
-    repo root (``.``, ``./``) is the same case wearing a path.
+    every file under it).
+
+    **A test runner always scopes to the whole repo (``""``).** Not
+    because it necessarily collects everything, but because what a runner
+    collects *cannot be determined from its argv* — and four consecutive
+    verification rounds proved that trying is a losing game. Each round
+    found another spelling the scope logic missed: ``pytest`` with no path
+    at all, then ``pytest tests/test_widget.py`` versus the ``conftest.py``
+    it loads implicitly, then ``pytest ./`` versus the literal ``"."``,
+    then ``tests/fixtures/`` reached through an ancestor rather than at
+    one, then ``go test ./...``. Each fix was correct and each was
+    immediately followed by a new spelling, across directory conventions,
+    path normalization and languages.
+
+    So the rule is inverted rather than extended: a runner's ruler is
+    every test asset, and any test-asset edit invalidates it. This is
+    fail-closed, it is one rule instead of a growing table, and it costs
+    only auto-closures that were never trustworthy — a criterion whose
+    result depends on tests the remediator just rewrote proves nothing
+    either way.
+
+    Criteria that drive **product** code by path keep precise scoping and
+    remain the auto-closable path, which is exactly what the template
+    already asks verifiers to prefer.
     """
+    if is_test_runner(argv):
+        return [""]
     scopes: List[str] = []
     for path in referenced_paths(argv):
         normalized = _normalize_scope(path)
         if normalized not in scopes:
             scopes.append(normalized)
-    if is_test_runner(argv) and not scopes:
-        return [""]
     return scopes
 
 
@@ -370,10 +394,10 @@ def changed_paths_between(
 def is_loader_asset(path: str) -> bool:
     """Whether *path* is loaded IMPLICITLY by a test run under it.
 
-    A pytest run of ``tests/test_widget.py`` also loads
-    ``tests/conftest.py`` and any conftest above it, plus fixture data —
-    none of which appears on the command line. They are part of the ruler
-    even though the criterion never names them.
+    Retained as a classifier (a ``conftest.py`` or fixture file is
+    obviously part of a test's ruler) but no longer load-bearing for
+    scoping: a test runner now scopes to the whole repo, which subsumes
+    every ancestor and nesting case this used to chase.
     """
     normalized = path.replace("\\", "/").lstrip("./")
     parts = PurePosixPath(normalized).parts
@@ -392,60 +416,21 @@ def modified_test_assets_in_scope(
 ) -> List[str]:
     """Changed TEST assets that could move this criterion's ruler.
 
-    A path scope covers its own subtree. For a **test runner**, two
-    further things count, because a runner loads more than it names
-    (remediation-review round 3): the **directory containing** a named
-    test file — its siblings and fixtures are loaded with it — and any
-    ``conftest.py`` / fixture asset in an **ancestor** directory, which
-    pytest loads implicitly all the way up to the root.
+    A path scope covers its own subtree; the whole-repo scope ``""``
+    covers everything. ``runner`` is accepted for call-site clarity and
+    back-compatibility — a runner's scope is already ``[""]``, so no
+    separate ancestor/loader walk is needed (see
+    :func:`criterion_scopes`).
     """
-    effective = [s for s in scopes]
-    ancestors: set = set()
-    if runner:
-        for scope in scopes:
-            if scope == "":
-                ancestors.add("")
-                continue
-            parent = str(PurePosixPath(scope).parent)
-            parent = "" if parent == "." else parent
-            if parent:
-                effective.append(parent)
-            walk = parent
-            while walk:
-                ancestors.add(walk)
-                nxt = str(PurePosixPath(walk).parent)
-                walk = "" if nxt == "." else nxt
-            ancestors.add("")
-
     hits: List[str] = []
     for path in changed:
         if not is_test_asset(path):
             continue
-        in_scope = any(
-            scope == "" or path == scope or path.startswith(scope + "/")
-            for scope in effective
-        )
-        if not in_scope and runner and is_loader_asset(path):
-            # A loader asset counts when it lies ANYWHERE UNDER an
-            # ancestor directory, not only when its immediate directory
-            # IS one: `tests/sub/test_widget.py` loads
-            # `tests/fixtures/sample.json` through ancestor `tests`
-            # (close-backstop round 5). The repo root is deliberately
-            # matched exactly rather than by prefix -- prefixing on ""
-            # would make an unrelated `other/fixtures/x.json` invalidate
-            # every targeted criterion in the tree.
-            directory = str(PurePosixPath(path).parent)
-            directory = "" if directory == "." else directory
-            for ancestor in ancestors:
-                if ancestor == "":
-                    if directory == "":
-                        in_scope = True
-                        break
-                elif path == ancestor or path.startswith(ancestor + "/"):
-                    in_scope = True
-                    break
-        if in_scope and path not in hits:
-            hits.append(path)
+        for scope in scopes:
+            if scope == "" or path == scope or path.startswith(scope + "/"):
+                if path not in hits:
+                    hits.append(path)
+                break
     return hits
 
 

@@ -1767,7 +1767,7 @@ is the fail-closed direction:
 | `auto-closed` | Failed pre-fix, passed post-fix. The only closing outcome. |
 | `not-discriminating` | **Already passed pre-fix** — vacuous; passing after proves nothing. |
 | `still-failing` | The fix does not satisfy the verifier's own condition. |
-| `test-asset-modified` | The remediation edited a test asset **inside the criterion's scope** — the person being judged moved the ruler. A path token scopes to its own subtree; a bare test runner (`pytest` with no path) scopes to the whole repo. |
+| `test-asset-modified` | The remediation edited a test asset **inside the criterion's scope** — the person being judged moved the ruler. A path token scopes to its own subtree; **any test runner scopes to the whole repo**, because what a runner collects cannot be read off its argv. |
 | `criterion-changed` | The criterion in the envelope does not match the one the **verifier wrote** in the round's raw artifact. |
 | `criterion-unbound` | The raw verification artifact could not be read, or carries no criterion for this finding — so there is no verifier-authored source to bind to. |
 | `refused-unsafe` | Carries a shell operator, names a shell or fetch tool, or is empty/untokenizable. |
@@ -1778,6 +1778,21 @@ Results are written to `sN-acceptance-round-<R>.json` (loop bookkeeping,
 excluded from the work-diff freshness binding like the envelopes it
 annotates) and are read back into the remediation-review's framing, where
 criteria-closed findings arrive **with both runs' evidence attached**.
+
+**Scope, and why a test runner is special.** A criterion that names paths
+is judged on those subtrees. A criterion that invokes a **test runner** —
+`pytest`, `go test`, `npm test`, `vitest`, … — is judged on the **whole
+repository**, because what a runner collects cannot be determined from its
+command line. Set 111 S2 established that the hard way: five consecutive
+verification rounds each found a different spelling a narrower rule missed
+(`pytest` with no path, then a targeted file versus the `conftest.py` it
+loads, then `./` versus the literal `"."`, then `tests/fixtures/` reached
+through an ancestor, then `go test ./...`). The rule was inverted rather
+than extended once more. The cost is only auto-closures that were never
+trustworthy: a criterion whose result depends on tests the remediator just
+rewrote proves nothing either way. **Criteria that drive product code by
+path keep precise scoping and are the auto-closable path** — which is what
+the template asks verifiers to prefer.
 
 **Containment — verifier-authored shell is untrusted input.** Criteria
 never run in the live working tree. Each criterion gets its **own fresh

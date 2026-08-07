@@ -429,9 +429,6 @@ class TestContainment:
         """`python -m pytest` names no test file but depends on all of
         them -- the hole a remediator would reach for (round-1 finding)."""
         assert ah.criterion_scopes(["python", "-m", "pytest"]) == [""]
-        assert ah.criterion_scopes(
-            ["python", "-m", "pytest", "ai_router/tests"]
-        ) == ["ai_router/tests"]
         assert ah.criterion_scopes(["python", "probe.py"]) == ["probe.py"]
 
     def test_modified_test_assets_in_scope_matches_directories(self):
@@ -444,64 +441,64 @@ class TestContainment:
         ) == ["ai_router/tests/test_x.py"]
         assert ah.modified_test_assets_in_scope(changed, ["docs"]) == []
 
-    def test_a_runner_scope_covers_what_it_loads_not_just_what_it_names(self):
-        """remediation-review round 3: `pytest tests/test_widget.py` also
-        loads `tests/conftest.py` and any conftest above it, none of which
-        appears on the command line — so editing one moves the ruler."""
-        scope = ["tests/test_widget.py"]
+    def test_normalization_still_folds_root_path_spellings(self):
+        """`.` / `./` normalize to the whole-repo scope. Now belt-and-
+        braces (a runner scopes to `""` regardless), but the normalizer
+        is still what keeps a NON-runner path token honest."""
+        assert ah._normalize_scope("./") == ""
+        assert ah._normalize_scope(".") == ""
+        assert ah._normalize_scope("tests/") == "tests"
+        assert ah._normalize_scope("./tests/sub/") == "tests/sub"
+
+    def test_a_test_runner_always_scopes_to_the_whole_repo(self):
+        """Five verification rounds found five spellings the scope logic
+        missed (`pytest` bare, its own conftest, `./`, an ancestor
+        `fixtures/`, `go test ./...`). What a runner collects cannot be
+        read off its argv, so the rule is inverted rather than extended:
+        a runner's ruler is every test asset."""
+        for command in (
+            "python -m pytest",
+            "python -m pytest ./",
+            "python -m pytest .",
+            "python -m pytest tests/",
+            "python -m pytest tests/sub/test_widget.py",
+            "go test ./...",
+            "npm test",
+            "npx vitest run src/",
+        ):
+            argv = ah.tokenize_command(command)
+            assert ah.criterion_scopes(argv) == [""], command
+
+    def test_any_test_asset_edit_invalidates_a_runner_criterion(self):
+        runner_scope = ah.criterion_scopes(
+            ah.tokenize_command("python -m pytest tests/sub/test_widget.py")
+        )
         for asset in ("tests/conftest.py", "conftest.py",
-                      "tests/fixtures/sample.json", "tests/test_sibling.py"):
+                      "tests/fixtures/sample.json", "other/fixtures/x.json",
+                      "pkg/widget_test.go", "src/a.spec.ts",
+                      "spec/models/user_spec.rb", "testdata/golden.txt"):
             assert ah.modified_test_assets_in_scope(
-                [asset], scope, runner=True
+                [asset], runner_scope, runner=True
             ) == [asset], asset
-        # A non-runner criterion is judged only on what it names.
+
+    def test_a_non_runner_criterion_keeps_precise_path_scoping(self):
+        """Probes over product code stay auto-closable — unrelated test
+        edits must not invalidate them, or nothing could ever close."""
+        scope = ah.criterion_scopes(
+            ah.tokenize_command("python probe.py widget.py")
+        )
+        assert scope == ["probe.py", "widget.py"]
         assert ah.modified_test_assets_in_scope(
-            ["tests/conftest.py"], scope, runner=False
-        ) == []
-        # An unrelated tree is still out of scope for a runner.
-        assert ah.modified_test_assets_in_scope(
-            ["other/tests/test_z.py"], scope, runner=True
+            ["tests/conftest.py", "tests/test_x.py"], scope
         ) == []
 
-    def test_a_root_path_token_is_the_whole_repo_scope(self):
-        """remediation-review round 4: `./` is an ordinary way to write
-        "here", and "here" for a repo-root command is the whole tree.
-        Leaving it as the literal `"."` matched nothing and let an edited
-        test auto-close a finding."""
-        for spelling in ("python -m pytest ./", "python -m pytest .",
-                         "python -m pytest"):
-            argv = ah.tokenize_command(spelling)
-            assert ah.criterion_scopes(argv) == [""], spelling
-            assert ah.modified_test_assets_in_scope(
-                ["tests/test_widget.py"], ah.criterion_scopes(argv),
-                runner=True,
-            ) == ["tests/test_widget.py"], spelling
-        # A trailing slash is not a root scope, just a directory.
-        assert ah.criterion_scopes(
-            ah.tokenize_command("python -m pytest tests/")
-        ) == ["tests"]
-
-    def test_nested_shared_fixtures_are_in_a_runner_scope(self):
-        """close-backstop round 5: a nested test loads fixture data from an
-        ANCESTOR directory, so the asset's own directory is not itself an
-        ancestor -- `tests/sub/test_widget.py` loads
-        `tests/fixtures/sample.json` through ancestor `tests`."""
-        scope = ["tests/sub/test_widget.py"]
-        assert ah.modified_test_assets_in_scope(
-            ["tests/fixtures/sample.json"], scope, runner=True
-        ) == ["tests/fixtures/sample.json"]
-        assert ah.modified_test_assets_in_scope(
-            ["tests/conftest.py"], scope, runner=True
-        ) == ["tests/conftest.py"]
-        assert ah.modified_test_assets_in_scope(
-            ["conftest.py"], scope, runner=True
-        ) == ["conftest.py"]
-        # An unrelated tree's fixtures must NOT invalidate a targeted
-        # criterion: prefixing on the repo root would make every fixture
-        # edit anywhere invalidate everything, for no safety gain.
-        assert ah.modified_test_assets_in_scope(
-            ["other/fixtures/x.json"], scope, runner=True
-        ) == []
+    def test_test_asset_recognition_spans_languages(self):
+        for path in ("pkg/widget_test.go", "src/lib_test.rs",
+                     "spec/user_spec.rb", "src/A.spec.ts",
+                     "app/FooTests.cs", "src/BarTest.java",
+                     "testdata/golden.txt", "src/__tests__/a.js"):
+            assert ah.is_test_asset(path), path
+        assert not ah.is_test_asset("ai_router/verify_session.py")
 
     def test_loader_asset_classification(self):
         assert ah.is_loader_asset("tests/conftest.py")

@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v5"
+TEMPLATE_ID = "session-verification-v6"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -115,6 +115,15 @@ TEMPLATE_HASHES = {
     # active id.
     "session-verification-v5": (
         "237d1118baee2c59189760c26dc27e84f87936813f4b7cad5134cdc3f2f0e2fb"
+    ),
+    # Set 111 S2, close-backstop round 6: minted when the test-runner
+    # scope rule was INVERTED rather than extended for a sixth time --
+    # any test-runner criterion is now judged against every test asset in
+    # the repo, because what a runner collects cannot be read off its
+    # argv. The guidance says so, so a verifier can choose a criterion
+    # that will actually close. v6 is the active id.
+    "session-verification-v6": (
+        "28ac19934edd93f91c14a7a6c4f1e1764bdbb5c3e16716b20ab5122fff3f9cd2"
     ),
 }
 

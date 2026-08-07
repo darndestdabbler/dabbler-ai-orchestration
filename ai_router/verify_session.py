@@ -1956,6 +1956,7 @@ def assemble_acceptance_block(
             if result.get("outcome") == OUTCOME_AUTO_CLOSED:
                 baseline = result.get("baseline") or {}
                 fixed = result.get("fixed") or {}
+                expects = result.get("expectedOutputContains")
                 closed_lines.append(head)
                 if criterion:
                     closed_lines.append(
@@ -1963,14 +1964,40 @@ def assemble_acceptance_block(
                         f"`{_squash(criterion, _LEDGER_SCENARIO_CAP)}` "
                         f"-- expected exit "
                         f"{result.get('expectedExitCode')}"
+                        + (
+                            f", output containing "
+                            f"\"{_squash(expects, 120)}\""
+                            if expects else ""
+                        )
                     )
                 closed_lines.append(
-                    f"  - Pre-fix tree: exit {baseline.get('exitCode')} "
-                    "-- FAILED, as baseline discrimination requires"
+                    f"  - Pre-fix tree: exit {baseline.get('exitCode')}"
+                    + (
+                        f", expected output present: "
+                        f"{bool(baseline.get('outputContainsExpected'))}"
+                        if expects else ""
+                    )
+                    + " -- FAILED, as baseline discrimination requires"
                 )
+                if expects and baseline.get("output"):
+                    closed_lines.append(
+                        "    - pre-fix output (tail): "
+                        + _squash(baseline.get("output"), 400)
+                    )
                 closed_lines.append(
-                    f"  - Fixed tree: exit {fixed.get('exitCode')} -- PASSED"
+                    f"  - Fixed tree: exit {fixed.get('exitCode')}"
+                    + (
+                        f", expected output present: "
+                        f"{bool(fixed.get('outputContainsExpected'))}"
+                        if expects else ""
+                    )
+                    + " -- PASSED"
                 )
+                if expects and fixed.get("output"):
+                    closed_lines.append(
+                        "    - fixed output (tail): "
+                        + _squash(fixed.get("output"), 400)
+                    )
             else:
                 reason = _squash(
                     result.get("reason") or "", _LEDGER_SCENARIO_CAP

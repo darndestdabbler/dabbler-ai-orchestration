@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineTree": "00bc8d4a9ca7554a9fb531cd40fddb2725041ca8",
+  "fixedTree": "80fd47f70f58fb9516e4bfbe5ae607ee22a63eff",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-07T11:38:54.542604+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Disposable worktrees cannot run the repo-standard `.venv/Scripts/python.exe` criteria. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A verifier writes the normal Windows ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A verifier-authored criterion using the documented workspace venv interpreter must execute inside the disposable worktree, or the template must stop recommending an unavailable interpreter path.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The remediation-review block omits the output evidence needed to justify output-based auto-closures. - **Category:** Completeness - **Severity:** Major - **Failure scenario:** A criterion uses `Acc ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Criteria-closed findings whose verdict depends on `expectedOutputContains` must show the expected substring and baseline/fixed output evidence in the remediation-review block.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** The harness promises “no network and no credentials” but only filters process environment variables. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A verifier output infl ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The harness must either enforce the documented no-network/no-credentials containment boundary, including Windows User/Machine env and credential-agent paths, or stop claiming that boundary.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

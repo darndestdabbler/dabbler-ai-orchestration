@@ -1767,9 +1767,10 @@ is the fail-closed direction:
 | `auto-closed` | Failed pre-fix, passed post-fix. The only closing outcome. |
 | `not-discriminating` | **Already passed pre-fix** — vacuous; passing after proves nothing. |
 | `still-failing` | The fix does not satisfy the verifier's own condition. |
-| `test-asset-modified` | The remediation edited a test asset the criterion runs on — the person being judged moved the ruler. |
-| `criterion-changed` | The criterion text changed since a previous harness run for this round. |
-| `refused-unsafe` | Carries a shell operator, or is empty/untokenizable. |
+| `test-asset-modified` | The remediation edited a test asset **inside the criterion's scope** — the person being judged moved the ruler. A path token scopes to its own subtree; a bare test runner (`pytest` with no path) scopes to the whole repo. |
+| `criterion-changed` | The criterion in the envelope does not match the one the **verifier wrote** in the round's raw artifact. |
+| `criterion-unbound` | The raw verification artifact could not be read, or carries no criterion for this finding — so there is no verifier-authored source to bind to. |
+| `refused-unsafe` | Carries a shell operator, names a shell or fetch tool, or is empty/untokenizable. |
 | `judgment` / `no-criterion` | Never executed; settled by the review as before. |
 | `error` | Timeout or spawn failure — not evidence either way. |
 
@@ -1779,11 +1780,30 @@ annotates) and are read back into the remediation-review's framing, where
 criteria-closed findings arrive **with both runs' evidence attached**.
 
 **Containment — verifier-authored shell is untrusted input.** Criteria
-never run in the live working tree. Both runs happen in **disposable git
-worktrees** checked out from the captured tree objects, with **no shell**
-(shell operators are refused, not interpreted), a **credential-stripped
-environment**, a wall-clock timeout, and cleanup on every path including
-errors.
+never run in the live working tree. Each criterion gets its **own fresh
+pair** of disposable git worktrees checked out from the captured tree
+objects (a shared pair let one criterion's writes rewrite the tree the
+next was judged against), with **no shell** (shell operators are refused,
+not interpreted; a shell or fetch tool as `argv[0]` is refused too), a
+**credential-stripped process environment**, a wall-clock timeout, and
+cleanup on every path including errors.
+
+**It is containment, not a sandbox — and the docs must not claim
+otherwise.** The harness does not block the network, and on Windows a
+child can still read User/Machine-scope environment variables and OS
+credential stores whatever was stripped from its own environment. The
+honest boundary: a criterion cannot damage your working tree, cannot
+silently use a shell, and cannot inherit your keys through the process
+environment. Read the criteria in a round's raw artifact as code.
+
+**Two further limits, stated because they bound what a pass proves.**
+Criteria run under the harness's own interpreter — so a venv or bare
+`python` in `argv[0]` is rewritten to it, which is what makes the
+documented `.venv/Scripts/python.exe` form work at all inside a checkout
+where `.venv/` is gitignored. That interpreter has the project installed
+**editable against the main checkout**, so a criterion that *imports* the
+installed package measures the main tree, not the disposable one:
+criteria must exercise the checkout **by path**.
 
 **What this does NOT do.** Baseline discrimination proves a criterion is
 *related* to the defect; it does not prove it is *sufficient*, and no

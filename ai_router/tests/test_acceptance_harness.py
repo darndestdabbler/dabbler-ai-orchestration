@@ -108,6 +108,9 @@ def repo(tmp_path: Path) -> Path:
         "    print(pathlib.Path(sys.argv[2]).read_text())\n"
         "elif mode == 'sabotage':\n"
         "    pathlib.Path(sys.argv[2]).write_text('SABOTAGE')\n"
+        "elif mode == 'delete':\n"
+        "    p = pathlib.Path(sys.argv[2])\n"
+        "    p.unlink(missing_ok=True)\n"
         "else:\n"
         "    sys.exit(2)\n",
         encoding="utf-8",
@@ -130,7 +133,9 @@ def _set_dir(repo: Path) -> Path:
 
 
 def _write_envelope(set_dir: Path, round_number: int, issues: list,
-                    baseline_tree: str) -> Path:
+                    baseline_tree: str, *, raw: bool = True) -> Path:
+    """Write the round's envelope, and (by default) the matching RAW
+    verification artifact the harness binds criteria against."""
     path = vs.issues_artifact_path(set_dir, 1, round_number)
     path.write_text(
         json.dumps(
@@ -147,6 +152,50 @@ def _write_envelope(set_dir: Path, round_number: int, issues: list,
         ),
         encoding="utf-8",
     )
+    if raw:
+        _write_raw_artifact(set_dir, round_number, issues)
+    return path
+
+
+def _render_issue_block(number: int, issue: dict) -> str:
+    """One Issue block in the template's own grammar, so the harness's
+    re-parse of the raw artifact sees exactly this criterion."""
+    lines = [
+        f"- **Issue {number}:** {issue['description']}",
+        f"  - **Category:** {issue.get('category', 'Correctness')}",
+        f"  - **Severity:** {issue.get('severity', 'Major')}",
+    ]
+    if issue.get("failureScenario"):
+        lines.append(f"  - **Failure scenario:** {issue['failureScenario']}")
+    acceptance = issue.get("acceptance")
+    if isinstance(acceptance, dict):
+        if acceptance.get("kind") == "executable":
+            lines.append(
+                f"  - **Acceptance criterion:** `{acceptance['command']}`"
+            )
+            expectation = f"exit {acceptance.get('expectedExitCode', 0)}"
+            if acceptance.get("expectedOutputContains"):
+                expectation += (
+                    f", output contains "
+                    f"\"{acceptance['expectedOutputContains']}\""
+                )
+            lines.append(f"  - **Acceptance expectation:** {expectation}")
+        else:
+            lines.append(
+                "  - **Acceptance criterion:** JUDGMENT - "
+                + str(acceptance.get("statement", ""))
+            )
+    return "\n".join(lines)
+
+
+def _write_raw_artifact(set_dir: Path, round_number: int,
+                        issues: list) -> Path:
+    """The immutable raw verifier output for the round, in template form."""
+    path = vs.verification_artifact_path(set_dir, 1, round_number)
+    body = "\n\n".join(
+        _render_issue_block(i + 1, issue) for i, issue in enumerate(issues)
+    )
+    path.write_text(f"ISSUES FOUND\n\n{body}\n", encoding="utf-8")
     return path
 
 
@@ -239,6 +288,24 @@ class TestCriterionParse:
         )
         acceptance = _parse_issue_blocks(body)[0]["acceptance"]
         assert acceptance["expectedExitCode"] == 2
+
+    def test_expectation_substring_may_contain_the_other_quote(self):
+        """A quoted expectation keeps everything up to its CLOSING quote.
+
+        Set 111 S2 remediation: a character-class scan truncated
+        ``"VALUE = 'fixed'"`` at the apostrophe, so re-parsing the raw
+        artifact produced a different contract hash and the harness
+        reported a perfectly honest criterion as edited.
+        """
+        body = (
+            "Issue 1: Broken.\n"
+            "  - Severity: Major\n"
+            "  - Acceptance criterion: `python probe.py print widget.py`\n"
+            "  - Acceptance expectation: exit 0, output contains "
+            "\"VALUE = 'fixed'\"\n"
+        )
+        acceptance = _parse_issue_blocks(body)[0]["acceptance"]
+        assert acceptance["expectedOutputContains"] == "VALUE = 'fixed'"
 
     def test_judgment_criterion(self):
         body = (
@@ -376,6 +443,49 @@ class TestContainment:
             changed, ["ai_router/tests"]
         ) == ["ai_router/tests/test_x.py"]
         assert ah.modified_test_assets_in_scope(changed, ["docs"]) == []
+
+    def test_a_runner_scope_covers_what_it_loads_not_just_what_it_names(self):
+        """remediation-review round 3: `pytest tests/test_widget.py` also
+        loads `tests/conftest.py` and any conftest above it, none of which
+        appears on the command line — so editing one moves the ruler."""
+        scope = ["tests/test_widget.py"]
+        for asset in ("tests/conftest.py", "conftest.py",
+                      "tests/fixtures/sample.json", "tests/test_sibling.py"):
+            assert ah.modified_test_assets_in_scope(
+                [asset], scope, runner=True
+            ) == [asset], asset
+        # A non-runner criterion is judged only on what it names.
+        assert ah.modified_test_assets_in_scope(
+            ["tests/conftest.py"], scope, runner=False
+        ) == []
+        # An unrelated tree is still out of scope for a runner.
+        assert ah.modified_test_assets_in_scope(
+            ["other/tests/test_z.py"], scope, runner=True
+        ) == []
+
+    def test_a_root_path_token_is_the_whole_repo_scope(self):
+        """remediation-review round 4: `./` is an ordinary way to write
+        "here", and "here" for a repo-root command is the whole tree.
+        Leaving it as the literal `"."` matched nothing and let an edited
+        test auto-close a finding."""
+        for spelling in ("python -m pytest ./", "python -m pytest .",
+                         "python -m pytest"):
+            argv = ah.tokenize_command(spelling)
+            assert ah.criterion_scopes(argv) == [""], spelling
+            assert ah.modified_test_assets_in_scope(
+                ["tests/test_widget.py"], ah.criterion_scopes(argv),
+                runner=True,
+            ) == ["tests/test_widget.py"], spelling
+        # A trailing slash is not a root scope, just a directory.
+        assert ah.criterion_scopes(
+            ah.tokenize_command("python -m pytest tests/")
+        ) == ["tests"]
+
+    def test_loader_asset_classification(self):
+        assert ah.is_loader_asset("tests/conftest.py")
+        assert ah.is_loader_asset("conftest.py")
+        assert ah.is_loader_asset("e2e/fixtures/sample.json")
+        assert not ah.is_loader_asset("tests/test_widget.py")
 
     def test_child_environment_strips_credentials(self, monkeypatch):
         monkeypatch.setenv("DABBLER_ANTHROPIC_API_KEY", "secret")
@@ -643,7 +753,8 @@ class TestInvalidation:
         assert _result_for(_run(repo), 0)["outcome"] == ah.OUTCOME_AUTO_CLOSED
 
         # Someone edits the (immutable-by-policy) envelope's criterion to a
-        # different, easier command and re-runs the harness.
+        # different, easier command and re-runs the harness. The RAW
+        # verifier artifact is left alone -- that is the whole attack.
         _write_envelope(
             set_dir, 1,
             [_blocking("widget is broken", {
@@ -652,6 +763,7 @@ class TestInvalidation:
                 "expectedExitCode": 0,
             })],
             baseline,
+            raw=False,
         )
         result = _result_for(_run(repo), 0)
         assert result["outcome"] == ah.OUTCOME_CRITERION_CHANGED
@@ -692,6 +804,7 @@ class TestInvalidation:
         assert _result_for(_run(repo), 0)["outcome"] == ah.OUTCOME_AUTO_CLOSED
 
         # Same command; the expectation that made it discriminate is gone.
+        # The raw verifier artifact still carries the real contract.
         _write_envelope(
             set_dir, 1,
             [_blocking("widget is broken", {
@@ -700,9 +813,159 @@ class TestInvalidation:
                 "expectedExitCode": 0,
             })],
             baseline,
+            raw=False,
         )
         result = _result_for(_run(repo), 0)
         assert result["outcome"] == ah.OUTCOME_CRITERION_CHANGED
+
+    def test_modified_test_assets_invalidate_directory_and_implicit_runner(
+        self, repo
+    ):
+        """Round-1 finding: a criterion's scope is what it RUNS, not what
+        it names. `python -m pytest` names no test file yet depends on
+        every one of them, and `pytest ai_router/tests` names a directory
+        rather than an asset — both used to sail past invalidation while
+        the remediation rewrote the tests.
+        """
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [
+                _blocking("bare runner", {
+                    "kind": "executable",
+                    "command": f"{_python()} -m pytest",
+                    "expectedExitCode": 0,
+                }),
+                _blocking("directory-scoped runner", {
+                    "kind": "executable",
+                    "command": f"{_python()} -m pytest tests",
+                    "expectedExitCode": 0,
+                }),
+            ],
+            baseline,
+        )
+        _remediate(repo)
+        # The "fix" also rewrites the tests both criteria would collect.
+        (repo / "tests" / "test_widget.py").write_text(
+            "import sys\nsys.exit(0)\n", encoding="utf-8"
+        )
+        artifact = _run(repo)
+        for index in (0, 1):
+            result = _result_for(artifact, index)
+            assert result["outcome"] == ah.OUTCOME_TEST_ASSET_MODIFIED
+            assert "tests/test_widget.py" in result["modifiedTestAssets"]
+            assert "baseline" not in result
+
+    def test_conftest_edit_invalidates_a_file_scoped_pytest_criterion(
+        self, repo
+    ):
+        """remediation-review round 3, reproduced end to end.
+
+        `pytest tests/test_widget.py` names one file, but pytest loads
+        `tests/conftest.py` with it. The remediator can leave the product
+        broken, change only the conftest, and the targeted test passes —
+        so a scope of exactly the named file let the ruler move.
+        """
+        (repo / "tests" / "conftest.py").write_text(
+            "PASS = False\n", encoding="utf-8"
+        )
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "conftest")
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": f"{_python()} -m pytest tests/test_widget.py",
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        # The "fix": only the conftest moves; widget.py stays broken.
+        (repo / "tests" / "conftest.py").write_text(
+            "PASS = True\n", encoding="utf-8"
+        )
+        result = _result_for(_run(repo), 0)
+        assert result["outcome"] == ah.OUTCOME_TEST_ASSET_MODIFIED
+        assert "tests/conftest.py" in result["modifiedTestAssets"]
+        assert "baseline" not in result
+
+    def test_root_scoped_runner_invalidates_on_any_test_edit(self, repo):
+        """remediation-review round 4, reproduced end to end: `pytest ./`
+        with only a test file changed must NOT auto-close."""
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": f"{_python()} -m pytest ./",
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        # Product left broken; only the test moves.
+        (repo / "tests" / "test_widget.py").write_text(
+            "import sys\nsys.exit(0)\n", encoding="utf-8"
+        )
+        result = _result_for(_run(repo), 0)
+        assert result["outcome"] == ah.OUTCOME_TEST_ASSET_MODIFIED
+        assert "tests/test_widget.py" in result["modifiedTestAssets"]
+
+    def test_first_run_criterion_edit_invalidates(self, repo):
+        """Round-1 finding: the FIRST harness run is the normal path.
+
+        Comparing the envelope only against a PREVIOUS harness artifact
+        left it unguarded — a remediator could edit the mutable envelope
+        before the first run and auto-close an unfixed finding. Criteria
+        are now bound to the immutable raw verification artifact, so the
+        edit is caught on run one, with no prior run to compare against.
+        """
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        # What the verifier actually wrote.
+        _write_raw_artifact(set_dir, 1, [
+            _blocking("widget is broken", {
+                "kind": "executable",
+                "command": _value_probe("fixed"),
+                "expectedExitCode": 0,
+            })
+        ])
+        # What the remediator put in the envelope instead: a command that
+        # passes on any tree.
+        _write_envelope(
+            set_dir, 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": _probe("exists", "widget.py"),
+                "expectedExitCode": 0,
+            })],
+            baseline,
+            raw=False,
+        )
+        _remediate(repo)
+        assert not ah.acceptance_artifact_path(set_dir, 1, 1).exists()
+        result = _result_for(_run(repo), 0)
+        assert result["outcome"] == ah.OUTCOME_CRITERION_CHANGED
+        assert "baseline" not in result
+
+    def test_criteria_are_unbound_without_a_raw_artifact(self, repo):
+        """No verifier-authored source ⇒ refuse to auto-close (fail closed)."""
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": _value_probe("fixed"),
+                "expectedExitCode": 0,
+            })],
+            baseline,
+            raw=False,
+        )
+        _remediate(repo)
+        artifact = _run(repo)
+        assert artifact["criteriaBoundToRawArtifact"] is False
+        result = _result_for(artifact, 0)
+        assert result["outcome"] == ah.OUTCOME_CRITERION_UNBOUND
 
     def test_the_cli_offers_no_criterion_override(self):
         """The harness reads criteria only from the immutable envelope."""
@@ -741,9 +1004,10 @@ class TestWorktreeCleanup:
         """Cleanup is finally-bound, not success-bound."""
         before = _worktree_count(repo)
         tree = vs.snapshot_worktree_tree(repo)
+        commit = ah.commit_for_tree(repo, tree, "test")
         path_seen = None
         with pytest.raises(RuntimeError):
-            with ah.DisposableWorktree(repo, tree, "baseline") as worktree:
+            with ah.DisposableWorktree(repo, commit, "baseline") as worktree:
                 path_seen = worktree.path
                 assert path_seen.is_dir()
                 raise RuntimeError("boom")
@@ -753,14 +1017,52 @@ class TestWorktreeCleanup:
     def test_the_worktree_is_a_checkout_of_the_captured_tree(self, repo):
         """Never the live working tree — the containment the design needs."""
         tree = vs.snapshot_worktree_tree(repo)
+        commit = ah.commit_for_tree(repo, tree, "test")
         _remediate(repo)  # the live tree moves on
-        with ah.DisposableWorktree(repo, tree, "baseline") as worktree:
+        with ah.DisposableWorktree(repo, commit, "baseline") as worktree:
             content = (worktree.path / "widget.py").read_text(encoding="utf-8")
             assert content == "VALUE = 'broken'\n"
             assert worktree.path.resolve() != repo.resolve()
         assert (repo / "widget.py").read_text(encoding="utf-8") == (
             "VALUE = 'fixed'\n"
         )
+
+    def test_per_criterion_worktree_isolation(self, repo):
+        """Each criterion gets a FRESH pair of checkouts.
+
+        Round-1 finding: one shared pair meant a criterion that writes
+        into its checkout rewrote the tree every later criterion was
+        judged against — enough to manufacture fails-before/passes-after
+        for a finding nothing fixed. Criterion 1 here deletes a sentinel
+        that exists in BOTH clean trees; criterion 2 checks that sentinel
+        and must therefore see it on both, i.e. be vacuous, not closed.
+        """
+        (repo / "sentinel.txt").write_text("present\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "sentinel")
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [
+                _blocking("saboteur", {
+                    "kind": "executable",
+                    "command": _probe("delete", "sentinel.txt"),
+                    "expectedExitCode": 0,
+                }),
+                _blocking("victim", {
+                    "kind": "executable",
+                    "command": _probe("exists", "sentinel.txt"),
+                    "expectedExitCode": 0,
+                }),
+            ],
+            baseline,
+        )
+        _remediate(repo)
+        artifact = _run(repo)
+        victim = _result_for(artifact, 1)
+        assert victim["outcome"] == ah.OUTCOME_NOT_DISCRIMINATING
+        assert victim["baselinePassed"] is True
+        assert victim["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
 
     def test_a_criterion_cannot_touch_the_live_working_tree(self, repo):
         """A destructive criterion damages only its disposable checkout."""

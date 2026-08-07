@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineTree": "e2baff3e4706bec0d485199ffaaa0098280b49f9",
+  "fixedTree": "40522c13839dca2be132c5a7768a02f1d706d3b8",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-07T11:38:39.316352+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Edited acceptance criteria are only detected after a previous harness artifact exists, so a first-run edit can still auto-close. **Category:** Correctness **Severity:** Major **Failure scenario:** ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The first harness run must refuse or mark `criterion-changed` when the issue acceptance contract differs from the verifier-authored contract captured at finding time, before executing any edited command.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** Broad test-runner criteria bypass test-asset invalidation. **Category:** Correctness **Severity:** Major **Failure scenario:** A verifier writes a common executable criterion like `python -m pytest ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A broad test-runner criterion such as `python -m pytest` must be invalidated when remediation modified any test asset that runner would execute, rather than auto-closing.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** Criteria contaminate each other because all findings share the same baseline/fixed worktrees. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A verifier criterion that wri ...",
+      "severity": "Major",
+      "criterion": ".venv/Scripts/python.exe -m pytest ai_router/tests/test_acceptance_harness.py -k per_criterion_worktree_isolation",
+      "criterionSha256": "608d3fa8e7f442f2283a0a5c0d5912679a4eafd4ac4d1eb7936a975fcd592f58",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "ai_router/tests/test_acceptance_harness.py",
+        "-k",
+        "per_criterion_worktree_isolation"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "ai_router/tests/test_acceptance_harness.py"
+      ],
+      "outcome": "test-asset-modified",
+      "modifiedTestAssets": [
+        "ai_router/tests/test_acceptance_harness.py"
+      ],
+      "reason": "the remediation changed test assets inside this criterion's scope (ai_router/tests/test_acceptance_harness.py) -- the person being judged moved the ruler, so the two runs are not comparable and the finding stays judgment-based"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "** Test-asset invalidation misses common test commands, so edited tests can still auto-close findings. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A verifier uses a norma ...",
+      "severity": "Major",
+      "criterion": ".venv/Scripts/python.exe -m pytest ai_router/tests/test_acceptance_harness.py -k modified_test_assets_invalidate_directory_and_implicit_runner",
+      "criterionSha256": "7f3f6f00ebe490621adeb998fe1e0c2e835bcb588793d483d938157ff9199c42",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "ai_router/tests/test_acceptance_harness.py",
+        "-k",
+        "modified_test_assets_invalidate_directory_and_implicit_runner"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "ai_router/tests/test_acceptance_harness.py"
+      ],
+      "outcome": "test-asset-modified",
+      "modifiedTestAssets": [
+        "ai_router/tests/test_acceptance_harness.py"
+      ],
+      "reason": "the remediation changed test assets inside this criterion's scope (ai_router/tests/test_acceptance_harness.py) -- the person being judged moved the ruler, so the two runs are not comparable and the finding stays judgment-based"
+    },
+    {
+      "issueIndex": 4,
+      "summary": "** Edited criteria are only detected after a previous harness run, not on the first run. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** After verification writes `sN-issues* ...",
+      "severity": "Major",
+      "criterion": ".venv/Scripts/python.exe -m pytest ai_router/tests/test_acceptance_harness.py -k first_run_criterion_edit_invalidates",
+      "criterionSha256": "0a63bd9acd396c9b438be9dc3e96f12ac09de2d308dab298b0275ba9658b6feb",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-m",
+        "pytest",
+        "ai_router/tests/test_acceptance_harness.py",
+        "-k",
+        "first_run_criterion_edit_invalidates"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "ai_router/tests/test_acceptance_harness.py"
+      ],
+      "outcome": "test-asset-modified",
+      "modifiedTestAssets": [
+        "ai_router/tests/test_acceptance_harness.py"
+      ],
+      "reason": "the remediation changed test assets inside this criterion's scope (ai_router/tests/test_acceptance_harness.py) -- the person being judged moved the ruler, so the two runs are not comparable and the finding stays judgment-based"
+    }
+  ]
+}

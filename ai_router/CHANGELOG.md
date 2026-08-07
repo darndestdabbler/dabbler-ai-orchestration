@@ -74,13 +74,28 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   judgment-based. Results are written to `sN-acceptance-round-<R>.json`.
 
   **Containment:** verifier-authored shell is untrusted input, so criteria
-  never run in the live working tree. Both runs happen in **disposable git
-  worktrees** checked out from the captured tree objects, with **no shell**
-  (shell operators are refused rather than interpreted), a
-  credential-stripped environment, a wall-clock timeout, and cleanup on every
-  path including errors.
+  never run in the live working tree. Each criterion gets its **own fresh
+  pair** of disposable git worktrees checked out from the captured tree
+  objects, with **no shell** (shell operators refused rather than
+  interpreted; a shell or fetch tool as `argv[0]` refused outright), a
+  credential-stripped process environment, a wall-clock timeout, and
+  cleanup on every path including errors. It is **containment, not a
+  sandbox**, and the docs now say so: the network is not blocked and
+  OS-level credential stores are still reachable. A venv or bare `python`
+  in `argv[0]` is rewritten to the harness's own interpreter, so the
+  documented `.venv/Scripts/python.exe` form works inside a checkout where
+  `.venv/` is gitignored.
 
-  Template version bumped: `TEMPLATE_ID = session-verification-v4`, with the
+  **"Unchanged" is bound to the raw artifact.** A finding is judged by the
+  criterion in the immutable `sN-verification*.md` — not the one in the
+  envelope (a derived artifact the orchestrator is invited to annotate),
+  and not one carried over from a previous harness run, which would leave
+  the FIRST run unguarded. A criterion's **scope** for test-asset
+  invalidation is its path tokens' subtrees, or the whole repo for a test
+  runner named without a path, so `pytest` with no arguments no longer
+  slips past.
+
+  Template version bumped: `TEMPLATE_ID = session-verification-v5`, with the
   new normalized hash pinned in `TEMPLATE_HASHES` (an edited-but-unbumped
   template still fails closed at stamp time). `sN-acceptance-round-*.json` is
   added to `WORK_DIFF_SET_BOOKKEEPING`, so a harness run between rounds cannot

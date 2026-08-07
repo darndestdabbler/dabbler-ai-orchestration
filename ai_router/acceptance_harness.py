@@ -16,19 +16,31 @@ may close a finding only when it survives **baseline discrimination**
 
 Containment (proposal §6, "untrusted-code execution was missed
 entirely"): a verifier-authored command is untrusted input. It is never
-run in the live working tree. Both runs happen in **disposable git
-worktrees** checked out from the tree objects ``verify_session`` already
-captures (``discoveryBaselineTree`` for pre-fix; a fresh
-``snapshot_worktree_tree`` for post-fix), with
+run in the live working tree. Each criterion gets its **own fresh pair**
+of disposable git worktrees, checked out from the tree objects
+``verify_session`` already captures (``discoveryBaselineTree`` for
+pre-fix; a fresh ``snapshot_worktree_tree`` for post-fix), with
 
 - **no shell** — the command is tokenized and spawned directly; any
   shell operator (``&&``, ``|``, ``;``, redirection, ``$(...)``) is
   refused outright rather than interpreted,
-- **credential-stripped environment** — API keys, tokens and secrets are
-  removed from the child environment,
+- **refused programs** — a general-purpose shell or a fetch tool as
+  ``argv[0]`` is rejected, because either one re-opens what the
+  tokenizer just closed,
+- **a credential-stripped process environment** — API keys, tokens and
+  secrets are removed from the child's ``os.environ``,
 - **a wall-clock timeout**, and
-- **guaranteed cleanup** on every path, including SIGINT and harness
-  errors.
+- **cleanup on every path**, including errors.
+
+**This is containment, NOT a sandbox — do not read it as one.** The
+harness does not block network access, and on Windows a child process can
+still read User- or Machine-scope environment variables (and any OS
+credential store) regardless of what was stripped from its own
+environment. A criterion is untrusted code running with the developer's
+own privileges. Treat the criteria in a round's raw artifact as code to
+be read, not as inputs that have been made safe. The honest boundary is:
+*a criterion cannot damage your working tree, cannot silently use a shell,
+and cannot inherit your keys through the process environment.*
 
 What this module never does: decide that a finding is *sufficiently*
 addressed. Baseline discrimination proves a criterion is *related* to the
@@ -37,6 +49,14 @@ adequacy checker is built). Sufficiency is delegated to the one retained
 ``--phase remediation-review``, which reads this harness's results as
 evidence and spends its attention on what the fixes BROKE and what the
 criteria MISSED.
+
+One more limit worth stating plainly: criteria run under the harness's
+own interpreter, and in this repo that interpreter has ``ai_router``
+installed **editable against the main checkout**. A criterion that
+*imports the installed package* therefore measures the main tree, not the
+disposable one. Criteria must exercise the checkout **by path** — run a
+file, read a file, invoke a test module under a path argument — which is
+what the template asks for.
 """
 
 from __future__ import annotations
@@ -51,6 +71,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import List, Optional, Sequence
@@ -292,6 +313,22 @@ def referenced_paths(argv: Sequence[str]) -> List[str]:
     return found
 
 
+def _normalize_scope(path: str) -> str:
+    """Repo-relative scope spelling: ``""`` means the whole repository.
+
+    ``.``, ``./``, ``.\\`` and a trailing slash are all ordinary ways to
+    write "here", and "here" for a criterion run from the repo root is
+    the whole tree. Leaving them unnormalized meant ``pytest ./`` scoped
+    to the literal string ``"."``, matched nothing, and let an edited
+    test auto-close a finding (remediation-review round 4).
+    """
+    candidate = path.replace("\\", "/").strip()
+    while candidate.startswith("./"):
+        candidate = candidate[2:]
+    candidate = candidate.rstrip("/")
+    return "" if candidate in (".", "") else candidate
+
+
 def criterion_scopes(argv: Sequence[str]) -> List[str]:
     """The repo areas a criterion's result actually depends on.
 
@@ -300,9 +337,14 @@ def criterion_scopes(argv: Sequence[str]) -> List[str]:
     the whole tree, so its scope is the whole repo (``""``) — that is the
     case plain ``referenced_paths`` could not see, and the one a
     remediator would reach for: ``python -m pytest`` names no test file
-    while depending on every one of them.
+    while depending on every one of them. A token that normalizes to the
+    repo root (``.``, ``./``) is the same case wearing a path.
     """
-    scopes = [p.rstrip("/") for p in referenced_paths(argv)]
+    scopes: List[str] = []
+    for path in referenced_paths(argv):
+        normalized = _normalize_scope(path)
+        if normalized not in scopes:
+            scopes.append(normalized)
     if is_test_runner(argv) and not scopes:
         return [""]
     return scopes
@@ -325,19 +367,70 @@ def changed_paths_between(
     ]
 
 
+def is_loader_asset(path: str) -> bool:
+    """Whether *path* is loaded IMPLICITLY by a test run under it.
+
+    A pytest run of ``tests/test_widget.py`` also loads
+    ``tests/conftest.py`` and any conftest above it, plus fixture data —
+    none of which appears on the command line. They are part of the ruler
+    even though the criterion never names them.
+    """
+    normalized = path.replace("\\", "/").lstrip("./")
+    parts = PurePosixPath(normalized).parts
+    if not parts:
+        return False
+    if parts[-1] == "conftest.py":
+        return True
+    return any(p in ("fixtures", "__fixtures__") for p in parts)
+
+
 def modified_test_assets_in_scope(
-    changed: Sequence[str], scopes: Sequence[str]
+    changed: Sequence[str],
+    scopes: Sequence[str],
+    *,
+    runner: bool = False,
 ) -> List[str]:
-    """Changed TEST assets that fall inside any of *scopes*."""
+    """Changed TEST assets that could move this criterion's ruler.
+
+    A path scope covers its own subtree. For a **test runner**, two
+    further things count, because a runner loads more than it names
+    (remediation-review round 3): the **directory containing** a named
+    test file — its siblings and fixtures are loaded with it — and any
+    ``conftest.py`` / fixture asset in an **ancestor** directory, which
+    pytest loads implicitly all the way up to the root.
+    """
+    effective = [s for s in scopes]
+    ancestors: set = set()
+    if runner:
+        for scope in scopes:
+            if scope == "":
+                ancestors.add("")
+                continue
+            parent = str(PurePosixPath(scope).parent)
+            parent = "" if parent == "." else parent
+            if parent:
+                effective.append(parent)
+            walk = parent
+            while walk:
+                ancestors.add(walk)
+                nxt = str(PurePosixPath(walk).parent)
+                walk = "" if nxt == "." else nxt
+            ancestors.add("")
+
     hits: List[str] = []
     for path in changed:
         if not is_test_asset(path):
             continue
-        for scope in scopes:
-            if scope == "" or path == scope or path.startswith(scope + "/"):
-                if path not in hits:
-                    hits.append(path)
-                break
+        in_scope = any(
+            scope == "" or path == scope or path.startswith(scope + "/")
+            for scope in effective
+        )
+        if not in_scope and runner and is_loader_asset(path):
+            directory = str(PurePosixPath(path).parent)
+            directory = "" if directory == "." else directory
+            in_scope = directory in ancestors
+        if in_scope and path not in hits:
+            hits.append(path)
     return hits
 
 
@@ -396,27 +489,59 @@ def path_blob_sha(repo_root: Path, tree_sha: str, path: str) -> Optional[str]:
     return sha or None
 
 
-class DisposableWorktree:
-    """A throwaway checkout of one captured tree, removed on every path."""
+class CriterionWorktrees:
+    """Fresh disposable checkouts of the two captured trees, per criterion.
 
-    def __init__(self, repo_root: Path, tree_sha: str, label: str):
+    Wrapping each tree in a commit is done ONCE (``git commit-tree`` is
+    the only step that needs the object database); each criterion then
+    gets its own pair of worktrees from those commits.
+
+    Sharing one pair across criteria was a real defect (Set 111 S2
+    verification, round 1): a verifier-authored command may write into
+    its checkout — probes and test runs routinely do — and every later
+    criterion would then be judged against a tree the previous one had
+    mutated, which can manufacture fails-before/passes-after for a
+    finding nothing actually fixed.
+    """
+
+    def __init__(self, repo_root: Path, baseline_tree: str, fixed_tree: str):
         self.repo_root = repo_root
-        self.tree_sha = tree_sha
+        self.baseline_commit = commit_for_tree(
+            repo_root, baseline_tree, f"acceptance-harness baseline {baseline_tree[:12]}"
+        )
+        self.fixed_commit = commit_for_tree(
+            repo_root, fixed_tree, f"acceptance-harness fixed {fixed_tree[:12]}"
+        )
+
+    @contextmanager
+    def fresh_pair(self):
+        """A ``(baseline_path, fixed_path)`` pair, removed on every path."""
+        with DisposableWorktree(
+            self.repo_root, self.baseline_commit, "baseline"
+        ) as before:
+            with DisposableWorktree(
+                self.repo_root, self.fixed_commit, "fixed"
+            ) as after:
+                yield before.path, after.path
+
+
+class DisposableWorktree:
+    """A throwaway checkout of one captured commit, removed on every path."""
+
+    def __init__(self, repo_root: Path, commit: str, label: str):
+        self.repo_root = repo_root
+        self.commit = commit
         self.label = label
         self.path: Optional[Path] = None
         self._parent: Optional[str] = None
 
     def __enter__(self) -> "DisposableWorktree":
-        commit = commit_for_tree(
-            self.repo_root,
-            self.tree_sha,
-            f"acceptance-harness {self.label} {self.tree_sha[:12]}",
-        )
         self._parent = tempfile.mkdtemp(prefix=f"acceptance-{self.label}-")
         target = Path(self._parent) / "tree"
         result = _git(
             self.repo_root,
-            ["worktree", "add", "--detach", "--force", str(target), commit],
+            ["worktree", "add", "--detach", "--force", str(target),
+             self.commit],
         )
         if result.returncode != 0:
             self._cleanup()
@@ -556,38 +681,30 @@ def acceptance_artifact_path(
 def collect_criteria(envelope: dict) -> List[dict]:
     """The blocking findings of *envelope*, with their criteria, in order.
 
-    Index is the position in the envelope's ``issues`` array (after the
-    same non-dict filtering the ledger assembler applies), so a result
-    maps back to exactly one immutable finding.
+    ``index`` is the position in the envelope's ``issues`` array (after
+    the same non-dict filtering the ledger assembler applies), so a
+    result maps back to exactly one immutable finding.
+
+    ``callKey`` is ``(discoveryCall, index_within_that_call)``, counted
+    over **every** envelope issue rather than only the blocking ones —
+    that is the coordinate that survives back to the raw verification
+    artifact, whose parsed issue list is not filtered by severity.
     """
     issues = [i for i in (envelope.get("issues") or []) if isinstance(i, dict)]
     collected: List[dict] = []
+    seen: dict = {}
     for index, issue in enumerate(issues):
+        call = issue.get("discoveryCall")
+        if not isinstance(call, int) or isinstance(call, bool) or call < 1:
+            call = 1
+        position = seen.get(call, 0)
+        seen[call] = position + 1
         if not is_blocking_issue(issue):
             continue
-        collected.append({"index": index, "issue": issue})
+        collected.append(
+            {"index": index, "issue": issue, "callKey": (call, position)}
+        )
     return collected
-
-
-def _prior_criterion_hashes(path: Path) -> dict:
-    """{index: criterionSha256} from an earlier run of the same round."""
-    if not path.is_file():
-        return {}
-    try:
-        prior = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    if not isinstance(prior, dict):
-        return {}
-    hashes = {}
-    for result in prior.get("results") or []:
-        if not isinstance(result, dict):
-            continue
-        index = result.get("issueIndex")
-        digest = result.get("criterionSha256")
-        if isinstance(index, int) and isinstance(digest, str):
-            hashes[index] = digest
-    return hashes
 
 
 def _summarize(description: object, cap: int = 200) -> str:
@@ -672,14 +789,20 @@ def _call_key(entry: dict, seen: dict) -> tuple:
 def evaluate_criterion(
     repo_root: Path,
     entry: dict,
-    baseline_tree: str,
-    fixed_tree: str,
-    baseline_worktree: Optional[Path],
-    fixed_worktree: Optional[Path],
+    changed_paths: Sequence[str],
+    worktrees: Optional["CriterionWorktrees"],
     timeout: int,
-    prior_hashes: dict,
+    authoritative: Optional[dict],
 ) -> dict:
-    """One finding's acceptance result (see the module docstring's rules)."""
+    """One finding's acceptance result (see the module docstring's rules).
+
+    ``authoritative`` is the raw-artifact criterion map from
+    :func:`raw_artifact_criteria` (``None`` when it could not be read).
+    ``worktrees`` supplies a FRESH pair of disposable checkouts for this
+    criterion alone — criteria must not share them, or one that writes
+    into its checkout silently rewrites the tree the next one is judged
+    against.
+    """
     issue = entry["issue"]
     index = entry["index"]
     result: dict = {
@@ -726,14 +849,30 @@ def evaluate_criterion(
     if expects:
         result["expectedOutputContains"] = expects
 
-    prior = prior_hashes.get(index)
-    if prior and prior != digest:
+    prior = authoritative.get(entry["callKey"]) if authoritative else None
+    if authoritative is None:
+        result["outcome"] = OUTCOME_CRITERION_UNBOUND
+        result["reason"] = (
+            "the round's raw verification artifact could not be read, so the "
+            "criterion cannot be bound to what the VERIFIER actually wrote; "
+            "refusing to auto-close on the envelope's word alone"
+        )
+        return result
+    if prior is None:
+        result["outcome"] = OUTCOME_CRITERION_UNBOUND
+        result["reason"] = (
+            "no criterion for this finding appears in the round's raw "
+            "verification artifact, so this one is not verifier-authored "
+            "evidence and cannot auto-close"
+        )
+        return result
+    if prior != digest:
         result["outcome"] = OUTCOME_CRITERION_CHANGED
         result["reason"] = (
-            "the criterion contract changed since the previous harness run "
-            f"for this round (was {prior[:12]}, now {digest[:12]}) -- an "
-            "edited criterion or expectation invalidates the result and "
-            "cannot auto-close"
+            "the criterion contract in the envelope does not match the one "
+            f"the verifier wrote (raw artifact {prior[:12]}, envelope "
+            f"{digest[:12]}) -- an edited criterion or expectation "
+            "invalidates the result and cannot auto-close"
         )
         return result
 
@@ -744,35 +883,36 @@ def evaluate_criterion(
         result["reason"] = f"refused: {exc}"
         return result
     result["argv"] = argv
+    if argv[0] != shlex.split(command, posix=True)[0]:
+        result["interpreterSubstituted"] = argv[0]
 
-    modified_assets = []
-    for path in referenced_paths(argv):
-        before = path_blob_sha(repo_root, baseline_tree, path)
-        after = path_blob_sha(repo_root, fixed_tree, path)
-        if before == after:
-            continue
-        if before is None and after is None:
-            continue
-        if is_test_asset(path):
-            modified_assets.append(path)
+    scopes = criterion_scopes(argv)
+    runner = is_test_runner(argv)
+    result["scopes"] = scopes
+    if runner:
+        result["testRunner"] = True
+    modified_assets = modified_test_assets_in_scope(
+        changed_paths, scopes, runner=runner
+    )
     if modified_assets:
         result["outcome"] = OUTCOME_TEST_ASSET_MODIFIED
         result["modifiedTestAssets"] = modified_assets
         result["reason"] = (
-            "the remediation changed test assets this criterion runs on ("
-            + ", ".join(modified_assets)
-            + ") -- the two runs are not comparable, so the finding stays "
-            "judgment-based"
+            "the remediation changed test assets inside this criterion's "
+            "scope (" + ", ".join(modified_assets[:8])
+            + ") -- the person being judged moved the ruler, so the two runs "
+            "are not comparable and the finding stays judgment-based"
         )
         return result
 
-    if baseline_worktree is None or fixed_worktree is None:
+    if worktrees is None:
         result["outcome"] = OUTCOME_ERROR
         result["reason"] = "no disposable worktree was available"
         return result
 
-    baseline_run = run_criterion_in(baseline_worktree, argv, timeout, expects)
-    fixed_run = run_criterion_in(fixed_worktree, argv, timeout, expects)
+    with worktrees.fresh_pair() as (before_path, after_path):
+        baseline_run = run_criterion_in(before_path, argv, timeout, expects)
+        fixed_run = run_criterion_in(after_path, argv, timeout, expects)
     result["baseline"] = baseline_run
     result["fixed"] = fixed_run
 
@@ -876,42 +1016,42 @@ def run_harness(
     artifact_path = acceptance_artifact_path(
         session_set_dir, session_number, round_number
     )
-    prior_hashes = _prior_criterion_hashes(artifact_path)
+    # The criteria as the VERIFIER wrote them. This — not the mutable
+    # envelope, and not a previous harness run — is what "unchanged"
+    # means, so the FIRST run is guarded like every later one.
+    authoritative = raw_artifact_criteria(
+        session_set_dir, session_number, round_number
+    )
+    changed_paths = changed_paths_between(
+        repo_root, baseline_tree, fixed_tree
+    )
 
     needs_execution = any(
         (acceptance_block(e["issue"]) or {}).get("kind") == "executable"
         for e in entries
     )
     results: List[dict] = []
+    worktrees: Optional[CriterionWorktrees] = None
     if needs_execution and baseline_tree != fixed_tree:
-        with DisposableWorktree(repo_root, baseline_tree, "baseline") as before:
-            with DisposableWorktree(repo_root, fixed_tree, "fixed") as after:
-                for entry in entries:
-                    results.append(
-                        evaluate_criterion(
-                            repo_root, entry, baseline_tree, fixed_tree,
-                            before.path, after.path, timeout, prior_hashes,
-                        )
-                    )
-    else:
-        # Nothing executable, or the tree never changed (no remediation
-        # landed): evaluate the non-executing outcomes without paying for
-        # two checkouts. An unchanged tree cannot discriminate anything.
-        for entry in entries:
-            results.append(
-                evaluate_criterion(
-                    repo_root, entry, baseline_tree, fixed_tree,
-                    None, None, timeout, prior_hashes,
-                )
+        worktrees = CriterionWorktrees(repo_root, baseline_tree, fixed_tree)
+    for entry in entries:
+        results.append(
+            evaluate_criterion(
+                repo_root, entry, changed_paths, worktrees, timeout,
+                authoritative,
             )
-        if needs_execution:
-            for result in results:
-                if result.get("outcome") == OUTCOME_ERROR:
-                    result["reason"] = (
-                        "the fixed tree is identical to the pre-fix baseline: "
-                        "no remediation has landed, so no criterion can "
-                        "discriminate"
-                    )
+        )
+    if needs_execution and worktrees is None:
+        # The tree never moved: no remediation landed, so no criterion can
+        # discriminate anything. Say that, rather than leaving the generic
+        # "no disposable worktree" reason.
+        for result in results:
+            if result.get("outcome") == OUTCOME_ERROR:
+                result["reason"] = (
+                    "the fixed tree is identical to the pre-fix baseline: "
+                    "no remediation has landed, so no criterion can "
+                    "discriminate"
+                )
 
     artifact = {
         "schemaVersion": ARTIFACT_SCHEMA_VERSION,
@@ -920,6 +1060,7 @@ def run_harness(
         "baselineRound": baseline_round,
         "baselineTree": baseline_tree,
         "fixedTree": fixed_tree,
+        "criteriaBoundToRawArtifact": authoritative is not None,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
         "timeoutSeconds": timeout,
         "results": results,

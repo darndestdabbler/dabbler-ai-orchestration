@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** `pytest ./` scopes to `\".\"`, so edited tests can still auto-close a broad test-runner criterion.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A verifier writes the common broad criterion `python -m pytest ./`. The remediator leaves product code broken but edits `tests/test_widget.py` so the suite passes. Because `\".\"` is not normalized to the whole-repo scope, the harness misses the modified test asset and records `auto-closed`; this is probable because `./` is a normal repo-root path spelling for test commands.\n  - **Acceptance criterion:** JUDGMENT - A pytest criterion whose path token normalizes to the repo root, including `python -m pytest ./`, must invalidate when remediation changes any test asset in the repo rather than auto-closing.\n  - **Details:** **Violation:** the harness contract says `test-asset-modified` applies when remediation edits a test asset inside the criterion’s scope, and broad test-runner scope is meant to include the tests it collects. **Impact:** this preserves the “move the ruler” false-closure path L4 was supposed to eliminate, so a reasonable reviewer should not accept the remediation as complete. **Evidence:** `criterion_scopes([\"python\",\"-m\",\"pytest\",\"./\"])` returns `[\".\"]`; `modified_test_assets_in_scope()` only treats `\"\"` as whole-repo scope and therefore misses `tests/test_widget.py`. A throwaway end-to-end harness run with only the test changed produced `outcome: \"auto-closed\"` with `scopes: [\".\"]`, `baselinePassed: false`, and `fixedPassed: true`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A verifier writes the common broad criterion `python -m pytest ./`. The remediator leaves product code broken but edits `tests/test_widget.py` so the suite passes. Because `\".\"` is not normalized to the whole-repo scope, the harness misses the modified test asset and records `auto-closed`; this is probable because `./` is a normal repo-root path spelling for test commands.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A pytest criterion whose path token normalizes to the repo root, including `python -m pytest ./`, must invalidate when remediation changes any test asset in the repo rather than auto-closing."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 raw-artifact binding catches first-run criterion edits",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 pathless broad test-runner invalidation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 per-criterion disposable worktree isolation",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 root-path test runner scope still lets edited tests auto-close",
+      "verdict": "fix-rejected",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 documented `.venv/Scripts/python.exe` criteria execute via interpreter substitution",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 output-based closure evidence is rendered in remediation-review",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8 containment claims now match the non-sandbox boundary",
+      "verdict": "fix-accepted",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 file-scoped pytest invalidates conftest and fixture edits",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    }
+  ]
+}

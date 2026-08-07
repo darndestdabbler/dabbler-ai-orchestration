@@ -103,9 +103,11 @@ Your criterion is **run by a harness, not by the person who wrote the fix**, aga
 **Prefer the executable form.** Put a single command in backticks:
 
 - It must **fail on the tree in front of you** and **pass once the finding is fixed**. A criterion that passes either way is worthless; prefer one that drives the real entrypoint with the input that breaks.
-- **One command, no shell operators** — no `&&`, `||`, `|`, `;`, `>`, `<`, `$(...)`, or nested backticks. The harness refuses them and falls back to judgment.
-- It runs from the **repository root** in a disposable checkout with **no network and no credentials**. Use **forward slashes** in paths. Assume nothing is installed that the repo does not already vendor or declare.
-- Prefer a check over the **product** code (a probe that drives the public entrypoint, a targeted existing test) over one that depends on a **test file the fix is expected to add or change**: the harness invalidates any criterion whose test assets the remediation modified, because a criterion that can be edited by the person it judges is not evidence.
+- **One command, no shell operators** — no `&&`, `||`, `|`, `;`, `>`, `<`, `$(...)`, or nested backticks. The harness refuses them and falls back to judgment. A shell (`bash`, `powershell`, `cmd`) or a fetch tool (`curl`, `wget`) as the program is refused for the same reason.
+- It runs from the **repository root of a throwaway checkout**, with your process environment stripped of credentials and a wall-clock timeout. Use **forward slashes** in paths. Assume nothing is installed that the repo does not already vendor or declare.
+- **Exercise the checkout by PATH, not by import.** The interpreter running your command has this project installed from the *main* working copy, so a criterion that imports the installed package measures that copy rather than the checkout under test. Run a file, read a file, or point a test runner at a path.
+- Write `python` (or the repo's documented interpreter path) and it will be run with the harness's own interpreter — you do not need to guess where the virtualenv lives, and a gitignored `.venv/` is not present in the checkout anyway.
+- Prefer a check over the **product** code (a probe that drives the public entrypoint, a targeted existing test) over one that depends on a **test file the fix is expected to add or change**: the harness invalidates any criterion whose test assets the remediation modified, because a criterion that can be edited by the person it judges is not evidence. Naming a broad test runner (`pytest` with no path) makes **every** test file part of that scope.
 
 **Use the judgment form only when no command can express it.** Write:
 

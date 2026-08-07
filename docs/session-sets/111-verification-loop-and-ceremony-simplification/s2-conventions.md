@@ -210,11 +210,28 @@ session in this set with a genuinely clean full run on this machine.
 - `test_pull_verifier.py` → **148 passed, 3 skipped in 18s**.
 
 **Full run of record — `python -m pytest ai_router/tests`, after the last
-code change, NOTHING deselected: 3,563 passed / 0 failed / 10 skipped in
-15m36s.** This is the first fully clean full run on this machine in the
-set: Sessions 1's two excused classes (16 failures, plus 14 more tests it
-had to deselect for CLI timeouts) were root-fixed above rather than
-carried forward.
+code change, NOTHING deselected: 3,584 passed / 0 failed / 10 skipped.**
+This is a fully clean full run: Session 1's two excused classes (16
+failures, plus 14 more tests it had to deselect for CLI timeouts) were
+root-fixed rather than carried forward.
+
+## Verification actually run
+
+- **Round 1 — discovery**, K=2, both lenses (`spec-conformance`,
+  `failure-scenario`), verifier `gpt-5.5`, anthropic excluded:
+  ISSUES_FOUND, 5 blocking.
+- **Round 2 — supplementary** (completeness critic): ISSUES_FOUND, 3
+  blocking. **Both discovery passes now spent.**
+- Remediated all 8 (6 distinct defects) → `s2-remediation-round-1.md`.
+- **Round 3 — remediation-review cycle 1**: 6 accepted, 1 duplicate-of,
+  **1 rejected** (file-scoped pytest ignored `conftest.py`). Fixed.
+- **Round 4 — remediation-review cycle 2**: 7 accepted, 1 duplicate-of,
+  **1 rejected** (`pytest ./` scoped to the literal `"."`). Fixed.
+- **The enforced bound is now reached: 2 of 2 remediation-review cycles.**
+  A third is refused without the operator's recorded
+  `--operator-authorized-round`. The session stops here for adjudication
+  rather than grinding; the recorded verdict is ISSUES_FOUND and this
+  session is **not closed**.
 
 ## Release contract
 

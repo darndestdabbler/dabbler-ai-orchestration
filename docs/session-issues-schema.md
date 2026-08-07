@@ -171,16 +171,23 @@ block. Its absence never changes blocking classification.
 **A criterion is not evidence until it discriminates.** `python -m
 ai_router.acceptance_harness --session-set-dir <dir> --round <M>` runs each
 **unchanged** criterion against the round's `discoveryBaselineTree`
-(pre-fix) and a fresh snapshot of the working tree (fixed), each in a
-**disposable git worktree**, with no shell, no credentials, and a
-timeout. The finding auto-closes **only** when the criterion **fails
-before and passes after**. Everything else — a criterion that already
-passed pre-fix (vacuous), one whose test assets the remediation modified,
-one carrying a shell operator, one edited since a previous harness run,
-a judgment criterion, or a timeout — stays judgment-based and is settled
-by the retained `--phase remediation-review`, which reads the harness's
-`sN-acceptance-round-<M>.json` artifact and spends its attention on what
-the fixes **broke** and what the criteria **missed**.
+(pre-fix) and a fresh snapshot of the working tree (fixed), each in its
+own **disposable git worktree**, with no shell, no credentials in the
+process environment, and a timeout. The finding auto-closes **only** when
+the criterion **fails before and passes after**. Everything else — a
+criterion that already passed pre-fix (vacuous), one whose test assets the
+remediation modified anywhere in its scope, one that does not match what
+the verifier wrote in the immutable raw artifact, one carrying a shell
+operator, a judgment criterion, or a timeout — stays judgment-based and is
+settled by the retained `--phase remediation-review`, which reads the
+harness's `sN-acceptance-round-<M>.json` artifact and spends its attention
+on what the fixes **broke** and what the criteria **missed**.
+
+"Unchanged" is measured against the **raw `sN-verification*.md`
+artifact**, not the envelope and not a previous harness run: the envelope
+is a derived artifact the orchestrator is invited to annotate, and
+comparing only against a previous run leaves the first run — the normal
+path — unguarded.
 
 Baseline discrimination proves a criterion is *related* to the defect; it
 does not prove it is *sufficient*. No adequacy checker exists by design —

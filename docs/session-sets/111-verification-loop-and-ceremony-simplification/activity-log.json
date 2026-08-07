@@ -164,6 +164,30 @@
       "dateTime": "2026-08-07T06:21:35.752284-04:00",
       "description": "REMEDIATION ROUND 1 INCOMPLETE -- operator ended the working window. Fixed: broad test-runner/directory scope invalidation (is_test_runner, criterion_scopes, changed_paths_between, modified_test_assets_in_scope); .venv/bare-python interpreter rewrite (resolve_interpreter); shell/fetch program denylist. Built but NOT wired: raw_artifact_criteria + _call_key + OUTCOME_CRITERION_UNBOUND for the first-run-edit hole. NOT started: per-criterion worktree isolation, output evidence in the review block, correcting the over-claimed no-network/no-credentials wording (needs template v5). Full handoff in s2-remediation-round-1.md. Harness suite 61 passed.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 11,
+      "stepKey": "remediate",
+      "dateTime": "2026-08-07T08:30:31.135360-04:00",
+      "description": "Remediated all 8 blocking findings (6 distinct defects; 2 cross-lens duplicate pairs): raw-artifact criterion binding (first-run edits), scope-based test-asset invalidation, per-criterion disposable worktrees, venv/bare-python interpreter substitution, output evidence in the review block, and honest containment wording (template v5) plus a shell/fetch denylist. 3 tests named by the verifier own criteria written under exactly those names.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 12,
+      "stepKey": "verify-remediation-review",
+      "dateTime": "2026-08-07T08:30:31.137829-04:00",
+      "description": "Remediation-review cycle 1 (round 3): 6 accepted, 1 duplicate-of, 1 REJECTED -- file-scoped pytest ignored conftest/fixture loading. Fixed with an end-to-end reproduction. Cycle 2 (round 4): 7 accepted, 1 duplicate-of, 1 REJECTED -- pytest ./ scoped to the literal dot. Fixed with an end-to-end reproduction. BOUND REACHED (2 of 2 cycles): stopping to the operator for adjudication rather than opening a third round. Full suite 3,584 passed / 0 failed / 10 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 13,
+      "stepKey": "dogfood-acceptance-harness",
+      "dateTime": "2026-08-07T08:30:31.139740-04:00",
+      "description": "Dogfooded the harness on this session own findings, both rounds: 0 of 8 auto-closed. 5 criteria were judgment-form (verifier choice); all 3 executable ones named tests the remediation had to write, so test-asset-modified fired on its own author -- the guard working as designed. Recorded in the sidecar as the first live measurement of Proposal B yield (proposal SS10 Q4) for Session 4 to weigh.",
+      "status": "complete"
     }
   ]
 }

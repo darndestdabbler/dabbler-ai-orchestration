@@ -273,12 +273,26 @@ def _parse_acceptance(block: str) -> Optional[dict]:
         if exit_match:
             acceptance["expectedExitCode"] = int(exit_match.group(1))
         contains = re.search(
-            r'contains?[\s*:=]*["\'\u201c\u2018`]([^"\'\u201d\u2019`]+)',
+            r'contains?[\s*:=]*(?:'
+            r'"([^"]+)"'
+            r"|\u201c([^\u201d]+)\u201d"
+            r"|`([^`]+)`"
+            r"|'([^']+)'"
+            r")",
             expectation,
             re.IGNORECASE,
         )
-        if contains and contains.group(1).strip():
-            acceptance["expectedOutputContains"] = contains.group(1).strip()
+        if contains:
+            # Whichever quoting style matched. Matching the CLOSING quote of
+            # the style that opened is what lets a substring contain the
+            # other quote character -- e.g. output containing "VALUE =
+            # 'fixed'", which a character-class scan truncates at the
+            # apostrophe and then reports as an edited criterion.
+            value = next(
+                (g for g in contains.groups() if g is not None), ""
+            ).strip()
+            if value:
+                acceptance["expectedOutputContains"] = value
     return acceptance
 
 

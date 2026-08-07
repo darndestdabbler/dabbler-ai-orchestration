@@ -212,42 +212,6 @@ the conftest moved → `test-asset-modified`, not `auto-closed`);
 `test_a_runner_scope_covers_what_it_loads_not_just_what_it_names` and
 `test_loader_asset_classification` pin the rule and its boundaries.
 
-## Remediation-review round 4 (cycle 2 of 2) — the bound is reached
-
-Seven of nine ledger entries accepted (L5 duplicate-of L1). **L4 rejected
-again**, and again correctly, one level narrower:
-
-> `criterion_scopes(["python","-m","pytest","./"])` returned `["."]`.
-> Only `""` was treated as the whole-repo scope, so the literal `"."`
-> matched nothing and an edited test could still auto-close.
-
-**Fix.** `_normalize_scope()` — `.`, `./`, `.\`, and trailing slashes all
-normalize, so a token meaning "here" at the repo root becomes the
-whole-repo scope `""`. Pinned by
-`test_a_root_path_token_is_the_whole_repo_scope` (three spellings) and
-`test_root_scoped_runner_invalidates_on_any_test_edit` (end to end:
-product left broken, only the test moved → `test-asset-modified`).
-
-**The loop is now at its enforced bound: 2 of 2 remediation-review
-cycles.** A third is refused without the operator's recorded
-`--operator-authorized-round` attestation, and the orchestrator does not
-hold that authority. The session therefore **stops to the operator** with
-this record rather than grinding another round.
-
-**The shape of the rejections is itself the evidence for adjudication.**
-Each cycle's rejection was strictly narrower than the last, on one defect
-class — *a criterion's scope is what it RUNS, not what it NAMES*:
-
-| Cycle | Rejected because | Kind of gap |
-|---|---|---|
-| 1 (round 3) | `pytest tests/test_widget.py` ignored `tests/conftest.py` | design: implicit loading |
-| 2 (round 4) | `pytest ./` scoped to the literal `"."` | mechanical: string normalization |
-
-Both are now fixed, each with an end-to-end reproduction of the exact
-scenario the reviewer described. The residual risk is that the class has
-another spelling nobody has named yet — which is precisely what a bound
-exists to stop us from chasing one round at a time.
-
 ## Dogfood: what the harness actually returned on these very findings
 
 Run for real, both rounds, and recorded honestly because it is the first

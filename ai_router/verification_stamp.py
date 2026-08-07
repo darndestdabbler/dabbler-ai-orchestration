@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v4"
+TEMPLATE_ID = "session-verification-v5"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -101,9 +101,20 @@ TEMPLATE_HASHES = {
     # Set 111 S2: minted when the per-Issue "Acceptance criterion" /
     # "Acceptance expectation" lines and the "Writing an acceptance
     # criterion" section were added (Proposal B, gated by baseline
-    # discrimination). v4 is the active id.
+    # discrimination).
     "session-verification-v4": (
         "9592f1fe1ec0102d47be7dc0b44efa35c6f5acb71631a963280073f3d3c7ef66"
+    ),
+    # Set 111 S2, remediation round 1: minted when this session's own
+    # supplementary round found the criterion guidance CLAIMED a
+    # containment boundary the harness does not enforce ("no network and
+    # no credentials"). The wording now states what is actually true -- a
+    # throwaway checkout, no shell, refused shell/fetch programs, a
+    # credential-stripped process environment, a timeout -- and adds the
+    # by-path (not by-import) rule and the interpreter note. v5 is the
+    # active id.
+    "session-verification-v5": (
+        "237d1118baee2c59189760c26dc27e84f87936813f4b7cad5134cdc3f2f0e2fb"
     ),
 }
 

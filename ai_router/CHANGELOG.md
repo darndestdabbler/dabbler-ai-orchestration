@@ -378,6 +378,10 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   - The printed next action is now consistent with the refusal: at a bound the
     CLI names the suspension and the operator/adjudication path, and never
     prints a re-run command the next invocation would reject.
+  - **An exhausted budget can never deadlock a close.** The close backstop
+    composes `verify_session`'s helpers but does not go through `run()`, so
+    the gate's own corroboration round is not refusable — enforcement binds
+    the orchestrator's rounds, not the close-out's.
 
 - **(Set 111 S1) The K=2 discovery fan-out sends differently-framed prompts,
   not identical ones.** Same K, same cost, same loop position, same envelope

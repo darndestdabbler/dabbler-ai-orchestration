@@ -29,7 +29,8 @@
     "reason": {
       "code": "continue-current-trajectory",
       "specifics": "Session 2 builds acceptance criteria with baseline discrimination directly on top of S1's phase machinery in verify_session.py -- the round ledger, the enforced bounds and the discovery-lens fan-out are all load-bearing context for it, and the same orchestrator already holds the proposal's settled decisions. No capability or cost reason to switch; cross-provider independence is preserved where it matters, in the session-verification route."
-    }
+    },
+    "provider": "anthropic"
   },
   "blockers": [],
   "lessons_cited": [
@@ -43,6 +44,7 @@
     "Operator-authorized scope extension (disclosed in s1-conventions.md with the full decision trail): the Copilot CLI transport's total dispatch ceiling was a hardcoded 300s with no config or env path, and a ~116KB session-verification bundle cannot complete inside it -- two total-timeout dispatches with nothing written, while a trivial prompt returned in 13s. The orchestrator refused to self-authorize and stopped to the operator, who chose the config knob. Known trade-off: a dispatch that streams then stalls can now occupy 20 minutes instead of 5; one that never starts still dies at first_byte_seconds=30.",
     "UNRESOLVED, for the operator: s1-verification.md and a VERIFIED disposition appeared in this set's folder mid-session, written by something other than this session, with NO stamped row in router-metrics.jsonl. Per the operator's instruction it was treated as a third-party verification, left unedited (so it occupies round 1 and this session's own rounds are 2-4), and this session closed only on its own stamped evidence. One substantive point from it was acted on (the VERIFIED-plus-NITS exit wording). A SECOND occurrence is to be treated as verification running out of band and investigated -- possibly a path-aware CLI process launching verification in parallel.",
     "Suite: 3,478 passed / 0 failed / 10 skipped locally, after the last code change. 31 tests were deselected as pre-existing environmental failures on this seat, in two classes, neither touching a module this session changed: missing DABBLER_OPENAI_API_KEY (drift-guard model-inventory checks, proven pre-existing by a stashed-baseline re-run) and real Copilot CLI dispatch total-timeouts in tests that shell out to the CLI.",
-    "Deferred to later sessions by the spec, not by omission: acceptance criteria with baseline discrimination (S2), the decision-rights rubric and decision journal (S3), and the ceremony pass including the artifact-necessity review and the guided-look UAT format (S4). requiresUAT is a set-level flag S4 dogfoods; S1 ships no UI surface."
+    "Deferred to later sessions by the spec, not by omission: acceptance criteria with baseline discrimination (S2), the decision-rights rubric and decision journal (S3), and the ceremony pass including the artifact-necessity review and the guided-look UAT format (S4). requiresUAT is a set-level flag S4 dogfoods; S1 ships no UI surface.",
+    "The close backstop re-verified independently (round 5, gpt-5.5, anthropic excluded) and also returned VERIFIED. Worth recording for future sessions: the backstop composes verify_session's helpers but never calls run(), so the newly enforced bounds cannot refuse the close gate's own corroboration round -- an exhausted budget can never deadlock a close. test_close_backstop is green with the enforcement in place."
   ]
 }

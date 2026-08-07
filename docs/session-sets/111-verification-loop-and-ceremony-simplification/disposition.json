@@ -1,50 +1,65 @@
 {
   "status": "completed",
-  "summary": "Set 111 Session 1: made the verification loop's bounds real. verify_session now REFUSES the round that would pass a bounded total (2 discovery-family passes, 2 remediation-review cycles, 2 classic rounds) before any metered call, unless the operator's --operator-authorized-round attestation is recorded in the new append-only per-session round ledger sN-rounds.jsonl; the K=2 discovery fan-out now sends two differently-framed prompts (spec-conformance / failure-scenario) over the same evidence instead of identical ones, with per-call evidence stamps and a discoveryLens recorded per finding; and a Minor-only round is a structural stop that is offered only the close command. Scope extension, operator-authorized mid-session: transports.copilot-cli.timeouts became a validated config block (total 300s -> 1200s) because this session's own MANDATORY verification could not complete inside the hardcoded ceiling.",
+  "summary": "Set 111 Session 2: acceptance criteria with baseline discrimination (Proposal B). The verifier now writes one acceptance criterion per Critical/Major finding -- an executable command where possible, JUDGMENT where not -- parsed tolerantly into the envelope's new optional per-issue `acceptance` block. The new ai_router.acceptance_harness runs each UNCHANGED criterion against the round's discoveryBaselineTree and a fresh working-tree snapshot, each in its OWN disposable git worktree, and auto-closes a finding ONLY on fails-before AND passes-after. 'Unchanged' is bound to the immutable raw sN-verification*.md artifact, not the annotatable envelope and not a previous harness run, so the first run is guarded like every later one. A criterion's SCOPE for test-asset invalidation is what it RUNS, not what it NAMES. Containment is stated honestly -- throwaway checkout, no shell, refused shell/fetch programs, credential-stripped process environment, timeout -- and explicitly NOT a sandbox. Exactly one remediation-review is retained and now reads the harness results. Operator-authorized scope extension (2026-08-07): provider API keys are validated at DISPATCH rather than at config load, because a keyless Copilot-CLI seat is one of the two supported populations, not a misconfiguration.",
   "verification_method": "api",
   "verification_verdict": "ISSUES_FOUND",
   "verification_message_ids": [],
   "files_changed": [
+    "ai_router/acceptance_harness.py",
     "ai_router/verify_session.py",
+    "ai_router/verification.py",
     "ai_router/verification_stamp.py",
-    "ai_router/cli_transport.py",
     "ai_router/config.py",
     "ai_router/__init__.py",
-    "ai_router/router-config.yaml",
+    "ai_router/prompt-templates/verification.md",
     "ai_router/CHANGELOG.md",
-    "ai_router/tests/test_verify_session_phases.py",
-    "ai_router/tests/test_cli_transport.py",
-    "ai_router/tests/test_session_issues_schema.py",
+    "ai_router/tests/test_acceptance_harness.py",
+    "ai_router/tests/conftest.py",
+    "ai_router/tests/test_transport_profile_config.py",
+    "ai_router/tests/test_drift_guard.py",
+    "ai_router/tests/test_orchestrator_identity.py",
+    "ai_router/tests/test_routing_exclusion_integrity.py",
+    "ai_router/tests/test_pull_verifier.py",
+    "docs/session-issues.schema.json",
+    "docs/session-issues-schema.md",
     "docs/ai-led-session-workflow.md",
     "docs/session-constitution.md",
-    "docs/session-issues-schema.md",
-    "docs/session-issues.schema.json",
-    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s1-conventions.md",
-    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s1-remediation-round-1.md"
+    "docs/quick-start.md",
+    "docs/proposals/2026-08-05-set-112-reservation-remove-lightweight-tier.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/operator-notes.md",
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-conventions.md",
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-1.md",
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-3.md",
+    "docs/session-sets/111-verification-loop-and-ceremony-simplification/s2-remediation-round-4.md"
   ],
   "next_orchestrator": {
     "engine": "copilot",
     "model": "claude-opus-5",
     "effort": "high",
+    "provider": "anthropic",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 builds acceptance criteria with baseline discrimination directly on top of S1's phase machinery in verify_session.py -- the round ledger, the enforced bounds and the discovery-lens fan-out are all load-bearing context for it, and the same orchestrator already holds the proposal's settled decisions. No capability or cost reason to switch; cross-provider independence is preserved where it matters, in the session-verification route."
-    },
-    "provider": "anthropic"
+      "specifics": "Session 3 (decision rights and education mode) builds on the same proposal SS11 decision record this orchestrator has been executing since S1, and its decision journal is a new small ai_router module of the same shape as the acceptance harness. Cross-provider independence is preserved where it matters -- the session-verification route, which excluded anthropic and used gpt-5.5 throughout. No capability or cost reason to switch. One carry-forward worth stating: S3 canonizes the rubric governing when an orchestrator may decide versus stop to the operator, and this session produced a live worked example of the stop -- the enforced bound was reached and the operator adjudicated rather than the orchestrator self-authorizing."
+    }
   },
   "blockers": [],
   "lessons_cited": [
-    "L-065-1",
     "L-069-1",
+    "L-064-8",
+    "L-065-1",
     "L-064-9"
   ],
   "notes": [
-    "Verification loop actually run: discovery round 2 (K=2, both lenses) -> supplementary round 3 -> remediation round 1 -> remediation-review round 4 = VERIFIED (0 blocking; 1 fix-accepted, 1 duplicate-of, 1 accepted-with-modification). Within the newly enforced bounds: 2 discovery passes of 2, 1 remediation-review cycle of 2, no operator authorization needed.",
-    "Both discovery lenses independently reported the same Major (the undisclosed operator-authorized transport scope extension), which is convergence rather than added coverage; the supplementary pass produced the session's most valuable finding -- with a working reproduction -- that a clean supplementary round consumes a discovery pass but writes no envelope, so a third pass was accepted unauthorized. That defect was in S1's own headline deliverable and is fixed, with fails-before/passes-after evidence.",
-    "Operator-authorized scope extension (disclosed in s1-conventions.md with the full decision trail): the Copilot CLI transport's total dispatch ceiling was a hardcoded 300s with no config or env path, and a ~116KB session-verification bundle cannot complete inside it -- two total-timeout dispatches with nothing written, while a trivial prompt returned in 13s. The orchestrator refused to self-authorize and stopped to the operator, who chose the config knob. Known trade-off: a dispatch that streams then stalls can now occupy 20 minutes instead of 5; one that never starts still dies at first_byte_seconds=30.",
-    "UNRESOLVED, for the operator: s1-verification.md and a VERIFIED disposition appeared in this set's folder mid-session, written by something other than this session, with NO stamped row in router-metrics.jsonl. Per the operator's instruction it was treated as a third-party verification, left unedited (so it occupies round 1 and this session's own rounds are 2-4), and this session closed only on its own stamped evidence. One substantive point from it was acted on (the VERIFIED-plus-NITS exit wording). A SECOND occurrence is to be treated as verification running out of band and investigated -- possibly a path-aware CLI process launching verification in parallel.",
-    "Suite: 3,478 passed / 0 failed / 10 skipped locally, after the last code change. 31 tests were deselected as pre-existing environmental failures on this seat, in two classes, neither touching a module this session changed: missing DABBLER_OPENAI_API_KEY (drift-guard model-inventory checks, proven pre-existing by a stashed-baseline re-run) and real Copilot CLI dispatch total-timeouts in tests that shell out to the CLI.",
-    "Deferred to later sessions by the spec, not by omission: acceptance criteria with baseline discrimination (S2), the decision-rights rubric and decision journal (S3), and the ceremony pass including the artifact-necessity review and the guided-look UAT format (S4). requiresUAT is a set-level flag S4 dogfoods; S1 ships no UI surface.",
-    "The close backstop re-verified independently (round 5, gpt-5.5, anthropic excluded) and also returned VERIFIED. Worth recording for future sessions: the backstop composes verify_session's helpers but never calls run(), so the newly enforced bounds cannot refuse the close gate's own corroboration round -- an exhausted budget can never deadlock a close. test_close_backstop is green with the enforcement in place."
+    "Verification loop actually run: discovery round 1 (K=2, both lenses, gpt-5.5, anthropic excluded) -> supplementary round 2 -> remediate -> remediation-review round 3 (cycle 1) -> remediation-review round 4 (cycle 2). 8 blocking findings over the two discovery passes, 6 distinct defects (two cross-lens duplicate pairs). Both discovery passes and both remediation-review cycles are spent; the loop is AT its enforced bound.",
+    "OPERATOR ADJUDICATION AT THE BOUND (2026-08-07): cycle 2 accepted 7 of 9 ledger entries and rejected one narrow gap -- `pytest ./` scoped to the literal '.' rather than the whole repo. That gap is FIXED, with an end-to-end reproduction test, but the fix itself was never seen by a routed remediation-review round because the bound refuses a third cycle without operator authorization. Presented to the operator as a stop; the operator adjudicated ACCEPT on the recorded executable evidence. Per the constitution an adjudication settles the STOP, not the truth: the owed residual is that the final normalization fix carries test evidence and the close backstop's independent round, but no routed remediation-review verdict. Owner: Session 3, one look at ai_router/acceptance_harness.criterion_scopes and _normalize_scope.",
+    "The two cycle rejections were the SAME defect class getting strictly narrower -- 'a criterion's scope is what it RUNS, not what it NAMES': cycle 1 caught implicit conftest/fixture loading for a file-scoped pytest run; cycle 2 caught the '.' / './' spelling. Both fixed with end-to-end reproductions of the reviewer's exact scenario. The residual risk is another unnamed spelling of the same class, which is precisely what a bound exists to stop us chasing one round at a time.",
+    "DOGFOOD RESULT, recorded honestly because it is the first live measurement of Proposal B's yield (proposal SS10 Q4): 0 of 8 findings auto-closed. Five criteria were judgment-form (the verifier's own call, and the right one for 'stop claiming a boundary you do not enforce'). All three executable criteria named tests inside ai_router/tests/test_acceptance_harness.py that did not exist yet -- the remediation had to write them -- so the test-asset-modified guard fired on its own author. That is the machinery working as designed, not failing. Implication for Session 4: on a session whose deliverable is test-shaped the auto-close rate will be near zero, because the honest criterion for 'you fixed the harness' is 'a new harness test passes', which is self-marking by construction. Do NOT loosen the guard to raise the number -- the guard is why the number is trustworthy. B's value here was convergence and clarity, not round-count reduction.",
+    "Operator-authorized scope extension (2026-08-07), disclosed in full in s2-conventions.md: provider API keys are now validated at DISPATCH (ai_router.__init__._init passes require_api_keys=True) rather than at config load. The framework has two supported populations -- Copilot CLI (a seat, no provider keys) and Direct APIs -- so read-only consumers that touch no provider must not complain about credentials. This root-fixed the two drift-guard tests AND the 14 CLI-timeout tests Session 1 had recorded as 'pre-existing environmental failures': two shared conftest fixtures (placeholder_provider_keys, direct_api_transport) make seat-dependent tests run as the population they were written for. Session 1 could not close on a clean full run; this session can.",
+    "Suite: 3,584 passed / 0 failed / 10 skipped, full run of record after the last code change, with NOTHING deselected or excused. Targeted: test_acceptance_harness.py 71 passed.",
+    "Template version bumped TWICE this session, both deliberate and both pinned: session-verification-v4 (the acceptance-criterion lines) and session-verification-v5 (the corrected containment wording, after the supplementary round found the template claiming 'no network and no credentials' -- a boundary the harness does not enforce; the L-064-8 class sitting in a security sentence).",
+    "Deferred to later sessions by the spec, not by omission: the decision-rights rubric and decision journal (S3), and the ceremony pass -- artifact-necessity review, session-size cap, test-run policy, guided-look UAT, walk stager, guidance streamlining, CI hygiene (S4). requiresUAT is a set-level flag S4 dogfoods; S2 ships no UI surface, which is why requiresE2E is false.",
+    "Recorded for a future set, not built here: docs/session-sets/111-.../operator-notes.md carries the operator's 2026-08-07 instruction on unaccounted verification work (treat as third-party, never edit, close only on your own stamped evidence) and two Work Explorer context-menu convenience items; the Set 112 reservation doc gains a note to relabel the two Full-tier transports 'Direct APIs' and 'Copilot CLI' (new labels, same config values -- renaming transport.profile on disk is a breaking change)."
   ]
 }

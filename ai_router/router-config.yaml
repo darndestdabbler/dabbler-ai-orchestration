@@ -1211,6 +1211,27 @@ output:
   cost_report_on_exit: true    # print cost summary when session ends
   verbose: false               # detailed logging of each API call
 
+# --- Authoring-time admission tests (Set 111 S4) ---
+# Checks a spec author runs BEFORE a set starts, so an oversized session is
+# split at authoring rather than discovered at hour three.
+#
+# max_steps_per_session is MEASURED, not asserted. Across the 172 schema-v4
+# sessions in this repo carrying both a parseable spec plan and start/complete
+# timestamps, crossing from 5 declared steps to 6 doubles the median session
+# (42 -> 84 min), triples the p90 (110 -> 386 min), and nearly triples the
+# share running past two hours (10% -> 28%). The operator target is 15-20 min
+# of work per session plus 5-20 min of verification scaled to risk.
+#
+# Known limit, stated so a green result is not over-read: step count predicts
+# the MEDIAN, not the TAIL. The longest sessions on record (591/562/544/509
+# min) all declared 5-8 steps. This is a floor on obvious oversizing.
+#
+# An author with a real reason to exceed the cap declares it IN THE SPEC:
+#   sessionSizeException: 4 - terminal ceremony session; steps are independent
+# so the justification survives review instead of being argued at hour three.
+authoring:
+  max_steps_per_session: 5
+
 # --- Guidance lifecycle (Set 064) ---
 # Token ceilings for the always-loaded guidance files and the disuse
 # window for the D5 archive trigger. The whole block is optional and

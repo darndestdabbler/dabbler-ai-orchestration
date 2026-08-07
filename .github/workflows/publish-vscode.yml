@@ -82,12 +82,12 @@ jobs:
         working-directory: tools/dabbler-ai-orchestration
     steps:
       - name: Checkout tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 1
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '20'
 
@@ -175,7 +175,7 @@ jobs:
         # intended bytes. Pre-the-fix, the glob uploaded both the built
         # and the pre-committed VSIX, and the publish step picked the
         # wrong one via `head -n1`.
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02  # v4.6.2
         with:
           name: vsix
           path: tools/dabbler-ai-orchestration/dabbler-ai-orchestration-${{ needs.classify.outputs.semver_version }}.vsix
@@ -202,7 +202,7 @@ jobs:
       checks: read
     steps:
       - name: Checkout tag (for the local composite action)
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           fetch-depth: 1
 
@@ -236,12 +236,12 @@ jobs:
       url: https://marketplace.visualstudio.com/items?itemName=DarndestDabbler.dabbler-ai-orchestration
     steps:
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '20'
 
       - name: Download VSIX artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           name: vsix
           path: vsix/
@@ -284,12 +284,12 @@ jobs:
       url: https://open-vsx.org/extension/DarndestDabbler/dabbler-ai-orchestration
     steps:
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
         with:
           node-version: '20'
 
       - name: Download VSIX artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
         with:
           name: vsix
           path: vsix/

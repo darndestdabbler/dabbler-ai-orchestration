@@ -824,9 +824,19 @@ class TestGateScope:
         assert not passed
 
     def test_registered_as_the_sixth_gate(self):
+        """Set 083 put verification_integrity sixth; Set 111 S4 appended
+        two more after it. The load-bearing contract is its INDEX, which
+        index-based consumers pin — not that it is last forever."""
         names = [name for name, _fn in GATE_CHECKS]
-        assert names[-1] == VERIFICATION_INTEGRITY_CHECK_NAME
-        assert len(names) == 6
+        assert names[5] == VERIFICATION_INTEGRITY_CHECK_NAME
+        assert names[:6] == [
+            "working_tree_clean",
+            "pushed_to_remote",
+            "activity_log_entry",
+            "next_orchestrator_present",
+            "change_log_fresh",
+            VERIFICATION_INTEGRITY_CHECK_NAME,
+        ]
 
     def test_refusal_names_the_exact_command(self, tmp_path):
         set_dir = _make_set(tmp_path)

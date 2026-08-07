@@ -207,6 +207,28 @@ export function activate(context: vscode.ExtensionContext): void {
     treeView.message = message;
   });
 
+  // Set 111 S4: the walk stager sets DABBLER_WALK=1 so a guided-look UAT
+  // opens on the thing to look at instead of on the file Explorer. Gated
+  // on the env var per the portability rule (universal core, gated
+  // extension): no ordinary launch and no Playwright spec sets it, so
+  // nothing else changes behavior. Fire-and-forget and fully swallowed —
+  // failing to reveal a view must never abort activation.
+  if (process.env.DABBLER_WALK === "1") {
+    setImmediate(() => {
+      void Promise.resolve(
+        vscode.commands.executeCommand(
+          "workbench.view.extension.dabblerSessionSetsContainer",
+        ),
+      ).then(undefined, (err) => {
+        console.error(
+          "[dabbler-ai-orchestration] walk staging: could not reveal the " +
+            "Dabbler view container; open it from the activity bar.",
+          err,
+        );
+      });
+    });
+  }
+
   const evaluateContextKeys = () => {
     const allSets = readAllSessionSets();
     evaluateSupportContextKeys(allSets);

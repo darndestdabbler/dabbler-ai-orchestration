@@ -173,16 +173,61 @@ The `NNN-` prefix is a per-repo monotonic counter:
 
 ## Sizing a session set
 
-Each session is one orchestrator conversation. The cap on a session is
-not strict, but two heuristics are reliable:
+Each session is one orchestrator conversation.
 
-- A session that runs out of context budget mid-step is a sign that the
-  session is too big. Either move steps to the next session or split
-  the set.
-- A session that finishes in under ~30 minutes is a sign the session is
-  too small (overhead per session — Step 0 registration, guidance
-  reads, verification, notify, commit — is fixed; very short sessions
-  are dominated by overhead).
+### The session-size cap (Set 111 S4)
+
+**The operator target is 15–20 minutes of work per session**, plus 5–20
+minutes of verification scaled to risk. Sets 047–074 already met it
+(24 min work median), so this is a **regression to fix, not a stretch
+goal** — by Sets 106–110 the median session had reached 115 minutes.
+
+**A session declares at most 5 top-level steps.** That number is
+measured, not asserted. Across the 172 schema-v4 sessions in this repo
+carrying both a parseable spec plan and start/complete timestamps:
+
+| declared steps | n | median | p90 | ran > 2 h |
+| :--- | ---: | ---: | ---: | ---: |
+| 1–5 steps | 106 | **42 min** | 110 min | 10% |
+| 6–8 steps | 64 | **84 min** | 386 min | 28% |
+| 9–11 steps | 2 | 86 min | 114 min | 0% |
+
+Crossing from 5 steps to 6 **doubles** the median, triples the p90, and
+nearly triples the share of sessions that run past two hours.
+
+Check it before the set starts — the whole point is that an oversized
+session is split at authoring, not discovered at hour three:
+
+```bash
+python -m ai_router.spec_admission --spec docs/session-sets/<slug>/spec.md
+python -m ai_router.spec_admission --all --check   # every spec, CI-friendly
+```
+
+**What the cap does not promise.** Step count predicts the **median**,
+not the **tail**. The longest sessions on record (591, 562, 544, 509 min)
+all declared 5–8 steps — within or barely over the cap. A green result is
+a floor on obvious oversizing, not a promise of a short session.
+
+**Declaring an exception.** When a session genuinely must exceed the cap,
+say so *in the spec* so the justification survives review:
+
+```
+sessionSizeException: 4 - terminal ceremony session; the steps are
+independent and none can move to a later session because there is none.
+```
+
+An exception with no stated reason is not honoured — it is
+indistinguishable from a typo. The cap itself lives in
+`ai_router/router-config.yaml` under `authoring.max_steps_per_session`.
+
+### Other sizing signals
+
+- A session that runs out of context budget mid-step is too big. Move
+  steps to the next session or split the set.
+- Overhead per session (registration, guidance reads, verification,
+  notify, commit) is fixed, so a session with a single trivial step is
+  dominated by overhead. That is an argument for *merging tiny steps*,
+  not for padding a session toward the cap.
 
 Sessions per set:
 
@@ -738,6 +783,135 @@ prerequisites.
   page and assert on rendered content, skipping the actual UI entry
   point. Those tests pass even when the entry point is broken; they
   do not satisfy `requiresE2E: true`.
+
+---
+
+## The test-run policy (Set 111 S4)
+
+Canonizes the policy piloted in Set 110's operator notes. The waste
+pattern being eliminated is **invalidated runs**, not full runs.
+
+- **Cheap suites run freely.** The Layer 2 stub-mocha pass (~2 min) costs
+  less than deciding whether to run it. Run it whenever useful.
+- **Expensive suites (Layer 3 Playwright, ~13 min) run in two modes
+  only:** *targeted* — the specific specs covering what you just changed,
+  any time; and *full* — **exactly once per session, at session close,
+  AFTER the last code change.** Never start a full expensive run you
+  might invalidate.
+- **Verification rounds do not each trigger suite runs.** The remediation
+  sidecar's acceptance checks are the per-round evidence; the full run
+  belongs to the session close, once.
+- **Non-negotiable exception:** any session touching the Explorer
+  rendering surface, a state-file writer, the extension MANIFEST, or the
+  fixture harness runs the full Layer 3 at its own close. Layer 2 and
+  every static gate stayed green while a real rendering regression was
+  live, and only Layer 3 caught it.
+- **A release-boundary session runs the whole matrix once** against the
+  final build.
+- **CI is the push-time backstop, never the session gate.** Close
+  evidence is local and in-session; do not block a close on a remote
+  queue.
+
+### The freshness check is executable, because prose was not enough
+
+Set 110 S3 tried to close on a full run that predated three test fixes,
+**disclosed it in the sidecar**, and was correctly refused by the
+backstop. The orchestrator agreed with the policy and slipped anyway.
+Prose does not survive end-of-session pressure, so the run of record is
+now recorded and checked:
+
+```bash
+# after the last code change, and after the suite goes green:
+python -m ai_router.run_of_record record \
+    --session-set-dir docs/session-sets/<slug> \
+    --suite playwright --outcome passed --detail "35 passed / 0 failed"
+
+python -m ai_router.run_of_record suites          # what is declared
+python -m ai_router.run_of_record check --session-set-dir <dir> --check
+```
+
+The `test_run_fresh` close gate then refuses a close when an expensive
+suite's covered surfaces changed after its run was recorded. Freshness is
+a **content digest** over those surfaces, not an mtime — a checkout or a
+no-op save rewrites mtimes without changing a byte, and both directions
+of that error are unacceptable in a gate.
+
+The gate is inert where it should be: a suite whose surfaces this session
+did not touch is not required, so a session that changed only
+documentation owes nothing.
+Suites are declared in `router-config.yaml` under `testing.suites`
+(`name`, `command`, `covers`, `expensive`).
+
+---
+
+## The guided-look UAT (Set 111 S4)
+
+Canonizes the format piloted in Set 110's operator notes, adopted after
+the operator named the real problem: *"We often bypass UAT. I haven't
+complained because it totally sucks, but we shouldn't bypass it. It
+should be a pleasurable experience."*
+
+**A walk is a guided look, not a test script.** Two sections only, and
+the whole thing fits in **ten minutes**:
+
+- **Look (≤5 items)** — confidence glances derived from the acceptance
+  criteria and from surfaces automation is blind to: rendering, theming,
+  timing, feel. **Three lines maximum per item**: one line to get there,
+  one line to say what to look at, one question. Every item must be
+  self-contained for a reader who has not watched the work.
+- **Decide (≤3 items)** — provisional calls the AI made that only the
+  operator can ratify, judged while looking at the real thing. **Answers
+  are choices, never essays.** Source them from the session's
+  `decisions.jsonl` (the records whose `authority` is `operator`, or
+  whose tiebreak reached the human). The next session opens by showing
+  each call applied or reversed.
+
+Lead with the strongest moment. End with a visible finish.
+
+**It starts itself.** The operator stages nothing:
+
+```bash
+cd tools/dabbler-ai-orchestration
+npm run walk                                   # fresh fixture workspace
+npm run walk -- --walk-doc ../../docs/session-sets/<slug>/sN-uat-walk.md
+```
+
+`npm run walk` builds a disposable fixture workspace, launches the real
+Extension Development Host against it with the same isolation flags the
+Playwright suite uses, and opens the Dabbler view by itself. It is a
+**walk, not a test**: no assertions, no exit-code verdict. The operator's
+judgment is the verdict.
+
+### No silent bypass
+
+A `requiresUAT: true` session closes only with its walk recorded, or with
+an operator-attested waiver. The `uat_walk_recorded` close gate reads
+`disposition.uat`:
+
+```json
+"uat": {
+  "status": "walked",
+  "walkArtifact": "s4-uat-walk.md",
+  "attestation": "operator walked it 2026-08-07; called the tree 'pleasurable'"
+}
+```
+
+```json
+"uat": {
+  "status": "waived",
+  "attestation": "operator declined: this set shipped no UI surface"
+}
+```
+
+`walked` requires a `walkArtifact` that **exists on disk** — a recorded
+walk must point at the walk actually presented. `waived` requires only
+the attestation. There is deliberately no third value: "the walk just did
+not happen" is the outcome this gate exists to make impossible. Skipping
+becomes a visible operator decision, not an evaporation.
+
+Scope follows the config block: `uatScope: per-set` puts the obligation
+on the final session, `per-session` on every session, `none` disarms it.
+A `requiresUAT: "suggested"` set is advisory and never gated.
 
 ---
 

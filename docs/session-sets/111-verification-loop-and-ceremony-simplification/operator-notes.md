@@ -161,3 +161,55 @@ artifact-necessity pass may retire or reshape per-session artifacts, and
 before building a UI that renders it. Candidate for the same future
 extension-facing set — **not Set 111's scope**.
 
+
+---
+
+## 2026-08-07 -- Step-level progress checklists at transitional boundaries
+
+**Operator-directed, during Session 4.** The operator supplied a screenshot
+of the shape they want -- a compact table titled `Session N step`, one row
+per step with a status box, and the row currently in flight marked
+`<- here` -- and directed two things:
+
+1. **Use it for the remainder of this session set**, posting it at each
+   transitional boundary.
+2. **Bake it into the Orchestrator**, so every repo that uses the framework
+   in future displays these checklists at transitional boundaries.
+
+This is the discharge of the item Session 3 recorded and explicitly did NOT
+build ("in-session progress visibility ... the framework has a good SET-level
+surface and NO step-level surface, even though `activity-log.json`'s
+`log_step` entries are exactly that data, written as the session runs and
+rendered nowhere"). S3 framed it as *either* an orchestrator convention
+*or* a Work Explorer feature. The operator's direction resolves it as
+**both halves of the convention path**: a shipped renderer plus a stated
+obligation to post it.
+
+**What shipped (S4):** `ai_router.session_checklist`.
+
+```
+python -m ai_router.session_checklist              # plain text, cp1252-safe
+python -m ai_router.session_checklist --markdown   # table for a chat surface
+python -m ai_router.session_checklist --verbose    # full logged descriptions
+```
+
+It resolves the in-progress set and the session in flight from
+`session-state.json` (never from file presence), reads the logged steps from
+`activity-log.json`, and renders one row per step using the `stepKey` as the
+short label -- because descriptions are audit-trail prose and a checklist
+whose rows wrap is not a checklist.
+
+**Design note worth keeping:** it renders **logged** steps, not planned
+ones. Synthesizing rows from the spec would produce a checklist that
+disagrees with the record, and the record is what close-out gates on. If the
+checklist looks short, the fix is to call `log_step` more faithfully, not to
+change the renderer. That also makes the checklist a live incentive to keep
+the activity log honest, which the `activity_log_entry` close gate already
+depends on.
+
+**Still open, deliberately not built here:** the Work Explorer half. An
+in-flight session node could expand to show its logged steps, which is the
+same data in the surface the operator already has open. That is a
+`tools/dabbler-ai-orchestration` change and belongs to a session that is
+allowed to touch the rendering surface (and therefore owes a full Layer 3
+run). Recorded, not deferred silently.

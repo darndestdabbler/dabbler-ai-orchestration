@@ -646,6 +646,7 @@
     "test:playwright": "npm run compile && npx tsc --outDir out && npx playwright test",
     "package": "npm run compile && npx vsce package",
     "make-uat-workspace": "node scripts/make-uat-workspace.js",
+    "walk": "npm run compile && node scripts/stage-walk.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

@@ -34813,6 +34813,20 @@ function activate(context) {
   treeProvider.onDiagnostic((message) => {
     treeView.message = message;
   });
+  if (process.env.DABBLER_WALK === "1") {
+    setImmediate(() => {
+      void Promise.resolve(
+        vscode46.commands.executeCommand(
+          "workbench.view.extension.dabblerSessionSetsContainer"
+        )
+      ).then(void 0, (err) => {
+        console.error(
+          "[dabbler-ai-orchestration] walk staging: could not reveal the Dabbler view container; open it from the activity bar.",
+          err
+        );
+      });
+    });
+  }
   const evaluateContextKeys = () => {
     const allSets = readAllSessionSets();
     evaluateSupportContextKeys(allSets);

@@ -533,3 +533,113 @@ def test_a_missing_config_alone_is_a_violation(tmp_path):
     violations = drift_guard.check_model_registry_matches_providers(repo)
     assert len(violations) == 1
     assert "router-config.yaml" in violations[0].location
+
+
+# ---------------------------------------------------------------------------
+# Set 111 S4 — every workflow `uses:` is pinned to a commit SHA.
+#
+# A tag is mutable, so `actions/checkout@v4` can be repointed at arbitrary
+# code; a branch ref (`@release/v1`, which this repo carried on the PyPI
+# publish path) moves on every upstream push. The guard is what stops a
+# future edit from quietly reintroducing either.
+# ---------------------------------------------------------------------------
+
+
+def _workflow(tmp_path: Path, body: str, name: str = "test.yml") -> Path:
+    wf = tmp_path / ".github" / "workflows"
+    wf.mkdir(parents=True, exist_ok=True)
+    (wf / name).write_text(body, encoding="utf-8")
+    return tmp_path
+
+
+SHA40 = "11d5960a326750d5838078e36cf38b85af677262"
+
+
+def test_actions_sha_pin_accepts_a_full_sha(tmp_path: Path):
+    root = _workflow(
+        tmp_path,
+        f"jobs:\n  a:\n    steps:\n      - uses: actions/checkout@{SHA40}  # v4.4.0\n",
+    )
+    assert drift_guard.check_actions_are_sha_pinned(root) == []
+
+
+def test_actions_sha_pin_flags_a_mutable_tag(tmp_path: Path):
+    root = _workflow(
+        tmp_path, "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n"
+    )
+    violations = drift_guard.check_actions_are_sha_pinned(root)
+    assert len(violations) == 1
+    assert violations[0].check == "actions-sha-pinned"
+    assert "not pinned to a commit SHA" in violations[0].detail
+
+
+def test_actions_sha_pin_flags_a_moving_branch(tmp_path: Path):
+    """`@release/v1` is not even a tag - it moves on every upstream push."""
+    root = _workflow(
+        tmp_path,
+        "jobs:\n  a:\n    steps:\n"
+        "      - uses: pypa/gh-action-pypi-publish@release/v1\n",
+    )
+    assert len(drift_guard.check_actions_are_sha_pinned(root)) == 1
+
+
+def test_actions_sha_pin_flags_an_unversioned_reference(tmp_path: Path):
+    root = _workflow(
+        tmp_path, "jobs:\n  a:\n    steps:\n      - uses: actions/checkout\n"
+    )
+    assert len(drift_guard.check_actions_are_sha_pinned(root)) == 1
+
+
+def test_actions_sha_pin_flags_a_short_sha(tmp_path: Path):
+    """A 7-char sha is ambiguous and not what the hardening guidance asks."""
+    root = _workflow(
+        tmp_path, "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@11d5960\n"
+    )
+    assert len(drift_guard.check_actions_are_sha_pinned(root)) == 1
+
+
+def test_actions_sha_pin_exempts_a_local_composite_action(tmp_path: Path):
+    """A local action resolves in-repo at the workflow's own commit."""
+    root = _workflow(
+        tmp_path,
+        "jobs:\n  a:\n    steps:\n"
+        "      - uses: ./.github/actions/require-green-test\n",
+    )
+    assert drift_guard.check_actions_are_sha_pinned(root) == []
+
+
+def test_actions_sha_pin_reports_file_and_line(tmp_path: Path):
+    root = _workflow(
+        tmp_path,
+        "jobs:\n  a:\n    steps:\n"
+        f"      - uses: actions/checkout@{SHA40}\n"
+        "      - uses: actions/setup-node@v4\n",
+    )
+    (violation,) = drift_guard.check_actions_are_sha_pinned(root)
+    assert violation.location == ".github/workflows/test.yml:5"
+
+
+def test_actions_sha_pin_scans_yaml_extension_too(tmp_path: Path):
+    root = _workflow(
+        tmp_path,
+        "jobs:\n  a:\n    steps:\n      - uses: actions/checkout@v4\n",
+        name="other.yaml",
+    )
+    assert len(drift_guard.check_actions_are_sha_pinned(root)) == 1
+
+
+def test_actions_sha_pin_is_silent_without_a_workflows_dir(tmp_path: Path):
+    assert drift_guard.check_actions_are_sha_pinned(tmp_path) == []
+
+
+def test_actions_sha_pin_is_registered_so_it_actually_runs():
+    assert "actions-sha-pinned" in dict(drift_guard.ALL_CHECKS)
+
+
+def test_the_real_repo_has_every_action_sha_pinned():
+    assert drift_guard.check_actions_are_sha_pinned(_repo_root()) == []
+
+
+def test_the_real_repo_declares_a_dependabot_bump_path():
+    """A SHA pin that nothing maintains rots invisibly."""
+    assert (_repo_root() / ".github" / "dependabot.yml").is_file()

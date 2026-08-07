@@ -16,6 +16,112 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 111 S4, operator-directed) `ai_router.session_checklist` — the
+  step-level progress surface.** The framework had a good **set**-level
+  surface (the Work Explorer tree, `print_session_set_status`) and **none**
+  at the step level: once a session was in flight, the operator could not
+  see where in the process it was — even though `activity-log.json`'s
+  `log_step` entries are exactly that data, written as the session runs and
+  rendered nowhere. Set 111 S3 recorded the gap and deliberately did not
+  build it; the operator directed it into the orchestrator during S4, so
+  every repo using the framework gets it.
+
+  ```
+  python -m ai_router.session_checklist            # plain text, cp1252-safe
+  python -m ai_router.session_checklist --markdown # table for a chat surface
+  python -m ai_router.session_checklist --verbose  # full logged descriptions
+  ```
+
+  It resolves the in-progress set and the session in flight from
+  `session-state.json` (never from file presence), and marks the step
+  actually in flight with `<- here` — a checklist that shows only what is
+  done answers half the question. Rows are labelled from `stepKey`, because
+  descriptions are audit-trail prose and a checklist whose rows wrap is not
+  a checklist.
+
+  **It renders logged steps, not planned ones.** Synthesizing rows from the
+  spec would produce a checklist that disagrees with the record, and the
+  record is what close-out gates on. If the checklist looks short, the fix
+  is to call `log_step` more faithfully — which also makes the checklist a
+  live incentive to keep the activity log honest, something the existing
+  `activity_log_entry` close gate already depends on.
+
+  The companion obligation is in `session-constitution.md` Step 4: post the
+  checklist at every transitional boundary.
+
+- **(Set 111 S4) `ai_router.spec_admission` — the session-size cap, enforced
+  at authoring time.** The operator target is 15–20 minutes of work per
+  session; Sets 047–074 already met it (24 min work median) and by Sets
+  106–110 the median session had reached 115 minutes. The guide had carried
+  sizing prose since Set 015 and sessions kept growing anyway, because a
+  session's real size is only discovered at hour three, by which point
+  splitting costs a context reset.
+
+  **The threshold is measured, not asserted.** Across the 172 schema-v4
+  sessions carrying both a parseable spec plan and start/complete timestamps,
+  crossing from 5 declared steps to 6 doubles the median session (42 → 84
+  min), triples the p90 (110 → 386 min), and nearly triples the share running
+  past two hours (10% → 28%). Hence `authoring.max_steps_per_session: 5`.
+
+  **Stated limit, so a green result is not over-read:** step count predicts
+  the MEDIAN, not the TAIL. The longest sessions on record (591/562/544/509
+  min) all declared 5–8 steps. This is a floor on obvious oversizing, nothing
+  more. An author who must exceed the cap declares
+  `sessionSizeException: <N> - <reason>` **in the spec**, so the
+  justification survives review; an exception with no reason is not honoured,
+  being indistinguishable from a typo. `--check` exits non-zero for CI.
+
+- **(Set 111 S4) `ai_router.run_of_record` + the `test_run_fresh` close
+  gate — the test-run policy, made executable.** The policy (piloted in Set
+  110's operator notes) is that an expensive suite runs fully **once per
+  session, after the last code change**. Set 110 S3 tried to close on a full
+  run that predated three test fixes, *disclosed it in the sidecar*, and was
+  correctly refused by the backstop — the orchestrator agreed with the policy
+  and slipped anyway. Prose does not survive end-of-session pressure.
+
+  Freshness is a **content digest** over the surfaces a suite covers, not an
+  mtime: `git checkout`, a stash pop, or a no-op save all rewrite mtimes
+  without changing a byte, and both directions of that error (a stale run
+  that looks fresh, a fresh run that looks stale) are unacceptable in a gate.
+  Same idea as `verification_stamp.compute_work_diff_sha256`, applied to the
+  testing question. `test-runs.jsonl` is append-only, so a session that had
+  to run its suite twice keeps that honest history.
+
+  Inert where it should be: a suite whose covered surfaces the session did
+  not touch is not required, and a set declaring no expensive suites passes
+  trivially. Suites are declared under `testing.suites` (`name`, `command`,
+  `covers`, `expensive`); an explicitly empty list disarms rather than
+  silently resurrecting the defaults.
+
+- **(Set 111 S4) `disposition.uat` + the `uat_walk_recorded` close gate —
+  UAT can no longer evaporate.** Set 110 S2 closed without its walk, part of
+  a long pattern the operator named directly: *"We often bypass UAT. I
+  haven't complained because it totally sucks, but we shouldn't bypass it."*
+  The failure mode is not a decision to skip; it is a walk simply not
+  happening and nothing noticing.
+
+  A `requiresUAT: true` session now closes only with `disposition.uat`
+  recording `status: "walked"` (plus a `walkArtifact` that **exists on
+  disk** — a recorded walk must point at the walk actually presented) or
+  `status: "waived"`, each with a non-empty `attestation`. There is
+  deliberately no third value. Scope follows the config block (`per-set` →
+  the final session; `per-session` → every session; `none` → disarmed), and
+  `requiresUAT: "suggested"` stays advisory and ungated, because arming an
+  advisory flag would be a policy change this work was not asked to make.
+
+- **(Set 111 S4) `drift_guard` check `actions-sha-pinned`, plus
+  `.github/dependabot.yml`.** Every workflow `uses:` is pinned to a
+  40-character commit SHA (31 references across three workflows), including
+  `pypa/gh-action-pypi-publish`, which was on a moving **branch**
+  (`@release/v1`) on the PyPI publish path; the stray
+  `actions/setup-python@v4` / `@v5` split converged on v5.6.0. A tag is
+  mutable, so a compromise of an action reaches every workflow referencing
+  it. Local `./.github/actions/...` composite actions are exempt — they
+  resolve in-repo at the workflow's own commit. Dependabot is the declared
+  bump path (it rewrites the SHA and its trailing `# vX.Y.Z` comment
+  together, so the comment cannot drift from the pin); a SHA pin nothing
+  maintains rots invisibly, which is worse than the tag it replaced.
+
 - **(Set 111 S3) `ai_router.decision_journal` — decision rights, routed by
   authority, journaled for audit.** Operator-gated adjudication assumes an
   operator who can responsibly decide; in an AI-led workflow the operator

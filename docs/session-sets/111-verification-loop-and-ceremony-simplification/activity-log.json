@@ -268,6 +268,142 @@
       "dateTime": "2026-08-07T13:31:13.935312-04:00",
       "description": "Dogfooded the journal on this session's own five judgment-shaped calls, written through the blessed writer to decisions.jsonl: the bookkeeping placement (defer-to-existing-gate), the declaration-over-classifier carve-out design (simpler-code), folding consensus into the rubric (goal-over-letter), cutting AGENTS.md prose rather than raising its ceiling (prefer-reversible), and discharging S2's owed residual through this session's own routed round (defer-to-existing-gate).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-07T14:36:05.758604-04:00",
+      "description": "Registered session 4 (copilot/anthropic/claude-opus-5/high); copilot_preflight OK; preload read.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "prerequisites",
+      "dateTime": "2026-08-07T14:36:05.760767-04:00",
+      "description": "Confirmed S1-S3 Creates/Touches on disk: verify_session bounds, acceptance_harness, decision_journal, decisions.jsonl all present. Reviewed S3 disposition carry-forwards.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "session-size-cap",
+      "dateTime": "2026-08-07T14:53:20.000036-04:00",
+      "description": "Shipped ai_router/spec_admission.py + authoring.max_steps_per_session=5. Threshold MEASURED from 172 v4 sessions: 6+ steps doubles median (42->84 min), triples p90, 10%->28% over 2h. 26 tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "test-run-policy",
+      "dateTime": "2026-08-07T14:53:20.002686-04:00",
+      "description": "Shipped ai_router/run_of_record.py (content-digest freshness) + check_test_run_fresh close gate. Reproduces and refuses the 110 S3 stale-run pattern. 34+16 tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "uat-close-gate",
+      "dateTime": "2026-08-07T14:53:20.004977-04:00",
+      "description": "Shipped disposition.uat block + check_uat_walk_recorded. requiresUAT session closes only with a walk or an attested waiver.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "walk-stager",
+      "dateTime": "2026-08-07T15:04:02.245840-04:00",
+      "description": "Shipped npm run walk: scripts/stage-walk.js + shared scripts/vscode-launch.js (single definition of binary discovery + isolation flags, pinned against electronLaunch.ts by test). DABBLER_WALK=1 gates a self-reveal of the view in activate(). 14 mocha tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 10,
+      "stepKey": "ci-hygiene",
+      "dateTime": "2026-08-07T15:04:02.248431-04:00",
+      "description": "Pinned all 31 workflow uses: refs to 40-char SHAs (incl. the pypa/gh-action-pypi-publish moving BRANCH on the PyPI path); converged the stray setup-python@v4/@v5 on v5.6.0. Added .github/dependabot.yml as the bump path and a drift_guard actions-sha-pinned check, proven in both directions. 51 drift tests pass.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "dogfood-walk",
+      "dateTime": "2026-08-07T15:09:42.715460-04:00",
+      "description": "Authored s4-uat-walk.md in the new format (Look 5 + Decide 3). Every Look command pre-verified by automation before offering to the human. Decide section carries the batched education-mode brief: D1 artifact table, D2 admission bar, D3 close-backstop bound (operator-held hard carve-out).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 8,
+      "stepKey": "changelog",
+      "dateTime": "2026-08-07T15:09:42.718040-04:00",
+      "description": "ai_router/CHANGELOG.md [Unreleased]: four Set 111 S4 entries. Publish stays operator-gated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "artifact-evidence",
+      "dateTime": "2026-08-07T15:09:42.720752-04:00",
+      "description": "Artifact-necessity evidence assembled from the code: sN-conventions.md has NO machine reader; ai-assignment.md parser is orphaned (UI removed Set 048 S3, accordion retired Set 034); change-log.md is load-bearing in ~15 sites + a close gate. Decision is the operators (D1).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 9,
+      "stepKey": "guidance-streamline",
+      "dateTime": "2026-08-07T15:09:42.727490-04:00",
+      "description": "Spec premise STALE: project-guidance.md is at 3499/3499 (100%), not +369 over -- discharged by commit d3e00680, which records +369 as a CRLF measurement artifact. No sweep performed. Own additions routed to the on-demand authoring guide so preload stayed green (94%). Admission-bar rule change is operator-held (D2).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 11,
+      "stepKey": "operator-brief",
+      "dateTime": "2026-08-07T15:14:48.950686-04:00",
+      "description": "Batched education-mode brief presented (D1 artifacts, D2 admission bar, D3 close backstop). Operator took all three defaults; journaled as three authority=human records with attestation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 12,
+      "stepKey": "step-checklist",
+      "dateTime": "2026-08-07T15:14:48.953073-04:00",
+      "description": "Operator-directed: ship ai_router.session_checklist so every consumer repo renders step-level progress at transitional boundaries.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 13,
+      "stepKey": "full-suite",
+      "dateTime": "2026-08-07T15:14:48.955367-04:00",
+      "description": "Full pytest + Layer 3 Playwright run of record after last code change.",
+      "status": "pending"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 14,
+      "stepKey": "verify-and-close",
+      "dateTime": "2026-08-07T15:14:48.957758-04:00",
+      "description": "Verification loop, change-log.md, Step 9 review, path-aware critique, disposition, close_session.",
+      "status": "pending"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 12,
+      "stepKey": "step-checklist",
+      "dateTime": "2026-08-07T15:16:24.120995-04:00",
+      "description": "Shipped ai_router.session_checklist (plain/markdown/verbose), constitution Step 4 obligation, operator-notes record, 33 tests. Discharges the S3-recorded in-session visibility gap.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 13,
+      "stepKey": "full-suite",
+      "dateTime": "2026-08-07T15:16:24.124905-04:00",
+      "description": "Full pytest + Layer 3 Playwright run of record, after the last code change.",
+      "status": "in-progress"
     }
   ]
 }

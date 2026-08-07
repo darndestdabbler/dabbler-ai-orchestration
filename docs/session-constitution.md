@@ -55,12 +55,20 @@ Run every router CLI through the workspace venv
     verification-only policy window. Set 111 owns the next routing-policy
     revision, so do not expand outsourcing before that set decides it.
   - **4. Execute.** Do the plan's steps; log every step to
-    `activity-log.json` (`log_step`). The active orchestrator owns
-    implementation, architecture, analysis, documentation, and test authoring
-    for the temporary policy window. Route only `session-verification`, which
-    must use a different effective provider; own the mechanics (file edits,
-    shell, git, and mechanical single-file edits under ~50 lines).
-- **5. Build + test.** Run the repo's suite; log the result.
+    `activity-log.json` (`log_step`), and **post the step checklist at
+    every transitional boundary** (`python -m
+    ai_router.session_checklist`, `--markdown` for a chat surface) so the
+    operator can see where the session is without scrolling. The active
+    orchestrator owns implementation, architecture, analysis, documentation,
+    and test authoring for the temporary policy window. Route only
+    `session-verification`, which must use a different effective provider;
+    own the mechanics (file edits, shell, git, and mechanical single-file
+    edits under ~50 lines).
+- **5. Build + test.** Run the repo's suite; log the result. Expensive
+  suites run targeted during the session and **fully once, after the
+  last code change**; record that run
+  (`python -m ai_router.run_of_record record --suite <s> --outcome
+  passed`) or the `test_run_fresh` close gate refuses the close.
 - **6. Verify (mandatory, every Full-tier session).** Run the phased
   loop: `python -m ai_router.verify_session --phase discovery` for the
   set (fan-out sized by config; all severities). It routes the evidence
@@ -80,7 +88,8 @@ Run every router CLI through the workspace venv
   below.
 - **8. Close.** Author `disposition.json`
   (`verification_verdict` always; `next_orchestrator` on a mid-set
-  completion), commit **and push**, run
+  completion; `uat` when the set declares `requiresUAT`), commit **and
+  push**, run
   `python -m ai_router.close_session` for the set, and only after it
   succeeds fire the session-complete notification. Record instrumental
   lessons in `disposition.lessons_cited` and run `cite_lessons` in the
@@ -227,8 +236,10 @@ Open the named reference at the step's trigger moment — not before.
 | 0 | `docs/quick-start.md` | First-time orientation only — never per session |
 | 1 | `docs/ai-led-session-workflow.md` | Trigger-phrase variants: parallel worktrees, maxout, typed Lightweight sessions |
 | 1 | `docs/planning/repo-worktree-layout.md` | Worktree layout, migration, drift recovery |
-| 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, sizing, slugs) |
+| 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, **session-size cap**, slugs) |
 | 2 | `docs/ai-led-session-workflow.md` | The set declares `requiresUAT` / `requiresE2E` — the gated UAT/E2E procedures |
+| 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy and the run-of-record freshness gate |
+| 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
 | 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |
 | 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options, Lightweight modes |
 | 8 | `ai_router/docs/close-out.md` | Close failure, stranded session, mixed-mode drift, manual-flag matrix |

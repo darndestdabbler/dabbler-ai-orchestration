@@ -47,6 +47,13 @@ The checks land in this module:
   zero-budget tier on the ``manual-via-other-engine`` / ``skipped``
   paths), and ``verification_method`` must be a legal token. Hard-blocks
   in both interactive and headless modes; see the function docstring.
+- :func:`check_test_run_fresh` — Set 111 S4: every expensive suite whose
+  covered surfaces this session touched must have a green run of record
+  whose content digest still matches those surfaces. Catches the Set 110
+  S3 pattern — closing on a full run that predates the last code change.
+- :func:`check_uat_walk_recorded` — Set 111 S4: a ``requiresUAT`` session
+  closes only with a recorded walk or an operator-attested waiver, so a
+  skipped UAT is a visible decision rather than an evaporation.
 
 Why a separate module
 ---------------------
@@ -1545,12 +1552,240 @@ def check_verification_integrity(
 
 
 # ---------------------------------------------------------------------------
+# check_test_run_fresh / check_uat_walk_recorded (Set 111 S4)
+# ---------------------------------------------------------------------------
+
+TEST_RUN_FRESH_CHECK_NAME = "test_run_fresh"
+UAT_WALK_CHECK_NAME = "uat_walk_recorded"
+
+
+def _router_config_or_none() -> Optional[dict]:
+    """Load ``router-config.yaml``, or ``None`` when it cannot be read.
+
+    Both Set 111 gates degrade to their locked defaults on a config
+    failure rather than raising — a close must not wedge because the
+    config is momentarily unparseable.
+    """
+    try:
+        try:
+            from .config import load_config  # type: ignore[import-not-found]
+        except ImportError:
+            from ai_router.config import load_config  # type: ignore[no-redef]
+        return load_config()
+    except Exception:
+        return None
+
+
+def check_test_run_fresh(
+    session_set_dir: str,
+    disposition: Optional[Disposition],
+    *,
+    allow_empty_commit: bool = False,
+) -> GateOutcome:
+    """Verify the expensive suites this session touched have a fresh run.
+
+    The test-run policy (Set 111 S4, piloted in Set 110's operator notes)
+    says an expensive suite runs fully **once per session, after the last
+    code change**. Set 110 S3 tried to close on a full run that predated
+    three test fixes, disclosed it, and was correctly refused — the
+    orchestrator agreed with the policy and slipped anyway, which is why
+    this is a check and not a paragraph.
+
+    Freshness is a **content digest** over the surfaces a suite covers
+    (``run_of_record.surface_digest``), not an mtime: a checkout or a
+    no-op save rewrites mtimes without changing content, and both
+    directions of that error are unacceptable in a gate.
+
+    Inert by construction where it should be: a suite whose covered
+    surfaces this session did not touch is not required, and a set that
+    declares no expensive suites passes trivially. Lightweight sets skip
+    the gate entirely (their close gates are per-set, Set 057 Q6).
+    """
+    _ = allow_empty_commit
+
+    if _set_is_lightweight(session_set_dir):
+        return True, ""
+    if disposition is None:
+        # A missing disposition is already the disposition_present gate's
+        # failure; piling on here would double-report one root cause.
+        return True, ""
+
+    try:
+        try:
+            from .run_of_record import (  # type: ignore[import-not-found]
+                evaluate_freshness,
+                load_suites,
+            )
+        except ImportError:
+            from ai_router.run_of_record import (  # type: ignore[no-redef]
+                evaluate_freshness,
+                load_suites,
+            )
+    except ImportError as exc:  # pragma: no cover - defensive
+        return False, f"run_of_record unavailable: {exc}"
+
+    suites = load_suites(_router_config_or_none())
+    if not any(s.expensive for s in suites):
+        return True, ""
+
+    verdicts = evaluate_freshness(
+        session_set_dir, list(disposition.files_changed), suites
+    )
+    failures = [v for v in verdicts if v.required and not v.passed]
+    if not failures:
+        return True, ""
+    return False, "; ".join(f"{v.suite}: {v.reason}" for v in failures)
+
+
+def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
+    """Return ``(requires_uat, uat_scope)`` from the set's spec.
+
+    A spec that cannot be parsed reports ``(False, "none")`` — the gate
+    is a universal-core addition and must stay inert for every set that
+    does not declare UAT, including specs predating the config block.
+    """
+    try:
+        try:
+            from .spec_config import (  # type: ignore[import-not-found]
+                parse_session_set_config,
+            )
+        except ImportError:
+            from ai_router.spec_config import (  # type: ignore[no-redef]
+                parse_session_set_config,
+            )
+        from pathlib import Path as _Path
+
+        cfg = parse_session_set_config(
+            _Path(session_set_dir) / "spec.md"
+        )
+    except Exception:
+        return False, "none"
+    # Only a literal `true` arms the gate. "suggested" is deliberately
+    # NOT armed: Set 048 S2 defined it as advisory, and turning an
+    # advisory flag into a hard close gate would be a policy change this
+    # session was not asked to make.
+    return (cfg.requires_uat is True), (cfg.uat_scope or "none")
+
+
+def check_uat_walk_recorded(
+    session_set_dir: str,
+    disposition: Optional[Disposition],
+    *,
+    allow_empty_commit: bool = False,
+) -> GateOutcome:
+    """A ``requiresUAT`` session closes with its walk, or an attested waiver.
+
+    Set 110 S2 closed without its UAT walk — part of a long pattern the
+    operator named directly: *"We often bypass UAT. I haven't complained
+    because it totally sucks, but we shouldn't bypass it."* The failure
+    mode is not a decision to skip; it is **evaporation**, the walk simply
+    not happening and nothing noticing. This gate makes skipping a visible,
+    recorded operator decision instead.
+
+    Policy, read from the spec's configuration block:
+
+    * ``requiresUAT`` is not literally ``true`` → inert.
+    * ``uatScope: per-set`` → only the **final** session owes a walk.
+    * ``uatScope: per-session`` → every session owes one.
+    * ``uatScope: none`` → inert (the scope contradicts the flag; the
+      narrower declaration wins rather than the gate inventing a policy).
+
+    A session that owes a walk passes only with a ``uat`` block whose
+    ``status`` is ``walked`` (and whose ``walkArtifact`` exists on disk)
+    or ``waived`` (with a non-empty attestation). Shape errors are the
+    disposition validator's job; this gate reports the policy failure and
+    the on-disk artifact check the validator cannot do.
+    """
+    _ = allow_empty_commit
+
+    requires_uat, scope = _uat_policy(session_set_dir)
+    if not requires_uat or scope == "none":
+        return True, ""
+
+    state = read_session_state(session_set_dir)
+    if not state:
+        return False, "session-state.json missing or unreadable"
+    view, err = _read_progress_or_none(state, session_set_dir)
+    if view is None:
+        return False, err  # type: ignore[return-value]
+    current = _session_in_focus(view)
+    if current is None:
+        return False, "no session in flight and none closed"
+
+    is_final = view.total_sessions > 0 and current >= view.total_sessions
+    if scope == "per-set" and not is_final:
+        return True, ""
+
+    if disposition is None:
+        return True, ""
+
+    uat = disposition.uat
+    if not isinstance(uat, dict) or not uat:
+        return (
+            False,
+            f"this set declares requiresUAT: true (uatScope: {scope}) and "
+            f"session {current} owes its guided-look walk, but "
+            f"disposition.uat is absent. Record the walk "
+            f"(status 'walked' + walkArtifact + attestation) or an "
+            f"operator-attested waiver (status 'waived' + attestation). "
+            f"A walk must never evaporate silently.",
+        )
+
+    status = uat.get("status")
+    attestation = uat.get("attestation")
+    if not isinstance(attestation, str) or attestation.strip() == "":
+        return (
+            False,
+            "disposition.uat.attestation must record what the operator "
+            "actually said; an unattested walk or waiver is not auditable",
+        )
+
+    if status == "waived":
+        return True, ""
+
+    if status != "walked":
+        return (
+            False,
+            f"disposition.uat.status must be 'walked' or 'waived' "
+            f"(got {status!r})",
+        )
+
+    artifact = uat.get("walkArtifact")
+    if not isinstance(artifact, str) or artifact.strip() == "":
+        return (
+            False,
+            "disposition.uat.walkArtifact must name the walk file when "
+            "uat.status == 'walked'",
+        )
+    # Resolve relative to the session-set dir first (the normal case),
+    # then as a repo-relative or absolute path, so a walk stored outside
+    # the set folder still validates.
+    candidates = [
+        os.path.join(session_set_dir, artifact),
+        artifact,
+    ]
+    repo_root = _repo_root_for(session_set_dir)
+    if repo_root:
+        candidates.append(os.path.join(repo_root, artifact))
+    if not any(os.path.isfile(c) for c in candidates):
+        return (
+            False,
+            f"disposition.uat.walkArtifact {artifact!r} does not exist; "
+            f"a recorded walk must point at the walk that was actually "
+            f"presented",
+        )
+    return True, ""
+
+
+# ---------------------------------------------------------------------------
 # Registry consumed by close_session._run_gate_checks
 # ---------------------------------------------------------------------------
 
 # Order matters: this is the order checks appear in the JSON output's
 # ``gate_results`` list. Skeleton ordering is preserved so consumers
 # (Set 5 VS Code extension) don't have to re-pin against a new shape.
+# Set 111 S4 appends two checks rather than inserting them, so every
+# existing index-based consumer keeps its position.
 GATE_CHECKS: Tuple[Tuple[str, "callable"], ...] = (  # type: ignore[name-defined]
     ("working_tree_clean", check_working_tree_clean),
     ("pushed_to_remote", check_pushed_to_remote),
@@ -1558,4 +1793,6 @@ GATE_CHECKS: Tuple[Tuple[str, "callable"], ...] = (  # type: ignore[name-defined
     ("next_orchestrator_present", check_next_orchestrator_present),
     ("change_log_fresh", check_change_log_fresh),
     (VERIFICATION_INTEGRITY_CHECK_NAME, check_verification_integrity),
+    (TEST_RUN_FRESH_CHECK_NAME, check_test_run_fresh),
+    (UAT_WALK_CHECK_NAME, check_uat_walk_recorded),
 )

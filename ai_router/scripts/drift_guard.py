@@ -582,6 +582,62 @@ def check_model_registry_matches_providers(repo_root: Path) -> list[Violation]:
     return violations
 
 
+def check_actions_are_sha_pinned(repo_root: Path) -> list[Violation]:
+    """Every workflow ``uses:`` references a 40-character commit SHA.
+
+    Set 111 S4. GitHub's supply-chain hardening guidance: a tag is
+    MUTABLE, so ``actions/checkout@v4`` can be repointed at arbitrary code
+    and a compromise of the action reaches every workflow referencing it.
+    A branch ref (``@release/v1``, which this repo had on the PyPI publish
+    path) is worse still — it moves on every upstream push.
+
+    Local ``./.github/actions/...`` composite actions are exempt: they
+    resolve inside this repository at the workflow's own commit, so there
+    is no third party to compromise and no ref to repoint.
+
+    The bump path is ``.github/dependabot.yml``, which rewrites the SHA
+    and its trailing ``# vX.Y.Z`` comment together.
+    """
+    workflows = repo_root / ".github" / "workflows"
+    if not workflows.is_dir():
+        return []
+    uses_re = re.compile(r"^\s*-?\s*uses:\s*(\S+)")
+    sha_re = re.compile(r"^[0-9a-f]{40}$")
+    violations: list[Violation] = []
+    for path in sorted(workflows.glob("*.yml")) + sorted(
+        workflows.glob("*.yaml")
+    ):
+        try:
+            lines = path.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        rel = path.relative_to(repo_root).as_posix()
+        for lineno, line in enumerate(lines, start=1):
+            m = uses_re.match(line)
+            if not m:
+                continue
+            ref = m.group(1)
+            if ref.startswith("./") or ref.startswith("docker://"):
+                continue
+            _, sep, version = ref.partition("@")
+            if sep and sha_re.match(version):
+                continue
+            violations.append(
+                Violation(
+                    check="actions-sha-pinned",
+                    location=f"{rel}:{lineno}",
+                    detail=(
+                        f"`uses: {ref}` is not pinned to a commit SHA. A tag "
+                        f"or branch is mutable, so a compromise of the "
+                        f"action reaches this workflow. Pin it as "
+                        f"`owner/action@<40-char-sha>  # vX.Y.Z`; Dependabot "
+                        f"(.github/dependabot.yml) maintains the pin."
+                    ),
+                )
+            )
+    return violations
+
+
 # ---------------------------------------------------------------------------
 # Aggregate + CLI
 # ---------------------------------------------------------------------------
@@ -592,6 +648,7 @@ ALL_CHECKS = (
     ("dist-in-sync", check_dist_bundle_in_sync),
     ("sample-dist-in-sync", check_sample_bundle_in_sync),
     ("model-registry-drift", check_model_registry_matches_providers),
+    ("actions-sha-pinned", check_actions_are_sha_pinned),
 )
 
 

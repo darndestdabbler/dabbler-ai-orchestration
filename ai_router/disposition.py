@@ -87,6 +87,14 @@ RETIRED_VERIFICATION_METHODS = {
 
 SWITCH_DUE_TO_BLOCKER = "switch-due-to-blocker"
 
+# Set 111 S4: how a `requiresUAT` session discharges its walk. ``walked``
+# means the operator walked the guided-look walk; ``waived`` means they
+# explicitly declined it. There is deliberately no third value — "the walk
+# just did not happen" is the outcome this gate exists to make impossible.
+UAT_STATUS_WALKED = "walked"
+UAT_STATUS_WAIVED = "waived"
+UAT_STATUSES = (UAT_STATUS_WALKED, UAT_STATUS_WAIVED)
+
 
 @dataclass
 class Disposition:
@@ -134,6 +142,14 @@ class Disposition:
       non-blocking mismatch). Omit-empty: absent when no lessons were
       cited, so older readers never see an unexpected key. An
       empty/absent list is fully inert — silence never auto-evicts.
+    - ``uat``: Set 111 S4 — how a ``requiresUAT`` session discharged its
+      guided-look walk. A mapping with ``status`` (one of
+      :data:`UAT_STATUSES`) and a non-empty ``attestation`` recording what
+      the operator said; ``walkArtifact`` names the walk file and is
+      required when ``status == "walked"``. Omit-null: absent on sets that
+      declare no UAT, so older readers never see an unexpected key. The
+      ``uat_walk_recorded`` close gate reads it — a ``requiresUAT``
+      session with no block does not close.
     """
 
     status: str
@@ -145,6 +161,7 @@ class Disposition:
     blockers: List[str] = field(default_factory=list)
     verification_verdict: Optional[str] = None
     lessons_cited: List[str] = field(default_factory=list)
+    uat: Optional[dict] = None
 
 
 def _disposition_path(session_set_dir: str) -> str:
@@ -229,6 +246,9 @@ def disposition_to_dict(disposition: Disposition) -> dict:
     # cited, so readers that pre-date this field never see it.
     if disposition.lessons_cited:
         d["lessons_cited"] = list(disposition.lessons_cited)
+    # Omit-null (Set 111 S4): absent on sets that declare no UAT.
+    if disposition.uat is not None:
+        d["uat"] = dict(disposition.uat)
     return d
 
 
@@ -250,6 +270,7 @@ def disposition_from_dict(data: dict) -> Disposition:
         blockers=list(data.get("blockers") or []),
         verification_verdict=data.get("verification_verdict"),
         lessons_cited=list(data.get("lessons_cited") or []),
+        uat=data.get("uat") if isinstance(data.get("uat"), dict) else None,
     )
 
 
@@ -361,6 +382,7 @@ def validate_disposition(
             "blockers": disposition.blockers,
             "verification_verdict": disposition.verification_verdict,
             "lessons_cited": disposition.lessons_cited,
+            "uat": disposition.uat,
         }
     elif isinstance(disposition, dict):
         data = disposition
@@ -475,5 +497,40 @@ def validate_disposition(
     lessons_cited = data.get("lessons_cited")
     if lessons_cited is not None and not _is_str_list(lessons_cited):
         errors.append("lessons_cited must be a list of strings")
+
+    # Set 111 S4: the UAT discharge block. Shape-only here — WHETHER a
+    # block is required is the spec's `requiresUAT` question, answered by
+    # the `uat_walk_recorded` close gate, which owns the set-level policy.
+    # This validator only refuses a block that is present but incoherent,
+    # because a malformed block that silently parsed as "no UAT declared"
+    # would turn a typo into a bypass of the gate.
+    uat = data.get("uat")
+    if uat is not None:
+        if not isinstance(uat, dict):
+            errors.append(
+                f"uat must be a mapping or null (got {type(uat).__name__})"
+            )
+        else:
+            uat_status = uat.get("status")
+            if uat_status not in UAT_STATUSES:
+                allowed = ", ".join(UAT_STATUSES)
+                errors.append(
+                    f"uat.status must be one of: {allowed} "
+                    f"(got {uat_status!r})"
+                )
+            attestation = uat.get("attestation")
+            if not isinstance(attestation, str) or attestation.strip() == "":
+                errors.append(
+                    "uat.attestation must be a non-empty string — a walk "
+                    "or a waiver is only auditable if it records what the "
+                    "operator actually said"
+                )
+            if uat_status == UAT_STATUS_WALKED:
+                artifact = uat.get("walkArtifact")
+                if not isinstance(artifact, str) or artifact.strip() == "":
+                    errors.append(
+                        "uat.walkArtifact must name the walk file when "
+                        "uat.status == 'walked'"
+                    )
 
     return (len(errors) == 0), errors

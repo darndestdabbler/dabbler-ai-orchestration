@@ -1327,6 +1327,65 @@ class TestAcceptanceBlock:
         assert ledger_ids == ["L1", "L2", "L3"]
         assert mapping == {(1, 0): "L1", (2, 0): "L2", (2, 1): "L3"}
 
+    def test_stale_acceptance_evidence_never_renders_as_closed(self, repo):
+        """close-backstop round 9: an acceptance result is evidence about
+        ONE tree — the `fixedTree` the harness ran against.
+
+        The normal flow is harness -> more edits -> remediation-review, so
+        by review time that tree is often gone. Rendering an old
+        `auto-closed` as "criteria-closed, do not re-derive" would hand
+        the reviewer false closure about a criterion a later edit may have
+        regressed.
+        """
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            set_dir, 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": _value_probe("fixed"),
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        _remediate(repo)
+        assert _result_for(_run(repo), 0)["outcome"] == ah.OUTCOME_AUTO_CLOSED
+
+        # Fresh from the harness: the artifact's tree IS the current tree.
+        block = vs.assemble_acceptance_block(set_dir, 1, 2)
+        assert "Criteria-closed findings" in block
+        assert "STALE" not in block
+
+        # Now more work lands, as it routinely does before the review.
+        (repo / "widget.py").write_text(
+            "VALUE = 'fixed'\nEXTRA = 1\n", encoding="utf-8"
+        )
+        block = vs.assemble_acceptance_block(set_dir, 1, 2)
+        assert "STALE" in block
+        assert "Criteria-closed findings" not in block
+        assert "judge these" in block
+
+    def test_unavailable_snapshot_is_treated_as_stale(self, repo, monkeypatch):
+        """Fail closed: if the current tree cannot be snapshotted we cannot
+        prove freshness, so nothing renders as closed."""
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            set_dir, 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": _value_probe("fixed"),
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        _remediate(repo)
+        _run(repo)
+        monkeypatch.setattr(vs, "snapshot_worktree_tree", lambda root: None)
+        block = vs.assemble_acceptance_block(set_dir, 1, 2)
+        assert "STALE" in block
+        assert "Criteria-closed findings" not in block
+
     def test_unreadable_acceptance_artifact_is_skipped_not_raised(self, repo):
         set_dir = _set_dir(repo)
         ah.acceptance_artifact_path(set_dir, 1, 1).write_text(

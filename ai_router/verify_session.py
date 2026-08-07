@@ -144,6 +144,7 @@ written ``encoding="utf-8"``.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import os
 import re
@@ -1895,6 +1896,67 @@ def assemble_prior_findings_block(
     )
 
 
+def acceptance_evidence_is_stale(
+    session_set_dir: Path,
+    artifact_tree: object,
+    current_tree: Optional[str],
+) -> bool:
+    """Whether an acceptance result no longer describes the tree under review.
+
+    An acceptance result is evidence about ONE tree — the ``fixedTree``
+    the harness ran against. If substantive work landed afterwards, a
+    later edit could have regressed the very behaviour the criterion
+    checked, so the result must not be rendered as settled evidence.
+
+    Raw sha equality is the wrong test, and fails in the ordinary case:
+    the harness WRITES ``sN-acceptance-round-<M>.json`` into the session
+    set after snapshotting, so the tree always differs by at least that
+    file. The comparison therefore ignores the same per-set loop
+    bookkeeping the verification stamp's freshness binding ignores
+    (:data:`verification_stamp.WORK_DIFF_SET_BOOKKEEPING`) — the
+    envelopes, sidecars, round ledger, acceptance artifacts, disposition
+    and state files that the sanctioned flows legitimately touch between
+    a round and its review.
+
+    Fails CLOSED: an unavailable snapshot, an unusable recorded tree, or
+    an unreadable diff all count as stale.
+    """
+    if current_tree is None or not isinstance(artifact_tree, str):
+        return True
+    if not artifact_tree.strip():
+        return True
+    if artifact_tree == current_tree:
+        return False
+    try:
+        from .verification_stamp import (
+            WORK_DIFF_SET_BOOKKEEPING as _BOOKKEEPING,
+            repo_relative_posix as _rel_posix,
+        )
+    except ImportError:  # pragma: no cover - test/bare context
+        from verification_stamp import (  # type: ignore[no-redef]
+            WORK_DIFF_SET_BOOKKEEPING as _BOOKKEEPING,
+            repo_relative_posix as _rel_posix,
+        )
+    try:
+        root = repo_root_for(session_set_dir)
+        set_rel = _rel_posix(session_set_dir.resolve(), root)
+        names = _run_git(
+            root, ["diff", "--name-only", artifact_tree, current_tree]
+        )
+    except (VerifySessionError, OSError, subprocess.SubprocessError):
+        return True
+    for line in names.splitlines():
+        path = line.strip().replace("\\", "/")
+        if not path:
+            continue
+        if path.startswith(f"{set_rel}/"):
+            name = path[len(set_rel) + 1:]
+            if any(fnmatch.fnmatch(name, pat) for pat in _BOOKKEEPING):
+                continue
+        return True  # a substantive path moved -> the evidence is stale
+    return False
+
+
 def assemble_acceptance_block(
     session_set_dir: Path, session_number: int, current_round: int
 ) -> str:
@@ -1937,10 +1999,27 @@ def assemble_acceptance_block(
         session_set_dir, session_number, current_round
     )
 
+    # -- Staleness (close-backstop round 9). An acceptance result is
+    #    evidence about ONE tree: the ``fixedTree`` the harness ran
+    #    against. The normal flow is harness -> more edits ->
+    #    remediation-review, so by review time that tree is often no
+    #    longer the current one, and a later edit could have regressed
+    #    the very behaviour the criterion checked. Rendering such a
+    #    result as "criteria-closed, do not re-derive" would hand the
+    #    reviewer false closure -- exactly what this machinery exists to
+    #    prevent. A mismatch (or an unavailable snapshot) therefore fails
+    #    CLOSED: the finding moves to the judge-normally list with the
+    #    staleness named.
+    current_tree = snapshot_worktree_tree(repo_root_for(session_set_dir))
+
     closed_lines: List[str] = []
     open_lines: List[str] = []
     for artifact in artifacts:
         artifact_round = artifact.get("verificationRound")
+        artifact_tree = artifact.get("fixedTree")
+        stale = acceptance_evidence_is_stale(
+            session_set_dir, artifact_tree, current_tree
+        )
         for result in artifact.get("results") or []:
             if not isinstance(result, dict):
                 continue
@@ -1953,7 +2032,19 @@ def assemble_acceptance_block(
             )
             head = f"- {id_note}[{severity}] {summary}"
             criterion = str(result.get("criterion") or "").strip()
-            if result.get("outcome") == OUTCOME_AUTO_CLOSED:
+            if result.get("outcome") == OUTCOME_AUTO_CLOSED and stale:
+                shown = (
+                    f"`{_squash(artifact_tree, 12)}`"
+                    if isinstance(artifact_tree, str) else "(unrecorded)"
+                )
+                open_lines.append(
+                    f"{head}\n  - Criterion outcome: STALE -- it passed "
+                    f"against tree {shown}, which is NOT the tree under "
+                    "review now. Work landed after the harness ran, so the "
+                    "result is not evidence about the current delta. Judge "
+                    "this finding normally."
+                )
+            elif result.get("outcome") == OUTCOME_AUTO_CLOSED:
                 baseline = result.get("baseline") or {}
                 fixed = result.get("fixed") or {}
                 expects = result.get("expectedOutputContains")
@@ -2024,7 +2115,11 @@ def assemble_acceptance_block(
         parts.append(
             "##### Criteria-closed findings -- evidence recorded, do not "
             "re-derive\n\n"
-            "Give each of these its one required `Fix verdict:` line (the "
+            "Each result below was produced against the tree under review "
+            "NOW (a stale result -- one that passed against a tree later "
+            "work has replaced -- is listed in the section after this one "
+            "instead, and carries no closing weight). Give each of these "
+            "its one required `Fix verdict:` line (the "
             "coverage check is unchanged, and the restatement is the "
             "regression check). Do NOT re-litigate the underlying finding: "
             "the executable evidence below already settles whether it was "
@@ -2037,9 +2132,9 @@ def assemble_acceptance_block(
         parts.append(
             "##### Criteria that did NOT close their finding -- judge these "
             "normally\n\n"
-            "A vacuous, unrunnable, invalidated or still-failing criterion "
-            "is NOT evidence of a fix. Review these findings exactly as you "
-            "would with no criterion at all.\n\n"
+            "A vacuous, unrunnable, invalidated, stale or still-failing "
+            "criterion is NOT evidence of a fix. Review these findings "
+            "exactly as you would with no criterion at all.\n\n"
             + "\n\n".join(open_lines)
         )
     parts.append(

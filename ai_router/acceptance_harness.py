@@ -426,9 +426,24 @@ def modified_test_assets_in_scope(
             for scope in effective
         )
         if not in_scope and runner and is_loader_asset(path):
+            # A loader asset counts when it lies ANYWHERE UNDER an
+            # ancestor directory, not only when its immediate directory
+            # IS one: `tests/sub/test_widget.py` loads
+            # `tests/fixtures/sample.json` through ancestor `tests`
+            # (close-backstop round 5). The repo root is deliberately
+            # matched exactly rather than by prefix -- prefixing on ""
+            # would make an unrelated `other/fixtures/x.json` invalidate
+            # every targeted criterion in the tree.
             directory = str(PurePosixPath(path).parent)
             directory = "" if directory == "." else directory
-            in_scope = directory in ancestors
+            for ancestor in ancestors:
+                if ancestor == "":
+                    if directory == "":
+                        in_scope = True
+                        break
+                elif path == ancestor or path.startswith(ancestor + "/"):
+                    in_scope = True
+                    break
         if in_scope and path not in hits:
             hits.append(path)
     return hits

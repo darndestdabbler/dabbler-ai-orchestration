@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** Nested shared fixture edits can still move the pytest ruler and auto-close a finding.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Failure scenario:** A verifier uses a normal targeted criterion such as `python -m pytest tests/sub/test_widget.py`. The remediation leaves product code broken but edits shared fixture data under `tests/fixtures/` so that targeted test passes. This is probable in real pytest suites because nested test folders commonly share ancestor-level fixture data, and the template recommends targeted existing tests as criteria.
+  - **Acceptance criterion:** `python -c 'exec("import runpy, sys\nsys.path.insert(0, \"ai_router\")\nah=runpy.run_path(\"ai_router/acceptance_harness.py\")\nassert ah[\"modified_test_assets_in_scope\"]([\"tests/fixtures/sample.json\"], [\"tests/sub/test_widget.py\"], runner=True) == [\"tests/fixtures/sample.json\"]")'`
+  - **Acceptance expectation:** exit 0
+  - **Details:** **Violation:** the task requires that “an edited criterion or test asset invalidates the result,” and the implementation’s own scope comment says runner-loaded `conftest.py` / fixture assets in ancestor areas are part of the ruler. **Impact:** the harness can record `auto-closed` for an unfixed Major finding, changing the remediation-review merge decision from “still needs judgment/fix” to “criteria-closed.” **Evidence:** `modified_test_assets_in_scope(["tests/fixtures/sample.json"], ["tests/sub/test_widget.py"], runner=True)` returns `[]`; an end-to-end temp repo probe changed only `tests/fixtures/value.txt` and the harness returned `outcome: "auto-closed"`, `baselinePassed: false`, `fixedPassed: true`, and no `modifiedTestAssets`. The miss is in `acceptance_harness.py`: it checks loader assets by exact containing directory membership in `ancestors`, so `tests/fixtures` is not matched against ancestor `tests`.

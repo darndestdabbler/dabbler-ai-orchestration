@@ -481,6 +481,28 @@ class TestContainment:
             ah.tokenize_command("python -m pytest tests/")
         ) == ["tests"]
 
+    def test_nested_shared_fixtures_are_in_a_runner_scope(self):
+        """close-backstop round 5: a nested test loads fixture data from an
+        ANCESTOR directory, so the asset's own directory is not itself an
+        ancestor -- `tests/sub/test_widget.py` loads
+        `tests/fixtures/sample.json` through ancestor `tests`."""
+        scope = ["tests/sub/test_widget.py"]
+        assert ah.modified_test_assets_in_scope(
+            ["tests/fixtures/sample.json"], scope, runner=True
+        ) == ["tests/fixtures/sample.json"]
+        assert ah.modified_test_assets_in_scope(
+            ["tests/conftest.py"], scope, runner=True
+        ) == ["tests/conftest.py"]
+        assert ah.modified_test_assets_in_scope(
+            ["conftest.py"], scope, runner=True
+        ) == ["conftest.py"]
+        # An unrelated tree's fixtures must NOT invalidate a targeted
+        # criterion: prefixing on the repo root would make every fixture
+        # edit anywhere invalidate everything, for no safety gain.
+        assert ah.modified_test_assets_in_scope(
+            ["other/fixtures/x.json"], scope, runner=True
+        ) == []
+
     def test_loader_asset_classification(self):
         assert ah.is_loader_asset("tests/conftest.py")
         assert ah.is_loader_asset("conftest.py")

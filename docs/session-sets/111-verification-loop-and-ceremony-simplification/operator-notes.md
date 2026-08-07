@@ -43,6 +43,49 @@ stamped route.
 
 ---
 
+## 2026-08-07 — Copilot-seat usage IS billed, and the router cannot see it
+
+Operator correction, recorded because an orchestrator got it wrong in this
+very set and the mistake is easy to repeat.
+
+**The mistake.** `verify_session` and the close backstop print
+`cost: $0.0000` on this machine, and the orchestrator read that as "these
+rounds are free." They are not. The operator's account is **GitHub Copilot
+Enterprise**, and CLI usage consumes real premium-request budget.
+
+**Why the zero appears.** `transports.copilot-cli.billed_usage_unavailable:
+true` in `router-config.yaml` — commented there as *"honest
+non-accounting"*. The transport **cannot observe** what a dispatch cost, so
+it records zero rather than inventing a number. **Unmeasured is not
+unbilled.** Never quote a Copilot-seat cost figure as evidence that
+something was cheap.
+
+**The consequence that matters, and it is structural.** Every cost control
+in the router keys off *recorded* cost:
+
+- `ai_router/budget.yaml` thresholds,
+- `verification.max_cost_multiplier`,
+- any per-session or per-set spend report.
+
+On the `copilot-cli` transport all of those see zero, always. **They cannot
+bind.** The only guard that still bites is
+`transports.copilot-cli.max_invocations_per_session` (200), which the
+config itself describes as *"a hard circuit breaker, not a budget"* — and
+200 invocations is far above the point at which a human would have wanted
+to stop.
+
+So on a Copilot seat, an unbounded loop is unbounded in **spend** as well
+as in rounds, and no automated guard can see it happening. This set's
+Session 2 is the worked example: the close backstop refused six
+consecutive close attempts, each round a real metered dispatch, every one
+recorded as `$0.0000`.
+
+**For Session 4 (and Set 112's transport-labelling work):** the
+verification-loop bound is not only a time control, it is the *only*
+effective spend control on the seat profile. Weakening a bound on this
+transport removes a guard nothing else replaces. Two follow-ons worth
+considering: surface premium-request consumption in the seat profile even
+approximately (or state loudly at close that cost is unaccounted), and
 ## 2026-08-07 — Work Explorer convenience items to consider (not this set)
 
 Two operator-suggested UI enhancements for the "Dabbler AI Orchestration"

@@ -1035,6 +1035,74 @@ class TestInvalidation:
         result = _result_for(artifact, 0)
         assert result["outcome"] == ah.OUTCOME_CRITERION_UNBOUND
 
+    def test_criteria_from_a_round_without_its_own_baseline_cannot_close(
+        self, repo
+    ):
+        """close-backstop round 10: only discovery-family rounds record a
+        `discoveryBaselineTree`, so criteria from a remediation-review
+        round would otherwise be compared against the PRE-REMEDIATION
+        tree — one that often predates the very file the finding is
+        about. "Fails before" would then hold for a reason unrelated to
+        the fix, collapsing the test into "does it pass now?".
+        """
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        # Round 1: a discovery round, carrying the only baseline.
+        _write_envelope(
+            set_dir, 1, [_blocking("original finding")], baseline
+        )
+        _remediate(repo)
+        # Round 2: a remediation-review round -- findings about code the
+        # fix introduced, and NO baseline of its own.
+        path = vs.issues_artifact_path(set_dir, 1, 2)
+        path.write_text(
+            json.dumps({
+                "schemaVersion": 1,
+                "sessionNumber": 1,
+                "verificationRound": 2,
+                "verificationVerdict": "ISSUES_FOUND",
+                "phase": "remediation-review",
+                "issues": [_blocking("new in-hunk defect", {
+                    "kind": "executable",
+                    "command": _value_probe("fixed"),
+                    "expectedExitCode": 0,
+                })],
+            }, indent=2),
+            encoding="utf-8",
+        )
+        _write_raw_artifact(set_dir, 2, [_blocking("new in-hunk defect", {
+            "kind": "executable",
+            "command": _value_probe("fixed"),
+            "expectedExitCode": 0,
+        })])
+        artifact = _run(repo, round_number=2)
+        assert artifact["baselineIsOwnRound"] is False
+        assert artifact["baselineRound"] == 1
+        result = _result_for(artifact, 0)
+        assert result["outcome"] == ah.OUTCOME_BASELINE_MISMATCH
+        assert result["outcome"] not in ah.AUTO_CLOSING_OUTCOMES
+        # Never run: there is no sound tree to run it against.
+        assert "baseline" not in result
+
+    def test_a_discovery_round_still_uses_its_own_baseline(self, repo):
+        """Regression guard for the fix above: the normal path is
+        unaffected, so criteria still close when the round owns its
+        baseline."""
+        baseline = vs.snapshot_worktree_tree(repo)
+        _write_envelope(
+            _set_dir(repo), 1,
+            [_blocking("widget is broken", {
+                "kind": "executable",
+                "command": _value_probe("fixed"),
+                "expectedExitCode": 0,
+            })],
+            baseline,
+        )
+        _remediate(repo)
+        artifact = _run(repo)
+        assert artifact["baselineIsOwnRound"] is True
+        assert _result_for(artifact, 0)["outcome"] == ah.OUTCOME_AUTO_CLOSED
+
     def test_the_cli_offers_no_criterion_override(self):
         """The harness reads criteria only from the immutable envelope."""
         parser = ah._build_arg_parser()

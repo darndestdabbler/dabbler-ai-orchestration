@@ -93,7 +93,12 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   criterion in the immutable `sN-verification*.md` — not the one in the
   envelope (a derived artifact the orchestrator is invited to annotate),
   and not one carried over from a previous harness run, which would leave
-  the FIRST run unguarded. A criterion's **scope** for test-asset
+  the FIRST run unguarded. Two further fail-closed guards: a result whose
+  recorded `fixedTree` is no longer the tree under review is rendered as
+  **stale** rather than as settled evidence, and criteria from a round
+  that did not record its own pre-fix baseline (only discovery-family
+  rounds do) return **`baseline-mismatch`** rather than being compared
+  against a tree that predates the fix. A criterion's **scope** for test-asset
   invalidation is its path tokens' subtrees, or the whole repo for a test
   runner named without a path, so `pytest` with no arguments no longer
   slips past.

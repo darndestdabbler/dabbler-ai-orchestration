@@ -1771,6 +1771,7 @@ is the fail-closed direction:
 | `runner-not-attributable` | The criterion invokes a **test runner**. A runner's result depends on both the product code and every test asset it collects, neither of which is knowable from the command line, so a pass cannot be attributed to the fix. Never run, never closes. |
 | `criterion-changed` | The criterion in the envelope does not match the one the **verifier wrote** in the round's raw artifact. |
 | `criterion-unbound` | The raw verification artifact could not be read, or carries no criterion for this finding — so there is no verifier-authored source to bind to. |
+| `baseline-mismatch` | The only pre-fix tree available belongs to an **earlier round** than the one that raised the finding. Only discovery-family rounds record a baseline, so a remediation-review round's criteria have no sound "before" tree; a fails-before there would not be attributable to the fix. |
 | `refused-unsafe` | Carries a shell operator, names a shell or fetch tool, or is empty/untokenizable. |
 | `judgment` / `no-criterion` | Never executed; settled by the review as before. |
 | `error` | Timeout or spawn failure — not evidence either way. |

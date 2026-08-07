@@ -118,6 +118,7 @@ OUTCOME_NOT_DISCRIMINATING = "not-discriminating"
 OUTCOME_STILL_FAILING = "still-failing"
 OUTCOME_TEST_ASSET_MODIFIED = "test-asset-modified"
 OUTCOME_RUNNER_NOT_ATTRIBUTABLE = "runner-not-attributable"
+OUTCOME_BASELINE_MISMATCH = "baseline-mismatch"
 OUTCOME_CRITERION_CHANGED = "criterion-changed"
 OUTCOME_CRITERION_UNBOUND = "criterion-unbound"
 OUTCOME_REFUSED_UNSAFE = "refused-unsafe"
@@ -801,6 +802,7 @@ def evaluate_criterion(
     worktrees: Optional["CriterionWorktrees"],
     timeout: int,
     authoritative: Optional[dict],
+    baseline_is_own: bool = True,
 ) -> dict:
     """One finding's acceptance result (see the module docstring's rules).
 
@@ -809,7 +811,9 @@ def evaluate_criterion(
     ``worktrees`` supplies a FRESH pair of disposable checkouts for this
     criterion alone — criteria must not share them, or one that writes
     into its checkout silently rewrites the tree the next one is judged
-    against.
+    against. ``baseline_is_own`` is False when the resolved pre-fix tree
+    belongs to an EARLIER round than the one supplying the criteria, in
+    which case nothing may auto-close.
     """
     issue = entry["issue"]
     index = entry["index"]
@@ -843,6 +847,29 @@ def evaluate_criterion(
     if not command:
         result["outcome"] = OUTCOME_REFUSED_UNSAFE
         result["reason"] = "executable criterion with an empty command"
+        return result
+
+    if not baseline_is_own:
+        # The resolved pre-fix tree belongs to an EARLIER round than the
+        # one that raised this finding (close-backstop round 10). Only
+        # discovery-family rounds record a discoveryBaselineTree, so
+        # criteria from a remediation-review round resolve back to the
+        # pre-remediation tree -- a tree that predates the fix, and often
+        # predates the very FILE the finding is about. "Fails before"
+        # then holds for a reason unrelated to the defect (the file did
+        # not exist yet) and the test collapses into "does it pass now?",
+        # which is exactly the vacuous auto-close baseline discrimination
+        # exists to reject. The module's own contract says a criterion
+        # run against the wrong "before" tree is worse than no criterion
+        # at all, so this fails closed rather than guessing.
+        result["outcome"] = OUTCOME_BASELINE_MISMATCH
+        result["criterion"] = command
+        result["reason"] = (
+            "the only pre-fix tree available belongs to an earlier round "
+            "than the one that raised this finding, so a fails-before "
+            "result would not be attributable to this fix. The finding "
+            "stays judgment-based."
+        )
         return result
 
     digest = criterion_sha256(block)
@@ -1037,6 +1064,11 @@ def run_harness(
             "--phase discovery first (it records the baseline)."
         )
     baseline_round, baseline_tree = baseline
+    # A pre-fix tree is only usable for THIS round's criteria when the
+    # round recorded it itself. Only discovery-family rounds do, so a
+    # remediation-review round's criteria would otherwise be compared
+    # against the pre-remediation tree (close-backstop round 10).
+    baseline_is_own = baseline_round == round_number
 
     repo_root = repo_root_for(session_set_dir)
     fixed_tree = snapshot_worktree_tree(repo_root)
@@ -1065,16 +1097,16 @@ def run_harness(
     )
     results: List[dict] = []
     worktrees: Optional[CriterionWorktrees] = None
-    if needs_execution and baseline_tree != fixed_tree:
+    if needs_execution and baseline_is_own and baseline_tree != fixed_tree:
         worktrees = CriterionWorktrees(repo_root, baseline_tree, fixed_tree)
     for entry in entries:
         results.append(
             evaluate_criterion(
                 repo_root, entry, changed_paths, worktrees, timeout,
-                authoritative,
+                authoritative, baseline_is_own,
             )
         )
-    if needs_execution and worktrees is None:
+    if needs_execution and worktrees is None and baseline_is_own:
         # The tree never moved: no remediation landed, so no criterion can
         # discriminate anything. Say that, rather than leaving the generic
         # "no disposable worktree" reason.
@@ -1091,6 +1123,7 @@ def run_harness(
         "sessionNumber": session_number,
         "verificationRound": round_number,
         "baselineRound": baseline_round,
+        "baselineIsOwnRound": baseline_is_own,
         "baselineTree": baseline_tree,
         "fixedTree": fixed_tree,
         "criteriaBoundToRawArtifact": authoritative is not None,

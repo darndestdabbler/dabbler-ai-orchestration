@@ -20,9 +20,9 @@
     {
       "number": 2,
       "title": "Session 2",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-07T04:07:29.909248-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-07T12:36:09.453231-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -30,7 +30,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "ISSUES_FOUND"
     },
     {
       "number": 3,

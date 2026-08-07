@@ -156,7 +156,7 @@ from .orchestrator_identity import (
 # cli_transport.py / copilot_catalog.py (Set 078 S2) are already
 # result-object-style (never raise) so route()/verify() compose them
 # directly rather than needing new plumbing in either module.
-from .cli_transport import CopilotCliTransport
+from .cli_transport import CopilotCliTransport, resolve_transport_timeouts
 from .copilot_catalog import (
     Catalog as CopilotCatalog,
     load_lockfile as load_copilot_catalog,
@@ -292,7 +292,9 @@ def _init_copilot_transport() -> None:
         )
 
     _copilot_catalog = catalog
-    _copilot_transport = CopilotCliTransport(binary=binary)
+    _copilot_transport = CopilotCliTransport(
+        binary=binary, timeouts=resolve_transport_timeouts(cli_cfg),
+    )
 
 
 @dataclass

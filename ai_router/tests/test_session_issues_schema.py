@@ -313,3 +313,27 @@ class TestPhasedLoopFields:
         env["issues"][0]["discoveryCall"] = 0
         with pytest.raises(jsonschema.ValidationError):
             validator.validate(env)
+
+    def test_discovery_lens_is_an_optional_non_empty_string(self, validator):
+        # Set 111 S1: the lens the reporting fan-out call reviewed under,
+        # written beside discoveryCall. Deliberately not enum-constrained
+        # (the lens list is code-side and may grow), but an empty string
+        # is not a lens id.
+        env = _minimal_envelope()
+        env["phase"] = "discovery"
+        env["issues"][0]["discoveryCall"] = 2
+        env["issues"][0]["discoveryLens"] = "failure-scenario"
+        validator.validate(env)
+        env["issues"][0]["discoveryLens"] = ""
+        with pytest.raises(jsonschema.ValidationError):
+            validator.validate(env)
+
+    def test_shipped_lens_ids_validate(self, validator):
+        # Parity with what verify_session actually emits (L-066-1): every
+        # id the code can write must satisfy the documented schema.
+        from ai_router import verify_session as vs
+
+        for lens in vs.DISCOVERY_LENSES:
+            env = _minimal_envelope()
+            env["issues"][0]["discoveryLens"] = lens
+            validator.validate(env)

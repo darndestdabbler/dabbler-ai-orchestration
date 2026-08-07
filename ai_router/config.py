@@ -16,12 +16,16 @@ from pathlib import Path
 try:
     from .pricing import unconfirmed_and_stale, validate_model_rates  # package context
     from .secret_resolver import resolve_secret
+    from .cli_transport import validate_transport_timeouts
 except ImportError:  # test context — this module is also imported bare
     from pricing import (  # type: ignore[import-not-found]
         unconfirmed_and_stale,
         validate_model_rates,
     )
     from secret_resolver import resolve_secret  # type: ignore[import-not-found]
+    from cli_transport import (  # type: ignore[import-not-found]
+        validate_transport_timeouts,
+    )
 
 # Default config location is router-config.yaml in the same directory as
 # this file. Keeps the default working regardless of where Python is
@@ -493,6 +497,9 @@ def _validate_transport(config: dict) -> None:
         raise ValueError(
             f"transports.{profile} is missing required key(s): {missing}"
         )
+    # Set 111 S1: the optional timeouts block, validated at load so a
+    # malformed ceiling fails at startup rather than mid-call.
+    validate_transport_timeouts(block.get("timeouts"))
 
 
 def _check_pricing_staleness(config: dict) -> None:

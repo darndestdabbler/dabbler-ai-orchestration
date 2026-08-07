@@ -88,9 +88,11 @@ Orchestrator (Claude / Codex / Gemini)
   |     |   Set 068 routed-gate SKIP path is retired)
   |     |-- sends all work to a DIFFERENT AI provider
   |     |-- saves raw verifier output (never edited)
-  |     +-- phased loop (Set 096): discovery (fan-out) -> supplementary
-  |         -> remediate once -> remediation-review on the fix delta
-  |         (bounded: <=2 discovery passes, <=2 review cycles)
+  |     +-- phased loop (Set 096): discovery (fan-out, lens per call)
+  |         -> supplementary -> remediate once -> remediation-review on
+  |         the fix delta (bounded and ENFORCED: <=2 discovery passes,
+  |         <=2 review cycles, <=2 classic rounds; past a bound the CLI
+  |         REFUSES without --operator-authorized-round)
   |
   |-- on last session: generates change-log.md (part of the same commit)
   |-- prints cost report
@@ -1632,12 +1634,22 @@ compound. Run Step 6 as phases (`--phase`), not undifferentiated rounds:
 1. **`--phase discovery`** (INITIAL_DISCOVERY) — the exhaustive harvest:
    all severities, coverage-over-salience framing, fanned out
    `verification.discovery.fan_out` ways (default 2 — the S1-measured
-   sizing: ~81% of the observable finding pool vs ~50% for one call) with
-   byte-identical bundles, merged into ONE round envelope (per-issue
-   `discoveryCall`). The round records a `discoveryBaselineTree`
-   working-tree snapshot the later fix-delta review diffs from. The
-   severity rubric is unchanged — discovery raises coverage, never
-   severity.
+   sizing: ~81% of the observable finding pool vs ~50% for one call) over
+   the SAME evidence bundle, merged into ONE round envelope (per-issue
+   `discoveryCall` + `discoveryLens`). **Set 111 S1: the K calls are
+   differently FRAMED, not identical.** Call 1 reads under the
+   `spec-conformance` lens (plan → diff: unmet deliverables, silent scope
+   changes, docs that no longer match the code); call 2 under the
+   `failure-scenario` lens (code → the ways it breaks: error paths,
+   partial failure, concurrency, platform/encoding, cleanup, untrusted
+   input); K>2 cycles the list. Same K, same cost, same loop position,
+   same merge — only the direction of the read differs, so the clean-run
+   fast path and the cost-scales-with-badness incentive are untouched
+   (this is the only surviving residue of the discarded parallel-lens
+   proposal). Neither lens narrows scope, and the severity rubric is
+   unchanged — discovery raises coverage, never severity. The round also
+   records a `discoveryBaselineTree` working-tree snapshot the later
+   fix-delta review diffs from.
 2. **`--phase supplementary`** (SUPPLEMENTARY_DISCOVERY) — **only when
    discovery found Critical/Major, and BEFORE any remediation**: a
    completeness-critic pass over the SAME evidence, fed the prior
@@ -1658,18 +1670,58 @@ compound. Run Step 6 as phases (`--phase`), not undifferentiated rounds:
    **new defects are admissible only within the fix hunks** (out-of-delta
    observations are NITS at most).
 
-**Bounded totals (routed `api` path):** at most **2 discovery passes**
-(the initial + one supplementary) and at most **2 remediation-review
-cycles**; past either bound the loop **suspends to the operator for
-adjudication** — it does not keep opening rounds. The severity gate is
-unchanged: only a Critical/Major (or unknown-severity) finding opens or
-continues any phase, a Minor-only result is effectively VERIFIED, and the
-operator's round-cap authority stands — persisting past an operator cap
-requires a material Critical/Major, nothing less. Invoking
-`verify_session` **without `--phase` keeps the classic single-call
-behavior** (compat), subject to the same severity gate and the classic
-max-2-automatic-rounds rule; the Lightweight Mode-B typed loop keeps its
-own 1–2 automatic / 3+ human bound.
+**Bounded totals (routed `api` path), ENFORCED since Set 111 S1:** at
+most **2 discovery passes** (the initial + one supplementary), at most
+**2 remediation-review cycles**, and at most **2 classic no-`--phase`
+rounds**; past any bound the loop **suspends to the operator for
+adjudication** — it does not keep opening rounds. These numbers are not
+new; what is new is that `verify_session` **refuses** the round that
+would pass one, before any metered call, instead of printing an advisory
+line after it. The bounds had been advisory-only and were exceeded in
+practice (one session ran 13 verification calls over 379 minutes *after*
+the cap shipped), which is why enforcement — not a different number —
+was the fix.
+
+Only **findings-bearing** rounds consume a budget, with one exception the
+loop's own record had to be extended to see: a clean round ends the loop
+on its own, and a `--wording-only` re-verify re-collects the verdict
+FORMAT of a round that already happened, so neither is a cycle — but a
+**clean `supplementary` round whose prior discovery blockers still
+stand** *is* the second discovery pass (the loop continues to
+remediation) and it writes no findings envelope. The bound therefore
+counts the union of the per-session round ledger `sN-rounds.jsonl`
+(every completed round's phase, verdict and `endedLoop`) and the findings
+envelopes, by round number — so sessions predating the ledger keep their
+enforcement and no round is counted twice. The classic path is bounded on
+**any** prior consuming round, so dropping `--phase` at the phased bound
+is not a one-flag bypass.
+
+Passing a bound requires the **operator's** recorded authorization —
+never the orchestrator's own:
+
+```
+python -m ai_router.verify_session --session-set-dir <set> [--phase ...] \
+    --operator-authorized-round "<the operator's reason>"
+```
+
+The flag alone is not an authorization: its value must be non-empty (the
+same contract as `close_session --manual-verify`), and it is appended to
+the same `sN-rounds.jsonl` ledger — append-only, written *before* the
+metered call it authorizes, so an authorization the operator actually
+gave survives a provider failure. Remember what an adjudication settles:
+it licenses the **stop**, not the truth. A finding waived at the bound is
+an owed residual with a named owner, never argued down to nothing.
+
+The severity gate is unchanged and is now structural in the CLI's exit
+path: only a Critical/Major (or unknown-severity) finding opens or
+continues any phase, and a **Minor-only round is named as such and
+directed straight to close** — the CLI offers the `close_session` command
+and no re-run command at all. The operator's round-cap authority stands —
+persisting past an operator cap requires a material Critical/Major,
+nothing less. Invoking `verify_session` **without `--phase` keeps the
+classic single-call behavior** (compat), subject to the same severity
+gate and the same enforced max-2-rounds rule; the Lightweight Mode-B
+typed loop keeps its own 1–2 automatic / 3+ human bound.
 
 #### Identity, dynamic exclusion, the stamp, and the close backstop (Set 084)
 
@@ -1802,16 +1854,26 @@ item points here).
    the id-keyed reconciliation helper for callers that track stable
    `issueId`s across rounds; recognising that two differently-worded
    findings are the *same* point is the orchestrator's judgment.)
-4. **Bounded totals (Set 096 restructure).** On the phased path the bound is
-   **≤2 discovery passes and ≤2 remediation-review cycles**, then the loop
-   **suspends to the operator for adjudication**; on the classic
-   (no `--phase`) path and the Lightweight Mode-B loop, the
-   **1–2 automatic / 3+ human** rule holds unchanged. A human-stop
-   disposition or an unfixed Critical/Major still stops to a human, and the
-   operator's round-cap authority stands. Set 071 removed the *Minor-only*
-   and *resurrected-nit* rounds that should never have opened; Set 096 moves
-   the harvest up front so remediation is reviewed once, against the fix
-   delta, where churn cannot compound.
+4. **Bounded totals (Set 096 restructure; ENFORCED since Set 111 S1).**
+   On the phased path the bound is **≤2 discovery passes and ≤2
+   remediation-review cycles**; on the classic (no `--phase`) path it is
+   **≤2 rounds**, counted over any prior consuming round so the
+   phased bound cannot be sidestepped by dropping the flag. A round
+   consumes its budget unless it ENDED the loop, read from the
+   per-session round ledger `sN-rounds.jsonl` unioned with the findings
+   envelopes. Past a bound
+   the loop **suspends to the operator for adjudication** and
+   `verify_session` **refuses the round** unless the operator's
+   `--operator-authorized-round "<reason>"` attestation is supplied (and
+   recorded in that same ledger). The Lightweight Mode-B
+   loop keeps its own **1–2 automatic / 3+ human** rule. A human-stop
+   disposition or an unfixed Critical/Major still stops to a human, and
+   the operator's round-cap authority stands. Set 071 removed the
+   *Minor-only* and *resurrected-nit* rounds that should never have
+   opened — Set 111 S1 made that structural, so a Minor-only round's
+   printed next action is the close command and nothing else; Set 096
+   moves the harvest up front so remediation is reviewed once, against
+   the fix delta, where churn cannot compound.
 
 #### Lightweight tier — verification (per-set; two modes)
 
@@ -2309,10 +2371,13 @@ the branch below apply.
   canonical record. There is no required `issue-logs/` directory in the
   current workflow.
 5. Re-verify — **only when the round is blocking** (≥1 Critical/Major; a
-   Minor-only round is not re-run). On the phased path this is
+   Minor-only round is not re-run, and the CLI now says so and offers
+   only the close command). On the phased path this is
    `--phase remediation-review` (the fix delta + the auto-assembled
-   ledger; **at most 2 cycles**, then operator adjudication). On the
-   classic path, a plain re-run (max 2 automatic rounds). The
+   ledger; **at most 2 cycles**, ENFORCED — the third is refused without
+   the operator's `--operator-authorized-round` attestation — then
+   operator adjudication). On the classic path, a plain re-run (max 2
+   rounds, enforced the same way). The
    auto-assembled ledger keeps a settled point from being resurrected
    under fresh wording (see *Materiality and the re-verify loop
    discipline* under Step 6). Phased rounds default to

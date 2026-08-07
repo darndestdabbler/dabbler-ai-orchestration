@@ -18,6 +18,7 @@ import json
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -166,6 +167,16 @@ class FakeMultiRoute:
         if isinstance(scripted, FakeRouteResult):
             return scripted
         return FakeRouteResult(content=scripted)
+
+
+def evidence_marker(prompt: str) -> str:
+    """The prompt's Response-Under-Review half (the evidence bundle).
+
+    Set 111 S1 varies only the LENS block inside the Original Task slot,
+    so two fan-out calls must differ in framing while this half stays
+    byte-identical.
+    """
+    return prompt.split("### Response Under Review", 1)[-1]
 
 
 VERIFIED_RESPONSE = (
@@ -524,7 +535,7 @@ class TestPriorFindingsBlock:
 # ---------------------------------------------------------------------------
 
 class TestRunDiscovery:
-    def test_fan_out_routes_k_identical_calls_and_merges(
+    def test_fan_out_routes_k_lens_varied_calls_and_merges(
         self, repo: Path, monkeypatch
     ):
         _phase_config(monkeypatch, fan_out=2)
@@ -535,23 +546,39 @@ class TestRunDiscovery:
         )
         assert code == vs.EXIT_BLOCKING
         assert len(fake.calls) == 2
-        assert fake.calls[0]["prompt"] == fake.calls[1]["prompt"]
+        # Set 111 S1: same evidence, DIFFERENT framing per call.
+        assert fake.calls[0]["prompt"] != fake.calls[1]["prompt"]
+        assert "SPEC CONFORMANCE" in fake.calls[0]["prompt"]
+        assert "FAILURE SCENARIOS" in fake.calls[1]["prompt"]
+        # The evidence itself is shared -- only the lens block differs.
+        assert evidence_marker(fake.calls[0]["prompt"]) == evidence_marker(
+            fake.calls[1]["prompt"]
+        )
         # Raised default complexity on a phase round.
         assert fake.calls[0]["complexity_hint"] == vs.PHASE_COMPLEXITY_HINT
-        # Per-call artifacts, per-call stamps binding each artifact.
+        # Per-call artifacts, per-call stamps binding each artifact AND
+        # each call's own filled prompt.
         assert (set_dir / "s1-verification.md").exists()
         assert (set_dir / "s1-verification-fanout-2.md").exists()
         stamp_paths = {
             c["verification_stamp"]["artifact_path"] for c in fake.calls
         }
         assert len(stamp_paths) == 2
-        # One merged envelope annotated per call.
+        evidence_hashes = {
+            c["verification_stamp"]["evidence_sha256"] for c in fake.calls
+        }
+        assert len(evidence_hashes) == 2
+        # One merged envelope annotated per call, with its lens.
         envelope = json.loads(
             (set_dir / "s1-issues.json").read_text(encoding="utf-8")
         )
         assert envelope["phase"] == "discovery"
         assert envelope["verificationVerdict"] == "ISSUES_FOUND"
         assert [i["discoveryCall"] for i in envelope["issues"]] == [1, 2]
+        assert [i["discoveryLens"] for i in envelope["issues"]] == [
+            vs.DISCOVERY_LENS_SPEC_CONFORMANCE,
+            vs.DISCOVERY_LENS_FAILURE_SCENARIO,
+        ]
         assert envelope.get("discoveryBaselineTree")
 
     def test_discovery_prompt_carries_the_framing(
@@ -1317,7 +1344,15 @@ class TestVerificationRoundHardening:
         fake2 = FakeMultiRoute([complete])
         code = vs.run(
             _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW,
-                  round_number=4),
+                  round_number=4,
+                  # Set 111 S1: this is remediation-review cycle 3, which
+                  # the enforced bound refuses without an operator
+                  # attestation. The rule under test here is ledger
+                  # coverage, not the bound, so the scenario carries the
+                  # authorization the operator would have given.
+                  operator_authorized_round=(
+                      "test fixture: exercising the cycle-3 coverage rule"
+                  )),
             route_fn=fake2,
         )
         assert code == vs.EXIT_OK
@@ -1510,3 +1545,582 @@ class TestVerificationRoundHardening:
             "s1-remediation-round-1.md" not in prompt
         )
         assert "Remediation notes (round 1)" in prompt  # via the ledger
+
+
+# ---------------------------------------------------------------------------
+# Set 111 S1 -- the bounds made real, the lenses varied, the Minor-only stop
+# ---------------------------------------------------------------------------
+
+MINOR_ONLY_RESPONSE = """ISSUES FOUND
+
+Issue 1: The docstring says "returns a list" but the helper returns a tuple.
+- **Category:** Documentation
+- **Severity:** Minor
+- **Details:** cosmetic wording; no caller reads the docstring at runtime.
+"""
+
+
+def _seed_round(
+    set_dir: Path,
+    round_number: int,
+    phase: Optional[str],
+    *,
+    baseline_tree: str = "",
+    clean: bool = False,
+) -> None:
+    """A completed prior round on disk: raw artifact, plus the findings
+    envelope unless *clean* (a clean round writes no envelope, exactly as
+    ``run()`` does -- which is why it must not consume the budget)."""
+    vs.verification_artifact_path(set_dir, 1, round_number).write_text(
+        VERIFIED_RESPONSE if clean else BLOCKING_RESPONSE, encoding="utf-8"
+    )
+    if clean:
+        return
+    envelope = {
+        "schemaVersion": 1,
+        "sessionNumber": 1,
+        "verificationRound": round_number,
+        "verificationVerdict": "ISSUES_FOUND",
+        "issues": [
+            {"description": f"finding from round {round_number}",
+             "severity": "Major"},
+        ],
+    }
+    if phase:
+        envelope["phase"] = phase
+    if baseline_tree:
+        envelope["discoveryBaselineTree"] = baseline_tree
+    vs.issues_artifact_path(set_dir, 1, round_number).write_text(
+        json.dumps(envelope, indent=2), encoding="utf-8"
+    )
+
+
+def _ledger(set_dir: Path, event: str) -> list:
+    """The session-1 round-ledger records of one ``event`` kind."""
+    return [
+        r for r in vs.read_round_ledger(set_dir, 1)
+        if r.get("event") == event
+    ]
+
+
+class TestEnforcedBounds:
+    """The bounded totals REFUSE the round that would pass them.
+
+    Set 111 S1: the numbers are unchanged; what changes is that
+    ``count_phase_rounds`` no longer only feeds an advisory message.
+    """
+
+    def test_third_discovery_family_pass_is_refused(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_USAGE
+        assert fake.calls == []  # refused BEFORE any metered call
+        err = capsys.readouterr().err
+        assert "discovery pass 3 of a bounded 2" in err
+        assert "--operator-authorized-round" in err
+
+    def test_supplementary_shares_the_discovery_budget(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # discovery + supplementary ARE the two discovery passes; a third
+        # of either shape is the same over-run.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_DISCOVERY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY), route_fn=fake
+        )
+        assert code == vs.EXIT_USAGE
+        assert fake.calls == []
+        assert "discovery pass 3 of a bounded 2" in capsys.readouterr().err
+
+    def test_third_remediation_review_cycle_is_refused(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY, baseline_tree=baseline)
+        _seed_round(set_dir, 2, vs.PHASE_REMEDIATION_REVIEW)
+        _seed_round(set_dir, 3, vs.PHASE_REMEDIATION_REVIEW)
+        fake = FakeMultiRoute([FIX_REVIEW_CLEAN])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW), route_fn=fake
+        )
+        assert code == vs.EXIT_USAGE
+        assert fake.calls == []
+        err = capsys.readouterr().err
+        assert "remediation-review cycle 3 of a bounded 2" in err
+        # The refusal names the operator path, not another round.
+        assert "third-provider adjudication" in err
+
+    def test_third_classic_round_is_refused_whatever_the_prior_phases(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # Dropping --phase at the phased bound must not be a one-flag
+        # bypass of the thing being enforced.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(_args(set_dir), route_fn=fake)
+        assert code == vs.EXIT_USAGE
+        assert fake.calls == []
+        assert "verification round 3 of a bounded 2" in capsys.readouterr().err
+
+    def test_clean_rounds_do_not_consume_the_budget(
+        self, repo: Path, monkeypatch
+    ):
+        # A clean round ends the loop on its own; only rounds that leave
+        # the loop running are cycles, so two clean ones must not lock it.
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY, clean=True)
+        _seed_round(set_dir, 2, vs.PHASE_DISCOVERY, clean=True)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_OK
+        assert len(fake.calls) == 1
+
+    def test_clean_supplementary_over_standing_blockers_consumes_a_pass(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # S1 supplementary-round finding, reproduced as a test. A clean
+        # supplementary round whose prior discovery blockers still stand
+        # does NOT end the loop -- it is the second discovery pass, and
+        # remediation comes next. It writes no findings envelope, so an
+        # envelope-only count let a THIRD discovery-family pass through
+        # unauthorized: exactly the grinding this set exists to stop.
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)  # blocking discovery
+        clean_supp = vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY),
+            route_fn=FakeMultiRoute([VERIFIED_RESPONSE]),
+        )
+        # Clean round, but the session stays blocking -> the loop runs on.
+        assert clean_supp == vs.EXIT_BLOCKING
+        assert not (set_dir / "s1-issues-round-2.json").exists()
+        completed = _ledger(set_dir, vs.ROUND_EVENT_COMPLETED)
+        assert completed[-1]["phase"] == vs.PHASE_SUPPLEMENTARY
+        assert completed[-1]["endedLoop"] is False
+        capsys.readouterr()
+        # The third discovery-family pass is now refused.
+        third = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY), route_fn=third
+        )
+        assert code == vs.EXIT_USAGE
+        assert third.calls == []
+        assert "discovery pass 3 of a bounded 2" in capsys.readouterr().err
+
+    def test_a_loop_ending_clean_round_is_recorded_but_not_counted(
+        self, repo: Path, monkeypatch
+    ):
+        # The mirror of the case above: a clean round that SETTLES the
+        # session is recorded in the ledger and consumes nothing.
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([VERIFIED_RESPONSE]),
+        ) == vs.EXIT_OK
+        completed = _ledger(set_dir, vs.ROUND_EVENT_COMPLETED)
+        assert completed[-1]["endedLoop"] is True
+        assert vs.count_phase_family_rounds(
+            set_dir, 1, 2, vs.DISCOVERY_FAMILY_PHASES
+        ) == 0
+
+    def test_the_ledger_and_the_envelopes_never_double_count(
+        self, repo: Path, monkeypatch
+    ):
+        # A blocking round leaves BOTH a ledger record and an envelope;
+        # the union is by round number, so one round counts once.
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([BLOCKING_RESPONSE]),
+        ) == vs.EXIT_BLOCKING
+        assert (set_dir / "s1-issues.json").exists()
+        assert _ledger(set_dir, vs.ROUND_EVENT_COMPLETED)
+        assert vs.count_phase_family_rounds(
+            set_dir, 1, 2, vs.DISCOVERY_FAMILY_PHASES
+        ) == 1
+
+    def test_a_ledgerless_session_still_counts_from_envelopes(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # Backward compat: sessions that predate the ledger keep their
+        # envelope-derived bound rather than losing enforcement.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        assert not vs.round_ledger_path(set_dir, 1).exists()
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        ) == vs.EXIT_USAGE
+        assert fake.calls == []
+        assert "discovery pass 3 of a bounded 2" in capsys.readouterr().err
+
+    def test_a_torn_ledger_line_never_voids_the_records_before_it(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # Tolerant reader: an interrupted append must not silently drop
+        # the bound (fail-open on a truncated line would unlock the loop).
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY),
+            route_fn=FakeMultiRoute([VERIFIED_RESPONSE]),
+        )
+        capsys.readouterr()
+        ledger = vs.round_ledger_path(set_dir, 1)
+        with open(ledger, "a", encoding="utf-8") as handle:
+            handle.write('{"event": "round-comple')  # torn write
+        third = FakeMultiRoute([BLOCKING_RESPONSE])
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY), route_fn=third
+        ) == vs.EXIT_USAGE
+        assert third.calls == []
+
+    def test_wording_only_reverify_is_not_a_new_cycle(
+        self, repo: Path, monkeypatch
+    ):
+        # --wording-only re-collects the verdict FORMAT of a round that
+        # already happened (L-064-7); it is not a fresh cycle.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, None)
+        _seed_round(set_dir, 2, None)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(_args(set_dir, wording_only=True), route_fn=fake)
+        assert code == vs.EXIT_OK
+        assert len(fake.calls) == 1
+
+    def test_authorization_runs_the_round_and_records_it(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY, baseline_tree=baseline)
+        _seed_round(set_dir, 2, vs.PHASE_REMEDIATION_REVIEW)
+        _seed_round(set_dir, 3, vs.PHASE_REMEDIATION_REVIEW)
+        # A complete re-verdict over the ledger's three ids, so the round
+        # turns on the AUTHORIZATION rather than on ledger coverage.
+        fake = FakeMultiRoute([
+            "VERIFIED\n\n"
+            "- Fix verdict: L1 finding from round 1 -- fix-accepted\n"
+            "- Fix verdict: L2 finding from round 2 -- fix-accepted\n"
+            "- Fix verdict: L3 finding from round 3 -- fix-accepted\n"
+        ])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW,
+                  operator_authorized_round=(
+                      "operator: the unmeasured-baseline Major is material; "
+                      "one more cycle authorized"
+                  )),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_OK
+        assert len(fake.calls) == 1
+        auths = _ledger(set_dir, vs.ROUND_EVENT_AUTHORIZATION)
+        assert len(auths) == 1
+        record = auths[0]
+        assert record["sessionNumber"] == 1
+        assert record["verificationRound"] == 4
+        assert record["phase"] == vs.PHASE_REMEDIATION_REVIEW
+        assert record["boundedUnit"] == "remediation-review cycle"
+        assert record["bound"] == 2
+        assert record["priorRounds"] == 2
+        assert "unmeasured-baseline Major" in record["attestation"]
+        assert record["recordedAt"]
+        # The same ledger carries the completed round it authorized.
+        completed = _ledger(set_dir, vs.ROUND_EVENT_COMPLETED)
+        assert [r["verificationRound"] for r in completed] == [4]
+        assert completed[0]["endedLoop"] is True
+        assert "recorded authorization" in capsys.readouterr().err
+
+    def test_authorization_is_recorded_before_the_metered_call(
+        self, repo: Path, monkeypatch
+    ):
+        # The operator authorized the spend; a provider failure afterward
+        # must not erase that from the audit trail.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        fake = FakeMultiRoute([RuntimeError("provider outage")])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY,
+                  operator_authorized_round="operator: one more harvest"),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_ROUTE_FAILED
+        trail = vs.round_ledger_path(set_dir, 1)
+        assert trail.exists()
+        assert "one more harvest" in trail.read_text(encoding="utf-8")
+
+    def test_repeat_authorizations_append_never_rewrite(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        for attestation in ("operator: pass one", "operator: pass two"):
+            vs.run(
+                _args(set_dir, phase=vs.PHASE_DISCOVERY,
+                      operator_authorized_round=attestation),
+                route_fn=FakeMultiRoute([BLOCKING_RESPONSE]),
+            )
+        auths = _ledger(set_dir, vs.ROUND_EVENT_AUTHORIZATION)
+        assert [a["attestation"] for a in auths] == [
+            "operator: pass one", "operator: pass two",
+        ]
+        # Each authorized round also left its own completed record.
+        assert len(_ledger(set_dir, vs.ROUND_EVENT_COMPLETED)) == 2
+
+    def test_empty_authorization_is_refused(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # Mirrors close_session --manual-verify: the flag alone is never
+        # the authorization.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY,
+                  operator_authorized_round="   "),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_USAGE
+        assert fake.calls == []
+        assert "non-empty operator attestation" in capsys.readouterr().err
+        assert not vs.round_ledger_path(set_dir, 1).exists()
+
+    def test_authorization_below_the_bound_is_noted_not_recorded(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY,
+                  operator_authorized_round="operator: not needed yet"),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_OK
+        assert "needs no authorization" in capsys.readouterr().err
+        # The round still leaves its completed record; what must be absent
+        # is an AUTHORIZATION nobody needed.
+        assert _ledger(set_dir, vs.ROUND_EVENT_AUTHORIZATION) == []
+
+    def test_dry_run_records_no_authorization(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY, dry_run=True,
+                  operator_authorized_round="operator: just looking"),
+            route_fn=fake,
+        )
+        assert code == vs.EXIT_OK
+        assert fake.calls == []
+        assert not vs.round_ledger_path(set_dir, 1).exists()
+        assert "PAST the bounded" in capsys.readouterr().out
+
+    def test_blocking_round_at_the_bound_never_prints_a_rerun_command(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # The printed next action can never direct the orchestrator at a
+        # round the CLI is about to refuse.
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        baseline = vs.snapshot_worktree_tree(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY, baseline_tree=baseline)
+        _seed_round(set_dir, 2, vs.PHASE_REMEDIATION_REVIEW)
+        fake = FakeMultiRoute([FIX_REVIEW_REJECTED])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW), route_fn=fake
+        )
+        assert code == vs.EXIT_BLOCKING
+        out = capsys.readouterr().out
+        assert "SUSPENDS" in out and "REFUSED" in out
+        assert out.count("--phase remediation-review") == 0
+
+    def test_second_discovery_pass_at_the_bound_points_at_remediation(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_BLOCKING
+        out = capsys.readouterr().out
+        # Discovery pass 2 of 2 -- a supplementary pass would be refused,
+        # so the CLI must not offer one.
+        assert "--phase supplementary" not in out
+        assert "--phase remediation-review" in out
+
+    def test_authorization_trail_is_loop_bookkeeping_not_reviewed_work(
+        self, repo: Path, monkeypatch
+    ):
+        # The trail is written mid-loop; it must not ride into later
+        # phased evidence (nor stale an earlier round's stamped hash).
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        vs.round_ledger_path(set_dir, 1).write_text(
+            '{"attestation": "AUTHORIZATION-TRAIL-MARKER"}\n',
+            encoding="utf-8",
+        )
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY), route_fn=fake
+        )
+        assert code == vs.EXIT_BLOCKING  # prior discovery blockers stand
+        assert "AUTHORIZATION-TRAIL-MARKER" not in fake.calls[0]["prompt"]
+
+
+class TestDiscoveryLenses:
+    def test_lenses_cycle_by_call_index(self):
+        assert vs.discovery_lens_for_call(1) == (
+            vs.DISCOVERY_LENS_SPEC_CONFORMANCE
+        )
+        assert vs.discovery_lens_for_call(2) == (
+            vs.DISCOVERY_LENS_FAILURE_SCENARIO
+        )
+        # Wraps rather than erroring when K exceeds the lens list.
+        assert vs.discovery_lens_for_call(3) == (
+            vs.DISCOVERY_LENS_SPEC_CONFORMANCE
+        )
+
+    def test_lens_framings_are_distinct_and_keep_the_rubric(self):
+        spec_lens = vs.build_phase_framing(
+            vs.PHASE_DISCOVERY, lens=vs.DISCOVERY_LENS_SPEC_CONFORMANCE
+        )
+        failure_lens = vs.build_phase_framing(
+            vs.PHASE_DISCOVERY, lens=vs.DISCOVERY_LENS_FAILURE_SCENARIO
+        )
+        assert spec_lens != failure_lens
+        # Both keep the base discovery contract (exhaustive, rubric
+        # unchanged) -- the lens changes direction, not severity.
+        for framing in (spec_lens, failure_lens):
+            assert "INITIAL DISCOVERY" in framing
+            assert "The rubric is unchanged" in framing
+            # Neither lens narrows scope out from under the other.
+            assert "Scope is NOT narrowed" in framing
+
+    def test_no_lens_is_the_unchanged_base_framing(self):
+        base = vs.build_phase_framing(vs.PHASE_DISCOVERY)
+        assert "INITIAL DISCOVERY" in base
+        assert "LENS FOR THIS CALL" not in base
+
+    def test_single_call_discovery_still_carries_lens_one(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(
+            _args(_set_dir(repo), phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_OK
+        assert "SPEC CONFORMANCE" in fake.calls[0]["prompt"]
+
+    def test_non_discovery_phases_carry_no_lens(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY), route_fn=fake
+        )
+        assert "LENS FOR THIS CALL" not in fake.calls[0]["prompt"]
+
+
+class TestMinorOnlyStop:
+    def test_minor_only_round_directs_to_close_not_another_round(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        fake = FakeMultiRoute([MINOR_ONLY_RESPONSE])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_OK
+        out = capsys.readouterr().out
+        assert "MINOR-ONLY round" in out
+        assert "1 Minor / unrated finding(s)" in out
+        assert "do NOT open another verification round" in out.replace(
+            "Do NOT", "do NOT"
+        )
+        # The only command offered is the close.
+        assert "close_session" in out
+        assert "--phase supplementary" not in out
+        assert "--phase remediation-review" not in out
+
+    def test_clean_round_says_verified_not_minor_only(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+        code = vs.run(
+            _args(_set_dir(repo), phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_OK
+        out = capsys.readouterr().out
+        assert "VERIFIED -- no Critical/Major findings" in out
+        assert "MINOR-ONLY" not in out
+        assert "close_session" in out
+
+    def test_verified_with_nits_is_not_called_findings_free(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        # A VERIFIED token drops the NITS section at the parser, so the
+        # exit line must not claim the round had no findings at all --
+        # it claims only what it knows: no Critical/Major.
+        _phase_config(monkeypatch, fan_out=1)
+        verified_with_nits = (
+            "VERIFIED\n\nNothing blocking.\n\n"
+            "#### NITS\n\n- **Nit:** a docstring says list, returns tuple.\n"
+        )
+        fake = FakeMultiRoute([verified_with_nits])
+        code = vs.run(
+            _args(_set_dir(repo), phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_OK
+        out = capsys.readouterr().out
+        next_action = out.split("Next action:", 1)[1]
+        assert "no findings" not in next_action
+        assert "no Critical/Major findings" in next_action
+        assert "Record any nits from the raw artifact" in next_action

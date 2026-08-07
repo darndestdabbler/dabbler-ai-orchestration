@@ -978,3 +978,95 @@ def test_inline_path_argv_byte_identical_below_threshold():
     ]
     # No payload file was ever created on the inline path.
     assert spawner.seen.get("path") is None
+
+
+# ---------------------------------------------------------------------------
+# Set 111 S1 -- the dispatch ceilings became configurable
+# ---------------------------------------------------------------------------
+
+
+def test_timeouts_default_when_the_block_is_absent():
+    # Additive: an absent timeouts block resolves to the shipped defaults,
+    # so nothing moved for a config that never opts in.
+    resolved = cli_transport.resolve_transport_timeouts({"lockfile": "x"})
+    assert resolved == cli_transport.TransportTimeouts()
+    assert resolved.total_seconds == cli_transport.DEFAULT_TOTAL_TIMEOUT_SECONDS
+    assert cli_transport.resolve_transport_timeouts(None) == (
+        cli_transport.TransportTimeouts()
+    )
+
+
+def test_timeouts_read_configured_values_and_fill_the_rest():
+    resolved = cli_transport.resolve_transport_timeouts(
+        {"timeouts": {"total_seconds": 1200}}
+    )
+    assert resolved.total_seconds == 1200.0
+    # Unspecified fields keep their defaults rather than dropping to zero.
+    assert resolved.spawn_seconds == cli_transport.DEFAULT_SPAWN_TIMEOUT_SECONDS
+    assert resolved.first_byte_seconds == (
+        cli_transport.DEFAULT_FIRST_BYTE_TIMEOUT_SECONDS
+    )
+
+
+def test_timeouts_validation_rejects_the_silent_failure_modes():
+    bad_blocks = [
+        ({"total_second": 900}, "unknown key"),          # typo keeps 300s
+        ({"total_seconds": "nine hundred"}, "must be a number"),
+        ({"total_seconds": 0}, "must be > 0"),
+        ({"total_seconds": -1}, "must be > 0"),
+        ({"spawn_seconds": True}, "must be a number"),   # bool is not 1s
+        ("900", "must be a mapping"),
+    ]
+    for block, fragment in bad_blocks:
+        with pytest.raises(ValueError) as excinfo:
+            cli_transport.validate_transport_timeouts(block)
+        assert fragment in str(excinfo.value)
+
+
+def test_timeouts_validation_enforces_the_ordering_constraint():
+    # design lock Section 3: spawn < first_byte < total. Out of order, an
+    # inner ceiling can never fire and a stall is misclassified.
+    with pytest.raises(ValueError) as excinfo:
+        cli_transport.validate_transport_timeouts({"total_seconds": 5})
+    assert "spawn_seconds < first_byte_seconds < total_seconds" in str(
+        excinfo.value
+    )
+    # A coherent trio passes, as does an absent block.
+    cli_transport.validate_transport_timeouts(
+        {"spawn_seconds": 5, "first_byte_seconds": 20, "total_seconds": 1200}
+    )
+    cli_transport.validate_transport_timeouts(None)
+
+
+def test_configured_total_timeout_is_the_one_that_fires():
+    # The knob is load-bearing, not decorative: the transport times out at
+    # the CONFIGURED ceiling, not the shipped default.
+    timeouts = cli_transport.resolve_transport_timeouts(
+        {"timeouts": {"spawn_seconds": 1.0, "first_byte_seconds": 1.0,
+                      "total_seconds": 0.3}}
+    )
+    fake_proc = FakeProcess(
+        stdout_lines=['{"type":"session.start"}\n'], block_stdout_after=2.0
+    )
+    transport = cli_transport.CopilotCliTransport(
+        spawner=FakeSpawner(fake_proc), timeouts=timeouts
+    )
+    result = transport.dispatch(model_id="m", system_prompt="", user_message="u")
+    assert not result.ok
+    assert result.transport_metadata["error_class"] == "total-timeout"
+    assert fake_proc.killed
+
+
+def test_shipped_config_raises_the_total_ceiling_above_the_old_default():
+    # The seat that found this could not complete a MANDATORY verification
+    # inside the old 300s ceiling; the shipped value must actually be higher.
+    from ai_router.config import load_config
+
+    cli_cfg = load_config()["transports"]["copilot-cli"]
+    resolved = cli_transport.resolve_transport_timeouts(cli_cfg)
+    assert resolved.total_seconds > cli_transport.DEFAULT_TOTAL_TIMEOUT_SECONDS
+    assert (
+        resolved.spawn_seconds
+        < resolved.first_byte_seconds
+        < resolved.total_seconds
+    )

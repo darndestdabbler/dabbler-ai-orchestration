@@ -136,6 +136,7 @@ are tolerated (`additionalProperties` is open on the issue object).
 | `severity` | string | no | verifier (loose) |
 | `failureScenario` | string | no | verifier (Set 096). The concrete failure scenario + probability justification the consequence-graded severity rubric requires per blocking Issue. Parsed tolerantly from the `Failure scenario:` line; valid under both schema versions; its absence never changes blocking classification (`classify_blocking` semantics unchanged). |
 | `discoveryCall` | integer ≥ 1 | no | machinery (Set 096). On a fanned-out discovery round, which fan-out call reported the finding (call 1 = the canonical round artifact; call k = the `-fanout-<k>` sibling). Absent on single-call rounds. |
+| `discoveryLens` | string | no | machinery (Set 111 S1). The discovery **lens** the reporting call reviewed under — `spec-conformance` (plan → diff) or `failure-scenario` (code → the ways it breaks), cycled by call index. Written beside `discoveryCall` on fanned-out discovery rounds; absent on single-call rounds and on every non-discovery phase. Not enum-constrained: the lens list is code-side (`verify_session.DISCOVERY_LENSES`) and may grow without a schema bump. |
 | `resolution_status` | string | no | orchestrator annotation (advisory). v1: loose. v2: enum-enforced **when present** (see below). |
 | `resolution_notes` | string | no | orchestrator annotation (advisory) |
 | `resolved_in_round` | integer ≥ 1 | no | orchestrator annotation (advisory) |

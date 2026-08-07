@@ -159,10 +159,10 @@ Human-only, every time; never consensus-eligible, never self-authorized:
   remote-less repos). Missing `disposition.json` fields are the usual
   first-attempt cause.
 - **Blocking findings** → complete the harvest, fix once, review the fix
-  delta. **Bounded totals: at most 2 discovery passes and 2
-  remediation-review cycles** (classic no-`--phase` path: 2 automatic
-  rounds). Past a bound the loop **suspends** — it does not keep opening
-  rounds:
+  delta. **Bounded totals, machine-ENFORCED: at most 2 discovery passes
+  and 2 remediation-review cycles** (classic no-`--phase` path: 2
+  rounds). Past a bound `verify_session` **refuses the round** — the loop
+  suspends, it does not keep opening rounds:
   - **No Critical/Major after the cap** (only Minor, or *unrated*/
     unknown-severity nits remain) → treat as **Minor-only / effectively
     VERIFIED**, record the residual as adjudicated-minor, and stop.
@@ -175,6 +175,11 @@ Human-only, every time; never consensus-eligible, never self-authorized:
     disputes** → stop to the human: either get a **third-provider
     opinion** or have the **operator adjudicate**. Never re-round a
     disputed finding.
+  Only the **operator** may pass a bound, via
+  `--operator-authorized-round "<reason>"` (non-empty; appended to
+  `sN-rounds.jsonl`) — never the orchestrator's own
+  authority. An adjudication settles the STOP, not the truth: a finding
+  waived at the bound is an owed residual with a named owner.
   A settled point never reopens under fresh wording — the auto-assembled
   cross-round ledger carries settled vs unresolved; a remediated round
   earns settlement via its remediation-note sidecar.

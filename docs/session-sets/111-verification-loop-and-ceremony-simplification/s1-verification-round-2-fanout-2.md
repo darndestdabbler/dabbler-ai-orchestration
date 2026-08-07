@@ -1,0 +1,7 @@
+ISSUES FOUND
+
+- **Issue 1:** The work ships an unrelated Copilot CLI transport timeout change under this session.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Failure scenario:** A user running `transport.profile: copilot-cli` hits a normal routed call that emits initial output and then stalls; the global transport total timeout is now 1200s instead of the previous 300s, so the router/test gate can hang for 20 minutes. This is probable enough to matter because the same seat’s reported full-suite failures are already real Copilot CLI `total-timeout` dispatches.
+  - **Details:** The task scoped S1 to “three changes to `ai_router/verify_session.py` plus tests and the doc echoes” and said the changelog gains **three** Set 111 S1 entries. The working tree adds a fourth changelog entry plus changes to `ai_router/cli_transport.py`, `config.py`, `__init__.py`, `router-config.yaml`, and `test_cli_transport.py`. `__init__.py` now passes configured timeouts into every `CopilotCliTransport`, and `router-config.yaml` sets `transports.copilot-cli.timeouts.total_seconds: 1200`, so this is a real runtime behavior change outside the bounded verification-loop deliverable. The correct resolution is to remove it from S1 or split it into an explicitly scoped transport change with its own review rationale.

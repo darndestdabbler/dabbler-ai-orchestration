@@ -175,6 +175,14 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # loop bookkeeping exactly like the issues envelopes it annotates. A
     # note recorded after a clean final round must not stale the evidence.
     "s*-remediation-round-*.md",
+    # Set 111 S1: the per-session round ledger
+    # (verify_session.round_ledger_path) -- the operator's pre-call
+    # authorization for a past-the-bound round plus the post-call record
+    # of every completed round, which is the bounded-totals input. Loop
+    # bookkeeping exactly like the envelopes and sidecars it sits beside,
+    # and a line appended mid-loop must not stale an earlier round's
+    # stamped evidence.
+    "s*-rounds.jsonl",
     "disposition.json",
     "session-events.jsonl",
     "session-state.json",

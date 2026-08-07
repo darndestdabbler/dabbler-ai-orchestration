@@ -534,6 +534,97 @@ class TransportTimeouts:
     total_seconds: float = DEFAULT_TOTAL_TIMEOUT_SECONDS
 
 
+# The config key each TransportTimeouts field reads, with its default.
+# One definition for the resolver, the validator and the tests (L-069-1).
+TIMEOUT_FIELD_DEFAULTS = (
+    ("spawn_seconds", DEFAULT_SPAWN_TIMEOUT_SECONDS),
+    ("first_byte_seconds", DEFAULT_FIRST_BYTE_TIMEOUT_SECONDS),
+    ("total_seconds", DEFAULT_TOTAL_TIMEOUT_SECONDS),
+)
+
+
+def validate_transport_timeouts(block: object) -> None:
+    """Raise ``ValueError`` unless *block* is a valid ``timeouts:`` mapping.
+
+    Set 111 S1. The three ceilings were hardcoded constants with no config
+    or env path, and the total one (300s) is **seat-dependent**: a Copilot
+    seat dispatching a full session-verification evidence bundle through
+    the CLI cannot finish inside it, which made a MANDATORY gate
+    structurally unreachable on that machine (the same class Set 109 S3
+    fixed for ``providers.google.timeout_seconds``, 300 -> 900). Validated
+    at LOAD so a malformed or incoherent value fails at startup rather
+    than mid-call, on an expensive path, after the work is done.
+
+    Unknown keys are rejected rather than ignored: a typo'd
+    ``total_second`` that silently kept the 300s default is the exact
+    failure this block exists to end.
+    """
+    if block is None:
+        return
+    if not isinstance(block, dict):
+        raise ValueError(
+            "transports.copilot-cli.timeouts must be a mapping, got "
+            f"{type(block).__name__}"
+        )
+    known = {name for name, _ in TIMEOUT_FIELD_DEFAULTS}
+    unknown = sorted(set(block) - known)
+    if unknown:
+        raise ValueError(
+            f"transports.copilot-cli.timeouts has unknown key(s): {unknown}. "
+            f"Known: {sorted(known)}"
+        )
+    for name, _default in TIMEOUT_FIELD_DEFAULTS:
+        if name not in block:
+            continue
+        value = block[name]
+        # bool is an int in Python; a True here is a config error, not 1s.
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise ValueError(
+                f"transports.copilot-cli.timeouts.{name} must be a number, "
+                f"got {type(value).__name__}"
+            )
+        if value <= 0:
+            raise ValueError(
+                f"transports.copilot-cli.timeouts.{name} must be > 0, "
+                f"got {value}"
+            )
+    resolved = resolve_transport_timeouts({"timeouts": block})
+    # design lock Section 3's constraint, enforced rather than commented:
+    # an out-of-order trio means an inner ceiling can never fire, so a
+    # stall is misclassified (or never classified) at the outer one.
+    if not (
+        resolved.spawn_seconds
+        < resolved.first_byte_seconds
+        < resolved.total_seconds
+    ):
+        raise ValueError(
+            "transports.copilot-cli.timeouts must satisfy spawn_seconds < "
+            "first_byte_seconds < total_seconds (design lock Section 3); "
+            f"got {resolved.spawn_seconds} / {resolved.first_byte_seconds} "
+            f"/ {resolved.total_seconds}"
+        )
+
+
+def resolve_transport_timeouts(cli_cfg: Optional[dict]) -> TransportTimeouts:
+    """The effective timeouts for a ``transports.copilot-cli`` block.
+
+    Each field falls back to its shipped default, so an absent
+    ``timeouts:`` block resolves exactly as before (Set 111 S1 is additive
+    — the defaults did not move).
+    """
+    block = (cli_cfg or {}).get("timeouts") or {}
+    if not isinstance(block, dict):
+        block = {}
+    values = {}
+    for name, default in TIMEOUT_FIELD_DEFAULTS:
+        raw = block.get(name, default)
+        try:
+            values[name] = float(raw)
+        except (TypeError, ValueError):
+            values[name] = float(default)
+    return TransportTimeouts(**values)
+
+
 class CopilotCliTransport:
     """Dispatches one call through the GitHub Copilot CLI's headless mode.
 

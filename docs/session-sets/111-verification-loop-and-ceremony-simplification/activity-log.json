@@ -1,0 +1,89 @@
+{
+  "sessionSetName": "111-verification-loop-and-ceremony-simplification",
+  "createdDate": "2026-08-06T22:41:54.079265+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-06T22:41:54.081731+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-06T19:20:19.006259-04:00",
+      "description": "Registered session 1 via start_session (copilot / claude-opus-5 / high); read the preload, the 2026-08-04 proposal doc SS2-SS11, and Set 110 operator-notes (2026-08-05 sections).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "bounds-enforced",
+      "dateTime": "2026-08-06T19:20:19.007903-04:00",
+      "description": "Enforced the bounded totals in verify_session: evaluate_phase_bound + count_phase_family_rounds refuse a 3rd discovery-family pass, 3rd remediation-review cycle, or 3rd classic round before any metered call, unless --operator-authorized-round carries a non-empty operator attestation (appended to sN-round-authorizations.jsonl, written before the call, added to WORK_DIFF_SET_BOOKKEEPING).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "framing-varied",
+      "dateTime": "2026-08-06T19:20:19.009267-04:00",
+      "description": "Varied the discovery fan-out framing: per-call spec-conformance / failure-scenario lenses, per-call prompts and per-call evidence stamps, discoveryLens recorded in the merged envelope.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "severity-stop",
+      "dateTime": "2026-08-06T19:20:19.010501-04:00",
+      "description": "Wired the severity-gated stop into the exit path: a Minor-only round is named, counted, told not to re-round, and offered only the close_session command; a clean round says VERIFIED -- no findings. At-bound blocking rounds no longer print a re-run command the CLI would refuse.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "tests",
+      "dateTime": "2026-08-06T19:20:19.011844-04:00",
+      "description": "Added 22 tests across TestEnforcedBounds / TestDiscoveryLenses / TestMinorOnlyStop; updated the two pre-existing tests whose scenarios the new behavior changes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "transport-timeout-knob",
+      "dateTime": "2026-08-07T03:17:47.793318-04:00",
+      "description": "Verification was transport-blocked: cli_transport.py hardcoded a 300s total dispatch ceiling with no config/env path, and a full session-verification bundle (~116KB over the Set 104 file handoff) could not complete inside it (two total-timeout dispatches, nothing written; a trivial prompt returned in 13s). Stopped to the operator rather than self-authorizing; operator chose option A. Added transports.copilot-cli.timeouts (spawn/first_byte/total), default-preserving, validated at load (unknown keys, non-numeric, non-positive, bool, and the spawn<first_byte<total ordering all refused), wired through __init__.py, set total_seconds: 1200, plus 6 tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "verify-discovery",
+      "dateTime": "2026-08-07T03:17:47.795122-04:00",
+      "description": "Discovery round 2 (both lenses) + supplementary round 3. Both discovery lenses independently reported the undisclosed operator-authorized transport scope extension (Major); supplementary reported, with a reproduction, that a clean supplementary round consumes a discovery pass but writes no envelope, so a third pass was accepted unauthorized (Major).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "remediate",
+      "dateTime": "2026-08-07T03:17:47.796506-04:00",
+      "description": "Remediation round 1. L1/L2: disclosed the operator-authorized scope extension in s1-conventions.md with the decision trail and trade-off; CHANGELOG now carries the fourth (Set 111 S1) entry. L3: replaced the authorization-only file with ONE append-only round ledger sN-rounds.jsonl carrying both the pre-call operator-authorization and the post-call round-completed record (phase/verdict/blocking/endedLoop); count_phase_family_rounds now unions ledger records (endedLoop false) with envelopes by round number, so pre-ledger sessions keep enforcement and no round double-counts; tolerant reader survives a torn line; WORK_DIFF_SET_BOOKKEEPING renamed to s*-rounds.jsonl. Baseline discrimination proven: the reproduction test fails pre-fix (EXIT_BLOCKING, third pass routed) and passes fixed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "verify-remediation-review",
+      "dateTime": "2026-08-07T03:17:47.797705-04:00",
+      "description": "Remediation-review round 4 on the fix delta: VERIFIED, 0 blocking, fix verdicts 1 accepted + 1 accepted-with-modification + 1 duplicate-of. One nit (a stale sN-round-authorizations.jsonl echo in s1-conventions.md) fixed in the same pass per L-065-1; the earlier activity-log entry describing the superseded design is left as the historical record it is.",
+      "status": "complete"
+    }
+  ]
+}

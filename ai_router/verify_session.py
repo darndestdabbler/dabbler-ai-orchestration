@@ -18,7 +18,7 @@ works (``start_session``, ``routed_gate``, ``close_session``,
         [--phase discovery|supplementary|remediation-review] \
         [--diff-base <ref>] [--round N] [--max-tier T] [--dry-run] \
         [--wording-only] [--exclude <pathspec> ...] [--no-default-excludes] \
-        [--conventions-file <path>]
+        [--conventions-file <path>] [--operator-authorized-round <reason>]
 
 What it does, in order:
 
@@ -62,13 +62,19 @@ canonical template file stays byte-identical, so the Set 084 F3
 template pin holds on every phase:
 
 - ``discovery`` — INITIAL_DISCOVERY: exhaustive-enumeration framing at
-  ALL severities, fanned out K ways with byte-identical bundles
+  ALL severities, fanned out K ways over the SAME evidence bundle
   (``verification.discovery.fan_out``, default 2 — sized by the Set 096
   S1 experiment: same-model pairwise overlap measured Jaccard 0.13–0.31,
   so K=2 harvests ~81% of the observable finding pool vs ~50% for one
-  call). Call 1 writes the canonical round artifact; call k writes the
-  ``-fanout-<k>`` sibling; the parsed finding sets merge into ONE round
-  envelope (per-issue ``discoveryCall``). The round also records a
+  call). Set 111 S1: the K calls no longer send IDENTICAL prompts — each
+  carries a different discovery LENS (``spec-conformance`` reads the
+  spec toward the diff; ``failure-scenario`` reads the code toward the
+  ways it breaks), cycled by call index. Same K, same cost, same
+  envelope merge; only the framing differs, so the fast path and the
+  cost-scaling incentive are untouched. Call 1 writes the canonical
+  round artifact; call k writes the ``-fanout-<k>`` sibling; the parsed
+  finding sets merge into ONE round envelope (per-issue
+  ``discoveryCall`` + ``discoveryLens``). The round also records a
   ``discoveryBaselineTree`` working-tree snapshot for the later
   fix-delta review.
 - ``supplementary`` — SUPPLEMENTARY_DISCOVERY: runs BEFORE any
@@ -95,6 +101,25 @@ must never sit below the round-1 verifier's tier -- so the CLI REFUSES a
 ``--round >= 2`` call whose ``--max-tier`` is below the round-1
 verifier's tier unless ``--wording-only`` is passed (the L-064-7
 symmetric failure, encoded).
+
+**The bounds are ENFORCED, not printed (Set 111 S1).** The loop's
+documented totals -- at most 2 discovery-family passes (``discovery`` +
+``supplementary``), at most 2 ``remediation-review`` cycles, at most 2
+classic no-``--phase`` rounds -- used to feed an advisory "Next action"
+message only, and were exceeded in practice (one session ran 13 calls
+over 379 minutes AFTER the cap shipped). The CLI now REFUSES the round
+that would pass a bound, before any metered call, unless
+``--operator-authorized-round "<reason>"`` carries the operator's
+attestation. That authorization is appended to the per-session round
+ledger ``sN-rounds.jsonl`` (append-only, mirroring
+``close_session --manual-verify``: the flag alone is never enough --
+an authorization with nothing to say is not an audit trail). The same
+ledger records every COMPLETED round's phase, verdict and ``endedLoop``,
+which is what the bound counts (unioned by round number with the findings
+envelopes, for sessions that predate it): a clean round that settles the
+session consumes nothing, but a clean ``supplementary`` round whose prior
+discovery blockers still stand IS the second discovery pass and writes no
+envelope to be counted from.
 
 Exit codes:
 
@@ -125,6 +150,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Callable, List, Optional, Sequence
 
@@ -187,6 +213,37 @@ PHASE_DISCOVERY = "discovery"
 PHASE_SUPPLEMENTARY = "supplementary"
 PHASE_REMEDIATION_REVIEW = "remediation-review"
 PHASE_CHOICES = (PHASE_DISCOVERY, PHASE_SUPPLEMENTARY, PHASE_REMEDIATION_REVIEW)
+
+# --- Set 111 S1: the bounded totals, ENFORCED -------------------------------
+# The two discovery-family passes are `discovery` (pass 1) and
+# `supplementary` (pass 2) -- the constitution's "at most 2 discovery
+# passes". `remediation-review` gets its own 2-cycle budget, and the
+# classic no-`--phase` path its documented "2 automatic rounds". Only
+# FINDINGS-BEARING rounds count (a clean round ends the loop on its own),
+# which is exactly what `count_phase_family_rounds` sees: envelopes.
+DISCOVERY_FAMILY_PHASES = (PHASE_DISCOVERY, PHASE_SUPPLEMENTARY)
+PHASE_BOUND_DISCOVERY = 2
+PHASE_BOUND_REMEDIATION_REVIEW = 2
+PHASE_BOUND_CLASSIC = 2
+
+# The two record kinds in the per-session round ledger (sN-rounds.jsonl):
+# the operator's pre-call authorization for a past-the-bound round, and
+# the post-call record of a completed round (the bounded-totals input).
+ROUND_EVENT_AUTHORIZATION = "operator-authorization"
+ROUND_EVENT_COMPLETED = "round-completed"
+
+# --- Set 111 S1: discovery LENSES -------------------------------------------
+# The K=2 fan-out is already paid for; sending the SAME prompt twice buys
+# only the model's own sampling variance. The residue of the (dead)
+# parallel-lens proposal is to vary the FRAMING inside the existing
+# fan-out: same K, same cost, same loop position, same envelope merge.
+# Cycled by call index, so K=1 gets lens 1 and K=3 wraps to lens 1 again.
+DISCOVERY_LENS_SPEC_CONFORMANCE = "spec-conformance"
+DISCOVERY_LENS_FAILURE_SCENARIO = "failure-scenario"
+DISCOVERY_LENSES = (
+    DISCOVERY_LENS_SPEC_CONFORMANCE,
+    DISCOVERY_LENS_FAILURE_SCENARIO,
+)
 
 # Phased rounds default to the raised complexity hint the workflow already
 # prescribes for post-Critical/Major re-verifies: discovery asks for an
@@ -1474,14 +1531,220 @@ def count_phase_rounds(
     in their envelope. Blocking phased rounds always write an envelope
     (a zero-parse blocking round synthesizes a finding), so this counts
     the loop's completed blocking cycles — the bounded-totals input."""
-    count = 0
+    return count_phase_family_rounds(
+        session_set_dir, session_number, upto_round, (phase_name,)
+    )
+
+
+def count_phase_family_rounds(
+    session_set_dir: Path,
+    session_number: int,
+    upto_round: int,
+    phase_names: Optional[Sequence[str]] = None,
+) -> int:
+    """How many rounds before *upto_round* consumed *phase_names*' budget
+    (``None`` = any phase — the classic path's input).
+
+    A round consumes its family's budget unless it ENDED THE LOOP: a clean
+    round that settles the session costs nothing, because nothing follows
+    it. Everything else is a completed cycle.
+
+    Two sources, unioned by round number so neither double-counts:
+
+    1. ``sN-rounds.jsonl`` — the round ledger (Set 111 S1), which records
+       every completed round's phase and whether it ended the loop.
+    2. The findings envelopes, as before — the backward-compatible
+       fallback for sessions that predate the ledger.
+
+    The ledger exists because the envelopes alone are not a faithful
+    record of the loop's cycles (S1 supplementary-round finding, verified
+    by reproduction): a **clean supplementary round while prior discovery
+    blockers stand** is the second discovery pass and does NOT end the
+    loop, yet it writes no envelope — so an envelope-only count let a
+    third discovery-family pass through unauthorized, which is exactly
+    the grinding this set exists to stop.
+    """
+    consumed: set = set()
+    for record in read_round_ledger(session_set_dir, session_number):
+        if record.get("event") != ROUND_EVENT_COMPLETED:
+            continue
+        round_number = record.get("verificationRound")
+        if not isinstance(round_number, int) or round_number >= upto_round:
+            continue
+        if record.get("endedLoop"):
+            continue
+        if phase_names is None or record.get("phase") in phase_names:
+            consumed.add(round_number)
     for prior_round in range(1, upto_round):
         envelope = _read_round_envelope(
             session_set_dir, session_number, prior_round
         )
-        if envelope is not None and envelope.get("phase") == phase_name:
-            count += 1
-    return count
+        if envelope is None:
+            continue
+        if phase_names is None or envelope.get("phase") in phase_names:
+            consumed.add(prior_round)
+    return len(consumed)
+
+
+@dataclass
+class PhaseBoundStatus:
+    """The bounded-totals verdict for the round about to run (Set 111 S1).
+
+    Attributes:
+        label: operator-facing name of the bounded unit ("discovery
+            pass", "remediation-review cycle", "verification round").
+        family: the phases that consume this budget (``None`` = any).
+        bound: how many findings-bearing rounds the budget allows.
+        prior_rounds: how many are already on disk.
+        exceeds: whether THIS round would pass the bound.
+    """
+    label: str
+    family: Optional[Sequence[str]]
+    bound: int
+    prior_rounds: int
+    exceeds: bool
+
+
+def evaluate_phase_bound(
+    session_set_dir: Path,
+    session_number: int,
+    round_number: int,
+    phase: Optional[str],
+) -> PhaseBoundStatus:
+    """Whether the round about to run would pass its bounded total.
+
+    Set 111 S1 (proposal §10 Q5, resolved): the bounds failed because
+    NOTHING enforced them — ``count_phase_rounds`` fed an advisory "Next
+    action" message and no refusal. This is the same arithmetic, read
+    BEFORE the metered call so the CLI can refuse.
+
+    The classic no-``--phase`` path is bounded on ANY prior
+    findings-bearing round, not just prior classic ones: otherwise
+    dropping ``--phase`` at the phased bound is a one-flag bypass of the
+    thing being enforced.
+    """
+    if phase in DISCOVERY_FAMILY_PHASES:
+        family: Optional[Sequence[str]] = DISCOVERY_FAMILY_PHASES
+        label, bound = "discovery pass", PHASE_BOUND_DISCOVERY
+    elif phase == PHASE_REMEDIATION_REVIEW:
+        family = (PHASE_REMEDIATION_REVIEW,)
+        label, bound = "remediation-review cycle", PHASE_BOUND_REMEDIATION_REVIEW
+    else:
+        family = None
+        label, bound = "verification round", PHASE_BOUND_CLASSIC
+    prior = count_phase_family_rounds(
+        session_set_dir, session_number, round_number, family
+    )
+    return PhaseBoundStatus(
+        label=label,
+        family=family,
+        bound=bound,
+        prior_rounds=prior,
+        exceeds=prior >= bound,
+    )
+
+
+def round_ledger_path(session_set_dir: Path, session_number: int) -> Path:
+    """The session's append-only round ledger.
+
+    One file, two record kinds (``event``): the pre-call operator
+    authorization for a past-the-bound round, and the post-call record of
+    a completed round. Both are loop bookkeeping about the same rounds,
+    so they share one artifact rather than accreting two.
+    """
+    return session_set_dir / f"s{session_number}-rounds.jsonl"
+
+
+def read_round_ledger(session_set_dir: Path, session_number: int) -> List[dict]:
+    """The ledger's records, or ``[]`` (absent, unreadable, or partly
+    malformed — a tolerant reader, like every artifact consumer here; a
+    truncated final line never voids the records before it)."""
+    path = round_ledger_path(session_set_dir, session_number)
+    if not path.exists():
+        return []
+    records: List[dict] = []
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(record, dict):
+            records.append(record)
+    return records
+
+
+def _append_round_ledger(path: Path, record: dict) -> dict:
+    """Append one record. Append-only by contract: verification artifacts
+    are immutable records, so a retry adds a sibling line rather than
+    rewriting one."""
+    with open(path, "a", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+    return record
+
+
+def record_round_authorization(
+    path: Path,
+    *,
+    session_number: int,
+    round_number: int,
+    phase: Optional[str],
+    status: PhaseBoundStatus,
+    attestation: str,
+) -> dict:
+    """Append the operator's past-the-bound authorization.
+
+    Written BEFORE the metered call, so an authorization the operator
+    actually gave is on the record even if the routed call then fails.
+    """
+    return _append_round_ledger(path, {
+        "event": ROUND_EVENT_AUTHORIZATION,
+        "sessionNumber": session_number,
+        "verificationRound": round_number,
+        "phase": phase,
+        "boundedUnit": status.label,
+        "bound": status.bound,
+        "priorRounds": status.prior_rounds,
+        "attestation": attestation,
+        "recordedAt": datetime.now().astimezone().isoformat(),
+    })
+
+
+def record_round_completed(
+    path: Path,
+    *,
+    session_number: int,
+    round_number: int,
+    phase: Optional[str],
+    verdict: str,
+    blocking: bool,
+    ended_loop: bool,
+) -> dict:
+    """Append the completed round's record — the bounded-totals input.
+
+    ``ended_loop`` is the whole point: a clean round that settles the
+    session consumes no budget, while a clean SUPPLEMENTARY round whose
+    prior discovery blockers still stand does (the loop continues to
+    remediation), and that round writes no findings envelope to be
+    counted from.
+    """
+    return _append_round_ledger(path, {
+        "event": ROUND_EVENT_COMPLETED,
+        "sessionNumber": session_number,
+        "verificationRound": round_number,
+        "phase": phase,
+        "verdict": verdict,
+        "blocking": blocking,
+        "endedLoop": ended_loop,
+        "recordedAt": datetime.now().astimezone().isoformat(),
+    })
+
 
 
 def assemble_fix_delta_evidence(
@@ -1602,13 +1865,66 @@ def assemble_prior_findings_block(
     )
 
 
-def build_phase_framing(phase: Optional[str]) -> str:
+def discovery_lens_for_call(call_index: int) -> str:
+    """The discovery lens call *call_index* (1-based) reviews under.
+
+    Cycled, so a K=1 fan-out gets lens 1 and a K>len(LENSES) fan-out
+    wraps rather than erroring — the lens list and the configured K are
+    independent knobs.
+    """
+    return DISCOVERY_LENSES[(call_index - 1) % len(DISCOVERY_LENSES)]
+
+
+def build_discovery_lens_framing(lens: str) -> str:
+    """The lens block appended to the discovery framing (Set 111 S1).
+
+    Both lenses demand the SAME exhaustive enumeration under the SAME
+    severity rubric; they differ only in the DIRECTION of the read, so
+    the two calls' attention lands in different places. Nothing here
+    raises or lowers severity, and neither lens narrows scope — a
+    finding the other lens would have caught is still in scope.
+    """
+    if lens == DISCOVERY_LENS_FAILURE_SCENARIO:
+        return (
+            "##### LENS FOR THIS CALL: FAILURE SCENARIOS (code -> the "
+            "ways it breaks)\n\n"
+            "Read the changed code first and the plan second. For each "
+            "changed line, ask how it behaves at its edges: unhandled "
+            "inputs and error paths; partial failure, retry and "
+            "interrupted-write states; concurrency and ordering; "
+            "platform, encoding and locale differences; resource "
+            "cleanup on every exit path; and the handling of anything "
+            "untrusted. Every finding still needs its concrete failure "
+            "scenario -- this lens exists to surface defects a "
+            "plan-conformance read cannot see. Scope is NOT narrowed: "
+            "report a conformance defect if you find one."
+        )
+    return (
+        "##### LENS FOR THIS CALL: SPEC CONFORMANCE (plan -> the diff)\n\n"
+        "Read the session plan first and the diff second. Walk every "
+        "obligation the plan states -- each step, each Creates/Touches "
+        "entry, each Ends-with clause -- and find the change that "
+        "discharges it. What is MISSING, PARTIAL, or CONTRADICTS the "
+        "stated plan is this lens's yield: unmet deliverables, silent "
+        "scope changes, documentation or comments that no longer match "
+        "the code they describe, and claims in the evidence the diff "
+        "does not support. Scope is NOT narrowed: report a runtime "
+        "defect if you find one."
+    )
+
+
+def build_phase_framing(phase: Optional[str], lens: Optional[str] = None) -> str:
     """The phase's framing block for the Original Task slot ('' when no
     phase). The framing changes COVERAGE and SCOPE only — the severity
     rubric, the materiality gate, and the verdict grammar all stay
-    exactly as the template states them."""
+    exactly as the template states them.
+
+    ``lens`` (Set 111 S1, discovery only) appends the per-call discovery
+    lens so the K-way fan-out sends differently-framed prompts instead
+    of identical ones.
+    """
     if phase == PHASE_DISCOVERY:
-        return (
+        framing = (
             "#### PHASE: INITIAL DISCOVERY -- exhaustive enumeration "
             "(read first)\n\n"
             "This round is a DISCOVERY pass, not a verdict-only review. "
@@ -1629,6 +1945,9 @@ def build_phase_framing(phase: Optional[str]) -> str:
             "plan that is reviewed against the fix delta afterward, so "
             "completeness now prevents churn later."
         )
+        if lens:
+            framing += "\n\n" + build_discovery_lens_framing(lens)
+        return framing
     if phase == PHASE_SUPPLEMENTARY:
         return (
             "#### PHASE: SUPPLEMENTARY DISCOVERY -- completeness critic "
@@ -1886,7 +2205,10 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "behavior, unchanged. 'discovery': exhaustive-enumeration "
             "framing at all severities, fanned out K ways "
             "(verification.discovery.fan_out, default "
-            f"{DISCOVERY_FAN_OUT_DEFAULT}) with identical bundles, merged "
+            f"{DISCOVERY_FAN_OUT_DEFAULT}) over the same evidence with a "
+            "DIFFERENT lens per call ("
+            + " / ".join(DISCOVERY_LENSES) +
+            "), merged "
             "into one round envelope; records the discovery baseline tree. "
             "'supplementary': completeness-critic pass over the SAME "
             "evidence BEFORE any remediation (run it when discovery found "
@@ -1977,6 +2299,23 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             f"{PHASE_COMPLEXITY_HINT} on any --phase round: discovery "
             "asks for an exhaustive enumeration and the later phases are "
             "by definition downstream of Critical/Major findings)."
+        ),
+    )
+    p.add_argument(
+        "--operator-authorized-round",
+        default=None,
+        metavar="REASON",
+        help=(
+            "Operator attestation authorizing a round PAST its bounded "
+            "total (Set 111 S1). The loop is bounded at 2 discovery-family "
+            "passes, 2 remediation-review cycles, and 2 classic rounds; the "
+            "round that would pass a bound is REFUSED without this flag. "
+            "The value is the operator's reason and must be non-empty -- "
+            "the flag alone is never enough (same contract as close_session "
+            "--manual-verify). Recorded, append-only, in "
+            "sN-rounds.jsonl. This is an operator "
+            "authorization: the orchestrator never passes it on its own "
+            "authority."
         ),
     )
     p.add_argument(
@@ -2125,6 +2464,78 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             PHASE_COMPLEXITY_HINT if phase is not None
             else DEFAULT_COMPLEXITY_HINT
         )
+
+    # -- Set 111 S1: ENFORCE the bounded totals (proposal §10 Q5). The
+    #    numbers are unchanged -- what changes is that passing one is now
+    #    a REFUSAL before any metered call, not an advisory line printed
+    #    after one. A --wording-only re-verify re-collects the verdict
+    #    FORMAT of a round that already happened, so it is not a fresh
+    #    cycle and does not consume (or trip) the budget.
+    raw_authorization = getattr(args, "operator_authorized_round", None)
+    authorization = (raw_authorization or "").strip()
+    if raw_authorization is not None and not authorization:
+        print(
+            "verify_session: refused -- --operator-authorized-round requires "
+            "a non-empty operator attestation (why the bound is being "
+            "passed, and what remains unresolved). The flag alone is not an "
+            "authorization; an audit trail with nothing in it is worse than "
+            "none. Same contract as close_session --manual-verify.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    bound_status = evaluate_phase_bound(
+        session_set_dir, session_number, round_number, phase
+    )
+    if args.wording_only:
+        # Not a fresh cycle: it re-collects the verdict FORMAT of a round
+        # that already ran, so it neither trips nor consumes the budget.
+        bound_status.exceeds = False
+    if bound_status.exceeds and not authorization:
+        print(
+            f"verify_session: refused -- this would be {bound_status.label} "
+            f"{bound_status.prior_rounds + 1} of a bounded "
+            f"{bound_status.bound} for session {session_number}. The loop "
+            "SUSPENDS at the bound; it does not keep opening rounds.\n"
+            "  - No Critical/Major left (only Minor or unrated nits): that "
+            "is effectively VERIFIED. Record the residual as "
+            "adjudicated-minor in the disposition and CLOSE.\n"
+            "  - An unfixed or disputed Critical/Major: stop to the "
+            "operator -- a single third-provider adjudication or the "
+            "operator's own call. An adjudication settles the STOP, not "
+            "the truth: a finding waived at the bound is an owed residual "
+            "with a named owner, never argued down to nothing.\n"
+            "Persisting past the bound requires a material Critical/Major "
+            "AND the operator's recorded authorization (never the "
+            "orchestrator's own):\n"
+            f"  python -m ai_router.verify_session --session-set-dir "
+            f"{session_set_dir}"
+            + (f" --phase {phase}" if phase else "")
+            + " --operator-authorized-round \"<the operator's reason>\"\n"
+            "The attestation is appended to "
+            f"{round_ledger_path(session_set_dir, session_number).name}"
+            " (append-only audit trail).",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    if authorization and not bound_status.exceeds:
+        if bound_status.prior_rounds >= bound_status.bound:
+            reason = (
+                "a --wording-only re-verify re-collects an existing round's "
+                "verdict format rather than opening a cycle, so it needs no "
+                "authorization"
+            )
+        else:
+            reason = (
+                f"this is only {bound_status.label} "
+                f"{bound_status.prior_rounds + 1} of {bound_status.bound}, "
+                "which needs no authorization"
+            )
+        print(
+            "verify_session: NOTE -- --operator-authorized-round was passed "
+            f"but {reason}; nothing recorded. Proceeding.",
+            file=sys.stderr,
+        )
+        authorization = ""
 
     # -- Set 084 (F2): resolve the orchestrator's EFFECTIVE provider
     #    (registry lookup on the orchestrator block's model — the shared
@@ -2312,10 +2723,27 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                 file=sys.stderr,
             )
 
-    prompt = build_prompt(
-        evidence, session_number, round_number, conventions=conventions,
-        ledger=ledger, framing=framing,
-    )
+    # -- Set 111 S1: one prompt PER CALL. The discovery fan-out varies
+    #    the lens by call index -- same evidence, same K, same cost, same
+    #    envelope merge; only the framing differs. Every other path
+    #    builds exactly one prompt, as before.
+    call_lenses: List[Optional[str]] = [
+        discovery_lens_for_call(call_index)
+        if phase == PHASE_DISCOVERY else None
+        for call_index in range(1, fan_out + 1)
+    ]
+    prompts = [
+        build_prompt(
+            evidence, session_number, round_number, conventions=conventions,
+            ledger=ledger,
+            framing=(
+                build_phase_framing(phase, lens=lens_k)
+                if lens_k else framing
+            ),
+        )
+        for lens_k in call_lenses
+    ]
+    prompt = prompts[0]
 
     review_path = verification_artifact_path(
         session_set_dir, session_number, round_number
@@ -2389,19 +2817,20 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         )
         return EXIT_STATE
     try:
-        # One stamp per fan-out call: the evidence hash is shared (the
-        # bundles are byte-identical by design) while the artifact
-        # binding is per call.
+        # One stamp per fan-out call: each stamp's evidence hash binds to
+        # THAT call's filled prompt (Set 111 S1 -- the discovery lenses
+        # make the prompts genuinely different, so a shared hash would
+        # misdescribe calls 2..K), and the artifact binding is per call.
         stamps = [
             build_stamp(
                 source=STAMP_SOURCE_VERIFY_SESSION,
-                evidence_sha256=sha256_hex(prompt.encode("utf-8")),
+                evidence_sha256=sha256_hex(prompt_k.encode("utf-8")),
                 orchestrator_effective_provider=identity.effective_provider,
                 artifact_path=repo_relative_posix(path_k, repo_root),
                 evidence_base=evidence_base,
                 work_diff_sha256=work_diff_sha256,
             )
-            for path_k in artifact_paths
+            for prompt_k, path_k in zip(prompts, artifact_paths)
         ]
         stamp = stamps[0]
     except ValueError as exc:
@@ -2422,8 +2851,15 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         print(f"  phase:              "
               f"{phase or '(none -- classic single-call)'}")
         if phase == PHASE_DISCOVERY:
-            print(f"  discovery fan-out:  {fan_out} call(s), "
-                  "identical bundles")
+            print(f"  discovery fan-out:  {fan_out} call(s), lenses: "
+                  + ", ".join(
+                      f"{k}={lens_k}"
+                      for k, lens_k in enumerate(call_lenses, start=1)
+                  ))
+        if bound_status.exceeds:
+            print(f"  bound:              PAST the bounded "
+                  f"{bound_status.bound} {bound_status.label}(s) -- "
+                  "operator-authorized")
         if phase == PHASE_REMEDIATION_REVIEW:
             print(f"  fix-delta baseline: round {baseline_round} tree "
                   f"{baseline_tree[:12]}")
@@ -2453,6 +2889,27 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     #    provider excluded -- Set 084 F2).
     if route_fn is None:
         route_fn = _default_route
+    # -- Set 111 S1: record the operator's authorization BEFORE the
+    #    metered call it authorizes. An authorization the operator
+    #    actually gave belongs on the record even if the call then fails
+    #    -- and a dry run (which returned above) records nothing.
+    if authorization:
+        auth_path = round_ledger_path(session_set_dir, session_number)
+        record_round_authorization(
+            auth_path,
+            session_number=session_number,
+            round_number=round_number,
+            phase=phase,
+            status=bound_status,
+            attestation=authorization,
+        )
+        print(
+            f"verify_session: NOTE -- {bound_status.label} "
+            f"{bound_status.prior_rounds + 1} exceeds the bounded "
+            f"{bound_status.bound}; proceeding on the operator's recorded "
+            f"authorization (appended to {auth_path.name}).",
+            file=sys.stderr,
+        )
     # R1 remediation (I-084-S1-2): the except clause below must catch the
     # CLASS OBJECT route() actually raises. _default_route resolves route
     # through the ai_router package, whose module raises
@@ -2518,9 +2975,9 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         load_discovery_model() if phase == PHASE_DISCOVERY else None
     )
 
-    def _route_once(stamp_k: dict, exclusions: List[str]):
+    def _route_once(prompt_k: str, stamp_k: dict, exclusions: List[str]):
         return route_fn(
-            prompt,
+            prompt_k,
             str(session_set_dir),
             session_number,
             complexity_hint,
@@ -2530,19 +2987,22 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             discovery_preference,
         )
 
-    # -- The call loop: one call classically, K identical calls on a
-    #    discovery fan-out. Call 1 is load-bearing (its failure keeps the
+    # -- The call loop: one call classically, K differently-framed calls
+    #    on a discovery fan-out (Set 111 S1: one lens per call over the
+    #    same evidence). Call 1 is load-bearing (its failure keeps the
     #    existing hard exits); calls 2..K are yield-enhancement, so their
     #    failure degrades LOUDLY to a reduced fan-out instead of voiding
     #    the round.
     results: List[tuple] = []  # (call_index, result)
-    for call_index, (artifact_path_k, stamp_k) in enumerate(
-        zip(artifact_paths, stamps), start=1
+    for call_index, (artifact_path_k, stamp_k, prompt_k) in enumerate(
+        zip(artifact_paths, stamps, prompts), start=1
     ):
         try:
             if call_index == 1 and preferred_exclusions is not None:
                 try:
-                    result = _route_once(stamp_k, preferred_exclusions)
+                    result = _route_once(
+                        prompt_k, stamp_k, preferred_exclusions
+                    )
                 except VerificationUnavailableError:
                     print(
                         "verify_session: NOTE -- no verifier survives the "
@@ -2552,9 +3012,11 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                         "(preference, not a hard rule).",
                         file=sys.stderr,
                     )
-                    result = _route_once(stamp_k, exclude_providers)
+                    result = _route_once(
+                        prompt_k, stamp_k, exclude_providers
+                    )
             else:
-                result = _route_once(stamp_k, exclude_providers)
+                result = _route_once(prompt_k, stamp_k, exclude_providers)
         except VerificationUnavailableError as exc:
             if call_index > 1:
                 print(
@@ -2698,6 +3160,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         if phase == PHASE_DISCOVERY and len(artifact_paths) > 1:
             for issue in issues_k:
                 issue["discoveryCall"] = call_index
+                issue["discoveryLens"] = call_lenses[call_index - 1]
         merged_issues.extend(issues_k)
     # Merged verdict token: VERIFIED ONLY when every completed call's token
     # is exactly VERIFIED — anything else fails closed to ISSUES_FOUND
@@ -2874,6 +3337,24 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     if supplementary_blockers_stand:
         session_verdict = "ISSUES_FOUND"
 
+    # -- Set 111 S1: record the completed round in the ledger BEFORE the
+    #    disposition patch, so the bounded-totals input exists even if a
+    #    later step fails. `endedLoop` is the load-bearing field: a clean
+    #    round that settles the session consumes no budget, but a clean
+    #    SUPPLEMENTARY round whose prior discovery blockers still stand
+    #    is the second discovery pass and the loop continues -- and that
+    #    round writes no findings envelope to be counted from.
+    ended_loop = not classification.blocking and not supplementary_blockers_stand
+    record_round_completed(
+        round_ledger_path(session_set_dir, session_number),
+        session_number=session_number,
+        round_number=round_number,
+        phase=phase,
+        verdict=session_verdict,
+        blocking=classification.blocking,
+        ended_loop=ended_loop,
+    )
+
     disposition_path = patch_disposition(session_set_dir, session_verdict)
 
     # -- Report (ASCII-only). (A load-bearing truncation was already handled
@@ -2895,7 +3376,10 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
           f"{f'{len(ledger)} chars (auto-assembled)' if ledger else '(empty -- no prior findings)'}")
     if len(artifact_paths) > 1:
         print(f"  discovery fan-out:  {len(results)}/{len(artifact_paths)} "
-              "call(s) completed, identical bundles")
+              "call(s) completed, lenses: "
+              + ", ".join(
+                  f"{k}={call_lenses[k - 1]}" for k, _ in results
+              ))
     if len(results) == 1:
         print(f"  verifier model:     {results[0][1].model_name}")
     else:
@@ -2936,18 +3420,36 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
     print(f"  cost:               ${total_cost:.4f}")
 
     set_dir_arg = str(session_set_dir)
+    # This round now bears findings on disk when it is blocking, so it has
+    # consumed one unit of its own budget (Set 111 S1: the same arithmetic
+    # the pre-call refusal uses, so the printed next action can never
+    # direct the orchestrator at a round the CLI will refuse).
+    family_used = bound_status.prior_rounds + 1
     if classification.blocking:
         if phase == PHASE_DISCOVERY:
-            print("\nNext action: BLOCKING findings in DISCOVERY -- run the "
-                  "supplementary discovery pass BEFORE any remediation "
-                  "(bounded: at most 2 discovery passes total):")
-            print(f"  python -m ai_router.verify_session --session-set-dir "
-                  f"{set_dir_arg} --phase supplementary")
-            print("  Then remediate the merged Critical/Major findings, "
-                  f"write the s{session_number}-remediation-round-<R>.md "
-                  "sidecar(s), and review the fix delta:")
-            print(f"  python -m ai_router.verify_session --session-set-dir "
-                  f"{set_dir_arg} --phase remediation-review")
+            if family_used >= PHASE_BOUND_DISCOVERY:
+                print("\nNext action: BLOCKING findings in DISCOVERY, and "
+                      f"the bounded {PHASE_BOUND_DISCOVERY} discovery "
+                      "passes are now used -- a supplementary pass would be "
+                      "REFUSED. Remediate the Critical/Major findings, "
+                      f"write the s{session_number}-remediation-round-<R>.md "
+                      "sidecar(s), then review the fix delta:")
+                print(f"  python -m ai_router.verify_session "
+                      f"--session-set-dir {set_dir_arg} "
+                      "--phase remediation-review")
+            else:
+                print("\nNext action: BLOCKING findings in DISCOVERY -- run "
+                      "the supplementary discovery pass BEFORE any "
+                      "remediation (bounded and ENFORCED: at most "
+                      f"{PHASE_BOUND_DISCOVERY} discovery passes total):")
+                print(f"  python -m ai_router.verify_session "
+                      f"--session-set-dir {set_dir_arg} --phase supplementary")
+                print("  Then remediate the merged Critical/Major findings, "
+                      f"write the s{session_number}-remediation-round-<R>.md "
+                      "sidecar(s), and review the fix delta:")
+                print(f"  python -m ai_router.verify_session "
+                      f"--session-set-dir {set_dir_arg} "
+                      "--phase remediation-review")
         elif phase == PHASE_SUPPLEMENTARY:
             print("\nNext action: discovery is complete. Remediate the "
                   "merged Critical/Major findings from BOTH discovery "
@@ -2956,22 +3458,19 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             print(f"  python -m ai_router.verify_session --session-set-dir "
                   f"{set_dir_arg} --phase remediation-review")
         elif phase == PHASE_REMEDIATION_REVIEW:
-            cycles = count_phase_rounds(
-                session_set_dir, session_number, round_number,
-                PHASE_REMEDIATION_REVIEW,
-            ) + 1
-            if cycles >= 2:
-                # S2 verification round 1: the CLI must not direct the
-                # orchestrator past the documented bound. The loop
-                # SUSPENDS here; only the operator can authorize more.
+            if family_used >= PHASE_BOUND_REMEDIATION_REVIEW:
+                # Set 096 S2 printed this suspension; Set 111 S1 makes it
+                # real -- the next cycle is refused before it can route.
                 print(f"\nNext action: BLOCKING findings in the fix delta "
-                      f"on remediation-review cycle {cycles} -- the "
-                      "bounded total (2 cycles) is reached. The loop "
-                      "SUSPENDS: stop to the operator for adjudication "
-                      "(accept / dismiss / third-provider opinion). Do "
-                      "NOT open another cycle on your own authority -- "
-                      "persisting past the cap requires a material "
-                      "Critical/Major and the operator's say-so.")
+                      f"on remediation-review cycle {family_used} -- the "
+                      f"bounded total ({PHASE_BOUND_REMEDIATION_REVIEW} "
+                      "cycles) is reached. The loop SUSPENDS and another "
+                      "cycle is now REFUSED: stop to the operator for "
+                      "adjudication (accept / dismiss / third-provider "
+                      "opinion). Persisting past the bound requires a "
+                      "material Critical/Major and the operator's recorded "
+                      "--operator-authorized-round attestation -- never "
+                      "your own authority.")
             else:
                 print("\nNext action: BLOCKING findings in the fix delta -- "
                       "remediate the rejected / new in-hunk findings, "
@@ -2979,22 +3478,34 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                 print(f"  python -m ai_router.verify_session "
                       f"--session-set-dir {set_dir_arg} "
                       "--phase remediation-review")
-                print("  (bounded: at most 2 remediation-review cycles; "
-                      "past that, stop to the operator for adjudication "
-                      "-- never grind rounds.)")
+                print("  (bounded and ENFORCED: at most "
+                      f"{PHASE_BOUND_REMEDIATION_REVIEW} remediation-review "
+                      "cycles; past that, stop to the operator for "
+                      "adjudication -- never grind rounds.)")
         else:
             next_round = round_number + 1
-            print("\nNext action: BLOCKING findings -- remediate each "
-                  "Critical/Major finding, then re-verify:")
-            print(
-                f"  python -m ai_router.verify_session --session-set-dir "
-                f"{set_dir_arg} --round {next_round} --complexity-hint 85"
-            )
-            print(
-                "  (max 2 automatic rounds; a 3rd round or an unfixed "
-                "Critical/Major stops to a human. Track findings in the "
-                "cross-round issue ledger -- do not resurrect settled points.)"
-            )
+            if family_used >= PHASE_BOUND_CLASSIC:
+                print(f"\nNext action: BLOCKING findings on verification "
+                      f"round {family_used} -- the bounded total "
+                      f"({PHASE_BOUND_CLASSIC} automatic rounds) is "
+                      "reached. The loop SUSPENDS and another round is now "
+                      "REFUSED: stop to the operator for adjudication "
+                      "(accept / dismiss / third-provider opinion), or "
+                      "re-run with the operator's recorded "
+                      "--operator-authorized-round attestation.")
+            else:
+                print("\nNext action: BLOCKING findings -- remediate each "
+                      "Critical/Major finding, then re-verify:")
+                print(
+                    f"  python -m ai_router.verify_session --session-set-dir "
+                    f"{set_dir_arg} --round {next_round} --complexity-hint 85"
+                )
+                print(
+                    f"  (max {PHASE_BOUND_CLASSIC} automatic rounds, "
+                    "ENFORCED; a 3rd round or an unfixed Critical/Major "
+                    "stops to a human. Track findings in the cross-round "
+                    "issue ledger -- do not resurrect settled points.)"
+                )
         return EXIT_BLOCKING
 
     if supplementary_blockers_stand:
@@ -3008,8 +3519,27 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
               f"{set_dir_arg} --phase remediation-review")
         return EXIT_BLOCKING
 
-    print("\nNext action: result is non-blocking (effectively VERIFIED "
-          "for the loop). Record any nits, then proceed to Step 8:")
+    # -- Set 111 S1: the severity-gated stop, made structural. A
+    #    Minor-only round IS the stop under the consequence rubric
+    #    (L-095-1) -- naming it as one, and printing only the close
+    #    command, removes the "one more round to polish the nits"
+    #    affordance the generic wording left open.
+    if classification.nit_issues:
+        print(f"\nNext action: MINOR-ONLY round -- "
+              f"{len(classification.nit_issues)} Minor / unrated finding(s) "
+              "and NO Critical/Major. Under the consequence rubric that is "
+              "effectively VERIFIED, and it is the loop's STOP: do NOT open "
+              "another verification round to polish Minors. Record them in "
+              "the disposition notes (with an owner if any is worth "
+              "carrying), then proceed to Step 8:")
+    else:
+        # A VERIFIED token drops NITS at the parser (only structured
+        # blocking blocks survive), so this round may still carry nits in
+        # its raw artifact. Say "no Critical/Major" -- which is true in
+        # both cases -- rather than "no findings", which is not.
+        print("\nNext action: VERIFIED -- no Critical/Major findings. "
+              "Record any nits from the raw artifact, then proceed to "
+              "Step 8:")
     print("  author the full disposition.json (preserving the patched "
           "verification fields), commit and push, then run:")
     print(

@@ -9,7 +9,7 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [Unreleased] (Sets 105, 107, 109, 110 — router-side changes awaiting a publish)
+## [Unreleased] (Sets 105, 107, 109, 110, 111 — router-side changes awaiting a publish)
 
 > Router-side, not yet published. A version bump / PyPI publish is
 > operator-gated and recorded at release time.
@@ -303,6 +303,104 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   operator learns to scroll past.
 
 ### Changed
+
+- **(Set 111 S1) The Copilot CLI transport's dispatch ceilings are
+  configurable, and the total one is raised.** `cli_transport.py` hardcoded
+  `spawn` / `first_byte` / `total` timeouts (10s / 30s / **300s**) with no
+  config key and no env override, and `__init__.py` constructed the transport
+  with the defaults. The 300s total is **seat-dependent**: a Copilot seat
+  dispatching a full `session-verification` evidence bundle (~116 KB — the
+  largest prompt this system sends, and it goes over the Set 104 file-handoff
+  path, so the verifier must read the whole file before emitting anything)
+  cannot finish inside it. The observed failure was two consecutive
+  `error_class='total-timeout'` dispatches with **nothing written**, while a
+  trivial prompt through the same CLI returned in 13s — i.e. a **mandatory**
+  gate the transport could not complete. That is the same class, and the same
+  reasoning, as Set 109 S3 raising `providers.google.timeout_seconds` from 300
+  to 900: a correctness knob, not a comfort one.
+
+  ```yaml
+  transports:
+    copilot-cli:
+      timeouts:
+        spawn_seconds: 10
+        first_byte_seconds: 30
+        total_seconds: 1200   # was a hardcoded 300
+  ```
+
+  Additive and default-preserving: an absent `timeouts:` block resolves to the
+  shipped constants exactly as before. Validated at **load** — unknown keys are
+  rejected rather than ignored (a typo'd `total_second` that silently kept 300s
+  is precisely the failure this ends), non-numeric and non-positive values are
+  refused, `True` is not accepted as `1`, and design lock Section 3's
+  `spawn < first_byte < total` ordering is now enforced instead of merely
+  commented (out of order, an inner ceiling can never fire and a stall is
+  misclassified at the outer one).
+
+- **(Set 111 S1) The verification loop's bounds are ENFORCED, not printed.**
+  `verify_session` documented "at most 2 discovery passes and 2
+  remediation-review cycles" and then only *printed* an advisory line —
+  `count_phase_rounds` fed the "Next action" message and nothing refused a
+  run past it. Measured result: the cap was routinely exceeded after it
+  shipped (one session ran 13 verification calls over 379 minutes; a Set 110
+  session ran 9 rounds). The numbers are unchanged; the CLI now **refuses**
+  the round that would pass one, before any metered call.
+
+  - Bounded units: **2 discovery-family passes** (`discovery` +
+    `supplementary` share one budget — they are the two discovery passes),
+    **2 `remediation-review` cycles**, and **2 classic no-`--phase` rounds**.
+    The classic bound counts *any* prior findings-bearing round, so dropping
+    `--phase` at the phased bound is not a one-flag bypass.
+  - Only **findings-bearing** rounds consume a budget: a clean round ends the
+    loop on its own, and `--wording-only` re-collects a prior round's verdict
+    FORMAT rather than opening a cycle. Neither counts. (See the ledger note
+    below for the one clean round that *does* count.)
+  - Passing a bound requires the **operator's** attestation:
+    `--operator-authorized-round "<reason>"`. The flag alone is not an
+    authorization — an empty value is refused, the same contract as
+    `close_session --manual-verify` — and it is appended to the session's
+    append-only round ledger `sN-rounds.jsonl` **before** the call it
+    authorizes, so an authorization survives a provider failure. The ledger
+    joins `WORK_DIFF_SET_BOOKKEEPING`, so writing it mid-loop cannot stale an
+    earlier round's stamped evidence.
+  - **The ledger, not the findings envelopes, is what the bound counts.** A
+    round consumes its family's budget unless it ENDED the loop, and the
+    envelopes cannot express that: a **clean `supplementary` round whose prior
+    discovery blockers still stand** is the second discovery pass and the loop
+    continues to remediation, yet it writes no envelope. Counting envelopes
+    alone let a third discovery-family pass through unauthorized — found by
+    this session's own supplementary verification round, which reproduced it.
+    `sN-rounds.jsonl` records every completed round's phase, verdict and
+    `endedLoop`; the count is the union (by round number) of the ledger and the
+    envelopes, so sessions predating the ledger keep their enforcement and no
+    round is counted twice. The reader is tolerant: a torn final line never
+    voids the records before it (failing open there would unlock the loop).
+  - The printed next action is now consistent with the refusal: at a bound the
+    CLI names the suspension and the operator/adjudication path, and never
+    prints a re-run command the next invocation would reject.
+
+- **(Set 111 S1) The K=2 discovery fan-out sends differently-framed prompts,
+  not identical ones.** Same K, same cost, same loop position, same envelope
+  merge — the calls now carry a per-call **lens**: `spec-conformance` (plan →
+  diff: unmet deliverables, silent scope changes, docs that drifted from the
+  code) and `failure-scenario` (code → the ways it breaks: error paths,
+  partial failure, concurrency, platform/encoding, cleanup, untrusted input),
+  cycled by call index. Neither lens narrows scope and the severity rubric is
+  untouched. The merged envelope records `discoveryLens` beside
+  `discoveryCall`, and each call's evidence stamp now hashes **its own** filled
+  prompt (previously one shared hash, correct only while the bundles were
+  byte-identical). This is the only surviving residue of the parallel-lens
+  proposal, which was otherwise dropped for charging every clean session a full
+  parallel wave.
+
+- **(Set 111 S1) A Minor-only round is a structural STOP.** The exit path used
+  to print a generic "non-blocking (effectively VERIFIED)" line, which left
+  "one more round to polish the nits" available. A Minor-only round is now
+  named as such, with its finding count, an explicit instruction not to open
+  another round, and **only** the `close_session` command — no re-run command
+  is offered. A round with no Critical/Major says exactly that (a `VERIFIED`
+  token drops the NITS section at the parser, so the line points at the raw
+  artifact for nits rather than claiming the round had no findings at all).
 
 - **(Set 109 S4) The model registry now matches what the providers actually
   offer, and every routable rate is confirmed rather than assumed.**

@@ -119,7 +119,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   per-session routed verification had missed.
 
 ## A Bug Is A Bug CLASS — Fix Every Sibling Site, Not Just The Reported One
-<!-- lesson: id="L-069-1" added-set="069" last-used-set="109" status="archived" scope="portable" -->
+<!-- lesson: id="L-069-1" added-set="069" last-used-set="111" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-19**
   after application across Sets 068 (origin: the `contract_gate` `UnicodeError` fix),
@@ -759,7 +759,7 @@ each id is in the active tier (D2: one id, one trailer).
   at that trigger moment.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="110" status="archived" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="111" status="archived" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each

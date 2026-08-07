@@ -119,6 +119,28 @@ transports:
     diagnostics:
       enabled: false
       log_path: ai_router/copilot-transport-diagnostics.jsonl
+    # Set 111 S1: the three dispatch ceilings, previously hardcoded in
+    # cli_transport.py with no config or env path. Constraint (design lock
+    # Section 3, now enforced at load): spawn < first_byte < total.
+    #
+    # total_seconds was 300 and is a CORRECTNESS knob, not a comfort one --
+    # the same call Set 109 S3 made when it raised providers.google from 300
+    # to 900. A session-verification round is MANDATORY and its evidence
+    # bundle is the largest prompt this system ever sends (a full working-tree
+    # diff; ~116 KB in the Set 111 S1 session that found this). Through the
+    # Copilot CLI that dispatch goes over the Set 104 file-handoff path, and
+    # the verifier must read the whole file before it emits its first
+    # enumeration -- which does not fit in 300s. The observed failure was two
+    # consecutive `error_class='total-timeout'` dispatches with NOTHING
+    # written, i.e. a mandatory gate the transport could not complete, while a
+    # trivial prompt through the same CLI returned in 13s. 1200 is 4x the old
+    # ceiling and 1.33x the highest existing api timeout; the discovery phase
+    # deliberately asks for the largest answer the loop ever requests, so the
+    # margin is the point. Lower it if your bundles are small.
+    timeouts:
+      spawn_seconds: 10
+      first_byte_seconds: 30
+      total_seconds: 1200
     roles:
       generator:
         prefer: [claude-sonnet-4.6, gpt-5.5, gemini-3.1-pro-preview]

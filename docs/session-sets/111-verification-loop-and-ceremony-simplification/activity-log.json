@@ -412,6 +412,30 @@
       "dateTime": "2026-08-07T15:41:11.014202-04:00",
       "description": "Run of record after code freeze: pytest 3783 passed / 0 failed / 10 skipped; Layer 3 Playwright 33 passed (9.3m). Both recorded via run_of_record; freshness check green.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 14,
+      "stepKey": "verify-and-close",
+      "dateTime": "2026-08-08T07:24:08.020412-04:00",
+      "description": "Verification loop: discovery K=2 (5 blocking) + supplementary (3 blocking) + remediation-review -> VERIFIED (5 fix-accepted, 2 accepted-with-modification, 0 rejected). Remediated 6 real defects, rejected finding 8 on API evidence (all six workflow SHA pins match their tags). s4-remediation-round-1.md written.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 15,
+      "stepKey": "walkthrough-capability-spec",
+      "dateTime": "2026-08-08T07:24:08.024595-04:00",
+      "description": "Operator-directed at the UAT stop: measured that Playwright recordVideo breaks VS Code automation (control run proves the automation itself works), then authored Set 113 (proposal + spec + state) for narrated video walkthroughs. Operator sequenced it AFTER Set 112. Spec passes the 5-step cap on all three sessions.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 16,
+      "stepKey": "runs-of-record-2",
+      "dateTime": "2026-08-08T07:24:08.026996-04:00",
+      "description": "Post-remediation runs of record after code freeze: pytest 3801 passed / 0 failed / 10 skipped (13m42s); Layer 3 Playwright in flight.",
+      "status": "in-progress"
     }
   ]
 }

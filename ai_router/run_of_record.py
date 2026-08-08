@@ -68,6 +68,20 @@ except ImportError:  # pragma: no cover - direct-script fallback
 
 TEST_RUNS_FILENAME = "test-runs.jsonl"
 
+
+def _posix(path: str) -> str:
+    """Normalise a declared path to posix separators on EVERY platform.
+
+    ``os.sep`` alone is the wrong tool here and the bug is asymmetric: on
+    Windows it rewrites backslashes, and on Linux/macOS ``os.sep`` is
+    already ``"/"`` so a Windows-authored ``files_changed`` entry like
+    ``src\\nested\\a.ts`` passes through untouched and matches nothing.
+    Dispositions are authored on one machine and evaluated on another
+    (the required CI matrix runs ubuntu and macOS), so the separator a
+    path was WRITTEN with must never decide whether it is recognised.
+    """
+    return path.replace("\\", "/")
+
 # Recognised outcomes. ``passed`` is the only one that can satisfy the gate;
 # the others exist so an honest record of a red or aborted run can still be
 # written (silence is worse than a recorded failure).
@@ -110,10 +124,30 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
     SuiteSpec(
         name="playwright",
         command="npm run test:playwright",
+        # The policy's non-negotiable Layer 3 trigger list, spelled out.
+        # The authoring guide names FOUR surfaces that must pay their own
+        # full Layer 3 -- the Explorer rendering surface, a state-file
+        # writer, the extension manifest, and the fixture harness -- but
+        # this map originally carried only the first and third. A session
+        # that changed a blessed writer or the harness that stages the
+        # fixtures could therefore close with Playwright reported "not
+        # required", which is precisely the rendering-regression class
+        # Layer 2 and the static gates cannot see. The writers are listed
+        # file-by-file rather than as `ai_router/`, because arming the
+        # expensive suite for every router change would make the gate
+        # something sessions route around instead of satisfy.
         covers=(
             "tools/dabbler-ai-orchestration/src/",
             "tools/dabbler-ai-orchestration/package.json",
             "tools/dabbler-ai-orchestration/media/",
+            # the fixture/walk harness that stages what Layer 3 looks at
+            "tools/dabbler-ai-orchestration/scripts/",
+            "tools/dabbler-ai-orchestration/test-fixtures/",
+            "ai_router/tests/e2e/",
+            # the blessed state-file writers whose shape the views render
+            "ai_router/session_state.py",
+            "ai_router/start_session.py",
+            "ai_router/close_session.py",
         ),
         expensive=True,
     ),
@@ -195,7 +229,7 @@ def load_suites(config: Optional[dict] = None) -> Tuple[SuiteSpec, ...]:
         if not isinstance(covers_raw, list):
             continue
         covers = tuple(
-            c.strip().replace(os.sep, "/")
+            _posix(c.strip())
             for c in covers_raw
             if isinstance(c, str) and c.strip()
         )
@@ -237,7 +271,7 @@ def surface_digest(repo_root: str, covers: Sequence[str]) -> Optional[str]:
     fails **closed** rather than treating an unmeasurable surface as
     unchanged.
     """
-    prefixes = tuple(c.replace(os.sep, "/") for c in covers if c)
+    prefixes = tuple(_posix(c) for c in covers if c)
     if not prefixes:
         return None
     tracked = _git_z(repo_root, "ls-files", "-z", "--")
@@ -376,11 +410,11 @@ def session_touched(
     disposition matches a posix-style ``covers`` prefix.
     """
     _ = repo_root
-    prefixes = tuple(c.replace(os.sep, "/") for c in covers if c)
+    prefixes = tuple(_posix(c) for c in covers if c)
     for raw in files_changed:
         if not isinstance(raw, str) or not raw.strip():
             continue
-        rel = raw.strip().replace(os.sep, "/").lstrip("./")
+        rel = _posix(raw.strip()).lstrip("./")
         for p in prefixes:
             norm = p if p.endswith("/") else p + "/"
             if rel == p.rstrip("/") or rel.startswith(norm):

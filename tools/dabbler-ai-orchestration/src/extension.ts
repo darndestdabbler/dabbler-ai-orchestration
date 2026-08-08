@@ -207,27 +207,15 @@ export function activate(context: vscode.ExtensionContext): void {
     treeView.message = message;
   });
 
-  // Set 111 S4: the walk stager sets DABBLER_WALK=1 so a guided-look UAT
-  // opens on the thing to look at instead of on the file Explorer. Gated
-  // on the env var per the portability rule (universal core, gated
-  // extension): no ordinary launch and no Playwright spec sets it, so
-  // nothing else changes behavior. Fire-and-forget and fully swallowed —
-  // failing to reveal a view must never abort activation.
-  if (process.env.DABBLER_WALK === "1") {
-    setImmediate(() => {
-      void Promise.resolve(
-        vscode.commands.executeCommand(
-          "workbench.view.extension.dabblerSessionSetsContainer",
-        ),
-      ).then(undefined, (err) => {
-        console.error(
-          "[dabbler-ai-orchestration] walk staging: could not reveal the " +
-            "Dabbler view container; open it from the activity bar.",
-          err,
-        );
-      });
-    });
-  }
+  // Set 111 S4: the guided-look walk reveals this view container from the
+  // development-only walk companion (`scripts/walk-companion/`), NOT from
+  // here. A reveal in this function could never fire: the extension declares
+  // no explicit activation events and contributes views, so VS Code activates
+  // it when the Dabbler view becomes VISIBLE — the very thing the reveal was
+  // supposed to do. The companion carries `onStartupFinished` instead, which
+  // keeps this extension's activation profile (the subject of Set 110)
+  // unchanged for every real user and leaves no walk-specific code in the
+  // product.
 
   const evaluateContextKeys = () => {
     const allSets = readAllSessionSets();

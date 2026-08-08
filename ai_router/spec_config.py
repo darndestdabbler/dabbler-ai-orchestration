@@ -20,7 +20,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Union
+from typing import Literal, Optional, Union
 
 TriStateFlag = Union[bool, Literal["suggested"]]
 SessionSetTier = Literal["full", "lightweight"]
@@ -33,14 +33,18 @@ class SessionSetConfig:
     tier: SessionSetTier
     requires_uat: TriStateFlag
     requires_e2e: TriStateFlag
-    uat_scope: str
+    # ``None`` means the field was OMITTED, which is deliberately distinct
+    # from an explicit ``uatScope: none``. Collapsing the two lost the only
+    # signal a gate could use to tell "the author said no UAT scope" from
+    # "the author never mentioned scope at all".
+    uat_scope: Optional[str]
 
 
 _DEFAULT = SessionSetConfig(
     tier="full",
     requires_uat=False,
     requires_e2e=False,
-    uat_scope="none",
+    uat_scope=None,
 )
 
 
@@ -120,7 +124,7 @@ def parse_session_set_config(spec_md_path: Path) -> SessionSetConfig:
     uat = _parse_tri(_tri_state_re("requiresUAT").search(block))
     e2e = _parse_tri(_tri_state_re("requiresE2E").search(block))
 
-    uat_scope = "none"
+    uat_scope: Optional[str] = None
     scope_match = _string_re("uatScope").search(block)
     if scope_match:
         uat_scope = scope_match.group(1)

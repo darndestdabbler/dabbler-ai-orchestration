@@ -96,6 +96,79 @@ wrong:
   a per-commit operator override that requires a recorded reason and never
   tolerates a genuine test failure.
 
+## The remediation that made Session 4 true
+
+Verification found that the ceremony pass had shipped its centrepiece
+**broken**, and the way it was broken is the most useful thing in this
+set's record.
+
+`npm run walk` could never have worked. The reveal lived inside the
+product extension's `activate()`, gated on an env var — but that extension
+declares no explicit activation events and contributes views, so VS Code
+activates it when the Dabbler view becomes **visible**. The code that was
+supposed to open the view was waiting on the view being open. It shipped
+green because its only tests were source-text greps asserting the string
+`process.env.DABBLER_WALK === "1"` appeared in a file: a test that a line
+of code exists, not that it does anything.
+
+Eight blocking findings across two discovery passes; seven distinct
+defects; six fixed, one rejected on evidence.
+
+- **The walk now starts itself, provably.** The startup activation moved
+  to a development-only companion extension (`scripts/walk-companion/`,
+  `onStartupFinished`), loaded by the stager as a second
+  `--extensionDevelopmentPath`. The product extension keeps its Set 110
+  activation profile and carries no walk-specific code at all.
+  `npm run walk:smoke` launches the real stager and fails unless a marker
+  written *after* the reveal command resolves says `revealed`.
+- **`scripts/vscode-launch.js` became the single definition it claimed to
+  be.** Created to remove duplication, it had instead re-typed binary
+  discovery from an older copy of the Playwright harness and dropped what
+  that harness had since learned: the macOS `.app`-bundle search (so
+  `npm run walk` was broken on every Mac) and the Electron env allowlist
+  (so a walk started from VS Code's own terminal could parse args instead
+  of opening a window). `electronLaunch.ts` now requires and re-exports it.
+- **`session_touched` was red on CI and green here.** It normalised with
+  `os.sep`, a no-op on posix, so a Windows-authored `files_changed` entry
+  matched nothing on the required ubuntu/macOS matrix — invisible from the
+  developer machine by construction, the same shape as the `drift-guards`
+  job this set's own CI section describes.
+- **The UAT gate had a hole shaped like its purpose.** An omitted
+  `uatScope` collapsed to `"none"` and disarmed the gate, so
+  `requiresUAT: true` with no scope — the likeliest hand-authored shape —
+  was exactly the spec that could close with no walk. Scope now chooses
+  *which* sessions owe a walk and never cancels the requirement.
+- **The Layer 3 freshness map named two of the policy's four trigger
+  surfaces.** It now also covers the blessed state-file writers and the
+  fixture/walk harness — and that fix immediately bound on this session.
+- **One finding rejected on evidence.** The pypa publish action was
+  reported as pinned to a moving branch head; `v1.14.2` is an annotated
+  tag that dereferences to exactly the pinned commit. All six workflow
+  pins were verified against their tags. No workflow change was warranted.
+
+Round 4 returned VERIFIED with seven fix verdicts accepted and no nits.
+
+## The UAT walk was waived, visibly
+
+Session 4's own walk was **not performed**. The operator's reason is the
+deliverable rather than the schedule: the guided-look format — a document
+of Look items driven from a terminal — is the format they have found
+unusable, and walking it would have rendered judgment on something already
+superseded by decision. The waiver and its full reasoning are on the
+record in `disposition.uat`, which is precisely what this session's gate
+exists to force: skipping is now a recorded decision, not an evaporation.
+
+The half of the problem this session *could* fix, it fixed and proved:
+staging costs the operator nothing. The other half — comprehension —
+became **Set 113**, authored here on operator instruction and sequenced
+after Set 112: narrated video walkthroughs with a "repeat it yourself"
+manual walkthrough rendered from the same source. Its feasibility is
+measured, not assumed: Playwright's built-in `recordVideo` **breaks** the
+automation it would record (the workbench window never attaches, no file
+is written), while the identical launch without it drives the real UI
+fine. Set 113 therefore starts from OS-level capture, and will not spend a
+session rediscovering that.
+
 ## Honest residuals
 
 - **The preload corpus has zero headroom.** `project-guidance.md` sits at
@@ -118,6 +191,43 @@ wrong:
   `verification_effect="reduces"`. Recorded as `escalate-to-human`. The
   refusal is the S3 rule working as designed; the vocabulary gap is real and
   worth a future look.
+- **The Layer 2 mocha suite is red on this machine, and was before this
+  session.** A clean-tree baseline measured 1,866 passing / **32 failing**;
+  after this session's changes, 1,876 passing / 32 failing — ten new tests,
+  the same pre-existing failures. Two environmental classes: VS Code 1.132
+  made `workspace.workspaceFolders` getter-only, breaking the suite's stubs,
+  and `watcherInventory` resolves `src` relative to the Electron host's cwd.
+  Neither is caused by this diff. Repairing a VS Code-version break is its
+  own work, not something to smuggle into a remediation round — but it does
+  mean Layer 2 has not been a real gate for some time, and nobody noticed.
+- **Nothing catches a SHA/comment mismatch on a pinned action.** The
+  `actions-sha-pinned` drift guard verifies pins are 40-char SHAs, not that
+  the trailing `# vX.Y.Z` names the tag they resolve to. Closing that needs
+  a network lookup, which is the wrong dependency for an offline guard that
+  gates every commit. All six pins were verified correct by hand this
+  session; the *check* is still owed.
+- **L-069-1 is archived and keeps being the answer.** `cite_lessons`
+  flagged it for reactivation, and this session is the evidence: its
+  central defect — a module created to remove duplication silently
+  reintroducing it, worse — is exactly that lesson. Reactivating it is a
+  guidance-tier change, and `lessons-learned.md` sits at 91% of its
+  ceiling, so it belongs to a session that can verify the edit rather than
+  to a close gate.
+- **`cite_lessons` and the freshness gate contradict each other**, and this
+  session hit it at close. The constitution says to run `cite_lessons` "in
+  the final commit" — i.e. *after* verification — but the marker it writes
+  lands in `lessons-learned.md`, which binds the work diff, so a
+  one-character `last-used-set="110"` → `"111"` edit invalidated a VERIFIED
+  round's evidence stamp and demanded a fresh metered round for pure
+  bookkeeping. The framework already solved this exact shape for
+  `decisions.jsonl` (freshness-exempt because a record *about* work is not
+  the work), and the same reasoning applies to a machine-stamped citation
+  marker. It was deliberately **not** fixed here: changing what the
+  freshness check can see, at close, to make one's own close easier is a
+  self-authorized reduction in verifier visibility — the one thing the
+  decision-rights carve-out forbids. `disposition.lessons_cited` carries
+  the durable citation either way; the markdown marker was reverted and
+  re-applied in a follow-up commit.
 
 ## Release
 

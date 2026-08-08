@@ -42,7 +42,10 @@ def test_missing_spec_returns_defaults(tmp_path: Path) -> None:
     assert cfg.tier == "full"
     assert cfg.requires_uat is False
     assert cfg.requires_e2e is False
-    assert cfg.uat_scope == "none"
+    # An OMITTED uatScope is None, not "none": the close gate has to be able
+    # to tell "the author never declared a scope" from "the author declared
+    # none", because only the second is a decision.
+    assert cfg.uat_scope is None
 
 
 def test_spec_without_config_block_returns_defaults(tmp_path: Path) -> None:
@@ -142,7 +145,7 @@ def test_inline_yaml_comment_tolerated(tmp_path: Path) -> None:
 
 def test_config_is_frozen() -> None:
     cfg = SessionSetConfig(
-        tier="full", requires_uat=False, requires_e2e=False, uat_scope="none"
+        tier="full", requires_uat=False, requires_e2e=False, uat_scope=None
     )
     with pytest.raises((AttributeError, TypeError)):
         cfg.tier = "lightweight"  # type: ignore[misc]

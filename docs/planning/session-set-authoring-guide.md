@@ -460,12 +460,22 @@ prerequisites:           # optional; sets that must complete before this one is 
   for non-web surfaces (CLI, native, Access, COM-driven apps, IDE
   plugins). See *Choosing `uatStyle`* below.
 
-- **`uatScope`** — only meaningful when `requiresUAT: true`:
+- **`uatScope`** — says WHICH sessions owe a walk, never **whether** any
+  does. Only meaningful when `requiresUAT: true`:
   - `per-session` — checklist items accumulate across sessions; the
     final session compiles the cumulative checklist.
   - `per-set` — a single checklist authored at the end of the set,
-    covering the whole effort.
-  - `none` — invalid here (use `requiresUAT: false` instead).
+    covering the whole effort. **This is what an omitted, `none`, or
+    misspelled scope resolves to when `requiresUAT: true`.**
+  - `none` — invalid here (use `requiresUAT: false` instead). Writing it
+    anyway no longer disarms the close gate; it resolves to `per-set`.
+
+  > **Scope cannot disarm an armed flag.** Until Set 111 S4 an omitted
+  > `uatScope` collapsed to `none` and switched the close gate off
+  > entirely — so `requiresUAT: true` with no scope, the likeliest
+  > hand-authored shape, was exactly the spec that could close with no
+  > walk and no complaint. Disarming happens where it is visible, in
+  > `requiresUAT: false` or `"suggested"`.
 
 - **`prerequisites`** — optional list of other session sets that must
   reach a particular state before this set is considered workable.
@@ -497,11 +507,12 @@ block with all five values spelled out as their defaults.
 
 If the block is **present but a field is omitted**, the missing field
 takes its default (`"full"` for `tier`, `false` for boolean tri-state
-flags, `"ad-hoc"` for `uatStyle`, `none` for `uatScope`, and — for the
+flags, `"ad-hoc"` for `uatStyle`, no scope for `uatScope`, and — for the
 opt-in attributes — `out-of-band-or-none` for `verificationMode` and
 `none` for `pathAwareCritique`, i.e. no path-aware critique gate). An
 omitted `kind` has no default value at all — the set is simply an
-ordinary work set.
+ordinary work set. An omitted `uatScope` matters only when
+`requiresUAT: true`, where it resolves to `per-set` (see above).
 
 **The safe default is no UAT and no E2E gate.** Authors who want UAT
 or E2E coverage must opt in explicitly. This keeps every set's gates
@@ -910,8 +921,11 @@ not happen" is the outcome this gate exists to make impossible. Skipping
 becomes a visible operator decision, not an evaporation.
 
 Scope follows the config block: `uatScope: per-set` puts the obligation
-on the final session, `per-session` on every session, `none` disarms it.
-A `requiresUAT: "suggested"` set is advisory and never gated.
+on the final session and `per-session` on every session. An omitted,
+`none`, or unrecognised scope resolves to `per-set` rather than
+disarming the gate — scope chooses the sessions, it never cancels the
+requirement. A `requiresUAT: "suggested"` set is advisory and never
+gated, and `requiresUAT: false` is the way to opt out.
 
 ---
 

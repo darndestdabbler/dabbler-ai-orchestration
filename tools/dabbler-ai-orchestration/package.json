@@ -647,6 +647,7 @@
     "package": "npm run compile && npx vsce package",
     "make-uat-workspace": "node scripts/make-uat-workspace.js",
     "walk": "npm run compile && node scripts/stage-walk.js",
+    "walk:smoke": "npm run compile && node scripts/walk-smoke.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

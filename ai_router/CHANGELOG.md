@@ -16,6 +16,32 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 111 S4 remediation) `session_touched` normalises path separators
+  on every platform.** `run_of_record` normalised with `os.sep`, which is
+  a no-op on Linux and macOS — so a Windows-authored `files_changed` entry
+  like `src\nested\a.ts` matched nothing there and the package's own
+  `test_normalises_windows_separators` failed on the required
+  `ubuntu-latest` / `macos-latest` matrix while passing on the developer
+  machine. A disposition is authored on one machine and evaluated on
+  another, so the separator a path was *written* with must never decide
+  whether it is recognised. Applied at all three normalisation sites
+  (`session_touched`, `load_suites`, `surface_digest`).
+
+- **(Set 111 S4 remediation) The Layer 3 freshness map now covers every
+  surface the test policy names.** The authoring guide's non-negotiable
+  Layer 3 triggers are four — the Explorer rendering surface, a
+  state-file writer, the extension manifest, and the fixture harness —
+  but `DEFAULT_SUITES` carried only the first and third, so a session
+  that changed a blessed writer or the fixture harness was told
+  "session touched none of this suite's surfaces" and could close
+  without the run the policy calls mandatory. The map now also covers
+  `tools/dabbler-ai-orchestration/scripts/`,
+  `tools/dabbler-ai-orchestration/test-fixtures/`, `ai_router/tests/e2e/`,
+  and the blessed writers (`session_state.py`, `start_session.py`,
+  `close_session.py`) named file-by-file — deliberately not `ai_router/`
+  wholesale, since arming a 13-minute suite for every router change
+  produces a gate sessions route around instead of satisfy.
+
 - **(Set 111 S4, operator-directed) `ai_router.session_checklist` — the
   step-level progress surface.** The framework had a good **set**-level
   surface (the Work Explorer tree, `print_session_set_status`) and **none**
@@ -105,9 +131,20 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   disk** — a recorded walk must point at the walk actually presented) or
   `status: "waived"`, each with a non-empty `attestation`. There is
   deliberately no third value. Scope follows the config block (`per-set` →
-  the final session; `per-session` → every session; `none` → disarmed), and
+  the final session; `per-session` → every session; anything else —
+  omitted, `none`, or a typo → `per-set`, because scope chooses WHICH
+  sessions owe a walk and never cancels the requirement), and
   `requiresUAT: "suggested"` stays advisory and ungated, because arming an
   advisory flag would be a policy change this work was not asked to make.
+  Opting out is done visibly, with `requiresUAT: false`.
+
+  **(S4 remediation)** `uatScope` originally had a hole shaped like the
+  gate's own purpose: an omitted scope parsed to `"none"` and disarmed the
+  gate entirely, so `requiresUAT: true` with no scope — the likeliest
+  hand-authored shape — was exactly the spec that could close with no walk
+  and no complaint. `SessionSetConfig.uat_scope` is now `Optional[str]`
+  (`None` when omitted, which is not the same statement as `none`), and
+  scope no longer disarms an armed flag.
 
 - **(Set 111 S4) `drift_guard` check `actions-sha-pinned`, plus
   `.github/dependabot.yml`.** Every workflow `uses:` is pinned to a

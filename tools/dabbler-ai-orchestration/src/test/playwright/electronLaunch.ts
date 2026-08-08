@@ -66,67 +66,17 @@ function _filteredEnv(): NodeJS.ProcessEnv {
   return out;
 }
 
-// Explicit allowlist for Electron-launch environment variables.
-// This guards against IDE host pollution: if a developer runs
-// `npm run test:playwright` from VS Code's integrated terminal, the
-// child Code.exe should not inherit VS Code's IPC vars (ELECTRON_RUN_AS_NODE,
-// VSCODE_*) which would flip it into CLI-arg-parsing mode. An allowlist
-// is more maintainable than a blocklist: if new IDE vars are added
-// (APPCODE_*, CURSOR_*, etc.), an allowlist won't inadvertently pass them.
-//
-// Variables are organized by platform and context:
-// - Universal: needed on all platforms
-// - Windows-specific: Windows system paths and user config
-// - GUI/locale: needed for GUI windows and i18n on Linux/macOS
-const _ELECTRON_VAR_ALLOWLIST_UNIVERSAL = [
-  "PATH", "PATHEXT",              // executable search path (Windows includes PATHEXT)
-  "HOME", "USERPROFILE", "USER", "USERNAME",
-  "DABBLER_STARTUP_TIMING_PATH",  // opt-in host timing evidence
-  "TEMP", "TMP", "TMPDIR",
-  "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "LC_NUMERIC", "LC_TIME",
-  "TERM", "COLORTERM",
-];
-
-const _ELECTRON_VAR_ALLOWLIST_WINDOWS = [
-  "SYSTEMROOT", "SYSTEMDRIVE", "COMSPEC", "WINDIR",
-  "APPDATA", "LOCALAPPDATA",
-];
-
-const _ELECTRON_VAR_ALLOWLIST_GUI = [
-  "DISPLAY",                        // X11 (Linux)
-  "XAUTHORITY",                     // X11 auth cookie — xvfb-run creates one;
-                                    // without it the X connection is refused
-                                    // and Electron dies with "The platform
-                                    // failed to initialize" (ui/aura)
-  "WAYLAND_DISPLAY",                // Wayland (Linux/macOS)
-  "XDG_RUNTIME_DIR", "XDG_SESSION_TYPE",  // XDG desktop (Linux)
-  "DBUS_SESSION_BUS_ADDRESS",       // D-Bus session (Linux)
-  "DESKTOP_SESSION", "GDMSESSION",  // GNOME/session (Linux)
-];
-
+// The Electron-launch environment is an explicit ALLOWLIST, defined once in
+// `scripts/vscode-launch.js` so the walk stager and this harness cannot
+// drift. It guards against IDE host pollution: run either one from VS Code's
+// integrated terminal and the parent environment carries VS Code's own IPC
+// variables (ELECTRON_RUN_AS_NODE, VSCODE_*), which flip the child Code
+// process into CLI-arg-parsing mode instead of launching a window.
 function _electronEnv(): { [key: string]: string } {
-  const out: { [key: string]: string } = {};
-
-  // Start with universal allowlist
-  const allowed = [..._ELECTRON_VAR_ALLOWLIST_UNIVERSAL, ..._ELECTRON_VAR_ALLOWLIST_GUI];
-
-  // Add platform-specific vars
-  if (process.platform === "win32") {
-    allowed.push(..._ELECTRON_VAR_ALLOWLIST_WINDOWS);
-  }
-
-  const allowedSet = new Set(allowed);
-
-  // Copy allowed vars from process.env
-  for (const [k, v] of Object.entries(process.env)) {
-    if (typeof v !== "string") continue;
-    if (allowedSet.has(k)) {
-      out[k] = v;
-    }
-  }
-
-  out.ELECTRON_ENABLE_LOGGING = "1";
-  return out;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  return (require("../../../scripts/vscode-launch.js") as {
+    electronEnv: () => { [key: string]: string };
+  }).electronEnv();
 }
 
 export interface FixtureHandle {
@@ -539,28 +489,40 @@ export function driveHappyPath(h: FixtureHandle, throughSession: number): void {
 // ---------------------------------------------------------------------
 // VS Code Electron launch
 // ---------------------------------------------------------------------
+//
+// Binary discovery lives in `scripts/vscode-launch.js`, which the UAT walk
+// stager also uses, and this file DELEGATES to it rather than keeping a
+// second copy. Set 111 S4 originally went the other way -- the stager
+// re-implemented discovery from the Set 027 harness -- and silently dropped
+// the macOS `.app`-bundle search this file had grown since, so `npm run walk`
+// was broken on macOS the day it shipped. Two implementations of "which Code
+// binary" is the sibling-site duplication L-069-1 names; there is now one,
+// and the re-exports below keep `electronBinaryLookup.test.ts` pointed at it.
 
-// Parse "vscode-<platform>-archive-1.120.0" -> [1, 120, 0]. Returns
-// null on dirs that don't match the canonical shape, so they sort
-// last. Numeric comparison guards against the lex-sort gotcha where
-// "1.99.0" would sort ahead of "1.120.0".
-function _parseCachedVersion(dirName: string): number[] | null {
-  const m = dirName.match(/(\d+)\.(\d+)\.(\d+)$/);
-  if (!m) return null;
-  return [parseInt(m[1], 10), parseInt(m[2], 10), parseInt(m[3], 10)];
-}
-
-function _cmpVersion(a: number[] | null, b: number[] | null): number {
-  if (!a && !b) return 0;
-  if (!a) return 1;   // unparseable sorts last
-  if (!b) return -1;
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const av = a[i] ?? 0;
-    const bv = b[i] ?? 0;
-    if (av !== bv) return bv - av;  // descending
-  }
-  return 0;
-}
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const _launch = require("../../../scripts/vscode-launch.js") as {
+  ISOLATION_FLAGS: string[];
+  electronEnv: (
+    extra?: { [key: string]: string },
+    sourceEnv?: NodeJS.ProcessEnv,
+    platform?: NodeJS.Platform,
+  ) => { [key: string]: string };
+  resolveCodeExecutable: (
+    versionDir: string,
+    platform: NodeJS.Platform,
+    io: BinaryProbeIo,
+  ) => string | null;
+  describeVersionDir: (
+    versionDir: string,
+    platform: NodeJS.Platform,
+    io: BinaryProbeIo,
+  ) => string;
+  findCodeBinary: (
+    testRoot?: string,
+    platform?: NodeJS.Platform,
+    io?: BinaryProbeIo,
+  ) => string;
+};
 
 /** The filesystem surface {@link resolveCodeExecutable} needs. */
 export interface BinaryProbeIo {
@@ -570,171 +532,29 @@ export interface BinaryProbeIo {
 }
 
 /**
- * macOS executable names inside `<bundle>.app/Contents/MacOS/`, most likely
- * first. VS Code has shipped its main binary under more than one name across
- * versions, so this is a preference order rather than a single guess.
- */
-const _DARWIN_EXEC_PREFERENCE = [
-  "Electron",
-  "Code Helper",
-  "Visual Studio Code",
-  "Code",
-];
-
-/**
  * Resolve the launchable VS Code executable inside one downloaded version
- * directory, or null when there isn't one.
- *
- * Pure + injected IO so the Layer-2 suite can drive the macOS branch from any
- * host — which matters, because the bug this replaces was macOS-only and
- * therefore invisible to everyone developing on Windows or Linux.
- *
- * The previous implementation guessed exactly ONE path per platform
- * (`<dir>/Visual Studio Code.app/Contents/MacOS/Electron` on darwin) and
- * reported only "no usable binary" when the guess missed. CI had been red on
- * macOS for at least twelve commits because of it, with an error that named
- * the directory but nothing about what was actually inside. This searches, and
- * {@link describeVersionDir} makes any remaining miss diagnosable.
+ * directory, or null when there isn't one. See `scripts/vscode-launch.js`
+ * for the implementation and the macOS rationale.
  */
 export function resolveCodeExecutable(
   versionDir: string,
   platform: NodeJS.Platform,
   io: BinaryProbeIo,
 ): string | null {
-  if (platform === "darwin") {
-    // The .app bundle is normally a child of the version dir, but tolerate the
-    // version dir itself already being the bundle.
-    const bundles: string[] = [];
-    if (io.exists(path.join(versionDir, "Contents", "MacOS"))) {
-      bundles.push(versionDir);
-    }
-    for (const entry of io.readdir(versionDir)) {
-      if (entry.endsWith(".app")) bundles.push(path.join(versionDir, entry));
-    }
-    for (const bundle of bundles) {
-      const macOsDir = path.join(bundle, "Contents", "MacOS");
-      if (!io.exists(macOsDir) || !io.isDirectory(macOsDir)) continue;
-      const present = io.readdir(macOsDir);
-      for (const preferred of _DARWIN_EXEC_PREFERENCE) {
-        if (present.includes(preferred)) return path.join(macOsDir, preferred);
-      }
-      // Unknown name, but there is exactly one thing in there — take it rather
-      // than fail on a rename we have not seen yet.
-      if (present.length === 1) return path.join(macOsDir, present[0]);
-    }
-    return null;
-  }
-
-  if (platform === "win32") {
-    const exact = path.join(versionDir, "Code.exe");
-    if (io.exists(exact)) return exact;
-    const exe = io.readdir(versionDir).find((e) => e.toLowerCase().endsWith(".exe"));
-    return exe ? path.join(versionDir, exe) : null;
-  }
-
-  // Linux (and anything else): the tarball puts `code` at the top level.
-  for (const rel of [["code"], ["bin", "code"]]) {
-    const candidate = path.join(versionDir, ...rel);
-    if (io.exists(candidate)) return candidate;
-  }
-  return null;
+  return _launch.resolveCodeExecutable(versionDir, platform, io);
 }
 
-/**
- * One line describing what a version directory actually contains, for the
- * failure message. An error that says only "no usable binary" costs a whole CI
- * round-trip to diagnose; one that lists the tree does not.
- */
+/** One line describing what a version directory actually contains. */
 export function describeVersionDir(
   versionDir: string,
   platform: NodeJS.Platform,
   io: BinaryProbeIo,
 ): string {
-  const name = path.basename(versionDir);
-  if (!io.exists(versionDir)) return `${name} (missing)`;
-  const top = io.readdir(versionDir);
-  if (platform !== "darwin") return `${name} -> [${top.join(", ") || "empty"}]`;
-  const parts: string[] = [];
-  for (const entry of top) {
-    if (!entry.endsWith(".app")) continue;
-    const macOsDir = path.join(versionDir, entry, "Contents", "MacOS");
-    parts.push(
-      io.exists(macOsDir)
-        ? `${entry}/Contents/MacOS -> [${io.readdir(macOsDir).join(", ") || "empty"}]`
-        : `${entry} (no Contents/MacOS)`,
-    );
-  }
-  return `${name} -> [${top.join(", ") || "empty"}]${parts.length ? `; ${parts.join("; ")}` : ""}`;
-}
-
-/** Real-fs {@link BinaryProbeIo}. */
-function realProbeIo(): BinaryProbeIo {
-  return {
-    exists: (p) => fs.existsSync(p),
-    isDirectory: (p) => {
-      try {
-        return fs.statSync(p).isDirectory();
-      } catch {
-        return false;
-      }
-    },
-    readdir: (p) => {
-      try {
-        return fs.readdirSync(p);
-      } catch {
-        return [];
-      }
-    },
-  };
+  return _launch.describeVersionDir(versionDir, platform, io);
 }
 
 function findCodeBinary(): string {
-  const override = process.env.VSCODE_BIN;
-  if (override) {
-    if (!fs.existsSync(override)) {
-      throw new Error(`VSCODE_BIN points at non-existent path: ${override}`);
-    }
-    return override;
-  }
-  const vsTestDir = path.join(EXTENSION_ROOT, ".vscode-test");
-  if (!fs.existsSync(vsTestDir)) {
-    throw new Error(
-      `No VS Code binary found and ${vsTestDir} does not exist. ` +
-        "Run `npm test` once (or set VSCODE_BIN) to populate the test binary.",
-    );
-  }
-  // Numeric version sort, descending. Avoids the lex-sort bug where
-  // "archive-1.99.0" would sort ahead of "archive-1.120.0".
-  //
-  // Note: the filter accepts any `vscode-*` entry rather than
-  // requiring the "archive" segment that Windows downloads carry.
-  // @vscode/test-electron names Windows downloads
-  // `vscode-win32-x64-archive-X.Y.Z` (the zip-archive layout)
-  // but Linux downloads `vscode-linux-x64-X.Y.Z` (no "archive"
-  // segment, because Linux ships as a tarball). macOS uses
-  // `vscode-darwin-x64-X.Y.Z` or `vscode-darwin-arm64-X.Y.Z`.
-  // Filtering on "archive" would exclude Linux/macOS, breaking CI.
-  const entries = fs
-    .readdirSync(vsTestDir)
-    .filter((e) => e.startsWith("vscode-"))
-    .sort((a, b) => _cmpVersion(_parseCachedVersion(a), _parseCachedVersion(b)));
-  const io = realProbeIo();
-  for (const dir of entries) {
-    const found = resolveCodeExecutable(
-      path.join(vsTestDir, dir),
-      process.platform,
-      io,
-    );
-    if (found) return found;
-  }
-  throw new Error(
-    `No usable VS Code binary in ${vsTestDir} (platform ${process.platform}). ` +
-      `Inspected: ${
-        entries
-          .map((d) => describeVersionDir(path.join(vsTestDir, d), process.platform, io))
-          .join(" | ") || "(empty)"
-      }`,
-  );
+  return _launch.findCodeBinary(path.join(EXTENSION_ROOT, ".vscode-test"));
 }
 
 export interface LaunchedVSCode {

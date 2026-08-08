@@ -22,6 +22,21 @@ import { readSessionSets } from "../../utils/fileSystem";
 const launch = require("../../../scripts/vscode-launch.js") as {
   EXTENSION_ROOT: string;
   ISOLATION_FLAGS: string[];
+  WALK_COMPANION_PATH: string;
+  electronEnv: (
+    extra?: Record<string, string>,
+    sourceEnv?: Record<string, string | undefined>,
+    platform?: string,
+  ) => Record<string, string>;
+  resolveCodeExecutable: (
+    versionDir: string,
+    platform: string,
+    io: {
+      exists: (p: string) => boolean;
+      isDirectory: (p: string) => boolean;
+      readdir: (p: string) => string[];
+    },
+  ) => string | null;
   findCodeBinary: (testRoot?: string) => string;
   launchArgs: (opts?: Record<string, unknown>) => string[];
 };
@@ -199,27 +214,180 @@ suite("walk stager", () => {
     });
   });
 
-  suite("the auto-reveal is gated", () => {    test("extension.ts reveals the view only under DABBLER_WALK", () => {
+  suite("the walk actually starts itself", () => {
+    test("the stager loads the walk companion as a second dev extension", () => {
+      const src = fs.readFileSync(
+        path.join(EXTENSION_ROOT, "scripts", "stage-walk.js"),
+        "utf8",
+      );
+      assert.ok(
+        src.includes("developmentPaths: [WALK_COMPANION_PATH]"),
+        "the stager must load the companion; without it nothing activates " +
+          "at startup and the walk opens on the file Explorer",
+      );
+    });
+
+    test("launchArgs emits one --extensionDevelopmentPath per extension", () => {
+      const argv = launch.launchArgs({
+        extensionRoot: "/ext",
+        userDataDir: "/tmp/ud",
+        extensionsDir: "/tmp/ed",
+        workspacePath: "/tmp/ws/x.code-workspace",
+        developmentPaths: ["/ext/scripts/walk-companion"],
+      });
+      const devPaths = argv.filter((a) =>
+        a.startsWith("--extensionDevelopmentPath="),
+      );
+      assert.deepStrictEqual(devPaths, [
+        "--extensionDevelopmentPath=/ext",
+        "--extensionDevelopmentPath=/ext/scripts/walk-companion",
+      ]);
+    });
+
+    test("the companion activates at startup, not on view visibility", () => {
+      // This is the whole defect in one assertion. The product extension
+      // declares no explicit activation events and contributes views, so it
+      // activates when the Dabbler view becomes VISIBLE. A reveal living
+      // inside it waits on the event it is supposed to cause.
+      const manifest = JSON.parse(
+        fs.readFileSync(
+          path.join(launch.WALK_COMPANION_PATH, "package.json"),
+          "utf8",
+        ),
+      ) as { activationEvents: string[]; main: string };
+      assert.deepStrictEqual(manifest.activationEvents, ["onStartupFinished"]);
+      assert.ok(
+        fs.existsSync(
+          path.join(launch.WALK_COMPANION_PATH, manifest.main.replace("./", "")),
+        ),
+        "the companion manifest must point at a file that exists",
+      );
+    });
+
+    test("the companion reveals this extension's view container", () => {
+      const companion = require(
+        path.join(launch.WALK_COMPANION_PATH, "extension.js"),
+      ) as { CONTAINER: string };
+      const pkg = JSON.parse(
+        fs.readFileSync(path.join(EXTENSION_ROOT, "package.json"), "utf8"),
+      ) as { contributes: { viewsContainers: { activitybar: { id: string }[] } } };
+      const ids = pkg.contributes.viewsContainers.activitybar.map((c) => c.id);
+      assert.ok(
+        ids.some((id) => companion.CONTAINER === `workbench.view.extension.${id}`),
+        `companion reveals ${companion.CONTAINER}, which is not a container ` +
+          `this extension contributes (${ids.join(", ")})`,
+      );
+    });
+
+    test("the product extension carries no walk-specific code", () => {
       const src = fs.readFileSync(
         path.join(EXTENSION_ROOT, "src", "extension.ts"),
         "utf8",
       );
       assert.ok(
-        src.includes('process.env.DABBLER_WALK === "1"'),
-        "the reveal must be gated on DABBLER_WALK",
-      );
-      assert.ok(
-        src.includes("workbench.view.extension.dabblerSessionSetsContainer"),
-        "the reveal must target this extension's view container",
+        !src.includes("process.env.DABBLER_WALK"),
+        "a reveal gated inside activate() cannot fire at startup; it belongs " +
+          "in the walk companion",
       );
     });
 
-    test("only the stager sets DABBLER_WALK", () => {
-      const stagerSrc = fs.readFileSync(
+    test("the companion is excluded from the VSIX", () => {
+      const ignore = fs.readFileSync(
+        path.join(EXTENSION_ROOT, ".vscodeignore"),
+        "utf8",
+      );
+      assert.ok(
+        ignore.split(/\r?\n/).includes("scripts/**"),
+        "scripts/** must stay ignored or the dev-only companion ships",
+      );
+    });
+  });
+
+  suite("the child environment is an allowlist, not an inheritance", () => {
+    const polluted = {
+      PATH: "/usr/bin",
+      ELECTRON_RUN_AS_NODE: "1",
+      VSCODE_IPC_HOOK_CLI: "/tmp/sock",
+      VSCODE_PID: "1234",
+      SOME_SECRET_TOKEN: "shh",
+    };
+
+    test("VS Code's own IPC variables are not inherited", () => {
+      const env = launch.electronEnv({}, polluted, "linux");
+      for (const banned of [
+        "ELECTRON_RUN_AS_NODE",
+        "VSCODE_IPC_HOOK_CLI",
+        "VSCODE_PID",
+      ]) {
+        assert.ok(
+          !(banned in env),
+          `${banned} leaked into the walk environment; a walk started from ` +
+            "VS Code's integrated terminal would parse args instead of opening",
+        );
+      }
+    });
+
+    test("unknown variables are excluded by default, not by blocklist", () => {
+      const env = launch.electronEnv({}, polluted, "linux");
+      assert.ok(!("SOME_SECRET_TOKEN" in env));
+      assert.strictEqual(env.PATH, "/usr/bin");
+    });
+
+    test("launch-specific extras are applied after filtering", () => {
+      const env = launch.electronEnv({ DABBLER_WALK_MARKER: "/tmp/m" }, polluted, "linux");
+      assert.strictEqual(env.DABBLER_WALK_MARKER, "/tmp/m");
+    });
+
+    test("the stager uses the allowlist rather than spreading process.env", () => {
+      const src = fs.readFileSync(
         path.join(EXTENSION_ROOT, "scripts", "stage-walk.js"),
         "utf8",
       );
-      assert.ok(stagerSrc.includes("DABBLER_WALK"));
+      // Match the CODE, not the comment that explains why the code is gone.
+      assert.ok(
+        !/env:\s*\{\s*\.\.\.process\.env/.test(src),
+        "stage-walk.js still spreads the parent environment into the child",
+      );
+      assert.ok(src.includes("env: electronEnv("));
+    });
+  });
+
+  suite("binary discovery is shared with the Playwright harness", () => {
+    const fakeIo = (tree: Record<string, string[]>) => ({
+      exists: (p: string) => p in tree || Object.keys(tree).some((k) => k === p),
+      isDirectory: (p: string) => p in tree,
+      readdir: (p: string) => tree[p] ?? [],
+    });
+
+    test("a macOS .app bundle cache resolves", () => {
+      // The regression that shipped: the stager's first resolver only looked
+      // at <versionDir>/Contents/MacOS/Electron and missed the standard
+      // @vscode/test-electron macOS layout the harness already handled, so
+      // `npm run walk` threw "No VS Code binary found" on every Mac.
+      const dir = path.join("/c", "vscode-darwin-arm64-1.132.0");
+      const bundle = path.join(dir, "Visual Studio Code.app");
+      const macOs = path.join(bundle, "Contents", "MacOS");
+      const io = fakeIo({
+        [dir]: ["Visual Studio Code.app"],
+        [macOs]: ["Electron"],
+      });
+      assert.strictEqual(
+        launch.resolveCodeExecutable(dir, "darwin", io)?.replace(/\\/g, "/"),
+        path.join(macOs, "Electron").replace(/\\/g, "/"),
+      );
+    });
+
+    test("electronLaunch.ts delegates rather than keeping a second copy", () => {
+      const harness = fs.readFileSync(HARNESS_SRC, "utf8");
+      assert.ok(
+        harness.includes('require("../../../scripts/vscode-launch.js")'),
+        "two implementations of 'which Code binary' is how the macOS bug " +
+          "got in; the harness must delegate to the shared module",
+      );
+      assert.ok(
+        !harness.includes("const _DARWIN_EXEC_PREFERENCE"),
+        "the darwin preference list must live in exactly one file",
+      );
     });
   });
 });

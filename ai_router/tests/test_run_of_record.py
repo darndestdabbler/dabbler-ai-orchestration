@@ -164,6 +164,72 @@ class TestSessionTouched:
     def test_normalises_windows_separators(self):
         assert ror.session_touched("", ("src/",), ["src\\nested\\a.ts"])
 
+    def test_normalises_windows_separators_on_every_platform(self, monkeypatch):
+        """The normalisation must not depend on the HOST separator.
+
+        The original implementation normalised with ``os.sep``, so on a
+        posix runner (``os.sep == "/"``) a Windows-authored path was left
+        untouched and matched nothing. The required CI matrix runs ubuntu
+        and macOS, so that made this repo's own test red everywhere the
+        developer machine could not see.
+        """
+        monkeypatch.setattr(ror.os, "sep", "/")
+        assert ror.session_touched("", ("src/",), ["src\\nested\\a.ts"])
+
+    def test_normalises_windows_separators_in_covers_too(self, monkeypatch):
+        monkeypatch.setattr(ror.os, "sep", "/")
+        assert ror.session_touched("", ("src\\nested",), ["src/nested/a.ts"])
+
+
+class TestDefaultSuiteCoverage:
+    """The expensive-suite map must cover every surface the policy names.
+
+    The authoring guide's non-negotiable Layer 3 list is four surfaces:
+    the Explorer rendering surface, a state-file writer, the extension
+    manifest, and the fixture harness. The map originally carried only the
+    first and third, so a session that changed a blessed writer or the
+    harness staging the fixtures could close with Playwright reported "not
+    required" — the exact rendering-regression class the static gates and
+    Layer 2 cannot see.
+    """
+
+    @staticmethod
+    def _playwright():
+        (suite,) = [s for s in ror.DEFAULT_SUITES if s.name == "playwright"]
+        return suite
+
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            "ai_router/session_state.py",
+            "ai_router/start_session.py",
+            "ai_router/close_session.py",
+            "ai_router/tests/e2e/harness_cli.py",
+            "tools/dabbler-ai-orchestration/scripts/stage-walk.js",
+            "tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/x.json",
+            "tools/dabbler-ai-orchestration/src/extension.ts",
+            "tools/dabbler-ai-orchestration/package.json",
+            "tools/dabbler-ai-orchestration/media/icon.svg",
+        ],
+    )
+    def test_policy_named_surfaces_require_layer_3(self, changed):
+        assert ror.session_touched("", self._playwright().covers, [changed])
+
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            "docs/planning/project-guidance.md",
+            "ai_router/pricing_proposal.py",
+            "README.md",
+        ],
+    )
+    def test_unrelated_surfaces_do_not_require_layer_3(self, changed):
+        """Widening must not become "every change pays 13 minutes"."""
+        assert not ror.session_touched("", self._playwright().covers, [changed])
+
+    def test_the_playwright_suite_is_still_the_expensive_one(self):
+        assert self._playwright().expensive is True
+
     def test_matches_an_exact_file_prefix(self):
         assert ror.session_touched(
             "", ("tools/x/package.json",), ["tools/x/package.json"]

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -43,16 +44,21 @@ SPEC_UAT = """# Spec
 tier: full
 requiresUAT: {uat}
 requiresE2E: false
-uatScope: {scope}
-```
+{scope_line}```
 """
+
+
+def _spec_text(uat: str, scope: Optional[str]) -> str:
+    """Render the config block; ``scope=None`` OMITS ``uatScope`` entirely."""
+    scope_line = "" if scope is None else f"uatScope: {scope}\n"
+    return SPEC_UAT.format(uat=uat, scope_line=scope_line)
 
 
 def _make_set(
     root: Path,
     *,
     uat: str = "true",
-    scope: str = "per-set",
+    scope: Optional[str] = "per-set",
     current: int = 2,
     total: int = 2,
 ) -> Path:
@@ -67,7 +73,7 @@ def _make_set(
     set_dir = root / "docs" / "session-sets" / "111-fixture"
     set_dir.mkdir(parents=True, exist_ok=True)
     (set_dir / "spec.md").write_text(
-        SPEC_UAT.format(uat=uat, scope=scope), encoding="utf-8"
+        _spec_text(uat, scope), encoding="utf-8"
     )
     register_session_start(
         session_set=str(set_dir),
@@ -111,12 +117,56 @@ class TestUatWalkGate:
         )
         assert passed
 
-    def test_inert_when_scope_is_none(self, tmp_path):
+    def test_an_explicit_scope_of_none_no_longer_disarms(self, tmp_path):
+        """Scope says WHICH sessions owe a walk, never WHETHER any does.
+
+        `uatScope: none` alongside `requiresUAT: true` is a contradiction
+        the authoring guide already calls invalid ("use requiresUAT: false
+        instead"). Honouring it as a disarm let the contradiction win
+        silently, which is the evaporation this gate exists to prevent.
+        """
         set_dir = _make_set(tmp_path / "r", scope="none")
-        passed, _ = gate_checks.check_uat_walk_recorded(
+        passed, remediation = gate_checks.check_uat_walk_recorded(
             str(set_dir), _disp()
         )
-        assert passed
+        assert not passed
+        assert "disposition.uat is absent" in remediation
+
+    def test_an_omitted_scope_still_arms_the_gate(self, tmp_path):
+        """The likeliest hand-authored shape: `requiresUAT: true`, no scope.
+
+        It used to parse to scope `none` and turn the gate off entirely —
+        so the one spec most likely to be written by hand was the one that
+        could close with no walk and no complaint.
+        """
+        set_dir = _make_set(tmp_path / "r", scope=None)
+        passed, remediation = gate_checks.check_uat_walk_recorded(
+            str(set_dir), _disp()
+        )
+        assert not passed
+        assert "disposition.uat is absent" in remediation
+
+    def test_an_unrecognised_scope_arms_rather_than_disarms(self, tmp_path):
+        """A typo must fail loud, not quietly switch the gate off."""
+        set_dir = _make_set(tmp_path / "r", scope="per-sett")
+        passed, _ = gate_checks.check_uat_walk_recorded(str(set_dir), _disp())
+        assert not passed
+
+    def test_an_omitted_scope_still_lets_a_recorded_walk_pass(self, tmp_path):
+        """Arming by default must not make the gate unsatisfiable."""
+        set_dir = _make_set(tmp_path / "r", scope=None)
+        (set_dir / "walk.md").write_text("# walk\n", encoding="utf-8")
+        passed, remediation = gate_checks.check_uat_walk_recorded(
+            str(set_dir),
+            _disp(
+                uat={
+                    "status": "walked",
+                    "walkArtifact": "walk.md",
+                    "attestation": "operator walked it",
+                }
+            ),
+        )
+        assert passed, remediation
 
     def test_per_set_scope_skips_a_non_final_session(self, tmp_path):
         set_dir = _make_set(tmp_path / "r", current=1, total=3)

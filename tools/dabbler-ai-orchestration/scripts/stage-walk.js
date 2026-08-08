@@ -17,9 +17,15 @@
 //
 // So this script does all six: builds a disposable fixture workspace,
 // launches the real Extension Development Host against it with the same
-// isolation flags the Playwright suite uses, and sets DABBLER_WALK=1 so the
-// extension reveals its own view on activation. The operator's first action
-// is looking at the thing.
+// isolation flags the Playwright suite uses, and loads the development-only
+// walk companion (scripts/walk-companion/), whose onStartupFinished
+// activation reveals the Dabbler view. The operator's first action is
+// looking at the thing.
+//
+// The reveal deliberately does NOT live in the product extension: that
+// extension activates when its view becomes visible, so a reveal inside it
+// would be waiting on the event it is supposed to cause. `npm run walk:smoke`
+// proves the reveal actually happens.
 //
 // This is a WALK, not a test: no assertions, no exit-code verdict. The
 // operator's judgment is the verdict, recorded in disposition.uat.
@@ -34,19 +40,26 @@ const os = require("os");
 const path = require("path");
 
 const { makeUatWorkspace } = require("./make-uat-workspace.js");
-const { EXTENSION_ROOT, findCodeBinary, launchArgs } = require("./vscode-launch.js");
+const {
+  EXTENSION_ROOT,
+  WALK_COMPANION_PATH,
+  findCodeBinary,
+  launchArgs,
+  electronEnv,
+} = require("./vscode-launch.js");
 
 function log(msg) {
   console.log(`[stage-walk] ${msg}`);
 }
 
 function parseArgs(argv) {
-  const out = { keep: false, walkDoc: null, workspace: null };
+  const out = { keep: false, walkDoc: null, workspace: null, marker: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--keep") out.keep = true;
     else if (a === "--walk-doc") out.walkDoc = argv[++i];
     else if (a === "--workspace") out.workspace = argv[++i];
+    else if (a === "--marker") out.marker = argv[++i];
     else if (a === "--help" || a === "-h") out.help = true;
   }
   return out;
@@ -59,6 +72,8 @@ function usage() {
       "",
       "  --walk-doc <path>   Open this walk document alongside the fixture.",
       "  --workspace <path>  Use an existing workspace instead of a fresh one.",
+      "  --marker <path>     Write this file when the walk companion activates",
+      "                      (proof the auto-reveal ran; used by the smoke check).",
       "  --keep              Leave the generated workspace on disk.",
       "  -h, --help          Show this message.",
     ].join("\n")
@@ -118,21 +133,29 @@ function main() {
     extensionsDir,
     workspacePath,
     extraArgs,
+    // The companion's `onStartupFinished` activation is what actually opens
+    // the Dabbler view. The product extension activates only when that view
+    // becomes visible, so a reveal living inside IT would be waiting on the
+    // event it is supposed to cause.
+    developmentPaths: [WALK_COMPANION_PATH],
   });
 
   log("Staging the guided-look walk.");
   log(`  binary:    ${code}`);
   log(`  workspace: ${workspacePath}`);
-  log("  the Dabbler view opens by itself (DABBLER_WALK=1); nothing to set up.");
+  log("  the Dabbler view opens by itself; nothing to set up.");
   log("");
   log("Close the VS Code window when you are done, then record the walk in");
   log("disposition.uat (status 'walked' + walkArtifact + attestation).");
 
   const child = cp.spawn(code, argv, {
-    // DABBLER_WALK is read by the extension's activate() to reveal the
-    // Dabbler view container. It is set ONLY here, so no ordinary launch
-    // (and no Playwright spec) changes behavior because of it.
-    env: { ...process.env, DABBLER_WALK: "1" },
+    // An ALLOWLIST, not `...process.env`. A walk is normally started from
+    // VS Code's integrated terminal, whose environment carries VS Code's own
+    // IPC variables (ELECTRON_RUN_AS_NODE, VSCODE_*); inheriting them flips
+    // the child Code process into CLI-arg-parsing mode instead of opening the
+    // isolated Extension Development Host. The Playwright harness has guarded
+    // against this since Set 027 and shares the allowlist with this call.
+    env: electronEnv(args.marker ? { DABBLER_WALK_MARKER: args.marker } : {}),
     stdio: "ignore",
     detached: false,
   });

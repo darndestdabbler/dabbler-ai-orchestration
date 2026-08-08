@@ -1643,6 +1643,17 @@ def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
     A spec that cannot be parsed reports ``(False, "none")`` — the gate
     is a universal-core addition and must stay inert for every set that
     does not declare UAT, including specs predating the config block.
+
+    **Scope never disarms an armed flag.** ``requiresUAT: true`` is the
+    arming decision; ``uatScope`` only says WHICH sessions owe the walk.
+    An omitted scope (a shape that already exists in this repo's history)
+    used to collapse to ``none`` and turn the whole gate off, so the one
+    spec most likely to be hand-authored — ``requiresUAT: true`` and
+    nothing else — was exactly the one that closed with no walk and no
+    complaint. That is the evaporation this gate exists to make
+    impossible, so anything other than a recognised scope now resolves to
+    ``per-set``: the final session owes the walk. Disarming is done where
+    it is visible, by ``requiresUAT: false`` or ``"suggested"``.
     """
     try:
         try:
@@ -1664,7 +1675,12 @@ def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
     # NOT armed: Set 048 S2 defined it as advisory, and turning an
     # advisory flag into a hard close gate would be a policy change this
     # session was not asked to make.
-    return (cfg.requires_uat is True), (cfg.uat_scope or "none")
+    if cfg.requires_uat is not True:
+        return False, "none"
+    scope = (cfg.uat_scope or "").strip().lower()
+    if scope not in ("per-set", "per-session"):
+        scope = "per-set"
+    return True, scope
 
 
 def check_uat_walk_recorded(
@@ -1687,8 +1703,10 @@ def check_uat_walk_recorded(
     * ``requiresUAT`` is not literally ``true`` → inert.
     * ``uatScope: per-set`` → only the **final** session owes a walk.
     * ``uatScope: per-session`` → every session owes one.
-    * ``uatScope: none`` → inert (the scope contradicts the flag; the
-      narrower declaration wins rather than the gate inventing a policy).
+    * anything else — omitted, ``none``, or a typo — → ``per-set``.
+      Scope chooses WHICH sessions owe a walk; it never cancels the
+      requirement. Disarming is done visibly, with ``requiresUAT: false``
+      or ``"suggested"``.
 
     A session that owes a walk passes only with a ``uat`` block whose
     ``status`` is ``walked`` (and whose ``walkArtifact`` exists on disk)

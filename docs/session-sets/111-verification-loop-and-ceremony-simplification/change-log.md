@@ -213,6 +213,16 @@ session rediscovering that.
   guidance-tier change, and `lessons-learned.md` sits at 91% of its
   ceiling, so it belongs to a session that can verify the edit rather than
   to a close gate.
+- **The advisory path-aware critique did not run.** The set declares
+  `pathAwareCritique: advisory`, and `close_session` warned (non-blocking)
+  that no `path-aware-critique.json` exists. `pull_critique` needs **direct
+  provider API keys** (`DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`),
+  and this set was orchestrated from the Copilot-CLI seat, which carries
+  none by design. So an advisory gate is silently unavailable on one of the
+  two supported transports — the same class of gap this session fixed
+  elsewhere (a check that cannot run is not a check). Owed: either a
+  seat-transport path for the pull verifier, or an explicit "unavailable on
+  this transport" record rather than a warning that reads like an omission.
 - **`cite_lessons` and the freshness gate contradict each other**, and this
   session hit it at close. The constitution says to run `cite_lessons` "in
   the final commit" — i.e. *after* verification — but the marker it writes

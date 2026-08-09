@@ -1,0 +1,160 @@
+[meta]
+schema_version = 1
+cli_name = "GitHub Copilot CLI"
+cli_version = "GitHub Copilot CLI 1.0.78."
+cli_version_pin_required = true
+seat_id = "op-personal"
+seat_label = "operator-personal"
+source = "empirical-probe"
+probed_at = "2026-08-05T13:34:12Z"
+
+[[models]]
+id = "claude-sonnet-4.6"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 1
+echoed_model = "claude-sonnet-4.6"
+
+[[models]]
+id = "claude-sonnet-4.5"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 1
+echoed_model = "claude-sonnet-4.5"
+
+[[models]]
+id = "claude-haiku-4.5"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+echoed_model = "claude-haiku-4.5"
+
+[[models]]
+id = "claude-fable-5"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"
+
+[[models]]
+id = "claude-opus-4.8"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 15
+echoed_model = "claude-opus-4.8"
+
+[[models]]
+id = "claude-opus-4.7"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"
+
+[[models]]
+id = "claude-opus-4.6"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"
+
+[[models]]
+id = "claude-opus-4.6-fast"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"
+
+[[models]]
+id = "claude-opus-4.5"
+provider = "anthropic"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 3
+echoed_model = "claude-opus-4.5"
+
+[[models]]
+id = "gpt-5.5"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 0
+echoed_model = "gpt-5.5"
+
+[[models]]
+id = "gpt-5.4"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 0
+echoed_model = "gpt-5.4"
+
+[[models]]
+id = "gpt-5.3-codex"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 0
+echoed_model = "gpt-5.3-codex"
+
+[[models]]
+id = "gpt-5.2-codex"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"
+
+[[models]]
+id = "gpt-5.2"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"
+
+[[models]]
+id = "gpt-5.4-mini"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 0
+echoed_model = "gpt-5.4-mini"
+
+[[models]]
+id = "gpt-5-mini"
+provider = "openai"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 0
+echoed_model = "gpt-5-mini"
+
+[[models]]
+id = "gemini-3.1-pro-preview"
+provider = "google"
+provider_source = "name-prefix-heuristic"
+enablement = "confirmed"
+confirmed_at = "2026-08-05T13:34:12Z"
+confirmed_on_cli_version = "GitHub Copilot CLI 1.0.78."
+premium_request_weight = 1
+echoed_model = "gemini-3.1-pro-preview"
+
+[[models]]
+id = "gemini-3.5-flash"
+provider = "google"
+provider_source = "name-prefix-heuristic"
+enablement = "unconfirmed"

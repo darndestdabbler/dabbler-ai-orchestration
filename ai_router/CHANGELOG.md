@@ -9,10 +9,98 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [Unreleased] (Sets 105, 107, 109, 110, 111 — router-side changes awaiting a publish)
+## [Unreleased] (Sets 105, 107, 109, 110, 111, 112 — router-side changes awaiting a publish)
 
 > Router-side, not yet published. A version bump / PyPI publish is
-> operator-gated and recorded at release time.
+> operator-gated and recorded at release time. **Set 112 makes the next
+> release a MAJOR one** — see *Removed* below.
+
+### Removed
+
+- **(Set 112 S1) The Lightweight tier is gone — this is a BREAKING
+  change.** A session set can no longer declare `tier: lightweight`; a
+  spec that does fails to load with a one-line migration message
+  (`spec_config.LightweightTierRemovedError`) naming both remedies: set
+  `tier: full` (or drop the line) and give the router a provider —
+  `DABBLER_*` API keys for the Direct APIs transport, or an
+  authenticated GitHub Copilot CLI seat with `transport: {profile:
+  copilot-cli}`. It is never converted silently, because a silent
+  conversion would run a set under discipline its author did not choose
+  and did not configure a provider for. Consumer-repo migration:
+  `docs/cross-repo-lightweight-removal-notice.md`.
+
+  The tier existed to serve users who had no provider access. The
+  Copilot-seat profile (Sets 078/079/084/086/104) replaced it: a keyless
+  seat was measured on 2026-08-05 to expose **three** provider families
+  (`anthropic`, `google`, `openai`), so excluding the orchestrator's own
+  family still leaves two independent verifier families. Every known
+  user is now covered by one tier whose cross-provider verification
+  story is true without asterisks. Probe evidence is archived at
+  `docs/session-sets/112-remove-lightweight-tier/probe-evidence-copilot-catalog.lock`.
+
+  Deleted with it (2,581 lines of production code plus 8 test modules):
+
+  - `dedicated_verification.py` — Mode B: the `dedicated-sessions` typed
+    verification/remediation flow, its bounded re-verification loop, and
+    its content-aware close gate.
+  - `external_verification.py` — Mode A: the `external-verification.md`
+    hand-recorded-verdict parser, and with it the framework's last
+    sanctioned zero-verification path.
+  - `pending_verification.py` — the owed-verification start banner.
+  - `change_verification_mode.py` — the Mode A→B writer.
+  - `migrate_lightweight_to_canonical_v4.py` — the Lightweight-shape
+    state-file migrator, and its `lightweight-to-v4` slot in the
+    `check_migrations` bulk chain and the shipped
+    `docs/schema-current.json` manifest. The surviving chain is
+    `v2-to-v3` then `v3-to-v4`.
+  - `start_session --type verification|remediation`, `--handoff`,
+    `--handoff-verdict`, `--title`, and `--verification-mode`, plus the
+    `session_state.register_typed_session_start` /
+    `register_typed_session_handoff` writers behind them. Typed sessions
+    can no longer be CREATED; the per-session `type` field remains READ
+    vocabulary so archived sets still parse and render.
+  - The `verificationMode` spec field and every reader of it.
+  - `runtime_mode` precedence step 3 (the spec's `tier:` field). The
+    resolver now names exactly two sources.
+  - `test-fixtures/cold-start/lightweight/`.
+
+### Changed
+
+- **(Set 112 S1) `--no-router` is a test affordance, not a tier and not
+  a gate escape.** The flag and the `DABBLER_NO_ROUTER` env var survive
+  for CI and hermetic tests, with exactly one meaning: **suppress routed
+  API calls**. They no longer buy any close-gate relief. Three escapes
+  closed:
+
+  - `gate_checks._set_is_lightweight` is deleted. It returned True on the
+    **env var alone**, and it gated both `check_verification_integrity`
+    and the expensive-suite run-of-record freshness check — so a single
+    environment variable, with no tier and no attestation behind it,
+    disarmed two verification gates. Removing the tier while leaving that
+    in place would have converted a documented tier escape into an
+    undocumented back door.
+  - `--no-router` no longer writes a stock manual attestation on the
+    operator's behalf, nor records `verification_method="manual"`. The
+    recorded method now reflects the disposition's own claim, and the
+    deterministic evidence gate checks it. `--manual-verify` remains the
+    one attested bypass.
+  - The close backstop is still skipped under `--no-router`, for the one
+    honest reason: it *dispatches* a routed verification, and a
+    suppressed-dispatch invocation cannot run one.
+
+  **Consumer impact:** a CI job that relied on `DABBLER_NO_ROUTER=1` to
+  close a session without verification evidence now fails the
+  verification-integrity gate. Use `--manual-verify` with an attestation,
+  or produce real evidence.
+
+- **(Set 112 S1) `tier: full` and unknown `tier:` values are tolerated,
+  not errors.** Consumer repos hold hundreds of legacy `tier: full`
+  lines; refusing them would turn an inert field into a migration chore
+  for no safety gain. Only `lightweight` refuses. Prose that merely
+  *mentions* the removed value, and yaml fences outside the canonical
+  `Session Set Configuration` block, stay inert — which is what keeps
+  archived session sets, proposals, and the migration notice readable by
+  every tool that walks a repo.
 
 ### Added
 

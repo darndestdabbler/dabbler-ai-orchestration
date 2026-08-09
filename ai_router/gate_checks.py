@@ -271,11 +271,10 @@ def _has_remote(repo_root: str) -> bool:
 # ---------------------------------------------------------------------------
 
 # Repo-level marker that declares a repository deliberately remote-less.
-# It sits beside the extension's ``.dabbler/install-method`` marker, works
-# on Full and Lightweight tiers alike, and survives window reloads (unlike
-# volatile webview state). Only its *presence* matters — the file contents
-# are not interpreted. See ``ai_router/docs/close-out.md`` for the
-# sanctioned local-only close path.
+# It sits beside the extension's ``.dabbler/install-method`` marker and
+# survives window reloads (unlike volatile webview state). Only its
+# *presence* matters — the file contents are not interpreted. See
+# ``ai_router/docs/close-out.md`` for the sanctioned local-only close path.
 _LOCAL_ONLY_MARKER = os.path.join(".dabbler", "local-only")
 
 
@@ -862,37 +861,6 @@ def _verify_session_command(session_set_dir: str) -> str:
     return f"{interp} -m ai_router.verify_session --session-set-dir {display}"
 
 
-def _set_is_lightweight(session_set_dir: str) -> bool:
-    """True when the set runs Lightweight (spec ``tier:`` or env var).
-
-    Lightweight verification is per-set with its own close gates (Set 057
-    Q6 / Set 077); this Full-tier gate is inert there. A resolution error
-    treats the set as Full — an unreadable spec must not disarm the gate.
-    """
-    try:
-        # runtime_mode is a Set 048 module: bare imports are forbidden
-        # (test_production_imports — they silently no-op under
-        # pip-install). Relative first; package-absolute fallback for the
-        # top-level-module context the test harness imports this file under.
-        try:
-            from .runtime_mode import (  # type: ignore[import-not-found]
-                _env_var_truthy,
-                _spec_says_lightweight,
-            )
-        except ImportError:
-            from ai_router.runtime_mode import (  # type: ignore[no-redef]
-                _env_var_truthy,
-                _spec_says_lightweight,
-            )
-        from pathlib import Path as _Path
-
-        return _env_var_truthy() or _spec_says_lightweight(
-            _Path(session_set_dir)
-        )
-    except Exception:
-        return False
-
-
 def _claimed_close_verdict(disposition: Disposition) -> Optional[str]:
     """The verdict this close would persist — the claim to corroborate.
 
@@ -1076,10 +1044,10 @@ def _check_session_ledger_present(session_set_dir: str) -> GateOutcome:
 
     Orthogonal to the verdict/stamp axis (a hand-forged stamp can look
     corroborated while the ledger is absent), so this runs FIRST and
-    short-circuits — one message, the root cause, never two. Guards are
-    inherited from the caller: Lightweight is inert (its own early-out) and
-    ``--manual-verify`` swaps this whole gate for the vocabulary check, so the
-    ledger axis never fires on either sanctioned no-ledger path. ``--no-router``
+    short-circuits — one message, the root cause, never two. The one
+    inherited guard is ``--manual-verify``, which swaps this whole gate for
+    the vocabulary check, so the ledger axis never fires on the sanctioned
+    attested no-ledger path. ``--no-router``
     is deliberately NOT consulted: this sub-check only *inspects*, so skipping
     under it would reopen the very bypass being closed (gate-placement
     decision C: docs/session-sets/086.../s1-gate-placement-architecture.json).
@@ -1126,8 +1094,7 @@ def _check_session_ledger_present(session_set_dir: str) -> GateOutcome:
         # hole this set exists to remove) — block the close with a diagnostic.
         # The whole read+detect path is inside this try so no exception path
         # can convert to a silent pass. The operator can fix the ai_router
-        # install, or use the sanctioned --manual-verify (attested) /
-        # Lightweight escapes.
+        # install, or use the sanctioned --manual-verify (attested) escape.
         return (
             False,
             "verification_integrity ledger check could not run "
@@ -1173,9 +1140,8 @@ def _check_session_ledger_present(session_set_dir: str) -> GateOutcome:
         "absence means the session was fully simulated or the state file was "
         "hand-authored. Re-run the session through the real (authenticated) "
         f"router so start_session/close_session write the ledger, then verify "
-        f"via: {command}. If this set is genuinely Lightweight, declare "
-        "'tier: lightweight' in spec.md; if this is an authorized manual "
-        "close, re-run with --manual-verify (attested, logged).",
+        f"via: {command}. If this is an authorized manual close, re-run "
+        "with --manual-verify (attested, logged).",
     )
 
 
@@ -1267,7 +1233,10 @@ def check_verification_integrity(
          block; the refusal names the sanctioned ``verify_session``
          command.
 
-    Scope: Lightweight sets are covered by their own per-set gates.
+    Scope: every set. Set 112 deleted the Lightweight tier, and with it
+    the ``_set_is_lightweight`` early-out that let a spec field — or the
+    ``DABBLER_NO_ROUTER`` env var on its own — make this gate inert.
+    ``--no-router`` now suppresses routed calls and buys no gate relief.
 
     Posture: **hard-block in BOTH interactive and headless modes** — the
     policed actor *is* the headless agent, so a soft warning printed to
@@ -1303,17 +1272,12 @@ def check_verification_integrity(
     if not vocab_passed:
         return False, vocab_remediation
 
-    # Lightweight sets verify per-set through their own close gates
-    # (Set 057 Q6 / Set 077); this Full-tier per-session gate is inert.
-    if _set_is_lightweight(session_set_dir):
-        return True, ""
-
     # Layer 2a — ledger axis (Set 086 S1). Orthogonal to the verdict/stamp
     # axis below and checked FIRST with a short-circuit: a fully-simulated
     # session leaves a corroborated-looking verdict but no router ledger, so
-    # the ledger absence is the loudest, root-cause signal. Runs on the Full,
-    # non-manual path only (Lightweight already returned; --manual-verify
-    # swaps this gate out at the caller).
+    # the ledger absence is the loudest, root-cause signal. Runs on the
+    # non-manual path only (--manual-verify swaps this gate out at the
+    # caller).
     ledger_passed, ledger_remediation = _check_session_ledger_present(
         session_set_dir
     )
@@ -1598,13 +1562,11 @@ def check_test_run_fresh(
 
     Inert by construction where it should be: a suite whose covered
     surfaces this session did not touch is not required, and a set that
-    declares no expensive suites passes trivially. Lightweight sets skip
-    the gate entirely (their close gates are per-set, Set 057 Q6).
+    declares no expensive suites passes trivially. There is no tier-shaped
+    escape — Set 112 removed the Lightweight early-out.
     """
     _ = allow_empty_commit
 
-    if _set_is_lightweight(session_set_dir):
-        return True, ""
     if disposition is None:
         # A missing disposition is already the disposition_present gate's
         # failure; piling on here would double-report one root cause.
@@ -1658,10 +1620,12 @@ def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
     try:
         try:
             from .spec_config import (  # type: ignore[import-not-found]
+                LightweightTierRemovedError,
                 parse_session_set_config,
             )
         except ImportError:
             from ai_router.spec_config import (  # type: ignore[no-redef]
+                LightweightTierRemovedError,
                 parse_session_set_config,
             )
         from pathlib import Path as _Path
@@ -1669,6 +1633,14 @@ def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
         cfg = parse_session_set_config(
             _Path(session_set_dir) / "spec.md"
         )
+    except LightweightTierRemovedError:
+        # Set 112: never swallow the removed-tier refusal. This broad
+        # handler exists so an UNPARSEABLE spec leaves the gate inert; a
+        # spec that parses fine and declares a DELETED tier is the
+        # opposite case, and converting it to "(False, 'none')" would
+        # both hide the migration message and silently disarm an armed
+        # UAT policy. Re-raise so the caller's boundary refusal fires.
+        raise
     except Exception:
         return False, "none"
     # Only a literal `true` arms the gate. "suggested" is deliberately

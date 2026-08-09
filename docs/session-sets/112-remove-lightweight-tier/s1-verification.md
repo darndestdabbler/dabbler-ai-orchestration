@@ -1,0 +1,19 @@
+ISSUES FOUND
+
+**Issue 1:** The `tier: lightweight` fail-loud error is swallowed by the only live production caller.
+- **Category:** Correctness / Completeness
+- **Severity:** Major
+- **Failure scenario:** A legacy Lightweight consumer—the exact migration target for this set—runs the normal router close/gate path with `tier: lightweight` still in the canonical config block. Instead of seeing the migration one-liner, `gate_checks._uat_policy()` catches the new `LightweightTierRemovedError` as a generic exception and returns `(False, "none")`, so the removed tier can proceed into later gates and can even evaporate an armed UAT policy. This is probable because existing Lightweight specs are the main population affected by Set 112, and `gate_checks` is the only production caller left after `runtime_mode` stopped reading the spec.
+- **Acceptance criterion:** `JUDGMENT - A router lifecycle/gate path invoked against a spec whose canonical Session Set Configuration contains tier: lightweight must block with LIGHTWEIGHT_REMOVED_MESSAGE, and no broad exception handler may convert that condition into an inert/default policy.`
+- **Details:** Violation: the plan requires “Fail-loud loader: `tier: lightweight` in a spec errors with the migration one-liner” and ends with “`tier: lightweight` fails loud with a helpful message.” Evidence: `spec_config.py` raises at lines 153–156, but `gate_checks.py` catches all exceptions at lines 1620–1635 and returns `False, "none"`. A direct probe confirmed the mismatch: `parse_session_set_config()` raises `LightweightTierRemovedError`, while `_uat_policy()` returns `(False, 'none')` for the same spec. The correct behavior is to propagate or explicitly translate this error into a failing gate result with the migration message.
+
+**Issue 2:** The authoritative close-out doc still documents deleted Lightweight close paths.
+- **Category:** Completeness
+- **Severity:** Major
+- **Failure scenario:** An operator or agent debugging close-out follows `ai_router/docs/close-out.md` after this removal lands. The doc still tells them Lightweight projects hand-write state, Lightweight closes keep their own per-set gates, `--no-router` has an external-verification soft gate, `verificationMode == dedicated-sessions` has a dedicated-verification gate, and prevention is to commit the set to Lightweight tier. Those are now deleted or refused paths, so the doc sends a typical blocked user toward impossible or obsolete remediation.
+- **Acceptance criterion:** `JUDGMENT - ai_router/docs/close-out.md no longer presents Lightweight as a supported close-out mode, no longer lists external-verification or dedicated-verification close gates, and describes --no-router only as routed-call suppression with no gate relief.`
+- **Details:** Violation: S1’s plan says to delete “Lightweight branches in close-out/gates/narration,” and the S1 inventory explicitly listed `ai_router/docs/close-out.md` forward-looking instructions as S1 cleanup, not an S2 docs deferral. Evidence: the doc still says “Lightweight-tier projects hand-write the same fields” at lines 113–117, “Lightweight closes keep their own per-set gates” at lines 369–370, lists the external-verification and dedicated-verification gates at lines 421–425, and advises committing a set to Lightweight at lines 965–969. The correct answer is to align this router-side close-out reference with the one-tier behavior.
+
+**NITS**
+
+- The S1 measurement artifacts are internally inconsistent: the handoff/test-runs claim `3,565 passed / 9 skipped`, while `s1-before-after-numbers.md` says `3,569 passed / 9 skipped`; the prose says 8 deleted test modules while the status shows 9 deleted test files; and `s1-kill-inventory.md` has a “5 modules, 143 tests” heading whose table totals 8 modules / 153 tests. Non-blocking, but the before/after evidence record should be cleaned up.

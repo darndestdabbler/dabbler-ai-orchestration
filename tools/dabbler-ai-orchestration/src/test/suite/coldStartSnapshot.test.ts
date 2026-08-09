@@ -1,19 +1,23 @@
 // Set 058 S3 — golden snapshot of the consumer-bootstrap render (D8).
 //
-// Renders the shared template writer's output for a FIXED context, for BOTH
-// tiers, and asserts byte-equality against committed golden fixtures under
-// repo-root test-fixtures/cold-start/<tier>/. A template edit changes the
-// render and fails this test until the golden is regenerated — that
-// regeneration is the deliberate, reviewed act that keeps generated stubs and
-// the rendered template bundle in lock-step.
+// Renders the shared template writer's output for a FIXED context and asserts
+// byte-equality against the committed golden fixture under repo-root
+// test-fixtures/cold-start/<tier>/. A template edit changes the render and
+// fails this test until the golden is regenerated — that regeneration is the
+// deliberate, reviewed act that keeps generated stubs and the rendered
+// template bundle in lock-step.
+//
+// Set 112 S1 deleted the Lightweight tier and its golden tree, so only the
+// `full` render is snapshotted. The `Tier` type and the context's
+// `verificationMode` field are still threaded through consumerBootstrap; S2
+// removes them from the extension along with the Getting Started tier fork.
 //
 // The same golden tree is the input to the Python cold-start ACCEPTANCE test
 // (ai_router/tests/test_cold_start_acceptance.py), which boots a throwaway repo
-// from these exact files and walks the cold-start chain per tier: it resolves
-// THE active set, drives the real start_session entry point (which derives the
-// router mode from the spec's tier:), and closes through the shared gate.
-// One artifact set, checked from both languages: TS proves the writer emits it,
-// Python proves it boots.
+// from these exact files and walks the cold-start chain: it resolves THE active
+// set, drives the real start_session entry point, and closes through the shared
+// gate. One artifact set, checked from both languages: TS proves the writer
+// emits it, Python proves it boots.
 //
 // Regenerate after an intentional template change:
 //   cd tools/dabbler-ai-orchestration
@@ -64,7 +68,7 @@ function goldenCtx(tier: Tier): BootstrapContext {
   };
 }
 
-const TIERS: Tier[] = ["full", "lightweight"];
+const TIERS: Tier[] = ["full"];
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
 suite("consumerBootstrap — cold-start golden snapshot", () => {

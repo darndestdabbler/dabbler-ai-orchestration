@@ -450,10 +450,10 @@ def run_close_backstop(
     route_fn: Optional[Callable] = None,
     complexity_hint: int = _DEFAULT_COMPLEXITY_HINT,
 ) -> BackstopOutcome:
-    """Run the Set 084 close backstop for one Full-tier close attempt.
+    """Run the Set 084 close backstop for one close attempt.
 
     The caller (``close_session.run``) has already excluded the
-    ``--force`` / ``--manual-verify`` / Lightweight paths and holds the
+    ``--force`` / ``--manual-verify`` / ``--no-router`` paths and holds the
     close lock. This function decides skip-vs-run, performs the
     verification when owed, writes the artifacts + stamped row + the
     disposition patch, and reports what happened; the caller maps the

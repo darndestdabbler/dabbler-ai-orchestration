@@ -759,9 +759,9 @@ def _untagged_yaml_blocks(lines: list[str]) -> list[int]:
     - **Taken:** a mapping key followed by an indented scalar list
       (``providers:`` / ``  - codex``). The first version required EVERY line to
       be a ``key:``, so the list items disqualified the block.
-    - **Declined:** a lone ``tier: lightweight``. A ONE-LINE ``word: value``
-      fence is not distinguishable from configuration by shape, and this
-      tutorial legitimately contains two of them —
+    - **Declined:** a lone ``key: value`` YAML line. A ONE-LINE
+      ``word: value`` fence is not distinguishable from configuration by
+      shape, and this tutorial legitimately contains two of them —
       ``Dabbler: Try a sample project`` and ``close_session: succeeded``.
       Widening to single lines flagged both. Two real lines stay the threshold;
       the residual is named in the session disposition rather than traded for

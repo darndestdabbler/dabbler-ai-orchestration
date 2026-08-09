@@ -10,10 +10,10 @@ artifact, the gate:
   * for ``advisory``: ALWAYS soft-warns and never blocks;
   * for ``none``: skips entirely.
 
-It fires ONLY on the set-terminal close. It is **tier-orthogonal** — it gates
-on the tier-independent ``pathAwareCritique`` record, so the behavior is
-identical on Full and Lightweight (the net-new Full-tier wiring is the whole
-point of Set 066: the Set-057 dedicated_verification gate is Lightweight-only).
+It fires ONLY on the set-terminal close and gates on the per-set
+``pathAwareCritique`` record alone. Set 112 deleted the Lightweight tier, so
+the tier-parameterized cases collapsed to one; a legacy ``tier:`` line in a
+spec is inert here.
 """
 from __future__ import annotations
 
@@ -74,13 +74,13 @@ def _trivial_artifact(set_name: str) -> dict:
     return art
 
 
-def _make_set(tmp_path, *, sessions, total, level=REQUIRED, tier="full",
+def _make_set(tmp_path, *, sessions, total, level=REQUIRED,
               artifact=None):
     d = tmp_path / "066-gate"
     d.mkdir()
     (d / "spec.md").write_text(
         "# spec\n\n## Session Set Configuration\n\n"
-        f"```yaml\ntier: {tier}\n```\n",
+        "```yaml\nrequiresUAT: false\n```\n",
         encoding="utf-8",
     )
     state = {
@@ -95,13 +95,6 @@ def _make_set(tmp_path, *, sessions, total, level=REQUIRED, tier="full",
     )
     (d / "activity-log.json").write_text(
         json.dumps({"entries": []}, indent=2), encoding="utf-8"
-    )
-    # Set 077 S4 (A3): the external-verification soft gate now keys off
-    # the RESOLVED tier, so lightweight-parameterized fixtures receive
-    # it too. Seed a recorded verdict to keep it quiet — these tests
-    # exercise the path-aware-critique gate, not the soft gate.
-    (d / "external-verification.md").write_text(
-        "## Round 1 — 2026-07-02\n\nVerdict: VERIFIED\n", encoding="utf-8"
     )
     if level is not None:
         pac.record_path_aware_critique(d, level)
@@ -175,11 +168,9 @@ def _ns(set_dir, **overrides):
 
 # --- none: gate never fires -------------------------------------------------
 
-@pytest.mark.parametrize("tier", ["full", "lightweight"])
-def test_none_does_not_fire_gate(tmp_path, monkeypatch, capsys, tier):
+def test_none_does_not_fire_gate(tmp_path, monkeypatch, capsys):
     d = _make_set(
         tmp_path, sessions=[_work(1, "in-progress")], total=1, level=NONE,
-        tier=tier,
     )
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     outcome = run(_ns(d))
@@ -199,12 +190,9 @@ def test_none_unrecorded_default_does_not_fire(tmp_path, monkeypatch):
 
 # --- required: hard-block / soft-warn posture -------------------------------
 
-@pytest.mark.parametrize("tier", ["full", "lightweight"])
-def test_required_missing_artifact_tty_hard_blocks(tmp_path, monkeypatch, tier):
-    # Tier-orthogonal: identical hard-block on Full and Lightweight.
+def test_required_missing_artifact_tty_hard_blocks(tmp_path, monkeypatch):
     d = _make_set(
         tmp_path, sessions=[_work(1, "in-progress")], total=1, level=REQUIRED,
-        tier=tier,
     )
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     outcome = run(_ns(d))

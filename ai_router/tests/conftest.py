@@ -11,8 +11,8 @@ consistency with existing test files.
 Set 048 S5: production code (``ai_router/__init__.py``,
 ``start_session.py``, ``close_session.py``, ``runtime_mode.py``) was
 discovered to use bare imports of the Set 048 modules
-(``runtime_mode``, ``spec_config``, ``suggestion_disposition``,
-``migrate_lightweight_to_canonical_v4``). Those bare imports only
+(``runtime_mode``, ``spec_config``, ``suggestion_disposition``).
+Those bare imports only
 worked under the test sys.path shim above — pip-installed consumers
 hit ``ModuleNotFoundError``. Production code now uses relative
 imports (``from .runtime_mode import …``). The Set 048 modules carry
@@ -84,7 +84,6 @@ _SHARED_MODULE_NAMES = (
     "runtime_mode",
     "spec_config",
     "suggestion_disposition",
-    "migrate_lightweight_to_canonical_v4",
     "call_trace",
     "pricing",
 )

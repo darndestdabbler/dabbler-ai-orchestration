@@ -7,24 +7,29 @@
  * Surfaced as a title-bar icon on the Session Sets view, enabled only
  * when at least one set is on a sub-current schema (the
  * `dabblerSessionSets.hasSubCurrentSets` context key, set during the
- * scan). Clicking it runs the corrected THREE-migrator chain in
+ * scan). Clicking it runs the migrator chain in
  * sequence, in-place, across every set under each workspace root's
  * docs/session-sets:
  *
- *   1. migrate_session_state              (v2 -> v3)
- *   2. migrate_lightweight_to_canonical_v4 (non-canonical / missing -> v4)
- *   3. migrate_v3_to_v4                    (v3 -> v4)
+ *   1. migrate_session_state (v2 -> v3)
+ *   2. migrate_v3_to_v4      (v3 -> v4)
  *
  * The S2 empirical correction (memory + check_migrations CHAIN NOTE): a
- * genuine v2 file is skipped by BOTH the lightweight and v3->v4
- * migrators, so the v2->v3 step (migrate_session_state) is required and
- * must run first. Each step is idempotent / skips inapplicable files, so
- * the sequence safely upgrades any drifted set and no-ops on clean ones.
+ * genuine v2 file is skipped by the v3->v4 migrator, so the v2->v3 step
+ * (migrate_session_state) is required and must run first. Each step is
+ * idempotent / skips inapplicable files, so the sequence safely upgrades
+ * any drifted set and no-ops on clean ones.
+ *
+ * Set 112 removed the third step. `migrate_lightweight_to_canonical_v4`
+ * repaired the non-canonical shapes that hand-maintained Lightweight
+ * state files produced; the tier is deleted and no writer produces them.
+ * The module no longer exists, so leaving it in this list would have
+ * failed the whole bulk upgrade on its second subprocess.
  *
  * This bulk path shells out to Python (the heavier, deliberate operator
- * action genuinely needs all three migrators, and only the v3->v4 step
- * has an in-process TS twin). The per-row single-set "Migrate to v4"
- * command remains in-process for routerless Lightweight repos.
+ * action needs both migrators, and only the v3->v4 step has an in-process
+ * TS twin). The per-row single-set "Migrate to v4" command remains
+ * in-process for repos with no router installed.
  */
 import * as vscode from "vscode";
 import * as cp from "child_process";
@@ -47,7 +52,6 @@ interface CommandDeps {
 // BULK_UPGRADE_MIGRATOR_IDS without launching VS Code.
 export const BULK_UPGRADE_MODULES: readonly string[] = [
   "ai_router.migrate_session_state",
-  "ai_router.migrate_lightweight_to_canonical_v4",
   "ai_router.migrate_v3_to_v4",
 ];
 

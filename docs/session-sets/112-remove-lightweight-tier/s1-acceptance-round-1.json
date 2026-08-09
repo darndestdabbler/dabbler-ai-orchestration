@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "66cff3d1a2d43b16fb77c24340893812f09be89a",
+  "fixedTree": "abc281eed3c48f305070e317dc390de14acbf8bf",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-09T10:26:34.589186+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The `tier: lightweight` fail-loud error is swallowed by the only live production caller. - **Category:** Correctness / Completeness - **Severity:** Major - **Failure scenario:** A legacy Lightweigh ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A router lifecycle/gate path invoked against a spec whose canonical Session Set Configuration contains tier: lightweight must block with LIGHTWEIGHT_REMOVED_MESSAGE, and no broad exception handler may convert that condition into an inert/default policy.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The authoritative close-out doc still documents deleted Lightweight close paths. - **Category:** Completeness - **Severity:** Major - **Failure scenario:** An operator or agent debugging close-out ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "ai_router/docs/close-out.md no longer presents Lightweight as a supported close-out mode, no longer lists external-verification or dedicated-verification close gates, and describes --no-router only as routed-call suppression with no gate relief.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** `tier: lightweight` is not fail-loud on the real lifecycle path. - **Category:** Completeness / Correctness - **Severity:** Major - **Failure scenario:** A typical stranded Lightweight consumer run ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A session set whose canonical Session Set Configuration declares tier: lightweight, including quoted YAML value \"lightweight\", is refused by start_session/close_session before any state or event write, and the refusal surfaces LIGHTWEIGHT_REMOVED_MESSAGE rather than a generic verification/UAT result.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

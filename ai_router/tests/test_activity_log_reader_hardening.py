@@ -5,7 +5,9 @@ The non-list-``entries`` guard + ``UnicodeError`` tolerance proven in the Set 07
 readers that walk ``activity-log.json`` looking for a durable record:
 
 - ``path_aware_critique.read_path_aware_critique`` / ``has_path_aware_critique_record``
-- ``dedicated_verification.read_verification_mode`` / ``has_verification_mode_record``
+
+Set 112 deleted the ``dedicated_verification`` pair with the Lightweight
+tier; the surviving readers keep the same guarantee.
 
 L-069-1: a bug is a bug CLASS. A malformed ``entries`` (non-list) or invalid
 UTF-8 bytes must collapse to the no-record default on EVERY sibling, never raise -
@@ -20,15 +22,12 @@ from pathlib import Path
 import pytest
 
 import path_aware_critique as pac
-import dedicated_verification as dv
 
 
-# (reader, is_predicate, no_record_value) for each of the four sibling readers.
+# (reader, is_predicate, no_record_value) for each surviving sibling reader.
 _READERS = [
     (pac.read_path_aware_critique, False, pac.DEFAULT_PATH_AWARE_CRITIQUE),
     (pac.has_path_aware_critique_record, True, False),
-    (dv.read_verification_mode, False, dv.DEFAULT_VERIFICATION_MODE),
-    (dv.has_verification_mode_record, True, False),
 ]
 
 
@@ -73,13 +72,9 @@ def test_non_dict_entry_members_are_skipped_not_fatal(tmp_path, reader, is_pred,
     skipped) while a valid record present alongside them is still found."""
     set_dir = tmp_path / "set"
     set_dir.mkdir()
-    # Mix junk members with a genuine record for whichever reader this is.
-    if reader in (pac.read_path_aware_critique, pac.has_path_aware_critique_record):
-        good = {"kind": "path_aware_critique", "choice": "required"}
-        expected_read = "required"
-    else:
-        good = {"kind": "verification_mode", "choice": "dedicated-sessions"}
-        expected_read = "dedicated-sessions"
+    # Mix junk members with a genuine record.
+    good = {"kind": "path_aware_critique", "choice": "required"}
+    expected_read = "required"
     _write(set_dir, {"entries": [1, "junk", None, good]})
     if is_pred:
         assert reader(set_dir) is True  # the valid record IS found
@@ -92,5 +87,3 @@ def test_missing_file_returns_no_record(tmp_path):
     set_dir.mkdir()  # no activity-log.json at all
     assert pac.read_path_aware_critique(set_dir) == pac.DEFAULT_PATH_AWARE_CRITIQUE
     assert pac.has_path_aware_critique_record(set_dir) is False
-    assert dv.read_verification_mode(set_dir) == dv.DEFAULT_VERIFICATION_MODE
-    assert dv.has_verification_mode_record(set_dir) is False

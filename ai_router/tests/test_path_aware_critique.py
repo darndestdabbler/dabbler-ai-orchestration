@@ -132,7 +132,12 @@ class TestSpecSeed:
         _spec(d, REQ)
         assert pac.read_spec_path_aware_critique(d) == REQ
 
-    def test_tier_orthogonal_lightweight_seed(self, tmp_path):
+    def test_legacy_tier_line_does_not_disturb_the_seed(self, tmp_path):
+        """A leftover ``tier:`` line in a consumer's spec is inert here.
+
+        This gate reads its own field with its own extractor, so a stale
+        tier declaration neither seeds nor suppresses it.
+        """
         d = _set_dir(tmp_path)
         _spec(d, ADV, tier="lightweight")
         assert pac.read_spec_path_aware_critique(d) == ADV

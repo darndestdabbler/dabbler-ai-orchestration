@@ -33889,7 +33889,6 @@ var path44 = __toESM(require("path"));
 var fs38 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
   "ai_router.migrate_session_state",
-  "ai_router.migrate_lightweight_to_canonical_v4",
   "ai_router.migrate_v3_to_v4"
 ];
 var SESSION_SETS_REL2 = path44.join("docs", "session-sets");

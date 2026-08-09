@@ -1,13 +1,24 @@
-"""Unit tests for --no-router close_session behavior.
+"""Unit tests for --no-router close_session behavior after Set 112.
 
-Set 048 Session 2 §3.1 A3 + §3.5: close_session.run() under --no-router
-mode short-circuits routed verification (records method="manual" with
-a stock attestation) AND fires a soft gate when external-verification.md
-is missing.
+``--no-router`` is a **test affordance**: it suppresses routed API calls so
+CI and hermetic tests can drive the CLIs end-to-end without spending money
+or needing a network. Set 112 deleted the Lightweight tier, and with it
+everything that made this flag a *verification* posture:
 
-The soft gate:
-  * --accept-suggestions OR non-TTY → stderr warning + proceed
-  * Interactive TTY → "[y/N]" prompt; "y" proceeds, anything else aborts
+  * the ``external-verification.md`` soft gate (Mode A) it used to fire;
+  * the stock manual attestation it wrote on the operator's behalf;
+  * the ``verification_method="manual"`` it recorded without a human;
+  * the ``check_verification_integrity`` / run-of-record-freshness
+    early-outs it inherited from ``_set_is_lightweight``.
+
+What survives, and what these tests pin:
+
+  * it still suppresses the routed close backstop (that gate DISPATCHES,
+    so a suppressed-dispatch invocation genuinely cannot run it);
+  * it self-attests nothing;
+  * the env var activates it exactly like the flag;
+  * ``--manual-verify`` remains the one attested bypass, and it is
+    unaffected by ``--no-router``.
 """
 from __future__ import annotations
 
@@ -20,6 +31,7 @@ import runtime_mode
 from close_session import (
     GateResult,
     _build_parser,
+    _resolve_no_router_for_run,
     run,
 )
 from disposition import (
@@ -49,7 +61,7 @@ def started_set(tmp_path: Path, monkeypatch) -> str:
     d.mkdir()
     (d / "spec.md").write_text(
         "# spec\n\n## Session Set Configuration\n\n"
-        "```yaml\ntier: lightweight\nrequiresUAT: false\n```\n",
+        "```yaml\nrequiresUAT: false\n```\n",
         encoding="utf-8",
     )
     register_session_start(
@@ -66,7 +78,7 @@ def started_set(tmp_path: Path, monkeypatch) -> str:
         str(d),
         Disposition(
             status="completed",
-            summary="lightweight test session",
+            summary="no-router test session",
             verification_method="api",
             files_changed=["foo.py"],
             verification_message_ids=[],
@@ -74,8 +86,8 @@ def started_set(tmp_path: Path, monkeypatch) -> str:
             blockers=[],
         ),
     )
-    # Stub the gate-check runner so the flow reaches our new soft-gate
-    # code without needing a real git repo etc.
+    # Stub the gate-check runner so the flow reaches the code under test
+    # without needing a real git repo etc.
     monkeypatch.setattr(
         close_session,
         "_run_gate_checks",
@@ -106,363 +118,179 @@ def _ns(set_dir: str, **overrides):
     return args
 
 
-# ---------- non-interactive (CI / no-TTY) branch ----------
-
-
-def test_no_router_non_tty_with_missing_ext_verify_warns_and_proceeds(
-    started_set: str, monkeypatch, capsys
-):
-    """No external-verification.md + no TTY → stderr warning, proceeds."""
-    # Simulate no TTY.
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    args = _ns(started_set, no_router=True)
-    outcome = run(args)
-    assert outcome.result == "succeeded"
-    captured = capsys.readouterr()
-    assert "external-verification.md missing" in captured.err
-    assert "external-verification.md missing" in " ".join(outcome.messages)
-
-
-def test_no_router_accept_suggestions_bypasses_prompt(
-    started_set: str, monkeypatch, capsys
-):
-    """--accept-suggestions forces non-interactive even with TTY."""
-    # Simulate TTY (the flag should override).
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite --accept-suggestions")
-
-    args = _ns(started_set, no_router=True, accept_suggestions=True)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-
-
-# ---------- interactive (TTY) branch ----------
-
-
-def test_no_router_tty_prompt_y_proceeds(started_set: str, monkeypatch):
-    """TTY + answer 'y' → close-out proceeds, message recorded."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=lambda _p: "y")
-    assert outcome.result == "succeeded"
-    assert "operator confirmed" in " ".join(outcome.messages)
-
-
-def test_no_router_tty_prompt_yes_proceeds(started_set: str, monkeypatch):
-    """TTY + answer 'yes' (full word) → close-out proceeds."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=lambda _p: "yes")
-    assert outcome.result == "succeeded"
-
-
-def test_no_router_tty_prompt_n_aborts(started_set: str, monkeypatch):
-    """TTY + answer 'n' → aborted_at_soft_gate."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=lambda _p: "n")
-    assert outcome.result == "aborted_at_soft_gate"
-    assert "soft gate" in " ".join(outcome.messages).lower()
-
-
-def test_no_router_tty_prompt_empty_aborts(started_set: str, monkeypatch):
-    """TTY + empty answer → default-no behavior → abort."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=lambda _p: "")
-    assert outcome.result == "aborted_at_soft_gate"
-
-
-def test_no_router_tty_abort_emits_closeout_failed_event(
-    started_set: str, monkeypatch
-):
-    """Soft-gate abort emits a closeout_failed event for audit trail."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    args = _ns(started_set, no_router=True)
-    run(args, prompt_fn=lambda _p: "n")
-    events = read_events(started_set)
-    failed = [e for e in events if e.event_type == "closeout_failed"]
-    assert failed, "soft-gate abort should emit a closeout_failed event"
-    assert "external_verification_soft_gate" in failed[-1].fields.get(
-        "failed_checks", []
-    )
-
-
-# ---------- external-verification.md content-awareness (Set 077 A4) ----------
-
-
-def test_no_router_with_verified_artifact_does_not_fire_soft_gate(
-    started_set: str, monkeypatch
-):
-    """A file with a recognizable VERIFIED verdict passes the gate silently."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    Path(started_set, "external-verification.md").write_text(
-        "## Round 1 — 2026-07-02\n\nVerdict: VERIFIED\n", encoding="utf-8"
-    )
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite a recorded VERIFIED verdict")
-
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-    assert "VERIFIED" in " ".join(outcome.messages)
-
-
-def test_no_router_with_verdictless_artifact_fires_soft_gate(
-    started_set: str, monkeypatch
-):
-    """Set 077 A4: a present-but-verdict-less file gets the same soft gate
-    as absence (previously an empty file passed the presence-only check)."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    Path(started_set, "external-verification.md").write_text(
-        "operator's manual verification notes, no verdict recorded\n",
-        encoding="utf-8",
-    )
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=lambda _p: "n")
-    assert outcome.result == "aborted_at_soft_gate"
-
-
-def test_no_router_with_empty_artifact_fires_soft_gate(
-    started_set: str, monkeypatch, capsys
-):
-    """Set 077 A4: an empty file no longer passes the gate."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    Path(started_set, "external-verification.md").write_text(
-        "", encoding="utf-8"
-    )
-    args = _ns(started_set, no_router=True)
-    outcome = run(args)
-    assert outcome.result == "succeeded"  # soft: non-TTY warns + proceeds
-    captured = capsys.readouterr()
-    assert "no recognizable verdict" in captured.err
-
-
-def test_no_router_with_waived_verdict_passes_and_records_reason(
-    started_set: str, monkeypatch
-):
-    """A WAIVED verdict (with its required reason) satisfies the gate."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    Path(started_set, "external-verification.md").write_text(
-        "## Round 1 — 2026-07-02\n\n"
-        "Verdict: WAIVED — solo project, no second provider available\n",
-        encoding="utf-8",
-    )
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite a recorded WAIVED verdict")
-
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-    joined = " ".join(outcome.messages)
-    assert "WAIVED" in joined
-    assert "solo project" in joined
-
-
-def test_no_router_with_issues_found_passes_with_outstanding_note(
-    started_set: str, monkeypatch
-):
-    """ISSUES_FOUND is a recorded verdict — the gate passes soft, but the
-    outstanding-remediation note is voiced."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    Path(started_set, "external-verification.md").write_text(
-        "## Round 1 — 2026-07-02\n\n"
-        "Verdict: ISSUES_FOUND\n\n- [Major] the frobnicator regressed\n",
-        encoding="utf-8",
-    )
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite a recorded verdict")
-
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-    assert "ISSUES_FOUND" in " ".join(outcome.messages)
-    assert "still owed" in " ".join(outcome.messages)
-
-
-def test_latest_round_wins_over_earlier_issues_found(
-    started_set: str, monkeypatch
-):
-    """Round semantics: a later VERIFIED round supersedes an earlier
-    ISSUES_FOUND round."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    Path(started_set, "external-verification.md").write_text(
-        "## Round 1 — 2026-07-01\n\nVerdict: ISSUES_FOUND\n\n"
-        "- [Major] missing regression test\n\n"
-        "## Round 2 — 2026-07-02\n\nVerdict: VERIFIED\n",
-        encoding="utf-8",
-    )
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite the latest round being VERIFIED")
-
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-    joined = " ".join(outcome.messages)
-    assert "VERIFIED (round 2)" in joined
-    assert "still owed" not in joined
-
-
-def test_spec_scoped_verdict_does_not_satisfy_the_gate(
-    started_set: str, monkeypatch, capsys
-):
-    """S4 code-review fix: a pre-work SPECIFICATION review's verdict must
-    not read as work verification — the soft gate still warns."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    Path(started_set, "external-verification.md").write_text(
-        "## Round 1 — 2026-07-02\n\n"
-        "Scope: specification\n\n"
-        "Verdict: VERIFIED\n",
-        encoding="utf-8",
-    )
-    args = _ns(started_set, no_router=True)
-    outcome = run(args)
-    assert outcome.result == "succeeded"  # soft posture unchanged
-    captured = capsys.readouterr()
-    assert "only a specification review" in captured.err
-
-
-def test_work_round_after_spec_round_satisfies_the_gate(
-    started_set: str, monkeypatch
-):
-    """A later work-review round supersedes the spec-scoped one."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    Path(started_set, "external-verification.md").write_text(
-        "## Round 1 — 2026-07-01\n\nScope: specification\n\nVerdict: VERIFIED\n\n"
-        "## Round 2 — 2026-07-02\n\nVerdict: VERIFIED\n",
-        encoding="utf-8",
-    )
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite a work-review verdict")
-
-    args = _ns(started_set, no_router=True)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-    assert "VERIFIED (round 2)" in " ".join(outcome.messages)
-
-
-# ---------- resolved-mode keying (Set 077 A3) ----------
-
-
-def test_spec_lightweight_without_cli_flag_fires_soft_gate(
-    started_set: str, monkeypatch, capsys
-):
-    """Set 077 A3 regression: a spec-declared Lightweight set gets the soft
-    gate WITHOUT the raw --no-router CLI flag (previously the gate keyed
-    off args.no_router only and this branch was dead)."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    args = _ns(started_set)  # no no_router override — spec.md decides
-    outcome = run(args)
-    assert outcome.result == "succeeded"
-    assert outcome.verification_method == "manual"
-    captured = capsys.readouterr()
-    assert "external-verification.md missing" in captured.err
-
-
-# ---------- dedicated-sessions stand-down (Set 077 A8) ----------
-
-
-def test_dedicated_mode_stands_down_external_verification_gate(
-    started_set: str, monkeypatch, capsys
-):
-    """When the recorded verificationMode is dedicated-sessions, the
-    external-verification gate stands down — the typed-session gate is
-    the authority, and only one corrective is voiced (A8)."""
-    import json as _json
-
-    from dedicated_verification import record_verification_mode
-
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    # record_verification_mode requires an existing activity log.
-    Path(started_set, "activity-log.json").write_text(
-        _json.dumps({"entries": []}), encoding="utf-8"
-    )
-    record_verification_mode(started_set, "dedicated-sessions")
-
-    args = _ns(started_set, no_router=True)
-    outcome = run(args)
-    joined = " ".join(outcome.messages)
-    assert "stood down" in joined
-    assert "external-verification.md missing" not in joined
-    captured = capsys.readouterr()
-    assert "external-verification.md missing" not in captured.err
-
-
-# ---------- full-tier (no --no-router) is unaffected ----------
-
-
-def test_full_tier_does_not_fire_soft_gate(started_set: str, monkeypatch):
-    """A genuinely full-tier set (spec tier: full, no CLI flag, no env var)
-    never fires the soft gate."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
-    # The shared fixture's spec declares tier: lightweight (most tests
-    # here want that); this test needs a real full-tier spec.
-    Path(started_set, "spec.md").write_text(
-        "# spec\n\n## Session Set Configuration\n\n"
-        "```yaml\ntier: full\nrequiresUAT: false\n```\n",
-        encoding="utf-8",
-    )
-
-    def prompt_fn_should_not_be_called(_p):
-        pytest.fail("prompt_fn called despite full-tier invocation")
-
-    args = _ns(started_set, manual_verify=True)
-    # manual_verify requires a reason — provide one via reason_file
-    reason = Path(started_set) / "reason.md"
-    reason.write_text("manual attestation for test\n", encoding="utf-8")
-    args.reason_file = str(reason)
-    outcome = run(args, prompt_fn=prompt_fn_should_not_be_called)
-    assert outcome.result == "succeeded"
-
-
-# ---------- method resolution and attestation ----------
-
-
-def test_no_router_records_method_manual(started_set: str, monkeypatch):
-    """--no-router records verification_method='manual' on the outcome."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)  # non-interactive
-    args = _ns(started_set, no_router=True)
-    outcome = run(args)
-    assert outcome.verification_method == "manual"
-
-
-def test_no_router_uses_stock_attestation_when_no_reason_file(
-    started_set: str, monkeypatch
-):
-    """Without --reason-file, --no-router auto-provides a stock attestation."""
-    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    args = _ns(started_set, no_router=True)
-    run(args)
-    events = read_events(started_set)
-    verify_completed = [
-        e for e in events if e.event_type == "verification_completed"
+def _verification_completed(set_dir: str):
+    return [
+        e for e in read_events(set_dir) if e.event_type == "verification_completed"
     ]
-    assert verify_completed
-    attestation = verify_completed[-1].fields.get("attestation", "")
-    assert "Lightweight tier" in attestation
-    assert "--no-router" in attestation
 
 
-def test_no_router_uses_reason_file_when_provided(
+# ---------- activation sources ----------
+
+
+def test_cli_flag_activates(started_set: str):
+    args = _ns(started_set, no_router=True)
+    assert _resolve_no_router_for_run(args, started_set) is True
+
+
+def test_env_var_activates_without_the_flag(started_set: str, monkeypatch):
+    """The Set 077 A3 fix, preserved: the env var must reach run()."""
+    monkeypatch.setenv(ENV_VAR_NAME, "1")
+    args = _ns(started_set)
+    assert _resolve_no_router_for_run(args, started_set) is True
+
+
+def test_neither_source_leaves_the_router_enabled(started_set: str):
+    args = _ns(started_set)
+    assert _resolve_no_router_for_run(args, started_set) is False
+
+
+def test_spec_tier_line_does_not_activate(tmp_path: Path, monkeypatch):
+    """Set 112: a spec field can no longer switch the router off.
+
+    A leftover ``tier: lightweight`` line in a consumer's spec must not
+    silently suppress dispatch -- the spec loader refuses such a spec, and
+    this resolver never consults the spec at all.
+    """
+    d = tmp_path / "legacy-set"
+    d.mkdir()
+    (d / "spec.md").write_text(
+        "# spec\n\n## Session Set Configuration\n\n"
+        "```yaml\ntier: lightweight\n```\n",
+        encoding="utf-8",
+    )
+    args = _ns(str(d))
+    assert _resolve_no_router_for_run(args, str(d)) is False
+
+
+# ---------- no soft gate, no prompt ----------
+
+
+def test_no_router_does_not_fire_a_soft_gate(started_set: str, monkeypatch, capsys):
+    """Set 112: the external-verification.md soft gate is gone.
+
+    A --no-router close over a set with no external-verification.md used to
+    warn (non-TTY) or prompt (TTY). It now proceeds silently: the artifact
+    was Mode A's hand-recorded verdict, and Mode A is deleted.
+    """
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    outcome = run(_ns(started_set, no_router=True))
+    assert outcome.result == "succeeded"
+    combined = capsys.readouterr().err + " ".join(outcome.messages)
+    assert "external-verification.md" not in combined
+
+
+def test_no_router_never_prompts_on_a_tty(started_set: str, monkeypatch):
+    """No interactive stop survives on this path."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: True)
+
+    def _should_not_be_called(_p):
+        pytest.fail("close_session prompted on a --no-router close")
+
+    outcome = run(_ns(started_set, no_router=True), prompt_fn=_should_not_be_called)
+    assert outcome.result == "succeeded"
+
+
+# ---------- no self-attestation ----------
+
+
+def test_no_router_does_not_record_method_manual(started_set: str, monkeypatch):
+    """The recorded method now reflects the disposition's own claim.
+
+    Recording "manual" for a flag that no human passed described a
+    verification that never happened. The disposition says ``api``; that is
+    what the outcome carries, and the deterministic evidence gate -- which
+    --no-router no longer disarms -- is what checks it.
+    """
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    outcome = run(_ns(started_set, no_router=True))
+    assert outcome.verification_method == "api"
+
+
+def test_no_router_writes_no_attestation(started_set: str, monkeypatch):
+    """No stock attestation event is emitted on the operator's behalf."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    run(_ns(started_set, no_router=True))
+    for event in _verification_completed(started_set):
+        assert not event.fields.get("attestation")
+
+
+def test_no_router_reason_file_is_not_promoted_to_an_attestation(
     started_set: str, monkeypatch, tmp_path: Path
 ):
-    """When --reason-file is provided, --no-router uses it as the attestation."""
+    """--reason-file alone is not an attestation.
+
+    ``--reason-file`` supplies text; ``--manual-verify`` is what claims a
+    human verified the work. Set 112 stopped --no-router from silently
+    combining the two.
+    """
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)
-    reason = tmp_path / "reason.md"
-    reason.write_text("operator's custom close-out narrative", encoding="utf-8")
-    args = _ns(started_set, no_router=True, reason_file=str(reason))
-    run(args)
-    events = read_events(started_set)
-    verify_completed = [
-        e for e in events if e.event_type == "verification_completed"
-    ]
-    assert verify_completed
-    attestation = verify_completed[-1].fields.get("attestation", "")
-    assert "operator's custom close-out narrative" in attestation
+    reason = tmp_path / "reason.txt"
+    reason.write_text("CI batch close", encoding="utf-8")
+    outcome = run(
+        _ns(started_set, no_router=True, reason_file=str(reason))
+    )
+    assert outcome.verification_method == "api"
+
+
+# ---------- --manual-verify is unaffected ----------
+
+
+def test_manual_verify_still_attests_under_no_router(
+    started_set: str, monkeypatch, tmp_path: Path
+):
+    """The one attested bypass keeps working, and it is explicit."""
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    reason = tmp_path / "reason.txt"
+    reason.write_text("provider outage; operator reviewed by hand", encoding="utf-8")
+    outcome = run(
+        _ns(
+            started_set,
+            no_router=True,
+            manual_verify=True,
+            reason_file=str(reason),
+        )
+    )
+    assert outcome.result == "succeeded"
+    assert outcome.verification_method == "manual"
+    events = _verification_completed(started_set)
+    assert events
+    assert "operator reviewed by hand" in events[-1].fields.get("attestation", "")
+
+
+# ---------- the backstop: suppressed for the one honest reason ----------
+
+
+def test_no_router_suppresses_the_routed_backstop(started_set: str, monkeypatch):
+    """--no-router skips the close backstop because the backstop DISPATCHES.
+
+    This is the one relief the flag legitimately buys: you cannot run a
+    routed verification with routing suppressed. It is not gate relief --
+    the deterministic gates all still run.
+    """
+    called: list[str] = []
+
+    import close_backstop
+
+    monkeypatch.setattr(
+        close_backstop,
+        "run_close_backstop",
+        lambda *_a, **_kw: called.append("ran"),
+    )
+    monkeypatch.setattr("sys.stdin.isatty", lambda: False)
+    run(_ns(started_set, no_router=True))
+    assert called == []
+
+
+# ---------- CLI surface ----------
+
+
+def test_no_router_help_does_not_advertise_a_tier():
+    """The flag's own help text describes a test affordance, not a tier."""
+    parser = _build_parser()
+    action = next(
+        a for a in parser._actions if "--no-router" in (a.option_strings or [])
+    )
+    help_text = (action.help or "").lower()
+    assert "lightweight" not in help_text
+    assert "tier" not in help_text
+    assert "--manual-verify" in help_text

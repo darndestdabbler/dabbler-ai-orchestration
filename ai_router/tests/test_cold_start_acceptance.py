@@ -1,19 +1,21 @@
-"""Set 058 S3 — cold-start acceptance test (D5), both tiers.
+"""Set 058 S3 — cold-start acceptance test (D5).
 
 Boots a throwaway consumer repo from the committed golden render
-(``test-fixtures/cold-start/<tier>/`` — the SAME artifacts the TS snapshot test
+(``test-fixtures/cold-start/full/`` — the SAME artifacts the TS snapshot test
 proves the shared writer emits) and walks the cold-start chain end to end:
 
     engine file -> docs/dabbler/start-here.md -> active spec.md
-        -> tier resolved -> correct start_session mode
-        (routed for Full, --no-router for Lightweight) -> close via shared gate.
+        -> start_session -> close via the shared gate.
 
 This is the regression guard for the operator failure that motivated the set:
-a freshly scaffolded repo whose spec lacked ``tier:`` (so the runtime defaulted
-to Full) and whose missing engine files / start-here left the orchestrator with
-no next step. The test asserts the rendered artifacts (a) carry the cold-start
-pointers and the verbatim active-set rule, (b) resolve to the right tier and
-router mode, and (c) register and close cleanly through the blessed lifecycle.
+a freshly scaffolded repo whose missing engine files / start-here left the
+orchestrator with no next step. The test asserts the rendered artifacts
+(a) carry the cold-start pointers and the verbatim active-set rule, and
+(b) register and close cleanly through the blessed lifecycle.
+
+Set 112 deleted the Lightweight tier, so the ``lightweight`` fixture tree and
+the tier-drives-router-mode link are gone. The router mode is now decided by
+the CLI flag / env var alone, which ``test_runtime_mode`` owns.
 """
 from __future__ import annotations
 
@@ -44,11 +46,6 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 GOLDEN_ROOT = REPO_ROOT / "test-fixtures" / "cold-start"
 SET_SLUG = "001-sample-feature"
 
-TIER_EXPECTATIONS = {
-    "full": {"no_router": False},
-    "lightweight": {"no_router": True},
-}
-
 
 @pytest.fixture(autouse=True)
 def _reset_runtime_mode(monkeypatch):
@@ -58,14 +55,14 @@ def _reset_runtime_mode(monkeypatch):
     runtime_mode.reset_for_tests()
 
 
-def _boot_repo(tmp_path: Path, tier: str) -> Path:
-    """Copy the golden render for *tier* into a throwaway repo dir."""
-    src = GOLDEN_ROOT / tier
+def _boot_repo(tmp_path: Path) -> Path:
+    """Copy the golden render into a throwaway repo dir."""
+    src = GOLDEN_ROOT / "full"
     assert src.is_dir(), (
-        f"golden render missing for {tier}; regenerate with "
+        "golden render missing; regenerate with "
         '"UPDATE_GOLDEN=1 npm run test:unit"'
     )
-    dst = tmp_path / f"{tier}-repo"
+    dst = tmp_path / "cold-start-repo"
     shutil.copytree(src, dst)
     return dst
 
@@ -92,9 +89,8 @@ def _close_args(set_dir: str, **overrides):
     return args
 
 
-@pytest.mark.parametrize("tier", ["full", "lightweight"])
-def test_cold_start_chain(tier: str, tmp_path: Path, monkeypatch):
-    repo = _boot_repo(tmp_path, tier)
+def test_cold_start_chain(tmp_path: Path, monkeypatch):
+    repo = _boot_repo(tmp_path)
     set_dir = repo / "docs" / "session-sets" / SET_SLUG
 
     # --- Link 1: the engine files all hand off to the cold-start doc. ---
@@ -117,19 +113,18 @@ def test_cold_start_chain(tier: str, tmp_path: Path, monkeypatch):
     assert Path(active).name == SET_SLUG
     assert read_status(str(set_dir)) == "not-started"
 
-    # --- Link 4: the runtime resolver derives the right mode from the spec. ---
-    expected_no_router = TIER_EXPECTATIONS[tier]["no_router"]
+    # --- Link 4: a scaffolded repo leaves the router ENABLED. ---
+    # Set 112: no spec field can switch it off, so a fresh consumer repo is
+    # never silently in a no-dispatch mode it did not ask for.
     assert (
         runtime_mode.resolve_no_router_mode(cli_flag=False, session_set_dir=set_dir)
-        is expected_no_router
-    ), f"{tier}: resolver did not derive no_router={expected_no_router} from the spec"
+        is False
+    ), "a scaffolded repo must resolve router-enabled"
     runtime_mode.reset_for_tests()  # let the real CLI entry re-resolve below
 
     # --- Link 5: register via the REAL start_session CLI entry point. ---
-    # Crucially we pass NO --no-router flag: the entry point must derive the
-    # mode from tier: in the rendered spec (that is the whole cold-start
-    # promise). main() resolves+caches the mode, then run() does the boundary
-    # write. start_session makes no external calls, so this is hermetic.
+    # main() resolves+caches the mode, then run() does the boundary write.
+    # start_session makes no external calls, so this is hermetic.
     rc = start_session.main(
         [
             "--session-set-dir",
@@ -140,15 +135,11 @@ def test_cold_start_chain(tier: str, tmp_path: Path, monkeypatch):
             "anthropic",
         ]
     )
-    assert rc == 0, f"{tier}: start_session.main exited {rc}"
-    assert runtime_mode.is_no_router_mode() is expected_no_router, (
-        f"{tier}: the start_session entry point resolved "
-        f"no_router={runtime_mode.is_no_router_mode()} (expected {expected_no_router}) "
-        "from the spec tier — the tier-drives-mode plumbing is broken"
-    )
+    assert rc == 0, f"start_session.main exited {rc}"
+    assert runtime_mode.is_no_router_mode() is False
     assert read_status(str(set_dir)) == "in-progress"
     assert any(e.event_type == "work_started" for e in read_events(str(set_dir))), (
-        f"{tier}: start_session did not append a work_started event"
+        "start_session did not append a work_started event"
     )
 
     # --- Link 6: close via the shared gate (non-final close of session 1). ---
@@ -156,7 +147,7 @@ def test_cold_start_chain(tier: str, tmp_path: Path, monkeypatch):
         str(set_dir),
         Disposition(
             status="completed",
-            summary=f"cold-start acceptance ({tier})",
+            summary="cold-start acceptance",
             verification_method="manual-via-other-engine",
             files_changed=["src/feature.py"],
             verification_message_ids=[],
@@ -167,16 +158,12 @@ def test_cold_start_chain(tier: str, tmp_path: Path, monkeypatch):
     _stub_gates(monkeypatch)
     monkeypatch.setattr("sys.stdin.isatty", lambda: False)  # non-interactive
 
-    if tier == "lightweight":
-        runtime_mode.reset_for_tests()
-        outcome = run(_close_args(str(set_dir), no_router=True))
-    else:
-        reason = set_dir / "reason.md"
-        reason.write_text("cold-start manual attestation\n", encoding="utf-8")
-        outcome = run(
-            _close_args(str(set_dir), manual_verify=True, reason_file=str(reason))
-        )
+    reason = set_dir / "reason.md"
+    reason.write_text("cold-start manual attestation\n", encoding="utf-8")
+    outcome = run(
+        _close_args(str(set_dir), manual_verify=True, reason_file=str(reason))
+    )
 
     assert outcome.result == "succeeded", (
-        f"{tier} close did not succeed: {outcome.result} / {outcome.messages}"
+        f"close did not succeed: {outcome.result} / {outcome.messages}"
     )

@@ -1,7 +1,11 @@
 """Unit tests for ai_router.runtime_mode.
 
-Set 048 Session 2: --no-router mode resolution with three-knob
-precedence: CLI flag > env var > spec tier > default.
+--no-router mode resolution with two-knob precedence: CLI flag > env var >
+default. Set 112 removed the third knob (the spec's ``tier:`` field) along
+with the Lightweight tier, and with it the ability of a spec file -- or the
+env var on its own -- to disarm a close-out verification gate. The
+``session_set_dir`` parameter survives as an ignored, signature-stable
+argument so consumer callers keep working across the major bump.
 """
 from __future__ import annotations
 
@@ -44,8 +48,8 @@ def _write_spec(tmp_path: Path, tier: str | None) -> Path:
 # ---------- defaults ----------
 
 
-def test_default_is_full_mode(tmp_path: Path) -> None:
-    """No CLI, no env, no spec tier → full mode (not no-router)."""
+def test_default_is_router_enabled(tmp_path: Path) -> None:
+    """No CLI flag, no env var -> the router is enabled."""
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=None) is False
     assert is_no_router_mode() is False
 
@@ -64,8 +68,7 @@ def test_cli_flag_wins_over_env_var(monkeypatch, tmp_path: Path) -> None:
     assert resolve_no_router_mode(cli_flag=True, session_set_dir=None) is True
 
 
-def test_cli_flag_wins_over_spec_tier_full(tmp_path: Path) -> None:
-    """CLI flag --no-router on a tier: full spec wins."""
+def test_cli_flag_wins_with_a_spec_dir_present(tmp_path: Path) -> None:
     spec_dir = _write_spec(tmp_path, "full")
     assert resolve_no_router_mode(cli_flag=True, session_set_dir=spec_dir) is True
 
@@ -85,39 +88,60 @@ def test_env_var_falsy_does_not_enable(monkeypatch, falsy_value: str) -> None:
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=None) is False
 
 
-def test_env_var_wins_over_spec_tier_full(monkeypatch, tmp_path: Path) -> None:
+def test_env_var_wins_with_a_spec_dir_present(monkeypatch, tmp_path: Path) -> None:
     monkeypatch.setenv(ENV_VAR_NAME, "1")
     spec_dir = _write_spec(tmp_path, "full")
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir) is True
 
 
-# ---------- spec tier ----------
+# ---------- the removed spec-tier knob ----------
 
 
-def test_spec_tier_lightweight_enables_no_router(tmp_path: Path) -> None:
+def test_spec_tier_lightweight_no_longer_enables_no_router(tmp_path) -> None:
+    """The Set 112 removal, asserted from the outside.
+
+    A spec still declaring the removed tier cannot switch the router off
+    behind the operator's back. (The spec loader refuses such a spec
+    outright -- see test_spec_config -- but the resolver must not depend on
+    that, because a resolver that silently honoured the field would be a
+    second, quieter activation path.)
+    """
     spec_dir = _write_spec(tmp_path, "lightweight")
-    assert resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir) is True
+    assert resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir) is False
 
 
-def test_spec_tier_full_does_not_enable(tmp_path: Path) -> None:
+def test_spec_tier_full_does_not_enable(tmp_path) -> None:
     spec_dir = _write_spec(tmp_path, "full")
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir) is False
 
 
-def test_spec_tier_absent_defaults_full(tmp_path: Path) -> None:
+def test_spec_tier_absent_does_not_enable(tmp_path) -> None:
     spec_dir = _write_spec(tmp_path, None)
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir) is False
 
 
-def test_missing_spec_dir_does_not_enable(tmp_path: Path) -> None:
+def test_missing_spec_dir_does_not_enable(tmp_path) -> None:
     nonexistent = tmp_path / "does-not-exist"
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=nonexistent) is False
 
 
-def test_missing_spec_file_does_not_enable(tmp_path: Path) -> None:
+def test_missing_spec_file_does_not_enable(tmp_path) -> None:
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
     assert resolve_no_router_mode(cli_flag=False, session_set_dir=empty_dir) is False
+
+
+def test_session_set_dir_is_accepted_and_ignored(tmp_path) -> None:
+    """Signature stability: an unreadable path is not an error, it is inert."""
+    assert (
+        resolve_no_router_mode(cli_flag=False, session_set_dir=tmp_path / "nope")
+        is False
+    )
+    reset_for_tests()
+    assert (
+        resolve_no_router_mode(cli_flag=True, session_set_dir=tmp_path / "nope")
+        is True
+    )
 
 
 # ---------- caching ----------
@@ -143,35 +167,32 @@ def test_is_no_router_mode_lazy_default_false() -> None:
     assert is_no_router_mode() is False
 
 
-# ---------- override logging ----------
+# ---------- source logging ----------
 
 
-def test_cli_overrides_spec_full_logs_info(caplog, tmp_path: Path) -> None:
-    """CLI --no-router on tier: full spec should log the override."""
+def test_cli_flag_logs_its_source(caplog, tmp_path) -> None:
     caplog.set_level(logging.INFO, logger="ai_router.runtime_mode")
-    spec_dir = _write_spec(tmp_path, "full")
-    resolve_no_router_mode(cli_flag=True, session_set_dir=spec_dir)
-    assert any("overrides spec tier" in r.message for r in caplog.records)
+    resolve_no_router_mode(cli_flag=True, session_set_dir=None)
+    assert any("via CLI flag" in r.message for r in caplog.records)
 
 
-def test_env_overrides_spec_full_logs_info(monkeypatch, caplog, tmp_path: Path) -> None:
+def test_env_var_logs_its_source(monkeypatch, caplog) -> None:
     caplog.set_level(logging.INFO, logger="ai_router.runtime_mode")
     monkeypatch.setenv(ENV_VAR_NAME, "1")
-    spec_dir = _write_spec(tmp_path, "full")
-    resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir)
-    assert any("overrides spec tier" in r.message for r in caplog.records)
+    resolve_no_router_mode(cli_flag=False, session_set_dir=None)
+    assert any("via env var" in r.message for r in caplog.records)
 
 
-def test_spec_lightweight_alone_logs_info(caplog, tmp_path: Path) -> None:
-    """Just spec tier: lightweight (no CLI/env) logs the enabling source."""
+def test_no_log_names_a_spec_tier(caplog, tmp_path) -> None:
+    """The resolver's log line names only the two surviving sources."""
     caplog.set_level(logging.INFO, logger="ai_router.runtime_mode")
     spec_dir = _write_spec(tmp_path, "lightweight")
-    resolve_no_router_mode(cli_flag=False, session_set_dir=spec_dir)
-    assert any("spec tier=lightweight" in r.message for r in caplog.records)
+    resolve_no_router_mode(cli_flag=True, session_set_dir=spec_dir)
+    assert not any("tier" in r.message for r in caplog.records)
 
 
-def test_default_full_does_not_log(caplog) -> None:
-    """Default-mode resolution should not log (nothing happened)."""
+def test_default_does_not_log(caplog) -> None:
+    """Default resolution should not log (nothing happened)."""
     caplog.set_level(logging.INFO, logger="ai_router.runtime_mode")
     resolve_no_router_mode(cli_flag=False, session_set_dir=None)
     assert not [r for r in caplog.records if r.levelno >= logging.INFO]

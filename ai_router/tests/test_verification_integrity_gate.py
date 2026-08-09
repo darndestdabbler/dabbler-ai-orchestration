@@ -795,7 +795,7 @@ class TestZeroBudgetArm:
 
 
 # ---------------------------------------------------------------------------
-# Scope: null claims, missing disposition, Lightweight sets
+# Scope: null claims, missing disposition, the removed tier escape
 # ---------------------------------------------------------------------------
 
 class TestGateScope:
@@ -804,19 +804,62 @@ class TestGateScope:
         passed, remediation = check_verification_integrity(str(set_dir), None)
         assert passed and remediation == ""
 
-    def test_lightweight_set_is_inert(self, tmp_path):
-        set_dir = _make_set(tmp_path, tier_line="tier: lightweight")
-        d = Disposition(
-            status="completed", summary="s",
-            verification_method="api",
-            verification_verdict="VERIFIED",
-        )
-        passed, remediation = check_verification_integrity(str(set_dir), d)
-        assert passed, remediation
+    def test_spec_tier_lightweight_no_longer_disarms_the_gate(self, tmp_path):
+        """Set 112 regression guard, inverted from the old inertness test.
 
-    def test_lightweight_does_not_exempt_illegal_tokens(self, tmp_path):
-        """Vocabulary is validated before the tier short-circuit — an
-        illegal token is illegal on every tier."""
+        Before Set 112 a ``tier: lightweight`` line in spec.md made this
+        gate return pass unconditionally. A spec file must never be able to
+        turn off the verification evidence check; the tier is gone and so
+        is the early-out.
+        """
+        set_dir = _make_set(tmp_path, tier_line="tier: lightweight")
+        self_delete = set_dir / "session-events.jsonl"
+        if self_delete.exists():
+            self_delete.unlink()
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "missing verification evidence" in remediation
+
+    def test_no_router_env_var_no_longer_disarms_the_gate(
+        self, tmp_path, monkeypatch
+    ):
+        """The other half of the removed escape.
+
+        ``DABBLER_NO_ROUTER=1`` alone used to satisfy the Lightweight
+        predicate and skip this gate outright -- an env var that disarmed a
+        verification gate with no tier and no attestation behind it. It is
+        now a routed-call suppressor and nothing else; ``--manual-verify``
+        is the attested bypass.
+        """
+        monkeypatch.setenv("DABBLER_NO_ROUTER", "1")
+        set_dir = _make_set(tmp_path)
+        ledger = set_dir / "session-events.jsonl"
+        if ledger.exists():
+            ledger.unlink()
+        passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert not passed
+        assert "missing verification evidence" in remediation
+
+    def test_remediation_no_longer_advertises_the_removed_tier(self, tmp_path):
+        """The corrective must not tell a blocked operator to declare a
+        tier that no longer loads."""
+        set_dir = _make_set(tmp_path)
+        ledger = set_dir / "session-events.jsonl"
+        if ledger.exists():
+            ledger.unlink()
+        _passed, remediation = check_verification_integrity(
+            str(set_dir), _api_disposition()
+        )
+        assert "lightweight" not in remediation.lower()
+        assert "--manual-verify" in remediation
+
+    def test_illegal_tokens_still_refused_with_a_legacy_tier_line(self, tmp_path):
+        """Vocabulary is validated first — an illegal token is illegal
+        regardless of any legacy tier line in the spec."""
         set_dir = _make_set(tmp_path, tier_line="tier: lightweight")
         passed, _ = check_verification_integrity(
             str(set_dir), Disposition(**INCIDENT_DISPOSITION)
@@ -1244,15 +1287,17 @@ class TestLedgerAxis:
         assert not passed
         assert "failing closed" in remediation
 
-    def test_lightweight_absent_ledger_is_inert(self, tmp_path):
-        # Lightweight sets verify per-set; the Full-tier ledger axis must not
-        # fire (the lightweight early-out precedes it).
+    def test_legacy_tier_line_does_not_exempt_an_absent_ledger(self, tmp_path):
+        # Set 112: the ledger axis used to sit behind the Lightweight
+        # early-out. A leftover tier line in a consumer's spec must not
+        # buy an absent ledger a pass.
         set_dir = _make_set(tmp_path, tier_line="tier: lightweight")
         self._delete_ledger(set_dir)
         passed, remediation = check_verification_integrity(
             str(set_dir), _api_disposition()
         )
-        assert passed, remediation
+        assert not passed
+        assert "missing verification evidence" in remediation
 
     def test_ledger_check_fails_closed_on_internal_error(
         self, tmp_path, monkeypatch

@@ -338,7 +338,7 @@ def render_template(
 
 # ---------------------------------------------------------------------------
 # session-state.json convenience reader (for the extension command +
-# Lightweight-tier CLI usage).
+# CLI usage).
 # ---------------------------------------------------------------------------
 
 

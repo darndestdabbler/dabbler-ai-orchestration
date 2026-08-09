@@ -1,0 +1,13 @@
+**ISSUES FOUND**
+
+- **Issue 1:** `tier: lightweight` is not fail-loud on the real lifecycle path.
+  - **Category:** Completeness / Correctness
+  - **Severity:** Major
+  - **Failure scenario:** A typical stranded Lightweight consumer runs `start_session` on an existing spec with `tier: lightweight`. Instead of getting the promised migration one-liner, the command succeeds, writes `session-state.json`, and proceeds under router-enabled semantics. That is probable because existing Lightweight repos already have exactly that spec field, and `start_session` is the first lifecycle command they run.
+  - **Acceptance criterion:** `JUDGMENT - A session set whose canonical Session Set Configuration declares tier: lightweight, including quoted YAML value "lightweight", is refused by start_session/close_session before any state or event write, and the refusal surfaces LIGHTWEIGHT_REMOVED_MESSAGE rather than a generic verification/UAT result.`
+  - **Details:** Violation: the task says “**Fail-loud loader**: `tier: lightweight` in a spec errors with the migration one-liner” and “Ends with: … `tier: lightweight` fails loud with a helpful message.” Impact: the removal’s main migration safety net is not on the user’s main path, so a consumer can be silently moved into the one-tier flow and only fail later with unrelated close/verification errors. Evidence: `ai_router\spec_config.py:119-156` raises only when that parser is called; `ai_router\start_session.py:723-876` registers the session without parsing that config; `ai_router\gate_checks.py:1620-1635` catches all exceptions from `parse_session_set_config`, swallowing `LightweightTierRemovedError`. I also drove a temp spec with `tier: lightweight` through `.venv\Scripts\python.exe -m ai_router.start_session`; it exited `0` and wrote an in-progress `session-state.json`. Separately, `spec_config._string_re` misses valid YAML like `tier: "lightweight"`, so even direct parser wiring would still leave a bypass.
+
+#### NITS
+
+- **Nit:** `ai_router\docs\close-out.md` still documents the removed external-verification and dedicated-verification gates as current close-out gates. That is stale active router documentation, though the code path is already removed.
+- **Nit:** The session evidence docs have inconsistent counts: `test-runs.jsonl` records `3,565 passed / 9 skipped`, while `s1-before-after-numbers.md` says `3,569 passed / 9 skipped`; `s1-kill-inventory.md` also says “5 modules, 143 tests” above a table listing 8 modules / 153 tests.

@@ -1,0 +1,71 @@
+{
+  "sessionSetName": "112-remove-lightweight-tier",
+  "createdDate": "2026-08-09T04:45:15.139705-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "probeEvidenceArchived",
+      "dateTime": "2026-08-09T04:45:15.142384-04:00",
+      "description": "Registered S1; archived the 2026-08-05 seat probe as probe-evidence-copilot-catalog.lock (11/18 confirmed, three provider families) plus a provenance README; journaled the D:-unavailable source substitution.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "killInventory",
+      "dateTime": "2026-08-09T04:48:52.858121-04:00",
+      "description": "Authored s1-kill-inventory.md from a fresh git-grep of 13 terms across 3,851 tracked files: 611 mention the tier, 461 are archives/proposals (exempt), 150 live. Found and journaled the env-var gate escape (DABBLER_NO_ROUTER alone disarms two Full-tier close gates) that the spec kill list did not name.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "modesDeleted",
+      "dateTime": "2026-08-09T05:09:43.177741-04:00",
+      "description": "Deleted Mode A + Mode B whole: dedicated_verification, external_verification, pending_verification, change_verification_mode, migrate_lightweight_to_canonical_v4 (2,581 lines) and their 7 test modules; removed both close-out gate blocks, the typed-session CLI/writer path in start_session, and the lightweight-to-v4 migrator from the chain + shipped manifest.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "runtimeModeTrimmed",
+      "dateTime": "2026-08-09T05:09:43.179392-04:00",
+      "description": "runtime_mode.py rewritten to two sources (CLI flag, env var); _spec_tier/_spec_says_lightweight deleted; session_set_dir kept as an ignored signature-stable arg. Removed the gate escapes in gate_checks._set_is_lightweight and close_session (verification-integrity + run-of-record freshness no longer disarmed by an env var), and the --no-router self-attestation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "failLoudLoader",
+      "dateTime": "2026-08-09T05:09:43.180832-04:00",
+      "description": "spec_config raises LightweightTierRemovedError (ValueError subclass) on tier: lightweight inside the canonical config block, carrying a one-line migration message naming tier: full, the DABBLER_* keys, the copilot-cli profile, and the notice doc. Prose mentions and non-canonical fences stay inert so archives remain readable.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "fixturesDeleted",
+      "dateTime": "2026-08-09T05:42:36.049741-04:00",
+      "description": "Deleted test-fixtures/cold-start/lightweight/ and dropped the tier from the TS golden-snapshot render matrix and the Python cold-start acceptance parameterisation. Recorded s1-before-after-numbers.md: 3,811 -> 3,578 tests (-233), 4,404 production lines removed, and the MEASURED finding that the CI-minutes saving is ~0 (the deleted modules cost 3.64s of a 957s suite) rather than the shrinkage the spec assumed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "runsOfRecord",
+      "dateTime": "2026-08-09T06:09:22.112435-04:00",
+      "description": "Post-freeze runs of record: pytest 3,565 passed / 0 failed / 9 skipped (16m18s); Layer 3 Playwright 33 passed / 0 failed (9m0s) -- required because this session edited three blessed writers (session_state, start_session, close_session) that the freshness map covers. drift_guard and tutorial_gate both clean; extension compiles.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "verified",
+      "dateTime": "2026-08-09T06:57:15.608487-04:00",
+      "description": "Cross-provider verification (gpt-5.5, anthropic excluded): discovery fan-out 2 -> 3 Major; supplementary -> 1 Major; all 4 accepted and fixed (boundary refusal in both lifecycle CLIs + _uat_policy re-raise + quoted-YAML gap, close-out.md, extension bulk-upgrade chain); remediation-review VERIFIED, 4 fixes accepted 0 rejected. Post-fix runs of record: pytest 3,576 passed / 9 skipped; Layer 3 33 passed.",
+      "status": "complete"
+    }
+  ]
+}

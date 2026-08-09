@@ -235,31 +235,29 @@ def test_shipped_manifest_migrator_ids_are_known():
 
 
 def test_bulk_chain_upgrades_genuine_v2_all_the_way_to_v4(tmp_path):
-    """The corrected three-migrator chain takes explicit schemaVersion:2 -> v4.
+    """The bulk chain takes an explicit schemaVersion:2 file all the way to v4.
 
     This is the test the verdict's Q7 "v2-needs-both-migrators sequence"
-    prescribed. It falsified the verdict's two-migrator enumeration
-    (lightweight-to-v4 + v3-to-v4 both SKIP a genuine v2 file) and confirms
-    the corrected chain (v2-to-v3, lightweight-to-v4, v3-to-v4).
+    prescribed. It falsified the verdict's enumeration -- ``v3-to-v4`` alone
+    SKIPS a genuine v2 file -- and confirms the v2-to-v3 step is required.
+    Set 112 removed the ``lightweight-to-v4`` step from the chain along with
+    the tier whose non-canonical state files it repaired.
     """
-    import migrate_lightweight_to_canonical_v4 as lw
     import migrate_session_state as v2v3
     import migrate_v3_to_v4 as v34
 
     set_dir = _write_set(tmp_path, "050-genuine-v2", _genuine_v2("050-genuine-v2"))
     state_path = set_dir / "session-state.json"
 
-    # Sanity: the two migrators the verdict named both SKIP this file.
+    # Sanity: the v3->v4 migrator the verdict named SKIPS this file.
     assert detect_drift(str(tmp_path), target=4)[0].schema_version == 2
-    lw.migrate_all(str(tmp_path), dry_run=False)
     v34.migrate_all(str(tmp_path), dry_run=False)
     still_v2 = json.loads(state_path.read_text(encoding="utf-8"))["schemaVersion"]
-    assert still_v2 == 2, "the verdict's two-migrator sequence should leave genuine v2 untouched"
+    assert still_v2 == 2, "v3-to-v4 alone should leave genuine v2 untouched"
 
-    # The corrected chain (matching cm.BULK_UPGRADE_MIGRATOR_IDS order) lands v4.
+    # The full chain (matching cm.BULK_UPGRADE_MIGRATOR_IDS order) lands v4.
     module_for = {
         "v2-to-v3": v2v3,
-        "lightweight-to-v4": lw,
         "v3-to-v4": v34,
     }
     for mid in cm.BULK_UPGRADE_MIGRATOR_IDS:
@@ -278,7 +276,6 @@ def test_bundled_bulk_commands_shape():
     cmds = cm.bulk_upgrade_commands()
     assert cmds == [
         "python -m ai_router.migrate_session_state --in-place",
-        "python -m ai_router.migrate_lightweight_to_canonical_v4 --in-place",
         "python -m ai_router.migrate_v3_to_v4 --in-place",
     ]
     assert " && " in cm.bulk_upgrade_oneliner()

@@ -1,18 +1,24 @@
-"""Resolves whether the current ai_router invocation is in --no-router mode.
+"""Resolves whether the current ai_router invocation suppresses routed calls.
 
-Set 048 Session 2: the Lightweight tier suppresses AI router runtime
-calls (no LLM API hits, no auto-verification). The mode is resolved
-once at process start from three precedence-ordered sources:
+``--no-router`` mode makes an invocation issue **no LLM API calls** — no
+routed dispatch, no auto-verification. It exists for CI and hermetic
+tests, which need the CLIs to run end-to-end without spending money or
+depending on a network.
+
+Set 112 deleted the Lightweight tier, and with it the spec-field source
+(``tier: lightweight``) that used to sit third in this precedence chain.
+Two sources remain:
 
   1. CLI flag ``--no-router`` (highest; one-off override)
   2. Env var ``DABBLER_NO_ROUTER`` (CI / shell-session default)
-  3. Spec.md field ``tier: lightweight`` (declarative per-set default)
-  4. Default ``full`` mode (lowest; router enabled)
+  3. Default: router enabled (lowest)
 
-When a higher-precedence source overrides a lower one (e.g., CLI
-``--no-router`` on a ``tier: full`` spec), the resolver emits an
-informational message naming the override so the operator sees what
-just happened. No refusal — explicit overrides always win.
+**``--no-router`` is a test affordance, not a tier and not a gate
+escape.** It suppresses routed calls and nothing else: it does not
+relieve a close of any verification gate. Before Set 112 the env var
+alone disarmed ``check_verification_integrity`` and the expensive-suite
+freshness check, because it was one of the ways the Lightweight tier
+turned itself on. That escape retired with the tier.
 
 This module also handles the "lazy LLM-SDK imports" deliverable from
 the audit (§3.1 A2). In this codebase, providers already call LLMs via
@@ -20,10 +26,6 @@ httpx (see ``ai_router/providers.py``) — there are NO module-level
 ``anthropic`` / ``openai`` / ``google-generativeai`` imports to make
 lazy. The audit work for A2 is therefore a no-op for this codebase;
 documenting it here for the next architect who wonders.
-
-The next session (S2 Commit C) wires this into ``route()`` and
-``verify()`` so they short-circuit cleanly under no-router mode and
-return a manual-attestation result without ever issuing httpx calls.
 """
 from __future__ import annotations
 
@@ -39,7 +41,7 @@ ENV_VAR_NAME = "DABBLER_NO_ROUTER"
 # Module-level cache: None means "not yet resolved." Once
 # ``resolve_no_router_mode`` runs, the result is cached here so that
 # ``is_no_router_mode`` calls from deep in the call stack don't have
-# to re-parse the spec or the env var.
+# to re-read the env var.
 _NO_ROUTER_MODE: Optional[bool] = None
 
 
@@ -54,40 +56,6 @@ def _env_var_truthy() -> bool:
     return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
-def _spec_tier(session_set_dir: Optional[Path]) -> Optional[str]:
-    """Return the spec.md's ``tier`` field, or None if no readable spec.
-
-    Returns ``"lightweight"`` / ``"full"`` when the spec is parseable,
-    or ``None`` when the dir is missing, the spec is missing, or the
-    parser raised. The None case is distinct from ``"full"`` so the
-    override-logging logic can tell "no spec" apart from "spec says
-    full" — the former does not generate an override message; the
-    latter does.
-    """
-    if session_set_dir is None:
-        return None
-    spec = Path(session_set_dir) / "spec.md"
-    if not spec.exists():
-        return None
-    try:
-        # Lazy-import the parser so this module stays cheap to import
-        # even from test contexts that mock out spec.md.
-        # S5 UAT fix: relative import resolves under pip-install mode
-        # (bare `from spec_config` only worked via the test conftest's
-        # sys.path shim, silently broken in production package consumers).
-        from .spec_config import parse_session_set_config
-
-        cfg = parse_session_set_config(spec)
-        return cfg.tier
-    except Exception:  # noqa: BLE001
-        return None
-
-
-def _spec_says_lightweight(session_set_dir: Optional[Path]) -> bool:
-    """Convenience wrapper: True iff spec exists and says tier=lightweight."""
-    return _spec_tier(session_set_dir) == "lightweight"
-
-
 def resolve_no_router_mode(
     cli_flag: bool,
     session_set_dir: Optional[Path] = None,
@@ -97,15 +65,18 @@ def resolve_no_router_mode(
     Precedence (high to low):
       1. ``cli_flag`` (explicit ``--no-router`` on the command line)
       2. ``DABBLER_NO_ROUTER`` env var
-      3. ``tier: lightweight`` in ``<session_set_dir>/spec.md``
-      4. Default (full mode)
+      3. Default (router enabled)
+
+    ``session_set_dir`` is accepted and ignored. Set 112 removed the
+    spec-field source that used to read it; the parameter stays in the
+    signature so consumer-repo callers (and the several in-repo entry
+    points that pass it positionally) keep working across the upgrade.
 
     Side effect: caches the result in module-level ``_NO_ROUTER_MODE``.
     Subsequent calls to ``is_no_router_mode`` return the cached value
-    without re-parsing.
+    without re-reading the environment.
 
-    Logging: when a higher-precedence source contradicts a lower one,
-    emits an ``INFO`` log line naming the source that won.
+    Logging: emits an ``INFO`` line naming the source that won.
 
     **Idempotency**: subsequent invocations of this function are no-ops
     that return the cached value (Set 048 S2 Round-A verifier-flagged
@@ -114,6 +85,8 @@ def resolve_no_router_mode(
     call ``reset_for_tests()`` first.
     """
     global _NO_ROUTER_MODE
+
+    del session_set_dir  # accepted for signature stability; see docstring
 
     if _NO_ROUTER_MODE is not None:
         # Already resolved; return cached. Don't re-log or re-evaluate
@@ -124,41 +97,13 @@ def resolve_no_router_mode(
         )
         return _NO_ROUTER_MODE
 
-    env_says = _env_var_truthy()
-    tier = _spec_tier(session_set_dir)  # "lightweight" | "full" | None
-
     if cli_flag:
-        if tier == "full":
-            logger.info(
-                "CLI flag --no-router overrides spec tier=full for this invocation"
-            )
-        elif tier == "lightweight":
-            logger.info(
-                "--no-router enabled via CLI flag (spec tier=lightweight agreed)"
-            )
-        else:
-            logger.info("--no-router enabled via CLI flag")
+        logger.info("--no-router enabled via CLI flag")
         _NO_ROUTER_MODE = True
         return True
 
-    if env_says:
-        if tier == "full":
-            logger.info(
-                "Env var %s overrides spec tier=full for this invocation",
-                ENV_VAR_NAME,
-            )
-        elif tier == "lightweight":
-            logger.info(
-                "--no-router enabled via env var %s (spec tier=lightweight agreed)",
-                ENV_VAR_NAME,
-            )
-        else:
-            logger.info("--no-router enabled via env var %s", ENV_VAR_NAME)
-        _NO_ROUTER_MODE = True
-        return True
-
-    if tier == "lightweight":
-        logger.info("--no-router enabled via spec tier=lightweight")
+    if _env_var_truthy():
+        logger.info("--no-router enabled via env var %s", ENV_VAR_NAME)
         _NO_ROUTER_MODE = True
         return True
 
@@ -169,36 +114,14 @@ def resolve_no_router_mode(
 def is_no_router_mode() -> bool:
     """Return the cached --no-router resolution.
 
-    If ``resolve_no_router_mode`` has not run yet, attempts a lazy
-    resolution from env var + active-session-set spec only (no CLI
-    flag context available). The lazy resolution does NOT cache —
-    callers that need the result more than once should call
+    If ``resolve_no_router_mode`` has not run yet, falls back to the env
+    var alone (no CLI-flag context is available here). The fallback does
+    NOT cache — callers that need the result more than once should call
     ``resolve_no_router_mode`` explicitly at entry-point startup.
     """
     if _NO_ROUTER_MODE is not None:
         return _NO_ROUTER_MODE
-    # Lazy resolution: env var + active session set's spec, no CLI
-    if _env_var_truthy():
-        return True
-    try:
-        # Avoid hard-coded import of find_active_session_set — that
-        # module is heavy and may not be available in test contexts.
-        # Set 077 S1: bare-then-relative, matching every other lazy
-        # import — the bare-only form raised ModuleNotFoundError under
-        # pip-install mode, so the lazy path always returned False there.
-        try:
-            from session_state import find_active_session_set
-        except ImportError:
-            from .session_state import (  # type: ignore[no-redef]
-                find_active_session_set,
-            )
-
-        active = find_active_session_set()
-        if active:
-            return _spec_says_lightweight(Path(active))
-    except Exception:  # noqa: BLE001
-        pass
-    return False
+    return _env_var_truthy()
 
 
 def reset_for_tests() -> None:

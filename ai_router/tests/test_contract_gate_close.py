@@ -10,7 +10,7 @@ matched, coverage-complete contract floor, the gate:
   * for ``advisory``: ALWAYS soft-warns and never blocks;
   * for ``none``: skips entirely.
 
-It fires ONLY on the set-terminal close and is tier-orthogonal. Harness mirrors
+It fires ONLY on the set-terminal close. Harness mirrors
 ``test_path_aware_critique_close_gate.py``.
 """
 from __future__ import annotations
@@ -62,13 +62,13 @@ def _floor(set_name, level=REQUIRED, passed=True):
     }
 
 
-def _make_set(tmp_path, *, sessions, total, level=REQUIRED, tier="full",
+def _make_set(tmp_path, *, sessions, total, level=REQUIRED,
               manifest=None, floor=None):
     d = tmp_path / "068-contract"
     d.mkdir()
     (d / "spec.md").write_text(
         "# spec\n\n## Session Set Configuration\n\n"
-        f"```yaml\ntier: {tier}\n```\n",
+        "```yaml\nrequiresUAT: false\n```\n",
         encoding="utf-8",
     )
     state = {
@@ -83,13 +83,6 @@ def _make_set(tmp_path, *, sessions, total, level=REQUIRED, tier="full",
     )
     (d / "activity-log.json").write_text(
         json.dumps({"entries": []}, indent=2), encoding="utf-8"
-    )
-    # Set 077 S4 (A3): the external-verification soft gate now keys off
-    # the RESOLVED tier, so lightweight-parameterized fixtures receive
-    # it too. Seed a recorded verdict to keep it quiet — these tests
-    # exercise the contract gate, not the soft gate.
-    (d / "external-verification.md").write_text(
-        "## Round 1 — 2026-07-02\n\nVerdict: VERIFIED\n", encoding="utf-8"
     )
     if level is not None:
         cg.record_contract_gate(d, level)
@@ -172,11 +165,9 @@ def _ns(set_dir, **overrides):
 # --- none: never fires ------------------------------------------------------
 
 
-@pytest.mark.parametrize("tier", ["full", "lightweight"])
-def test_none_does_not_fire(tmp_path, monkeypatch, capsys, tier):
+def test_none_does_not_fire(tmp_path, monkeypatch, capsys):
     d = _make_set(
         tmp_path, sessions=[_work(1, "in-progress")], total=1, level=NONE,
-        tier=tier,
     )
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     outcome = run(_ns(d))
@@ -195,11 +186,9 @@ def test_unrecorded_default_does_not_fire(tmp_path, monkeypatch):
 # --- required: hard-block / soft-warn ---------------------------------------
 
 
-@pytest.mark.parametrize("tier", ["full", "lightweight"])
-def test_required_missing_tty_hard_blocks(tmp_path, monkeypatch, tier):
+def test_required_missing_tty_hard_blocks(tmp_path, monkeypatch):
     d = _make_set(
         tmp_path, sessions=[_work(1, "in-progress")], total=1, level=REQUIRED,
-        tier=tier,
     )
     monkeypatch.setattr("sys.stdin.isatty", lambda: True)
     outcome = run(_ns(d))

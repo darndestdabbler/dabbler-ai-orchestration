@@ -1,7 +1,6 @@
-"""``close_session`` — close-out gate for Full-tier session sets.
+"""``close_session`` — close-out gate for AI-led session sets.
 
-**Who uses this:** All Full-tier consumers (dabbler-platform, dabbler-access-harvester).
-**Not used by:** Lightweight-tier projects (no ai_router at all).
+**Who uses this:** every consumer repo (dabbler-platform, dabbler-access-harvester).
 **See also:** ``gate_checks.py`` (the deterministic predicates this script runs).
 
 ---
@@ -185,13 +184,13 @@ except ImportError:
 # close-out turn) read the result string rather than the integer where
 # they can.
 #
-# ``aborted_at_soft_gate`` (Set 077 S4, S1 bundle D): the operator
-# answered "no" at the interactive external-verification.md soft gate.
-# Previously unmapped, so it fell through to the default exit code 2 —
-# indistinguishable from ``invalid_invocation``. It gets its own code
-# (4) because it is neither a usage error nor a deterministic gate
-# failure: the invocation was valid and the gates passed; the operator
-# chose to stop.
+# ``aborted_at_soft_gate``: the operator answered "no" at an interactive
+# close-out prompt. It gets its own code (4) because it is neither a
+# usage error nor a deterministic gate failure: the invocation was valid
+# and the gates passed; the operator chose to stop. Set 112 deleted the
+# external-verification.md soft gate that originally raised it; the code
+# stays mapped because consumer tooling reads it and a future
+# interactive stop should land here rather than on exit code 2.
 RESULT_TO_EXIT_CODE = {
     "succeeded": 0,
     "noop_already_closed": 0,
@@ -416,27 +415,24 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         dest="no_router",
         help=(
-            "Run in Lightweight tier --no-router mode: skip routed "
-            "verification calls; accept a pre-supplied verdict (default "
-            "'manual'). Highest-precedence activation source per Set "
-            "048 §3.1 (overrides env var DABBLER_NO_ROUTER and "
-            "spec.md tier field)."
+            "Suppress routed API calls for this invocation (CI / hermetic "
+            "test affordance): no LLM dispatch, no routed verification. "
+            "Highest-precedence source, above the DABBLER_NO_ROUTER env "
+            "var. It buys no close-gate relief -- the verification gates "
+            "still run, and an attested bypass is --manual-verify."
         ),
     )
-    # Set 048 Session 2: --accept-suggestions forces non-interactive
-    # behavior for the external-verification.md soft gate (Set 048
-    # §3.5). Useful for batch / CI invocations that want the soft-
-    # gate emit-to-stderr branch without a TTY prompt.
+    # --accept-suggestions forces non-interactive behavior wherever the
+    # close-out would otherwise prompt. Useful for batch / CI invocations
+    # that want the emit-to-stderr branch without a TTY prompt.
     p.add_argument(
         "--accept-suggestions",
         action="store_true",
         dest="accept_suggestions",
         help=(
-            "Force non-interactive behavior for the external-"
-            "verification.md soft gate (Set 048 §3.5). When the gate "
-            "fires and this flag is set, the close-out emits a stderr "
-            "warning and proceeds without prompting, regardless of "
-            "TTY status."
+            "Force non-interactive behavior at any close-out prompt: emit "
+            "a stderr warning and proceed without prompting, regardless "
+            "of TTY status."
         ),
     )
     return p
@@ -727,10 +723,12 @@ def _resolve_lessons_cited(
 def _close_is_terminal(session_set_dir: str, session_number: Optional[int]) -> bool:
     """Return True iff closing *session_number* finalizes the whole set.
 
-    Set 057 Q6: the dedicated-verification close-out gate only fires on the
+    Set 057 Q6 introduced this for the (since-removed) dedicated-verification
+    gate; the path-aware-critique and contract gates inherited it and are now
+    its only consumers. They fire only on the
     **set-terminal** close (the close that brings ``completedSessions`` up
     to the runtime ``totalSessions``) — a non-terminal work-session close
-    must not be blocked merely because the verification session has not run
+    must not be blocked merely because an end-of-set artifact does not exist
     yet. Mirrors ``_flip_state_to_closed``'s own final-session detection
     (``len(completed-after-append) == totalSessions``).
 
@@ -1422,18 +1420,21 @@ def _resolve_no_router_for_run(
     Set 077 S4 (A3 root cause, S1 bundle D Critical): ``main()``
     resolved ``resolve_no_router_mode(...)`` and **discarded the return
     value**, so every ``getattr(args, "no_router")`` branch in
-    :func:`run` — the soft gate, the stock manual attestation, and the
-    ``method="manual"`` selection — was dead for sets whose Lightweight
-    mode comes from ``spec.md`` (``tier: lightweight``) or the
+    :func:`run` was dead for sets that activated the mode through the
     ``DABBLER_NO_ROUTER`` env var rather than the raw CLI flag. This
     helper is the single resolution point :func:`run` consults;
     ``resolve_no_router_mode`` caches, so the ``main()`` entry-point
     resolution and this call agree within one process.
 
+    Set 112 removed the spec-field source, so the precedence is the CLI
+    flag then the env var. ``session_set_dir`` is retained for signature
+    stability and for the diagnostic message.
+
     Errors are surfaced (stderr note), never swallowed silently, and
     never fatal: on failure the raw CLI flag is the fallback — exactly
     the pre-Set-077 behavior.
     """
+    _ = session_set_dir
     cli_flag = bool(getattr(args, "no_router", False))
     if cli_flag:
         # The explicit CLI flag is the highest-precedence source and is
@@ -1451,34 +1452,54 @@ def _resolve_no_router_for_run(
         # package-absolute is the fallback for the top-level-module
         # context the test harness imports this file under.
         try:
-            from .runtime_mode import (
-                _env_var_truthy,
-                _spec_says_lightweight,
-            )
+            from .runtime_mode import _env_var_truthy
         except ImportError:
             from ai_router.runtime_mode import (  # type: ignore[no-redef]
                 _env_var_truthy,
-                _spec_says_lightweight,
             )
 
-        # Same precedence as resolve_no_router_mode (env var, then the
-        # spec's tier), computed directly against THIS set — the
-        # resolver's module-level cache is deliberately not consulted,
-        # because a multi-set process (the reconciler sweep, pytest)
-        # would otherwise pin every later set to the first set's
-        # resolution.
-        return _env_var_truthy() or _spec_says_lightweight(
-            Path(session_set_dir)
-        )
+        # Read the env var directly rather than through the resolver,
+        # whose module-level cache would otherwise pin every set in a
+        # multi-set process (the reconciler sweep, pytest) to the first
+        # set's resolution.
+        return _env_var_truthy()
     except Exception as exc:  # noqa: BLE001
         print(
             "WARNING: --no-router mode resolution failed "
             f"({exc.__class__.__name__}: {exc}); falling back to the raw "
-            "CLI flag. A spec/env-activated Lightweight set may not get "
-            "its soft gate this close.",
+            "CLI flag.",
             file=sys.stderr,
         )
         return cli_flag
+
+
+def _refuse_removed_tier(session_set_dir: str) -> Optional[str]:
+    """Set 112: the removed-tier refusal message, or ``None`` to proceed.
+
+    ``spec_config`` raises wherever it is called, but nothing on the close
+    path parsed the config block before the gate chain — so a legacy
+    Lightweight spec would have reached an unrelated gate failure instead
+    of the migration one-liner. Returning a message (rather than raising)
+    keeps ``run``'s single-exit CloseoutOutcome contract intact.
+    """
+    try:
+        try:
+            from .spec_config import (  # type: ignore[import-not-found]
+                LightweightTierRemovedError,
+                refuse_if_lightweight,
+            )
+        except ImportError:
+            from ai_router.spec_config import (  # type: ignore[no-redef]
+                LightweightTierRemovedError,
+                refuse_if_lightweight,
+            )
+    except Exception:  # noqa: BLE001 — a broken install has its own errors
+        return None
+    try:
+        refuse_if_lightweight(session_set_dir)
+    except LightweightTierRemovedError as exc:
+        return f"refused -- {exc}"
+    return None
 
 
 def run(
@@ -1566,9 +1587,20 @@ def run(
         )
         return outcome
 
-    # Set 077 S4 (A3): resolve the effective Lightweight mode ONCE and
+    # Set 112: the removed-tier boundary refusal. Sits below the
+    # repair/idempotency short-circuits on purpose — a set that is already
+    # closed, or that is being repaired, must not be blocked by a legacy
+    # tier line; but a live close of a spec that still declares the removed
+    # tier gets the migration one-liner instead of a downstream gate error.
+    tier_refusal = _refuse_removed_tier(session_set_dir)
+    if tier_refusal is not None:
+        outcome.result = "invalid_invocation"
+        outcome.messages.append(tier_refusal)
+        return outcome
+
+    # Set 077 S4 (A3): resolve the effective --no-router mode ONCE and
     # thread it through every branch below. The raw ``args.no_router``
-    # flag misses spec/env-activated Lightweight sets. Sits below the
+    # flag misses env-activated invocations. Sits below the
     # repair/idempotency short-circuits — those paths never consume it.
     no_router = _resolve_no_router_for_run(args, session_set_dir)
 
@@ -1656,23 +1688,13 @@ def run(
     # neither-source case, so reaching this branch with both empty
     # means the operator aborted the prompt mid-way.
     manual_attestation: Optional[str] = None
-    # Set 048 Session 2: --no-router treats the close-out as manual-
-    # attestation by construction (Lightweight tier skips routed
-    # verification per §3.1 A3). The attestation comes from
-    # --reason-file when provided; absent that, a stock attestation
-    # documents that Lightweight mode is active so the audit trail
-    # still records what happened.
-    if no_router and not args.manual_verify:
-        if reason_text is not None:
-            manual_attestation = reason_text
-        else:
-            manual_attestation = (
-                "Set 048 Lightweight tier (--no-router mode): "
-                "routed verification skipped per §3.1 A3. "
-                "Operator runs external verification via copyable-"
-                "prompt commands."
-            )
-    elif args.manual_verify:
+    # ``--manual-verify`` is the one attested bypass of the evidence layer,
+    # and it is the ONLY source of a manual attestation. Set 112 removed the
+    # arm where ``--no-router`` auto-wrote a stock attestation on the
+    # operator's behalf: a self-written attestation is exactly the
+    # asterisk this set exists to delete, and ``--no-router`` is a
+    # routed-call suppressor, not a verification claim.
+    if args.manual_verify:
         if reason_text is not None:
             manual_attestation = reason_text
         else:
@@ -1778,15 +1800,19 @@ def run(
         # the evidence gate below), refuse with the findings on a
         # blocking ISSUES_FOUND, block explicitly on
         # verification_unavailable / provider failure — never a pass.
-        # Scope: every Full-tier close INCLUDING --force (I-084-S2-1,
+        # Scope: every close INCLUDING --force (I-084-S2-1,
         # this set's own backstop round-1 finding: "--force bypasses
         # neither evidence layer" means force closes get the same
         # in-process verification, not just the same refusal —
         # incident recovery under a dead provider goes through the
         # attested --manual-verify path instead). --manual-verify is
-        # that attested operator bypass; Lightweight closes have their
-        # own per-set gates; the zero-budget tier is honored inside
-        # the backstop itself.
+        # that attested operator bypass; the zero-budget tier is
+        # honored inside the backstop itself. ``--no-router`` skips it
+        # for the one honest reason: the backstop DISPATCHES a routed
+        # verification, and a suppressed-dispatch invocation cannot run
+        # one. That is not gate relief -- the deterministic
+        # verification-integrity gate still runs on this path and still
+        # demands real evidence.
         backstop_written_paths: List[str] = []
         if not args.manual_verify and not no_router:
             try:
@@ -1888,13 +1914,6 @@ def run(
                 method = "skipped"
         elif args.manual_verify:
             method = "manual"
-        elif no_router:
-            # Set 048 Session 2 §3.1 A3: Lightweight tier skips routed
-            # verification. Method records as "manual" so the events
-            # ledger + state file converge with the existing manual
-            # attestation path; the attestation text (set above)
-            # documents the --no-router invocation explicitly.
-            method = "manual"
         elif disposition is not None and disposition.verification_method:
             method = disposition.verification_method
         else:
@@ -1971,301 +1990,41 @@ def run(
             )
             return outcome
 
-        # The dedicated_verification imports serve BOTH the Set 077 A8
-        # stand-down inside the soft gate below and the Set 057 Q6 gate
-        # that follows, so the import lives above both.
-        try:
-            from dedicated_verification import (  # type: ignore[import-not-found]
-                VERIFICATION_MODE_DEDICATED,
-                read_verification_mode,
-                validate_dedicated_verification,
-            )
-        except ImportError:
-            from .dedicated_verification import (  # type: ignore[no-redef]
-                VERIFICATION_MODE_DEDICATED,
-                read_verification_mode,
-                validate_dedicated_verification,
-            )
-
         # Set 077 S4 (S1 bundle D): the set-terminal predicate is
-        # computed ONCE for the whole gate chain — the dedicated-
-        # verification, path-aware-critique, and contract gates all key
-        # on the same value, and re-deriving it three times invited
-        # drift between the gates within a single close.
+        # computed ONCE for the whole gate chain -- the path-aware-
+        # critique and contract gates both key on the same value, and
+        # re-deriving it invited drift between the gates within a
+        # single close.
         close_is_terminal = _close_is_terminal(
             session_set_dir, outcome.session_number
         )
 
-        # Set 048 Session 2 §3.5: external-verification.md soft gate,
-        # reworked in Set 077 S4 (A3/A4/A8):
-        #   * keys off the RESOLVED Lightweight mode (``no_router``
-        #     above), so spec/env-activated Lightweight sets get the
-        #     gate too — not only raw ``--no-router`` invocations (A3);
-        #   * STANDS DOWN when the recorded ``verificationMode`` is
-        #     ``dedicated-sessions`` — there the Set 057 Q6 typed-
-        #     session gate below is the authority, and double-gating
-        #     produced contradictory correctives (A8). The stand-down
-        #     keys off ``read_verification_mode`` (the durable
-        #     activity-log record, same source the Q6 gate uses);
-        #   * content-aware but still SOFT (A4): an empty file, an
-        #     unreadable file, or one with no recognizable verdict line
-        #     (per ``ai_router.external_verification``) gets the same
-        #     soft prompt/warn as absence. Posture is unchanged:
-        #     --accept-suggestions or no TTY warns and proceeds; an
-        #     interactive TTY prints the corrective guidance FIRST,
-        #     then prompts "[y/N]".
-        # Set 048 keeps this OUT of the gate_checks framework because
-        # gate_checks contract is deterministic / non-interactive; the
-        # soft gate is by-design interactive.
-        if no_router:
-            dv_mode_dedicated = False
-            try:
-                dv_mode_dedicated = (
-                    read_verification_mode(session_set_dir)
-                    == VERIFICATION_MODE_DEDICATED
-                )
-            except Exception:  # noqa: BLE001
-                dv_mode_dedicated = False
-            if dv_mode_dedicated:
-                outcome.messages.append(
-                    "external-verification.md soft gate stood down: the "
-                    "recorded verificationMode is dedicated-sessions, so "
-                    "the typed-session close-out gate is the authority "
-                    "(Set 077 A8)."
-                )
-            else:
-                ext_verify_path = os.path.join(
-                    session_set_dir, "external-verification.md"
-                )
-                gate_problem: Optional[str] = None
-                if not os.path.exists(ext_verify_path):
-                    gate_problem = (
-                        f"external-verification.md missing at "
-                        f"{ext_verify_path}"
-                    )
-                else:
-                    # Same dual-context pattern as runtime_mode above
-                    # (the parser is on the pip-installed Lightweight
-                    # close path, so a bare import is forbidden).
-                    try:
-                        from .external_verification import (
-                            VERDICT_ISSUES_FOUND,
-                            VERDICT_WAIVED,
-                            parse_external_verification,
-                        )
-                    except ImportError:
-                        from ai_router.external_verification import (  # type: ignore[no-redef]
-                            VERDICT_ISSUES_FOUND,
-                            VERDICT_WAIVED,
-                            parse_external_verification,
-                        )
-                    try:
-                        with open(
-                            ext_verify_path, "r", encoding="utf-8"
-                        ) as f:
-                            ext_text = f.read()
-                    except (OSError, UnicodeError) as exc:
-                        gate_problem = (
-                            f"external-verification.md at "
-                            f"{ext_verify_path} is unreadable "
-                            f"({exc.__class__.__name__})"
-                        )
-                    else:
-                        parsed = parse_external_verification(ext_text)
-                        if not parsed.has_recognizable_verdict:
-                            gate_problem = (
-                                f"external-verification.md at "
-                                f"{ext_verify_path} has no recognizable "
-                                f"verdict line (empty or template-only)"
-                            )
-                        elif parsed.is_specification_scope:
-                            # Set 077 S4 (code-review auto-verify Major):
-                            # a spec review runs BEFORE the work exists —
-                            # its verdict reviews the plan, not delivered
-                            # work, and must not launder the gate.
-                            gate_problem = (
-                                f"external-verification.md at "
-                                f"{ext_verify_path} records only a "
-                                f"specification review (latest round "
-                                f"{parsed.round or 1}, Scope: "
-                                f"specification) — no work-review "
-                                f"verdict is recorded"
-                            )
-                        elif parsed.verdict == VERDICT_WAIVED:
-                            outcome.messages.append(
-                                "external-verification.md verdict: WAIVED "
-                                f"(round {parsed.round or 1}) — reason: "
-                                f"{parsed.waive_reason}"
-                            )
-                        elif parsed.verdict == VERDICT_ISSUES_FOUND:
-                            # Recorded evidence exists, so the gate is
-                            # satisfied — but say out loud that the
-                            # latest round leaves remediation owed so a
-                            # terminal close over open issues is a
-                            # visible decision, not an oversight.
-                            note = (
-                                "NOTE: external-verification.md latest "
-                                f"round ({parsed.round or 1}) verdict is "
-                                "ISSUES_FOUND — remediation/response is "
-                                "still owed. Closing is allowed (soft "
-                                "gate), but review the open findings."
-                            )
-                            print(note, file=sys.stderr)
-                            outcome.messages.append(note)
-                        else:
-                            outcome.messages.append(
-                                "external-verification.md verdict: "
-                                f"VERIFIED (round {parsed.round or 1})"
-                            )
-                if gate_problem is not None:
-                    non_interactive = bool(
-                        getattr(args, "accept_suggestions", False)
-                    ) or not sys.stdin.isatty()
-                    guidance = (
-                        f"{gate_problem} (Lightweight mode). To produce "
-                        f"a verdict: in the Dabbler 'Session Sets' view, "
-                        f"right-click the set row -> Copy Prompt -> "
-                        f"Evaluate Session Set (or Evaluate Most Recent "
-                        f"Session mid-set) and paste it into a path-aware "
-                        f"AI assistant on a DIFFERENT provider than the "
-                        f"one that did the work; the prompt instructs the "
-                        f"reviewing engine to write its verdict into this "
-                        f"file itself (canonical instructions: "
-                        f"docs/dabbler/cross-provider-verification.md). "
-                        f"Per Set 048 section 3.5 this is a soft gate, "
-                        f"not a hard failure."
-                    )
-                    if non_interactive:
-                        print(f"WARNING: {guidance}", file=sys.stderr)
-                        outcome.messages.append(guidance)
-                    else:
-                        # Set 077 S4 (S1 bundle D Minor): the corrective
-                        # guidance prints BEFORE the [y/N] prompt so the
-                        # operator decides with the remediation path in
-                        # front of them, not after aborting to find it.
-                        print(f"NOTE: {guidance}", file=sys.stderr)
-                        prompt = (
-                            f"{gate_problem}. Continue closing session "
-                            f"without a recorded verification verdict? "
-                            f"[y/N]: "
-                        )
-                        # Set 107 S1: guard EOF/interrupt the same way the
-                        # sibling `_prompt_manual_attestation` already does
-                        # (L-069-1 — fix every site of the class). An agent
-                        # or CI runner invoking close_session with no tty
-                        # gets EOFError from `input()`; unguarded, that
-                        # escaped as a raw traceback with the remediation
-                        # buried above it. Treat it as the safe "no" answer
-                        # so the operator-facing abort message — which
-                        # names --accept-suggestions — is what they see.
-                        try:
-                            answer = (prompt_fn(prompt) or "").strip().lower()
-                        except (EOFError, KeyboardInterrupt):
-                            answer = ""
-                        if answer not in ("y", "yes"):
-                            outcome.result = "aborted_at_soft_gate"
-                            outcome.messages.append(
-                                "close-out aborted by operator at the "
-                                "external-verification.md soft gate "
-                                "(Set 048 §3.5); create the artifact and "
-                                "re-run, or pass --accept-suggestions to "
-                                "bypass non-interactively."
-                            )
-                            _emit_event(
-                                session_set_dir,
-                                "closeout_failed",
-                                outcome.session_number,
-                                outcome,
-                                failed_checks=[
-                                    "external_verification_soft_gate"
-                                ],
-                            )
-                            return outcome
-                        outcome.messages.append(
-                            "operator confirmed close-out without "
-                            "external-verification.md at the soft gate "
-                            "(Set 048 §3.5)"
-                        )
+        # Set 112 deleted the Lightweight tier, and with it the two
+        # gates that used to sit here: the Mode A external-
+        # verification.md soft gate and the Set 057 Q6
+        # dedicated-sessions typed-session gate. Both existed only to
+        # give the Lightweight tier a verification story; the Full
+        # tier's own mandatory cross-provider gate
+        # (check_verification_integrity in gate_checks, run above with
+        # the rest of the gate chain) is now the single authority, and
+        # it has no tier-shaped early-out to escape through.
 
-        # Set 057 Q6 close-out gate (validator landed S2; gate STRENGTH
-        # wired here in S3). When verificationMode=dedicated-sessions, the
-        # content-aware close-time validator confirms a *different-engine*
-        # verification session ran before the SET-TERMINAL close. Operator
-        # decision (engines split): HARD-block in an interactive TTY (refuse
-        # the close, print corrective), SOFT-warn in non-TTY / headless or
-        # under --accept-suggestions (mirrors the established soft posture of
-        # the external-verification.md gate while strengthening the
-        # interactive path). The gate fires ONLY on the set-terminal close —
-        # a non-terminal work-session close is never blocked for "no
-        # verification yet". Fail-open in the non-block direction: any
-        # internal error here never wedges close-out. D3 is left unchanged
-        # (content-blind, inert on Lightweight); this validator + the
-        # blessed writers are the enforcement surface (see spec S1 Audit
-        # Lock -> Concrete defect).
-        dv_gate_failed = False
-        dv_detail = ""
-        try:
-            if (
-                read_verification_mode(session_set_dir) == VERIFICATION_MODE_DEDICATED
-                and close_is_terminal
-            ):
-                dv = validate_dedicated_verification(
-                    session_set_dir,
-                    closing_session_number=outcome.session_number,
-                )
-                if dv.applicable and not dv.ok:
-                    dv_detail = f"{dv.reason} {dv.corrective}".strip()
-                    non_interactive = bool(
-                        getattr(args, "accept_suggestions", False)
-                    ) or not sys.stdin.isatty()
-                    if non_interactive:
-                        soft = (
-                            "WARNING (Set 057 dedicated-sessions soft gate, "
-                            f"non-TTY/--accept-suggestions): {dv_detail}"
-                        )
-                        print(soft, file=sys.stderr)
-                        outcome.messages.append(soft)
-                    else:
-                        dv_gate_failed = True
-        except Exception:
-            dv_gate_failed = False
-        if dv_gate_failed:
-            outcome.result = "gate_failed"
-            outcome.messages.append(
-                "gate dedicated_verification failed (Set 057 Q6, "
-                f"hard-TTY): {dv_detail} Pass --accept-suggestions to "
-                "bypass non-interactively (incident/headless only)."
-            )
-            _emit_event(
-                session_set_dir,
-                "closeout_failed",
-                outcome.session_number,
-                outcome,
-                failed_checks=["dedicated_verification_gate"],
-            )
-            return outcome
-
-        # Set 066 S2 path-aware-critique close-out gate (net-new, tier-
-        # ORTHOGONAL). When the durable ``pathAwareCritique`` record is
-        # ``advisory`` or ``required``, confirm a valid multi-provider
-        # critique artifact exists at the SET-TERMINAL close. Posture mirrors
-        # the Set 057 Q6 split for ``required`` (HARD-block in an interactive
-        # TTY, SOFT-warn non-TTY / headless / --accept-suggestions);
-        # ``advisory`` ALWAYS soft-warns and never blocks; ``none`` skips
-        # entirely. This is NET-NEW wiring reaching the Full-tier close path:
-        # the dedicated_verification gate above is Lightweight-only (it gates
-        # on verificationMode), so this attribute could not reuse it (Set 066
-        # spec Erratum). Fires ONLY on the set-terminal close, and fail-open
-        # in the non-block direction — any internal error here never wedges
-        # close-out.
+        # Set 066 S2 path-aware-critique close-out gate. When the durable
+        # ``pathAwareCritique`` record is ``advisory`` or ``required``,
+        # confirm a valid multi-provider critique artifact exists at the
+        # SET-TERMINAL close. Posture: ``required`` HARD-blocks in an
+        # interactive TTY and SOFT-warns non-TTY / headless /
+        # --accept-suggestions; ``advisory`` ALWAYS soft-warns and never
+        # blocks; ``none`` skips entirely. Fires ONLY on the set-terminal
+        # close, and fail-open in the non-block direction — any internal
+        # error here never wedges close-out.
         pac_gate_failed = False
         pac_detail = ""
-        # The module import lives INSIDE the broad fail-open guard (a
-        # deliberate strengthening over the Set 057 dedicated_verification
-        # block, which imports before its guard): the "any internal error
-        # never wedges close-out" contract must also cover a non-ImportError
-        # failure during module import/initialization, not only the
-        # bare-vs-relative ImportError shim. S2 verifier Major.
+        # The module import lives INSIDE the broad fail-open guard: the
+        # "any internal error never wedges close-out" contract must also
+        # cover a non-ImportError failure during module
+        # import/initialization, not only the bare-vs-relative ImportError
+        # shim. S2 verifier Major.
         try:
             try:
                 from path_aware_critique import (  # type: ignore[import-not-found]
@@ -2572,10 +2331,10 @@ def main(argv: Optional[List[str]] = None) -> int:
             session_set_dir=Path(ssd) if ssd else None,
         )
     except Exception as exc:  # noqa: BLE001
-        # Resolution must never block close_session (full-tier is the
+        # Resolution must never block close_session (router-enabled is the
         # safe default) — but say so instead of swallowing silently
-        # (Set 077 S4): a spec/env-activated Lightweight set that loses
-        # its soft gate this close should be a visible event.
+        # (Set 077 S4): an env-activated --no-router invocation that
+        # silently reverts should be a visible event.
         print(
             "WARNING: --no-router mode resolution failed at entry "
             f"({exc.__class__.__name__}: {exc}); proceeding with the raw "

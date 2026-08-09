@@ -5,8 +5,8 @@ Set 048 S5 UAT discovered that ``ai_router/__init__.py``,
 ``ai_router/runtime_mode.py`` used bare imports of the new Set 048
 modules (``from runtime_mode import …``, ``from spec_config import …``).
 Those bare forms only resolve under the test ``conftest.py`` ``sys.path``
-shim — pip-installed package consumers (the Lightweight target audience)
-have no such shim, so the imports raised ``ModuleNotFoundError``. The
+shim — pip-installed package consumers have no such shim, so the imports
+raised ``ModuleNotFoundError``. The
 ``route()`` / ``verify()`` call sites blew up outright; the
 ``start_session.main()`` / ``close_session.run()`` sites silently
 swallowed the error in ``try/except``, so ``--no-router`` was a no-op
@@ -41,10 +41,6 @@ SET_048_MODULES = frozenset(
         "runtime_mode",
         "spec_config",
         "suggestion_disposition",
-        "migrate_lightweight_to_canonical_v4",
-        # Set 077 S4: the external-verification verdict parser is
-        # consumed on the same pip-installed Lightweight close path.
-        "external_verification",
     )
 )
 
@@ -94,8 +90,8 @@ def test_no_bare_imports_of_set048_modules_in_production_code():
     assert not bad, (
         "Production code in ai_router/ has bare imports of Set 048 modules. "
         "These work under the test conftest's sys.path shim but raise "
-        "ModuleNotFoundError under pip-install (the Lightweight consumer "
-        "target). Use `from .<module> import …` (relative) or "
+        "ModuleNotFoundError under pip-install. Use "
+        "`from .<module> import …` (relative) or "
         "`from ai_router.<module> import …` (absolute) instead.\n"
         "Offenders:\n  "
         + "\n  ".join(f"{fn}:{ln}  {src}" for fn, ln, src in bad)

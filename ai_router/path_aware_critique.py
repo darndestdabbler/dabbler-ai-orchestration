@@ -6,23 +6,23 @@ contract that backs it. The design source is the Set 065 proposal
 (``docs/proposals/2026-06-14-verification-surface-empirics/proposal.md``
 Candidate 1 + the unifying blast-radius rule in section 7) and its
 2026-06-15 Erratum, which establishes that the close-out wiring is
-**net-new** (the existing ``dedicated-sessions`` content-aware gate is
-Lightweight-only and inert on Full tier) and that the feature is
-**tier-orthogonal** — ``none | advisory | required`` on both tiers.
+**net-new**: when it landed, the only content-aware close gate belonged to
+the Lightweight ``dedicated-sessions`` mode and was inert everywhere else,
+so this attribute could not reuse it. Set 112 deleted that mode; this gate
+is now the repo's only per-set content-aware close gate.
 
 Two concerns live here:
 
 1. The **policy attribute** ``pathAwareCritique: none | advisory |
    required`` — seeded in spec.md's Session Set Configuration block,
    recorded **once at set start** to ``activity-log.json`` (its own
-   ``kind`` so it never collides with the Set-057 ``verification_mode``
-   choice), and **immutable** after the first record. This deliberately
-   mirrors the ``verificationMode`` machinery in
-   :mod:`ai_router.dedicated_verification` (Set 057 Q5) so the two
-   per-set attributes behave identically and an operator who knows one
-   knows the other. The default when no record exists is ``none`` — the
-   feature is strictly opt-in and a set that declares nothing pays no
-   gate (preserving Full tier's walk-away promise).
+   ``kind`` so it never collides with another per-set policy record),
+   and **immutable** after the first record. The shape was modelled on
+   the Set-057 ``verificationMode`` machinery, which Set 112 deleted;
+   ``contractGate`` (Set 070) is its surviving sibling and behaves
+   identically, so an operator who knows one knows the other. The default
+   when no record exists is ``none`` — the feature is strictly opt-in and
+   a set that declares nothing pays no gate.
 
 2. The **saved critique artifact** (``path-aware-critique.json``) and its
    pure-Python :func:`validate_path_aware_critique_artifact`. The
@@ -72,18 +72,18 @@ PATH_AWARE_CRITIQUE_VALUES = (
 )
 # Default when no durable record exists: opt-in, no gate. A set that
 # declares nothing is treated as ``none`` — the Set 066 S2 close-out gate
-# only fires on ``required``, so the default preserves current behavior on
-# both tiers (Full tier's "walk away with no gate" promise).
+# only fires on ``required``, so the default preserves the "walk away with
+# no gate" promise for a set that declares nothing.
 DEFAULT_PATH_AWARE_CRITIQUE = PATH_AWARE_CRITIQUE_NONE
-# The activity-log entry ``kind`` discriminator. Distinct from Set 057's
-# ``verification_mode`` and Set 048's ``suggestion_disposition`` so the
-# path-aware-critique choice never overloads either enum.
+# The activity-log entry ``kind`` discriminator. Distinct from Set 048's
+# ``suggestion_disposition`` (and, historically, Set 057's
+# ``verification_mode``) so the path-aware-critique choice never overloads
+# another enum.
 PATH_AWARE_CRITIQUE_ENTRY_KIND = "path_aware_critique"
 # The kinds that carry a durable pathAwareCritique ``choice``. Kept as a
-# tuple (like Set 057's verification-mode record kinds) so a future
-# sanctioned-transition record kind can be added without changing the
-# reader's "last valid entry of any record kind wins" rule. Only one kind
-# exists today (Set 066 ships no A->B transition writer).
+# tuple so a future sanctioned-transition record kind can be added without
+# changing the reader's "last valid entry of any record kind wins" rule.
+# Only one kind exists today.
 _PATH_AWARE_CRITIQUE_RECORD_KINDS = (PATH_AWARE_CRITIQUE_ENTRY_KIND,)
 
 
@@ -94,9 +94,7 @@ def _now_iso_utc() -> str:
 def _write_activity_log_atomic(log_path: Path, log: dict) -> None:
     """Atomic temp-file-rename write of ``activity-log.json``.
 
-    Kept local so this module is self-contained (mirrors
-    :func:`ai_router.dedicated_verification._write_activity_log_atomic`;
-    both write the same activity-log.json shape).
+    Kept local so this module is self-contained.
     """
     log_dir = log_path.parent
     fd, tmp_path = tempfile.mkstemp(suffix=".activity-log.tmp", dir=str(log_dir))
@@ -172,8 +170,8 @@ def read_spec_path_aware_critique(
     record. Returns the value when it is a recognized level, else ``None``
     (missing spec, no config block, no field, or an unknown value). Never
     raises — a malformed spec degrades to "no seed". Reuses the shared
-    config-block extractor so the attribute is parsed exactly like ``tier``
-    / ``verificationMode`` (no separate parser).
+    config-block extractor so the attribute is parsed exactly like every
+    other Session Set Configuration policy field (no separate parser).
     """
     spec_path = Path(session_set_dir) / "spec.md"
     if not spec_path.is_file():
@@ -333,9 +331,8 @@ def record_path_aware_critique(
 ) -> None:
     """Append a ``path_aware_critique`` entry to ``activity-log.json``.
 
-    The durable record (Set 066 S1). Mirrors the Set-057
-    ``record_verification_mode`` writer (atomic temp-file rename, UTC
-    timestamp). Raises ``ValueError`` on an unknown value and
+    The durable record (Set 066 S1). Atomic temp-file rename, UTC
+    timestamp. Raises ``ValueError`` on an unknown value and
     ``FileNotFoundError`` if the activity log is missing (the set must have
     started first — this helper does not create the file).
 
@@ -809,8 +806,7 @@ class PathAwareCritiqueGateResult:
     The hard-block-vs-soft-warn **posture** is the *caller's* decision and
     depends on ``level``: ``required`` hard-blocks in an interactive TTY /
     soft-warns headless; ``advisory`` always soft-warns and never blocks.
-    This validator is posture-agnostic — it reports only ok/not-ok, exactly
-    like :func:`ai_router.dedicated_verification.validate_dedicated_verification`.
+    This validator is posture-agnostic — it reports only ok/not-ok.
     """
 
     level: str
@@ -836,13 +832,10 @@ def validate_path_aware_critique_gate(
       :func:`validate_path_aware_critique_artifact`; ``ok`` is True iff a
       valid multi-provider, content-non-trivial artifact exists.
 
-    Never raises (mirrors
-    :func:`ai_router.dedicated_verification.validate_dedicated_verification`):
-    a missing or unreadable artifact is reported as ``ok=False`` with a
-    corrective, so the close-out gate decides posture rather than crashing.
-    This function is **tier-orthogonal** — it consults only the
-    tier-independent ``pathAwareCritique`` record, so it behaves identically
-    on Full and Lightweight.
+    Never raises: a missing or unreadable artifact is reported as
+    ``ok=False`` with a corrective, so the close-out gate decides posture
+    rather than crashing. It consults only the ``pathAwareCritique``
+    record, so a set's gate policy is the sole input.
     """
     level = read_path_aware_critique(session_set_dir)
     if level == PATH_AWARE_CRITIQUE_NONE:

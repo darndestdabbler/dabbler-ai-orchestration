@@ -110,10 +110,13 @@ Both writers are idempotent and safe to re-run:
 - `close_session` re-running on an already-closed session exits 0
   with `result: "noop_already_closed"` (see Section 3 step 4).
 
-### Tier symmetry
+### One protocol, one tier
 
-The protocol applies tier-symmetrically: Full-tier projects use the
-two CLIs; Lightweight-tier projects hand-write the same fields. See
+Every project uses the two CLIs. Set 112 deleted the Lightweight tier,
+and with it the hand-written close path: `start_session` and
+`close_session` are the only sanctioned writers, and a spec that still
+declares `tier: lightweight` is refused at the boundary with a migration
+message before any state or event write. See
 [`docs/session-state-schema.md`](../../docs/session-state-schema.md)
 for the canonical field list and worked examples, and Step 1 of
 [`docs/ai-led-session-workflow.md`](../../docs/ai-led-session-workflow.md)
@@ -366,7 +369,7 @@ returns the corresponding exit code without touching downstream state.
     layer" means force closes receive the same in-process verification,
     not merely the same refusal); incident recovery under a dead
     provider goes through the attested `--manual-verify` path.
-    Lightweight closes keep their own per-set gates; an illegal
+    An illegal
     `verification_method` token skips the backstop because the
     vocabulary gate refuses that close anyway. The backstop runs inside
     the close lock and is idempotent: a re-run after a
@@ -418,13 +421,8 @@ returns the corresponding exit code without touching downstream state.
 7b. **Content-aware close-out gates** (run after the deterministic gates,
     before the state flip; each fires only on the **set-terminal** close
     and never on a non-terminal work-session close):
-   - **External-verification soft gate** (Set 048 §3.5) — `--no-router`
-     mode only; warns when `external-verification.md` is missing.
-   - **Dedicated-verification gate** (Set 057 Q6) — fires when the durable
-     `verificationMode == dedicated-sessions` (**Lightweight only**);
-     confirms a different-engine verification session ran.
-   - **Path-aware-critique gate** (Set 066) — **tier-orthogonal** (Full
-     *and* Lightweight). Fires when the durable `pathAwareCritique` record
+   - **Path-aware-critique gate** (Set 066). Fires when the durable
+     `pathAwareCritique` record
      (an `activity-log.json` entry written once at set start; default
      `none`) is `advisory` or `required`. It confirms a valid
      **multi-provider** `path-aware-critique.json` artifact exists at the
@@ -433,12 +431,10 @@ returns the corresponding exit code without touching downstream state.
      `required` **hard-blocks** in an interactive TTY (`gate_failed` +
      `closeout_failed`, `failed_checks: ["path_aware_critique_gate"]`) and
      **soft-warns** in non-TTY / headless / under `--accept-suggestions`;
-     `advisory` **always soft-warns** and never blocks; `none` skips. The
-     wiring is **net-new** on the Full-tier close path — the
-     dedicated-verification gate above is Lightweight-only, so the
-     attribute could not reuse it. Fail-open in the non-block direction:
+     `advisory` **always soft-warns** and never blocks; `none` skips.
+     Fail-open in the non-block direction:
      any internal error never wedges close-out.
-   - **Contract-test / CDC gate** (Set 068 S5) — **tier-orthogonal**. Fires
+   - **Contract-test / CDC gate** (Set 068 S5). Fires
      when the durable `contractGate` record (an `activity-log.json` entry
      written once at set start; default `none`) is `advisory` or `required`.
      It validates the saved `contract-floor-result.json` + `contract-manifest.json`
@@ -915,11 +911,12 @@ re-use the same `_evaluate_one(session_set_dir, ...)` predicate so
 the two paths cannot disagree about what "stranded" means.
 
 **Mixed-mode drift (hand-authored session in a router-driven set).**
-The supported tiers are Full (every session runs through
-`close_session`; events ledger is authoritative) and Lightweight
-(no router writer; the human or orchestrator hand-maintains
-`session-state.json`). Mixing the two within a single set is **not
-supported** but does happen in practice — earlier sessions run
+There is one supported mode: every session runs through
+`close_session`, and the events ledger is authoritative. (Before Set
+112 the Lightweight tier offered a sanctioned hand-maintained
+alternative; mixing the two was the drift below. The tier is gone, so
+a hand-authored session is now simply unsanctioned — but the drift
+still happens in practice.) Earlier sessions run
 through `close_session` and a later session (often a "quick bug
 fix" or "wrap up" session) is authored directly:
 `session-state.json` is edited to `currentSession: N` /
@@ -962,11 +959,10 @@ Recovery:
   to In Progress and the work can resume through `close_session`
   normally.
 
-Prevention: the orchestrator instruction file should either commit
-the set to Lightweight tier (no router writes, no events ledger,
-maintain `completedSessions[]` manually per
-`docs/session-state-schema.md`) or Full tier (every session
-through `close_session`). Don't switch mid-set.
+Prevention: never hand-edit `session-state.json` to declare progress.
+Every session goes through `start_session` / `close_session`; if a
+state file genuinely needs repair, use the sanctioned `--repair
+--apply` path above rather than an edit.
 
 **Cross-set parallelism on the same `(repo, branch)`.** The
 per-set lifecycle lock at `<session-set-dir>/.lifecycle.lock` (Set 036

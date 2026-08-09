@@ -12,7 +12,7 @@ migration sequencing). Two consumers call into this module:
    The extension does NOT shell out; it carries its own TypeScript
    mirror of :func:`migrate_one_set` in
    ``tools/dabbler-ai-orchestration/src/utils/migrateSessionStateV4.ts``
-   so Lightweight-tier consumer repos that never install ai-router can
+   so a consumer repo that has not installed ai-router can
    still right-click → "Migrate to v4 schema" without a Python
    dependency. Both implementations MUST stay in lockstep on the on-disk
    v4 shape and the rollback file naming.

@@ -98,8 +98,6 @@ try:
         compute_effective_completed_sessions,
         read_session_state,
         register_session_start,
-        register_typed_session_handoff,
-        register_typed_session_start,
     )
     from close_lock import (  # type: ignore[import-not-found]
         DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
@@ -122,8 +120,6 @@ except ImportError:
         compute_effective_completed_sessions,
         read_session_state,
         register_session_start,
-        register_typed_session_handoff,
-        register_typed_session_start,
     )
     from .close_lock import (  # type: ignore[no-redef]
         DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
@@ -142,7 +138,7 @@ except ImportError:
 # test_production_imports guard): the bare form only resolves under the
 # test conftest's sys.path shim and raises ModuleNotFoundError under
 # pip-install. Relative-first with a package-absolute fallback, matching
-# gate_checks._set_is_lightweight.
+# the other Set 048 module consumers.
 try:
     from .runtime_mode import is_no_router_mode  # type: ignore[import-not-found]
 except ImportError:
@@ -176,8 +172,8 @@ def _run_copilot_preflight_or_block(
     Only the copilot-cli seat (a multi-provider engine) runs this — the
     direct-API path has no CLI to preflight, so single-vendor engines return
     immediately with no cost or new failure mode. Under ``--no-router``
-    (Lightweight, zero metered calls) it also no-ops: there is no routed
-    verification to protect, so spending a billed live probe would be wrong.
+    (zero metered calls) it also no-ops: there is no routed dispatch to
+    protect, so spending a billed live probe would be wrong.
 
     Returns an exit code to STOP session start (the preflight failed and
     printed its remediation), or ``None`` to proceed. The preflight is the
@@ -329,57 +325,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         ),
     )
     p.add_argument(
-        "--type",
-        dest="session_type",
-        default="work",
-        choices=["work", "verification", "remediation"],
-        help=(
-            "Set 057: session type. ``work`` (default) starts the next "
-            "authored session normally. ``verification`` or "
-            "``remediation`` invoke the blessed typed-session writer: it "
-            "APPENDS a new typed entry to session-state.json sessions[] "
-            "(growing the runtime totalSessions by one) and never mutates "
-            "spec.md. Typed sessions take their step list from "
-            "docs/ai-led-session-workflow.md (the Lightweight dedicated-"
-            "verification procedure), NOT from a spec.md heading."
-        ),
-    )
-    p.add_argument(
-        "--title",
-        dest="session_title",
-        default=None,
-        help=(
-            "Optional title for a typed (--type verification|remediation) "
-            "session. Defaults to e.g. 'Verification round 1'. Ignored for "
-            "--type work."
-        ),
-    )
-    p.add_argument(
-        "--handoff",
-        action="store_true",
-        help=(
-            "Set 057: hand-off close. With --type verification|remediation, "
-            "atomically CLOSE the in-flight typed session and OPEN this one "
-            "(the sanctioned writer for the verification->remediation and "
-            "remediation->re-verification transitions). Required because a "
-            "standalone non-terminal typed close would leave sessions[] "
-            "all-complete-while-in-progress (rejected by invariant rule 6). "
-            "Use this instead of hand-editing session-state.json so typed "
-            "sessions always come from a blessed writer (L3/Q1). Refused "
-            "unless exactly one typed session is in flight."
-        ),
-    )
-    p.add_argument(
-        "--handoff-verdict",
-        dest="handoff_verdict",
-        default=None,
-        help=(
-            "Optional verdict recorded on the session being closed by "
-            "--handoff (e.g. ISSUES_FOUND for the verification round that "
-            "hands off to remediation). Ignored without --handoff."
-        ),
-    )
-    p.add_argument(
         "--total-sessions",
         type=int,
         default=None,
@@ -393,25 +338,6 @@ def _build_arg_parser() -> argparse.ArgumentParser:
             "``0/?`` in the Session Set Explorer per Set 046 "
             "deliverable (a). Pass this flag to lock the count "
             "explicitly without editing spec.md."
-        ),
-    )
-    p.add_argument(
-        "--verification-mode",
-        dest="verification_mode",
-        default=None,
-        choices=["dedicated-sessions", "out-of-band-or-none"],
-        help=(
-            "Set 057 (Q5): record the operator's Lightweight verification "
-            "choice once at set start. ``dedicated-sessions`` opts in to the "
-            "typed verification/remediation workflow (and the close-out gate "
-            "that confirms a different-engine verification ran); "
-            "``out-of-band-or-none`` preserves the current copy/paste flow. "
-            "When omitted, the writer seeds the choice from spec.md's "
-            "Session Set Configuration ``verificationMode`` field if present "
-            "(recorded only when no choice exists yet); otherwise nothing is "
-            "recorded and the default out-of-band-or-none applies implicitly. "
-            "The durable record is an activity-log.json entry every later "
-            "step reads."
         ),
     )
     p.add_argument(
@@ -458,54 +384,21 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     # source for runtime_mode.resolve_no_router_mode (CLI flag > env
     # var DABBLER_NO_ROUTER > spec.md tier field > default full mode).
     # Under --no-router, the start_session writer behaves identically
-    # (state file flip and orchestrator block are tier-agnostic per
-    # premise P1); the flag is plumbed through to the resolver so
-    # downstream verification calls in close_session can short-circuit.
+    # (the state-file flip and orchestrator block make no routed calls);
+    # the flag is plumbed through to the resolver so downstream
+    # verification calls in close_session can short-circuit.
     p.add_argument(
         "--no-router",
         action="store_true",
         dest="no_router",
         help=(
-            "Run in Lightweight tier --no-router mode: suppress all "
-            "AI router runtime calls (no LLM API hits, no auto-"
-            "verification) for this invocation. Highest-precedence "
-            "activation source per Set 048 §3.1 (overrides env var "
-            "DABBLER_NO_ROUTER and spec.md tier field)."
+            "Suppress routed API calls for this invocation (CI / "
+            "hermetic test affordance): no LLM dispatch, no routed "
+            "verification. Highest-precedence source, above the "
+            "DABBLER_NO_ROUTER env var."
         ),
     )
     return p
-
-
-def _capture_verification_mode(
-    session_set_dir: str,
-    session_number: int,
-    cli_choice: Optional[str],
-) -> None:
-    """Set 057 (Q5): record the operator's verificationMode once at set start.
-
-    Best-effort: delegates to
-    :func:`dedicated_verification.resolve_and_record_verification_mode`
-    (CLI choice wins; otherwise the spec.md seed is recorded only when no
-    durable record exists yet). A bad explicit ``--verification-mode`` is
-    already rejected by argparse ``choices``; any other failure here must
-    never block the session-start write, so it is swallowed.
-    """
-    try:
-        try:
-            from dedicated_verification import (  # type: ignore[import-not-found]
-                resolve_and_record_verification_mode,
-            )
-        except ImportError:
-            from .dedicated_verification import (  # type: ignore[no-redef]
-                resolve_and_record_verification_mode,
-            )
-        resolve_and_record_verification_mode(
-            session_set_dir,
-            cli_choice=cli_choice,
-            session_number=session_number,
-        )
-    except Exception:
-        pass
 
 
 def _capture_path_aware_critique(
@@ -572,101 +465,6 @@ def _capture_contract_gate(
         )
     except Exception:
         pass
-
-
-def _print_pending_verification_banner(session_set_dir: str) -> None:
-    """Set 077 (Feature 4): loud, ADVISORY owed-verification banner.
-
-    Fires on work-session starts, both tiers, no-router-aware (the
-    derivation reads no router config). Printed to stderr like every
-    other lifecycle advisory; never blocks and never changes the exit
-    status — any failure inside the scan is swallowed.
-    """
-    try:
-        try:
-            from pending_verification import (  # type: ignore[import-not-found]
-                format_banner,
-                pending_verification_notices,
-            )
-        except ImportError:
-            from .pending_verification import (  # type: ignore[no-redef]
-                format_banner,
-                pending_verification_notices,
-            )
-        banner = format_banner(pending_verification_notices(session_set_dir))
-        if banner:
-            print(banner, file=sys.stderr)
-    except Exception:
-        pass
-
-
-def _refuse_same_pair_verification(
-    session_set_dir: str,
-    engine: str,
-    provider: Optional[str],
-) -> Optional[str]:
-    """Set 077 S5 (Critique-2 M1): the start-time cross-provider guardrail.
-
-    Returns the refusal message when the declared ``(engine, provider)``
-    identity could not possibly satisfy the Mode-B close gate against the
-    work sessions as currently recorded — the cross-provider property is
-    enforced where the operator can still fix it (before any write), not
-    only at close. Returns ``None`` (allow) otherwise.
-
-    The check mirrors the close gate's acceptance predicate exactly
-    (``dedicated_verification.cross_provider_satisfied``) so it can never
-    refuse a start whose close would pass. It stays silent (allows) when
-    there is no recorded work-session identity to compare against — the
-    close gate's fail-closed no-baseline posture covers that case with
-    its own corrective — and it never blocks on an internal error (the
-    guardrail narrows honest mistakes; it must not add a failure mode).
-    """
-    try:
-        try:
-            from dedicated_verification import (  # type: ignore[import-not-found]
-                cross_provider_satisfied,
-                work_session_pairs,
-            )
-            from progress import normalize_to_v4_shape  # type: ignore[import-not-found]
-        except ImportError:
-            from .dedicated_verification import (  # type: ignore[no-redef]
-                cross_provider_satisfied,
-                work_session_pairs,
-            )
-            from .progress import normalize_to_v4_shape  # type: ignore[no-redef]
-
-        state = read_session_state(session_set_dir)
-        if not isinstance(state, dict):
-            return None
-        normalized = normalize_to_v4_shape(
-            state, os.path.join(session_set_dir, "spec.md")
-        )
-        sessions = normalized.get("sessions") or []
-        pairs = work_session_pairs(sessions)
-        # No baseline to compare against -> allow (close gate owns that).
-        if not any(e is not None or p is not None for e, p in pairs):
-            return None
-        if cross_provider_satisfied(engine, provider, pairs):
-            return None
-    except Exception:
-        return None
-    provider_label = provider if provider is not None else "<not declared>"
-    return (
-        "refused -- the declared verification identity (engine="
-        f"{engine!r}, provider={provider_label!r}) does not differ from "
-        "the work sessions by engine or by provider, so the Mode-B "
-        "close-out gate could never pass it. Cross-provider review is the "
-        "point of a dedicated verification session. Fix: run it on a "
-        "different engine, or keep the engine and switch the model "
-        "provider — the sanctioned single-engine pattern for a "
-        "Copilot-locked shop is a second Copilot chat with the model "
-        "picker on another provider, declared as: --engine copilot "
-        "--provider openai (verifying work done under --engine copilot "
-        "--provider anthropic). Declare the true provider with "
-        "--provider; if the work sessions' providers were never "
-        "recorded, record them on the per-session orchestrator blocks "
-        "first."
-    )
 
 
 def _refuse_unresolvable_identity(args: argparse.Namespace) -> Optional[str]:
@@ -922,6 +720,34 @@ def run(args: argparse.Namespace) -> int:
             pass
 
 
+def _refuse_removed_tier(session_set_dir: str) -> Optional[int]:
+    """Set 112: refuse a spec that still declares the removed tier.
+
+    Returns ``EXIT_BOUNDARY`` after printing the migration one-liner, or
+    ``None`` to proceed. Placed before every write so the refusal is the
+    FIRST thing a stranded Lightweight consumer sees.
+    """
+    try:
+        try:
+            from .spec_config import (  # type: ignore[import-not-found]
+                LightweightTierRemovedError,
+                refuse_if_lightweight,
+            )
+        except ImportError:
+            from ai_router.spec_config import (  # type: ignore[no-redef]
+                LightweightTierRemovedError,
+                refuse_if_lightweight,
+            )
+    except Exception:  # noqa: BLE001 — a broken install has its own errors
+        return None
+    try:
+        refuse_if_lightweight(session_set_dir)
+    except LightweightTierRemovedError as exc:
+        print(f"start_session: refused -- {exc}", file=sys.stderr)
+        return EXIT_BOUNDARY
+    return None
+
+
 def _run_under_lock(args: argparse.Namespace) -> int:
     """The original boundary + write flow, executed with the per-set
     lifecycle lock already held by the caller.
@@ -933,20 +759,13 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     """
     session_set_dir = args.session_set_dir
 
-    # Set 057: typed verification/remediation sessions take a separate
-    # writer path. They are NOT authored in spec.md and do NOT obey the
-    # work-session boundary math (skip-ahead / next-sequential refusals);
-    # instead they APPEND a new typed entry beyond the authored plan and
-    # grow the runtime totalSessions. The blessed writer enforces its own
-    # fail-loud contract (known plan required, no session in flight). The
-    # announcement banner tells the operator AND the orchestrator what
-    # kind of session this is and where its step list lives, so a pasted
-    # "Start the next session" prompt is self-describing.
-    session_type = getattr(args, "session_type", "work") or "work"
-    if session_type in ("verification", "remediation"):
-        if getattr(args, "handoff", False):
-            return _run_typed_handoff(args, session_set_dir, session_type)
-        return _run_typed_session(args, session_set_dir, session_type)
+    # Set 112: the removed-tier boundary refusal, BEFORE any read of the
+    # ledger and before every write. A stranded Lightweight consumer meets
+    # the migration one-liner on the first command they run, not an
+    # unrelated close-out error three steps later.
+    refusal = _refuse_removed_tier(session_set_dir)
+    if refusal is not None:
+        return refusal
 
     state = read_session_state(session_set_dir) or {}
     closed = compute_effective_completed_sessions(session_set_dir)
@@ -1092,14 +911,7 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         orchestrator_provider=args.provider,
     )
 
-    # Set 057 (Q5): capture the operator's verificationMode choice once at
-    # set start (CLI flag wins; spec.md seed recorded only when no record
-    # exists yet). Best-effort — never blocks the boundary write.
-    _capture_verification_mode(
-        session_set_dir, requested, getattr(args, "verification_mode", None)
-    )
-
-    # Set 066 (S1): capture the tier-orthogonal pathAwareCritique policy
+    # Set 066 (S1): capture the pathAwareCritique policy
     # once at set start (CLI flag wins; spec.md seed recorded only when no
     # record exists yet). Best-effort — never blocks the boundary write.
     _capture_path_aware_critique(
@@ -1125,21 +937,13 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         provider=args.provider,
     )
 
-    # Set 077 (Feature 4): pending-verification banner — an owed /
-    # unfinished verification (this set, a stalled Mode-B sibling, or
-    # the most recently completed set) is named out loud at the next
-    # session start. Advisory only: stderr, never blocks, never changes
-    # the exit status; fires on both tiers with no router config.
-    _print_pending_verification_banner(session_set_dir)
-
-    # Set 083 Session 3: Full-tier Step-6 affordance. Verification is
+    # Set 083 Session 3: Step-6 affordance. Verification is
     # not implicit and not skippable — the Set 068 routed-gate SKIP path
     # is retired (operator decision after the 2026-07-06 UAT incident);
     # the orchestrator must run the verify_session CLI before
-    # close_session on every Full-tier session. This is advisory-only,
-    # stderr-only, and fail-open like the drift advisory below.
-    # Lightweight stays quiet because its verification path is governed
-    # by the set's verificationMode.
+    # close_session on every session. This is advisory-only,
+    # stderr-only, and fail-open like the drift advisory below. It stays
+    # quiet under --no-router, where no routed call can be made anyway.
     try:
         if not is_no_router_mode():
             # Venv-qualified on purpose: a bare `python` often resolves
@@ -1184,209 +988,6 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     return EXIT_OK
 
 
-def _run_typed_session(
-    args: argparse.Namespace,
-    session_set_dir: str,
-    session_type: str,
-) -> int:
-    """Set 057: append a typed verification/remediation session.
-
-    Delegates to :func:`session_state.register_typed_session_start`, then
-    prints an ASCII-only announcement banner naming the session type and
-    pointing at the canonical procedure (typed sessions take their step
-    list from ``docs/ai-led-session-workflow.md``, NOT from spec.md).
-    The drift advisory and writer-log appender mirror the work-session
-    path so a typed session is observationally identical otherwise.
-
-    Returns ``EXIT_OK`` on success, ``EXIT_BOUNDARY`` when the writer's
-    fail-loud contract refuses (no plan, session in flight), or
-    ``EXIT_USAGE`` for a bad session_type.
-    """
-    # Set 077 S5 (Critique-2 M1): fail loud BEFORE any write when the
-    # declared (engine, provider) pair cannot possibly satisfy the
-    # cross-provider close gate. Verification sessions only — a
-    # remediation session legitimately runs on the work engine.
-    if session_type == "verification":
-        refusal = _refuse_same_pair_verification(
-            session_set_dir, args.engine, args.provider
-        )
-        if refusal is not None:
-            print(f"start_session: {refusal}", file=sys.stderr)
-            return EXIT_BOUNDARY
-
-    try:
-        _path, new_number = register_typed_session_start(
-            session_set=session_set_dir,
-            session_type=session_type,
-            orchestrator_engine=args.engine,
-            orchestrator_model=args.model,
-            orchestrator_effort=args.effort,
-            orchestrator_provider=args.provider,
-            title=getattr(args, "session_title", None),
-        )
-    except ValueError as exc:
-        # SessionStateInvariantError is a ValueError subclass; both land
-        # here. Contract refusals (no plan / in-flight) are boundary
-        # violations; a bad session_type is a usage error, but argparse
-        # ``choices`` already rejects that upstream, so treat all of these
-        # as boundary violations for a clear, consistent exit code.
-        print(f"start_session: {exc}", file=sys.stderr)
-        return EXIT_BOUNDARY
-
-    # Announcement banner (ASCII-only per the cp1252 convention). Printed
-    # to stderr so it never pollutes any machine-readable stdout consumer,
-    # matching the drift advisory's stream.
-    print(
-        f"[dabbler] Session {new_number} is a {session_type.upper()} session "
-        f"(type={session_type}).",
-        file=sys.stderr,
-    )
-    print(
-        "[dabbler] Typed sessions take their step list from "
-        "docs/ai-led-session-workflow.md -> Lightweight dedicated "
-        "verification (NOT a spec.md heading).",
-        file=sys.stderr,
-    )
-
-    # Set 057 (Q5): capture is immutable after the first record, so this is
-    # a no-op once the set has opted in/out at its start. Kept for the edge
-    # case where a set's very first start is itself a typed session.
-    _capture_verification_mode(
-        session_set_dir, new_number, getattr(args, "verification_mode", None)
-    )
-
-    # Set 077 S5 (S1 review, bundle C): the typed path must seed the same
-    # once-at-set-start policies the work path does — a set whose FIRST
-    # boundary call is a typed session otherwise never records
-    # pathAwareCritique / contractGate and the Set 066/070 close gates
-    # silently no-op. Both captures are idempotent (no-op once a durable
-    # record exists) and best-effort.
-    _capture_path_aware_critique(
-        session_set_dir, new_number, getattr(args, "path_aware_critique", None)
-    )
-    _capture_contract_gate(
-        session_set_dir, new_number, getattr(args, "contract_gate", None)
-    )
-
-    _log_session_start(
-        session_set_dir=session_set_dir,
-        session_number=new_number,
-        engine=args.engine,
-        provider=args.provider,
-    )
-
-    # Set 053 schema-drift advisory, identical to the work-session path:
-    # non-blocking, fail-open, stderr only, never changes exit status.
-    try:
-        drift_line = summarize_drift(
-            os.path.dirname(os.path.abspath(session_set_dir))
-        )
-        if drift_line:
-            print(drift_line, file=sys.stderr)
-        # Set 064 D5 backstop: soft guidance over-ceiling advisory
-        # (non-blocking, fail-open, stderr-only).
-        overhead_line = summarize_overhead()
-        if overhead_line:
-            print(overhead_line, file=sys.stderr)
-    except Exception:
-        pass
-
-    return EXIT_OK
-
-
-def _run_typed_handoff(
-    args: argparse.Namespace,
-    session_set_dir: str,
-    followon_type: str,
-) -> int:
-    """Set 057: hand-off close (the sanctioned writer for the
-    verification->remediation and remediation->re-verification transitions).
-
-    Delegates to :func:`session_state.register_typed_session_handoff`, which
-    atomically closes the in-flight typed session and opens the follow-on
-    session in-progress. This is the CLI path that keeps non-Python flows
-    (Copilot/Codex/Gemini) on a blessed writer instead of hand-editing
-    session-state.json (L3/Q1). Returns ``EXIT_OK`` on success or
-    ``EXIT_BOUNDARY`` when the writer's fail-loud contract refuses (no
-    plan, no/!=1 in-flight typed session).
-    """
-    # Set 077 S5 (Critique-2 M1): the remediation->re-verification handoff
-    # opens a verification session too — same start-time guardrail as the
-    # plain typed start, before any write.
-    if followon_type == "verification":
-        refusal = _refuse_same_pair_verification(
-            session_set_dir, args.engine, args.provider
-        )
-        if refusal is not None:
-            print(f"start_session: {refusal}", file=sys.stderr)
-            return EXIT_BOUNDARY
-
-    try:
-        _path, closed_number, new_number = register_typed_session_handoff(
-            session_set=session_set_dir,
-            followon_type=followon_type,
-            orchestrator_engine=args.engine,
-            orchestrator_model=args.model,
-            orchestrator_effort=args.effort,
-            orchestrator_provider=args.provider,
-            verification_verdict=getattr(args, "handoff_verdict", None),
-            title=getattr(args, "session_title", None),
-        )
-    except ValueError as exc:
-        print(f"start_session: {exc}", file=sys.stderr)
-        return EXIT_BOUNDARY
-
-    print(
-        f"[dabbler] Hand-off: closed session {closed_number}; session "
-        f"{new_number} is a {followon_type.upper()} session "
-        f"(type={followon_type}).",
-        file=sys.stderr,
-    )
-    print(
-        "[dabbler] Typed sessions take their step list from "
-        "docs/ai-led-session-workflow.md -> Lightweight dedicated "
-        "verification (NOT a spec.md heading).",
-        file=sys.stderr,
-    )
-
-    # Set 077 S5 (S1 review, bundle C): the handoff path skipped ALL
-    # three once-at-set-start policy captures (the plain typed path at
-    # least captured verificationMode). All idempotent + best-effort —
-    # no-ops on any set that recorded its policies at its first start.
-    _capture_verification_mode(
-        session_set_dir, new_number, getattr(args, "verification_mode", None)
-    )
-    _capture_path_aware_critique(
-        session_set_dir, new_number, getattr(args, "path_aware_critique", None)
-    )
-    _capture_contract_gate(
-        session_set_dir, new_number, getattr(args, "contract_gate", None)
-    )
-
-    _log_session_start(
-        session_set_dir=session_set_dir,
-        session_number=new_number,
-        engine=args.engine,
-        provider=args.provider,
-    )
-
-    try:
-        drift_line = summarize_drift(
-            os.path.dirname(os.path.abspath(session_set_dir))
-        )
-        if drift_line:
-            print(drift_line, file=sys.stderr)
-        # Set 064 D5 backstop: soft guidance over-ceiling advisory
-        # (non-blocking, fail-open, stderr-only).
-        overhead_line = summarize_overhead()
-        if overhead_line:
-            print(overhead_line, file=sys.stderr)
-    except Exception:
-        pass
-
-    return EXIT_OK
-
-
 def main(argv: Optional[list[str]] = None) -> int:
     parser = _build_arg_parser()
     args = parser.parse_args(argv)
@@ -1399,7 +1000,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # mode. The original bare `from runtime_mode import …` worked under
     # the test sys.path shim but silently no-op'd in production because
     # the try/except swallowed the ModuleNotFoundError — `--no-router`
-    # was a no-op for every Lightweight consumer.
+    # was a no-op for every pip-installed consumer.
     try:
         from .runtime_mode import resolve_no_router_mode
 

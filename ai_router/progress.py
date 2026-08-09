@@ -72,14 +72,14 @@ TOP_LEVEL_STATUSES = (
 LIFECYCLE_STATE_WORK_IN_PROGRESS = "work_in_progress"
 LIFECYCLE_STATE_CLOSED = "closed"
 
-# Set 057: per-session ``type`` field. Default ``work``; absent/``work``
-# for every existing and Full-tier entry. ``verification`` and
-# ``remediation`` entries are appended at runtime by the blessed writer
-# (``register_typed_session_start``) for the Lightweight dedicated-
-# verification flow — they are NOT authored in spec.md. The field is
-# additive and backward-compatible: a missing ``type`` is interpreted as
-# ``work`` everywhere. Only non-``work`` types are persisted on disk so
-# historical and Full-tier ledgers are untouched.
+# Set 057: per-session ``type`` field. Default ``work``; absent or ``work``
+# for every entry a current writer produces. Set 112 deleted the Lightweight
+# dedicated-verification flow and its blessed typed-session writer, so
+# ``verification`` and ``remediation`` entries are no longer CREATED — the
+# tokens survive as READ vocabulary so archived sets that recorded typed
+# sessions still parse and render. The field is additive and
+# backward-compatible: a missing ``type`` is interpreted as ``work``
+# everywhere, and only non-``work`` types were ever persisted on disk.
 SESSION_TYPE_WORK = "work"
 SESSION_TYPE_VERIFICATION = "verification"
 SESSION_TYPE_REMEDIATION = "remediation"

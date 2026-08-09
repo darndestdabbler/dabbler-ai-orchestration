@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The extension bulk-upgrade command still invokes the deleted Lightweight migrator.\n- **Category:** Correctness / Completeness\n- **Severity:** Major\n- **Failure scenario:** A user with any sub-current session set clicks the contributed **Upgrade Older Session Sets** title-bar command. That path always runs `BULK_UPGRADE_MODULES` in order, so it reaches `ai_router.migrate_lightweight_to_canonical_v4`, which no longer exists, and the upgrade reports an error instead of upgrading. This is probable for older consumer repos because the command is specifically gated on `hasSubCurrentSets`.\n- **Acceptance criterion:** `python -c \"__import__('sys').exit(any('ai_router.migrate_lightweight_to_canonical_v4' in __import__('pathlib').Path(p).read_text(encoding='utf-8') for p in ['tools/dabbler-ai-orchestration/src/commands/upgradeOlderSets.ts','tools/dabbler-ai-orchestration/dist/extension.js']))\"`\n- **Acceptance expectation:** exit 0\n- **Details:** Violation: the session deletes `ai_router/migrate_lightweight_to_canonical_v4.py` and updates the router bulk chain to two migrators, but the live extension command still hardcodes the removed module. Impact: a user-visible migration command fails on its second subprocess and blocks the schema-upgrade path. Evidence: `upgradeOlderSets.ts` still lists `\"ai_router.migrate_lightweight_to_canonical_v4\"` in `BULK_UPGRADE_MODULES`, `package.json` still contributes `dabblerSessionSets.upgradeOlderSets`, `dist/extension.js` still contains the same module string, and `python -m ai_router.migrate_lightweight_to_canonical_v4 --help` now exits with `No module named ai_router.migrate_lightweight_to_canonical_v4`.",
+      "category": "Correctness / Completeness",
+      "severity": "Major",
+      "failureScenario": "A user with any sub-current session set clicks the contributed **Upgrade Older Session Sets** title-bar command. That path always runs `BULK_UPGRADE_MODULES` in order, so it reaches `ai_router.migrate_lightweight_to_canonical_v4`, which no longer exists, and the upgrade reports an error instead of upgrading. This is probable for older consumer repos because the command is specifically gated on `hasSubCurrentSets`.",
+      "acceptance": {
+        "kind": "executable",
+        "command": "python -c \"__import__('sys').exit(any('ai_router.migrate_lightweight_to_canonical_v4' in __import__('pathlib').Path(p).read_text(encoding='utf-8') for p in ['tools/dabbler-ai-orchestration/src/commands/upgradeOlderSets.ts','tools/dabbler-ai-orchestration/dist/extension.js']))\"",
+        "expectedExitCode": 0
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "e0260ca7bdd92bf3b984494ccb295732fe039c30"
+}

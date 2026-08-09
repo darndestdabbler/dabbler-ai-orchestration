@@ -47,22 +47,19 @@ sequence as two migrators — ``migrate_lightweight_to_canonical_v4`` then
 both steps." Implementing the S2 carried-risk-#2 test ("v2-needs-both-
 migrators sequence") falsified that claim empirically: a *genuine* v2 file
 (explicit ``schemaVersion: 2`` with the legacy currentSession/totalSessions/
-completedSessions triple) is **skipped by both** of those migrators —
-``lightweight-to-v4`` returns ``skipped-pre-v3`` and ``v3-to-v4`` returns
-``skipped-not-v3``. The v2→v3 step belongs to a *third* existing migrator,
-``migrate_session_state``, which the verdict's enumeration omitted. The
-verdict's *intent* (a single bulk command that upgrades any drifted set to
-current) is preserved; only its migrator list was incomplete. The corrected,
-empirically-verified bulk chain (each step idempotent / skips inapplicable
-files; ordered so output of step N feeds step N+1) is:
+completedSessions triple) was **skipped by both** of those migrators. The
+v2→v3 step belongs to a *third* existing migrator, ``migrate_session_state``,
+which the verdict's enumeration omitted.
 
-    1. python -m ai_router.migrate_session_state --in-place            # v2 -> v3
-    2. python -m ai_router.migrate_lightweight_to_canonical_v4 --in-place  # non-canonical / missing-version -> v4
-    3. python -m ai_router.migrate_v3_to_v4 --in-place                 # v3 -> v4
+Set 112 then deleted ``migrate_lightweight_to_canonical_v4`` along with the
+Lightweight tier it existed to migrate off. Its slot in the chain is gone,
+not replaced: the non-canonical shapes it repaired were Lightweight
+hand-maintained state files, and there is no longer a tier that produces
+them. The surviving chain (each step idempotent / skips inapplicable files;
+ordered so output of step N feeds step N+1) is:
 
-This adds no new migrator logic ("no new migrator logic" non-goal intact) —
-it orchestrates an *existing* third migrator. See the S2 close-out for the
-flagged deviation; the S5 cross-provider verifier should confirm it.
+    1. python -m ai_router.migrate_session_state --in-place  # v2 -> v3
+    2. python -m ai_router.migrate_v3_to_v4 --in-place       # v3 -> v4
 """
 
 from __future__ import annotations
@@ -110,15 +107,14 @@ STATUS_UNREADABLE = "unreadable"  # file missing / not JSON / not an object
 # resolution lives here, in local code (verdict Q3).
 MIGRATOR_MODULES = {
     "v2-to-v3": "ai_router.migrate_session_state",
-    "lightweight-to-v4": "ai_router.migrate_lightweight_to_canonical_v4",
     "v3-to-v4": "ai_router.migrate_v3_to_v4",
 }
 
 # Ordered bulk-upgrade chain. Run in this order, each idempotent and each a
 # no-op / structured-skip on files it does not apply to, the sequence
 # upgrades any drifted set to the current schema (see CHAIN NOTE in the
-# module docstring for why all three are required).
-BULK_UPGRADE_MIGRATOR_IDS = ["v2-to-v3", "lightweight-to-v4", "v3-to-v4"]
+# module docstring).
+BULK_UPGRADE_MIGRATOR_IDS = ["v2-to-v3", "v3-to-v4"]
 
 MANIFEST_FILENAME = "schema-current.json"
 _DEFAULT_MANIFEST_CACHE = Path.home() / ".dabbler" / "schema-manifest-cache.json"

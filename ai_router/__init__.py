@@ -1,11 +1,11 @@
 """
-AI Router — Lightweight model routing for Claude Code.
+AI Router — complexity-tiered multi-provider model routing.
 
 Module map (for new contributors):
   __init__.py            route() — the public routing entry point; start here
-  close_session.py       Close-out gate: deterministic checks + state flip (Full-tier)
-  session_state.py       Lifecycle snapshot (session-state.json) + events ledger (Full-tier)
-  gate_checks.py         Deterministic close-out predicates (Full-tier)
+  close_session.py       Close-out gate: deterministic checks + state flip
+  session_state.py       Lifecycle snapshot (session-state.json) + events ledger
+  gate_checks.py         Deterministic close-out predicates
   disposition.py         Disposition dataclass + validator — the per-session outcome record
   worktree.py            Worktree lifecycle CLI (open / close / list)
   notifications.py       Session-complete push notifications (optional)
@@ -365,7 +365,7 @@ def _build_no_router_route_stub() -> "RouteResult":
     Set 048 §3.1 A3: callers SHOULD check ``runtime_mode.is_no_router_mode()``
     before invoking ``route()`` and short-circuit at the call site. This
     stub exists as a defensive safety net so a stray invocation under
-    Lightweight tier never hits an LLM API or requires credentials in env.
+    --no-router never hits an LLM API or requires credentials in env.
     """
     return RouteResult(
         content="",
@@ -1096,10 +1096,10 @@ def route(
     #
     # Set 048 S5 UAT-discovered Critical: the original `from runtime_mode
     # import …` bare form only worked under the test conftest's sys.path
-    # shim. pip-installed consumers (the Lightweight target audience) had
-    # no such shim, so the import raised ModuleNotFoundError on every
-    # route() call under --no-router. Use a relative import so the
-    # package resolves the module within its own namespace.
+    # shim. pip-installed consumers had no such shim, so the import raised
+    # ModuleNotFoundError on every route() call under --no-router. Use a
+    # relative import so the package resolves the module within its own
+    # namespace.
     from .runtime_mode import is_no_router_mode
 
     if is_no_router_mode():

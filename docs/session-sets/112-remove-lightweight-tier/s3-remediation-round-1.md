@@ -1,0 +1,121 @@
+# S3 remediation — round 1 (discovery) + round 2 (supplementary)
+
+> Six blocking findings, merged across both discovery passes and fixed in
+> one pass. Every one was accepted; none was disputed. Four of the six are
+> the same defect class — **the gate's declaration/narration boundary was
+> drawn too narrowly and let real declaration shapes through** — and they
+> are answered together by widening the rules, not by widening the
+> exemptions.
+
+## Round 1, findings 1 + 5 — the gate missed live declaration shapes
+
+**Accepted.** The verifier planted four shapes in throwaway trees and the
+gate exited 0 on all of them. Each is an ordinary way this repo writes
+code, so these are probable over the gate's life rather than adversarial:
+
+| shape | why it slipped |
+| :--- | :--- |
+| `{"tier":"lightweight"}` | `TIER_DECLARATION` was line-anchored |
+| `verificationMode?: string` | the field regex required `:` or `=` immediately after the name; TypeScript's optional marker sits between |
+| `if (spec.verificationMode)` | a property **read** has neither `:` nor `=` |
+| `type VerificationMode = "out-of-band-or-none" \| "dedicated-sessions"` | the PascalCase type name was not a pattern at all, and `MODE_VALUE` required the literal to end the line |
+| `const DEFAULT_MODE = "dedicated-sessions";` | same: `;` is not end-of-line |
+| `MODES = ["a", "dedicated-sessions"]` | same |
+
+**Fix.** `TIER_DECLARATION_INLINE` was added for the embedded JSON form;
+`VERIFICATION_MODE_FIELD` now also matches an optional property, a
+property read, and the PascalCase alias; `MODE_VALUE` now keys on an
+assigning/aliasing/listing **prefix** (`:` `=` `=>` `[` `,` `|`) and
+accepts `;` `)` `}` `]` `|` `,` or a comment as the terminator.
+
+**One boundary was drawn deliberately and is pinned by a test.** A bare
+mode literal alone on its own line is *not* flagged, because the
+Playwright spec that proves a stale `.dabbler/verification-mode` marker
+is now **inert** has to write `"dedicated-sessions\n"` as a positional
+argument. A literal in that position configures nothing, and a gate that
+failed the test proving the removal works would be eating its own
+evidence.
+
+**A second boundary came from a false positive this fix produced.** The
+first inline rule required only the *value* to be quoted, and it fired on
+`test_spec_config.py:133` — `for raw in ('tier: "lightweight"', ...)`, a
+test that plants quoted variants to prove the loader refuses them. The
+rule now requires **both** key and value quoted, which is the JSON /
+object-literal shape and nothing else. YAML and markdown lose nothing:
+a real config entry starts its line and is caught by the line-anchored
+rule, quoted or not.
+
+## Round 1, finding 2 — triple-quoted templates were treated as narration
+
+**Accepted, and it was the sharpest finding of the round.** The Python
+blanker blanked *every* triple-quoted string on the theory that
+docstrings live there. But `SPEC = """\ntier: lightweight\n"""` is an
+ordinary way to embed a spec snippet, and it was blanked and passed.
+
+**Fix.** `_docstring_spans()` uses `ast` to find the real docstrings —
+the first statement of a module, class, or function, and nothing else.
+Comments still blank via `tokenize`. Every other string, single- or
+triple-quoted, is now scanned.
+
+**This is why the boundary above matters.** With multi-line strings
+scanned, the line-anchored rule catches a real embedded spec (whose YAML
+starts its line) while single-line escaped fragments in tests
+(`"tier: lightweight\nrequiresUAT: false"` as a Python string) still
+pass. Both directions are pinned.
+
+## Round 2 (supplementary), finding 1 — `.template` scaffolds were not scanned
+
+**Accepted, and this was the worst blind spot of the three.**
+`docs/templates/consumer-bootstrap/spec.md.template` is the canonical
+source of every new consumer repo's `spec.md`. A tier declaration there
+would be handed to every future adopter — and CI would stay green,
+because `.template` was not in the extension map at all.
+
+**Fix.** `effective_suffix()` resolves `.template` / `.tmpl` / `.in` to
+the suffix of the stem, so `spec.md.template` is read as markdown and
+`azure-pipelines.yml.template` as YAML. Verified by planting a
+declaration in the real scaffold's shape.
+
+## Round 1, finding 3 — the recorded Layer 2 run named a command nobody ran
+
+**Accepted, and the fix is in the product, not in the record.**
+`run_of_record.DEFAULT_SUITES` declared the mocha suite's command as
+`npm test` — the `@vscode/test-electron` Layer 2 harness, which
+`CONTRIBUTING.md` documents as **broken on Windows 11 + VS Code 1.120**
+and which CI skips for that reason. Layer 2 is `npm run test:unit`, and
+that is what every session has actually run.
+
+So the run of record has been naming an unrunnable command since it
+shipped. This session's release-boundary evidence inherited it.
+
+**Fix.** The suite's declared command is now `npm run test:unit`, with a
+comment recording why. The Layer 2 run was re-recorded after the fix.
+This is a repo-wide correction, not a Set 112 one — every future session
+records the command it can actually run.
+
+## Round 1, finding 4 — the release-status row named a stale live version
+
+**Accepted, and it was pre-existing staleness this session perpetuated.**
+`docs/repository-reference.md`'s router row said `0.33.0` live.
+`ai_router/CHANGELOG.md` says **`0.34.0` was published 2026-07-15** (Set
+104, tag `v0.34.0`, operator-authorized), superseding `0.33.0`. The row
+was never updated after that publish, and Session 3 wrote `1.0.0 (staged)
+/ 0.33.0 (live)` on top of it without checking the claim it was
+inheriting — exactly the L-064-8 failure the conventions block warns
+about, committed by the session that quoted the lesson.
+
+**Fix.** The row now reads `1.0.0` (staged) / `0.34.0` (live), carries
+`0.34.0`'s publish details, demotes `0.33.0` to prior lineage, and names
+the correction inline — the same way the extension row records the
+`0.46.0` correction Set 107 S1 made for the identical failure mode.
+
+## What was re-run after the fixes
+
+| suite | result |
+| :--- | :--- |
+| `pytest ai_router/tests/test_lightweight_resurrection_guard.py` | 55 passed (was 41; 14 new falsifiers, one per missed shape) |
+| `pytest ai_router/tests/test_run_of_record.py` | 49 passed |
+| the gate against the real repo | exit 0 |
+| the nine verifier-named shapes, planted in throwaway trees | 9/9 caught |
+
+The full matrix re-run is recorded in `test-runs.jsonl`.

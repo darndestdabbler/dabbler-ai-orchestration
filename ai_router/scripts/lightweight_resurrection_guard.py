@@ -68,6 +68,7 @@ All output is ASCII-only so it is safe on a Windows ``cp1252`` console
 from __future__ import annotations
 
 import argparse
+import ast
 import io
 import os
 import re
@@ -135,27 +136,60 @@ DELETED_FILES: tuple[str, ...] = (
     "tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/hello-world-lightweight",
 )
 
-# A spec.md / YAML mapping entry that declares the tier. The value must
-# TERMINATE the line (optionally followed by a comment): that is what
-# distinguishes the YAML entry `tier: lightweight` from the migration
-# message, which opens with the same six words and then keeps talking
-# ("tier: lightweight was removed in Set 112 -- there is one tier now.").
+# A spec.md / YAML mapping entry that declares the tier, as its own line.
+# The value must TERMINATE the line (optionally followed by a comment):
+# that is what distinguishes the YAML entry `tier: lightweight` from the
+# migration message, which opens with the same six words and then keeps
+# talking ("tier: lightweight was removed in Set 112 -- there is one tier
+# now.").
 TIER_DECLARATION = re.compile(
     r"""^\s*(?:-\s*)?["']?tier["']?\s*:\s*["']?lightweight["']?\s*(?:\#.*)?,?\s*$""",
     re.IGNORECASE,
 )
 
-# The removed verification-mode field, as a YAML key, a JSON key, an object
-# property, or an assignment target. Matched anywhere on the line because
-# these forms are already machine-syntax -- there is no prose that looks
-# like `verificationMode:` outside a code fence.
-VERIFICATION_MODE_FIELD = re.compile(
-    r"""(?:^|[\s\{\[,\.\(])["']?verification[_-]?[Mm]ode["']?\s*(?::(?!:)|=(?!=))"""
+# The same declaration EMBEDDED in a line: `{"tier": "lightweight"}` in
+# JSON, or an inline object literal. Round-1 verification found the
+# line-anchored form above passes compact JSON straight through.
+#
+# BOTH sides must be quoted, which is the JSON/object-literal shape and
+# nothing else. A bare `tier:` key mid-line is how test code plants a spec
+# fragment inside a string argument (`_config_block("tier: lightweight  #
+# locked")`, `for raw in ('tier: "lightweight"', ...)`), and flagging
+# those would put the gate at war with the tests that prove the refusal
+# works. YAML and markdown lose nothing to this narrowing: a real config
+# entry starts its line and is caught by the rule above, quoted or not.
+TIER_DECLARATION_INLINE = re.compile(
+    r"""["']tier["']\s*:\s*["']lightweight["']""",
+    re.IGNORECASE,
 )
 
-# The two mode VALUES, in a position that assigns them to something.
+# The removed verification-mode field, as a YAML key, a JSON key, an object
+# property, an assignment target, an OPTIONAL TypeScript property
+# (`verificationMode?: string`), a property READ (`spec.verificationMode`),
+# or the PascalCase type alias that named it. Round-1 verification found
+# the first version caught only the `name:`/`name =` forms, which is a
+# minority of the ways this field would actually come back in the
+# TypeScript surface Set 112 stripped it from.
+VERIFICATION_MODE_FIELD = re.compile(
+    r"""(?:(?:^|[\s\{\[,\(])["']?verification[_-]?[Mm]ode["']?\s*\??\s*(?::(?!:)|=(?!=))"""
+    r"""|\.verification[_M]ode\b"""
+    r"""|\bVerificationMode\b)"""
+)
+
+# The two mode VALUES, in a position that assigns, aliases, or lists them:
+# `mode: dedicated-sessions`, `const M = "dedicated-sessions";`,
+# `type T = "out-of-band-or-none" | "dedicated-sessions"`,
+# `["out-of-band-or-none", "dedicated-sessions"]`.
+#
+# A bare literal alone on its own line is NOT matched, and that is
+# deliberate: the Playwright spec that proves a stale `.dabbler/
+# verification-mode` marker is now INERT has to write the string
+# `"dedicated-sessions\n"` as a positional argument, and flagging the test
+# that proves the removal works would be the gate eating its own evidence.
+# A literal in that position configures nothing on its own.
 MODE_VALUE = re.compile(
-    r"""(?::|=|=>)\s*["']?(?:out-of-band-or-none|dedicated-sessions)["']?\s*,?\s*$"""
+    r"""(?::|=|=>|\[|,|\|)\s*["']?(?:out-of-band-or-none|dedicated-sessions)["']?"""
+    r"""\s*(?=$|[,;)}\]|]|\#|//)"""
 )
 
 DELETED_MODULE_REF = re.compile(
@@ -194,20 +228,61 @@ def _blank(segment: str) -> str:
     return "".join("\n" if ch == "\n" else " " for ch in segment)
 
 
-def blank_python_narration(source: str) -> str:
-    """Blank comments and triple-quoted strings in Python source.
+def _docstring_spans(source: str) -> list[tuple[int, int, int, int]]:
+    """Positions of every real docstring in *source*.
 
-    Single-quoted strings are LEFT INTACT on purpose: `{"verificationMode":
-    ...}` is a declaration that happens to be spelled with quotes, and the
-    dict-key form is the most likely way the field would come back. Triple-
-    quoted strings are blanked because that is where module and function
-    docstrings live, and Set 112's docstrings necessarily name what they
-    removed.
+    A docstring is the first statement of a module, class, or function and
+    nothing else. Round-1 verification found the first version of this
+    module treated *every* triple-quoted string as narration, which meant
+    a production template like ``SPEC = '''\\ntier: lightweight\\n'''``
+    -- an ordinary way to embed a spec snippet -- was blanked and passed
+    the gate. Docstrings explain; an assigned multi-line string is data.
+    """
+    try:
+        tree = ast.parse(source)
+    except (SyntaxError, ValueError):
+        return []
+
+    spans: list[tuple[int, int, int, int]] = []
+    for node in ast.walk(tree):
+        if not isinstance(
+            node, (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)
+        ):
+            continue
+        body = getattr(node, "body", None)
+        if not body:
+            continue
+        first = body[0]
+        if (
+            isinstance(first, ast.Expr)
+            and isinstance(first.value, ast.Constant)
+            and isinstance(first.value.value, str)
+            and first.end_lineno is not None
+            and first.end_col_offset is not None
+        ):
+            spans.append(
+                (
+                    first.lineno,
+                    first.col_offset,
+                    first.end_lineno,
+                    first.end_col_offset,
+                )
+            )
+    return spans
+
+
+def blank_python_narration(source: str) -> str:
+    """Blank comments and docstrings in Python source.
+
+    String literals that are NOT docstrings are left intact -- both the
+    single-line kind (``{"verificationMode": ...}`` is a declaration that
+    happens to be spelled with quotes) and the triple-quoted kind (an
+    assigned multi-line template can carry a whole spec).
 
     A file that does not tokenize (a syntax error, or a Python-3.13-only
-    construct on an older runtime) is returned unchanged: fail CLOSED, scan
-    it whole, and let a false positive be adjudicated. A tokenizer failure
-    must never be a silent pass.
+    construct on an older runtime) is returned unchanged: fail CLOSED,
+    scan it whole, and let a false positive be adjudicated. A tokenizer
+    failure must never be a silent pass.
     """
     lines = source.splitlines(keepends=True)
     try:
@@ -215,14 +290,10 @@ def blank_python_narration(source: str) -> str:
     except (tokenize.TokenError, IndentationError, SyntaxError):
         return source
 
-    spans: list[tuple[int, int, int, int]] = []
-    for tok in tokens:
-        if tok.type == tokenize.COMMENT:
-            spans.append((*tok.start, *tok.end))
-        elif tok.type == tokenize.STRING:
-            text = tok.string.lstrip("rbuRBUf")
-            if text[:3] in ('"""', "'''"):
-                spans.append((*tok.start, *tok.end))
+    spans: list[tuple[int, int, int, int]] = [
+        (*tok.start, *tok.end) for tok in tokens if tok.type == tokenize.COMMENT
+    ]
+    spans.extend(_docstring_spans(source))
 
     for srow, scol, erow, ecol in spans:
         for row in range(srow, erow + 1):
@@ -351,6 +422,23 @@ _BLANKERS = {
 }
 
 
+def effective_suffix(path: Path) -> str:
+    """The suffix that decides how a file is read.
+
+    ``spec.md.template`` is markdown; ``azure-pipelines.yml.template`` is
+    YAML. Supplementary verification found the first version skipped
+    ``.template`` entirely -- and those files are the canonical source for
+    every new consumer repo's ``spec.md``, so a tier declaration there
+    would be handed to every future adopter while CI stayed green. The
+    scaffold source is exactly the place a resurrection does the most
+    damage.
+    """
+    suffix = path.suffix.lower()
+    if suffix in (".template", ".tmpl", ".in"):
+        return Path(path.stem).suffix.lower()
+    return suffix
+
+
 def iter_scanned_files(repo_root: Path) -> Iterable[Path]:
     """Yield every live, scannable file under *repo_root*.
 
@@ -372,7 +460,7 @@ def iter_scanned_files(repo_root: Path) -> Iterable[Path]:
         )
         for name in sorted(filenames):
             path = Path(dirpath) / name
-            if path.suffix.lower() not in _BLANKERS:
+            if effective_suffix(path) not in _BLANKERS:
                 continue
             rel = Path(*dir_parts, name) if dir_parts else Path(name)
             if rel.as_posix() in SELF_EXEMPT:
@@ -437,7 +525,7 @@ def scan_text(rel_path: str, source: str, suffix: str) -> list[Resurrection]:
         raw = raw_lines[lineno - 1].strip() if lineno <= len(raw_lines) else line.strip()
         loc = f"{rel_path}:{lineno}"
 
-        if TIER_DECLARATION.match(line):
+        if TIER_DECLARATION.match(line) or TIER_DECLARATION_INLINE.search(line):
             violations.append(
                 Resurrection(
                     rule="tier-declared",
@@ -504,9 +592,9 @@ def check_no_live_declarations(repo_root: Path) -> list[Resurrection]:
             source = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
-        if path.suffix.lower() == ".md" and declares_frozen_history(source):
+        if effective_suffix(path) == ".md" and declares_frozen_history(source):
             continue
-        violations.extend(scan_text(rel, source, path.suffix.lower()))
+        violations.extend(scan_text(rel, source, effective_suffix(path)))
     return violations
 
 
@@ -514,7 +602,7 @@ def find_frozen_history(repo_root: Path) -> list[str]:
     """Repo-relative paths of every doc claiming the frozen-history marker."""
     frozen: list[str] = []
     for path in iter_scanned_files(repo_root):
-        if path.suffix.lower() != ".md":
+        if effective_suffix(path) != ".md":
             continue
         try:
             source = path.read_text(encoding="utf-8")

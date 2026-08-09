@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "f8b9c4627319cbdca1fd37d62517965ee71c07f2",
+  "fixedTree": "8d0032b9c8b2590f3ecea3973abcbd9d301cae32",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-09T16:28:56.186270+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The anti-resurrection gate skips live `.template` scaffold sources. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A future normal scaffold edit reintroduces `tier: light ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The guard scans live `.template` scaffold files, and a planted `tier: lightweight` or `verificationMode:` declaration in `docs/templates/consumer-bootstrap/spec.md.template` makes the guard fail while legitimate template narration remains allowed.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

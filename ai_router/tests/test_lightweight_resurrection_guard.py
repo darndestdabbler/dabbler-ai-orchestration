@@ -99,6 +99,100 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
     assert "verification-mode-field" in _scan(text, suffix)
 
 
+# ---------------------------------------------------------------------------
+# Round-1 / supplementary findings, as permanent falsifiers
+#
+# Every case below was MISSED by the first version of this gate and named
+# by cross-provider verification. They are the shapes a resurrection would
+# most plausibly take in this repo, so they stay pinned.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("text", "suffix", "rule"),
+    [
+        # Round 1, finding 2: a triple-quoted string that is NOT a docstring
+        # is data, not narration. This is the ordinary way to embed a spec.
+        ('SPEC = """\ntier: lightweight\nrequiresUAT: false\n"""\n', ".py", "tier-declared"),
+        # Round 1, finding 5: compact JSON slips past a line-anchored rule.
+        ('{"tier":"lightweight"}\n', ".json", "tier-declared"),
+        # Round 1, finding 1: the TypeScript shapes the extension surface
+        # would actually come back as.
+        ("interface S { verificationMode?: string; }\n", ".ts", "verification-mode-field"),
+        ("if (spec.verificationMode) { enableLegacy(); }\n", ".ts", "verification-mode-field"),
+        (
+            'export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";\n',
+            ".ts",
+            "verification-mode-field",
+        ),
+        ('const DEFAULT_MODE = "dedicated-sessions";\n', ".ts", "verification-mode-value"),
+        (
+            'const MODES = ["out-of-band-or-none", "dedicated-sessions"];\n',
+            ".ts",
+            "verification-mode-value",
+        ),
+    ],
+)
+def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
+    assert rule in _scan(text, suffix)
+
+
+def test_a_docstring_is_still_narration_after_the_template_fix():
+    """The fix must not swing the other way and flag every long string."""
+    text = (
+        "def f():\n"
+        '    """Set 112 removed tier: lightweight and the verificationMode field.\n'
+        "\n"
+        '    dedicated_verification went with them.\n'
+        '    """\n'
+        "    return 1\n"
+    )
+    assert _scan(text, ".py") == []
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["spec.md.template", "azure-pipelines.yml.template", "config.json.in"],
+)
+def test_a_template_is_read_as_the_file_it_renders_to(name: str):
+    """Supplementary finding: `.template` scaffolds were not scanned at all.
+
+    They are the canonical source of every new consumer repo's `spec.md`,
+    so a declaration there reaches every future adopter while CI stays
+    green -- the worst place in the repo for the gate to be blind.
+    """
+    assert guard.effective_suffix(Path(name)) in guard._BLANKERS
+
+
+def test_a_planted_declaration_in_the_scaffold_template_is_caught(tmp_path: Path):
+    templates = tmp_path / "docs" / "templates" / "consumer-bootstrap"
+    templates.mkdir(parents=True)
+    (templates / "spec.md.template").write_text(
+        "## Session Set Configuration\n\n```yaml\ntier: lightweight\n```\n",
+        encoding="utf-8",
+    )
+    rules = [v.rule for v in guard.check_no_live_declarations(tmp_path)]
+    assert rules == ["tier-declared"]
+
+
+def test_a_bare_mode_literal_on_its_own_line_is_spared():
+    """Deliberate boundary, not an oversight.
+
+    The Playwright spec that proves a stale `.dabbler/verification-mode`
+    marker is now INERT must write the string as a positional argument. A
+    literal in that position configures nothing, and a gate that ate the
+    test proving the removal works would be eating its own evidence.
+    """
+    text = (
+        "fs.writeFileSync(\n"
+        '  path.join(dabblerDir, "verification-mode"),\n'
+        '  "dedicated-sessions\\n",\n'
+        '  "utf8",\n'
+        ");\n"
+    )
+    assert _scan(text, ".ts") == []
+
+
 def test_the_mode_values_are_caught():
     assert "verification-mode-value" in _scan("mode: dedicated-sessions\n", ".yaml")
     assert "verification-mode-value" in _scan("mode: out-of-band-or-none\n", ".yaml")
@@ -211,6 +305,20 @@ def test_a_fenced_block_quoting_the_migration_message_survives():
 def test_a_test_that_plants_the_tier_in_a_string_survives():
     """`test_lightweight_removal_boundary.py`'s pattern, which must keep working."""
     text = 'd = _make_set(tmp_path, "tier: lightweight\\nrequiresUAT: false")\n'
+    assert _scan(text, ".py") == []
+
+
+def test_tests_that_plant_quoted_and_commented_variants_survive():
+    """`test_spec_config.py`'s parameterisations, likewise.
+
+    These are the tests that PROVE the refusal fires. A bare `tier:` key
+    mid-line is how test code carries a spec fragment; only the fully
+    quoted JSON shape counts as an embedded declaration.
+    """
+    text = (
+        "for raw in ('tier: \"lightweight\"', \"tier: 'lightweight'\"):\n"
+        '    body = _config_block("tier: lightweight  # operator-locked at S1")\n'
+    )
     assert _scan(text, ".py") == []
 
 

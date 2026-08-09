@@ -117,7 +117,14 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
     ),
     SuiteSpec(
         name="mocha",
-        command="npm test",
+        # Set 112 S3 (round-1 verification): this said ``npm test``, which
+        # is the Layer 2 @vscode/test-electron harness -- documented broken
+        # on Windows 11 + VS Code 1.120 and skipped in CI for that reason
+        # (CONTRIBUTING.md -> Layer 2). Every session that actually ran
+        # Layer 2 ran ``npm run test:unit`` and then recorded its run of
+        # record against a command it had not run, so the release-boundary
+        # evidence named a suite nobody could execute on the dev platform.
+        command="npm run test:unit",
         covers=("tools/dabbler-ai-orchestration/src/",),
         expensive=False,
     ),

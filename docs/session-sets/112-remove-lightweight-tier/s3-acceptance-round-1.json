@@ -1,0 +1,75 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "6f57a8e1051edfffbe93750f95bd4e2820233247",
+  "fixedTree": "1b337cc4e5d7849bacd956baf5b847f78fff2f12",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-09T16:28:45.715556+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The anti-resurrection gate misses likely TypeScript resurrections of `verificationMode` and both deleted modes. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A future ex ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The guard reports violations for TypeScript optional properties, PascalCase type aliases, and array/list/union declarations containing `verificationMode`, `out-of-band-or-none`, or `dedicated-sessions`, with falsifier tests for those shapes.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** Python non-docstring triple-quoted templates are wrongly treated as narration. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A future Python helper or fixture generator ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The Python blanker distinguishes actual docstrings from assigned/called triple-quoted strings, and the guard fails on a triple-quoted production template containing `tier: lightweight` while still sparing real docstrings.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** The recorded Layer 2 run is not the canonical Layer 2 command. - **Category:** Completeness / False Positive - **Severity:** Major - **Failure scenario:** The release proceeds claiming the full mat ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The final Session 3 test-runs record and run-of-record suite definition use `npm run test:unit` for Layer 2, or the canonical test policy is deliberately updated and the release-boundary evidence matches it.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "** The authoritative release-status row still says router `0.33.0` is live. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** The operator or next orchestrator uses `docs/repos ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "`docs/repository-reference.md` names `0.34.0` as the live router version, includes the `0.34.0` publish details, and demotes `0.33.0` to prior lineage consistently with `ai_router/CHANGELOG.md`.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 4,
+      "summary": "** The anti-resurrection guard misses common live declaration forms, so the CI gate does not actually prove the tier cannot come back silently. - **Category:** Correctness - **Severity:** Major - **Fa ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec(__import__('base64').b64decode('aW1wb3J0IHBhdGhsaWIsIHN1YnByb2Nlc3MsIHN5cywgdGVtcGZpbGUKcm9vdCA9IHBhdGhsaWIuUGF0aCh0ZW1wZmlsZS5ta2R0ZW1wKCkpCihyb290IC8gImxpdmVfdGVtcGxhdGUucHkiKS53cml0ZV90ZXh0KCdTUEVDID0gIiIiXG50aWVyOiBsaWdodHdlaWdodFxucmVxdWlyZXNVQVQ6IGZhbHNlXG4iIiJcbicsIGVuY29kaW5nPSJ1dGYtOCIpCihyb290IC8gImxlZ2FjeS50cyIpLndyaXRlX3RleHQoJ2NvbnN0IERFRkFVTFRfTU9ERSA9ICJkZWRpY2F0ZWQtc2Vzc2lvbnMiO1xuJywgZW5jb2Rpbmc9InV0Zi04IikKKHJvb3QgLyAibGVnYWN5X3JlYWQudHMiKS53cml0ZV90ZXh0KCdpZiAoc3BlYy52ZXJpZmljYXRpb25Nb2RlKSB7IGVuYWJsZUxlZ2FjeU1vZGUoKTsgfVxuJywgZW5jb2Rpbmc9InV0Zi04IikKKHJvb3QgLyAiY29tcGFjdC5qc29uIikud3JpdGVfdGV4dCgneyJ0aWVyIjoibGlnaHR3ZWlnaHQifVxuJywgZW5jb2Rpbmc9InV0Zi04IikKcHJvYyA9IHN1YnByb2Nlc3MucnVuKFtzeXMuZXhlY3V0YWJsZSwgImFpX3JvdXRlci9zY3JpcHRzL2xpZ2h0d2VpZ2h0X3Jlc3VycmVjdGlvbl9ndWFyZC5weSIsICItLXJlcG8tcm9vdCIsIHN0cihyb290KV0sIHRleHQ9VHJ1ZSwgY2FwdHVyZV9vdXRwdXQ9VHJ1ZSkKb3V0ID0gcHJvYy5zdGRvdXQgKyBwcm9jLnN0ZGVycgpuZWVkZWQgPSBbImxpdmVfdGVtcGxhdGUucHkiLCAibGVnYWN5LnRzIiwgImxlZ2FjeV9yZWFkLnRzIiwgImNvbXBhY3QuanNvbiJdCnN5cy5leGl0KDAgaWYgcHJvYy5yZXR1cm5jb2RlICE9IDAgYW5kIGFsbChuYW1lIGluIG91dCBmb3IgbmFtZSBpbiBuZWVkZWQpIGVsc2UgMSkK'))\"",
+      "criterionSha256": "e7d15e81c1c7449e896eff0a2d484b28f986ba9264f405db3839ea1f9abadfee",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec(__import__('base64').b64decode('aW1wb3J0IHBhdGhsaWIsIHN1YnByb2Nlc3MsIHN5cywgdGVtcGZpbGUKcm9vdCA9IHBhdGhsaWIuUGF0aCh0ZW1wZmlsZS5ta2R0ZW1wKCkpCihyb290IC8gImxpdmVfdGVtcGxhdGUucHkiKS53cml0ZV90ZXh0KCdTUEVDID0gIiIiXG50aWVyOiBsaWdodHdlaWdodFxucmVxdWlyZXNVQVQ6IGZhbHNlXG4iIiJcbicsIGVuY29kaW5nPSJ1dGYtOCIpCihyb290IC8gImxlZ2FjeS50cyIpLndyaXRlX3RleHQoJ2NvbnN0IERFRkFVTFRfTU9ERSA9ICJkZWRpY2F0ZWQtc2Vzc2lvbnMiO1xuJywgZW5jb2Rpbmc9InV0Zi04IikKKHJvb3QgLyAibGVnYWN5X3JlYWQudHMiKS53cml0ZV90ZXh0KCdpZiAoc3BlYy52ZXJpZmljYXRpb25Nb2RlKSB7IGVuYWJsZUxlZ2FjeU1vZGUoKTsgfVxuJywgZW5jb2Rpbmc9InV0Zi04IikKKHJvb3QgLyAiY29tcGFjdC5qc29uIikud3JpdGVfdGV4dCgneyJ0aWVyIjoibGlnaHR3ZWlnaHQifVxuJywgZW5jb2Rpbmc9InV0Zi04IikKcHJvYyA9IHN1YnByb2Nlc3MucnVuKFtzeXMuZXhlY3V0YWJsZSwgImFpX3JvdXRlci9zY3JpcHRzL2xpZ2h0d2VpZ2h0X3Jlc3VycmVjdGlvbl9ndWFyZC5weSIsICItLXJlcG8tcm9vdCIsIHN0cihyb290KV0sIHRleHQ9VHJ1ZSwgY2FwdHVyZV9vdXRwdXQ9VHJ1ZSkKb3V0ID0gcHJvYy5zdGRvdXQgKyBwcm9jLnN0ZGVycgpuZWVkZWQgPSBbImxpdmVfdGVtcGxhdGUucHkiLCAibGVnYWN5LnRzIiwgImxlZ2FjeV9yZWFkLnRzIiwgImNvbXBhY3QuanNvbiJdCnN5cy5leGl0KDAgaWYgcHJvYy5yZXR1cm5jb2RlICE9IDAgYW5kIGFsbChuYW1lIGluIG91dCBmb3IgbmFtZSBpbiBuZWVkZWQpIGVsc2UgMSkK'))"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 0,
+        "output": ""
+      },
+      "fixed": {
+        "exitCode": 0,
+        "outputChars": 0,
+        "output": ""
+      },
+      "baselinePassed": false,
+      "fixedPassed": true,
+      "outcome": "auto-closed",
+      "reason": "baseline discrimination holds: the unchanged criterion FAILS on the pre-fix tree and PASSES on the fixed tree"
+    }
+  ]
+}

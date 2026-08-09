@@ -728,6 +728,48 @@ class TestTwoAttemptLadder:
 # ---------------------------------------------------------------------------
 
 class TestBackstopMechanics:
+    def test_oversized_evidence_is_a_gate_refusal_not_a_traceback(
+        self, closeable, monkeypatch,
+    ):
+        """Set 112 S2 (found by this repo's own close).
+
+        ``assemble_evidence`` raises ``EvidenceTooLargeError``, which is
+        deliberately NOT a ``VerifySessionError`` (the CLI maps it to its own
+        verification-unavailable exit code). The backstop only caught
+        ``VerifySessionError``, so an oversized session made ``close_session``
+        die with a raw traceback instead of refusing the close with a message.
+        A traceback on the close path reads as a broken tool, and it arrives
+        at exactly the moment an operator most needs to be told what to do.
+
+        The refusal must fail CLOSED and name the escape: the backstop
+        assembles with the default excludes only, so the way out is the
+        sanctioned Step 6 command, where ``--exclude`` / ``--diff-base``
+        can shrink the bundle honestly.
+        """
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+
+        def _too_large(*_args, **_kwargs):
+            raise _vs.EvidenceTooLargeError(968_227, 614_400)
+
+        monkeypatch.setattr(close_backstop._vs, "assemble_evidence", _too_large)
+        # A route call would mean the backstop got past assembly -- it must not.
+        monkeypatch.setattr(
+            close_backstop,
+            "_default_route",
+            lambda *a, **k: pytest.fail("routed despite oversized evidence"),
+        )
+
+        outcome = close_backstop.run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        assert outcome.status == close_backstop.STATUS_UNAVAILABLE
+        assert "968227" in outcome.remediation
+        assert "--exclude" in outcome.remediation
+        assert "verify_session" in outcome.remediation
+
     def test_backstop_close_is_idempotent_under_rerun(
         self, closeable, fake_route,
     ):

@@ -556,6 +556,35 @@ def run_close_backstop(
             set_dir, session_number, diff_base,
             list(_vs.DEFAULT_DIFF_EXCLUDES),
         )
+    except _vs.EvidenceTooLargeError as exc:
+        # Set 112 S2: assemble_evidence raises this (deliberately NOT a
+        # VerifySessionError -- the CLI maps it to its own
+        # verification-unavailable exit code), so the handler below did not
+        # catch it and close_session died with a raw traceback instead of a
+        # gate outcome. A session large enough to overrun the cap is exactly
+        # when an operator most needs the actionable message, and a traceback
+        # on the close path reads as a tool failure rather than a refusal.
+        #
+        # Fail CLOSED, loudly, and name the way out: the backstop assembles
+        # with the DEFAULT excludes only, so the fix is to run the sanctioned
+        # Step 6 command directly, where --exclude and --diff-base are
+        # available to shrink a bundle honestly.
+        try:
+            from .gate_checks import _verify_session_command
+        except ImportError:
+            from gate_checks import _verify_session_command  # type: ignore[no-redef]
+        return BackstopOutcome(
+            status=STATUS_UNAVAILABLE,
+            remediation=(
+                f"the backstop cannot verify this close: {exc}. It assembles "
+                "with the default excludes only and refuses to route a bundle "
+                "the verifier would silently truncate (fails closed). Run the "
+                "sanctioned Step 6 command yourself, where --exclude "
+                "<pathspec> (drop generated trees) and --diff-base <ref> are "
+                "available to shrink the evidence honestly, then close again: "
+                f"{_verify_session_command(str(set_dir))}"
+            ),
+        )
     except _vs.VerifySessionError as exc:
         return BackstopOutcome(
             status=STATUS_ROUTE_FAILED,

@@ -119,3 +119,37 @@ the correction inline — the same way the extension row records the
 | the nine verifier-named shapes, planted in throwaway trees | 9/9 caught |
 
 The full matrix re-run is recorded in `test-runs.jsonl`.
+
+---
+
+## Round 3 (remediation-review) — two live READ forms still slipped
+
+**Accepted.** Four of the five round-1 fixes were accepted; the
+declaration-shape fix was **rejected**, and correctly so: it covered the
+places the field is *written* and the dotted read, but not the two most
+ordinary ways TypeScript *reads* a config field.
+
+| shape | why it slipped |
+| :--- | :--- |
+| `const { verificationMode } = spec;` | destructuring binds the name with no `:`/`=`/`.` adjacent to it |
+| `spec["verificationMode"]` | bracket access quotes the name inside `[...]`, which the field rule read as a list context |
+
+**Fix.** Two alternatives added to `VERIFICATION_MODE_FIELD`: a
+destructured binding (`[{,]` … name … `[},:=]`, which also covers
+`{ verificationMode: renamed }` and `{ tier, verificationMode }`) and a
+quoted bracket read.
+
+**The risk this fix carries is over-reach**, because these rules key on
+the bare identifier rather than on punctuation that only appears in
+machine syntax. Three lines live in the repo today would break if the
+rules degraded into "the word appears": a Layer 2 test *name* containing
+`tier / verificationMode`, a `!/verificationMode/.test(spec)` assertion,
+and the string `"spec must not mention verificationMode"` — all in
+`consumerBootstrap.test.ts` / `sessionSetKind.test.ts`, and all of them
+tests that *prove the removal*. A test pins exactly those three lines as
+clean.
+
+Probes, planted in throwaway trees: `const { verificationMode } = spec`,
+`const { verificationMode: mode } = spec`, `spec["verificationMode"]`,
+and `cfg['verification_mode']` — 4/4 caught. The guard's suite is now
+**60 tests**.

@@ -131,10 +131,28 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
             ".ts",
             "verification-mode-value",
         ),
+        # Remediation-review round: the two remaining live-read forms.
+        ("const { verificationMode } = spec;\n", ".ts", "verification-mode-field"),
+        ("const { verificationMode: mode } = spec;\n", ".ts", "verification-mode-field"),
+        ("const { tier, verificationMode } = spec;\n", ".ts", "verification-mode-field"),
+        ('if (spec["verificationMode"]) { legacy(); }\n', ".ts", "verification-mode-field"),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_the_word_in_prose_or_a_test_name_is_still_not_a_declaration():
+    """The read-form rules must not degrade into 'the word appears'.
+
+    All three lines below are live in the repo and must stay clean.
+    """
+    text = (
+        'test("validation is case-tolerant, matching tier / verificationMode", () => {\n'
+        "  assert.ok(!/verificationMode/.test(spec), \"spec must not mention verificationMode\");\n"
+        "});\n"
+    )
+    assert _scan(text, ".ts") == []
 
 
 def test_a_docstring_is_still_narration_after_the_template_fix():

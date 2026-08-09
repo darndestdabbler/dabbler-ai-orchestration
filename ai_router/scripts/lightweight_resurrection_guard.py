@@ -163,17 +163,25 @@ TIER_DECLARATION_INLINE = re.compile(
     re.IGNORECASE,
 )
 
-# The removed verification-mode field, as a YAML key, a JSON key, an object
-# property, an assignment target, an OPTIONAL TypeScript property
+# The removed verification-mode field, in every position a live read or
+# declaration can take: a YAML key, a JSON key, an object property, an
+# assignment target, an OPTIONAL TypeScript property
 # (`verificationMode?: string`), a property READ (`spec.verificationMode`),
-# or the PascalCase type alias that named it. Round-1 verification found
-# the first version caught only the `name:`/`name =` forms, which is a
-# minority of the ways this field would actually come back in the
-# TypeScript surface Set 112 stripped it from.
+# a destructured binding (`const { verificationMode } = spec`), a bracket
+# read (`spec["verificationMode"]`), or the PascalCase type alias that
+# named it.
+#
+# The first version caught only the `name:` / `name =` forms. Round 1 added
+# the optional-property, dotted-read and type-alias forms; the
+# remediation-review round added destructuring and bracket access. Every
+# one of those is an ordinary way this codebase reads a config field, and
+# each was found by a verifier planting it and watching the gate exit 0.
 VERIFICATION_MODE_FIELD = re.compile(
     r"""(?:(?:^|[\s\{\[,\(])["']?verification[_-]?[Mm]ode["']?\s*\??\s*(?::(?!:)|=(?!=))"""
     r"""|\.verification[_M]ode\b"""
-    r"""|\bVerificationMode\b)"""
+    r"""|\bVerificationMode\b"""
+    r"""|[\{,]\s*verification[_M]ode\s*[\},:=]"""
+    r"""|\[\s*["']verification[_-]?[Mm]ode["']\s*\])"""
 )
 
 # The two mode VALUES, in a position that assigns, aliases, or lists them:

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "112-remove-lightweight-tier",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -36,9 +36,9 @@
     {
       "number": 3,
       "title": "Session 3",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-09T11:20:39.647198-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-09T16:37:30.299419-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -46,7 +46,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

@@ -212,7 +212,7 @@ Each entry is an object with these fields:
 | `number` | positive int | 1-indexed session number. Unique within the array, sorted ascending. |
 | `title` | string | Display title, copied from `spec.md`'s `### Session K of N: <title>` heading. Cosmetic — drift between `spec.md` and the state file is benign. |
 | `status` | enum (see below) | Per-session lifecycle state. |
-| `type` | enum or absent | Session type: `work` (default) \| `verification` \| `remediation` (Set 057). **Absent means `work`** — every existing and Full-tier entry omits it, and only non-`work` values are written to disk. See **Per-session `type`** below. |
+| `type` | enum or absent | Session type: `work` (default) \| `verification` \| `remediation` (Set 057). RETIRED with the Lightweight tier (Set 112). **Absent means `work`**, which is now every entry; readers stay tolerant for archived ledgers and nothing writes it. See **Per-session `type`** below. |
 | `startedAt` | ISO 8601 or null | Set on `start_session`. Null until the session begins. |
 | `completedAt` | ISO 8601 or null | Set on `close_session`. Null until the session closes. |
 | `orchestrator` | object or null | Engine / provider / model / effort for the holder of THIS session, omit-null on disk. Null when this session has not yet started; populated by `start_session`; **preserved across `close_session`** as historical attribution on closed sessions. See **Per-session orchestrator block** below. |
@@ -997,7 +997,7 @@ write the plan-less carve-out shape (no `sessions[]` key, top-level
 
 ## Tier expectations
 
-- **Full tier** (`Workflow: Full` in the spec frontmatter): `ai_router`
+- `ai_router`
   writes the state file on every session boundary.
   - `start_session`: validates no other session is in-progress
     (invariant rule 3), flips `sessions[N-1].status` to

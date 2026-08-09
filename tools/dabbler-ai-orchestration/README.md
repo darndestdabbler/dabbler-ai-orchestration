@@ -2,32 +2,44 @@
 
 An AI-led coding-session workflow for VS Code. Manage structured AI
 sessions, mandatory cross-provider verification, cost tracking, and
-git-worktree-aware session-set state — all from the activity bar, in
-two tiers that let you trade API spend against your own attention.
+git-worktree-aware session-set state — all from the activity bar.
 
 ![The native Work Explorer tree, four levels deep: the Auth Service module is expanded into In Progress, Not Started and Complete status buckets; the in-progress set 042-token-refresh-rotation is expanded again into its four sessions, with Session 1 complete and Session 2 in flight; the Billing, Notifications and Platform Core modules are collapsed below](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/work-explorer-modules.png)
 
 ---
 
-## Two tiers — pay with dollars or pay with attention
+## Verification you do not have to remember
 
-Both tiers run the **same workflow**: the same session lifecycle, the
-same Work Explorer, the same state files and close-out gates.
-They differ in how much of the workflow is automated — and therefore
-in what each one costs you:
+Every session is reviewed before it closes, and the review is run for
+you. `verify_session` picks a model from a **different provider** than
+the one that did the work, routes it the session's evidence, and writes
+the verdict where the close-out gate can corroborate it. There is no
+per-session skip: an engine cannot decide its own diff is too small to
+check, and a close with no corroborated verification is refused.
 
-|  | **Full tier** | **Lightweight tier** |
+If no different-provider verifier can be reached, the result is an
+honest blocked state (`verification_unavailable`) resolvable only by an
+operator-attested manual path — never a silent same-provider pass.
+
+Two ways to give the router a provider to call:
+
+| | **Direct provider API keys** | **GitHub Copilot CLI seat** |
 |---|---|---|
-| Verification | Mandatory on every session — `verify_session` picks a model from a *different provider* and runs the review for you before each close | Copyable review prompts — you paste them into a second AI chat and record the verdict yourself |
-| API spend | Metered, capped by your not-to-exceed budget (a 3-session set typically totals $0.15–$2.50) | **$0** — the router makes no API calls |
-| Your attention | Mostly at session boundaries. Run **several projects at once** while you sit in meetings, answer email, or do other work — the workflow carries itself between check-ins | More hands-on: you drive each verification, so multitasking is more constrained. More than one project at a time still works — each just needs more of you |
-| Best for | Parallel project streams; "start it, check in later" operation | Cost-sensitive work; learning the workflow; environments where API spend isn't an option |
+| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` / `DABBLER_OPENAI_API_KEY` | Install the Copilot CLI and sign in; the form configures the rest |
+| Spend | Metered, capped by your not-to-exceed budget (a 3-session set typically totals $0.15–$2.50) | Covered by your existing Copilot subscription |
+| Best for | Anyone with provider accounts | Shops whose staff hold only a Copilot seat and cannot get provider keys |
 
-The tier is declared **per session set** (`tier:` in the spec), not
-per repo — mix them freely in one workspace, and switch a not-started
-set's tier from the Explorer (**Switch Tier…**). A common path: start
-Lightweight, then go Full when the attention cost outweighs the API
-cost.
+Either way you need reach to **at least two provider families**, or
+cross-provider verification has nothing to cross to. The Getting
+Started form asks which one you want; that is its only setup question.
+
+> **Upgrading from a version before 2026-08?** A second "Lightweight"
+> tier used to let a session set opt out of routed verification
+> (`tier: lightweight` in the spec). It is **removed**, and a spec that
+> still declares it now fails to load with a migration message. The
+> Copilot seat option above covers the same keyless case without giving
+> verification up. What to change:
+> [the removal notice](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/cross-repo-lightweight-removal-notice.md).
 
 ---
 
@@ -52,25 +64,21 @@ cost.
   blocked on prerequisites, what's done and verified. You can step
   away and know exactly what happened while you weren't watching.
 
-- **Cost-minded routing (Full tier).** On the Full tier, reasoning
-  tasks (code review, analysis, documentation, end-of-session
+- **Cost-minded routing.** Reasoning tasks (code review, analysis,
+  documentation, end-of-session
   verification) go through the AI router, which picks the cheapest
   capable model per task and escalates only when needed. Real
   projects we tested measured **73% savings vs Opus-only** on a
   CLI/library project (990 routed calls) and **32% savings** on a UI
   app with UAT/E2E gates (370 calls). Two sample reports ship in the
   [GitHub repo](https://github.com/darndestdabbler/dabbler-ai-orchestration/tree/master/docs/sample-reports).
-  The Lightweight tier skips the router entirely — that's the $0
-  column in the table above.
 
-- **Cross-provider verification at session close.** On the
-  Full tier, every session is reviewed before it closes — no skip: a model
+- **Cross-provider verification at session close.** Every session is
+  reviewed before it closes — no skip: a model
   from a *different provider* than the one that did the work reviews the session and returns a
   structured verdict, and the close gate refuses an unverified close;
   disagreements surface for human adjudication
-  rather than being silently merged or dismissed. On the Lightweight
-  tier the same step is a copyable review prompt you paste into a
-  second AI chat and a verdict you record yourself.
+  rather than being silently merged or dismissed.
 
 - **Confirm-gated git automation — remove keystrokes, not oversight.**
   The mechanical trunk-based loop (push a session branch and open its
@@ -92,24 +100,18 @@ Open a project folder with no session sets yet and the Work Explorer
 renders the staged **Getting Started form** (two sections), with
 companion step-by-step instructions in the editor:
 
-![The two-section Getting Started form in the Work Explorer: Build project structure with a Full/Lightweight tier choice, then Define modules (optional)](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
+![The two-section Getting Started form in the Work Explorer: Build project structure with a provider-access choice, then Define modules (optional)](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
 
-1. **Build project structure** — pick your tier (Full or
-   Lightweight, the cost/attention tradeoff described above). Choosing
-   Full surfaces a second choice for **provider access**: **direct
-   provider API keys** (the default) or a **GitHub Copilot CLI seat**
-   (calls run through your Copilot subscription's command-line tool —
-   no `DABBLER_*` keys needed). Choosing Lightweight surfaces a second
-   choice: **separate verification sessions** (a dedicated session on
-   a different AI engine or provider reviews the work before the set
-   can close) or **manual review** (paste a review prompt into a
-   second AI assistant yourself and record what it says — the
-   default). All choices persist through a window reload, so
-   revisiting the form never silently reverts them. The form
+1. **Build project structure** — pick your **provider access**:
+   **direct provider API keys** (the default) or a **GitHub Copilot
+   CLI seat** (calls run through your Copilot subscription's
+   command-line tool — no `DABBLER_*` keys needed). Your choice
+   persists through a window reload, so
+   revisiting the form never silently reverts it. The form
    scaffolds everything: the `.venv` with the router package, the
-   AI-agent instruction files, and the `docs/session-sets/` home. On
-   the Full tier the form also asks for your verification **budget /
-   NTE cap** (saved to `ai_router/budget.yaml`; a `$0` budget asks
+   AI-agent instruction files, and the `docs/session-sets/` home.
+   On the direct-keys path the form also asks for your verification
+   **budget / NTE cap** (saved to `ai_router/budget.yaml`; a `$0` budget asks
    you to pick manual-via-other-engine or skipped verification
    explicitly). Environment faults render in a persistent **System
    Status strip** above the form (the same strip that sits above the
@@ -192,8 +194,8 @@ appetite. Honest framing:
 The router writes one JSON line per call to
 `ai_router/router-metrics.jsonl` so you can audit spend at any
 time. The **Cost Dashboard** command surfaces cumulative spend
-visually — it appears only in workspaces that actually route (it is
-absent on Lightweight) and, on open, prompts you to refresh the
+visually — it appears only in workspaces that actually route (a
+resolvable `ai_router/router-config.yaml`) and, on open, prompts you to refresh the
 per-provider rate estimates if they have gone stale (older than
 `metadata.review_frequency_days`, default 30 days). `python -m ai_router.report` produces a full markdown
 manager-report with the Opus-baseline savings headline,
@@ -240,70 +242,47 @@ Sign-up links and a full prerequisites checklist live in the
   two-step submenus: **Open File ▸** (Spec / Activity Log / Change
   Log / Session State), **Copy Eval ▸** (copyable prompts —
   Evaluate Specification / Most Recent Session / Session Set /
-  Start Next Session / Start New Parallel Session / Verification
-  Kickoff), and flat actions for Copy Slug, Open Orchestrator
-  Writer Log, Open Prerequisite Spec (on blocked rows), Switch
-  Tier… (not-started rows), Set Up Dedicated Verification… and
-  Open External Verification Note (eligible Lightweight rows),
+  Start Next Session / Start New Parallel Session), and flat
+  actions for Copy Slug, Open Orchestrator
+  Writer Log, Open Prerequisite Spec (on blocked rows),
   Migrate to v4 schema, Cancel set, and Restore set. The
   right-click menu honors light/dark theme natively and dismisses
   on Escape or click-outside.
-- **Copyable review prompts that complete themselves.** Four
-  `Dabbler: Copy …` commands (also under Copy Eval ▸ in the
+- **Copyable review prompts for a second opinion.** The
+  `Dabbler: Copy …` Evaluate commands (also under Copy Eval ▸ in the
   right-click menu) author review prompts that reference your
   session-set artifacts by path rather than embedding their contents,
   then write to the clipboard. Paste into any path-aware AI chat
   (Claude Code, Codex, Cline, Cursor, etc.) on a *different* provider
   than the one that did the work — the prompt points it at the
   canonical `docs/dabbler/cross-provider-verification.md` instructions
-  (ensure-written into every workspace automatically) and its one
-  non-negotiable closing instruction: the reviewing engine itself
-  writes its verdict into `external-verification.md`, so a verdict
-  that only exists in the chat doesn't count. Optional per-repo files
+  (ensure-written into every workspace automatically), which fix the
+  review stance and the verdict grammar. These are **advisory**: a
+  second opinion you read, separate from the routed verification round
+  the close-out gate corroborates. Optional per-repo files
   at `docs/review-criteria/{spec,session,set}.md` override the
   default review instructions if present.
-- **Lightweight tier (no API spend).** Run
+- **`--no-router` for CI and hermetic tests.** Run
   `python -m ai_router.start_session … --no-router`, or set
-  `tier: lightweight` in `spec.md`, or `DABBLER_NO_ROUTER=1` in
-  your environment. The router stops making LLM calls (no
-  credentials needed), `close_session` accepts a manual
-  attestation, and the soft gate prompts when an
-  `external-verification.md` artifact is missing
-  (`Dabbler: Open External Verification Document` creates or opens
-  it). Same Work Explorer, same `session-state.json`
-  lifecycle, same close-out gates — just no API spend on
-  verification.
-- **Lightweight verification at a glance.** Lightweight rows carry a
-  quiet `lw` marker, and sets using dedicated verification sessions
-  show an honest `N/M+` fraction (the `+` says the session count can
-  still grow). Two verification-posture markers appear at the
-  actionable moment: `v?` on a completed out-of-band set the
-  Explorer cannot vouch for, and `v+` when the work is done and a
-  dedicated verification session is owed. Clicking a marker opens
-  the row menu — **Verification Kickoff** copies a paste-ready
-  handoff prompt that has a *different* AI engine run the typed
-  verification/remediation flow, and **Set Up Dedicated
-  Verification…** switches a set's `verificationMode` safely (a
-  spec-seed rewrite on not-started sets; a recorded, gated
-  transition through the `ai_router` blessed writer on completed
-  sets). Verified sets stay quiet — the verdict lives in the
-  fraction tooltip, and no positive badge is shown. A row that owes
-  verification or remediation says so in words in its description,
-  and its **Start Next Session** copy action auto-routes to the
-  right prompt (verification kickoff or remediation handoff) instead
-  of a work-session prompt that would just be refused. Separately,
-  `start_session` itself prints a loud, non-blocking banner naming
-  any owed verification the moment you start your next session, on
-  both tiers — so an owed set is never silently forgotten between
-  sessions.
+  `DABBLER_NO_ROUTER=1` in your environment, and the router makes no
+  LLM calls (no credentials needed). It means exactly that and nothing
+  more: it buys **no** relief from the close-out gates, so a hermetic
+  run cannot quietly become an unverified close. A project that
+  genuinely cannot verify declares it on disk instead, with
+  `threshold_usd: 0` and a matching `verification_method` in
+  `ai_router/budget.yaml` — an operator declaration, not an engine's
+  choice.
+- **Owed verification is said out loud.** `start_session` prints a
+  loud, non-blocking banner naming any owed verification the moment
+  you start your next session — so an owed set is never silently
+  forgotten between sessions.
 - **Schema-v4 migrator + prerequisites.** Set 047 introduced the v4
   `session-state.json` shape where every per-session lifecycle field
   (orchestrator, startedAt, completedAt, verdict) lives in a
   per-session `sessions[]` ledger. The **Migrate to v4 schema**
   right-click action (also `python -m ai_router.migrate_v3_to_v4`)
   upgrades v1/v2/v3 state files with a `.bak.json` rollback
-  contract. Lightweight consumers with hand-edited shapes can run
-  `python -m ai_router.migrate_lightweight_to_canonical_v4`.
+  contract.
   Specs can declare a `prerequisites:` field listing other session-
   set slugs — see **Prerequisites and the blocked marker** below.
 - **Prerequisites and the blocked marker** — declare dependencies in

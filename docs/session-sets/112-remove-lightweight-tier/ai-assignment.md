@@ -64,6 +64,41 @@ Layer 3 after freeze — the same trigger that fired here.
 
 ---
 
+## Session 2 — Extension and docs (as run)
+
+**Orchestrator:** `copilot` / `anthropic` / `claude-opus-5` / effort `high`
+(GitHub Copilot CLI transport; the seat carries no provider API keys by
+design) — as recommended.
+
+**Verification:** routed to `gpt-5.5` (openai), a different effective
+provider. Three rounds: discovery (fan-out 2, lenses spec-conformance +
+failure-scenario) → supplementary → remediation-review. Final verdict
+**VERIFIED**, 1 fix accepted, 0 rejected. Cost $0.0000 (Copilot seat).
+
+**What the pairing bought.** Both discovery findings converged on one
+real miss from two lenses: the collapse stopped at the repo-root
+`README.md` and never reached
+`tools/dabbler-ai-orchestration/README.md` — the file that ships in the
+VSIX and renders on the Marketplace. It still sold "two tiers" and named
+four deleted commands. That is precisely the omission an adversarial
+reader on another provider is good at, and it was the single
+highest-traffic user-facing surface in the change.
+
+**Two defects this session found on its own** (recorded so S3 does not
+re-derive them):
+
+1. The shipped sample project would have broken for every user of
+   `Dabbler: Try a sample project`. Its spec declared `tier: lightweight`
+   (S1's loader now refuses it) and its honest `verification_method:
+   "skipped"` close lost its sanctioned home when `--no-router` stopped
+   relieving gates. Fixed by shipping `ai_router/budget.yaml` with
+   `threshold_usd: 0` — the operator-declared exception the gate names.
+2. The three Evaluate prompts still ordered a reviewer to write
+   `external-verification.md` "or it does not count", citing a gate whose
+   parser S1 deleted. Reframed as advisory. Journaled.
+
+---
+
 ## Session 3 — The grep gate, the walk, the release
 
 **Recommended orchestrator:** `copilot` / `anthropic` / `claude-opus-5` /
@@ -82,3 +117,38 @@ The gate must also exempt, by construction: `docs/session-sets/**`,
 tests, and the comments that narrate the removal. A gate that cannot tell
 "mentions the tier" from "declares the tier" would either fail on its own
 error message or force the removal to go undocumented.
+
+**Notes for Session 3, from Session 2.**
+
+- **The grep gate's exemption list grew.** Beyond S1's list, S2 added
+  surfaces that necessarily name the tier and must NOT fail the gate:
+  `docs/concepts/tier-model.md` (now a historical note),
+  `docs/cross-repo-lightweight-removal-notice.md` (the migration notice),
+  `docs/cross-repo-lightweight-notice.md` (the superseded Set 048
+  notice, banner-marked), the `> **REMOVED (Set 112)**` blocks in
+  `docs/spec-md-schema.md` and
+  `docs/planning/session-set-authoring-guide.md`, the upgrade note in
+  `tools/dabbler-ai-orchestration/README.md`, and the retirement notes in
+  `ai_router/scripts/drift_guard.py`,
+  `ai_router/tests/test_drift_guard.py`,
+  `test-fixtures/uat-matrix/README.md` and `.github/workflows/test.yml`.
+  A gate that cannot tell "explains the removal" from "declares the tier"
+  will fail on this session's own documentation.
+- **Reuse the doc-walk, do not re-derive it.** `drift_guard.py` kept
+  `iter_scanned_docs` / `_is_excluded` when its stale-framing check
+  retired, specifically so the grep gate inherits the live-guidance vs
+  frozen-history distinction (`docs/session-sets/**` and
+  `docs/proposals/**` excluded) instead of re-encoding it. There is a
+  comment there saying so.
+- **`test-fixtures/cold-start/full/` keeps its `full/` directory name**
+  deliberately (a path, not a claim). If the gate greps paths as well as
+  contents, exempt it.
+- **The UAT walk is S3's**, and the set is `uatScope: per-set`. The
+  walk's "Look" items should include: the Getting Started form shows no
+  tier question (Layer 3 pins the absence, but eyes judge the result), a
+  `tier: lightweight` spec fails with a message a stranded reader can
+  act on, and the extension README reads as one story.
+- **Version bumps are untouched.** `pyproject.toml` is `0.34.0` and
+  `package.json` is `0.49.0`; the major bump, the CHANGELOG
+  breaking-change entry, and the notice send are S3's, all
+  operator-gated.

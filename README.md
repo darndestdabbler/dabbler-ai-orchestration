@@ -59,7 +59,7 @@ deeper feature descriptions live at
   gates (370 calls) — see
   [docs/sample-reports/](docs/sample-reports/) for the full reports.
   [Deep dive](docs/repository-reference.md#2-cost-minded-orchestration).
-- **Cross-provider verification** — Every Full-tier session ends with
+- **Cross-provider verification** — Every session ends with
   `verify_session`, which sends the work to an independent
   model from a different provider (mandatory — the close gate refuses an
   unverified close). The verifier returns structured JSON
@@ -148,7 +148,7 @@ strip** above the form (and above the Work Explorer tree), visible
 only when a fault exists: a missing Python interpreter, a missing
 provider API key on the direct-API option, or a missing `copilot`
 CLI with the Copilot seat option selected. The form also runs the
-Full-tier verification **budget / NTE step** (saved to
+verification **budget / NTE step** (saved to
 `ai_router/budget.yaml` —
 [schema](docs/budget-yaml-schema.md); prerequisites are checked before
 any write, so a missing one fails with a friendly explainer and

@@ -1,0 +1,12 @@
+**ISSUES FOUND**
+
+**Issue 1:** Live user-facing docs still teach the retired two-tier workflow and removed extension actions.  
+- **Category:** Completeness  
+- **Severity:** Major  
+- **Failure scenario:** A typical new extension user reads the packaged/Marketplace README or canonical workflow docs, follows the still-current instructions to pick Lightweight, use `Switch Tier…`, open `external-verification.md`, or rely on `verificationMode`. Those features were removed and `tier: lightweight` now fails at the loader, so the docs would send users onto a broken path. This is probable because the extension README is the main user-facing README and the workflow doc is the canonical operating reference.  
+- **Acceptance criterion:** `JUDGMENT - All live, non-archival onboarding/workflow docs and the extension README must tell the one-tier story and must not present Lightweight/Full as selectable current tiers or advertise deleted verification-mode/external-verification actions, except in explicitly historical/retired/superseded records.`  
+- **Details:** The plan requires “Docs collapse: every teaching doc tells the one-tier story” and ends with “one story everywhere.” Evidence contradicts that: `tools/dabbler-ai-orchestration/README.md:3-30` opens with “two tiers,” a Full/Lightweight comparison, `tier:` in specs, and `Switch Tier…`; `tools/dabbler-ai-orchestration/README.md:95-113` still describes the Getting Started form’s Full/Lightweight tier choice and Lightweight verification modes; `tools/dabbler-ai-orchestration/README.md:234-306` advertises removed row actions, `external-verification.md`, Lightweight markers, `Verification Kickoff`, `Set Up Dedicated Verification…`, and `migrate_lightweight_to_canonical_v4`. Other live docs retain current-path Full-tier wording, e.g. `docs/adoption-bootstrap.md:20-31` and `docs/ai-led-session-workflow.md:253-300`, weakening the one-tier collapse.
+
+**NITS**
+
+- **Nit:** `tools/dabbler-ai-orchestration/src/utils/sampleProject.ts:159-162` and `459-466` still describe the sample as “Lightweight” and say the seeded router config is removed; with the new bundled `ai_router/budget.yaml`, that branch no longer removes the directory. This is internal commentary, not a user-facing/runtime break.

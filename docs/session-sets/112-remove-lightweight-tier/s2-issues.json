@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Live user-facing docs still teach the retired two-tier workflow and removed extension actions.  \n- **Category:** Completeness  \n- **Severity:** Major  \n- **Failure scenario:** A typical new extension user reads the packaged/Marketplace README or canonical workflow docs, follows the still-current instructions to pick Lightweight, use `Switch Tier…`, open `external-verification.md`, or rely on `verificationMode`. Those features were removed and `tier: lightweight` now fails at the loader, so the docs would send users onto a broken path. This is probable because the extension README is the main user-facing README and the workflow doc is the canonical operating reference.  \n- **Acceptance criterion:** `JUDGMENT - All live, non-archival onboarding/workflow docs and the extension README must tell the one-tier story and must not present Lightweight/Full as selectable current tiers or advertise deleted verification-mode/external-verification actions, except in explicitly historical/retired/superseded records.`  \n- **Details:** The plan requires “Docs collapse: every teaching doc tells the one-tier story” and ends with “one story everywhere.” Evidence contradicts that: `tools/dabbler-ai-orchestration/README.md:3-30` opens with “two tiers,” a Full/Lightweight comparison, `tier:` in specs, and `Switch Tier…`; `tools/dabbler-ai-orchestration/README.md:95-113` still describes the Getting Started form’s Full/Lightweight tier choice and Lightweight verification modes; `tools/dabbler-ai-orchestration/README.md:234-306` advertises removed row actions, `external-verification.md`, Lightweight markers, `Verification Kickoff`, `Set Up Dedicated Verification…`, and `migrate_lightweight_to_canonical_v4`. Other live docs retain current-path Full-tier wording, e.g. `docs/adoption-bootstrap.md:20-31` and `docs/ai-led-session-workflow.md:253-300`, weakening the one-tier collapse.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A typical new extension user reads the packaged/Marketplace README or canonical workflow docs, follows the still-current instructions to pick Lightweight, use `Switch Tier…`, open `external-verification.md`, or rely on `verificationMode`. Those features were removed and `tier: lightweight` now fails at the loader, so the docs would send users onto a broken path. This is probable because the extension README is the main user-facing README and the workflow doc is the canonical operating reference.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "All live, non-archival onboarding/workflow docs and the extension README must tell the one-tier story and must not present Lightweight/Full as selectable current tiers or advertise deleted verification-mode/external-verification actions, except in explicitly historical/retired/superseded records."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** The VS Code extension’s public README still teaches the removed two-tier workflow and removed commands.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** A typical user installing or evaluating the extension from the Marketplace reads `tools/dabbler-ai-orchestration/README.md` and is told to choose Full vs Lightweight, use **Switch Tier…**, **Set Up Dedicated Verification…**, **Verification Kickoff**, and `external-verification.md`. Those commands/artifacts were removed in this session, so the documented onboarding path fails and the “one story everywhere” deliverable is not met.\n  - **Acceptance criterion:** `JUDGMENT - The extension Marketplace README no longer teaches Full/Lightweight tiers or names Set 112-removed commands/artifacts, and instead describes the one-tier provider-access setup plus current advisory Evaluate prompts.`\n  - **Details:** The task says Session 2 ends with “one story everywhere” and “the form asks no tier question.” But `tools/dabbler-ai-orchestration/README.md:6`, `:12-30`, `:95-113`, and `:234-298` still describe two tiers, a tier radio, Lightweight verification modes, `external-verification.md`, `Switch Tier…`, `Set Up Dedicated Verification…`, and `Verification Kickoff`. The diff shows those commands were removed from `package.json` and `ActionRegistry`, so this is not just stale wording; it points users at dead extension surfaces.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A typical user installing or evaluating the extension from the Marketplace reads `tools/dabbler-ai-orchestration/README.md` and is told to choose Full vs Lightweight, use **Switch Tier…**, **Set Up Dedicated Verification…**, **Verification Kickoff**, and `external-verification.md`. Those commands/artifacts were removed in this session, so the documented onboarding path fails and the “one story everywhere” deliverable is not met.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The extension Marketplace README no longer teaches Full/Lightweight tiers or names Set 112-removed commands/artifacts, and instead describes the one-tier provider-access setup plus current advisory Evaluate prompts."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "39288e1911e5d0faebac53ee300b5e128d4f6736"
+}

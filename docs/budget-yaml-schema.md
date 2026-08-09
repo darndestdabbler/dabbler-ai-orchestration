@@ -86,7 +86,7 @@ notes: |
 ## Writers
 
 - **The Getting Started form's budget step** (VS Code extension
-  0.32.0+, Full tier only) is the standard writer: a required
+  0.32.0+) is the standard writer: a required
   budget/NTE input in the Build-project-structure step, written at
   scaffold time. It **never clobbers** an existing
   `ai_router/budget.yaml` (skip + report). The pure-TS writer lives at

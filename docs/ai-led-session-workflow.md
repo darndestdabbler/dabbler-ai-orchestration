@@ -230,7 +230,7 @@ session set lives in `docs/session-sets/<name>/` and contains:
 | `session-events.jsonl` | Append-only lifecycle ledger emitted by `start_session` / `close_session`. |
 | `ai-assignment.md` | Per-session ledger of cheapest-capable AI for each step + next-session recommendation. Authored on Session 1; appended each session. |
 | `activity-log.json` | Machine-readable log of every step across all sessions |
-| `disposition.json` | Structured close-out handoff for the just-finished session. Rewritten at each close-out; required before `close_session` on Full-tier sets. |
+| `disposition.json` | Structured close-out handoff for the just-finished session. Rewritten at each close-out; required before `close_session`. |
 | `sN-verification.md` | Recommended root-level raw verifier output for session `N` (never edited). Additional rounds use `sN-verification-round-2.md`, `sN-verification-round-3.md`, etc. |
 | `sN-issues.json` | Root-level machine-readable structured findings for a **findings-bearing** verification round (Set 055). Round 1 uses `sN-issues.json`; later findings-bearing retries use `sN-issues-round-2.json`, etc. Written only when the verdict is not `VERIFIED` — its presence means that round found issues. No runtime reader; never overwritten. See [`docs/session-issues-schema.md`](session-issues-schema.md). |
 | `sN-close-reason.md` | Recommended root-level close-out / attestation narrative for session `N`. |
@@ -250,7 +250,7 @@ Session 2 of 5, etc.). Each session:
 
 - Has a defined list of steps in `spec.md`
 - Is executed by exactly one orchestrator in one conversation
-- Ends with cross-provider verification on **every Full-tier session**
+- Ends with cross-provider verification on **every session**
   (Set 083 — mandatory, no skip; see *Verification-surface policy* and
   Step 6), with the end-of-set path-aware critique + contract-test gate as
   additional surfaces
@@ -274,7 +274,7 @@ review, or documentation itself. The router:
 
 ### Cross-Provider Verification
 
-Every Full-tier session ends with an independent verification step
+Every session ends with an independent verification step
 (Set 083 — mandatory, no skip; between Sets 068 and 083 this was gated on a
 diff predicate, and before Set 068 it was mandatory — the mandate is
 restored). The orchestrator sends its work to a model from a **different AI
@@ -289,7 +289,7 @@ biases and blind spots:
 ### Verification-surface policy (Set 083 — MANDATORY, reversing the Set 068 DEMOTE)
 
 > **Current policy (Set 083, operator decision).** Per-session
-> cross-provider verification is **mandatory on every Full-tier session**.
+> cross-provider verification is **mandatory on every session**.
 > The Set 068 routed-gate SKIP path is retired: the 2026-07-06 UAT incident
 > showed the gating predicate's verdict is only as honest as the path list
 > the policed actor feeds it, and a skip affordance presented to an engine
@@ -297,7 +297,7 @@ biases and blind spots:
 > contract-test gate remain **additional** surfaces; the only exception is
 > the operator-declared zero-budget tier (`ai_router/budget.yaml`,
 > `threshold_usd: 0`) — never an engine's per-session call. The Set 083
-> verification-integrity close gate enforces this: a Full-tier close with
+> verification-integrity close gate enforces this: a close with
 > no corroborated verification verdict is hard-refused in both interactive
 > and headless modes. The rest of this section is preserved as the
 > historical record of the Set 068 DEMOTE experiment and its rationale.
@@ -1327,7 +1327,7 @@ status = "complete"                                        → set done
 
 Two tier-symmetric paths produce the same shape on disk:
 
-**Full tier (router-driven).** Run the CLI as the first action of the
+Run the CLI as the first action of the
 session, then proceed to Step 2:
 
 ```bash
@@ -1530,7 +1530,7 @@ Log the result with `log.log_step()`.
 dispatches to a different AI provider for independent review.
 
 > **Note (Set 083 — MANDATORY, reversing the Set 068 DEMOTE).** This step
-> runs on **every Full-tier session, with no skip**. The Set 068 routed-gate
+> runs on **every session, with no skip**. The Set 068 routed-gate
 > SKIP path is retired by operator decision after the 2026-07-06 UAT
 > incident: the gating predicate's verdict was only as honest as the path
 > list the policed actor fed it (an empty argument list evaluated as a
@@ -1543,7 +1543,7 @@ dispatches to a different AI provider for independent review.
 > per-session: the zero-budget tier in `ai_router/budget.yaml`
 > (`threshold_usd: 0`). The verifier always routes to a **different
 > provider** than the orchestrator, and the Set 083 verification-integrity
-> close gate hard-refuses a Full-tier close with no corroborated verdict.
+> close gate hard-refuses a close with no corroborated verdict.
 
 When this step terminates with a `VERIFIED` verdict and
 `disposition.json` reports `status: "completed"`, the orchestration
@@ -1830,7 +1830,7 @@ by a static config pin or the orchestrator's own labels:
   verdict). The Set 083 close gate accepts **only** a row with a valid,
   internally consistent stamp — a bare `route()` row no longer corroborates a
   close. The stamp is **drift/affordance control, not cryptography**.
-- **The close backstop.** On a Full-tier close with no valid stamped evidence,
+- **The close backstop.** On a close with no valid stamped evidence,
   `close_session` does not merely refuse — it **runs the verification itself,
   in-process**, through the same exclusion machinery, then proceeds on
   `VERIFIED` / refuses with the findings on blocking `ISSUES_FOUND` / blocks on
@@ -2173,7 +2173,7 @@ close-out script is the **sole synchronization barrier** between
 session work and the session being marked complete: it runs
 deterministic gate checks (including `check_pushed_to_remote`,
 which enforces that the push already landed), waits on
-verification — and on a Full-tier close that arrives without valid
+verification — and on a close that arrives without valid
 stamped verification evidence, **runs the verification itself
 in-process (the Set 084 close backstop)** before the gate chain,
 blocking on `verification_unavailable` and never passing an
@@ -3231,7 +3231,7 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
 `AGENTS.md`, `GEMINI.md`) reference this section rather than duplicating it.
 
 1. **One session only.** Never execute more than the assigned session.
-2. **Never skip verification.** Every Full-tier session must be independently
+2. **Never skip verification.** Every session must be independently
    verified by a **different-provider** verifier via
    `python -m ai_router.verify_session` (the orchestrator's model-derived
    effective provider is excluded; a bare `route()` fallback must reproduce the
@@ -3295,7 +3295,7 @@ This is the authoritative rules list. Instruction files (`CLAUDE.md`,
     separate follow-up commit so the session-complete notification is
     never held up by the human reviewing proposals.
 16. **Register session start before the first activity-log entry.** Run
-    `python -m ai_router.start_session` (Full tier) at Step 1 so
+    `python -m ai_router.start_session` at Step 1 so
     external tooling (VS Code Work Explorer, dashboards) sees
     the set as in-progress immediately. `close_session` handles the
     flip to `complete` at Step 8, including reading

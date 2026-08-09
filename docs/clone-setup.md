@@ -102,7 +102,7 @@ secret manager, or the provider's supported credential store.
 
 ### GitHub Copilot CLI seat
 
-For a Copilot-only Full-tier setup, follow
+For a Copilot-only setup, follow
 [`copilot-seat-setup-checklist.md`](copilot-seat-setup-checklist.md):
 
 1. Install `@github/copilot` and authenticate with the correct tenant.
@@ -162,7 +162,7 @@ Before starting a session:
 3. Run the router and guidance checks from the clone's `.venv`.
 4. Start the session through `ai_router.start_session`; never hand-edit
    session state.
-5. Run `ai_router.verify_session` before close on Full-tier work.
+5. Run `ai_router.verify_session` before every close.
 
 The per-session preload and lifecycle rules remain canonical in
 [`session-constitution.md`](session-constitution.md). This note answers the

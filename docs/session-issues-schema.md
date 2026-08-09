@@ -206,7 +206,7 @@ sufficiency is delegated to that one holistic review.
 ### v2 promoted finding fields (Set 057)
 
 Under `schemaVersion: 2`, four additional **optional** fields are
-recognized on the issue object. They are additive and Full-tier-safe —
+recognized on the issue object. They are additive —
 a v2 file may carry none of them and stay valid. When present, the two
 enum fields are validated (spelling-drift guard only; the semantics
 remain advisory, no runtime gate reads them).

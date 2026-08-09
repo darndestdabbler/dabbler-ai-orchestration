@@ -139,7 +139,7 @@ wired the blast-radius gating predicate (`ai_router/routed_gate.py`) that flippe
 per-session routed verification from mandatory to **gated**.
 
 > **Set 083 reversed the demote.** Per-session cross-provider verification is
-> mandatory again on every Full-tier session (no skip); this contract-test
+> mandatory again on every session (no skip); this contract-test
 > gate remains an **additional** deterministic surface, not a replacement
 > floor (see [`docs/verification-surface-strategy.md`](verification-surface-strategy.md)
 > and `docs/ai-led-session-workflow.md` → *Verification-surface policy*).

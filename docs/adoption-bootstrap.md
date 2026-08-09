@@ -2,7 +2,7 @@
 
 > **This conversational bootstrap flow is retired** (Set 063,
 > 2026-06-12; extension 0.32.0). Its one unique capability — the
-> Full-tier budget / NTE dialog — now lives in the VS Code extension's
+> budget / NTE dialog — now lives in the VS Code extension's
 > **Getting Started form**, which is the single onboarding path. This
 > stub stays at the same URL so older extension versions (≤ 0.31.0)
 > whose "Copy adoption bootstrap prompt" command fetches it at click
@@ -18,7 +18,7 @@ right path below (and help them follow it).
 1. Install the **Dabbler AI Orchestration** extension from the VS Code
    Marketplace (`DarndestDabbler.dabbler-ai-orchestration`).
 2. Open the project folder and run **`Dabbler: Get Started`**. The
-   Getting Started form walks through tier choice, the Full-tier
+   Getting Started form walks through the provider-access choice, the
    verification **budget / NTE step** (written to
    `ai_router/budget.yaml`), and the project scaffold (`.venv` +
    router package, agent instruction files, `docs/session-sets/`).
@@ -27,8 +27,8 @@ right path below (and help them follow it).
 
 Follow the quick start:
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/quick-start.md>
-— create a `.venv`, `pip install dabbler-ai-router`, and (Full tier)
-hand-create `ai_router/router-config.yaml` and `ai_router/budget.yaml`.
+— create a `.venv`, `pip install dabbler-ai-router`, and hand-create
+`ai_router/router-config.yaml` and `ai_router/budget.yaml`.
 
 ## Reference
 

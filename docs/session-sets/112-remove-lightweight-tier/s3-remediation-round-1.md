@@ -265,3 +265,43 @@ had become a claim about a kind nothing can emit. Narrowed to
 
 Probes: 4/4 caught. The guard's suite is **70 tests**, and every shape
 found across rounds 1, 3, 4 and 5 is pinned as a falsifier.
+
+---
+
+## Round 6 (the close backstop, again) — the multiline list
+
+**Accepted, and it landed on a boundary I had drawn wrong.**
+
+`MODE_VALUE` required an assigning prefix (`:` `=` `[` `,` `return`
+`case`) on the same line. In a multiline list or tuple every element sits
+on its own line with no prefix in sight:
+
+```python
+MODES = (
+    "out-of-band-or-none",
+    "dedicated-sessions",
+)
+```
+
+That is the most natural way a mode enum would come back, and the gate
+exited 0 on it.
+
+The prefix requirement existed to spare the Playwright spec that proves a
+stale `.dabbler/verification-mode` marker is now inert, which writes
+`"dedicated-sessions\n"` as a positional argument. Relaxing the rule
+looked like it would trade one hole for a false positive on the test that
+proves the removal works.
+
+**It does not, and the reason is a better rule than the one it replaces.**
+The quoted form now matches a literal whose **entire content** is a mode
+name. `"dedicated-sessions\n"` is a mode name *plus a newline* — file
+content, not a configuration value, since no config value carries a
+trailing newline inside its literal. So the multiline tuple is caught and
+the marker-content line is spared **for a stated reason rather than by an
+exemption**, which is what the prefix rule was really standing in for.
+
+The bare, unquoted YAML form (`mode: dedicated-sessions`) keeps its
+`:`/`=` prefix, because unquoted prose would otherwise match.
+
+Probes: 6/6 correct (5 caught, 1 correctly spared). Guard suite: **74
+tests**.

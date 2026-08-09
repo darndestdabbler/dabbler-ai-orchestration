@@ -274,6 +274,14 @@
       "dateTime": "2026-08-09T14:50:55.614697-04:00",
       "description": "The close backstop refused the close and was right to. It found the engine bootstrap files (AGENTS/CLAUDE/GEMINI -- auto-loaded every session, preload) still teaching the state schema as applying on both Full and Lightweight tiers, which S2 missed, the gate cannot see by design (prose is narration), and three routed rounds never saw because the files were not in the diff. Fixed in all three and pinned by a direct-read test. Also three more declaration shapes (the field as a VALUE, a quoted name in a tuple, a returned mode literal) and one genuine leftover assertion about a deleted entry kind. pytest 3633 passed",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 12,
+      "stepKey": "session-3/backstop-round-6",
+      "dateTime": "2026-08-09T15:13:42.466976-04:00",
+      "description": "Backstop round 6: a multiline list/tuple of mode literals slipped, because MODE_VALUE required an assigning prefix on the same line. Replaced the prefix rule with an exactness rule -- a quoted literal whose ENTIRE content is a mode name counts anywhere. The Playwright stale-marker test is still spared, now for a stated reason rather than by an exemption: dedicated-sessions plus a newline is file content, not a config value. 6/6 probes correct, guard suite 74 tests, pytest 3636 passed",
+      "status": "complete"
     }
   ]
 }

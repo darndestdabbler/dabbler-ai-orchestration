@@ -165,10 +165,43 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
             ".ts",
             "verification-mode-value",
         ),
+        # Round 6 (the close backstop): a multiline list or tuple, where
+        # every element sits on its own line with no assigning prefix in
+        # sight -- the most natural way a mode enum would come back.
+        (
+            'MODES = (\n    "out-of-band-or-none",\n    "dedicated-sessions",\n)\n',
+            ".py",
+            "verification-mode-value",
+        ),
+        (
+            'const MODES = [\n  "out-of-band-or-none",\n  "dedicated-sessions",\n];\n',
+            ".ts",
+            "verification-mode-value",
+        ),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_marker_FILE_CONTENT_is_spared_because_it_is_not_a_mode_name():
+    """The exactness of the quoted rule is doing real work here.
+
+    The Playwright spec that proves a stale `.dabbler/verification-mode`
+    marker is now INERT writes `"dedicated-sessions\\n"` -- a mode name
+    plus a newline, which is file CONTENT. No configuration value carries
+    a trailing newline inside its literal, so the rule that catches a
+    multiline tuple element still spares the test that proves the removal
+    works. This is a reason, not an exemption.
+    """
+    text = (
+        "fs.writeFileSync(\n"
+        '  path.join(d, "verification-mode"),\n'
+        '  "dedicated-sessions\\n",\n'
+        '  "utf8",\n'
+        ");\n"
+    )
+    assert _scan(text, ".ts") == []
 
 
 def test_the_marker_FILENAME_is_still_nameable():

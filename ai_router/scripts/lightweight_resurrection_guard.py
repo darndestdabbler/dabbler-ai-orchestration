@@ -199,20 +199,28 @@ VERIFICATION_MODE_FIELD = re.compile(
     r"""|["']verification(?:_m|M)ode["'])"""
 )
 
-# The two mode VALUES, in a position that assigns, aliases, or lists them:
-# `mode: dedicated-sessions`, `const M = "dedicated-sessions";`,
-# `type T = "out-of-band-or-none" | "dedicated-sessions"`,
-# `["out-of-band-or-none", "dedicated-sessions"]`.
+# The two mode VALUES. Two forms, and the split is what keeps the rule
+# honest:
 #
-# A bare literal alone on its own line is NOT matched, and that is
-# deliberate: the Playwright spec that proves a stale `.dabbler/
-# verification-mode` marker is now INERT has to write the string
-# `"dedicated-sessions\n"` as a positional argument, and flagging the test
-# that proves the removal works would be the gate eating its own evidence.
-# A literal in that position configures nothing on its own.
+#   * a quoted literal whose ENTIRE content is a mode name -- anywhere at
+#     all, including as an element of a multiline list or tuple, which is
+#     how a mode enum would most naturally come back;
+#   * a bare, unquoted value after `:` or `=`, which is the YAML form.
+#
+# The exactness of the quoted form is doing real work. The Playwright spec
+# that proves a stale `.dabbler/verification-mode` marker is now INERT
+# writes `"dedicated-sessions\n"` -- a mode name plus a newline, which is
+# FILE CONTENT, not a configuration value; no config value carries a
+# trailing newline inside its literal. So that test is spared for a reason,
+# not by an exemption, and a gate that failed the test proving the removal
+# works would be eating its own evidence.
+#
+# An earlier version required an assigning prefix (`:` `=` `[` `,`) on the
+# same line. The close backstop found the hole: in a multiline tuple every
+# element sits on its own line with no prefix in sight.
 MODE_VALUE = re.compile(
-    r"""(?::|=|=>|\[|,|\||\(|\breturn\b|\bcase\b)\s*"""
-    r"""["']?(?:out-of-band-or-none|dedicated-sessions)["']?"""
+    r"""(?<![\w-])["'](?:out-of-band-or-none|dedicated-sessions)["']"""
+    r"""|(?::|=|=>)\s*(?:out-of-band-or-none|dedicated-sessions)"""
     r"""\s*(?=$|[,;:)}\]|]|\#|//)"""
 )
 

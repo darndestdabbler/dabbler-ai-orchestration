@@ -178,10 +178,43 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
             ".ts",
             "verification-mode-value",
         ),
+        # Round 7 (the close backstop): unquoted YAML shapes. Chasing one
+        # prefix at a time was the wrong move -- in a DATA file the token
+        # simply IS the declaration.
+        (
+            "modes:\n  - out-of-band-or-none\n  - dedicated-sessions\n",
+            ".yaml",
+            "verification-mode-value",
+        ),
+        ("modes: [out-of-band-or-none, dedicated-sessions]\n", ".yaml", "verification-mode-value"),
+        ('{"modes":["dedicated-sessions"]}\n', ".json", "verification-mode-value"),
+        (
+            "```yaml\nverificationMode:\n  - dedicated-sessions\n```\n",
+            ".md",
+            "verification-mode-value",
+        ),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_a_yaml_comment_naming_a_mode_is_still_narration():
+    """The data-file rule reads content, and comments are not content."""
+    assert _scan("# dedicated-sessions was Mode B; it is gone\nkey: value\n", ".yaml") == []
+
+
+def test_the_data_rule_does_not_leak_into_code():
+    """A bare mode token in a .py or .ts line is not automatically a value.
+
+    Code has comments the blanker removes and strings it deliberately
+    keeps; the exact-quoted rule is what governs there. Applying the
+    data-file rule to code would flag, for example, a variable named
+    `dedicatedSessionsRemoved` -- no, that is not a token match -- but
+    more importantly it would make the two territories' rules diverge for
+    no stated reason.
+    """
+    assert guard._DATA_SUFFIXES == frozenset({".yaml", ".yml", ".json", ".md"})
 
 
 def test_marker_FILE_CONTENT_is_spared_because_it_is_not_a_mode_name():

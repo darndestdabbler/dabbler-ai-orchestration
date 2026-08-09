@@ -305,3 +305,50 @@ The bare, unquoted YAML form (`mode: dedicated-sessions`) keeps its
 
 Probes: 6/6 correct (5 caught, 1 correctly spared). Guard suite: **74
 tests**.
+
+---
+
+## Round 7 (the close backstop, third time) — and the change of tactic
+
+**Accepted.** An unquoted YAML sequence slipped:
+
+```yaml
+modes:
+  - out-of-band-or-none
+  - dedicated-sessions
+```
+
+`- ` was not in the bare-value prefix set. The one-line fix was obvious,
+and taking it would have been the wrong move.
+
+**Three consecutive backstop rounds had each found one more syntax**, and
+the pattern was no longer about this gate — it is what a regex-based gate
+*is*. Syntax can be enumerated indefinitely; a regex can never be provably
+complete against it. Adding a seventh prefix would have bought exactly one
+more round of the same.
+
+**So the tactic changed.** In a **data file** — YAML, JSON, or a fenced
+block in a doc — comments are already blanked, so anything remaining is
+content a machine reads. There is no such thing as an incidental mention
+there. `MODE_VALUE_IN_DATA` therefore matches the mode names **bare, in
+any position**, in `.yaml` / `.yml` / `.json` / `.md`-fence territory, and
+the entire class of "some YAML shape the prefix rules did not anticipate"
+closes at once.
+
+Code keeps the exact-quoted rule, because code genuinely does hold
+incidental mentions (string arguments, test names, assertions about
+absence) that the two territories treat differently for stated reasons.
+
+Probes: 5/5 correct — sequence, flow sequence, JSON array, a fenced block
+in markdown, and a YAML **comment** naming a mode, which is still
+narration. Guard suite: **80 tests**.
+
+### The honest reading of rounds 5–7
+
+The verifier was right three times running, and each fix was real. But the
+findings were also strictly decreasing in consequence — from *the preload
+files teach the tier* (round 5) to *a YAML sequence syntax* (round 7) —
+and the last two were the same defect wearing different syntax. The
+data-file rule is the answer to the class rather than to the instance,
+which is why it is worth recording as a change of tactic and not just
+another row in the table.

@@ -224,6 +224,25 @@ MODE_VALUE = re.compile(
     r"""\s*(?=$|[,;:)}\]|]|\#|//)"""
 )
 
+# In a DATA file -- YAML, JSON, or a fenced block in a doc -- there is no
+# such thing as an incidental mention: comments are already blanked, so
+# anything left is content a machine reads. So the mode names are matched
+# bare, in any position, and the whole class of "some YAML shape the
+# prefix rules did not anticipate" closes at once rather than one syntax
+# at a time.
+#
+# The close backstop found this the slow way, one shape per round: a
+# multiline tuple, then an unquoted YAML sequence item (`- dedicated-
+# sessions`). Chasing prefixes was the wrong move; a regex can enumerate
+# syntax forever and never be provably complete, while "in a data file,
+# the token IS the declaration" needs no enumeration at all.
+MODE_VALUE_IN_DATA = re.compile(
+    r"""(?<![\w-])(?:out-of-band-or-none|dedicated-sessions)(?![\w-])"""
+)
+
+# The suffixes whose non-comment content is data rather than code.
+_DATA_SUFFIXES: frozenset[str] = frozenset({".yaml", ".yml", ".json", ".md"})
+
 DELETED_MODULE_REF = re.compile(
     r"\b(?:" + "|".join(DELETED_MODULES) + r")\b"
 )
@@ -588,7 +607,9 @@ def scan_text(rel_path: str, source: str, suffix: str) -> list[Resurrection]:
                     ),
                 )
             )
-        if MODE_VALUE.search(line):
+        if MODE_VALUE.search(line) or (
+            suffix in _DATA_SUFFIXES and MODE_VALUE_IN_DATA.search(line)
+        ):
             violations.append(
                 Resurrection(
                     rule="verification-mode-value",

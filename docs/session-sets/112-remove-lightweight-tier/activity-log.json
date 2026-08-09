@@ -282,6 +282,14 @@
       "dateTime": "2026-08-09T15:13:42.466976-04:00",
       "description": "Backstop round 6: a multiline list/tuple of mode literals slipped, because MODE_VALUE required an assigning prefix on the same line. Replaced the prefix rule with an exactness rule -- a quoted literal whose ENTIRE content is a mode name counts anywhere. The Playwright stale-marker test is still spared, now for a stated reason rather than by an exemption: dedicated-sessions plus a newline is file content, not a config value. 6/6 probes correct, guard suite 74 tests, pytest 3636 passed",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 13,
+      "stepKey": "session-3/backstop-round-7",
+      "dateTime": "2026-08-09T15:35:54.978978-04:00",
+      "description": "Backstop round 7 found an unquoted YAML sequence. Changed tactic instead of adding a seventh prefix: in a DATA file (yaml/yml/json/md-fence) comments are already blanked, so anything left is content a machine reads -- the mode names now match bare in any position there, closing the whole class. Code keeps the exact-quoted rule, because code does hold incidental mentions. 5/5 probes correct including a YAML comment correctly spared. Guard suite 80 tests, pytest 3642 passed",
+      "status": "complete"
     }
   ]
 }

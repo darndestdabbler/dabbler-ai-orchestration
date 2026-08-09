@@ -170,6 +170,14 @@
       "dateTime": "2026-08-09T11:06:00.087980-04:00",
       "description": "Authoring disposition and closing session 2",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 9,
+      "stepKey": "session-2/close-out",
+      "dateTime": "2026-08-09T11:16:26.640846-04:00",
+      "description": "close_session succeeded: all 8 gates PASS. Round 4 re-verification VERIFIED against the final tree after the close-out writes; close backstop EvidenceTooLargeError crash fixed en route",
+      "status": "complete"
     }
   ]
 }

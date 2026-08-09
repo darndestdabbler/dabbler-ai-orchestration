@@ -298,6 +298,14 @@
       "dateTime": "2026-08-09T15:59:49.371839-04:00",
       "description": "Backstop round 8: a legacy-compatibility PARSER naming the field/modes in regex form. Weighed for dispute, then accepted -- the obvious fix would have flagged consumerBootstraps live !/verificationMode/.test(spec) absence assertion, so the rule is anchored on a regex METACHARACTER after the name: a metacharacter means parsing, a bare name means testing. 5/5 probes correct. Guard suite 85 tests, pytest 3647 passed",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 15,
+      "stepKey": "session-3/backstop-round-9",
+      "dateTime": "2026-08-09T16:22:03.701305-04:00",
+      "description": "Backstop round 9: round 8 had given the FIELD a parser rule and left the TIER without one -- my asymmetry, not the verifiers persistence. TIER_IN_REGEX added, anchored on regex syntax so the migration message (same three words, same order) is spared for a reason rather than by exemption. 5/5 probes correct, guard suite 90 tests, pytest 3652 passed",
+      "status": "complete"
     }
   ]
 }

@@ -392,3 +392,29 @@ the loop bound stands unchanged: **the gate catches every shape anyone has
 thought to plant, and no one can prove that is all of them.** Its floor
 does not depend on any regex — `check_deleted_files_stay_deleted` reads
 the filesystem.
+
+---
+
+## Round 9 (the close backstop, fifth time) — my own asymmetry
+
+**Accepted, and this one was my fault rather than the verifier's
+persistence.** Round 8's fix gave the *field* a parser rule and left the
+*tier* without one, so `/tier\s*:\s*lightweight/` and
+`re.compile(r"tier\s*:\s*lightweight")` still passed — and
+`spec_config.py` says in as many words that the spec-config parser is
+"intentionally simple regex", which makes that the single most plausible
+shape a tier restoration would take in this repo. The colon-only field
+form (`/verificationMode:/`) slipped for a smaller reason: `/` was not in
+the set of characters allowed before the name.
+
+**Fix.** `TIER_IN_REGEX`, anchored the same way round 8's rule was — on an
+escape class between the words, or a `/` delimiter opening the literal —
+and `/` added to the field rule's leading class.
+
+**The anchoring matters more here than anywhere else in the gate**, because
+the migration message *is* the same three words in the same order:
+`tier: lightweight was removed in Set 112 ...`. That string is the text a
+stranded consumer reads. It is spared because it has no regex syntax in
+it, not because it is exempted. Pinned in both directions.
+
+Probes: 5/5 correct. Guard suite: **90 tests**.

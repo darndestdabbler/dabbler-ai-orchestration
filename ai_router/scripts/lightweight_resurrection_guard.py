@@ -177,6 +177,24 @@ TIER_DECLARATION_INLINE_BARE = re.compile(
     re.IGNORECASE,
 )
 
+# The tier as a PARSER pattern rather than a value: `/tier\s*:\s*lightweight/`
+# or `re.compile(r"tier\s*:\s*lightweight")`. `spec_config.py` says in as
+# many words that the spec-config parser is "intentionally simple regex",
+# so a compatibility shim restoring the tier would most plausibly look
+# exactly like this.
+#
+# Two forms, and both are anchored on something only a regex has -- an
+# escape class between the two words, or a `/` delimiter opening the
+# literal. That anchoring is what keeps the rule off the migration
+# message, which is the same three words in the same order
+# ("tier: lightweight was removed in Set 112 ...") and must never be
+# flagged: it is the text a stranded consumer reads.
+TIER_IN_REGEX = re.compile(
+    r"""tier[^\n]{0,12}\\[sSdDwWbB][^\n]{0,12}lightweight"""
+    r"""|/tier[^\n/]{0,16}lightweight""",
+    re.IGNORECASE,
+)
+
 # The removed verification-mode field, in every position a live read or
 # declaration can take: a YAML key, a JSON key, an object property, an
 # assignment target, an OPTIONAL TypeScript property
@@ -200,7 +218,7 @@ TIER_DECLARATION_INLINE_BARE = re.compile(
 # field, and each was found by a verifier planting it and watching the
 # gate exit 0.
 VERIFICATION_MODE_FIELD = re.compile(
-    r"""(?:(?:^|[\s\{\[,\(])["']?verification[_-]?[Mm]ode["']?\s*\??\s*(?::(?!:)|=(?!=))"""
+    r"""(?:(?:^|[\s\{\[,\(/])["']?verification[_-]?[Mm]ode["']?\s*\??\s*(?::(?!:)|=(?!=))"""
     r"""|\.verification(?:_m|M)ode\b"""
     r"""|\bVerificationMode\b"""
     r"""|[\{,]\s*verification(?:_m|M)ode\s*[\},:=]"""
@@ -594,6 +612,7 @@ def scan_text(rel_path: str, source: str, suffix: str) -> list[Resurrection]:
         if (
             TIER_DECLARATION.match(line)
             or TIER_DECLARATION_INLINE.search(line)
+            or TIER_IN_REGEX.search(line)
             or (suffix != ".py" and TIER_DECLARATION_INLINE_BARE.search(line))
         ):
             violations.append(

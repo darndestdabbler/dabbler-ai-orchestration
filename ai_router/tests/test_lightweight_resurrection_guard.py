@@ -214,10 +214,34 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
             ".py",
             "verification-mode-value",
         ),
+        # Round 9: the same parser form for the TIER, which round 8's fix
+        # had left asymmetric, plus the colon-only field regex.
+        ("const field = /verificationMode:/;\n", ".ts", "verification-mode-field"),
+        ("const tier = /tier\\s*:\\s*lightweight/;\n", ".ts", "tier-declared"),
+        ('T = re.compile(r"tier\\s*:\\s*lightweight")\n', ".py", "tier-declared"),
+        ("const t = /tier: lightweight/;\n", ".ts", "tier-declared"),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_the_migration_message_survives_the_tier_parser_rule():
+    """The message is the same three words in the same order.
+
+    `tier: lightweight was removed in Set 112 ...` is the text a stranded
+    consumer reads, and it lives in `spec_config.py` as a plain string.
+    The parser rule is anchored on something only a regex has -- an escape
+    class between the words, or a `/` delimiter -- so the message is
+    spared for a reason rather than by an exemption.
+    """
+    text = (
+        "MSG = (\n"
+        '    "tier: lightweight was removed in Set 112 -- there is one tier now. "\n'
+        '    "Fix: set tier: full."\n'
+        ")\n"
+    )
+    assert _scan(text, ".py") == []
 
 
 def test_a_bare_regex_asserting_ABSENCE_is_spared():

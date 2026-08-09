@@ -105,13 +105,18 @@ class TestRecordRead:
         with pytest.raises(FileNotFoundError):
             pac.record_path_aware_critique(d, REQ)
 
-    def test_entry_kind_distinct_from_verification_mode(self, tmp_path):
+    def test_entry_kind_distinct_from_other_policy_records(self, tmp_path):
         d = _set_dir(tmp_path)
         pac.record_path_aware_critique(d, REQ)
         log = json.loads((d / "activity-log.json").read_text(encoding="utf-8"))
         kinds = {e.get("kind") for e in log["entries"]}
         assert pac.PATH_AWARE_CRITIQUE_ENTRY_KIND in kinds
-        assert "verification_mode" not in kinds
+        # Set 112 S3: this used to also assert the kind was not the
+        # Lightweight tier's `verification_mode` record. That record's
+        # writer was deleted with the tier, so nothing can emit the kind
+        # any more and the assertion had become a claim about a thing that
+        # does not exist. `suggestion_disposition` is the live sibling, and
+        # the collision this test guards against is a real one.
         assert "suggestion_disposition" not in kinds
 
     def test_has_record_false_then_true(self, tmp_path):

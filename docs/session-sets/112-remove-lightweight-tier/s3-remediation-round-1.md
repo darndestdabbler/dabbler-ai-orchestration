@@ -207,3 +207,61 @@ catches every shape anyone has thought to plant, and no one can prove
 that is all of them.** Its floor does not depend on the regexes —
 `check_deleted_files_stay_deleted` reads the filesystem, and a returned
 module is caught no matter how it is spelled.
+
+---
+
+## Round 5 (the close backstop) — two more, and the worse one was not the gate
+
+The close gate runs its own in-process verification, and it refused the
+close. Both findings were accepted.
+
+### 1. The engine bootstrap files still taught the tier
+
+`AGENTS.md`, `CLAUDE.md` and `GEMINI.md` all still described
+`session-state.json` as "the v4 shape, **on both Full and Lightweight
+tiers**". These are the files every Claude / Copilot / Gemini session in
+this repo **auto-loads at session start** — the highest-frequency guidance
+surface there is, and a preload file besides.
+
+This is the miss that matters most in the whole set, and it is worth being
+precise about why nothing caught it earlier:
+
+- Session 2 collapsed the docs and did not reach them.
+- The gate cannot see them **by design**: they are markdown prose, which is
+  narration territory. The gate proves nothing *declares* the tier; it
+  never claimed to prove nothing *describes* it.
+- Three rounds of routed verification read the diff, and these files were
+  not in the diff.
+
+Fixed in all three, and pinned by a test that reads the three files
+directly and asserts the word does not appear. That test is the narrow,
+explicit exception to the positional rules, justified by frequency: a
+stale claim here steers every future session in the repo.
+
+### 2. The field as a VALUE, and a mode literal returned
+
+Three more shapes, all ordinary config-compatibility code:
+
+| shape | why it slipped |
+| :--- | :--- |
+| `const LEGACY_KEY = "verificationMode";` | every field rule looked for the name in a *key* position; here it is the value |
+| `ALLOWED_SPEC_FIELDS = ("requiresUAT", "verificationMode")` | same — a quoted name in a tuple |
+| `return "dedicated-sessions";` | `MODE_VALUE` had no `return` (or `case`) prefix |
+
+**Fix.** A quoted-identifier alternative (`"verificationMode"` /
+`"verification_mode"`), plus `return` / `case` prefixes and `:` as a
+terminator for mode values.
+
+**The quoted-identifier rule is deliberately spelling-specific.** It
+matches the camelCase and snake_case forms the *field* took, not the
+hyphenated `"verification-mode"`, which is the on-disk **marker filename**
+the Playwright spec must name to prove that marker is inert. Pinned.
+
+**It also surfaced one genuine leftover.** `test_path_aware_critique.py`
+asserted the critique entry kind was not `"verification_mode"` — a
+collision guard against a record whose writer S1 deleted. The assertion
+had become a claim about a kind nothing can emit. Narrowed to
+`suggestion_disposition`, the live sibling, with a note.
+
+Probes: 4/4 caught. The guard's suite is **70 tests**, and every shape
+found across rounds 1, 3, 4 and 5 is pinned as a falsifier.

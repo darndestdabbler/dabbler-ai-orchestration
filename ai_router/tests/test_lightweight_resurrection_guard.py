@@ -147,10 +147,40 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
             ".ts",
             "tier-declared",
         ),
+        # Round 5 (the close backstop): the field as a VALUE rather than a
+        # key, and a mode literal returned or switched on.
+        ('const LEGACY_KEY = "verificationMode";\n', ".ts", "verification-mode-field"),
+        (
+            'ALLOWED_SPEC_FIELDS = ("requiresUAT", "verificationMode")\n',
+            ".py",
+            "verification-mode-field",
+        ),
+        (
+            'function defaultMode() { return "dedicated-sessions"; }\n',
+            ".ts",
+            "verification-mode-value",
+        ),
+        (
+            'switch (m) { case "out-of-band-or-none": return 1; }\n',
+            ".ts",
+            "verification-mode-value",
+        ),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_the_marker_FILENAME_is_still_nameable():
+    """`.dabbler/verification-mode` is a path, not a field.
+
+    The quoted-identifier rule matches the camelCase and snake_case
+    spellings the field actually took. The hyphenated form is the on-disk
+    marker filename, and the Playwright spec proving that marker is now
+    INERT has to name it.
+    """
+    text = 'fs.writeFileSync(path.join(dir, "verification-mode"), "x");\n'
+    assert _scan(text, ".ts") == []
 
 
 def test_the_bare_key_inline_rule_does_not_apply_to_python():
@@ -382,6 +412,25 @@ def test_a_tier_full_declaration_is_not_a_resurrection():
 # ---------------------------------------------------------------------------
 # The escapes stay narrow
 # ---------------------------------------------------------------------------
+
+
+def test_the_engine_bootstrap_files_teach_one_tier():
+    """The highest-frequency guidance surface in the repo.
+
+    `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` are auto-loaded at the start of
+    every session, and all three still described the state schema as
+    applying "on both Full and Lightweight tiers" until the close backstop
+    caught it. They are markdown prose, so the positional rules cannot see
+    them by design -- this is the narrow, explicit exception, because a
+    stale claim in a preload file steers every future session.
+    """
+    root = _repo_root()
+    for rel in ("AGENTS.md", "CLAUDE.md", "GEMINI.md"):
+        text = (root / rel).read_text(encoding="utf-8")
+        assert "Lightweight" not in text, (
+            f"{rel} still names the removed tier; it is auto-loaded at the "
+            "start of every session in this repo"
+        )
 
 
 def test_the_self_exemption_is_exactly_the_gates_own_two_files():

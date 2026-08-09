@@ -195,7 +195,8 @@ VERIFICATION_MODE_FIELD = re.compile(
     r"""|\.verification(?:_m|M)ode\b"""
     r"""|\bVerificationMode\b"""
     r"""|[\{,]\s*verification(?:_m|M)ode\s*[\},:=]"""
-    r"""|\[\s*["']verification[_-]?[Mm]ode["']\s*\])"""
+    r"""|\[\s*["']verification[_-]?[Mm]ode["']\s*\]"""
+    r"""|["']verification(?:_m|M)ode["'])"""
 )
 
 # The two mode VALUES, in a position that assigns, aliases, or lists them:
@@ -210,8 +211,9 @@ VERIFICATION_MODE_FIELD = re.compile(
 # that proves the removal works would be the gate eating its own evidence.
 # A literal in that position configures nothing on its own.
 MODE_VALUE = re.compile(
-    r"""(?::|=|=>|\[|,|\|)\s*["']?(?:out-of-band-or-none|dedicated-sessions)["']?"""
-    r"""\s*(?=$|[,;)}\]|]|\#|//)"""
+    r"""(?::|=|=>|\[|,|\||\(|\breturn\b|\bcase\b)\s*"""
+    r"""["']?(?:out-of-band-or-none|dedicated-sessions)["']?"""
+    r"""\s*(?=$|[,;:)}\]|]|\#|//)"""
 )
 
 DELETED_MODULE_REF = re.compile(

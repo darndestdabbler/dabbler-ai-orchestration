@@ -266,6 +266,14 @@
       "dateTime": "2026-08-09T14:26:53.035224-04:00",
       "description": "Operator walked the guided-look UAT: PASS with one defect, found on the empty-project window the --empty stager mode made walkable. The System Status strip warned about a missing provider API key before any provider path had been chosen, because api is the DEFAULT profile and an explicit Direct-API pick is never written to disk. Fixed: the fault now also requires workspaceInitialized, which keeps it firing for keyless direct-API users; gating on a recorded choice was rejected because it would silence the fault for everyone it helps. Journaled, 4 Layer 2 cases + a Layer 3 falsifier, Layer 2 1609 passing and Layer 3 33 passed after the fix. Decides recorded: version 1.0.0, publish HELD until Set 114, consumer notice not needed",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 11,
+      "stepKey": "session-3/backstop-round-5",
+      "dateTime": "2026-08-09T14:50:55.614697-04:00",
+      "description": "The close backstop refused the close and was right to. It found the engine bootstrap files (AGENTS/CLAUDE/GEMINI -- auto-loaded every session, preload) still teaching the state schema as applying on both Full and Lightweight tiers, which S2 missed, the gate cannot see by design (prose is narration), and three routed rounds never saw because the files were not in the diff. Fixed in all three and pinned by a direct-read test. Also three more declaration shapes (the field as a VALUE, a quoted name in a tuple, a returned mode literal) and one genuine leftover assertion about a deleted entry kind. pytest 3633 passed",
+      "status": "complete"
     }
   ]
 }

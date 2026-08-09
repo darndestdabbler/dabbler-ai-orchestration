@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The remediated guard still misses ordinary live declaration forms.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** A future extension helper or scaffold source adds a normal TypeScript object literal such as `const spec = { tier: \"lightweight\", requiresUAT: false };`, or Python/TS code reintroduces the normalized `verification_mode` field through an attribute/destructured read. Those are standard config/object shapes in this repo’s TypeScript/Python surfaces, so this is probable over the life of the CI gate. The guard exits 0, so the removed tier/field can silently re-enter despite the anti-resurrection deliverable.\n  - **Acceptance criterion:** JUDGMENT - The guard reports `tier-declared` for unquoted inline object-literal tier declarations such as `const spec = { tier: \"lightweight\" }`, and reports `verification-mode-field` for snake_case property reads/destructuring such as `spec.verification_mode` and `const { verification_mode } = spec`, while the existing inert-string/test-fixture exclusions still pass.\n  - **Details:** Violation: the spec requires “a script/test asserting zero live references to `tier: lightweight`, `verificationMode`, or either mode outside archives,” and the guard’s own contract says declaration territory includes “code outside comments/docstrings.” Impact: the CI-wired executable proof remains false for common code declarations, so a reasonable reviewer should not accept the gate as proving the tier cannot resurrect silently. Evidence: `TIER_DECLARATION_INLINE` only matches quoted keys (`[\"']tier[\"']...`), so a probed `const spec = { tier: \"lightweight\", requiresUAT: false };` returned `[]`; the field regex’s dotted/destructuring branches use `verification[_M]ode`, so probed `spec.verification_mode` and `const { verification_mode } = spec` also returned `[]`. The correct behavior is to catch those declaration-territory forms.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A future extension helper or scaffold source adds a normal TypeScript object literal such as `const spec = { tier: \"lightweight\", requiresUAT: false };`, or Python/TS code reintroduces the normalized `verification_mode` field through an attribute/destructured read. Those are standard config/object shapes in this repo’s TypeScript/Python surfaces, so this is probable over the life of the CI gate. The guard exits 0, so the removed tier/field can silently re-enter despite the anti-resurrection deliverable.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The guard reports `tier-declared` for unquoted inline object-literal tier declarations such as `const spec = { tier: \"lightweight\" }`, and reports `verification-mode-field` for snake_case property reads/destructuring such as `spec.verification_mode` and `const { verification_mode } = spec`, while the existing inert-string/test-fixture exclusions still pass."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 TypeScript optional/read/type/value forms",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 Python non-docstring triple-quoted templates",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 canonical Layer 2 run-of-record command",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 router live-version release-status row",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 common declaration forms from round 1",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 live `.template` scaffold sources",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 TypeScript destructuring and bracket reads",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    }
+  ]
+}

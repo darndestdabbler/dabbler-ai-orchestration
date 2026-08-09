@@ -136,10 +136,33 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
         ("const { verificationMode: mode } = spec;\n", ".ts", "verification-mode-field"),
         ("const { tier, verificationMode } = spec;\n", ".ts", "verification-mode-field"),
         ('if (spec["verificationMode"]) { legacy(); }\n', ".ts", "verification-mode-field"),
+        # Round 4 (at the loop bound): the snake_case spelling, which a
+        # `verification[_M]ode` character class silently never matched, and
+        # the bare-key object literal.
+        ("if (spec.verification_mode) { legacy(); }\n", ".ts", "verification-mode-field"),
+        ("const { verification_mode } = spec;\n", ".ts", "verification-mode-field"),
+        ("mode = spec.verification_mode\n", ".py", "verification-mode-field"),
+        (
+            'const spec = { tier: "lightweight", requiresUAT: false };\n',
+            ".ts",
+            "tier-declared",
+        ),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_the_bare_key_inline_rule_does_not_apply_to_python():
+    """Deliberate, and the reason the bare-key rule is separate.
+
+    Planting a spec fragment inside a string is the idiom of the Python
+    tests that prove the refusal fires. Applying the bare-key rule there
+    would fail the tests that demonstrate the removal works. A real Python
+    template still gets caught: its YAML starts its own line.
+    """
+    assert _scan("for raw in ('tier: \"lightweight\"',):\n", ".py") == []
+    assert "tier-declared" in _scan('SPEC = """\ntier: lightweight\n"""\n', ".py")
 
 
 def test_the_word_in_prose_or_a_test_name_is_still_not_a_declaration():

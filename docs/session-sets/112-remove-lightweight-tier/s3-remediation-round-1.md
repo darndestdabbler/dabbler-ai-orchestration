@@ -153,3 +153,57 @@ Probes, planted in throwaway trees: `const { verificationMode } = spec`,
 `const { verificationMode: mode } = spec`, `spec["verificationMode"]`,
 and `cfg['verification_mode']` — 4/4 caught. The guard's suite is now
 **60 tests**.
+
+---
+
+## Round 4 (remediation-review cycle 2) — accepted and fixed AT THE BOUND
+
+All seven prior fixes were accepted (7 accepted / 0 rejected). One new
+finding arrived, naming two gaps. **Both were real, and one of them was a
+bug I wrote in the round-3 fix.**
+
+1. **`verification[_M]ode` never matched `verification_mode`.** The
+   character class reads as "verification" + one of `_`/`M` + "ode", so
+   it matches `verificationMode` and the nonsense `verification_ode` —
+   but not the snake_case spelling it was written to cover. The dotted
+   and destructuring branches were therefore blind to
+   `spec.verification_mode` and `const { verification_mode } = spec`.
+   Corrected to `verification(?:_m|M)ode`. (The bracket-read branch used
+   `[_-]?[Mm]ode` and was always right; the inconsistency is what hid it.)
+
+2. **A bare-key object literal — `const spec = { tier: "lightweight" }`
+   — was not an inline declaration.** Round 1 had narrowed the inline
+   rule to *both* sides quoted to escape a false positive on Python
+   tests. That narrowing was right for Python and too wide for
+   everything else. A second rule, `TIER_DECLARATION_INLINE_BARE`,
+   applies the bare-key form **everywhere except `.py`**. The exception
+   is the point: planting a spec fragment inside a string is the idiom
+   of the Python tests that prove the refusal fires, TypeScript has no
+   such tests (its tier tests were deleted with the tier), and the only
+   non-Python live matches in the whole repo are markdown prose inside
+   the frozen historical record. A real Python template is still caught —
+   its YAML starts its own line.
+
+Probes: 4/4 caught. Guard suite: **65 tests**.
+
+### Why this round is a STOP, not a fifth round
+
+`verify_session` enforces at most two remediation-review cycles and now
+**refuses** another. That refusal is about opening a *round*, not about
+fixing — the fixes above are in, tested, and probed. What has not
+happened is an independent re-read of them.
+
+Both fixes are narrow (two regex alternatives and one character class),
+both are pinned by falsifiers, and the pattern across rounds 1→3→4 is
+convergent — each round's findings were a strictly smaller, more
+specific set than the last. But convergent is not converged: this same
+verifier has now found a missed shape in three consecutive rounds, and
+the honest reading is that a fourth look might find a fifth shape.
+
+That is the operator's call, and it is item D of the close-out brief:
+accept the close with this residual named, authorize a fifth round, or
+take a third-provider opinion. The residual, stated plainly: **the gate
+catches every shape anyone has thought to plant, and no one can prove
+that is all of them.** Its floor does not depend on the regexes —
+`check_deleted_files_stay_deleted` reads the filesystem, and a returned
+module is caught no matter how it is spelled.

@@ -99,10 +99,71 @@ re-derive them):
 
 ---
 
-## Session 3 — The grep gate, the walk, the release
+## Session 3 — The grep gate, the walk, the release (as run)
 
-**Recommended orchestrator:** `copilot` / `anthropic` / `claude-opus-5` /
-effort `high`.
+**Orchestrator:** `copilot` / `anthropic` / `claude-opus-5` / effort `high`
+(GitHub Copilot CLI transport) — as recommended.
+
+**Verification:** routed to `gpt-5.5` (openai), a different effective
+provider. **Four rounds** — discovery (fan-out 2) → supplementary →
+remediation-review → remediation-review cycle 2 — and the loop reached
+its enforced bound. Eight findings, **all accepted, none disputed**, all
+fixed. Cost $0.0000 (Copilot seat).
+
+**What the pairing bought — the most productive verification of the set.**
+Every finding was about the same organ: the gate's declaration/narration
+boundary. The verifier did not argue about it; it **planted shapes in
+throwaway trees and watched the gate exit 0**, round after round:
+
+| round | what it planted and the gate missed |
+| :--- | :--- |
+| 1 | compact JSON `{"tier":"lightweight"}`; `verificationMode?: string`; `spec.verificationMode`; `type VerificationMode = ... \| ...`; `const M = "dedicated-sessions";`; a single-line array; and — sharpest — an assigned triple-quoted Python spec template, which the blanker treated as a docstring |
+| 2 | `.template` scaffold sources were not scanned **at all** — and `spec.md.template` is the canonical source of every new consumer repo's `spec.md` |
+| 3 | `const { verificationMode } = spec` and `spec["verificationMode"]` |
+| 4 | `const spec = { tier: "lightweight" }`, and a character class of mine (`verification[_M]ode`) that silently never matched `verification_mode` |
+
+Two findings were not about the gate at all, and both were **pre-existing
+repo defects this session inherited**: `run_of_record` declared the Layer 2
+suite's command as `npm test` (the harness CONTRIBUTING documents as broken
+on this platform and CI skips), so every session has recorded a run against
+a command it could not execute; and `repository-reference.md` still named
+router `0.33.0` live when the changelog says `0.34.0` shipped 2026-07-15 —
+and this session wrote a new row **on top of** that stale claim, which is
+the exact L-064-8 failure its own conventions block warns about.
+
+**The residual, stated plainly.** The round-4 fixes are in, tested, and
+probed, but the bound refuses a fifth round, so they were never
+independently re-read. Three consecutive rounds each found one more shape.
+The gate catches every shape anyone has thought to plant; no one can prove
+that is all of them. Its **floor** does not depend on the regexes at all —
+`check_deleted_files_stay_deleted` reads the filesystem, so a returned
+module is caught however it is spelled. Operator adjudication item D.
+
+**What Session 3 found on its own** (recorded so it is not re-derived):
+
+1. **The UAT walk was unstageable as specified.** The spec's first Look
+   item is "the form shows no tier question", and the Getting Started form
+   renders **only** while a workspace has zero materialized session sets
+   (`SetupStatusView.buildGettingStarted` keys the flip on `hasAnySets`).
+   The fixture workspace ships four. `npm run walk -- --empty` now stages
+   it, proven by `npm run walk:smoke -- --empty` rather than asserted.
+2. **`docs/cross-repo-migration-guard-notice.md` was live and wrong** — a
+   notice whose banner says everything else in it still applies, telling
+   consumers to run a module S1 deleted.
+
+## Next set — recommendation
+
+**No successor set is required for the tier removal.** It is complete and
+gated. Two things are owed to the operator, not to a session: the publish
+(router `1.0.0`, extension `0.50.0`) and the consumer notice send.
+
+If a set is authored next, the strongest candidate is **the run-of-record /
+canonical-test-policy alignment** this session's finding 3 exposed. The
+`npm test` defect was in the shipped `DEFAULT_SUITES` for as long as
+`run_of_record` has existed, which means the freshness gate's own suite
+definitions have never been checked against `CONTRIBUTING.md`. That is a
+small, high-value, fully-testable pass — and exactly the kind of drift a
+gate is supposed to prevent in others while carrying it itself.
 
 **Note for whoever writes the S3 acceptance gate.** The measured numbers in
 `s1-before-after-numbers.md` contradict one of the spec's premises: the

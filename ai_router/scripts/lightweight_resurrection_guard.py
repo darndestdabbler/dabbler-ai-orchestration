@@ -163,6 +163,20 @@ TIER_DECLARATION_INLINE = re.compile(
     re.IGNORECASE,
 )
 
+# The same thing with a BARE key -- `const spec = { tier: "lightweight" }`,
+# the ordinary TypeScript/JSON5 object literal. Applied everywhere EXCEPT
+# Python, and that exception is the whole reason this is a separate rule:
+# planting a spec fragment inside a string is the established idiom of the
+# tests that PROVE the refusal fires (`_config_block("tier: lightweight  #
+# locked")`, `for raw in ('tier: "lightweight"', ...)`), and those tests
+# are Python. TypeScript has no such tests -- its tier tests were deleted
+# with the tier -- and the only non-Python live matches in the repo are
+# markdown prose inside a frozen historical record.
+TIER_DECLARATION_INLINE_BARE = re.compile(
+    r"""(?<![\w-])tier\s*:\s*["']lightweight["']""",
+    re.IGNORECASE,
+)
+
 # The removed verification-mode field, in every position a live read or
 # declaration can take: a YAML key, a JSON key, an object property, an
 # assignment target, an OPTIONAL TypeScript property
@@ -178,9 +192,9 @@ TIER_DECLARATION_INLINE = re.compile(
 # each was found by a verifier planting it and watching the gate exit 0.
 VERIFICATION_MODE_FIELD = re.compile(
     r"""(?:(?:^|[\s\{\[,\(])["']?verification[_-]?[Mm]ode["']?\s*\??\s*(?::(?!:)|=(?!=))"""
-    r"""|\.verification[_M]ode\b"""
+    r"""|\.verification(?:_m|M)ode\b"""
     r"""|\bVerificationMode\b"""
-    r"""|[\{,]\s*verification[_M]ode\s*[\},:=]"""
+    r"""|[\{,]\s*verification(?:_m|M)ode\s*[\},:=]"""
     r"""|\[\s*["']verification[_-]?[Mm]ode["']\s*\])"""
 )
 
@@ -533,7 +547,11 @@ def scan_text(rel_path: str, source: str, suffix: str) -> list[Resurrection]:
         raw = raw_lines[lineno - 1].strip() if lineno <= len(raw_lines) else line.strip()
         loc = f"{rel_path}:{lineno}"
 
-        if TIER_DECLARATION.match(line) or TIER_DECLARATION_INLINE.search(line):
+        if (
+            TIER_DECLARATION.match(line)
+            or TIER_DECLARATION_INLINE.search(line)
+            or (suffix != ".py" and TIER_DECLARATION_INLINE_BARE.search(line))
+        ):
             violations.append(
                 Resurrection(
                     rule="tier-declared",

@@ -242,6 +242,14 @@
       "dateTime": "2026-08-09T13:42:29.044077-04:00",
       "description": "Four rounds: discovery fan-out 2 (5 blocking) -> supplementary (1 blocking) -> remediation-review (4 accepted, 1 rejected, 1 new) -> remediation-review cycle 2 (7 accepted, 1 new). All 8 findings accepted and fixed; none disputed. The loop reached its ENFORCED bound at round 4 and refuses a fifth round: the round-4 fixes are in, tested and probed, but not independently re-read. Stopping to the operator for adjudication",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 8,
+      "stepKey": "session-3/disposition",
+      "dateTime": "2026-08-09T13:57:51.960883-04:00",
+      "description": "Authored disposition.json (validates clean as the final session; verdict ISSUES_FOUND_RESOLVED_IN_FLIGHT -- all 8 findings found and fixed in flight, the last pair at the enforced bound). The disposition.uat block is the one field still owed: requiresUAT true + uatScope per-set puts the walk on this session, and it needs the operators attestation",
+      "status": "in-progress"
     }
   ]
 }

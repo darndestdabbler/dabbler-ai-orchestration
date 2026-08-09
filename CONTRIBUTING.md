@@ -89,40 +89,45 @@ config edit with a stated reason, never an in-session fix.
 Operator UAT of the Work Explorer never requires hand-built
 sample projects. The committed fixture matrix at
 [`tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/`](tools/dabbler-ai-orchestration/test-fixtures/uat-matrix/)
-holds two trivial hello-world consumer projects whose session sets
-cover every marker/action state shipped by Sets 061 + 062 — the
-Full-tier control row, blocked-by-prereqs (real pending + unknown
-slug), needs-migration (schema v3 asterisk), and every Lightweight
-state (`lw`, `N/M+`, `v?`, `v+`, note-suppressed, verified-quiet).
-The matrix README carries the full row inventory.
+holds a trivial hello-world consumer project whose session sets
+cover the marker/action states the Explorer ships — the control row,
+blocked-by-prereqs (real pending + unknown slug), and needs-migration
+(schema v3 asterisk). The matrix README carries the full row inventory.
 
-Generate a disposable copy outside the repo and open it:
+Set 112 removed the Lightweight tier, and with it the second fixture
+project (`hello-world-lightweight`) and every state that existed only to
+make the tier legible (`lw`, `N/M+`, `v?`, `v+`).
+
+**A guided-look UAT walk stages itself** — `npm run walk` builds the
+disposable copy, launches the real Extension Development Host against it,
+and opens the Dabbler view for you (see the authoring guide). Two modes:
 
 ```bash
 cd tools/dabbler-ai-orchestration
-npm run make-uat-workspace
-# then File > Open Workspace from File... on the printed
-# uat-matrix.code-workspace path
+npm run walk                 # the fixture project, with session sets
+npm run walk -- --empty      # a project with NO sets -- the only state
+                             # that shows the Getting Started form
 ```
+
+`npm run make-uat-workspace` still generates the copy without launching
+anything, if you want to open it yourself.
 
 The copy is throwaway — delete the printed folder (or just re-run the
 script) when done. Walking UAT against the generated copy is safe even
-for mutating actions (Switch Tier, Set Up Dedicated Verification,
-Migrate to v4 schema): the committed matrix is untouched.
+for mutating actions (Migrate to v4 schema): the committed matrix is
+untouched.
 
 When this checkout has a repo-root `.venv`, the generator pins
 `dabblerSessionSets.pythonPath` to it in the *generated*
 `.code-workspace` (never the committed one), so the python-backed row
-actions (the blessed verification-mode writer, the v4 migrator) work
-in the disposable workspace without any setup.
+actions (the v4 migrator) work in the disposable workspace without any
+setup.
 
 To refresh the matrix after a schema or predicate change, edit the
 fixtures and run the pinning suite
 (`npm run test:unit -- --grep "uat-matrix"` — part of Layer 2), which
-derives every row through the real `readSessionSets` scan; the repo
-drift guard also live-scans the fixture markdown, so fixture prose
-must avoid the banned tier phrasings. The fixtures are synthetic by
-design (the cold-start fixtures are the precedent) — the
+derives every row through the real `readSessionSets` scan. The fixtures
+are synthetic by design (the cold-start fixtures are the precedent) — the
 writer-discipline rules govern real sets, not these.
 
 ## Building the extension

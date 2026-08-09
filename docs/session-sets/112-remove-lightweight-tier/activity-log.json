@@ -306,6 +306,14 @@
       "dateTime": "2026-08-09T16:22:03.701305-04:00",
       "description": "Backstop round 9: round 8 had given the FIELD a parser rule and left the TIER without one -- my asymmetry, not the verifiers persistence. TIER_IN_REGEX added, anchored on regex syntax so the migration message (same three words, same order) is spared for a reason rather than by exemption. 5/5 probes correct, guard suite 90 tests, pytest 3652 passed",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 16,
+      "stepKey": "session-3/backstop-round-10",
+      "dateTime": "2026-08-09T16:27:14.219875-04:00",
+      "description": "Backstop round 10 changed organ: CONTRIBUTING.md still taught the deleted hello-world-lightweight fixture, the Lightweight-only Explorer states, and the removed Switch Tier / Set Up Dedicated Verification row actions -- the same prose blind spot as round 5, which the gate cannot see by design. Rewritten, and it gained the walk-stager modes (npm run walk, and --empty) that this session added. drift_guard, tutorial_gate and the resurrection guard all exit 0",
+      "status": "complete"
     }
   ]
 }

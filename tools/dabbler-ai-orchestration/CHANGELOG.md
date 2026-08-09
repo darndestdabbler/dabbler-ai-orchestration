@@ -21,6 +21,11 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > a spec declaring `tier: lightweight` is refused by the router at the
 > boundary, and this build no longer offers any way to create one.
 >
+> **Publish is deferred until Set 114 completes** (operator decision,
+> 2026-08-09, at the Set 112 UAT walk), so this VSIX and
+> `dabbler-ai-router` `1.0.0` are expected to ship together after that
+> set. Held, not blocked.
+>
 > **Not yet published.** No tag, no publish run: the artifact is built and
 > the gates are green, and the Marketplace step is the operator's.
 
@@ -65,6 +70,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   be caught.
 
 ### Fixed
+
+- **The Getting Started form no longer opens under a warning about the
+  question it is asking.** On a brand-new project the System Status strip
+  reported *"No provider API key was found for direct API routing"* before
+  the operator had chosen anything — because `api` is the default
+  transport profile and an explicit "Direct provider API keys" pick is
+  never written to disk (only the Copilot choice is recorded, since `api`
+  needs no override). The fault now also requires the workspace to be
+  **built**: before that, the strip's workspace-initialization fault
+  already describes the state accurately and a second warning about keys
+  is noise for the same condition; after it, a keyless direct-API
+  workspace still warns, which is the case the fault exists for.
+
+  This also makes the two transport faults symmetric — the `copilot-cli`
+  fault has always required an actual choice, because that profile is
+  never a default. Found by the operator on the Set 112 guided-look UAT
+  walk, on the empty-project window; pinned at the rendering layer by the
+  Layer 3 spec that opens that exact window with no provider key seeded.
 
 - **`Dabbler: Try a sample project` would have broken for every user.**
   The shipped sample's spec declared `tier: lightweight`, which the

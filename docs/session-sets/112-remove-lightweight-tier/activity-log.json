@@ -258,6 +258,14 @@
       "dateTime": "2026-08-09T13:59:28.390318-04:00",
       "description": "Step 9 guidance review (run early, since the close is blocked on the operator walk): added L-112-1 (a gate that only ever passes proves nothing -- ship it with falsifiers), which passed the Set 085 admission test on this sessions evidence: the gate passed its own repo cleanly and still missed six declaration shapes over four rounds, every one found by planting rather than by reading. Adding it breached the lessons-learned ceiling by 23 tokens, so the lesson was TRIMMED rather than the ceiling raised (ceilings ratchet down only). Cited L-064-8, L-069-1, L-079-1, L-112-1; cite_lessons flags L-069-1 as archived-but-reused for operator reactivation review",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 10,
+      "stepKey": "session-3/uat-walked",
+      "dateTime": "2026-08-09T14:26:53.035224-04:00",
+      "description": "Operator walked the guided-look UAT: PASS with one defect, found on the empty-project window the --empty stager mode made walkable. The System Status strip warned about a missing provider API key before any provider path had been chosen, because api is the DEFAULT profile and an explicit Direct-API pick is never written to disk. Fixed: the fault now also requires workspaceInitialized, which keeps it firing for keyless direct-API users; gating on a recorded choice was rejected because it would silence the fault for everyone it helps. Journaled, 4 Layer 2 cases + a Layer 3 falsifier, Layer 2 1609 passing and Layer 3 33 passed after the fix. Decides recorded: version 1.0.0, publish HELD until Set 114, consumer notice not needed",
+      "status": "complete"
     }
   ]
 }

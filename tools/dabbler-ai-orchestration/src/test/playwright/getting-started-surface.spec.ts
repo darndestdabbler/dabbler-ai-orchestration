@@ -123,6 +123,17 @@ test.describe("Set 110 S3 — the re-homed Getting Started surface", () => {
     ).toBeChecked();
     await expect(inner.locator("[data-gs-budget]")).toBeVisible();
     expect(await inner.locator('[data-status-code="python"]').count()).toBe(0);
+    // Set 112 S3, from the operator's UAT walk on this exact window: the
+    // form must not open under a warning about the question it is asking.
+    // This launch seeds NO provider key (the Electron env allowlist strips
+    // the real DABBLER_* values), so the probe genuinely fails here — the
+    // assertion is a falsifier, not a vacuous pass. Before the fix this
+    // window showed "No provider API key was found for direct API routing"
+    // while the operator had chosen nothing at all, because `api` is the
+    // default profile and an explicit Direct-API pick is never recorded.
+    expect(await inner.locator('[data-status-code="provider-key"]').count()).toBe(
+      0,
+    );
   });
 
   test("renders exactly two sections with the Define-modules buttons", async () => {

@@ -166,3 +166,52 @@ consumer repos.
 Say so plainly and stop. A "looks off" on any Look item is worth more
 than a completed checklist — ten minutes of your attention exists to
 catch what automation cannot see.
+
+---
+
+## Walked 2026-08-09 — operator's answers
+
+**Verdict: PASS, with one defect found.** The defect is the reason the
+walk exists: nothing in the suite could see it, because every automated
+check either seeded a provider key or ran against a workspace that was
+already built.
+
+| # | Item | Answer |
+| :--- | :--- | :--- |
+| 1 | The form's first question | Reads as designed — **but the API-keys warning should not be there.** "We shouldn't need that unless and until the user selects the direct api approach." |
+| 2 | The Explorer rows | "Yes, it looks great." |
+| 3 | The migration message | Wording accepted. Same finding as item 1: "The System Status warnings should exclude the API Key warnings. That should only become an issue when users select the direct API approach and the API Keys are not in the environment variables." |
+| 4 | The Marketplace README | "No. The explanation is fine." — nothing implies a choice of tier. |
+| 5 | `tier-model.md` | "Honest history." |
+
+### The defect, and what was done about it
+
+`api` is the **default** transport profile, and an explicit Direct-API
+pick is never written to disk — `gitScaffold` records only the Copilot
+choice, because `api` needs no override. So `profile === "api"` was true
+on a brand-new project where nothing had been chosen, and the onboarding
+form opened under a warning about the answer it was still asking for.
+
+Fixed in `systemStatusHtml.js`: the provider-key fault now also requires
+`workspaceInitialized`. Before the workspace is built, the strip's
+workspace-initialization fault already describes that state accurately;
+after it, a keyless direct-API workspace still warns. The two transport
+faults are now symmetric — the `copilot-cli` fault has always required an
+actual choice, because that profile is never a default.
+
+Gating on "was a profile explicitly recorded" was considered and
+**rejected**: it would have silenced the fault for every direct-API user,
+who never writes `transport.profile` at all. Pinned by four Layer 2 cases
+(both directions plus the symmetry) and by the Layer 3 spec that opens
+the empty-project window with no provider key seeded — a falsifier, since
+the probe genuinely fails there.
+
+### Decide answers
+
+- **A — version:** `1.0.0`. The operator may need to supply PyPI
+  credentials at publish time.
+- **B — publish:** **hold until Set 114 is done.** Router and extension
+  ship together after that set.
+- **C — consumer notice:** not needed. `dabbler-homehealthcare-accessdb`
+  is the operator's own repo, so the migration is theirs to do directly.
+  The notice stays as a written reference, not an outbound action.

@@ -48,7 +48,31 @@
     if (status.pythonPresent === false) {
       faults.push({ code: "python", text: PYTHON_TEXT });
     }
-    if (profile === "api" && status.providerKeyPresent === false) {
+    // Set 112 S3 (operator UAT walk): the provider-key fault is gated on the
+    // workspace being BUILT, not merely on the api profile being current.
+    //
+    // `api` is the DEFAULT profile, and an explicit "Direct provider API
+    // keys" pick is never written to disk (gitScaffold records only the
+    // Copilot choice, since api needs no override). So "profile === api"
+    // is true on a brand-new project where the operator has chosen nothing
+    // at all -- and the Getting Started form, whose whole first question is
+    // which provider path to take, opened under a warning about the answer
+    // it was still asking for. The operator's rule, from the walk: this
+    // "should only become an issue when users select the direct API
+    // approach and the API keys are not in the environment variables".
+    //
+    // `workspaceInitialized` is that line. Before it, the strip already
+    // says the workspace is not set up, which is the accurate and
+    // sufficient message; a second fault about keys is noise for the same
+    // state. After it, a keyless direct-API workspace is a real, actionable
+    // fault and still warns. This also makes the two transport faults
+    // symmetric -- the copilot-cli fault has always required an ACTUAL
+    // choice, because `copilot-cli` is never a default.
+    if (
+      profile === "api" &&
+      status.providerKeyPresent === false &&
+      status.workspaceInitialized !== false
+    ) {
       faults.push({ code: "provider-key", text: PROVIDER_KEY_TEXT });
     }
     if (profile === "copilot-cli" && status.copilotCliPresent === false) {

@@ -46,7 +46,10 @@
     "tools/dabbler-ai-orchestration/scripts/walk-smoke.js",
     "tools/dabbler-ai-orchestration/src/commands/upgradeOlderSets.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/walkStager.test.ts",
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts"
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/media/session-sets-tree/systemStatusHtml.js",
+    "tools/dabbler-ai-orchestration/src/test/suite/systemStatusHtml.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/getting-started-surface.spec.ts"
   ],
   "verification_message_ids": [],
   "next_orchestrator": null,
@@ -56,5 +59,10 @@
     "L-069-1",
     "L-079-1",
     "L-112-1"
-  ]
+  ],
+  "uat": {
+    "status": "walked",
+    "walkArtifact": "s3-uat-walk.md",
+    "attestation": "Operator walked all 5 Look items and answered all 3 Decide items on 2026-08-09. Verdict PASS with one defect found -- the defect the walk exists for, since nothing in the suite could see it: the System Status strip warned about a missing provider API key on a brand-new project, before any provider path had been chosen. Operator: 'We shouldn't need that unless and until the user selects the direct api approach' and 'that should only become an issue when users select the direct API approach and the API Keys are not in the environment variables'. Fixed in-session: the fault now also requires workspaceInitialized, which keeps it firing for keyless direct-API users (an explicit api pick is never written to disk, so gating on a recorded choice would have silenced it for everyone it helps). Pinned by 4 Layer 2 cases and a Layer 3 falsifier on the empty-project window. Other items: Explorer rows 'it looks great'; the extension README implies no choice of tier; tier-model.md reads as 'honest history'. Decides: version 1.0.0 (operator may supply PyPI credentials at publish time); publish HELD until Set 114 completes; consumer notice NOT needed, since dabbler-homehealthcare-accessdb is the operator's own repo."
+  }
 }

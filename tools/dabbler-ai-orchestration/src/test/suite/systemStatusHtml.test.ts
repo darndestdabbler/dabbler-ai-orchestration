@@ -40,7 +40,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
     );
   });
 
-  test("renders workspace, Python, and direct-provider faults", () => {
+  test("an unbuilt workspace reports the workspace and Python faults", () => {
     const html = statusHtml.renderSystemStatus(
       {
         ...HEALTHY,
@@ -53,12 +53,65 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
     assert.ok(html.includes('data-testid="system-status"'));
     assert.ok(html.includes('data-status-code="workspace-initialization"'));
     assert.ok(html.includes('data-status-code="python"'));
-    assert.ok(html.includes('data-status-code="provider-key"'));
     // The UAT walks quote these operator-facing strings verbatim — pin
     // the literal copy, not just the semantic codes (S2 R1 nit).
     assert.ok(html.includes(statusHtml.WORKSPACE_TEXT));
     assert.ok(html.includes(statusHtml.PYTHON_TEXT));
+  });
+
+  test("an unbuilt workspace does NOT report a missing provider key", () => {
+    // Set 112 S3, from the operator's UAT walk: `api` is the DEFAULT
+    // profile and an explicit Direct-API pick is never written to disk, so
+    // this fault fired on a brand-new project where nothing had been
+    // chosen — the Getting Started form opened under a warning about the
+    // question it was still asking. The workspace-initialization fault
+    // above already describes that state accurately.
+    const html = statusHtml.renderSystemStatus(
+      { ...HEALTHY, workspaceInitialized: false, providerKeyPresent: false },
+      { transportProfile: "api" },
+    );
+    assert.ok(
+      !html.includes('data-status-code="provider-key"'),
+      "a project that has not been built yet has not chosen a provider path",
+    );
+    assert.ok(!html.includes(statusHtml.PROVIDER_KEY_TEXT));
+  });
+
+  test("a BUILT workspace still reports a missing provider key", () => {
+    // The other half, and the reason the gate is `workspaceInitialized`
+    // rather than "was a profile explicitly recorded": a direct-API user
+    // never writes transport.profile to disk, so gating on an explicit
+    // choice would silence this fault for everyone it is meant to help.
+    const html = statusHtml.renderSystemStatus(
+      { ...HEALTHY, workspaceInitialized: true, providerKeyPresent: false },
+      { transportProfile: "api" },
+    );
+    assert.ok(html.includes('data-status-code="provider-key"'));
     assert.ok(html.includes(statusHtml.PROVIDER_KEY_TEXT));
+  });
+
+  test("the two transport faults are symmetric about being chosen", () => {
+    // `copilot-cli` is never a default, so its fault has always required an
+    // actual choice. After Set 112 S3 the api fault does too.
+    const unbuilt = {
+      ...HEALTHY,
+      workspaceInitialized: false,
+      providerKeyPresent: false,
+      copilotCliPresent: false,
+    };
+    const api = statusHtml.renderSystemStatus(unbuilt, {
+      transportProfile: "api",
+    });
+    assert.ok(!api.includes('data-status-code="provider-key"'));
+
+    const copilot = statusHtml.renderSystemStatus(unbuilt, {
+      transportProfile: "copilot-cli",
+    });
+    assert.ok(
+      copilot.includes('data-status-code="copilot-cli"'),
+      "choosing the seat on an unbuilt workspace IS an explicit choice, and " +
+        "a missing CLI is actionable immediately",
+    );
   });
 
   test("provider access fault follows the live profile control", () => {

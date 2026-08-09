@@ -27,6 +27,11 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > the run-of-record and UAT close gates, the session checklist, the
 > spec-admission cap, and dispatch-time provider-key validation.
 >
+> **Publish is deferred until Set 114 completes** (operator decision,
+> 2026-08-09, at the Set 112 UAT walk). The artifact is staged and green;
+> it is held, not blocked. The version number `1.0.0` was confirmed by the
+> operator at the same walk.
+>
 > **Not yet published.** No tag, no PyPI run: the version is staged and
 > the gates are green; the publish is the operator's.
 

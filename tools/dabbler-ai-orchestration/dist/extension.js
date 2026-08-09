@@ -16015,11 +16015,9 @@ function readSessionSets(root) {
     let ledgerSessions = null;
     let schemaVersionOnDisk = null;
     const eventsPath = path4.join(dir, "session-events.jsonl");
-    let activityLogParsed = null;
     if (fs4.existsSync(activityPath)) {
       try {
         const data = JSON.parse(fs4.readFileSync(activityPath, "utf8"));
-        activityLogParsed = data;
         if (typeof data.totalSessions === "number")
           totalSessions = data.totalSessions;
         for (const e of data.entries ?? []) {

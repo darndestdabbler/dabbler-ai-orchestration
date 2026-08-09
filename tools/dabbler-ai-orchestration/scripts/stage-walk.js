@@ -3,6 +3,7 @@
 //
 //   npm run walk                    (from tools/dabbler-ai-orchestration)
 //   npm run walk -- --keep          (do not delete the workspace on exit)
+//   npm run walk -- --empty         (stage a project with no session sets)
 //
 // The guided-look UAT format asks for ten minutes of the operator's
 // attention and nothing else: "It starts itself. The operator stages
@@ -53,16 +54,54 @@ function log(msg) {
 }
 
 function parseArgs(argv) {
-  const out = { keep: false, walkDoc: null, workspace: null, marker: null };
+  const out = {
+    keep: false,
+    walkDoc: null,
+    workspace: null,
+    marker: null,
+    empty: false,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--keep") out.keep = true;
+    else if (a === "--empty") out.empty = true;
     else if (a === "--walk-doc") out.walkDoc = argv[++i];
     else if (a === "--workspace") out.workspace = argv[++i];
     else if (a === "--marker") out.marker = argv[++i];
     else if (a === "--help" || a === "-h") out.help = true;
   }
   return out;
+}
+
+// Set 112 S3: the Getting Started form renders ONLY while a workspace has
+// no materialized session set (SetupStatusView.buildGettingStarted keys the
+// getting-started -> list flip on `hasAnySets`). The default fixture
+// workspace ships four sets, so it can never show the form — which meant
+// the onboarding surface, the one surface a walk is most obviously for,
+// was the one surface the stager could not stage. Set 112 had to walk
+// exactly that: the form's tier fork is gone. Hence `--empty`.
+//
+// It is a real project directory, not a bare temp folder: an untitled
+// window and a folder window are different surfaces, and the operator
+// should judge the one a new adopter actually opens.
+function makeEmptyWorkspace(targetParent) {
+  const parent = targetParent || os.tmpdir();
+  const dest = fs.mkdtempSync(path.join(parent, "dabbler-walk-empty-"));
+  const project = path.join(dest, "my-new-project");
+  fs.mkdirSync(project, { recursive: true });
+  fs.writeFileSync(
+    path.join(project, "README.md"),
+    [
+      "# my-new-project",
+      "",
+      "A brand-new project with no session sets, staged for a guided-look",
+      "UAT of the Getting Started surface (`npm run walk -- --empty`).",
+      "Disposable: this folder is deleted when the walk window closes.",
+      "",
+    ].join("\n"),
+    "utf8"
+  );
+  return project;
 }
 
 function usage() {
@@ -72,6 +111,9 @@ function usage() {
       "",
       "  --walk-doc <path>   Open this walk document alongside the fixture.",
       "  --workspace <path>  Use an existing workspace instead of a fresh one.",
+      "  --empty             Stage a project with NO session sets, which is",
+      "                      the only state that shows the Getting Started",
+      "                      form (it flips to the list once a set exists).",
       "  --marker <path>     Write this file when the walk companion activates",
       "                      (proof the auto-reveal ran; used by the smoke check).",
       "  --keep              Leave the generated workspace on disk.",
@@ -103,6 +145,14 @@ function main() {
       return 1;
     }
     workspacePath = args.workspace;
+  } else if (args.empty) {
+    try {
+      workspacePath = makeEmptyWorkspace();
+      generated = true;
+    } catch (err) {
+      log(`ERROR: could not build the empty workspace: ${err.message}`);
+      return 1;
+    }
   } else {
     try {
       workspacePath = makeUatWorkspace();
@@ -199,4 +249,4 @@ if (require.main === module) {
   if (rc !== 0) process.exitCode = rc;
 }
 
-module.exports = { parseArgs };
+module.exports = { parseArgs, makeEmptyWorkspace };

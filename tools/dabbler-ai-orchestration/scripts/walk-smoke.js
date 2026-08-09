@@ -19,6 +19,12 @@
 // It is deliberately not in CI: it opens a real window, and a headless runner
 // would be testing a different thing than the operator's machine does.
 //
+// Extra arguments are passed straight through to the stager, so a walk mode
+// can be proven rather than assumed:
+//
+//   npm run walk:smoke -- --empty      (Set 112 S3: the empty-project window
+//                                       that shows the Getting Started form)
+//
 // Output is ASCII-only (Windows cp1252 console lesson, L-079-1).
 
 "use strict";
@@ -41,10 +47,14 @@ function main() {
     "reveal.txt"
   );
 
-  log("launching the stager (a VS Code window will open, then close itself)");
+  const passthrough = process.argv.slice(2);
+  log(
+    "launching the stager (a VS Code window will open, then close itself)" +
+      (passthrough.length ? ` [${passthrough.join(" ")}]` : "")
+  );
   const child = cp.spawn(
     process.execPath,
-    [path.join(__dirname, "stage-walk.js"), "--marker", marker],
+    [path.join(__dirname, "stage-walk.js"), "--marker", marker, ...passthrough],
     { stdio: "inherit" }
   );
 

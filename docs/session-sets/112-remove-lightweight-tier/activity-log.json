@@ -202,6 +202,38 @@
       "dateTime": "2026-08-09T11:33:30.530023-04:00",
       "description": "Shipped ai_router/scripts/lightweight_resurrection_guard.py + 41 falsifier tests + CI wiring. Gate classifies by position (declaration territory vs narration), not a file allowlist. It caught 2 real defects: cross-repo-migration-guard-notice.md still told consumers to run the deleted migrator, and the superseded Set 048 notice did too. Also fixed 3 stale claims: session-constitution.md named verificationMode as a live gate record, fileSystem.ts kept a dead activityLogParsed binding, upgradeOlderSets.ts said three migrators",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "session-3/release-staging",
+      "dateTime": "2026-08-09T11:46:06.476904-04:00",
+      "description": "Staged the breaking release: router 0.34.0 -> 1.0.0 (pyproject + __init__), CHANGELOG [Unreleased] cut to [1.0.0] with a BREAKING banner + the S3 gate entry; extension 0.49.0 -> 0.50.0 with a Set 112 section superseding the never-published 0.49.0; repository-reference release-status rows updated. Publish/tag/notice-send left operator-gated. Verified every changelog claim against the tree before writing it",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "session-3/uat-walk",
+      "dateTime": "2026-08-09T11:46:06.479495-04:00",
+      "description": "Authored s3-uat-walk.md (5 Look, 3 Decide). Found the walk was unstageable as specified: the Getting Started form renders ONLY when a workspace has zero materialized sets, and the fixture workspace ships four, so the tier-fork absence could not be looked at. Added --empty to the walk stager (+3 Layer 2 tests) and an arg passthrough to walk:smoke, then PROVED it: npm run walk:smoke -- --empty reports revealed dabblerSessionSetsContainer",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "session-3/full-matrix",
+      "dateTime": "2026-08-09T12:06:13.329253-04:00",
+      "description": "Release-boundary matrix green after freeze: pytest 3603 passed / 9 skipped (16m51s), mocha Layer 2 1606 passing, Playwright Layer 3 33 passed (10.3m). All three recorded via run_of_record; freshness check OK",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "session-3/change-log",
+      "dateTime": "2026-08-09T12:06:13.331315-04:00",
+      "description": "Authored change-log.md (set-terminal deliverable) with the measured end-state numbers: 105 live non-archive files still MENTION the tier, 0 DECLARE it and that is now gated",
+      "status": "complete"
     }
   ]
 }

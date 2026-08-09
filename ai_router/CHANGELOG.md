@@ -9,11 +9,26 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
-## [Unreleased] (Sets 105, 107, 109, 110, 111, 112 — router-side changes awaiting a publish)
+## [1.0.0] — 2026-08-09 (Set 112 — the Lightweight tier is removed; staged, publish operator-gated)
 
-> Router-side, not yet published. A version bump / PyPI publish is
-> operator-gated and recorded at release time. **Set 112 makes the next
-> release a MAJOR one** — see *Removed* below.
+> **BREAKING. A session set can no longer declare `tier: lightweight`.**
+> This is the release the version number is for: `1.0.0` says the package
+> now has exactly one tier and one verification story, and that the
+> workflow no longer has a mode in which cross-provider verification is
+> substituted rather than performed. If any `spec.md` in your repo
+> declares the tier, read
+> [`docs/cross-repo-lightweight-removal-notice.md`](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/cross-repo-lightweight-removal-notice.md)
+> **before upgrading** — the fix is one line, and the failure is loud and
+> immediate rather than silent.
+>
+> The release also carries the router-side work of Sets 105, 107, 109,
+> 110 and 111, none of which had been published: the phased verification
+> loop's enforced bounds, the decision journal, the acceptance harness,
+> the run-of-record and UAT close gates, the session checklist, the
+> spec-admission cap, and dispatch-time provider-key validation.
+>
+> **Not yet published.** No tag, no PyPI run: the version is staged and
+> the gates are green; the publish is the operator's.
 
 ### Removed
 
@@ -103,6 +118,33 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   every tool that walks a repo.
 
 ### Added
+
+- **(Set 112 S3) An anti-resurrection gate: the tier cannot come back one
+  plausible commit at a time.** `ai_router/scripts/lightweight_resurrection_guard.py`
+  fails the build if any live file *declares* the removed tier — a
+  `tier: lightweight` spec entry, a `verificationMode` /
+  `verification_mode` field, either mode value, or a reference to one of
+  the five deleted modules — and separately asserts that the deleted
+  module files and both Lightweight fixture trees are still absent. It
+  runs in the `Drift guards` CI job and in pytest.
+
+  It classifies by **position**, not by an allowlist of blessed files:
+  comments, Python docstrings, markdown prose and inline backticks are
+  narration and are never scanned; code outside comments, fenced code
+  blocks, and YAML/JSON bodies are declaration territory and always are.
+  That distinction is what lets the removal stay documented — the
+  migration message, its tests, the historical note, the cross-repo
+  notice and these changelog entries all name the tier freely — while
+  still failing on anything that would actually take effect. Two escapes
+  exist, both pinned by tests and both reported on every run: the gate's
+  own two files, and an opt-in frozen-history marker for a superseded
+  notice kept verbatim as a record.
+
+  The gate paid for itself on its first run: `cross-repo-migration-guard-notice.md`,
+  a notice whose banner says everything in it still applies, told
+  consumers to run `ai_router.migrate_lightweight_to_canonical_v4` as
+  step 2 of a 3-step bulk migration chain. Set 112 S1 deleted that
+  module. The chain is two steps, and the notice now says so.
 
 - **(Set 111 S4 remediation) `session_touched` normalises path separators
   on every platform.** `run_of_record` normalised with `os.sep`, which is

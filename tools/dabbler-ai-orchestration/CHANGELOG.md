@@ -3,7 +3,78 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [0.49.0] — 2026-08-05 (staged; publish operator-gated)
+## [0.50.0] — 2026-08-09 (staged; publish operator-gated)
+
+> **The Getting Started form no longer asks which tier you want.** Set 112
+> removed the Lightweight tier from the whole workflow, and this release is
+> the extension's half of that removal: the form's tier radio and its
+> verification-mode sub-choice are gone, provider access (API keys vs. an
+> authenticated Copilot CLI seat) is now the form's first and only setup
+> question, and the tier's Explorer signals go with it.
+>
+> **This release supersedes `0.49.0`, which was staged but never published.**
+> Set 110's native-tree Work Explorer ships for the first time in this
+> artifact; the `0.49.0` section below stands as the record of when that
+> work was written.
+>
+> **Requires `dabbler-ai-router` 1.0.0 or newer.** The two ship together:
+> a spec declaring `tier: lightweight` is refused by the router at the
+> boundary, and this build no longer offers any way to create one.
+>
+> **Not yet published.** No tag, no publish run: the artifact is built and
+> the gates are green, and the Marketplace step is the operator's.
+
+### Removed
+
+- **The Getting Started tier fork.** The Full/Lightweight radio, the
+  Lightweight-only verification-mode sub-choice (`out-of-band-or-none` /
+  `dedicated-sessions`), and the branch-specific prerequisites and
+  callouts each arm rendered. A workspace upgrading from a Lightweight
+  setup still has its `.dabbler/tier` and `.dabbler/verification-mode`
+  marker files on disk; both are now **inert** — nothing reads them, no
+  radio re-checks itself, and the form renders its one-tier shape
+  regardless. A Playwright spec asserts the absence at the rendering
+  layer, where the builder tests cannot see it.
+
+- **The tier's Explorer machinery**: `switchTier.ts`, `tierLegibility.ts`,
+  `tierMarkerStore.ts`, `tierRewrite.ts`, `verificationModeRewrite.ts`,
+  `setupVerification.ts`, `externalVerification.ts`, and the commands they
+  contributed (`Switch Tier…`, `Set Up Dedicated Verification…`, and the
+  external-verification affordances). The `lw` row marker, the tier
+  mismatch advisory, the `N/M+` fraction and the `v?` / `v+` verification
+  posture markers existed only to make the tier legible; the verdict
+  vocabulary that is tier-independent survived into `verdictTokens.ts`.
+
+- **The `hello-world-lightweight` UAT fixture workspace**, and the
+  `migrate_lightweight_to_canonical_v4` step from the **Upgrade older
+  session sets** bulk action — the router deleted that migrator, so
+  leaving it in the chain would have failed the whole upgrade on its
+  second subprocess.
+
+### Changed
+
+- **Scaffolded specs render no `tier:` and no `verificationMode:` line.**
+  The consumer-bootstrap templates, the sample project, and every
+  cold-start golden were regenerated accordingly, so a repo bootstrapped
+  by this build inherits the one-tier story rather than re-seeding the
+  fork.
+
+- **The Marketplace README tells one story.** It had still been selling
+  two tiers and naming four commands that no longer exist — the
+  highest-traffic user-facing surface in the change, and the last one to
+  be caught.
+
+### Fixed
+
+- **`Dabbler: Try a sample project` would have broken for every user.**
+  The shipped sample's spec declared `tier: lightweight`, which the
+  router now refuses at the boundary, and its honest
+  `verification_method: "skipped"` close lost its sanctioned home when
+  `--no-router` stopped relieving close gates. The bundle now ships an
+  `ai_router/budget.yaml` with `threshold_usd: 0` — the operator-declared
+  exception the gate actually names — and a `tier`-free spec.
+
+## [0.49.0] — 2026-08-05 (staged; superseded by `0.50.0`, never published)
 
 > **The Work Explorer is now a native VS Code tree.** Set 110 replaces the
 > hand-rolled webview tree with a `TreeDataProvider`, which is what buys

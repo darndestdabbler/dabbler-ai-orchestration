@@ -46,7 +46,9 @@ const stager = require("../../../scripts/stage-walk.js") as {
     keep: boolean;
     walkDoc: string | null;
     workspace: string | null;
+    empty: boolean;
   };
+  makeEmptyWorkspace: (targetParent?: string) => string;
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const generator = require("../../../scripts/make-uat-workspace.js") as {
@@ -173,6 +175,7 @@ suite("walk stager", () => {
       assert.strictEqual(a.keep, false);
       assert.strictEqual(a.workspace, null);
       assert.strictEqual(a.walkDoc, null);
+      assert.strictEqual(a.empty, false);
     });
 
     test("--keep, --walk-doc and --workspace are read", () => {
@@ -184,6 +187,55 @@ suite("walk stager", () => {
       assert.strictEqual(a.keep, true);
       assert.strictEqual(a.walkDoc, "docs/walk.md");
       assert.strictEqual(a.workspace, "/tmp/x.code-workspace");
+    });
+
+    test("--empty is read", () => {
+      assert.strictEqual(stager.parseArgs(["--empty"]).empty, true);
+    });
+  });
+
+  suite("the empty workspace (Set 112 S3)", () => {
+    // The Getting Started form renders only while a workspace has no
+    // materialized session set, so the default fixture -- which ships four
+    // -- can never show it. Without this mode the onboarding surface is
+    // unwalkable, which is the surface Set 112 changed.
+    test("derives zero session sets, which is what shows the form", () => {
+      const parent = fs.mkdtempSync(path.join(os.tmpdir(), "walk-empty-"));
+      try {
+        const project = stager.makeEmptyWorkspace(parent);
+        assert.strictEqual(readSessionSets(project).length, 0);
+      } finally {
+        fs.rmSync(parent, { recursive: true, force: true });
+      }
+    });
+
+    test("is a real folder with content, not a bare temp directory", () => {
+      // An empty folder and a project are different windows to look at;
+      // the operator should judge the one a new adopter actually opens.
+      const parent = fs.mkdtempSync(path.join(os.tmpdir(), "walk-empty-"));
+      try {
+        const project = stager.makeEmptyWorkspace(parent);
+        assert.ok(fs.statSync(project).isDirectory());
+        assert.ok(fs.existsSync(path.join(project, "README.md")));
+        assert.ok(!fs.existsSync(path.join(project, "docs", "session-sets")));
+      } finally {
+        fs.rmSync(parent, { recursive: true, force: true });
+      }
+    });
+
+    test("its parent is disposable, so cleanup removes the whole staging dir", () => {
+      // main() deletes path.dirname(workspacePath); the project must
+      // therefore sit INSIDE the mkdtemp dir, or cleanup would either miss
+      // it or reach outside the staging area.
+      const parent = fs.mkdtempSync(path.join(os.tmpdir(), "walk-empty-"));
+      try {
+        const project = stager.makeEmptyWorkspace(parent);
+        const staging = path.dirname(project);
+        assert.notStrictEqual(path.resolve(staging), path.resolve(parent));
+        assert.strictEqual(path.resolve(path.dirname(staging)), path.resolve(parent));
+      } finally {
+        fs.rmSync(parent, { recursive: true, force: true });
+      }
     });
   });
 

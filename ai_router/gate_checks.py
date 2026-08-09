@@ -1792,15 +1792,18 @@ def check_uat_walk_recorded(
 # ---------------------------------------------------------------------------
 
 # The cadence, encoded. Each tuple is (kind, operator-facing label) for a
-# transition this gate can SEE in the session's own records. The prose
-# cadence in session-constitution.md Step 4 names one more -- every
-# operator stop -- which leaves no timestamped record of its own and is
-# therefore doctrine the gate cannot check. Naming the gap here is the
-# point: a checked cadence and a stated cadence must not be silently
-# assumed identical.
+# transition this gate can SEE in the session's own records.
+#
+# Set 114 S1 round 1 (finding 3): the first cut of this comment claimed
+# operator stops "leave no timestamped record of their own" and used that
+# to justify not checking them. That was false — `decision_journal`
+# writes a timestamped record for every decision, and the human-authority
+# ones ARE the operator stops. They are checked below. The genuinely
+# unobservable half is named in the docstring.
 CHECKLIST_TRANSITION_START = "session-start"
 CHECKLIST_TRANSITION_TEST_RUN = "test-run-recorded"
 CHECKLIST_TRANSITION_ROUND = "verification-round"
+CHECKLIST_TRANSITION_OPERATOR_STOP = "operator-stop"
 CHECKLIST_TRANSITION_LAST_STEP = "last-logged-step"
 
 
@@ -1812,9 +1815,11 @@ def _checklist_transitions(
     Read from the records the session already keeps, so the gate never
     asks the orchestrator to attest to anything: ``session-state.json``
     for the start, ``test-runs.jsonl`` for the long-running commands,
-    ``sN-rounds.jsonl`` for the completed verification rounds, and the
-    newest ``activity-log.json`` entry for "the work moved on, and the
-    next thing is close".
+    ``sN-rounds.jsonl`` for the completed verification rounds,
+    ``decisions.jsonl`` for the operator stops (a human-authority
+    decision IS a stop, by definition), and the newest
+    ``activity-log.json`` entry for "the work moved on, and the next
+    thing is close".
 
     Only the LAST logged step becomes a transition, not every one. A post
     after every step is the noise failure the spec warns about, and a
@@ -1877,6 +1882,50 @@ def _checklist_transitions(
     except OSError:
         pass
 
+    # An operator stop is a decision the AI may not take alone, and
+    # `decision_journal` timestamps every one of them. Only the
+    # human-authority rows are stops: an `ai`-authority decision is
+    # journaled without stopping for anyone.
+    try:
+        try:
+            from .decision_journal import (  # type: ignore[import-not-found]
+                JOURNAL_FILENAME,
+            )
+        except ImportError:
+            from decision_journal import (  # type: ignore[no-redef]
+                JOURNAL_FILENAME,
+            )
+        with open(
+            os.path.join(session_set_dir, JOURNAL_FILENAME),
+            "r",
+            encoding="utf-8",
+        ) as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if record.get("authority") != "human":
+                    continue
+                if record.get("session_number") != session_number:
+                    continue
+                when = _parse_iso_timestamp(record.get("timestamp"))
+                if when is not None:
+                    rubric = record.get("rubric_line") or "?"
+                    out.append(
+                        (
+                            when,
+                            f"{CHECKLIST_TRANSITION_OPERATOR_STOP} ({rubric})",
+                        )
+                    )
+    except (OSError, ImportError):
+        pass
+
     log = _read_activity_log(session_set_dir)
     entries = (log or {}).get("entries")
     if isinstance(entries, list):
@@ -1919,17 +1968,33 @@ def check_checklist_posted(
     makes the final transition's window the "before close" post by
     construction — no separate close concept needed.
 
+    Exactly one transition may be excused, and only by being older than
+    the session's first recorded post: **the session start**. A ledger
+    cannot describe the time before it existed, so a session already in
+    flight when this shipped — or in a consumer repo that upgraded
+    mid-session — is not failed for a start it could not have recorded.
+    Every other transition binds unconditionally, however old the ledger
+    is. The first cut of this gate excused *every* transition older than
+    the first post, which meant a session that ignored the checklist all
+    day, hit this gate, ran the command once and retried closed
+    cleanly — the exact decay this set exists to end (round-1 findings 1
+    and 4).
+
+    Records older than the session's own ``startedAt`` are not this
+    session's transitions at all and are dropped before any of that: a
+    session cannot owe a post for a moment that preceded it.
+
     Two deliberate limits, stated rather than hidden:
 
     * **A post proves a render, not a reader.** The gate can be satisfied
       mechanically. That is an acceptable floor: it converts an invisible
       omission into a visible one, which is strictly what it claims.
-    * **Transitions before the first post are unobservable.** A ledger
-      cannot describe the time before it existed, so a session already in
-      flight when this shipped (or in a consumer repo mid-upgrade) is not
-      failed for its history — it is failed only if it never posted at
-      all, or skipped a transition the ledger could have seen. There is
-      no fail-open hole in that: zero posts is a refusal.
+    * **The *before* half of a long-running command is not checkable.**
+      Starting a command leaves no artifact, and asking the orchestrator
+      to declare one would be the self-reported attestation the spec
+      rules out (Decision 3) — it would decay exactly as the prose
+      obligation did. The completion half binds; the doc says which is
+      which rather than implying both are enforced.
     """
     _ = disposition
     _ = allow_empty_commit
@@ -1982,6 +2047,25 @@ def check_checklist_posted(
         )
 
     transitions = _checklist_transitions(session_set_dir, current, state)
+    started = next(
+        (
+            when
+            for when, label in transitions
+            if label == CHECKLIST_TRANSITION_START
+        ),
+        None,
+    )
+    if started is not None:
+        # A transition is a moment WITHIN the session. A record older
+        # than the session's own start belongs to something else (a
+        # fixture's canned history, a prior session's entry, a clock the
+        # session did not own), and a session cannot owe a post for a
+        # moment that preceded it.
+        transitions = [
+            (when, label)
+            for when, label in transitions
+            if when >= started or label == CHECKLIST_TRANSITION_START
+        ]
     if not transitions:
         return True, ""
 
@@ -1997,16 +2081,24 @@ def check_checklist_posted(
     first_post = posts[0]
     missing: List[str] = []
     for index, (when, labels) in enumerate(grouped):
-        if when < first_post:
-            continue  # older than the ledger; unobservable, not a failure
         upper = (
             grouped[index + 1][0] if index + 1 < len(grouped) else None
         )
         covered = any(
             post >= when and (upper is None or post < upper) for post in posts
         )
-        if not covered:
-            missing.extend(labels)
+        if covered:
+            continue
+        # The one bounded excuse: a session start older than the ledger's
+        # first post. Anything else in the same group still binds, so a
+        # test run that happens to share the start's instant is not
+        # excused by proximity.
+        excused = [
+            label
+            for label in labels
+            if label == CHECKLIST_TRANSITION_START and when < first_post
+        ]
+        missing.extend(label for label in labels if label not in excused)
 
     if not missing:
         return True, ""

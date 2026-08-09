@@ -817,13 +817,13 @@ hours and nothing noticed.
 just changed.** Five of them, and no more — a checklist posted after
 every step is scrolled past like any other banner:
 
-| Transition | Post when |
-| :--- | :--- |
-| **Session start** | Right after `start_session`, once the plan's steps are logged. |
-| **Around a long-running command** | Before you start one you expect to block for minutes (a full suite, a routed round), and again when it returns. |
-| **Every operator stop** | Immediately before the education-mode brief, so the human sees where the session is while they decide. |
-| **After verification** | Once a round's verdict is in, before remediating or moving on. |
-| **Before close** | After the last logged step, before `close_session`. |
+| Transition | Post when | Gate-checked? |
+| :--- | :--- | :--- |
+| **Session start** | Right after `start_session`, once the plan's steps are logged. | Yes |
+| **A long-running command returns** | After a blocking command (a full suite, a routed round) finishes **and its record is written** — `run_of_record record` first, then post. | Yes |
+| **Before a long-running command** | Before you start one you expect to block for minutes. | **No** — see below |
+| **Every operator stop** | Immediately before the education-mode brief, so the human sees where the session is while they decide. | Yes |
+| **Before close** | After the last logged step, before `close_session`. | Yes |
 
 ### Posting is recorded by the act of posting
 
@@ -832,18 +832,34 @@ the session-set directory (session, timestamp, step count, which step
 carried `<- here`). Nobody attests to anything: the `checklist_posted`
 close gate compares that ledger against the transitions the session's
 **own records** already show — `startedAt` in `session-state.json`, each
-`test-runs.jsonl` record, each completed round in `sN-rounds.jsonl`, and
-the newest `activity-log.json` entry. Each transition needs its own post
-before the next transition happens, so a single post at the end does not
-cover a whole session.
+`test-runs.jsonl` record, each completed round in `sN-rounds.jsonl`,
+each **human-authority** row in `decisions.jsonl` (a decision the AI may
+not take alone *is* an operator stop), and the newest `activity-log.json`
+entry. Each transition needs its own post before the next transition
+happens, so a single post at the end does not cover a whole session.
 
-Two limits worth stating plainly:
+**Order matters around a long-running command.** The transition's
+timestamp is the `recordedAt` of the run-of-record line, so record the
+run and *then* post. Posting before you record leaves the transition
+uncovered and the close gate will say so.
 
-- **The gate checks four of the five.** An operator stop leaves no
-  timestamped record of its own, so it is doctrine the gate cannot see.
-  A checked cadence and a stated cadence are not the same list.
-- **A post proves a render, not a reader.** The floor this buys is that
-  an omission becomes visible; it does not prove anyone looked.
+Three limits worth stating plainly:
+
+- **The *before* half of a long-running command is doctrine, not a
+  gate.** Starting a command leaves no artifact, and a flag that let the
+  orchestrator declare one would be the self-reported attestation this
+  set exists to avoid — it would decay exactly as the prose obligation
+  did. Post before you start anyway: that post is for the operator
+  staring at a silent terminal, which is the whole point.
+- **A post proves a render, not a reader.** The gate can be satisfied
+  mechanically. The floor it buys is that an omission becomes visible.
+- **Exactly one transition can be excused**, and only by being older
+  than the session's first post: the **session start**. A ledger cannot
+  describe the time before it existed, so a session already in flight
+  when this shipped, or one in a repo that upgraded mid-session, is not
+  failed for a start it could not have recorded. Every other transition
+  binds however old the ledger is, and a session with no posts at all is
+  refused outright.
 
 `--no-record` renders without recording, for scripted or repeated reads.
 It can only ever weaken the caller's own position at close, never

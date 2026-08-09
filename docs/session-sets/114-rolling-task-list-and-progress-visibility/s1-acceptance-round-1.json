@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "55390960085cccde3c3fb01b94211c504aa7ffd0",
+  "fixedTree": "79cff29d876f300da085c611f0dd529f026a6af5",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-09T22:50:22.232171+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** A single late checklist post can satisfy the gate for all earlier recorded transitions. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** An orchestrator forgets to post unt ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "check_checklist_posted must refuse a current/new session with recorded start/test-run/verification/last-step transitions and only one post after all of them, naming the missing earlier transitions; any migration grace must be explicitly bounded to pre-existing in-flight sessions.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The gate does not enforce the required “before long-running command” post. - **Category:** Completeness - **Severity:** Major - **Failure scenario:** A session starts a full pytest, Playwright run, ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The close gate must have a recorded transition for the start of each long-running command, or an equivalent enforceable mechanism, and must fail when the pre-command checklist post is missing.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** “Every operator stop” is documented as required but explicitly not gated. - **Category:** Completeness - **Severity:** Major - **Failure scenario:** The workflow stops for a human decision, records ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A timestamped operator-stop record, including human-authority decision_journal entries, must be included in checklist transition enforcement or the cadence/gate contract must no longer claim every operator stop is checkable.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "** A first/only checklist post made at the end satisfies the gate. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A typical session forgets to post during work, hits the clo ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Does check_checklist_posted refuse a session whose first and only checklist post occurs after all recorded session-start/activity/test/verification transitions, with a regression test for that exact case?",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

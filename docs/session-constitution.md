@@ -58,8 +58,8 @@ Run every router CLI through the workspace venv
     `activity-log.json` (`log_step`), and **post the step checklist**
     (`python -m ai_router.session_checklist`, `--markdown` for a chat
     surface) at each of the five named transitions: session start,
-    either side of a long-running command, every operator stop, after
-    each verification round, and before close. Rendering it is what
+    before a long-running command and again once its run is **recorded**,
+    every operator stop, and before close. Rendering it is what
     records it, and the `checklist_posted` close gate compares that
     record against the transitions your own records show — a session
     that never posted cannot close quietly. The active

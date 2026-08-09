@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "a3d1aba23bdd450f51b77425466ba8ccf14b107b",
+  "fixedTree": "681f7b74b301fedc9af4be5931064fd2a63d977a",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-09T22:50:28.828887+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The gate enforces “after the test-run record is written,” not the documented “when the long-running command returns.” - **Category:** Correctness - **Severity:** Major - **Failure scenario:** An or ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A checklist post made after a long-running suite command returns must satisfy the documented after-command obligation even if the run-of-record metadata line is appended afterward, or the documented cadence must be changed to the actually enforced post-after-record contract.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

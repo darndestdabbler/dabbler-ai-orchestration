@@ -148,6 +148,31 @@ def _round(at: str, number: int = 1, *, session=1) -> dict:
     }
 
 
+def _decision(
+    set_dir: str, at: str, *, authority="human", session=1, rubric="value-trade-off"
+) -> None:
+    with open(
+        Path(set_dir) / "decisions.jsonl", "a", encoding="utf-8", newline="\n"
+    ) as fh:
+        fh.write(
+            json.dumps(
+                {
+                    "timestamp": at,
+                    "session_set": "114-fixture",
+                    "session_number": session,
+                    "question": "q",
+                    "decision": "d",
+                    "authority": authority,
+                    "rubric_line": rubric,
+                    "options": [],
+                    "reversibility": "reversible",
+                    "verification_effect": "none",
+                }
+            )
+            + "\n"
+        )
+
+
 def _test_run(set_dir: str, at: str, *, suite="playwright", session=1) -> None:
     with open(
         Path(set_dir) / "test-runs.jsonl", "a", encoding="utf-8", newline="\n"
@@ -374,6 +399,71 @@ class TestChecklistGateRefusals:
         assert passed is False
         assert "session-state.json" in remediation
 
+    def test_one_late_post_cannot_launder_a_whole_silent_session(
+        self, tmp_path
+    ):
+        """Round-1 findings 1 and 4: the exact decay this set exists to end.
+
+        An orchestrator ignores the checklist all day, is refused by this
+        gate, runs the remediation command once, and retries the close.
+        The first cut excused every transition older than that first
+        post, so the retry passed. It must not.
+        """
+        set_dir = _make_set(
+            tmp_path,
+            entries=[
+                _entry(1, "register", "complete", at=_iso(1)),
+                _entry(2, "close", "complete", at=_iso(50)),
+            ],
+        )
+        _test_run(set_dir, _iso(20))
+        _rounds(set_dir, records=[_round(_iso(30))])
+        _post(set_dir, _iso(60))  # the first and only post, at the end
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is False
+        assert "test-run-recorded" in remediation
+        assert "verification-round 1" in remediation
+        # The final post does cover the LAST transition — which is
+        # precisely why covering only that one must not be enough.
+        assert "last-logged-step (close)" not in remediation
+        # ...and the one bounded excuse is not withdrawn along with it.
+        assert gate_checks.CHECKLIST_TRANSITION_START not in remediation
+
+    def test_an_operator_stop_without_a_post_is_refused(self, tmp_path):
+        """Round-1 finding 3: a human-authority decision IS a stop.
+
+        The first cut claimed operator stops leave no timestamped record
+        and skipped them on that basis. `decisions.jsonl` times-stamps
+        every one.
+        """
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(0.5))
+        _post(set_dir, _iso(2))
+        _decision(set_dir, _iso(30), authority="human")
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is False
+        assert "operator-stop (value-trade-off)" in remediation
+
+    def test_a_post_before_recording_a_run_does_not_cover_it(self, tmp_path):
+        """Round-2 finding: the transition is the record, not the return.
+
+        The doc now says record the run and *then* post, so a post that
+        predates the run-of-record line is deliberately not coverage.
+        """
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(0.5))
+        _post(set_dir, _iso(19))  # posted when the command returned...
+        _test_run(set_dir, _iso(20))  # ...but recorded afterwards
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is False
+        assert "test-run-recorded (playwright)" in remediation
+
 
 class TestChecklistGateAcceptance:
     def test_a_post_at_every_transition_passes(self, tmp_path):
@@ -404,10 +494,11 @@ class TestChecklistGateAcceptance:
         assert passed is True, remediation
 
     def test_transitions_older_than_the_ledger_are_not_failed(self, tmp_path):
-        """A session already in flight when this shipped can still close.
+        """The grace is bounded to the session start, and nothing else.
 
-        The grace is bounded: the transitions AFTER the first post are
-        still enforced, and zero posts is still a refusal.
+        A ledger cannot describe the time before it existed, so a session
+        already in flight when this shipped is not failed for a start it
+        could not have recorded — but every later transition still binds.
         """
         set_dir = _make_set(
             tmp_path,
@@ -416,9 +507,8 @@ class TestChecklistGateAcceptance:
                 _entry(2, "close", "complete", at=_iso(50)),
             ],
         )
-        _test_run(set_dir, _iso(20))
-        _rounds(set_dir, records=[_round(_iso(30))])
-        _post(set_dir, _iso(51))  # the first post this session ever made
+        _post(set_dir, _iso(20))  # the first post this session ever made
+        _post(set_dir, _iso(51))  # ...and one after the last logged step
         passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
         assert passed is True, remediation
 
@@ -451,6 +541,33 @@ class TestChecklistGateAcceptance:
         passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
         assert passed is True, remediation
 
+    def test_records_older_than_the_session_start_are_not_its_transitions(
+        self, tmp_path
+    ):
+        """A session cannot owe a post for a moment that preceded it."""
+        set_dir = _make_set(
+            tmp_path,
+            started_at=_iso(40),
+            entries=[_entry(1, "prior", "complete", at=_iso(1))],
+        )
+        _test_run(set_dir, _iso(2))
+        _post(set_dir, _iso(41))
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is True, remediation
+
+    def test_a_record_after_the_start_still_binds(self, tmp_path):
+        """The look-alike: same shape, but inside the session."""
+        set_dir = _make_set(
+            tmp_path,
+            started_at=_iso(40),
+            entries=[_entry(1, "prior", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(41))
+        _test_run(set_dir, _iso(42))
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is False
+        assert "test-run-recorded (playwright)" in remediation
+
     def test_unparseable_timestamps_are_skipped_not_crashed(self, tmp_path):
         set_dir = _make_set(
             tmp_path,
@@ -458,6 +575,54 @@ class TestChecklistGateAcceptance:
             entries=[_entry(1, "register", "complete", at="also-not")],
         )
         _post(set_dir, _iso(1))
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is True, remediation
+
+    def test_an_operator_stop_followed_by_a_post_passes(self, tmp_path):
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(2))
+        _decision(set_dir, _iso(30), authority="human")
+        _post(set_dir, _iso(31))
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is True, remediation
+
+    def test_an_ai_authority_decision_is_not_an_operator_stop(self, tmp_path):
+        """The legitimate look-alike: journaled, but nobody was stopped."""
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(2))
+        _decision(set_dir, _iso(30), authority="ai", rubric="simpler-code")
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is True, remediation
+
+    def test_another_sessions_operator_stop_is_not_this_sessions(
+        self, tmp_path
+    ):
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(2))
+        _decision(set_dir, _iso(30), authority="human", session=2)
+        passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
+        assert passed is True, remediation
+
+    def test_recording_then_posting_covers_a_long_running_command(
+        self, tmp_path
+    ):
+        """The documented order: run, record, post."""
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(2))
+        _test_run(set_dir, _iso(20))
+        _post(set_dir, _iso(20.5))
         passed, remediation = gate_checks.check_checklist_posted(set_dir, None)
         assert passed is True, remediation
 

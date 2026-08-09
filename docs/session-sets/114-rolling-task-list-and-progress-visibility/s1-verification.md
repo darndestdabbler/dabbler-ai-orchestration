@@ -1,0 +1,22 @@
+ISSUES FOUND
+
+**Issue 1:** A single late checklist post can satisfy the gate for all earlier recorded transitions.
+- **Category:** Correctness
+- **Severity:** Major
+- **Failure scenario:** An orchestrator forgets to post until just before close, runs `session_checklist` once, and closes successfully even though session start, test-run, verification, and last-step transitions had no posts. This is probable because it is the exact decay mode this session was created to prevent.
+- **Acceptance criterion:** `JUDGMENT - check_checklist_posted must refuse a current/new session with recorded start/test-run/verification/last-step transitions and only one post after all of them, naming the missing earlier transitions; any migration grace must be explicitly bounded to pre-existing in-flight sessions.`
+- **Details:** Violation: the plan requires “A close check that compares posts against the transitions the record shows” and the authoring guide says “Each transition needs its own post before the next transition happens, so a single post at the end does not cover a whole session.” Impact: the close gate fails open on the core omission it is meant to block. Evidence: `gate_checks.py` skips every transition before the first post (`if when < first_post: continue`), and `test_transitions_older_than_the_ledger_are_not_failed` codifies that a first post after all transitions passes.
+
+**Issue 2:** The gate does not enforce the required “before long-running command” post.
+- **Category:** Completeness
+- **Severity:** Major
+- **Failure scenario:** A session starts a full pytest, Playwright run, or routed verification without posting the checklist first, then posts only after completion. This is likely on the main path because every session runs long tests and verification, and the gate only observes completion records.
+- **Acceptance criterion:** `JUDGMENT - The close gate must have a recorded transition for the start of each long-running command, or an equivalent enforceable mechanism, and must fail when the pre-command checklist post is missing.`
+- **Details:** Violation: the cadence definition requires posts “Before you start [a long-running command] … and again when it returns.” Impact: the operator can be left without the checklist during the long wait, defeating the visibility objective. Evidence: `_checklist_transitions` only reads `test-runs.jsonl` `recordedAt` and completed verification rounds; `run_of_record.TestRunRecord` stores only `recorded_at`, not a command-start timestamp.
+
+**Issue 3:** “Every operator stop” is documented as required but explicitly not gated.
+- **Category:** Completeness
+- **Severity:** Major
+- **Failure scenario:** The workflow stops for a human decision, records it in `decisions.jsonl`, but the orchestrator does not post the checklist before the education-mode brief; close still passes if the other transitions are covered. This is probable whenever one of the documented human-required decision classes occurs.
+- **Acceptance criterion:** `JUDGMENT - A timestamped operator-stop record, including human-authority decision_journal entries, must be included in checklist transition enforcement or the cadence/gate contract must no longer claim every operator stop is checkable.`
+- **Details:** Violation: the plan says to name “every operator stop” so cadence is “checkable rather than tasteful.” Impact: one named required transition remains prose-only, recreating the silent omission problem. Evidence: `gate_checks.py` comments that operator stops are not checked because they supposedly leave no timestamped record, while `decision_journal.py` records timestamped human-authority decisions in `decisions.jsonl`.

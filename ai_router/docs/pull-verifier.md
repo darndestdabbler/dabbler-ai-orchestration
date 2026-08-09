@@ -588,7 +588,10 @@ that interaction — without weakening the equal-arms steelman default.
   `path_aware_critique.py`; `read_verification_mode` / `has_verification_mode_record` in
   `dedicated_verification.py`), with `UnicodeError` added to the two
   `dedicated_verification.py` readers — closing the malformed-activity-log close-out crash
-  class across every reader.
+  class across every reader. *(Set 112 removed the Lightweight tier, deleting
+  `dedicated_verification.py` and both of its readers. The two
+  `path_aware_critique.py` readers carry the hardening forward; the entry above
+  stands as the record of when it landed.)*
 
 The matrix mode is **additive**: absent per-arm params, `run_dual_surface` is unchanged;
 absent a call to `verification_only_app`, nothing in the normal flow runs a matrix. The

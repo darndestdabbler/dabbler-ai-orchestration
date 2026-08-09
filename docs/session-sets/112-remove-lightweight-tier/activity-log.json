@@ -314,6 +314,14 @@
       "dateTime": "2026-08-09T16:27:14.219875-04:00",
       "description": "Backstop round 10 changed organ: CONTRIBUTING.md still taught the deleted hello-world-lightweight fixture, the Lightweight-only Explorer states, and the removed Switch Tier / Set Up Dedicated Verification row actions -- the same prose blind spot as round 5, which the gate cannot see by design. Rewritten, and it gained the walk-stager modes (npm run walk, and --empty) that this session added. drift_guard, tutorial_gate and the resurrection guard all exit 0",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 17,
+      "stepKey": "session-3/backstop-round-11",
+      "dateTime": "2026-08-09T16:34:07.804052-04:00",
+      "description": "Backstop round 11: live policy docs still cited verificationMode as current precedent (contract-gate.md and path-aware-critique-schema.md both said the live gate attributes mirror it, the latter claiming behaviour on both tiers). Swept the whole class rather than the two reported sites (L-069-1): also verification-surface-strategy.md x3, the authoring guides both-tiers line, pull-verifier.mds deleted-reader entry, and a dated banner on the great-psalms case study. Release-lineage rows and REMOVED banners left alone -- those are records",
+      "status": "complete"
     }
   ]
 }

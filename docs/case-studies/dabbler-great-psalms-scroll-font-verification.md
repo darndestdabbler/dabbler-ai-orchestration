@@ -6,6 +6,14 @@
 > surfaces (Set 070 dual-surface / "overdetermined" verification) and documents
 > what actually ran when neither a `pathAwareCritique` record nor a dual-surface
 > `verificationMode` is configured.
+>
+> **Dated record — read the `verificationMode` references as history.**
+> Set 112 (2026-08) removed the Lightweight tier and the `verificationMode`
+> field with it, so a spec can no longer declare either, and the
+> "Full-tier-inert default" this study describes is simply the only
+> behaviour now. Nothing else in the account changes: the push/pull
+> distinction and the `pathAwareCritique` lever are unaffected. See
+> [`docs/concepts/tier-model.md`](../concepts/tier-model.md).
 
 ---
 

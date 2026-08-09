@@ -29,8 +29,8 @@ This gate is the floor. It is **not** a CI runner or a general test harness (Set
 `contractGate: none | advisory | required` — declared in spec.md's Session Set
 Configuration block, captured **once at set start** to `activity-log.json` (its
 own `kind`, immutable thereafter), default `none`. This mirrors `pathAwareCritique`
-(Set 066) and `verificationMode` (Set 057) exactly, so an operator who knows one
-knows the others. Reader/writer/resolver:
+(Set 066) exactly, so an operator who knows one knows the other.
+Reader/writer/resolver:
 `ai_router.contract_gate.read_contract_gate` /
 `record_contract_gate` / `resolve_and_record_contract_gate`.
 

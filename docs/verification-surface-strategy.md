@@ -52,7 +52,7 @@ and pre-registered experimental evidence:
 
 | # | Set 065 question | Settled answer | Where |
 |---|---|---|---|
-| (a) | Promote path-aware critique? | **Yes — shipped.** Tier-orthogonal per-set `pathAwareCritique: none\|advisory\|required`, multi-provider, end-of-set, `required` recommended by the blast-radius predicate. Automated producer added. | Set 066 (`ai_router` 0.20.0), Set 067 producer (0.21.x) |
+| (a) | Promote path-aware critique? | **Yes — shipped.** Per-set `pathAwareCritique: none\|advisory\|required`, multi-provider, end-of-set, `required` recommended by the blast-radius predicate. Automated producer added. | Set 066 (`ai_router` 0.20.0), Set 067 producer (0.21.x) |
 | (b) | Keep / demote / retire per-session routed verification? | **DEMOTE** — the open question Set 065 *deferred to forward Experiments A and B* is now answered on that data, and **cut over** to a gated check. | Set 067 (Exp A) + Set 068 (re-grade, Exp B, S4 decision, **S6 cut-over**) |
 | (c) | Manual now → automated later? Which surface? | **Yes, phased — done.** Manual flow institutionalized (Set 066); first-party tool-loop **pull adapter** built as the primary Mode-2 engine (Set 067). | Set 066 manual stage, Set 067 `pull_verifier.py` + `pull_critique.py` |
 | (d) | Which TDD / contract elements earn their overhead? | **Contract-test / CDC gate adopted** as the deterministic floor (the ~95%-probeable share); the path-aware agent reserved for the residual + falsifier *authoring*. | Set 068 S5 (`contract_gate.py`) |
@@ -266,7 +266,7 @@ was written; **Set 070 built all three** (see §5.2):
    high-severity tally is exactly the telemetry the RETIRE criterion above needs.
    Random sampling gives unbiased telemetry; operator/orchestrator opt-in gives a
    high-assurance mode for complex modernization work. This is the forward A/B the §2
-   evidence always pointed to, and a standing `verificationMode`-pattern option.
+   evidence always pointed to, and a standing `pathAwareCritique`-pattern option.
 
 ### 5.2 Set 070 — the steelman-push upgrade and the dual-surface instrument (BUILT)
 
@@ -310,7 +310,7 @@ is now measured at its adversarial best, and the head-to-head instrument exists:
    operator-confirmed decision, not the decision. `aggregate_retire_telemetry`
    **refuses to pool** `sampled` (unbiased) with `opt-in` (operational) runs.
 4. **The mode, recorded and triggered (S2).** `dualSurfaceMode`
-   (`off` / `sampled` / `opt-in`) follows the `verificationMode` / `pathAwareCritique`
+   (`off` / `sampled` / `opt-in`) follows the `pathAwareCritique`
    pattern: recorded **once at set start and immutable** in `activity-log.json` (a
    distinct entry kind, overloading neither existing enum). `should_run_dual_surface`
    takes an **injected** random draw (hermetic, deterministic) — `off` never runs,

@@ -304,8 +304,7 @@ prerequisites:           # optional; sets that must complete before this one is 
   provider is insufficient, so the gate requires >=2 distinct providers).
   Three levels:
   - `none` (**default**) — no gate. The feature is strictly opt-in; a set
-    that declares nothing pays nothing, preserving the walk-away promise on
-    both tiers.
+    that declares nothing pays nothing, preserving the walk-away promise.
   - `advisory` — a critique is recommended; a missing or invalid artifact
     **warns** at close but never blocks.
   - `required` — the Set-066 close-out gate confirms a valid multi-provider

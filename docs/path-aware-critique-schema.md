@@ -54,14 +54,14 @@ consults it only when the recorded `pathAwareCritique` policy is
 
 ## The policy attribute it backs
 
-`pathAwareCritique` is a **tier-orthogonal** per-set policy attribute —
-declared in `spec.md`'s Session
+`pathAwareCritique` is a per-set policy attribute — declared in
+`spec.md`'s Session
 Set Configuration block and recorded once at set start (immutable
-thereafter), exactly mirroring the `verificationMode` attribute:
+thereafter). `contractGate` (Set 070) follows the same shape:
 
 | Value | Meaning | Close-out behavior |
 |---|---|---|
-| `none` (default) | No path-aware critique gate. | Skipped — no artifact required. Preserves the walk-away promise on both tiers. |
+| `none` (default) | No path-aware critique gate. | Skipped — no artifact required, so the walk-away promise is preserved. |
 | `advisory` | A critique is recommended. | Non-blocking: a missing/invalid artifact **warns**, never blocks. |
 | `required` | A critique is required. | The set-terminal close confirms a **valid multi-provider** artifact exists and is content-non-trivial. Hard-blocks in an interactive TTY; soft-warns headless. |
 

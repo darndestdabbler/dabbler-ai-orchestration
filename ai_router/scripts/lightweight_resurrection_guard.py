@@ -187,16 +187,26 @@ TIER_DECLARATION_INLINE_BARE = re.compile(
 #
 # The first version caught only the `name:` / `name =` forms. Round 1 added
 # the optional-property, dotted-read and type-alias forms; the
-# remediation-review round added destructuring and bracket access. Every
-# one of those is an ordinary way this codebase reads a config field, and
-# each was found by a verifier planting it and watching the gate exit 0.
+# remediation-review round added destructuring and bracket access; the
+# close backstop added the quoted-identifier form (the name as a VALUE,
+# e.g. `const LEGACY_KEY = "verificationMode"`) and the regex form -- the
+# name followed by a regex metacharacter class, which is what a legacy
+# field PARSER looks like (`/verificationMode\s*:/`). That last rule is
+# deliberately metacharacter-anchored: a BARE `/verificationMode/` is how
+# this repo's own tests assert the field is ABSENT from a scaffold, and
+# flagging those would be the gate eating its own evidence.
+#
+# Every one of those is an ordinary way this codebase reads a config
+# field, and each was found by a verifier planting it and watching the
+# gate exit 0.
 VERIFICATION_MODE_FIELD = re.compile(
     r"""(?:(?:^|[\s\{\[,\(])["']?verification[_-]?[Mm]ode["']?\s*\??\s*(?::(?!:)|=(?!=))"""
     r"""|\.verification(?:_m|M)ode\b"""
     r"""|\bVerificationMode\b"""
     r"""|[\{,]\s*verification(?:_m|M)ode\s*[\},:=]"""
     r"""|\[\s*["']verification[_-]?[Mm]ode["']\s*\]"""
-    r"""|["']verification(?:_m|M)ode["'])"""
+    r"""|["']verification(?:_m|M)ode["']"""
+    r"""|verification(?:_m|M)ode\\[sSdDwWbB])"""
 )
 
 # The two mode VALUES. Two forms, and the split is what keeps the rule
@@ -205,7 +215,10 @@ VERIFICATION_MODE_FIELD = re.compile(
 #   * a quoted literal whose ENTIRE content is a mode name -- anywhere at
 #     all, including as an element of a multiline list or tuple, which is
 #     how a mode enum would most naturally come back;
-#   * a bare, unquoted value after `:` or `=`, which is the YAML form.
+#   * a bare, unquoted value after `:` or `=`, which is the YAML form;
+#   * a mode name adjacent to a regex alternation pipe, which is how a
+#     legacy-compatibility PARSER would name the modes it still accepts
+#     (`/dedicated-sessions|out-of-band-or-none/`).
 #
 # The exactness of the quoted form is doing real work. The Playwright spec
 # that proves a stale `.dabbler/verification-mode` marker is now INERT
@@ -222,6 +235,8 @@ MODE_VALUE = re.compile(
     r"""(?<![\w-])["'](?:out-of-band-or-none|dedicated-sessions)["']"""
     r"""|(?::|=|=>)\s*(?:out-of-band-or-none|dedicated-sessions)"""
     r"""\s*(?=$|[,;:)}\]|]|\#|//)"""
+    r"""|(?:out-of-band-or-none|dedicated-sessions)\|"""
+    r"""|\|(?:out-of-band-or-none|dedicated-sessions)"""
 )
 
 # In a DATA file -- YAML, JSON, or a fenced block in a doc -- there is no

@@ -193,10 +193,47 @@ def test_the_removed_field_is_caught_in_every_syntax(text: str, suffix: str):
             ".md",
             "verification-mode-value",
         ),
+        # Round 8 (the close backstop): a legacy-compatibility PARSER.
+        (
+            "const field = /verificationMode\\s*:/;\n",
+            ".ts",
+            "verification-mode-field",
+        ),
+        (
+            'FIELD = re.compile(r"verificationMode\\s*:")\n',
+            ".py",
+            "verification-mode-field",
+        ),
+        (
+            "const modes = /dedicated-sessions|out-of-band-or-none/;\n",
+            ".ts",
+            "verification-mode-value",
+        ),
+        (
+            'MODES = re.compile(r"dedicated-sessions|out-of-band-or-none")\n',
+            ".py",
+            "verification-mode-value",
+        ),
     ],
 )
 def test_shapes_the_first_version_missed_are_caught(text: str, suffix: str, rule: str):
     assert rule in _scan(text, suffix)
+
+
+def test_a_bare_regex_asserting_ABSENCE_is_spared():
+    """The regex rule is metacharacter-anchored, and that is the point.
+
+    `/verificationMode\\s*:/` parses a field. A BARE `/verificationMode/`
+    is how this repo's own Layer 2 test asserts the field is absent from a
+    scaffolded spec -- the line lives in `consumerBootstrap.test.ts` today
+    -- and a gate that failed the test proving the removal works would be
+    eating its own evidence.
+    """
+    text = (
+        'assert.ok(!/verificationMode/.test(spec), '
+        '"spec must not mention verificationMode");\n'
+    )
+    assert _scan(text, ".ts") == []
 
 
 def test_a_yaml_comment_naming_a_mode_is_still_narration():

@@ -290,6 +290,14 @@
       "dateTime": "2026-08-09T15:35:54.978978-04:00",
       "description": "Backstop round 7 found an unquoted YAML sequence. Changed tactic instead of adding a seventh prefix: in a DATA file (yaml/yml/json/md-fence) comments are already blanked, so anything left is content a machine reads -- the mode names now match bare in any position there, closing the whole class. Code keeps the exact-quoted rule, because code does hold incidental mentions. 5/5 probes correct including a YAML comment correctly spared. Guard suite 80 tests, pytest 3642 passed",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 14,
+      "stepKey": "session-3/backstop-round-8",
+      "dateTime": "2026-08-09T15:59:49.371839-04:00",
+      "description": "Backstop round 8: a legacy-compatibility PARSER naming the field/modes in regex form. Weighed for dispute, then accepted -- the obvious fix would have flagged consumerBootstraps live !/verificationMode/.test(spec) absence assertion, so the rule is anchored on a regex METACHARACTER after the name: a metacharacter means parsing, a bare name means testing. 5/5 probes correct. Guard suite 85 tests, pytest 3647 passed",
+      "status": "complete"
     }
   ]
 }

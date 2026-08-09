@@ -352,3 +352,43 @@ and the last two were the same defect wearing different syntax. The
 data-file rule is the answer to the class rather than to the instance,
 which is why it is worth recording as a change of tactic and not just
 another row in the table.
+
+---
+
+## Round 8 (the close backstop, fourth time) — the parser form
+
+**Accepted, after being weighed for a dispute.** The finding: a legacy
+compatibility *parser* names the removed field and modes in regex form —
+`/verificationMode\s*:/`, `re.compile(r"verificationMode\s*:")`,
+`/dedicated-sessions|out-of-band-or-none/` — and none of them tripped the
+gate. It is a real hole: a regex-only resurrection never has to spell the
+field in any position the other rules watch.
+
+**This one was close to a dispute, and the reason it is not is worth
+stating.** The obvious fix — flag the identifier inside any regex —
+would have flagged `consumerBootstrap.test.ts`'s
+`!/verificationMode/.test(spec)`, a live test asserting the field is
+**absent** from a scaffolded spec. A gate that fails the test proving the
+removal works is worse than the hole.
+
+The distinction that resolves it is mechanical and, once seen, obvious:
+**a metacharacter after the name means parsing; a bare name means
+testing.** `/verificationMode\s*:/` reads a field. `/verificationMode/`
+checks for one. So the rule is anchored on `\s`/`\d`/`\w`/`\b` following
+the identifier, and on a mode name adjacent to an alternation pipe.
+
+Probes: 5/5 correct — all four parser forms caught, the absence assertion
+spared. Both directions pinned.
+
+### Where this stops
+
+Four consecutive backstop rounds, each finding one more syntax for the
+same field. Rounds 6–8 were all answered by generalising rather than by
+enumerating — the exactness rule, then the data-file rule, then the
+metacharacter rule — and each generalisation closed a class rather than an
+instance. That is the right response to an adversary who can always
+produce one more syntax, and it is also the reason the residual named at
+the loop bound stands unchanged: **the gate catches every shape anyone has
+thought to plant, and no one can prove that is all of them.** Its floor
+does not depend on any regex — `check_deleted_files_stay_deleted` reads
+the filesystem.

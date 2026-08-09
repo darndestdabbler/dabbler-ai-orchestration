@@ -237,6 +237,20 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # normally. It is NOT an evidence exclusion: see
     # EVIDENCE_VISIBLE_BOOKKEEPING below.
     "decisions.jsonl",
+    # Set 114 S1: the checklist-post ledger
+    # (session_checklist.POSTS_FILENAME) -- one line per render, written
+    # by the act of posting the step checklist. FRESHNESS-exempt for the
+    # same reason decisions.jsonl is: posting continues after a round is
+    # stamped (the cadence names "after verification" and "before close"
+    # as transitions that owe a post), so without this entry the post
+    # would stale its own round's stamp -- and a stale row sends the
+    # close backstop into a fresh metered round. Posting would then cost
+    # money, and the obligation would decay exactly as the prose one did
+    # (Set 111 S4 lost this round with cite_lessons). Safe because a post
+    # is a RECORD about work whose substance -- the code and docs the
+    # session produced -- binds the diff normally. NOT an evidence
+    # exclusion: see EVIDENCE_VISIBLE_BOOKKEEPING below.
+    "checklist-posts.jsonl",
     "disposition.json",
     "session-events.jsonl",
     "session-state.json",
@@ -266,7 +280,12 @@ WORK_DIFF_SET_BOOKKEEPING = (
 #
 # These entries are therefore freshness-exempt but stay VISIBLE in a
 # --phase round's evidence bundle.
-EVIDENCE_VISIBLE_BOOKKEEPING = ("decisions.jsonl",)
+#
+# Set 114 S1 adds the checklist-post ledger on the same reasoning: a
+# reviewer of the set that SHIPS the posting cadence should be able to
+# see whether the session shipping it followed it, and suppressing that
+# would be the same self-authorized reduction.
+EVIDENCE_VISIBLE_BOOKKEEPING = ("decisions.jsonl", "checklist-posts.jsonl")
 
 # What a --phase round's evidence bundle excludes: the loop's own
 # immutable machinery (round artifacts, envelopes, sidecars, ledgers,

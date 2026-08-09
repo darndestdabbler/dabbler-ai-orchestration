@@ -51,6 +51,7 @@ from close_backstop import (
 )
 from disposition import Disposition, read_disposition, write_disposition
 from session_events import read_events
+from session_checklist import record_post
 from session_state import (
     NextOrchestrator,
     NextOrchestratorReason,
@@ -156,6 +157,9 @@ def closeable(tmp_path: Path, monkeypatch):
         }, indent=2),
         encoding="utf-8",
     )
+    # Set 114 S1: the session posted its step checklist. Written through
+    # the shipping writer so the fixture exercises the real path.
+    record_post(str(set_dir), 1, [])
     return root, set_dir
 
 
@@ -834,6 +838,8 @@ class TestBackstopMechanics:
             }, indent=2),
             encoding="utf-8",
         )
+        # Set 114 S1: the session posted its step checklist.
+        record_post(str(set_dir), 1, [])
         write_disposition(str(set_dir), Disposition(
             status="completed",
             summary="rerun idempotency",

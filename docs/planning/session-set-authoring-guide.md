@@ -804,6 +804,60 @@ Suites are declared in `router-config.yaml` under `testing.suites`
 
 ---
 
+## The step-checklist cadence (Set 114 S1)
+
+`python -m ai_router.session_checklist` renders the session's logged
+steps with the current one marked `<- here`. Set 111 S4 shipped it and
+told the orchestrator to post it "at every transitional boundary" —
+without saying what one is. An undefined cadence cannot be followed
+consistently or checked at all, so that session posted **once** in many
+hours and nothing noticed.
+
+**A transition is a moment where the answer to "where is this session?"
+just changed.** Five of them, and no more — a checklist posted after
+every step is scrolled past like any other banner:
+
+| Transition | Post when |
+| :--- | :--- |
+| **Session start** | Right after `start_session`, once the plan's steps are logged. |
+| **Around a long-running command** | Before you start one you expect to block for minutes (a full suite, a routed round), and again when it returns. |
+| **Every operator stop** | Immediately before the education-mode brief, so the human sees where the session is while they decide. |
+| **After verification** | Once a round's verdict is in, before remediating or moving on. |
+| **Before close** | After the last logged step, before `close_session`. |
+
+### Posting is recorded by the act of posting
+
+Rendering the checklist appends one line to `checklist-posts.jsonl` in
+the session-set directory (session, timestamp, step count, which step
+carried `<- here`). Nobody attests to anything: the `checklist_posted`
+close gate compares that ledger against the transitions the session's
+**own records** already show — `startedAt` in `session-state.json`, each
+`test-runs.jsonl` record, each completed round in `sN-rounds.jsonl`, and
+the newest `activity-log.json` entry. Each transition needs its own post
+before the next transition happens, so a single post at the end does not
+cover a whole session.
+
+Two limits worth stating plainly:
+
+- **The gate checks four of the five.** An operator stop leaves no
+  timestamped record of its own, so it is doctrine the gate cannot see.
+  A checked cadence and a stated cadence are not the same list.
+- **A post proves a render, not a reader.** The floor this buys is that
+  an omission becomes visible; it does not prove anyone looked.
+
+`--no-record` renders without recording, for scripted or repeated reads.
+It can only ever weaken the caller's own position at close, never
+strengthen it.
+
+The ledger is **freshness-exempt but evidence-visible**: it is named in
+`verification_stamp.WORK_DIFF_SET_BOOKKEEPING`, so a post written after
+a stamped round does not stale that round (which would send the close
+backstop into a fresh metered round, making posting cost money and
+guaranteeing the obligation decays again), and in
+`EVIDENCE_VISIBLE_BOOKKEEPING`, so the verifier still reads it.
+
+---
+
 ## The guided-look UAT (Set 111 S4)
 
 Canonizes the format piloted in Set 110's operator notes, adopted after

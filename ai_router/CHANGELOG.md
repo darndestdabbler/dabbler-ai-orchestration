@@ -22,10 +22,11 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > immediate rather than silent.
 >
 > The release also carries the router-side work of Sets 105, 107, 109,
-> 110 and 111, none of which had been published: the phased verification
-> loop's enforced bounds, the decision journal, the acceptance harness,
-> the run-of-record and UAT close gates, the session checklist, the
-> spec-admission cap, and dispatch-time provider-key validation.
+> 110, 111 and 114, none of which had been published: the phased
+> verification loop's enforced bounds, the decision journal, the
+> acceptance harness, the run-of-record and UAT close gates, the session
+> checklist and its recorded posting cadence, the spec-admission cap, and
+> dispatch-time provider-key validation.
 >
 > **Publish is deferred until Set 114 completes** (operator decision,
 > 2026-08-09, at the Set 112 UAT walk). The artifact is staged and green;
@@ -123,6 +124,55 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   every tool that walks a repo.
 
 ### Added
+
+- **(Set 114 S1) The step checklist is now recorded by the act of posting
+  it, and a close gate checks the cadence.** Set 111 S4 shipped
+  `session_checklist` and wrote the obligation to post it "at every
+  transitional boundary" as prose — then ran for many hours across dozens
+  of transitions and posted **once**. Nothing noticed, because a close
+  gate cannot observe a chat window.
+
+  So rendering is recording: every CLI render appends one line to
+  `checklist-posts.jsonl` in the session-set directory (session,
+  timestamp, step count, which step carried `<- here`). Nothing is
+  self-attested. The new `checklist_posted` close gate compares that
+  ledger against the transitions the session's **own** records already
+  show — `startedAt` in `session-state.json`, each `test-runs.jsonl`
+  record, each completed round in `sN-rounds.jsonl`, and the newest
+  `activity-log.json` entry — and requires a post per transition,
+  consumed in time order, so one post at the very end cannot cover a
+  whole session. The gate is appended to `GATE_CHECKS`, so index-based
+  consumers keep their positions.
+
+  A **sibling** ledger rather than a new `activity-log.json` entry kind:
+  an entry would be rendered by the checklist itself, making its content
+  a function of how many times it had been shown, and would satisfy the
+  existing `activity_log_entry` gate for a session that logged no real
+  step at all. `test-runs.jsonl` is the same record-then-gate shape.
+
+  The ledger is **freshness-exempt but evidence-visible** — named in both
+  `verification_stamp.WORK_DIFF_SET_BOOKKEEPING` and
+  `EVIDENCE_VISIBLE_BOOKKEEPING`. Exempt because a post written after a
+  stamped round would otherwise stale that round, and a stale row sends
+  the close backstop into a fresh metered round: posting would cost
+  money, and the obligation would decay exactly as the prose one did
+  (Set 111 S4 lost a round to this with `cite_lessons`). Still visible
+  because freshness-exemption and evidence-exclusion are different
+  questions (Set 111 S3), and hiding the cadence record from the verifier
+  reviewing the set that ships the cadence would be a self-authorized
+  reduction in verifier visibility.
+
+  Two limits stated rather than hidden: a post proves a render, not a
+  reader; and transitions older than the ledger's first post are
+  unobservable and are not failed, so a session already in flight when
+  this ships can still close — but a session that posted **nothing** is
+  refused outright. `--no-record` renders without recording, for scripted
+  or repeated reads; it can only weaken the caller's own position at
+  close. The cadence itself (five transitions: session start, either side
+  of a long-running command, every operator stop, after each verification
+  round, before close) is defined in `docs/session-constitution.md`
+  Step 4 and `docs/planning/session-set-authoring-guide.md`, which also
+  names the one transition the gate cannot see.
 
 - **(Set 112 S3) An anti-resurrection gate: the tier cannot come back one
   plausible commit at a time.** `ai_router/scripts/lightweight_resurrection_guard.py`

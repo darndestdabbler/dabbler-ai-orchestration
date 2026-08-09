@@ -39,6 +39,7 @@ import pytest
 
 import close_session
 from close_session import resolve_close_verdict
+from session_checklist import record_post
 from disposition import (
     Disposition,
     RETIRED_VERIFICATION_METHODS,
@@ -1005,6 +1006,9 @@ def incident_repo(tmp_path: Path) -> Path:
         }, indent=2),
         encoding="utf-8",
     )
+    # Set 114 S1: the session posted its step checklist. Written through
+    # the shipping writer so the fixture exercises the real path.
+    record_post(str(set_dir), 1, [])
     write_disposition(str(set_dir), Disposition(
         next_orchestrator=_valid_next_orc(),
         **INCIDENT_DISPOSITION,

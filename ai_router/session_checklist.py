@@ -5,7 +5,8 @@ session — and any operator who wants to know where an in-flight session
 actually is. ``python -m ai_router.session_checklist`` prints it.
 **See also:** ``session_log.SessionLog.log_step`` (the writer whose
 entries this renders); ``progress.print_session_set_status`` (the
-SET-level surface this complements).
+SET-level surface this complements); ``gate_checks.check_checklist_posted``
+(the close gate that reads the post ledger this module writes).
 
 ---
 
@@ -41,6 +42,32 @@ never logged does not appear, because inventing rows from the spec would
 produce a checklist that disagrees with the record — and the record is
 what close-out gates on. If the checklist looks short, the fix is to
 call ``log_step``, not to change this renderer.
+
+The renderer is the recorder (Set 114 S1)
+-----------------------------------------
+A close gate cannot observe a chat window, so Set 111 S4's obligation to
+post at every transition was prose — and that session, which wrote the
+obligation, posted **once** in many hours across dozens of transitions.
+Nothing noticed, because nothing could.
+
+So producing the checklist is what records that it was produced: every
+CLI render appends one line to ``checklist-posts.jsonl`` beside the
+activity log (:func:`record_post`), and ``gate_checks
+.check_checklist_posted`` compares those lines against the transitions
+the session's own records show. The record proves a render happened, not
+that a human read it — an acceptable floor, because it converts an
+invisible omission into a visible one.
+
+The ledger is a **sibling** file rather than a new ``activity-log.json``
+entry kind for two reasons: an entry would be rendered by
+:func:`build_rows` itself, making the checklist's content a function of
+how many times it had been shown, and it would satisfy the existing
+``activity_log_entry`` gate for a session that logged no real step at
+all. ``test-runs.jsonl`` is the same record-then-gate shape.
+
+Recording is deliberately confined to the CLI path: :func:`build_rows`
+and :func:`render` stay pure, so a caller that only wants the rows (the
+Work Explorer, a test) does not write to disk.
 """
 
 from __future__ import annotations
@@ -50,12 +77,26 @@ import json
 import os
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from typing import List, Optional, Sequence
 
 try:
     from .session_state import read_session_state  # type: ignore[import-not-found]
 except ImportError:  # pragma: no cover - direct-script fallback
     from session_state import read_session_state  # type: ignore[no-redef]
+
+
+# The post ledger: one JSON line per render, append-only, never rewritten.
+# Named in verification_stamp.WORK_DIFF_SET_BOOKKEEPING (freshness-exempt:
+# a post is a record ABOUT work whose substance binds the digest on its
+# own) and in EVIDENCE_VISIBLE_BOOKKEEPING (it stays in the verifier's
+# evidence bundle — freshness-exemption and evidence-exclusion are
+# different questions, Set 111 S3).
+POSTS_FILENAME = "checklist-posts.jsonl"
+
+# Rendering surfaces, recorded so the ledger says which shape was shown.
+SURFACE_TEXT = "text"
+SURFACE_MARKDOWN = "markdown"
 
 
 # Status token -> box glyph. ASCII only (cp1252 console, L-079-1).
@@ -298,6 +339,94 @@ def render_markdown(
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------------------
+# The post ledger — rendering the checklist is what records that it was
+# rendered (Set 114 S1)
+# ---------------------------------------------------------------------------
+
+
+def posts_path(session_set_dir: str) -> str:
+    """Path of the per-set checklist-post ledger."""
+    return os.path.join(session_set_dir, POSTS_FILENAME)
+
+
+def read_posts(
+    session_set_dir: str, session_number: Optional[int] = None
+) -> List[dict]:
+    """Every post record, oldest first, filtered to *session_number*.
+
+    Tolerant by construction, exactly like ``verify_session
+    .read_round_ledger``: an absent, unreadable, or partly-written file
+    yields the records that ARE parseable rather than raising. A ledger
+    is bookkeeping — a truncated last line (a crash mid-append) must not
+    take down the close, and the gate that reads this fails on
+    *insufficient* posts, which a dropped line can only make stricter.
+    """
+    records: List[dict] = []
+    try:
+        with open(posts_path(session_set_dir), "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if session_number is not None:
+                    if record.get("sessionNumber") != session_number:
+                        continue
+                records.append(record)
+    except OSError:
+        return records
+    return records
+
+
+def record_post(
+    session_set_dir: str,
+    session_number: int,
+    rows: Sequence[ChecklistRow],
+    *,
+    surface: str = SURFACE_TEXT,
+) -> Optional[dict]:
+    """Append one post record for a render that just happened.
+
+    Records what the spec asks a post to prove: **when**, for which
+    session, how many steps were shown, and which step carried the
+    ``<- here`` marker — the three facts that distinguish "the operator
+    was shown where this session is" from "a file was touched".
+
+    Returns the record written, or ``None`` when the append failed. The
+    failure is deliberately non-fatal: a locked or read-only ledger must
+    not deny the operator the checklist they asked for. Callers surface
+    the skip by name (L-079-1: a fail-open branch around I/O must NAME
+    the skip in operator-facing output) — silence here would be the
+    invisible omission this whole mechanism exists to end.
+    """
+    here = next((r for r in rows if r.is_here), None)
+    record = {
+        "sessionNumber": session_number,
+        "postedAt": datetime.now().astimezone().isoformat(),
+        "stepCount": len(rows),
+        "surface": surface,
+    }
+    if here is not None:
+        record["hereStepKey"] = here.step_key
+        if here.step_number is not None:
+            record["hereStepNumber"] = here.step_number
+        record["hereStatus"] = here.status
+    try:
+        with open(
+            posts_path(session_set_dir), "a", encoding="utf-8", newline="\n"
+        ) as fh:
+            fh.write(json.dumps(record, ensure_ascii=True) + "\n")
+    except OSError:
+        return None
+    return record
+
+
 def _resolve_set_dir(explicit: Optional[str]) -> Optional[str]:
     if explicit:
         return explicit
@@ -351,6 +480,16 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Use the logged description instead of the short step label.",
     )
+    p.add_argument(
+        "--no-record",
+        action="store_true",
+        help=(
+            "Render without appending to %s. For scripted or repeated "
+            "reads only -- an orchestrator's transitional post must be "
+            "recorded, and the close gate reads that record."
+        )
+        % POSTS_FILENAME,
+    )
     return p
 
 
@@ -381,6 +520,18 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         )
     else:
         print(render(rows, number, width=args.width, verbose=args.verbose))
+
+    # The render is the record. Do it AFTER the output so a ledger
+    # problem can never cost the operator the checklist itself.
+    if not args.no_record:
+        surface = SURFACE_MARKDOWN if args.markdown else SURFACE_TEXT
+        if record_post(set_dir, number, rows, surface=surface) is None:
+            print(
+                f"session_checklist: could not append to "
+                f"{posts_path(set_dir)}; this post is NOT recorded and the "
+                f"close gate will not count it.",
+                file=sys.stderr,
+            )
     return 0
 
 
@@ -399,10 +550,16 @@ if __name__ == "__main__":  # pragma: no cover
 __all__ = [
     "STATUS_BOXES",
     "HERE_MARKER",
+    "POSTS_FILENAME",
+    "SURFACE_MARKDOWN",
+    "SURFACE_TEXT",
     "ChecklistRow",
     "build_rows",
     "current_session_number",
+    "posts_path",
     "read_activity_log",
+    "read_posts",
+    "record_post",
     "render",
     "render_markdown",
     "main",

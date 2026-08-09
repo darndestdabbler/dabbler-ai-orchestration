@@ -54,6 +54,10 @@ The checks land in this module:
 - :func:`check_uat_walk_recorded` — Set 111 S4: a ``requiresUAT`` session
   closes only with a recorded walk or an operator-attested waiver, so a
   skipped UAT is a visible decision rather than an evaporation.
+- :func:`check_checklist_posted` — Set 114 S1: the step checklist must
+  have been posted at each transition the session's own records show.
+  Rendering it is what records it, so the gate compares records against
+  records and never asks anyone to attest they posted.
 
 Why a separate module
 ---------------------
@@ -842,23 +846,38 @@ def _project_root_for(session_set_dir: str) -> str:
     return os.path.abspath(os.path.join(session_set_dir, "..", "..", ".."))
 
 
-def _verify_session_command(session_set_dir: str) -> str:
-    """The exact sanctioned Step 6 invocation for this set.
+def _venv_python() -> str:
+    """The workspace-venv interpreter the runbooks tell operators to use.
 
-    The refusal message teaches: the moment an engine hits the blocked
-    path it must learn the one command that produces real evidence.
+    One spelling, shared by every remediation message that names a
+    command, so a platform fix lands in one place (L-069-1).
     """
-    interp = (
+    return (
         ".venv/Scripts/python.exe" if os.name == "nt" else ".venv/bin/python"
     )
+
+
+def _set_dir_display(session_set_dir: str) -> str:
+    """*session_set_dir* as a project-relative, posix-separated path."""
     root = _project_root_for(session_set_dir)
     display = session_set_dir
     try:
         display = os.path.relpath(os.path.abspath(session_set_dir), root)
     except ValueError:
         pass
-    display = display.replace(os.sep, "/")
-    return f"{interp} -m ai_router.verify_session --session-set-dir {display}"
+    return display.replace(os.sep, "/")
+
+
+def _verify_session_command(session_set_dir: str) -> str:
+    """The exact sanctioned Step 6 invocation for this set.
+
+    The refusal message teaches: the moment an engine hits the blocked
+    path it must learn the one command that produces real evidence.
+    """
+    return (
+        f"{_venv_python()} -m ai_router.verify_session "
+        f"--session-set-dir {_set_dir_display(session_set_dir)}"
+    )
 
 
 def _claimed_close_verdict(disposition: Disposition) -> Optional[str]:
@@ -1521,6 +1540,7 @@ def check_verification_integrity(
 
 TEST_RUN_FRESH_CHECK_NAME = "test_run_fresh"
 UAT_WALK_CHECK_NAME = "uat_walk_recorded"
+CHECKLIST_POSTED_CHECK_NAME = "checklist_posted"
 
 
 def _router_config_or_none() -> Optional[dict]:
@@ -1768,9 +1788,241 @@ def check_uat_walk_recorded(
 
 
 # ---------------------------------------------------------------------------
-# Registry consumed by close_session._run_gate_checks
+# check_checklist_posted (Set 114 S1)
 # ---------------------------------------------------------------------------
 
+# The cadence, encoded. Each tuple is (kind, operator-facing label) for a
+# transition this gate can SEE in the session's own records. The prose
+# cadence in session-constitution.md Step 4 names one more -- every
+# operator stop -- which leaves no timestamped record of its own and is
+# therefore doctrine the gate cannot check. Naming the gap here is the
+# point: a checked cadence and a stated cadence must not be silently
+# assumed identical.
+CHECKLIST_TRANSITION_START = "session-start"
+CHECKLIST_TRANSITION_TEST_RUN = "test-run-recorded"
+CHECKLIST_TRANSITION_ROUND = "verification-round"
+CHECKLIST_TRANSITION_LAST_STEP = "last-logged-step"
+
+
+def _checklist_transitions(
+    session_set_dir: str, session_number: int, state: dict
+) -> List[Tuple[datetime, str]]:
+    """Every checkable transition for *session_number*, unsorted.
+
+    Read from the records the session already keeps, so the gate never
+    asks the orchestrator to attest to anything: ``session-state.json``
+    for the start, ``test-runs.jsonl`` for the long-running commands,
+    ``sN-rounds.jsonl`` for the completed verification rounds, and the
+    newest ``activity-log.json`` entry for "the work moved on, and the
+    next thing is close".
+
+    Only the LAST logged step becomes a transition, not every one. A post
+    after every step is the noise failure the spec warns about, and a
+    checklist scrolled past like a banner answers nothing.
+    """
+    out: List[Tuple[datetime, str]] = []
+
+    for session in state.get("sessions") or []:
+        if not isinstance(session, dict):
+            continue
+        if session.get("number") != session_number:
+            continue
+        started = _parse_iso_timestamp(session.get("startedAt"))
+        if started is not None:
+            out.append((started, CHECKLIST_TRANSITION_START))
+        break
+
+    try:
+        try:
+            from .run_of_record import read_records  # type: ignore[import-not-found]
+        except ImportError:
+            from run_of_record import read_records  # type: ignore[no-redef]
+        for record in read_records(session_set_dir):
+            if record.session_number != session_number:
+                continue
+            when = _parse_iso_timestamp(record.recorded_at)
+            if when is not None:
+                suite = record.suite or "?"
+                out.append(
+                    (when, f"{CHECKLIST_TRANSITION_TEST_RUN} ({suite})")
+                )
+    except ImportError:  # pragma: no cover - defensive
+        pass
+
+    rounds_path = os.path.join(
+        session_set_dir, f"s{session_number}-rounds.jsonl"
+    )
+    try:
+        with open(rounds_path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(record, dict):
+                    continue
+                if record.get("event") != "round-completed":
+                    continue
+                if record.get("sessionNumber") != session_number:
+                    continue
+                when = _parse_iso_timestamp(record.get("recordedAt"))
+                if when is not None:
+                    number = record.get("verificationRound")
+                    out.append(
+                        (when, f"{CHECKLIST_TRANSITION_ROUND} {number}")
+                    )
+    except OSError:
+        pass
+
+    log = _read_activity_log(session_set_dir)
+    entries = (log or {}).get("entries")
+    if isinstance(entries, list):
+        stamps = [
+            (parsed, e)
+            for e in entries
+            if isinstance(e, dict) and e.get("sessionNumber") == session_number
+            for parsed in [_parse_iso_timestamp(e.get("dateTime"))]
+            if parsed is not None
+        ]
+        if stamps:
+            when, entry = max(stamps, key=lambda pair: pair[0])
+            key = str(entry.get("stepKey") or "").strip() or "?"
+            out.append((when, f"{CHECKLIST_TRANSITION_LAST_STEP} ({key})"))
+
+    return out
+
+
+def check_checklist_posted(
+    session_set_dir: str,
+    disposition: Optional[Disposition],
+    *,
+    allow_empty_commit: bool = False,
+) -> GateOutcome:
+    """A session that never showed the operator where it was cannot close.
+
+    Set 111 S4 shipped ``session_checklist`` and wrote the obligation to
+    post it at every transitional boundary as **prose** — then ran for
+    many hours across dozens of transitions and posted once, at the
+    start. Nothing noticed, because nothing could: a close gate cannot
+    observe a chat window. So Set 114 made rendering the checklist the
+    act that records it (``checklist-posts.jsonl``), and this gate
+    compares those records against the transitions the session's own
+    records show.
+
+    The rule is one post per transition, consumed in time order: for
+    transitions at ``t1 < t2 < ... < tk``, each ``ti`` needs a post in
+    ``[ti, ti+1)`` (the last: at or after ``tk``). That is what stops a
+    single post at the very end from covering the whole session, and it
+    makes the final transition's window the "before close" post by
+    construction — no separate close concept needed.
+
+    Two deliberate limits, stated rather than hidden:
+
+    * **A post proves a render, not a reader.** The gate can be satisfied
+      mechanically. That is an acceptable floor: it converts an invisible
+      omission into a visible one, which is strictly what it claims.
+    * **Transitions before the first post are unobservable.** A ledger
+      cannot describe the time before it existed, so a session already in
+      flight when this shipped (or in a consumer repo mid-upgrade) is not
+      failed for its history — it is failed only if it never posted at
+      all, or skipped a transition the ledger could have seen. There is
+      no fail-open hole in that: zero posts is a refusal.
+    """
+    _ = disposition
+    _ = allow_empty_commit
+
+    try:
+        try:
+            from .session_checklist import (  # type: ignore[import-not-found]
+                POSTS_FILENAME,
+                read_posts,
+            )
+        except ImportError:
+            from session_checklist import (  # type: ignore[no-redef]
+                POSTS_FILENAME,
+                read_posts,
+            )
+    except ImportError as exc:  # pragma: no cover - defensive
+        return False, f"session_checklist unavailable: {exc}"
+
+    state = read_session_state(session_set_dir)
+    if not state:
+        return False, "session-state.json missing or unreadable"
+    view, err = _read_progress_or_none(state, session_set_dir)
+    if view is None:
+        return False, err  # type: ignore[return-value]
+    current = _session_in_focus(view)
+    if current is None:
+        return False, "no session in flight and none closed"
+
+    command = (
+        f"{_venv_python()} -m ai_router.session_checklist --markdown "
+        f"--session-set-dir {_set_dir_display(session_set_dir)}"
+    )
+
+    posts = sorted(
+        (
+            parsed
+            for record in read_posts(session_set_dir, current)
+            for parsed in [_parse_iso_timestamp(record.get("postedAt"))]
+            if parsed is not None
+        )
+    )
+    if not posts:
+        return (
+            False,
+            f"session {current} recorded no step-checklist post in "
+            f"{POSTS_FILENAME}. The operator was never shown where this "
+            f"session was. Post it now ({command}) and re-run close; from "
+            f"here on, post at every transition named in "
+            f"session-constitution.md Step 4.",
+        )
+
+    transitions = _checklist_transitions(session_set_dir, current, state)
+    if not transitions:
+        return True, ""
+
+    # Group transitions that share an instant: one post covers them all,
+    # because an empty [t, t) window is unsatisfiable by construction.
+    grouped: List[Tuple[datetime, List[str]]] = []
+    for when, label in sorted(transitions, key=lambda pair: pair[0]):
+        if grouped and grouped[-1][0] == when:
+            grouped[-1][1].append(label)
+        else:
+            grouped.append((when, [label]))
+
+    first_post = posts[0]
+    missing: List[str] = []
+    for index, (when, labels) in enumerate(grouped):
+        if when < first_post:
+            continue  # older than the ledger; unobservable, not a failure
+        upper = (
+            grouped[index + 1][0] if index + 1 < len(grouped) else None
+        )
+        covered = any(
+            post >= when and (upper is None or post < upper) for post in posts
+        )
+        if not covered:
+            missing.extend(labels)
+
+    if not missing:
+        return True, ""
+    return (
+        False,
+        f"session {current} owes a step-checklist post at "
+        f"{len(missing)} transition(s) that left a record and no post: "
+        f"{'; '.join(missing)}. Post the checklist ({command}) and re-run "
+        f"close — a post recorded now covers the last transition. Each "
+        f"transition needs its own post, before the next one happens.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Registry consumed by close_session._run_gate_checks
+# ---------------------------------------------------------------------------
 # Order matters: this is the order checks appear in the JSON output's
 # ``gate_results`` list. Skeleton ordering is preserved so consumers
 # (Set 5 VS Code extension) don't have to re-pin against a new shape.
@@ -1785,4 +2037,5 @@ GATE_CHECKS: Tuple[Tuple[str, "callable"], ...] = (  # type: ignore[name-defined
     (VERIFICATION_INTEGRITY_CHECK_NAME, check_verification_integrity),
     (TEST_RUN_FRESH_CHECK_NAME, check_test_run_fresh),
     (UAT_WALK_CHECK_NAME, check_uat_walk_recorded),
+    (CHECKLIST_POSTED_CHECK_NAME, check_checklist_posted),
 )

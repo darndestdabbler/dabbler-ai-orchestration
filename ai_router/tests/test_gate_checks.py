@@ -617,9 +617,10 @@ def test_change_log_fresh_fails_when_stale_and_no_reference(repo_with_remote):
 def test_gate_checks_registry_order_is_stable():
     """The skeleton's documented gate order must be preserved.
 
-    verification_integrity (Set 083) appends after the original five, and
-    test_run_fresh / uat_walk_recorded (Set 111 S4) append after that, so
-    consumers pinned against any earlier prefix keep their positions.
+    verification_integrity (Set 083) appends after the original five,
+    test_run_fresh / uat_walk_recorded (Set 111 S4) append after that,
+    and checklist_posted (Set 114 S1) after those, so consumers pinned
+    against any earlier prefix keep their positions.
     """
     names = tuple(name for name, _fn in gate_checks.GATE_CHECKS)
     original_prefix = (
@@ -636,4 +637,5 @@ def test_gate_checks_registry_order_is_stable():
     assert names == original_prefix + (
         "test_run_fresh",
         "uat_walk_recorded",
+        "checklist_posted",
     )

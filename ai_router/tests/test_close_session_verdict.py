@@ -19,6 +19,7 @@ import pytest
 
 import close_session
 from close_session import resolve_close_verdict
+from session_checklist import record_post
 from disposition import Disposition, write_disposition
 from session_state import (
     NextOrchestrator,
@@ -119,6 +120,9 @@ def _build_repo_with_set(
         }, indent=2),
         encoding="utf-8",
     )
+    # Set 114 S1: the session posted its step checklist. Written through
+    # the shipping writer so the fixture exercises the real path.
+    record_post(str(set_dir), 1, [])
     return root, set_dir
 
 

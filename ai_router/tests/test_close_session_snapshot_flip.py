@@ -36,6 +36,7 @@ import pytest
 
 import close_session
 from disposition import Disposition, write_disposition
+from session_checklist import record_post
 from stamp_fixtures import write_stamped_evidence
 from session_events import (
     SessionLifecycleState,
@@ -161,6 +162,10 @@ def _build_repo_with_set(
     )
     # Set 084 (F3): stamped artifact + row per session — settled
     # evidence also stands the close backstop down.
+    # Set 114 S1: session 1 posted its step checklist. Only session 1 —
+    # a later session's post belongs after that session registers, or it
+    # predates its own startedAt.
+    record_post(str(set_dir), 1, [])
     rows = [
         write_stamped_evidence(set_dir, session_number=n)
         for n in range(1, total_sessions + 1)
@@ -555,6 +560,9 @@ def test_close_session_multi_session_set_clean(tmp_path: Path):
     activity_log_path.write_text(
         json.dumps(log_data, indent=2), encoding="utf-8",
     )
+    # Set 114 S1: session 2 posted its step checklist, after it
+    # registered and after its last step was logged.
+    record_post(str(set_dir), 2, [])
 
     write_disposition(str(set_dir), Disposition(
         status="completed",

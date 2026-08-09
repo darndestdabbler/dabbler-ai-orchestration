@@ -28,6 +28,7 @@ import pytest
 import close_session
 from close_lock import LOCK_FILENAME, STALE_LOCK_TTL_SECONDS, acquire_lock, release_lock
 from disposition import Disposition, write_disposition
+from session_checklist import record_post
 from session_state import (
     NextOrchestrator,
     NextOrchestratorReason,
@@ -167,6 +168,10 @@ def closeable_set(tmp_path: Path, monkeypatch) -> Path:
         next_orchestrator=_valid_next_orc(),
         blockers=[],
     ))
+    # Set 114 S1: the session posted its step checklist, recorded by the
+    # act of rendering it. Written through the shipping writer rather
+    # than a hand-rolled line, so the fixture exercises the real path.
+    record_post(str(set_dir), 1, [])
     _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
     _git(root, "add", "-A")
     _git(root, "commit", "-m", "land set")
@@ -308,6 +313,7 @@ def test_missing_change_log_triggers_gate_failed_on_final_session(
     ))
     # Set 084: settle the verification evidence so the close backstop
     # stands down and change_log_fresh stays the gate under test.
+    record_post(str(set_dir), 2, [])
     _corroborate_api_close(set_dir, 2, monkeypatch, tmp_path)
     _git(root, "add", "-A")
     _git(root, "commit", "-m", "land final set")

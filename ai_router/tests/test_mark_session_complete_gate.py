@@ -40,6 +40,7 @@ import pytest
 import close_session
 from disposition import Disposition, write_disposition
 from session_events import read_events
+from session_checklist import record_post
 from session_state import (
     CloseoutGateFailure,
     GateCheckFailure,
@@ -550,6 +551,9 @@ def integration_set(tmp_path: Path) -> Path:
         }, indent=2),
         encoding="utf-8",
     )
+    # Set 114 S1: the session posted its step checklist. Written through
+    # the shipping writer so the fixture exercises the real path.
+    record_post(str(set_dir), 1, [])
     return set_dir
 
 

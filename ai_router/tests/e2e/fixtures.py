@@ -75,6 +75,7 @@ from disposition import (  # type: ignore[import-not-found]
     write_disposition,
 )
 from session_events import read_events as _read_events_raw  # type: ignore[import-not-found]
+from session_checklist import record_post  # type: ignore[import-not-found]
 from session_lifecycle import (  # type: ignore[import-not-found]
     cancel_session_set,
     restore_session_set,
@@ -528,6 +529,12 @@ def make_activity_log_entry(
     with open(path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
+
+    # Set 114 S1: a real orchestrator logs a step and then posts the step
+    # checklist, and the ``checklist_posted`` close gate reads that post
+    # ledger. Written through the shipping writer so the harness exercises
+    # the real path rather than a hand-rolled line.
+    record_post(str(handle.set_dir), session_number, [])
 
     if commit:
         _commit_and_push(

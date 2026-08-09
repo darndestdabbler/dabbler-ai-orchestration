@@ -1,0 +1,97 @@
+{
+  "sessionSetName": "114-rolling-task-list-and-progress-visibility",
+  "createdDate": "2026-08-09T20:52:21.043390+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-09T20:52:21.046343+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-09T16:57:12.916409-04:00",
+      "description": "Registered session 1 of Set 114; read the proposal, spec, and preload.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "post-record-design",
+      "dateTime": "2026-08-09T16:57:12.917706-04:00",
+      "description": "Design the durable post record: sibling append-only checklist-posts.jsonl, freshness-exempt but evidence-visible.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "cadence-defined",
+      "dateTime": "2026-08-09T16:57:12.918628-04:00",
+      "description": "Name the transitions that owe a checklist post, in session-constitution.md Step 4 and the authoring guide.",
+      "status": "pending"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "checklist-gate",
+      "dateTime": "2026-08-09T16:57:12.919402-04:00",
+      "description": "Close gate comparing posts against the transitions the record shows; test the refusal.",
+      "status": "pending"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "verify-and-close",
+      "dateTime": "2026-08-09T16:57:12.920229-04:00",
+      "description": "Full pytest after freeze, cross-provider verification, close.",
+      "status": "pending"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "post-record-design",
+      "dateTime": "2026-08-09T17:04:05.594739-04:00",
+      "description": "Post record shipped: checklist-posts.jsonl written by the CLI render, freshness-exempt and evidence-visible.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "checklist-gate",
+      "dateTime": "2026-08-09T17:04:05.596190-04:00",
+      "description": "check_checklist_posted registered; 32 tests including a falsifier per rule.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "cadence-defined",
+      "dateTime": "2026-08-09T17:04:05.597155-04:00",
+      "description": "Name the transitions that owe a checklist post, in session-constitution.md Step 4 and the authoring guide.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "cadence-defined",
+      "dateTime": "2026-08-09T17:10:04.223788-04:00",
+      "description": "Five transitions named in session-constitution.md Step 4, the authoring guide, and the CHANGELOG; pointer-table row added.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "verify-and-close",
+      "dateTime": "2026-08-09T17:10:04.225150-04:00",
+      "description": "Full pytest after freeze, cross-provider verification, close.",
+      "status": "in-progress"
+    }
+  ]
+}

@@ -55,10 +55,14 @@ Run every router CLI through the workspace venv
     verification-only policy window. Set 111 owns the next routing-policy
     revision, so do not expand outsourcing before that set decides it.
   - **4. Execute.** Do the plan's steps; log every step to
-    `activity-log.json` (`log_step`), and **post the step checklist at
-    every transitional boundary** (`python -m
-    ai_router.session_checklist`, `--markdown` for a chat surface) so the
-    operator can see where the session is without scrolling. The active
+    `activity-log.json` (`log_step`), and **post the step checklist**
+    (`python -m ai_router.session_checklist`, `--markdown` for a chat
+    surface) at each of the five named transitions: session start,
+    either side of a long-running command, every operator stop, after
+    each verification round, and before close. Rendering it is what
+    records it, and the `checklist_posted` close gate compares that
+    record against the transitions your own records show — a session
+    that never posted cannot close quietly. The active
     orchestrator owns implementation, architecture, analysis, documentation,
     and test authoring for the temporary policy window. Route only
     `session-verification`, which must use a different effective provider;
@@ -232,8 +236,8 @@ Open the named reference at the step's trigger moment — not before.
 | 1 | `docs/planning/repo-worktree-layout.md` | Worktree layout, migration, drift recovery |
 | 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, **session-size cap**, slugs) |
 | 2 | `docs/ai-led-session-workflow.md` | The set declares `requiresUAT` / `requiresE2E` — the gated UAT/E2E procedures |
-| 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy and the run-of-record freshness gate |
-| 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
+| 4 | `docs/planning/session-set-authoring-guide.md` | The step-checklist cadence: what a transition is, the post ledger, the `checklist_posted` gate |
+| 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy and the run-of-record freshness gate || 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
 | 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |
 | 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options |
 | 8 | `ai_router/docs/close-out.md` | Close failure, stranded session, mixed-mode drift, manual-flag matrix |

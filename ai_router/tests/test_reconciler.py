@@ -25,6 +25,7 @@ import pytest
 
 import close_session
 import reconciler
+from session_checklist import record_post
 from session_events import append_event
 
 
@@ -419,6 +420,9 @@ def test_reconciler_recovers_stranded_session_via_real_close_session(
         }, indent=2),
         encoding="utf-8",
     )
+    # Set 114 S1: the session posted its step checklist. Written through
+    # the shipping writer so the fixture exercises the real path.
+    record_post(str(set_dir), 1, [])
     write_disposition(str(set_dir), Disposition(
         status="completed",
         summary="api-verified session",

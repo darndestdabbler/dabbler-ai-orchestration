@@ -565,7 +565,7 @@ def test_happy_path_skeleton_succeeds(started_with_disposition):
     assert outcome.exit_code == 0
     # Every named gate appears in the output (shape stability;
     # verification_integrity joined in Set 083, test_run_fresh and
-    # uat_walk_recorded in Set 111 S4).
+    # uat_walk_recorded in Set 111 S4, checklist_posted in Set 114 S1).
     assert {g.check for g in outcome.gate_results} == {
         "working_tree_clean",
         "pushed_to_remote",
@@ -575,6 +575,7 @@ def test_happy_path_skeleton_succeeds(started_with_disposition):
         "verification_integrity",
         "test_run_fresh",
         "uat_walk_recorded",
+        "checklist_posted",
     }
     assert all(g.passed for g in outcome.gate_results)
 

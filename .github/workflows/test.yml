@@ -72,6 +72,21 @@ jobs:
       - name: Run tutorial-fidelity gate
         run: python ai_router/scripts/tutorial_gate.py
 
+      # Set 112 S3: the anti-resurrection gate for the removed Lightweight
+      # tier. Set 112 deleted the tier; this is the executable proof that
+      # the deletion holds, so the tier cannot come back one plausible
+      # commit at a time. It classifies by POSITION, not by an allowlist of
+      # blessed files: comments, docstrings and markdown prose may explain
+      # the removal freely (the migration message, the historical note, the
+      # cross-repo notice and the changelogs all name it), while code
+      # outside comments, fenced code blocks, and YAML/JSON bodies may not
+      # declare it. Stdlib only, so it needs no install step. Also run by
+      # pytest (ai_router/tests/test_lightweight_resurrection_guard.py),
+      # which additionally proves the gate CATCHES planted resurrections --
+      # a gate that only ever passes proves nothing.
+      - name: Run Lightweight-tier anti-resurrection gate
+        run: python ai_router/scripts/lightweight_resurrection_guard.py
+
   guidance-ceiling:
     name: Preload guidance ceiling gate
     runs-on: ubuntu-latest

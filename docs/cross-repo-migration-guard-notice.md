@@ -108,20 +108,29 @@ reader shim and `--no-router` mode available.) Reinstall:
 ```
 
 If it reports drift, run the bulk upgrade — either the Explorer's
-**"Upgrade older session sets"** title-bar icon, or the three existing
+**"Upgrade older session sets"** title-bar icon, or the two remaining
 migrators in sequence (idempotent, `.bak`-backed, reversible):
 
 ```bash
 .venv/Scripts/python.exe -m ai_router.migrate_session_state --in-place              # v2 -> v3
-.venv/Scripts/python.exe -m ai_router.migrate_lightweight_to_canonical_v4 --in-place # lightweight/v2 -> v4
 .venv/Scripts/python.exe -m ai_router.migrate_v3_to_v4 --in-place                    # v3 -> v4
 ```
+
+> **Set 112 correction (2026-08-09).** This chain used to have a third
+> step between the two above — `migrate_lightweight_to_canonical_v4`,
+> which normalized hand-edited Lightweight-shaped state files. Set 112
+> removed the Lightweight tier and deleted that migrator, so running it
+> now fails with `No module named
+> ai_router.migrate_lightweight_to_canonical_v4`. `check_migrations` no
+> longer registers it either, so it cannot appear in the drift report.
+> The two steps above are the whole chain. See
+> [`cross-repo-lightweight-removal-notice.md`](cross-repo-lightweight-removal-notice.md).
 
 > **Chain note (Set 050 S2 empirical correction):** a *genuine* v2 file
 > (explicit `schemaVersion: 2` + the legacy
 > `currentSession`/`totalSessions`/`completedSessions` triple) is skipped
-> by both v4 migrators on their own — it needs the `migrate_session_state`
-> (v2→v3) step **first**. Run all three in the order above; each is a
+> by the v4 migrator on its own — it needs the `migrate_session_state`
+> (v2→v3) step **first**. Run both in the order above; each is a
 > no-op on files already at its target.
 
 ---

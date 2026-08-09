@@ -1,10 +1,18 @@
 # Cross-repo CLAUDE.md notice — Lightweight-tier parity (Set 048)
 
+<!-- lightweight-guard: frozen-history -->
+
 > **SUPERSEDED — do not send this notice.** Set 112 removed the
 > Lightweight tier entirely. This file is a frozen record of the notice
 > that announced the tier's parity surface in 2026-05; everything it
-> instructs consumers to adopt has since been deleted. The current notice
-> is
+> instructs consumers to adopt has since been deleted, **including the
+> `migrate_lightweight_to_canonical_v4` migrator its state-file section
+> tells you to run** — that module no longer exists, so the command below
+> now fails with `No module named`. The text is preserved unedited as the
+> record of what consumers were told; the marker above tells Set 112's
+> anti-resurrection gate
+> (`ai_router/scripts/lightweight_resurrection_guard.py`) to skip it for
+> that reason. The current notice is
 > [`docs/cross-repo-lightweight-removal-notice.md`](cross-repo-lightweight-removal-notice.md),
 > and the retired model is described in
 > [`docs/concepts/tier-model.md`](concepts/tier-model.md).

@@ -946,18 +946,18 @@ export function readSessionSets(root: string): SessionSet[] {
     // and the per-entry `dateTime` for the `lastTouched` display, which
     // is more granular than the state-file's session-boundary timestamps
     // while a session is mid-flight.
-    // Set 077 Session 5 (A7): the parsed log is also the home of the
-    // DURABLE verificationMode record (`verification_mode` /
-    // `verification_mode_change` entries), captured here so the config
-    // resolution below can prefer it over the spec seed.
-    let activityLogParsed: unknown = null;
+    // Set 112 S3: those two ARE the whole reason this read survives. It
+    // used to keep the parsed log in scope as well, for the Set 077 (A7)
+    // durable `verificationMode` record (`verification_mode` /
+    // `verification_mode_change` entries) that the tier's config
+    // resolution preferred over the spec seed. S2 deleted that resolution
+    // with the tier and left the binding behind, reading to nothing.
     if (fs.existsSync(activityPath)) {
       try {
         const data = JSON.parse(fs.readFileSync(activityPath, "utf8")) as {
           totalSessions?: number;
           entries?: Array<{ sessionNumber?: number; dateTime?: string }>;
         };
-        activityLogParsed = data;
         if (typeof data.totalSessions === "number") totalSessions = data.totalSessions;  // noqa: D13 - activity-log.json carrier field, not session-state
         for (const e of data.entries ?? []) {
           if (e.dateTime && (!lastTouched || e.dateTime > lastTouched)) lastTouched = e.dateTime;

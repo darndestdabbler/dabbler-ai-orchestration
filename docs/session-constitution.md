@@ -115,7 +115,7 @@ Run every router CLI through the workspace venv
   signal.
 - **The spec's configuration block, as captured at set start, is
   immutable at runtime.** Gate policy records (`pathAwareCritique`,
-  `verificationMode`) are written once at the first `start_session`.
+  `contractGate`) are written once at the first `start_session`.
 - **Shared operational facts live in engine-agnostic docs** (`docs/`,
   package changelogs), never only in `CLAUDE.md` / `AGENTS.md` /
   `GEMINI.md` — the bootstrap files are entrypoints, not the record.

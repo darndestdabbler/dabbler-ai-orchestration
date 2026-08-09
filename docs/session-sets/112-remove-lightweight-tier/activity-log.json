@@ -178,6 +178,30 @@
       "dateTime": "2026-08-09T11:16:26.640846-04:00",
       "description": "close_session succeeded: all 8 gates PASS. Round 4 re-verification VERIFIED against the final tree after the close-out writes; close backstop EvidenceTooLargeError crash fixed en route",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "session-3/register",
+      "dateTime": "2026-08-09T11:21:34.459625-04:00",
+      "description": "Registered session 3 (copilot/anthropic/claude-opus-5, effort high); committed S2 close-out state; read preload + spec + S1 inventory + ai-assignment notes",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/grep-gate",
+      "dateTime": "2026-08-09T11:25:08.746115-04:00",
+      "description": "Authoring the anti-resurrection gate: surveyed all live references per pattern; every remaining hit is narration (comment/docstring/prose), so the gate encodes declaration-territory vs narration-territory structurally rather than an file allowlist",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "session-3/grep-gate",
+      "dateTime": "2026-08-09T11:33:30.530023-04:00",
+      "description": "Shipped ai_router/scripts/lightweight_resurrection_guard.py + 41 falsifier tests + CI wiring. Gate classifies by position (declaration territory vs narration), not a file allowlist. It caught 2 real defects: cross-repo-migration-guard-notice.md still told consumers to run the deleted migrator, and the superseded Set 048 notice did too. Also fixed 3 stale claims: session-constitution.md named verificationMode as a live gate record, fileSystem.ts kept a dead activityLogParsed binding, upgradeOlderSets.ts said three migrators",
+      "status": "complete"
     }
   ]
 }

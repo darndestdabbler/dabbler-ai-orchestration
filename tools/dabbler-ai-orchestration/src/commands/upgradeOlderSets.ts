@@ -113,7 +113,7 @@ function runMigrator(
 }
 
 // Best-effort one-line summary from a migrator's --json output. The
-// three migrators emit slightly different shapes; fall back to a generic
+// two migrators emit slightly different shapes; fall back to a generic
 // "ran" when the count isn't parseable.
 function summarizeJson(stdout: string): string {
   try {

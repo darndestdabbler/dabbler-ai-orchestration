@@ -91,7 +91,7 @@ whose trigger moment is situational, moved full-text to
 | L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
 
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
-<!-- lesson: id="L-079-1" added-set="079" last-used-set="111" status="active" scope="portable" -->
+<!-- lesson: id="L-079-1" added-set="079" last-used-set="112" status="active" scope="portable" -->
 
 - The child Python's stdout text layer defaults to `cp1252` on Windows,
   so any non-ASCII payload crossing a pipe *as text* is a latent crash in
@@ -135,6 +135,20 @@ full text in `lessons-archive.md`:
   generating diff-based evidence, or include `git status --short`
   alongside the diff so additions are visible.
 
+
+## A Gate That Only Ever Passes Proves Nothing — Ship It With Falsifiers
+<!-- lesson: id="L-112-1" added-set="112" last-used-set="112" status="active" scope="portable" -->
+
+- A pattern-matching gate (grep guard, banned-phrase scan) that matches
+  nothing looks **identical** to one that finds nothing, and reviewing
+  its regexes reads as confirmation. Only a **planted violation**
+  separates them: per rule, one falsifier that plants the defect and
+  asserts the gate fires, one that plants the legitimate look-alike and
+  asserts it does not. Set 112's anti-resurrection gate passed its own
+  repo cleanly and still missed six declaration shapes over four
+  verification rounds — every one found by planting it, none by reading
+  the code. Add a **structural** assertion beside the textual one; it
+  holds however a thing is spelled.
 
 ## A Dependency-Pin Bump Is Not Enablement
 <!-- lesson: id="L-075-1" added-set="075" last-used-set="084" status="active" scope="portable" -->

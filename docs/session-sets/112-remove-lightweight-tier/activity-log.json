@@ -250,6 +250,14 @@
       "dateTime": "2026-08-09T13:57:51.960883-04:00",
       "description": "Authored disposition.json (validates clean as the final session; verdict ISSUES_FOUND_RESOLVED_IN_FLIGHT -- all 8 findings found and fixed in flight, the last pair at the enforced bound). The disposition.uat block is the one field still owed: requiresUAT true + uatScope per-set puts the walk on this session, and it needs the operators attestation",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 9,
+      "stepKey": "session-3/step-9-review",
+      "dateTime": "2026-08-09T13:59:28.390318-04:00",
+      "description": "Step 9 guidance review (run early, since the close is blocked on the operator walk): added L-112-1 (a gate that only ever passes proves nothing -- ship it with falsifiers), which passed the Set 085 admission test on this sessions evidence: the gate passed its own repo cleanly and still missed six declaration shapes over four rounds, every one found by planting rather than by reading. Adding it breached the lessons-learned ceiling by 23 tokens, so the lesson was TRIMMED rather than the ceiling raised (ceilings ratchet down only). Cited L-064-8, L-069-1, L-079-1, L-112-1; cite_lessons flags L-069-1 as archived-but-reused for operator reactivation review",
+      "status": "complete"
     }
   ]
 }

@@ -579,6 +579,13 @@ class TestChecklistGateAcceptance:
         assert passed is True, remediation
 
     def test_an_operator_stop_followed_by_a_post_passes(self, tmp_path):
+        """What the gate actually means: journaled, then posted.
+
+        The pre-brief timing the cadence prescribes is NOT what this
+        checks — `decisions.jsonl` gets its line once the decision
+        exists, which is after the brief. The docs say so rather than
+        implying the gate sees the earlier moment.
+        """
         set_dir = _make_set(
             tmp_path,
             entries=[_entry(1, "register", "complete", at=_iso(1))],

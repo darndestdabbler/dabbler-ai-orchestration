@@ -822,7 +822,8 @@ every step is scrolled past like any other banner:
 | **Session start** | Right after `start_session`, once the plan's steps are logged. | Yes |
 | **A long-running command returns** | After a blocking command (a full suite, a routed round) finishes **and its record is written** — `run_of_record record` first, then post. | Yes |
 | **Before a long-running command** | Before you start one you expect to block for minutes. | **No** — see below |
-| **Every operator stop** | Immediately before the education-mode brief, so the human sees where the session is while they decide. | Yes |
+| **An operator stop is journaled** | After `decision_journal` records the human-authority decision. | Yes |
+| **Before the education-mode brief** | Immediately before you put the question to the human, so they see where the session is while they decide. | **No** — see below |
 | **Before close** | After the last logged step, before `close_session`. | Yes |
 
 ### Posting is recorded by the act of posting
@@ -845,12 +846,19 @@ uncovered and the close gate will say so.
 
 Three limits worth stating plainly:
 
-- **The *before* half of a long-running command is doctrine, not a
-  gate.** Starting a command leaves no artifact, and a flag that let the
-  orchestrator declare one would be the self-reported attestation this
-  set exists to avoid — it would decay exactly as the prose obligation
-  did. Post before you start anyway: that post is for the operator
-  staring at a silent terminal, which is the whole point.
+- **Every "before X" moment in this table is doctrine, not a gate.**
+  There is a general reason, not two special cases: this framework's
+  records are all written *after* the thing they describe, so the gate
+  can prove a post followed an event and can never prove one preceded
+  it. Starting a command leaves no artifact, and `decisions.jsonl` gets
+  its line once the decision exists — after the brief, not before it. A
+  flag that let the orchestrator declare "I posted first" would be the
+  self-reported attestation this set exists to avoid, and it would decay
+  exactly as the prose obligation did. So the two before-posts are
+  prescribed and unchecked, and the table says so rather than implying
+  otherwise. Post before you start anyway: the before-post is for the
+  operator staring at a silent terminal or being asked a question, which
+  is the whole point of the surface.
 - **A post proves a render, not a reader.** The gate can be satisfied
   mechanically. The floor it buys is that an omission becomes visible.
 - **Exactly one transition can be excused**, and only by being older
@@ -859,7 +867,8 @@ Three limits worth stating plainly:
   when this shipped, or one in a repo that upgraded mid-session, is not
   failed for a start it could not have recorded. Every other transition
   binds however old the ledger is, and a session with no posts at all is
-  refused outright.
+  refused outright. Records older than the session's own `startedAt` are
+  not its transitions at all.
 
 `--no-record` renders without recording, for scripted or repeated reads.
 It can only ever weaken the caller's own position at close, never

@@ -1989,12 +1989,16 @@ def check_checklist_posted(
     * **A post proves a render, not a reader.** The gate can be satisfied
       mechanically. That is an acceptable floor: it converts an invisible
       omission into a visible one, which is strictly what it claims.
-    * **The *before* half of a long-running command is not checkable.**
-      Starting a command leaves no artifact, and asking the orchestrator
-      to declare one would be the self-reported attestation the spec
-      rules out (Decision 3) — it would decay exactly as the prose
-      obligation did. The completion half binds; the doc says which is
-      which rather than implying both are enforced.
+    * **No "before X" moment is checkable.** Every record this framework
+      keeps is written *after* the thing it describes, so this gate can
+      prove a post followed an event and can never prove one preceded
+      it: starting a command leaves no artifact, and `decisions.jsonl`
+      gets its line once the decision exists — after the brief, not
+      before it. Asking the orchestrator to declare either would be the
+      self-reported attestation the spec rules out (Decision 3), and it
+      would decay exactly as the prose obligation did. The
+      ``operator-stop`` transition therefore means "a stop was journaled
+      and the session posted after it", and the docs say so.
     """
     _ = disposition
     _ = allow_empty_commit

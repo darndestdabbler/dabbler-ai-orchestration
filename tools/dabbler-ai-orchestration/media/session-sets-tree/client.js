@@ -33,49 +33,42 @@
   const gsHtml = window.DabblerGettingStartedHtml;
   const systemStatusHtml = window.DabblerSystemStatusHtml;
   // Set 060 Session 2: the Getting Started form's control state. Kept
-  // here so a snapshot re-render — which happens
-  // after every action and on every watcher tick — doesn't snap the
-  // tier radio back to Full or untick the parallel checkbox. Set 063
-  // S2: `budget` (raw input string) and `zeroMethod` (the $0 zero-rule
-  // radio pick) ride along for the same reason.
+  // here so a snapshot re-render — which happens after every action and
+  // on every watcher tick — doesn't snap the provider-access radio back
+  // to its default. Set 063 S2: `budget` (raw input string) and
+  // `zeroMethod` (the $0 zero-rule radio pick) ride along for the same
+  // reason.
   //
-  // Set 077 S2 (A1/A11): the state now also survives webview TEARDOWN —
+  // Set 077 S2 (A1/A11): the state also survives webview TEARDOWN —
   // hiding the view, collapsing the sidebar, or reloading the window
-  // re-runs this script, and the in-memory object alone re-checked the
-  // Full radio (and re-showed the Full-tier key warning) over a
-  // Lightweight pick. `vscode.getState()`/`setState()` round-trips the
-  // whole control state (tier AND the same-family budget / zeroMethod /
-  // parallel fields); `persistGsState()` runs after every mutation. The
-  // host's durable tier seed (`.dabbler/tier` marker → router-config
-  // inference) is applied ONCE per script load when the first
-  // getting-started snapshot arrives — it outranks an UNTOUCHED
-  // persisted radio (Feature 1 precedence: marker → inference →
-  // volatile UI) but never a radio the operator explicitly flipped
-  // after the last seed (`tierDirty`, S2 review Major 1).
+  // re-runs this script, and the in-memory object alone would re-check
+  // the default radio over the operator's pick.
+  // `vscode.getState()`/`setState()` round-trips the whole control
+  // state; `persistGsState()` runs after every mutation. The host's
+  // durable seat-profile seed is applied ONCE per script load when the
+  // first getting-started snapshot arrives — it outranks an UNTOUCHED
+  // persisted radio but never a radio the operator explicitly flipped
+  // after the last seed (`profileDirty`).
   // Restoration/narrowing is the pure `gsHtml.restoreGsState` so the
   // contract is unit-tested at Layer 2.
+  //
+  // Set 112 S2: the tier radio and the Lightweight verification-mode
+  // radios retired with the tier; provider access is the form's only
+  // setup fork now.
   const persistedState = vscode.getState();
   let gsState = gsHtml.restoreGsState(
     persistedState ? persistedState.gsState : undefined,
     null,
     null,
-    null,
-    null,
   );
-  // The (rootId, tierSeed, verificationModeSeed, transportProfileSeed)
-  // tuple last applied this script-lifetime. Sentinels (not null) so the
-  // first getting-started snapshot always seeds; a later snapshot whose
-  // rootId OR any seed differs re-runs the restore — the once-per-load
-  // boolean missed a mid-life root switch (S077-S2-V1-001) and a
-  // rootId-only key missed a same-root seed change, e.g. the marker
-  // written by a scaffold action while the webview stays alive
-  // (S077-S2-V1-002, round 2). Set 077 S3: the verification-mode marker
-  // seed joins the tuple with identical semantics. Set 079 S1: the
-  // seat-profile seed joins too (null from the host until Session 2
-  // wires the durable source).
+  // The (rootId, transportProfileSeed) pair last applied this
+  // script-lifetime. Sentinels (not null) so the first getting-started
+  // snapshot always seeds; a later snapshot whose rootId OR the seed
+  // differs re-runs the restore — the once-per-load boolean missed a
+  // mid-life root switch (S077-S2-V1-001) and a rootId-only key missed a
+  // same-root seed change, e.g. a profile written by a scaffold action
+  // while the webview stays alive (S077-S2-V1-002, round 2).
   let lastSeedRootId = { unseeded: true };
-  let lastSeedValue = { unseeded: true };
-  let lastSeedMode = { unseeded: true };
   let lastSeedProfile = { unseeded: true };
   // Merge-preserving write (S2 review, Minor 2): never clobber other
   // keys a future consumer may persist alongside gsState.
@@ -84,14 +77,8 @@
     vscode.setState(
       Object.assign({}, prior && typeof prior === "object" ? prior : {}, {
         gsState: {
-          tier: gsState.tier,
           budget: gsState.budget,
           zeroMethod: gsState.zeroMethod,
-          tierDirty: gsState.tierDirty,
-          lastSeed: gsState.lastSeed,
-          verificationMode: gsState.verificationMode,
-          modeDirty: gsState.modeDirty,
-          lastModeSeed: gsState.lastModeSeed,
           transportProfile: gsState.transportProfile,
           profileDirty: gsState.profileDirty,
           lastProfileSeed: gsState.lastProfileSeed,
@@ -170,49 +157,38 @@
     var gs = lastSnapshot.gettingStarted;
     var status = lastSnapshot.systemStatus;
     if (gs && gs.mode !== "list") {
-      // Set 077 S2 (A1): the host's durable tier seed rides the
+      // Set 077 S2 (A1): the host's durable seat-profile seed rides the
       // snapshot. Applied once per (script load, root) — before the
       // first form paint, and again if the detection root changes
       // mid-life (S077-S2-V1-001). All precedence lives in the pure
-      // restoreGsState: the seed outranks an UNTOUCHED persisted radio
-      // (the Set 076 leak), a post-seed explicit flip survives the
-      // SAME seed (tierDirty, S2 review Major 1), and a CHANGED seed —
-      // a newer sanctioned choice — re-applies and clears the flag
-      // (S077-S2-V1-002). A root switch discards the other root's
-      // persisted state entirely.
+      // restoreGsState: the seed outranks an UNTOUCHED persisted radio,
+      // a post-seed explicit flip survives the SAME seed
+      // (profileDirty), and a CHANGED seed — a newer sanctioned choice —
+      // re-applies and clears the flag (S077-S2-V1-002). A root switch
+      // discards the other root's persisted state entirely.
       if (
         gs.mode === "getting-started" &&
         (lastSeedRootId !== gs.rootId ||
-          lastSeedValue !== gs.tierSeed ||
-          lastSeedMode !== gs.verificationModeSeed ||
           lastSeedProfile !== gs.transportProfileSeed)
       ) {
         lastSeedRootId = gs.rootId;
-        lastSeedValue = gs.tierSeed;
-        lastSeedMode = gs.verificationModeSeed;
         lastSeedProfile = gs.transportProfileSeed;
         gsState = gsHtml.restoreGsState(
           gsState,
-          gs.tierSeed,
           gs.rootId,
-          gs.verificationModeSeed,
           gs.transportProfileSeed,
         );
         persistGsState();
       }
       // Set 092 S2 (verification R1): the strip is computed only AFTER
       // the durable seed lands in gsState, so the first paint's strip
-      // and form read the same finalized tier/profile controls — a
-      // pre-seed strip could show a provider-key fault the seeded tier
-      // suppresses (or hide a Copilot fault it implies).
+      // and form read the same finalized profile control — a pre-seed
+      // strip could hide a Copilot fault the seeded profile implies.
       var statusHtml = systemStatusHtml.renderSystemStatus(
         status,
         gs.mode === "getting-started"
           ? gsState
-          : {
-              tier: status && status.tier,
-              transportProfile: status && status.transportProfile,
-            },
+          : { transportProfile: status && status.transportProfile },
       );
       root.innerHTML =
         statusHtml + (gs.mode === "no-folder"
@@ -231,7 +207,6 @@
     // transient state (the tick between a fault clearing and the key being
     // re-evaluated), not the steady state.
     root.innerHTML = systemStatusHtml.renderSystemStatus(status, {
-      tier: status && status.tier,
       transportProfile: status && status.transportProfile,
     });
   }
@@ -243,27 +218,12 @@
 
   // Set 060 Session 2: wire the Getting Started surfaces. Buttons post a
   // typed `gettingStartedAction` message; build-structure carries the
-  // form state (tier / seat profile / budget / verification mode), and
+  // form state (seat profile / budget), and
   // open-modules carries none (Set 094). The clicked button disables until
   // the host's post-action snapshot re-renders the surface (double-click
   // guard). Radio changes update gsState and re-render / toggle the System
   // Status faults in place — no host round-trip.
   function wireGettingStarted() {
-    Array.from(root.querySelectorAll('input[name="gs-tier"]')).forEach(function (input) {
-      input.addEventListener("change", function () {
-        if (input.checked) {
-          gsState.tier = input.value === "lightweight" ? "lightweight" : "full";
-          // Explicit operator intent: later seeds must not revert it.
-          gsState.tierDirty = true;
-        }
-        persistGsState();
-        // Set 063 S2 (R1 Minor fix): the budget block is OMITTED from
-        // the Lightweight render (not hidden), so a tier flip
-        // re-renders the form surface locally. gsState carries every
-        // control value, so nothing is lost; no host round-trip.
-        render();
-      });
-    });
     // Set 063 S2 (spec D1): budget input + the $0 zero-rule radio pair.
     // Typing updates gsState and flips the zero-choice visibility in
     // place; any edit clears a standing validation message (the next
@@ -283,10 +243,9 @@
         showBudgetError(null);
       });
     });
-    // Set 079 S1 (Feature 1): the Full-only seat-profile radios. A flip
-    // is explicit operator intent (profileDirty), so later seeds never
-    // silently revert it — the tierDirty contract. Unlike the
-    // verification-mode radios this DOES re-render: the System Status
+    // Set 079 S1 (Feature 1): the seat-profile radios. A flip is
+    // explicit operator intent (profileDirty), so later seeds never
+    // silently revert it. This DOES re-render: the System Status
     // strip's provider-key / Copilot-CLI faults key on the selection,
     // and the re-render recomputes their visibility in one pass (radios
     // carry no typing focus to lose — the budget-input concern doesn't
@@ -307,23 +266,6 @@
         render();
       });
     });
-    // Set 077 S3 (Feature 2): the Lightweight-only verification-mode
-    // radios. A flip is explicit operator intent (modeDirty), so later
-    // marker seeds never silently revert it — the same contract as the
-    // tier radio's tierDirty. No re-render needed: block visibility
-    // depends only on the tier, and the radios update themselves.
-    Array.from(root.querySelectorAll('input[name="gs-verification-mode"]')).forEach(function (input) {
-      input.addEventListener("change", function () {
-        if (input.checked) {
-          gsState.verificationMode =
-            input.value === "dedicated-sessions"
-              ? "dedicated-sessions"
-              : "out-of-band-or-none";
-          gsState.modeDirty = true;
-        }
-        persistGsState();
-      });
-    });
     Array.from(root.querySelectorAll("[data-gs-action]")).forEach(function (btn) {
       btn.addEventListener("click", function (ev) {
         ev.stopPropagation();
@@ -331,36 +273,25 @@
         if (!action) return;
         var msg = { type: "gettingStartedAction", action: action };
         if (action === "build-structure") {
-          msg.tier = gsState.tier;
-          if (gsState.tier !== "lightweight") {
-            // Set 079 S2 (Feature 1): the Full-tier seat-profile pick
-            // rides the build so the host can run the guided Copilot
-            // seat setup after the scaffold succeeds. Omitted on
-            // Lightweight (the sub-choice block is not rendered there).
-            msg.transportProfile = gsState.transportProfile;
-            // Set 063 S2 (spec D1) → scoped by Set 081 S1: on Full,
-            // Build is blocked until the budget validates (required
-            // amount; $0 additionally needs the zero-rule pick) — but
-            // ONLY while the budget block is live (the Direct-API
-            // sub-option selected). Under the Copilot seat the block
-            // is not rendered and Build posts no budget riders — a
-            // hidden input must never trip Build validation.
-            // Lightweight never renders the input either.
-            if (gsState.transportProfile !== "copilot-cli") {
-              var check = gsHtml.validateBudgetControls(gsState);
-              if (!check.ok) {
-                showBudgetError(check.error);
-                return; // button stays enabled; the operator fixes and retries
-              }
-              msg.budgetUsd = check.budgetUsd;
-              if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
+          // Set 079 S2 (Feature 1): the seat-profile pick rides the
+          // build so the host can run the guided Copilot seat setup
+          // after the scaffold succeeds.
+          msg.transportProfile = gsState.transportProfile;
+          // Set 063 S2 (spec D1) → scoped by Set 081 S1: Build is
+          // blocked until the budget validates (required amount; $0
+          // additionally needs the zero-rule pick) — but ONLY while the
+          // budget block is live (the Direct-API sub-option selected).
+          // Under the Copilot seat the block is not rendered and Build
+          // posts no budget riders — a hidden input must never trip
+          // Build validation.
+          if (gsState.transportProfile !== "copilot-cli") {
+            var check = gsHtml.validateBudgetControls(gsState);
+            if (!check.ok) {
+              showBudgetError(check.error);
+              return; // button stays enabled; the operator fixes and retries
             }
-          } else {
-            // Set 077 S3 (Feature 2): the verification-mode pick rides
-            // the Lightweight build so the scaffold seeds the durable
-            // marker + generated docs with the operator's choice. Full
-            // posts no mode rider (the field is inert on Full).
-            msg.verificationMode = gsState.verificationMode;
+            msg.budgetUsd = check.budgetUsd;
+            if (check.budgetUsd === 0) msg.zeroBudgetMethod = check.zeroMethod;
           }
         }
         // Set 094: `open-modules` carries no riders — the generic
@@ -374,15 +305,14 @@
 
   // D6 note (Set 060 S3 → Set 063 S2 → Set 092 S2): the provider-key
   // fault now renders in the System Status strip; its visibility is
-  // computed in renderSystemStatus from the tier / seat-profile
-  // controls. Tier and profile radio changes re-render the surface
-  // (see the listeners above), so no standalone visibility-flip helper
-  // remains.
+  // computed in renderSystemStatus from the seat-profile control.
+  // Profile radio changes re-render the surface (see the listener
+  // above), so no standalone visibility-flip helper remains.
 
   // Set 063 S2 (spec D1): the nested $0 zero-rule pair shows only
   // while the parsed value is exactly 0. Pure visibility flip on input
   // events (re-rendering per keystroke would drop input focus). The
-  // block itself is omitted from the Lightweight render entirely, so
+  // block itself is omitted from the Copilot-seat render entirely, so
   // there is no block-level flip.
   function syncBudgetBlock() {
     var zero = root.querySelector("[data-gs-zero-choice]");

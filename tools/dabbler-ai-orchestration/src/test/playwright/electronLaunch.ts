@@ -72,11 +72,11 @@ function _filteredEnv(): NodeJS.ProcessEnv {
 // integrated terminal and the parent environment carries VS Code's own IPC
 // variables (ELECTRON_RUN_AS_NODE, VSCODE_*), which flip the child Code
 // process into CLI-arg-parsing mode instead of launching a window.
-function _electronEnv(): { [key: string]: string } {
+function _electronEnv(extra?: Record<string, string>): { [key: string]: string } {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   return (require("../../../scripts/vscode-launch.js") as {
-    electronEnv: () => { [key: string]: string };
-  }).electronEnv();
+    electronEnv: (extra?: Record<string, string>) => { [key: string]: string };
+  }).electronEnv(extra);
 }
 
 export interface FixtureHandle {
@@ -581,6 +581,13 @@ export interface LaunchedVSCode {
 export async function launchVSCode(
   workspacePath: string,
   extraArgs: string[] = [],
+  // Set 112 S2: extra environment for the launched extension host, layered
+  // on top of the allowlist. The allowlist deliberately drops `DABBLER_*`
+  // provider keys so a developer's real credentials can never change a test
+  // outcome — which means the provider-key probe reads FALSE by default.
+  // A test that needs a specific, deterministic answer from that probe
+  // supplies a dummy value here rather than depending on the machine.
+  extraEnv?: Record<string, string>,
 ): Promise<LaunchedVSCode> {
   const code = findCodeBinary();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-userdata-"));
@@ -600,7 +607,7 @@ export async function launchVSCode(
       ...extraArgs,
       workspacePath,
     ],
-    env: _electronEnv(),
+    env: _electronEnv(extraEnv),
     timeout: 60_000,
   });
   const page = await app.firstWindow({ timeout: 60_000 });

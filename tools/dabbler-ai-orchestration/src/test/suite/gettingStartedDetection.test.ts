@@ -8,8 +8,8 @@
 // single `structureBuilt` flag (the old plan / session-set steps retired),
 // and `computeGettingStarted` no longer carries the environment probes
 // (provider key / Python / Copilot CLI) — the System Status strip computes
-// those independently — so the payload is `{ mode, structureBuilt, tierSeed,
-// rootId, verificationModeSeed, transportProfileSeed }`.
+// those independently — so the payload is `{ mode, structureBuilt, rootId,
+// transportProfileSeed }`.
 
 import * as assert from "assert";
 import * as path from "path";
@@ -93,9 +93,7 @@ function payload(over: Partial<ReturnType<typeof computeGettingStarted>> = {}) {
   return {
     mode: "getting-started",
     structureBuilt: false,
-    tierSeed: null,
     rootId: null,
-    verificationModeSeed: null,
     transportProfileSeed: null,
     ...over,
   };
@@ -247,69 +245,15 @@ suite("gettingStartedDetection — providerKeyPresent (Set 060 S3, D6)", () => {
   });
 });
 
-// Set 077 Session 2 (Feature 1, A1): the durable tier seed rides the
-// payload so the webview can re-seed the form's tier radio after a
-// teardown. The resolver is a thunk gated on getting-started mode —
-// the one mode that renders the form — so list/no-folder snapshots
-// never pay the marker probe.
-suite("gettingStartedDetection — tierSeed (Set 077 S2)", () => {
-  test("getting-started mode calls the resolver and carries its value", () => {
-    const calls: string[] = [];
-    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), (root) => {
-      calls.push(root);
-      return "lightweight";
-    });
-    assert.strictEqual(p.tierSeed, "lightweight");
-    assert.deepStrictEqual(calls, [ROOT]);
-  });
-
-  test("resolver returning null carries null (rootId still rides)", () => {
-    const p = computeGettingStarted(true, ROOT, false, new FakeFs(), () => null);
-    assert.strictEqual(p.tierSeed, null);
-    // S077-S2-V1-001: the root identity ships whenever the form renders,
-    // so the webview can scope its persisted state per root.
-    assert.strictEqual(p.rootId, ROOT);
-  });
-
-  test("list mode never calls the resolver", () => {
-    let called = false;
-    const p = computeGettingStarted(true, ROOT, true, new FakeFs(), () => {
-      called = true;
-      return "full";
-    });
-    assert.strictEqual(called, false);
-    assert.strictEqual(p.tierSeed, null);
-  });
-
-  test("no-folder mode never calls the resolver", () => {
-    let called = false;
-    const p = computeGettingStarted(false, ROOT, false, new FakeFs(), () => {
-      called = true;
-      return "full";
-    });
-    assert.strictEqual(called, false);
-    assert.strictEqual(p.tierSeed, null);
-  });
-
-  test("resolver omitted (legacy callers) yields null", () => {
-    const p = computeGettingStarted(true, ROOT, false, new FakeFs());
-    assert.strictEqual(p.tierSeed, null);
-  });
-});
-
-// Set 077 S3 / Set 079 — the verification-mode + seat-profile seed thunks:
-// getting-started-mode-gated, null everywhere else. (Set 094: the
+// Set 079 — the seat-profile seed thunk: getting-started-mode-gated,
+// null everywhere else. (Set 094: the
 // Python-presence + Copilot-CLI probes these suites used to also exercise
 // left computeGettingStarted; the System Status strip owns them now.)
-suite("computeGettingStarted — seed thunks (verificationMode + transportProfile)", () => {
+suite("computeGettingStarted — transportProfile seed thunk", () => {
   function countingThunks() {
-    const calls = { modeSeed: 0, profileSeed: 0 };
+    const calls = { profileSeed: 0 };
     return {
       calls,
-      modeSeed: () => {
-        calls.modeSeed++;
-        return "dedicated-sessions" as const;
-      },
       profileSeed: () => {
         calls.profileSeed++;
         return "copilot-cli" as const;
@@ -317,79 +261,51 @@ suite("computeGettingStarted — seed thunks (verificationMode + transportProfil
     };
   }
 
-  test("getting-started mode: both seeds run and flow through", () => {
+  test("getting-started mode: seed runs and flows through", () => {
     const t = countingThunks();
     const p = computeGettingStarted(
       true,
       ROOT,
       false,
       fullyScaffolded(),
-      () => "lightweight",
-      t.modeSeed,
       t.profileSeed,
     );
     assert.strictEqual(p.mode, "getting-started");
-    assert.strictEqual(t.calls.modeSeed, 1);
     assert.strictEqual(t.calls.profileSeed, 1);
-    assert.strictEqual(p.verificationModeSeed, "dedicated-sessions");
     assert.strictEqual(p.transportProfileSeed, "copilot-cli");
   });
 
-  test("list mode: seed thunks never run; nulls ship", () => {
+  test("list mode: seed thunk never runs; null ships", () => {
     const t = countingThunks();
     const p = computeGettingStarted(
       true,
       ROOT,
       true,
       fullyScaffolded(),
-      () => "lightweight",
-      t.modeSeed,
       t.profileSeed,
     );
     assert.strictEqual(p.mode, "list");
-    assert.strictEqual(t.calls.modeSeed, 0);
     assert.strictEqual(t.calls.profileSeed, 0);
-    assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.transportProfileSeed, null);
   });
 
-  test("no-folder mode: seed thunks never run; nulls ship", () => {
+  test("no-folder mode: seed thunk never runs; null ships", () => {
     const t = countingThunks();
     const p = computeGettingStarted(
       false,
       undefined,
       false,
       fullyScaffolded(),
-      () => "lightweight",
-      t.modeSeed,
       t.profileSeed,
     );
     assert.strictEqual(p.mode, "no-folder");
-    assert.strictEqual(t.calls.modeSeed, 0);
     assert.strictEqual(t.calls.profileSeed, 0);
-    assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.transportProfileSeed, null);
   });
 
   test("omitted thunks yield null in getting-started mode", () => {
     const p = computeGettingStarted(true, ROOT, false, fullyScaffolded());
     assert.strictEqual(p.mode, "getting-started");
-    assert.strictEqual(p.verificationModeSeed, null);
     assert.strictEqual(p.transportProfileSeed, null);
-  });
-
-  test("regression: the tier seed still applies alongside the other seeds", () => {
-    const p = computeGettingStarted(
-      true,
-      ROOT,
-      false,
-      fullyScaffolded(),
-      () => "lightweight",
-      () => "dedicated-sessions",
-      () => "copilot-cli",
-    );
-    assert.strictEqual(p.tierSeed, "lightweight");
-    assert.strictEqual(p.verificationModeSeed, "dedicated-sessions");
-    assert.strictEqual(p.transportProfileSeed, "copilot-cli");
   });
 });

@@ -89,7 +89,7 @@ Copy the rendered file to the *consumer project's* workspace root
 (not the session-set folder) so the assistant picks it up at
 session start.
 
-### From the CLI (Lightweight tier)
+### From the CLI
 
 ```bash
 python -m ai_router.narration \

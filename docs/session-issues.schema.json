@@ -195,7 +195,7 @@
       }
     },
     "IssueV2": {
-      "description": "One verifier finding under the Set 057 v2 contract. Inherits the v1 base (description required, additionalProperties open) and adds: enum-enforced resolution_status / issueType WHEN PRESENT, plus four optional promoted finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck). All promoted fields stay OPTIONAL in the shared schema (additive / Full-tier-safe). The Lightweight dedicated-verification flow imposes a stricter requirement on a verifier-created open issue (issueId + issueType + verificationMethod) at the flow layer, NOT in this shared schema.",
+      "description": "One verifier finding under the Set 057 v2 contract. Inherits the v1 base (description required, additionalProperties open) and adds: enum-enforced resolution_status / issueType WHEN PRESENT, plus four optional promoted finding fields (issueId, issueType, verificationMethod, suggestedTestOrCheck). All promoted fields stay OPTIONAL in the shared schema (additive). Set 057's Lightweight dedicated-verification flow imposed a stricter flow-layer requirement on a verifier-created open issue (issueId + issueType + verificationMethod); Set 112 removed that flow, and this schema is unchanged by either event.",
       "allOf": [ { "$ref": "#/$defs/Issue" } ],
       "properties": {
         "resolution_status": {
@@ -227,7 +227,7 @@
           ]
         },
         "verificationMethod": {
-          "description": "Optional one-line description of how the verifier reached this finding (the check it ran / would run). Required on a verifier-created open issue at the Lightweight dedicated-verification flow layer.",
+          "description": "Optional one-line description of how the verifier reached this finding (the check it ran / would run).",
           "type": "string",
           "minLength": 1
         },

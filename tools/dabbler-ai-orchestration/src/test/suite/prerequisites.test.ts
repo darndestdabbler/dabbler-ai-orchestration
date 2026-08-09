@@ -456,7 +456,7 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
       sessionsCompleted: 0,
       lastTouched: null,
       liveSession: null,
-      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
+      config: { requiresUAT: false, requiresE2E: false, uatScope: "none", module: null },
       uatSummary: null,
       root: "/x",
       needsMigration: false,
@@ -465,11 +465,6 @@ suite("Set 061 / S2 — blockedMarker + blockedTooltip (D3)", () => {
       prerequisites: null,
       blockedByPrereqs: false,
       unsatisfiedPrereqs: [],
-      plusFraction: false,
-      externalVerificationNoteExists: false,
-      completedVerification: null,
-      verificationMarker: "",
-      workspaceTierMarker: null,
       ...over,
     };
   }

@@ -1,6 +1,6 @@
 // Set 107 S1 step 8 — the sample project's executable acceptance floor.
 //
-// Proposal v3 §6/§8: render the bundle, start the Lightweight lifecycle, run
+// Proposal v3 §6/§8: render the bundle, start the zero-budget lifecycle, run
 // the sample's tests, and assert the expected program output. Everything the
 // tutorial (Session 2) and the stopwatch walk (Session 3) will claim about the
 // sample is asserted here first, against `bundle.json` rather than against
@@ -235,7 +235,7 @@ suite("sampleProject — smoke: the sample really goes red to green (v3 §8)", f
     );
   });
 
-  test("the Lightweight lifecycle registers the session", () => {
+  test("the lifecycle registers the session", () => {
     const setDir = `docs/session-sets/${bundle.meta.sampleSetSlug}`;
     const started = run(
       python,
@@ -325,6 +325,11 @@ suite("sampleProject — smoke: the sample really goes red to green (v3 §8)", f
     fs.writeFileSync(
       path.join(setAbs, "change-log.md"),
       "# Change log\n\nAdded `shout` to `hello/greeting.py`.\n",
+      "utf8",
+    );
+    fs.writeFileSync(
+      path.join(setAbs, "activity-log.json"),
+      JSON.stringify({ entries: [{ sessionNumber: 1, kind: "sample_smoke" }] }, null, 2),
       "utf8",
     );
     assert.strictEqual(run("git", ["add", "-A"], target).code, 0);

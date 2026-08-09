@@ -31,7 +31,7 @@ function ssStub(over: Partial<SessionSet> = {}): SessionSet {
     sessionsCompleted: 0,
     lastTouched: "2026-05-16T00:00:00Z",
     liveSession: null,
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", module: null },
     uatSummary: null,
     root: "/tmp",
     needsMigration: false,
@@ -40,11 +40,6 @@ function ssStub(over: Partial<SessionSet> = {}): SessionSet {
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     ...over,
   };
 }

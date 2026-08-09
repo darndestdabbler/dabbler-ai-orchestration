@@ -8,8 +8,8 @@
 //
 // The router (`routeGettingStartedAction`) is pure dispatch + input
 // narrowing over an injected handler set, so the validation rules —
-// unknown actions ignored, untrusted tier narrowed with a "full"
-// default — are unit-testable without VS Code. `makeGettingStartedHandlers`
+// unknown actions ignored, untrusted riders narrowed — are unit-testable
+// without VS Code. `makeGettingStartedHandlers`
 // binds the real implementations, each of which reuses an existing engine:
 //   - open-folder     → showOpenDialog → vscode.openFolder (D5)
 //   - build-structure → buildProjectStructureNoPrompt (Set 058 writer)
@@ -28,13 +28,16 @@
 // (runNewModuleFlow) still ship — Set 093's per-module row actions + the
 // Command Palette own them now — but the Getting Started form no longer
 // surfaces them.
+//
+// Set 112 S2: the tier rider and the Lightweight verification-mode rider
+// are gone with the tier. Provider access (the seat-profile sub-choice)
+// is the form's first question now, so its rider is the only narrowing
+// that shapes the build.
 
 import * as vscode from "vscode";
 import { GettingStartedActionMsg } from "../types/sessionSetsWebviewProtocol";
-import { asTier, buildProjectStructureNoPrompt } from "./gitScaffold";
-import { DEFAULT_VERIFICATION_MODE, Tier } from "../utils/consumerBootstrap";
+import { buildProjectStructureNoPrompt } from "./gitScaffold";
 import { TransportProfile } from "../utils/copilotSeatSetup";
-import { VerificationMode } from "../types";
 import {
   BudgetChoice,
   asBudgetUsd,
@@ -46,9 +49,7 @@ import { runCopyModuleDecompositionPromptFlow } from "./copyModuleDecompositionP
 export interface GettingStartedHandlers {
   openFolder(): Promise<void>;
   buildStructure(
-    tier: Tier,
     budget?: BudgetChoice,
-    verificationMode?: VerificationMode,
     transportProfile?: TransportProfile,
   ): Promise<void>;
   /** Set 094 (spec D1): create docs/modules.yaml if absent, then open it. */
@@ -59,47 +60,11 @@ export interface GettingStartedHandlers {
 }
 
 /**
- * Set 077 S3 (Feature 2): narrow the untrusted verification-mode rider.
- * Same posture as {@link asTier}: absent (undefined / null) returns
- * undefined so callers apply their documented default; a PRESENT-but-
- * unrecognized value throws (fail-loud — a hostile/buggy webview must
- * not silently seed the default over an operator's choice).
- */
-export function asVerificationModeRider(
-  value: unknown,
-): VerificationMode | undefined {
-  if (value === undefined || value === null) return undefined;
-  if (typeof value === "string") {
-    const v = value.toLowerCase();
-    if (v === "dedicated-sessions" || v === "out-of-band-or-none") return v;
-  }
-  throw new Error(
-    `Unrecognized verificationMode value ${JSON.stringify(value)} — expected ` +
-      `"dedicated-sessions" or "out-of-band-or-none".`,
-  );
-}
-
-/**
- * Resolve the effective verification mode for a Lightweight action:
- * the rider when present, the documented default otherwise. Full drops
- * the rider outright — the field is inert on Full (same posture as the
- * budget riders on Lightweight).
- */
-export function resolveVerificationMode(
-  msg: GettingStartedActionMsg,
-  tier: Tier,
-): VerificationMode | undefined {
-  if (tier !== "lightweight") return undefined;
-  return asVerificationModeRider(msg.verificationMode) ?? DEFAULT_VERIFICATION_MODE;
-}
-
-/**
- * Set 079 S2 (Feature 1): narrow the untrusted seat-profile rider. Same
- * posture as {@link asVerificationModeRider}: absent (undefined / null)
- * returns undefined so callers apply the documented default ("api", the
- * seeded transport.profile default); a PRESENT-but-unrecognized value
- * throws (fail-loud — a hostile/buggy webview must not silently launch
- * or suppress the Copilot seat setup).
+ * Set 079 S2 (Feature 1): narrow the untrusted seat-profile rider.
+ * Absent (undefined / null) returns undefined so callers apply the
+ * documented default ("api", the seeded transport.profile default); a
+ * PRESENT-but-unrecognized value throws (fail-loud — a hostile/buggy
+ * webview must not silently launch or suppress the Copilot seat setup).
  */
 export function asTransportProfileRider(
   value: unknown,
@@ -117,41 +82,32 @@ export function asTransportProfileRider(
 
 /**
  * Resolve the effective seat profile for a build-structure action: the
- * rider when present, the seeded default ("api") otherwise. Lightweight
- * drops the rider outright — the sub-choice is Full-only (the block is
- * not even rendered on Lightweight), mirroring how the budget riders
- * are dropped there and the verification-mode rider is dropped on Full.
+ * rider when present, the seeded default ("api") otherwise.
  */
 export function resolveTransportProfile(
   msg: GettingStartedActionMsg,
-  tier: Tier,
-): TransportProfile | undefined {
-  if (tier !== "full") return undefined;
+): TransportProfile {
   return asTransportProfileRider(msg.transportProfile) ?? "api";
 }
 
 /**
  * Set 063 S2 (spec D1): narrow the untrusted budget riders on a
  * build-structure message to a {@link BudgetChoice}, or undefined when
- * the riders are absent / malformed / tier-inapplicable. Lightweight
- * never writes the file, so the rider is dropped outright there. A $0
- * budget without the required zero-rule pick narrows to undefined too —
- * the host never invents the operator's choice (the writer would refuse
- * it anyway); the scaffold still runs, just without a budget write.
+ * the riders are absent / malformed / inapplicable. A $0 budget without
+ * the required zero-rule pick narrows to undefined too — the host never
+ * invents the operator's choice (the writer would refuse it anyway); the
+ * scaffold still runs, just without a budget write.
  *
- * Set 081 S1: the rider is also dropped outright under the Copilot
- * seat sub-choice — the budget governs metered provider-API spend,
- * which the copilot-cli profile excludes by design, and a Copilot-seat
- * Build writes no budget.yaml (absence has documented compat defaults
- * in docs/budget-yaml-schema.md). Same posture as the Lightweight
- * drop above.
+ * Set 081 S1: the rider is dropped outright under the Copilot seat
+ * sub-choice — the budget governs metered provider-API spend, which the
+ * copilot-cli profile excludes by design, and a Copilot-seat Build
+ * writes no budget.yaml (absence has documented compat defaults in
+ * docs/budget-yaml-schema.md).
  */
 export function asBudgetChoice(
   msg: GettingStartedActionMsg,
-  tier: Tier,
   transportProfile?: TransportProfile,
 ): BudgetChoice | undefined {
-  if (tier !== "full") return undefined;
   if (transportProfile === "copilot-cli") return undefined;
   const thresholdUsd = asBudgetUsd(msg.budgetUsd);
   if (thresholdUsd === undefined) return undefined;
@@ -177,25 +133,15 @@ export async function routeGettingStartedAction(
       await handlers.openFolder();
       return true;
     case "build-structure": {
-      // Untrusted tier rider: narrow, defaulting to "full" (the radio's
-      // checked default) only when ABSENT. Set 077 S2 (A11): a present-
-      // but-unrecognized value now fails loud — the action is rejected
-      // (same posture as the unknown-action default below) instead of
-      // silently scaffolding Full. The Set 063 budget riders narrow
-      // alongside (Full only; see asBudgetChoice).
-      let tier: Tier;
-      let verificationMode: VerificationMode | undefined;
-      let transportProfile: TransportProfile | undefined;
+      // Untrusted seat-profile rider: narrow, defaulting to "api" (the
+      // radio's checked default) only when ABSENT. A present-but-
+      // unrecognized value fails loud — the action is rejected (same
+      // posture as the unknown-action default below) instead of silently
+      // launching or suppressing the Copilot seat setup. The Set 063
+      // budget riders narrow alongside (see asBudgetChoice).
+      let transportProfile: TransportProfile;
       try {
-        tier = asTier(msg.tier) ?? "full";
-        // Set 077 S3 (Feature 2): the Lightweight verification-mode
-        // rider narrows alongside — absent defaults, unrecognized
-        // rejects loud (same fail posture as the tier rider).
-        verificationMode = resolveVerificationMode(msg, tier);
-        // Set 079 S2 (Feature 1): the Full-tier seat-profile rider —
-        // same narrowing posture (absent defaults to "api" on Full,
-        // dropped on Lightweight, unrecognized rejects loud).
-        transportProfile = resolveTransportProfile(msg, tier);
+        transportProfile = resolveTransportProfile(msg);
       } catch (err) {
         // Operator-visible (S2 verifier): a rejected action must not
         // look like a silent no-op from the form.
@@ -207,24 +153,24 @@ export async function routeGettingStartedAction(
         );
         return false;
       }
-      const budget = asBudgetChoice(msg, tier, transportProfile);
-      if (tier === "full" && transportProfile !== "copilot-cli" && !budget) {
+      const budget = asBudgetChoice(msg, transportProfile);
+      if (transportProfile !== "copilot-cli" && !budget) {
         // S2 verifier R1 Major (fail-closed): D1 makes the budget
-        // REQUIRED on the Full form path. The webview blocks Build until
-        // its riders validate, so a Full action arriving without a
+        // REQUIRED on the form path. The webview blocks Build until
+        // its riders validate, so an action arriving without a
         // narrowable budget is a hostile/buggy webview — reject it
-        // rather than scaffolding a Full repo with no budget.yaml. The
+        // rather than scaffolding a repo with no budget.yaml. The
         // Command-Palette setupNewProject flow (no webview, no budget
         // input) stays the only budgetless entry point. Set 081 S1:
         // scoped to the Direct-API sub-choice — a Copilot-seat Build
         // legitimately carries no budget riders (the block is not
         // rendered) and writes no budget.yaml.
         console.warn(
-          "[gettingStarted] rejected Full-tier build-structure without a valid budget rider",
+          "[gettingStarted] rejected build-structure without a valid budget rider",
         );
         return false;
       }
-      await handlers.buildStructure(tier, budget, verificationMode, transportProfile);
+      await handlers.buildStructure(budget, transportProfile);
       return true;
     }
     case "open-modules":
@@ -273,9 +219,7 @@ export function makeGettingStartedHandlers(
     // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
     // budget pick rides through to the scaffold's budget.yaml write.
     async buildStructure(
-      tier: Tier,
       budget?: BudgetChoice,
-      verificationMode?: VerificationMode,
       transportProfile?: TransportProfile,
     ): Promise<void> {
       const openRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -283,9 +227,7 @@ export function makeGettingStartedHandlers(
         await buildProjectStructureNoPrompt(
           context,
           openRoot,
-          tier,
           budget,
-          verificationMode,
           transportProfile,
         );
         return;
@@ -304,9 +246,7 @@ export function makeGettingStartedHandlers(
       const result = await buildProjectStructureNoPrompt(
         context,
         picked[0].fsPath,
-        tier,
         budget,
-        verificationMode,
         transportProfile,
       );
       // S3 code-review Major 1: only open the picked folder when the

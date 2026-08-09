@@ -1,5 +1,14 @@
 # Cross-repo CLAUDE.md notice — Lightweight-tier parity (Set 048)
 
+> **SUPERSEDED — do not send this notice.** Set 112 removed the
+> Lightweight tier entirely. This file is a frozen record of the notice
+> that announced the tier's parity surface in 2026-05; everything it
+> instructs consumers to adopt has since been deleted. The current notice
+> is
+> [`docs/cross-repo-lightweight-removal-notice.md`](cross-repo-lightweight-removal-notice.md),
+> and the retired model is described in
+> [`docs/concepts/tier-model.md`](concepts/tier-model.md).
+
 **Authored:** 2026-05-26 (Set 048 Session 4)
 **Audience:** consumer-repo CLAUDE.md authors (dabbler-platform,
 dabbler-access-harvester, dabbler-homehealthcare-accessdb,

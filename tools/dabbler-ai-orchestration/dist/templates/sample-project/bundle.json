@@ -1,9 +1,11 @@
 {
   "bundleVersion": 1,
   "sampleSetSlug": "001-add-a-shout",
-  "tier": "lightweight",
   "programEntryPoint": "main.py",
-  "testCommandArgs": ["-m", "unittest"],
+  "testCommandArgs": [
+    "-m",
+    "unittest"
+  ],
   "expectedTestCount": 2,
   "expectedProgramOutput": [
     "Hello, world!",

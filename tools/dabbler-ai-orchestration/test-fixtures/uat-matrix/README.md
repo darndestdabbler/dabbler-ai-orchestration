@@ -27,26 +27,22 @@ re-walk any affected UAT checklist rows.
 
 ## Row inventory
 
-### `hello-world-full/` — Full-tier control + tier-agnostic rows
+### `hello-world-full/` — the row matrix
 
 | Set | State on disk | Demonstrates |
 |---|---|---|
-| `001-hello-page` | Full tier, session 2 of 3 in flight | Control row: fraction `1/3` with in-flight annotation; NO `lw` marker, NO `v?`/`v+`, no `+` suffix |
+| `001-hello-page` | session 2 of 3 in flight | Control row: fraction `1/3` with the in-flight annotation and no markers |
 | `002-style-the-greeting` | not-started; `prerequisites:` names `001-hello-page` (in-progress) | Blocked chain marker (⛓︎) with a REAL pending prerequisite; tooltip names the slug + its current state |
 | `003-publish-the-page` | not-started; `prerequisites:` names `099-cdn-rollout` (does not exist) | Blocked chain marker via an UNKNOWN slug — typos block, never silently unblock |
 | `004-legacy-greeting-notes` | complete; `session-state.json` is schema v3 | Needs-migration asterisk (`*`) + "Ran under schema v3" tooltip + the `Migrate to v4 schema` row action |
 
-### `hello-world-lightweight/` — every Lightweight marker state
-
-| Set | State on disk | Demonstrates |
-|---|---|---|
-| `001-greet-the-world` | Mode A (`out-of-band-or-none`), not-started, no activity log | `lw` marker; `Switch Tier…` eligible; `Set Up Dedicated Verification…` eligible in BOTH directions (no durable record yet) |
-| `002-greet-quietly` | Mode A, complete, no `external-verification.md` | `v?` marker + its tooltip; `Open External Verification Note` row action; completed-set `Set Up Dedicated Verification…` (blessed-writer path) |
-| `003-greet-with-note` | Mode A, complete, `external-verification.md` present | Marker suppressed — the out-of-band record exists, quiet is success |
-| `004-add-a-farewell` | Mode B (`dedicated-sessions`), session 2 of 2 in flight | `1/2+` fraction (denominator can still grow); no `v+` yet (work still open) |
-| `005-shout-the-greeting` | Mode B, both work sessions complete, no typed session yet (top-level still in-progress; counts come from `session-events.jsonl`) | `2/2+` AND `v+` together — the actionable "verification owed" moment; `Verification Kickoff` copy action |
-| `006-whisper-mode` | Mode B, complete with an appended `type: verification` session (verdict `VERIFIED`) | No marker (quiet is success); fraction `3/3` shows the runtime-grown count; fraction tooltip carries "Verification: VERIFIED (session 3)" |
-| `007-echo-the-greeting` | Mode B, both work sessions complete, verification session 3 complete (`ISSUES_FOUND`, one open finding in `s3-issues.json`), remediation session 4 in flight (Set 077) | Row description reads `remediation owed` in words; `Start Next Session` copy action reroutes to the remediation hand-off prompt (the status-bar message names the reroute); fraction `3/4` with no `+` — a typed session already grew the count |
+> **Set 112:** the second project, `hello-world-lightweight/`, is deleted.
+> Its seven rows demonstrated Lightweight-only Explorer signals — the `lw`
+> tier marker, the `v?`/`v+` verification-posture markers, the `N/M+`
+> growable fraction, and the `Switch Tier…` / `Set Up Dedicated
+> Verification…` / `Open External Verification Note` / `Verification
+> Kickoff` row actions. Every one of those surfaces was removed with the
+> tier, so the fixtures had nothing left to pin.
 
 ## Refreshing the matrix
 

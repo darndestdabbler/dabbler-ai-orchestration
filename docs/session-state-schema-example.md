@@ -93,7 +93,7 @@ A `session-state.json` cycles through three shapes during a set's
 lifetime. The committed example is the **complete** shape. The other
 two — **not-started** (written when the folder is first scaffolded)
 and **in-progress** (written by `start_session` at Step 1 of each
-session, or hand-edited on Lightweight tier) — are documented inline
+session) — are documented inline
 below because they are the entry points consumers and hand-authors
 most often need to reproduce.
 
@@ -126,7 +126,7 @@ in the legacy triple (dual-write surface) are all `null`/empty.
 
 ### In-progress (mid-set)
 
-Written when `start_session` (Full tier) or the operator (Lightweight)
+Written when `start_session`
 flips the next `sessions[]` entry to `"in-progress"`. Top-level
 `status` becomes `"in-progress"`, `lifecycleState` becomes
 `"work_in_progress"`, `startedAt` is set if previously null, and

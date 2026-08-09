@@ -112,11 +112,11 @@ function reviewCriteriaTrailer(
  */
 function verificationPointerOpener(): string {
   return (
-    `Cross-provider review request (out-of-band verification).\n` +
+    `Cross-provider review request (advisory second opinion).\n` +
     `\n` +
     `First read \`${CROSS_PROVIDER_VERIFICATION_REL_PATH}\` (repo root) — ` +
     `it carries the review stance, the verdict grammar, and the required ` +
-    `output artifact. If that file is missing, use this fallback: review ` +
+    `output shape. If that file is missing, use this fallback: review ` +
     `adversarially with a materiality bar, and record exactly one verdict ` +
     `token — VERIFIED, ISSUES_FOUND (findings tagged [Critical]/[Major]/` +
     `[Minor]), or WAIVED — <one-line reason>.`
@@ -124,37 +124,38 @@ function verificationPointerOpener(): string {
 }
 
 /**
- * The mandatory write-the-artifact close shared by the three Evaluate
- * prompts (Set 077 S4, A2): the reviewing engine itself writes the
- * verdict file — a verdict that exists only in the chat does not count
- * and the close-out gate will warn on it.
+ * The shared close for the three Evaluate prompts: the reviewing engine
+ * reports its verdict in the instruction doc's fixed grammar.
  *
- * A ``spec`` review runs BEFORE the work exists, so its round must
- * carry a parser-visible ``Scope: specification`` line — the close-out
- * gate deliberately refuses to read a spec-only verdict as evidence
- * the WORK was reviewed (S4 code-review finding: without the scope
- * marker, a pre-work spec review could silently satisfy the gate).
+ * Set 112 S2: this used to MANDATE writing
+ * `docs/session-sets/<slug>/external-verification.md`, on the claim that
+ * the close-out gate read it. That was Mode A machinery — Session 1
+ * deleted the parser and both Lightweight close gates — so the mandate
+ * would now instruct operators to produce a file nothing reads, and
+ * worse, imply an unverified close could be satisfied by it. These
+ * prompts are an advisory second opinion; the routed `verify_session`
+ * round is the verification of record (decisions.jsonl, S2).
+ *
+ * A ``spec`` review runs BEFORE the work exists, so its report must say
+ * so — a pre-work plan review must never read as work verification.
  */
 function verificationArtifactClose(
   set: SessionSet,
   kind: ReviewKind,
 ): string {
-  const artifactRel = relFromRoot(
-    set.root,
-    path.join(set.dir, "external-verification.md"),
-  );
+  void set;
   const scopeLine =
     kind === "spec"
-      ? ` Because this is a pre-work SPECIFICATION review, put the line ` +
-        `\`Scope: specification\` directly under your round header — a ` +
-        `spec-only verdict must not read as work verification.`
+      ? ` Because this is a pre-work SPECIFICATION review, include the line ` +
+        `\`Scope: specification\` under your header — a spec-only verdict ` +
+        `must not read as work verification.`
       : "";
   return (
-    `Non-negotiable final step: YOU (the reviewing engine) must write ` +
-    `your verdict as a new dated round section appended to ` +
-    `\`${artifactRel}\` (UTF-8, append-only — never rewrite earlier ` +
-    `rounds).${scopeLine} A verdict that exists only in this chat does ` +
-    `not count.`
+    `Final step: report your verdict in the grammar that doc defines ` +
+    `(one UPPERCASE token, findings tagged by severity).${scopeLine} This ` +
+    `review is advisory — the session's verification of record is the ` +
+    `router's own cross-provider round, which the close-out gate ` +
+    `corroborates independently.`
   );
 }
 
@@ -177,7 +178,6 @@ export function ensureCrossProviderVerificationDoc(
     const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
     const ctx = structureOnlyContext(
       path.basename(root),
-      "lightweight",
       new Date().toISOString().slice(0, 10),
     );
     const rendered = renderCrossProviderVerification(bundle, ctx);
@@ -298,124 +298,6 @@ export function buildStartNextSessionPrompt(set: SessionSet): string {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
 
-// Set 077 S5 (Feature 5, A9): the derived-state router behind the
-// "Start Next Session" copy action. Exported + pure so Layer-2 tests
-// drive it without the command plumbing. The status-bar message names
-// WHAT was copied — an operator who expected a work prompt must see the
-// reroute, not discover it mid-paste.
-export function resolveStartNextSessionPrompt(set: SessionSet): {
-  prompt: string;
-  message: string;
-} {
-  if (set.workflowState === "awaiting-verification") {
-    return {
-      prompt: buildVerificationKickoffPrompt(set),
-      message: `Copied: Verification kickoff (verification owed) for ${set.name}`,
-    };
-  }
-  if (set.workflowState === "awaiting-remediation") {
-    return {
-      prompt: buildRemediationHandoffPrompt(set),
-      message: `Copied: Remediation handoff (remediation owed) for ${set.name}`,
-    };
-  }
-  return {
-    prompt: buildStartNextSessionPrompt(set),
-    message: `Copied: Start the next session of ${set.name}`,
-  };
-}
-
-// Set 077 S5 (Feature 5, A9): the minimum dabbler-ai-router version the
-// Mode-B guardrail + owed-state banner ship in. Surfaced in the typed
-// Mode-B prompts so a mixed-version workspace (new extension, old
-// router) fails LOUD where the work happens instead of silently
-// skipping the start-time cross-provider refusal (critique M6).
-export const MODE_B_MIN_ROUTER_VERSION = "0.27.0";
-
-function modeBVersionLine(): string {
-  return (
-    `This flow expects dabbler-ai-router >= ${MODE_B_MIN_ROUTER_VERSION} ` +
-    `(the start-time cross-provider guardrail and the owed-verification ` +
-    `banner ship there). Check with \`python -m pip show dabbler-ai-router\` ` +
-    `and upgrade first if older — an older router accepts a same-provider ` +
-    `verification session silently and the close-out gate then refuses it.`
-  );
-}
-
-// Set 062 Session 2 (spec D2), REWRITTEN Set 077 S5 (Feature 5 with A9):
-// the dedicated-verification kickoff prompt for Lightweight
-// `dedicated-sessions` sets, now pointer-style per the Feature-3
-// standard — it points at the canonical Mode B procedure and names the
-// required output, instead of inlining a six-step script that drifts
-// from the doc it paraphrases. The one command line kept inline is the
-// entry point itself (the M1 start-time guardrail fires there). The
-// generic start-next-session prompt is deliberately NOT reused: the
-// dedicated flow is typed-session + cross-provider, not a spec session,
-// and the agent's own `start_session --type verification` is the only
-// session creator (never hand-edit the state file).
-export function buildVerificationKickoffPrompt(set: SessionSet): string {
-  const slug = sanitizeSlugForPrompt(set.name);
-  // The set-dir path is spliced into backtick-delimited command lines,
-  // so it gets the same backtick defense as the slug.
-  const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
-  const specRel = relFromRoot(set.root, set.specPath);
-  const activityRel = relFromRoot(set.root, set.activityPath);
-  const stateRel = relFromRoot(set.root, set.statePath);
-  return (
-    `Run the dedicated cross-provider verification round for the Lightweight\n` +
-    `session set \`${slug}\` (verificationMode: dedicated-sessions).\n` +
-    `\n` +
-    `Authoritative procedure: docs/ai-led-session-workflow.md -> Step 6 ->\n` +
-    `"Mode B — dedicated-sessions" (typed sessions, bounded rounds, hand-off\n` +
-    `close). Follow it — do not improvise the flow from this prompt.\n` +
-    `${modeBVersionLine()}\n` +
-    `\n` +
-    `You must differ from this set's work sessions by ENGINE or by model\n` +
-    `PROVIDER (read the per-session \`orchestrator\` blocks in ${stateRel}).\n` +
-    `Single-engine shop? Use a second chat with the model picker on another\n` +
-    `provider, and declare it honestly via --provider — start_session\n` +
-    `refuses a same-engine+same-provider verification at start.\n` +
-    `\n` +
-    `Open the typed session through the blessed writer (workspace venv);\n` +
-    `never hand-edit the state file:\n` +
-    `\`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type verification --engine <your-engine> --provider <your-provider>\`\n` +
-    `\n` +
-    `Required output: review the completed work sessions against ${specRel}\n` +
-    `and ${activityRel}, then record your verdict (VERIFIED / ISSUES_FOUND\n` +
-    `with severities) on the session record; on findings, seed the\n` +
-    `sN-issues.json envelope and chain the remediation hand-off — both per\n` +
-    `the workflow doc's Mode B section.\n`
-  );
-}
-
-// Set 077 S5 (Feature 5): the remediation handoff prompt — the copy
-// action's target when a Mode-B set derives to `awaiting-remediation`
-// (a verification round returned ISSUES_FOUND). Pointer-style like the
-// kickoff above.
-export function buildRemediationHandoffPrompt(set: SessionSet): string {
-  const slug = sanitizeSlugForPrompt(set.name);
-  const setDirRel = sanitizeSlugForPrompt(relFromRoot(set.root, set.dir));
-  return (
-    `Run the remediation round for the Lightweight session set \`${slug}\`\n` +
-    `— its dedicated verification returned ISSUES_FOUND.\n` +
-    `\n` +
-    `Authoritative procedure: docs/ai-led-session-workflow.md -> Step 6 ->\n` +
-    `"Mode B — dedicated-sessions" (remediate -> re-verify, bounded rounds).\n` +
-    `${modeBVersionLine()}\n` +
-    `\n` +
-    `Read the LATEST sN-issues*.json findings envelope in ${setDirRel}.\n` +
-    `If a remediation session is already in flight, resume it — do NOT\n` +
-    `open another. Otherwise open it through the blessed writer\n` +
-    `(workspace venv); never hand-edit the state file:\n` +
-    `\`python -m ai_router.start_session --session-set-dir "${setDirRel}" --type remediation --engine <work-engine> --provider <work-provider>\`\n` +
-    `\n` +
-    `Required output: confirm each finding reproduces, resolve it, and\n` +
-    `record a resolution_status on every issue in the envelope (the enum\n` +
-    `and the human-stop rules are in the workflow doc); if anything was\n` +
-    `fixed, hand off back to a re-verification round per the doc.\n`
-  );
-}
-
 // Set 049 S1 hygiene: parallel-session variant. The
 // `dabblerSessionSets.copyStartCommand.parallel` command in
 // copyCommand.ts already builds this text but is not surfaced in the
@@ -480,14 +362,11 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
       "dabbler.copyStartNextSessionPrompt",
       async (item: SetItem) => {
         if (!item?.set) return;
-        // Set 077 S5 (Feature 5, A9): auto-route by derived state. When
-        // a Mode-B set owes its verification (or a remediation round),
-        // "Start Next Session" yields the typed-session kickoff instead
-        // of a work-session prompt — the owed state is one copy action
-        // away, and a work prompt that start_session would refuse is
-        // never handed out.
-        const { prompt, message } = resolveStartNextSessionPrompt(item.set);
-        await copyToClipboard(prompt, message);
+        const prompt = buildStartNextSessionPrompt(item.set);
+        await copyToClipboard(
+          prompt,
+          `Copied: Start the next session of ${item.set.name}`,
+        );
       },
     ),
     vscode.commands.registerCommand(
@@ -496,14 +375,6 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
         if (!item?.set) return;
         const prompt = buildStartNextParallelSessionPrompt(item.set);
         await copyToClipboard(prompt, `Copied: Start the next parallel session of ${item.set.name}`);
-      },
-    ),
-    vscode.commands.registerCommand(
-      "dabbler.copyVerificationKickoffPrompt",
-      async (item: SetItem) => {
-        if (!item?.set) return;
-        const prompt = buildVerificationKickoffPrompt(item.set);
-        await copyToClipboard(prompt, `Copied: Verification kickoff prompt for ${item.set.name}`);
       },
     ),
   );

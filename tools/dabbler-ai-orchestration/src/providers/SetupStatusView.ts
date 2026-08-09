@@ -5,8 +5,8 @@
 // in one webview. The tree is now a native `TreeView`; what is left here is
 // everything a `TreeItem` cannot host:
 //
-//   - the Getting Started form — radio groups (tier, transport profile,
-//     verification mode), a validated numeric budget input, and buttons that
+//   - the Getting Started form — a radio group (provider access), a
+//     validated numeric budget input, and buttons that
 //     post typed messages to the host. `contributes.viewsWelcome` renders
 //     markdown with command links, not a form, so it could not take this on.
 //   - the System Status strip — the environment faults (workspace
@@ -63,11 +63,7 @@ import {
   computeGettingStarted,
   nodeDetectionFs,
 } from "../utils/gettingStartedDetection";
-// Set 077 S2 / S3, Set 079 S2: the durable seeds the form restores from.
-import {
-  readVerificationModeMarker,
-  resolveDurableTier,
-} from "../utils/tierMarkerStore";
+// Set 079 S2: the durable seed the form restores from.
 import { readTransportProfile } from "../utils/copilotSeatSetup";
 // Set 060 Session 2: the form's action handlers (D4/D5/D7).
 import {
@@ -167,8 +163,8 @@ export class SetupStatusView
     }
     if (type === "gettingStartedAction") {
       // Set 060 Session 2: the form's buttons. The router narrows the
-      // untrusted action/tier/parallel riders; after a handler runs, refresh
-      // so the form's live completion state repaints immediately.
+      // untrusted action / seat-profile / budget riders; after a handler runs,
+      // refresh so the form's live completion state repaints immediately.
       void routeGettingStartedAction(
         msg as Parameters<typeof routeGettingStartedAction>[0],
         this.gettingStartedHandlers,
@@ -254,8 +250,6 @@ export class SetupStatusView
       folders[0]?.uri.fsPath,
       all.length > 0,
       nodeDetectionFs,
-      (root) => resolveDurableTier(root)?.tier ?? null,
-      (root) => readVerificationModeMarker(root),
       (root) => readTransportProfile(root),
     );
   }

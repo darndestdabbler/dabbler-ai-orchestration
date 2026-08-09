@@ -75,48 +75,6 @@ const needsMigrationToV4 = (s: SessionSet): boolean =>
 const hasUnsatisfiedPrereqs = (s: SessionSet): boolean =>
   inFlightLike(s) && s.unsatisfiedPrereqs.length > 0;
 
-// Set 061 S3 (spec D4): tier is switchable ONLY before any session has
-// started — mid-set switching is deliberately unsupported (Set 057
-// verificationMode immutability; per-session escape hatch: --no-router).
-const isNotStarted = (s: SessionSet): boolean => s.state === "not-started";
-
-// Set 062 S2 (spec D2): the dedicated-verification kickoff prompt is
-// offered while a Mode-B set still owes its verification — Lightweight,
-// `dedicated-sessions`, no COMPLETED `type: verification` session yet.
-// Cancelled rows are excluded (verification on an abandoned set is not
-// actionable — the same terminal suppression every Set 061/062 marker
-// applies); in-flight typed sessions keep the entry visible so a
-// stalled verification session can be re-kicked.
-const kickoffEligible = (s: SessionSet): boolean =>
-  s.config.tier === "lightweight" &&
-  s.config.verificationMode === "dedicated-sessions" &&
-  s.completedVerification === null &&
-  s.state !== "cancelled";
-
-// Set 062 S2+S3 (spec D3): `Set Up Dedicated Verification…` is offered
-// on Lightweight rows in exactly two states:
-//   - not-started (S2): no durable record exists yet, so the spec seed
-//     is the authority — the handler rewrites it byte-preservingly
-//     (mirrors `Switch Tier…`; both directions legal; the handler also
-//     guards against a stray activity-log record).
-//   - complete Mode-A (S3): the realistic "I finished the work, now I
-//     want it verified" case — the handler routes through the blessed
-//     Python writer (`ai_router.change_verification_mode`), A->B only.
-// `in-progress` is excluded deliberately (contention with a running
-// session; verification is not yet due) and completed Mode-B rows have
-// nothing to set up (the kickoff prompt is their affordance).
-const setupVerificationEligible = (s: SessionSet): boolean =>
-  s.config.tier === "lightweight" &&
-  (isNotStarted(s) ||
-    (isCompleteState(s) && s.config.verificationMode === "out-of-band-or-none"));
-
-// Set 062 S2 (spec step 4): the sanctioned out-of-band recording path,
-// surfaced exactly where the `v?` marker renders (completed Mode-A
-// rows with no note and no typed verification session) — the derived
-// marker glyph already encodes every suppression rule.
-const showsOutOfBandMarker = (s: SessionSet): boolean =>
-  s.verificationMarker === "v?";
-
 // Ordered list. `group` controls QuickPick sort within a category;
 // `category` controls which top-level item or submenu the entry lands
 // under. The numeric bands:
@@ -152,10 +110,6 @@ export const ROW_ACTIONS: RowAction[] = [
   // pattern is only meaningful on non-terminal rows.
   { id: "dabbler.copyStartNextParallelSessionPrompt", label: "Start New Parallel Session", group: 305, category: "copyEval",
     when: (s) => inFlightLike(s) },
-  // Set 062 S2 (spec D2): paste-ready agent handoff into the Set 057
-  // dedicated-verification flow (typed session, different engine).
-  { id: "dabbler.copyVerificationKickoffPrompt", label: "Verification Kickoff", group: 306, category: "copyEval",
-    when: kickoffEligible },
 
   // Flat actions — appear at the top level of the QuickPick. The
   // spec §3.3 table lists v4 only because v4 is the canonical target;
@@ -173,21 +127,6 @@ export const ROW_ACTIONS: RowAction[] = [
   // row (QuickPick when more than one). Reuses the openSpec plumbing
   // in commands/openFile.ts.
   { id: "dabblerSessionSets.openPrerequisiteSpec", label: "Open Prerequisite Spec",    group: 503, category: "flat", when: hasUnsatisfiedPrereqs },
-  // Set 061 S3 (spec D4): rewrite the spec's `tier:` value via a tier
-  // QuickPick; not-started rows only. See commands/switchTier.ts.
-  { id: "dabblerSessionSets.switchTier",        label: "Switch Tier…",                 group: 504, category: "flat", when: isNotStarted },
-  // Set 062 S2+S3 (spec D3): not-started Lightweight rows get the
-  // confirmed spec-seed rewrite; completed Mode-A rows get the
-  // blessed-writer transition (A->B only). See
-  // commands/setupVerification.ts.
-  { id: "dabblerSessionSets.setupVerification", label: "Set Up Dedicated Verification…", group: 505, category: "flat",
-    when: setupVerificationEligible },
-  // Set 062 S2 (spec step 4): reuse the existing out-of-band note
-  // command on exactly the rows that render `v?` — the sanctioned
-  // recording path; the detail names the marker-clearing consequence.
-  { id: "dabbler.openExternalVerificationDoc",  label: "Open External Verification Note", group: 506, category: "flat",
-    detail: "Record the out-of-band verdict — creating external-verification.md clears the v? marker.",
-    when: showsOutOfBandMarker },
   { id: "dabblerSessionSets.migrate",           label: "Migrate to v3 schema",         group: 801, category: "flat", when: needsMigrationToV3 },
   { id: "dabblerSessionSets.migrateToV4",       label: "Migrate to v4 schema",         group: 802, category: "flat", when: needsMigrationToV4 },
   { id: "dabblerSessionSets.cancel",            label: "Cancel Session Set",           group: 901, category: "flat",

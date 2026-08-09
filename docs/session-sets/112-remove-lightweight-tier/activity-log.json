@@ -66,6 +66,94 @@
       "dateTime": "2026-08-09T06:57:15.608487-04:00",
       "description": "Cross-provider verification (gpt-5.5, anthropic excluded): discovery fan-out 2 -> 3 Major; supplementary -> 1 Major; all 4 accepted and fixed (boundary refusal in both lifecycle CLIs + _uat_policy re-raise + quoted-YAML gap, close-out.md, extension bulk-upgrade chain); remediation-review VERIFIED, 4 fixes accepted 0 rejected. Post-fix runs of record: pytest 3,576 passed / 9 skipped; Layer 3 33 passed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "session-2/register",
+      "dateTime": "2026-08-09T09:05:51.402519-04:00",
+      "description": "Registered S2; read preload, spec, S1 kill inventory and disposition; confirmed copilot-cli transport",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/inventory-scope",
+      "dateTime": "2026-08-09T09:05:51.404320-04:00",
+      "description": "Scoped the S2 remainder: 52 extension src/media files, 57 extension test/fixture files, 12 templates, 35 docs prose files",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "session-2/inventory-scope",
+      "dateTime": "2026-08-09T09:40:42.238439-04:00",
+      "description": "Scoped the S2 remainder from s1-kill-inventory.md: extension src/media, extension tests/fixtures, docs/templates, docs prose",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "session-2/tier-fork-removed",
+      "dateTime": "2026-08-09T09:40:42.240399-04:00",
+      "description": "Getting Started form: tier radio group and the Lightweight verification-mode block deleted; provider access is the first question. 7 extension modules deleted whole; types/protocol/scan layer/ActionRegistry/package.json contributions trimmed",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "session-2/templates-collapsed",
+      "dateTime": "2026-08-09T09:40:42.242150-04:00",
+      "description": "consumer-bootstrap + sample-project templates render one tier; cold-start/full golden regenerated from the templates",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/docs-collapse",
+      "dateTime": "2026-08-09T09:40:42.243957-04:00",
+      "description": "Collapsing teaching docs to the one-tier story; tier-model.md to a historical note; drift guard retirement",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "session-2/docs-collapse",
+      "dateTime": "2026-08-09T09:55:24.683179-04:00",
+      "description": "Teaching docs tell one story: workflow doc lost its 383-line Lightweight verification section and typed-session procedure; constitution, spec-md-schema, session-state-schema, authoring guide, quick-start, README collapsed; tier-model.md is now a historical note; the drift guard retired its stale-framing check and kept its doc-walk mechanism for S3",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "session-2/migration-notice",
+      "dateTime": "2026-08-09T09:55:24.685147-04:00",
+      "description": "Authored docs/cross-repo-lightweight-removal-notice.md (send is operator-gated); marked the Set 048 Lightweight notice superseded",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/test-suites",
+      "dateTime": "2026-08-09T09:55:24.687161-04:00",
+      "description": "Running Layer 1 pytest and Layer 2 extension unit suites",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "session-2/test-suites",
+      "dateTime": "2026-08-09T10:42:59.287167-04:00",
+      "description": "Layer 1 pytest 3,561 passed / 9 skipped; Layer 2 mocha 1,602 passing; Layer 3 Playwright 33 passed incl. the rewritten tier-fork-is-gone assertion and the real first-run walkthrough. drift_guard and tutorial_gate both exit 0. All three runs of record recorded",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "session-2/commit-and-verify",
+      "dateTime": "2026-08-09T10:42:59.289292-04:00",
+      "description": "Committing S2 and running cross-provider verification",
+      "status": "in-progress"
     }
   ]
 }

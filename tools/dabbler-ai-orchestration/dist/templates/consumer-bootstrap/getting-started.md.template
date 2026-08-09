@@ -11,13 +11,11 @@
 
 To get the project started, the AI orchestration extension needs to
 download some Python scripts and markdown files and create some
-folders. There are two options for the orchestration. Choose an
-option and then click **Build project structure**.
+folders. First answer the form's one question — **how the router
+reaches your AI providers** — then click **Build project structure**.
 
-**Full tier.** The full tier uses an AI router to "outsource" much of
-the work via AI APIs. By outsourcing most of the work, you pay more
-money but you are less subject to AI capacity limitations. The full
-tier needs access to more than one AI provider family, so the Step 6
+The workflow uses an AI router to "outsource" work via AI APIs, and it
+needs access to more than one AI provider family so the Step 6
 verification command can send work done under one provider to a
 different one.
 
@@ -47,14 +45,7 @@ Copilot seat, work through the one-time per-machine setup checklist
 (install the CLI, log in to your tenant, run the auth-preflight):
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/copilot-seat-setup-checklist.md>
 — an unauthenticated seat is blocked at session start rather than
-silently faking verification. For more
-information on either option, see the tier model documentation:
-<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
-
-**Lightweight tier.** The lightweight tier does not outsource any AI
-work. It is better suited to users who can't (or don't want to)
-spend extra money on projects and who are OK with some workarounds
-for verifying AI output.
+silently faking verification.
 
 **What Build gives you.** Building the project structure also
 declares a `default` module in `docs/modules.yaml` with two starter
@@ -137,10 +128,8 @@ work in it yet (delete *cancels* non-terminal sets, so rename is the right
 move once you have run the sets). See the reorganization guide linked in
 Section 2. On a single-area project it is perfectly fine to just keep it.
 
-For the full tier option, every session runs the router's `verify_session`
-command for cross-provider verification before it closes — verification is
-mandatory, not optional. For the lightweight tier option, each session set
-has some follow-on sessions for cross-provider verification.
+Every session runs the router's `verify_session` command for cross-provider
+verification before it closes — verification is mandatory, not optional.
 
 Note that the AI orchestration does support parallel session sets
 (but not parallel sessions within the same set). Parallel session
@@ -175,8 +164,8 @@ You will repeat the above process for each session within each
 session set.
 
 Note that you can use the same AI engine or different AI engines for
-each session. For the lightweight tier, you are asked to use a
-different AI engine for verification sessions.
+each session. Verification always runs against a different provider
+than the one that did the work — the router picks it for you.
 
 Also, sometimes the AI orchestration will recommend use of a more
 capable (but more expensive) or less capable (and less expensive) AI

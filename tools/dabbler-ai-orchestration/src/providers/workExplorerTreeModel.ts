@@ -48,14 +48,10 @@ import {
   kindTooltip,
   migrationTooltip,
   orderedBuckets,
-  tierMarker,
-  tierTooltip,
   touchedDate,
   uatBadge,
-  verificationOwedText,
-  verificationTooltip,
 } from "./SessionSetsModel";
-import { TIER_MISMATCH_MARKER, isRecognizedVerdictToken } from "../utils/tierLegibility";
+import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 
 // ---------------------------------------------------------------------------
 // Nodes
@@ -316,7 +312,6 @@ export type SetSeverity =
   | "migration"
   | "verification"
   | "duplicate-name"
-  | "tier-mismatch"
   | null;
 
 export function verdictIsUnclean(verdict: string | null | undefined): boolean {
@@ -331,18 +326,7 @@ export function severityOf(set: SessionSet): SetSeverity {
   if (set.needsMigration) return "migration";
   if (verdictIsUnclean(set.liveSession?.verificationVerdict)) return "verification";
   if (set.duplicateNameError) return "duplicate-name";
-  if (tierMarkerIsMismatch(set)) return "tier-mismatch";
   return null;
-}
-
-/**
- * Reuses the shipped `tierMarker` semantics rather than re-deriving the
- * mismatch rule, so the native tree and the webview agree about which
- * rows are drifted. Calling the shared function is the point —
- * duplicating the predicate is how the two surfaces would diverge.
- */
-function tierMarkerIsMismatch(set: SessionSet): boolean {
-  return tierMarker(set) === TIER_MISMATCH_MARKER;
 }
 
 export function setIcon(set: SessionSet): IconSpec {
@@ -444,7 +428,7 @@ export function setTooltip(set: SessionSet): string {
 
   const progress =
     set.totalSessions && set.totalSessions > 0
-      ? `${set.sessionsCompleted}/${set.totalSessions}${set.plusFraction ? "+" : ""}`
+      ? `${set.sessionsCompleted}/${set.totalSessions}`
       : `${set.sessionsCompleted}/?`;
   const state = set.state.replace("-", " ");
   lines.push("", `${state} · ${progress} sessions complete`);
@@ -453,10 +437,6 @@ export function setTooltip(set: SessionSet): string {
   const blocked = blockedTooltip(set);
   if (blocked) markers.push(blocked);
   if (set.needsMigration) markers.push(migrationTooltip(set));
-  const tier = tierTooltip(set);
-  if (tier) markers.push(tier);
-  const verification = verificationTooltip(set);
-  if (verification) markers.push(verification);
   const verdict = set.liveSession?.verificationVerdict;
   if (typeof verdict === "string" && verdict.trim() !== "") {
     markers.push(
@@ -473,8 +453,6 @@ export function setTooltip(set: SessionSet): string {
   }
   const kind = kindTooltip(set);
   if (kind) markers.push(kind);
-  const owed = verificationOwedText(set);
-  if (owed) markers.push(owed);
   const uat = uatBadge(set);
   if (uat) markers.push(`UAT: ${uat.replace(/^\[|\]$/g, "")}`);
   const forced = forceClosedBadge(set);

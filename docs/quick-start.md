@@ -13,30 +13,28 @@ gets you oriented in five minutes.
 
 ---
 
-## Two adoption tiers
+## One tier, one verification story
 
-The tier changes **one thing only**: whether the AI router makes external,
-metered LLM API calls. **Lightweight is router-off, not Python-off** — both
-tiers install Python + `dabbler-ai-router`, run `start_session` /
-`close_session`, and share the same state file, close-out gate, and Session
-Set Explorer.
+Every project runs the same way: the AI router routes reasoning tasks
+cost-mindedly, and the **mandatory Step 6 cross-provider verification command
+runs on every session** before it closes. The verifier is picked by excluding
+the orchestrator's own effective provider, so work is never reviewed by the
+model that did it.
 
-**Full** — the AI router is on: cost-minded routing of reasoning tasks and the
-mandatory Step 6 cross-provider verification command on every session,
-plus metrics and cost reports. Two active consumer repos use Full:
-`dabbler-platform` and `dabbler-access-harvester`.
+The router needs a provider to call. There are two ways to give it one:
+**direct provider API keys** (`DABBLER_ANTHROPIC_API_KEY` /
+`DABBLER_GEMINI_API_KEY` / `DABBLER_OPENAI_API_KEY`), or an authenticated
+**GitHub Copilot CLI seat** (`transport.profile: copilot-cli`) for shops that
+hold Copilot subscriptions and no provider keys. Either way you need reach to
+**at least two provider families**, or verification has nothing to cross to.
 
-**Lightweight** — zero metered API calls (`tier: lightweight` flips
-`--no-router`). Same Python lifecycle as Full; the only setup difference is no
-router config. Verification is handled **per set** — out-of-band via a
-copyable review prompt pasted into a different assistant, a dedicated
-different-engine verification session, or opted out.
-
-> **The full model — read this, don't paraphrase it:**
+> Set 112 removed a second "Lightweight" adoption tier that opted out of
+> routed verification entirely. The Copilot seat profile covers the same
+> keyless population without giving verification up. History:
 > [`docs/concepts/tier-model.md`](concepts/tier-model.md).
 
 The extension's Getting Started form (**`Dabbler: Get Started`** in VS Code)
-walks you through the setup interactively — tier choice, the Full-tier
+walks you through the setup interactively — the provider-access choice, the
 verification budget step, and the project scaffold. **Build** also declares
 a `default` module with two starter sets already scaffolded —
 `001-default-plan` (create or import your project plan) and
@@ -46,24 +44,23 @@ set, then **rename** Default into your first real module once you know your
 module names (rename re-homes the work sets; delete instead only when you
 have not run them yet — see
 [`docs/module-reorganization.md`](module-reorganization.md)). The quick
-version of the environment setup (**both tiers**):
+version of the environment setup:
 
 ```bash
 python -m venv .venv
 .venv/Scripts/pip install dabbler-ai-router   # POSIX: .venv/bin/pip install ...
 ```
 
-Full additionally writes `ai_router/router-config.yaml` (and `budget.yaml`);
-Lightweight sets `tier: lightweight` in each spec instead.
+The scaffold also writes `ai_router/router-config.yaml` (and `budget.yaml`).
 
 > **Without VS Code:** the manual path is the two commands above, then
-> (Full tier) copy `router-config.yaml` out of the installed `ai_router`
+> copy `router-config.yaml` out of the installed `ai_router`
 > package into an `ai_router/` folder at your repo root and hand-create
 > `ai_router/budget.yaml` per [`docs/budget-yaml-schema.md`](budget-yaml-schema.md).
 
 ---
 
-## Configuring your project (Full tier)
+## Configuring your project
 
 After `pip install dabbler-ai-router` and the Getting Started form's scaffold (or the manual setup above), your project has `ai_router/router-config.yaml` and `ai_router/budget.yaml`. To tune them visually:
 
@@ -156,7 +153,7 @@ need for a simple set: `uatStyle` and `uatScope` — only relevant when
 
 ---
 
-## The happy path — Full tier
+## The happy path
 
 A developer runs one session by telling their AI agent:
 
@@ -226,10 +223,10 @@ decision stay human. Setup and the raw commands each action runs:
 
 ## Run your first session (step by step)
 
-**Full-tier setup checklist** — before you run any session, confirm:
+**Setup checklist** — before you run any session, confirm:
 
 - [ ] **Project configured** — run the extension's Getting Started form
-  (`Dabbler: Get Started`), whose Full-tier budget step writes
+  (`Dabbler: Get Started`), whose budget step writes
   `ai_router/budget.yaml`, or manually create `ai_router/router-config.yaml`
   and `ai_router/budget.yaml` (see [`docs/budget-yaml-schema.md`](budget-yaml-schema.md)).
   The form is the recommended path.
@@ -325,5 +322,5 @@ and say:
 - **Releasing, hotfixing, rolling back:**
   [`docs/tutorials/release-and-recovery.md`](tutorials/release-and-recovery.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).
-- **Setting up a new project:** the extension's Getting Started form (`Dabbler: Get Started`); without VS Code, the manual-setup note under [Two adoption tiers](#two-adoption-tiers) above.
+- **Setting up a new project:** the extension's Getting Started form (`Dabbler: Get Started`); without VS Code, the manual-setup note under [One tier, one verification story](#one-tier-one-verification-story) above.
 - **UAT checklists, outsource-last, adjudication, advanced flags:** Reference section of the workflow doc — only read what applies to your set's configuration.

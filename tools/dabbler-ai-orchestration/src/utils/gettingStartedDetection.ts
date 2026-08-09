@@ -118,7 +118,7 @@ export function detectCompletion(root: string, fsi: DetectionFs): CompletionStat
 
 // ---------- D6 — provider-key validation (Set 060 Session 3) ----------
 
-// The provider keys the Full tier can route through. Any ONE of them
+// The provider keys the router can route through. Any ONE of them
 // present satisfies D6 (the router needs at least one provider).
 const PROVIDER_KEY_VARS = [
   "DABBLER_ANTHROPIC_API_KEY",
@@ -179,27 +179,18 @@ export function selectExplorerMode(hasFolder: boolean, hasAnySets: boolean): Exp
  * (`env` provider-key check, `resolvePythonPresent`, `resolveCopilotCliPresent`)
  * are gone — Set 092 S2 moved those faults to the System Status strip, which
  * computes them independently (`buildSystemStatus`), so the payload copies
- * were dead. The two-section form needs only the tier / verification-mode /
- * seat-profile seeds below.
+ * were dead. The two-section form needs only the seat-profile seed below.
  *
- * `resolveTierSeed` (Set 077 S2, A1) resolves the workspace's durable tier
- * (the `.dabbler/tier` marker → router-config inference chain). Injected as
- * a thunk — it runs ONLY in "getting-started" mode, the one mode that renders
- * the form the seed feeds. `resolveVerificationModeSeed` (Set 077 S3)
- * resolves the durable `.dabbler/verification-mode` marker the same way (no
- * inference rung — marker or null). `resolveTransportProfileSeed` (Set 079)
- * resolves the durable Full-tier seat-profile seed. All three are
- * getting-started-mode-gated; hosts that omit a thunk get null.
+ * `resolveTransportProfileSeed` (Set 079) resolves the workspace's durable
+ * seat-profile choice. Injected as a thunk — it runs ONLY in
+ * "getting-started" mode, the one mode that renders the form the seed
+ * feeds; hosts that omit the thunk get null.
  */
 export function computeGettingStarted(
   hasFolder: boolean,
   root: string | undefined,
   hasAnySets: boolean,
   fsi: DetectionFs,
-  resolveTierSeed?: (root: string) => "full" | "lightweight" | null,
-  resolveVerificationModeSeed?: (
-    root: string,
-  ) => "dedicated-sessions" | "out-of-band-or-none" | null,
   resolveTransportProfileSeed?: (root: string) => "api" | "copilot-cli" | null,
 ): GettingStartedPayload {
   const mode = selectExplorerMode(hasFolder, hasAnySets);
@@ -207,14 +198,6 @@ export function computeGettingStarted(
     mode === "getting-started" && root
       ? detectCompletion(root, fsi)
       : { structureBuilt: false };
-  const tierSeed =
-    mode === "getting-started" && root && resolveTierSeed
-      ? resolveTierSeed(root)
-      : null;
-  const verificationModeSeed =
-    mode === "getting-started" && root && resolveVerificationModeSeed
-      ? resolveVerificationModeSeed(root)
-      : null;
   const transportProfileSeed =
     mode === "getting-started" && root && resolveTransportProfileSeed
       ? resolveTransportProfileSeed(root)
@@ -225,9 +208,7 @@ export function computeGettingStarted(
   return {
     mode,
     ...completion,
-    tierSeed,
     rootId,
-    verificationModeSeed,
     transportProfileSeed,
   };
 }

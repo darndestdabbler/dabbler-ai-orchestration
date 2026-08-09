@@ -88,21 +88,15 @@ deeper feature descriptions live at
   accordingly. No-UI repos default to the universal core (build,
   test, verify, commit) with no UAT/E2E surface area.
   [Deep dive](docs/repository-reference.md#uat-and-e2e-support-when-to-opt-in).
-- **Full and Lightweight tiers.** Specs declare `tier: full` (default)
-  or `tier: lightweight`. The tier changes **one thing only** — whether
-  the AI router makes metered API calls. **Lightweight is router-off,
-  not Python-off:** both tiers use a `.venv` + `dabbler-ai-router`, the
-  same `session-state.json` lifecycle, the same close-out gate, and the
-  same Work Explorer. Full adds cost-minded routing and the
-  mandatory Step 6 cross-provider verification command on every session;
-  Lightweight makes zero metered calls and
-  verifies per-set (copyable review prompts pasted into a different
-  assistant, a dedicated different-engine verification session, or opt
-  out). On either tier, `start_session` prints a loud, non-blocking
-  banner the moment a set's verification or remediation is owed, so
-  nothing sits forgotten between sessions. The single source of truth is
-  [docs/concepts/tier-model.md](docs/concepts/tier-model.md).
-  [Deep dive](docs/concepts/tier-model.md).
+- **Mandatory cross-provider verification.** Every session runs the
+  router's Step 6 verification command before it closes, and the
+  close-out gate corroborates the result against a stamped
+  cross-provider metrics row — there is no per-session skip. The
+  verifier is chosen by **excluding** the orchestrator's own effective
+  provider, so work is never reviewed by the model that did it. If no
+  different-provider verifier is reachable, the outcome is a blocked
+  `verification_unavailable`, resolvable only by the operator-attested
+  manual path — never a silent same-provider pass.
 
 ---
 
@@ -145,17 +139,10 @@ palette.
 If you're starting a new project — greenfield, or an existing local
 project that hasn't yet adopted the workflow — the recommended
 starting point is **`Dabbler: Get Started`** from the command palette.
-The Work Explorer's Getting Started form walks you through tier
-choice (Full vs. Lightweight — see
-[docs/concepts/tier-model.md](docs/concepts/tier-model.md)); picking
-Full surfaces a second choice for provider access — direct `DABBLER_*`
-API keys (the default) or a GitHub Copilot CLI seat that routes calls
-through your Copilot subscription with no provider keys; picking
-Lightweight surfaces a second choice between separate verification
-sessions (a dedicated session on a different AI engine or provider
-reviews the work before the set can close) and manual review (paste a
-review prompt into a second AI assistant yourself and record what it
-says — the default). All picks persist through a window
+The Work Explorer's Getting Started form asks one setup question —
+**provider access**: direct `DABBLER_*` API keys (the default) or a
+GitHub Copilot CLI seat that routes calls through your Copilot
+subscription with no provider keys. Your pick persists through a window
 reload. Environment faults surface in a persistent **System Status
 strip** above the form (and above the Work Explorer tree), visible
 only when a fault exists: a missing Python interpreter, a missing

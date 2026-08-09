@@ -812,8 +812,14 @@ def _untagged_yaml_blocks(lines: list[str]) -> list[int]:
 
 # The one sanctioned mention of anything beyond the sample (the set's spec
 # requires it, so its ABSENCE is as much a defect as forbidden content).
-_FULL_TIER_SENTENCE_RE = re.compile(
-    r"Full tier adds independent cross-provider verification", re.IGNORECASE
+#
+# Set 112 S2 rewrote the required wording, not the rule. It used to read
+# "Full tier adds independent cross-provider verification" — naming a
+# Lightweight/Full contrast that no longer exists. The sentence still has to
+# be there, and it still has to say the same true thing: a real project gets
+# an independent cross-provider review that this local sample does not.
+_REQUIRED_VERIFICATION_SENTENCE_RE = re.compile(
+    r"adds independent cross-provider verification", re.IGNORECASE
 )
 
 
@@ -865,16 +871,16 @@ def check_first_run_constraint(repo_root: Path) -> list[Violation]:
     # The required closing sentence, exactly once. Matched on the
     # whitespace-normalised copy: markdown reflows the sentence across lines,
     # and a line break is not a content difference.
-    hits = len(_FULL_TIER_SENTENCE_RE.findall(_normalise(text)))
+    hits = len(_REQUIRED_VERIFICATION_SENTENCE_RE.findall(_normalise(text)))
     if hits != 1:
         violations.append(
             Violation(
                 check="first-run-constraint",
                 location=FIRST_RUN_DOC,
                 detail=(
-                    "the spec requires exactly ONE sentence noting that Full "
-                    "tier adds independent cross-provider verification; found "
-                    f"{hits}"
+                    "the spec requires exactly ONE sentence noting that a real "
+                    "project adds independent cross-provider verification; "
+                    f"found {hits}"
                 ),
             )
         )

@@ -86,49 +86,38 @@ suite("gitScaffold — makeRealKillEffects (S3 verification R1: async taskkill f
 });
 
 suite("gitScaffold — decideCopilotSeatSetup (the sequencing gate)", () => {
-  test("not selected: lightweight tier never runs, whatever the profile", () => {
+  test("not selected: api / absent profile never runs", () => {
     assert.strictEqual(
-      decideCopilotSeatSetup("lightweight", "copilot-cli", true, "/venv"),
+      decideCopilotSeatSetup("api", true, "/venv"),
       "skip-not-selected",
     );
     assert.strictEqual(
-      decideCopilotSeatSetup("lightweight", undefined, true, "/venv"),
-      "skip-not-selected",
-    );
-  });
-
-  test("not selected: full tier with api / absent profile never runs", () => {
-    assert.strictEqual(
-      decideCopilotSeatSetup("full", "api", true, "/venv"),
-      "skip-not-selected",
-    );
-    assert.strictEqual(
-      decideCopilotSeatSetup("full", undefined, true, "/venv"),
+      decideCopilotSeatSetup(undefined, true, "/venv"),
       "skip-not-selected",
     );
   });
 
   test("selected but the install failed: honest skip, never a run", () => {
     assert.strictEqual(
-      decideCopilotSeatSetup("full", "copilot-cli", false, "/venv"),
+      decideCopilotSeatSetup("copilot-cli", false, "/venv"),
       "skip-install-incomplete",
     );
   });
 
   test("selected but no venv materialized: honest skip, never a run", () => {
     assert.strictEqual(
-      decideCopilotSeatSetup("full", "copilot-cli", true, null),
+      decideCopilotSeatSetup("copilot-cli", true, null),
       "skip-install-incomplete",
     );
     assert.strictEqual(
-      decideCopilotSeatSetup("full", "copilot-cli", true, undefined),
+      decideCopilotSeatSetup("copilot-cli", true, undefined),
       "skip-install-incomplete",
     );
   });
 
   test("selected + install succeeded + venv present: run", () => {
     assert.strictEqual(
-      decideCopilotSeatSetup("full", "copilot-cli", true, "/proj/.venv"),
+      decideCopilotSeatSetup("copilot-cli", true, "/proj/.venv"),
       "run",
     );
   });
@@ -318,7 +307,6 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
       skipped: [],
       installOk,
       installMessage: installOk ? "installed" : "pip failed",
-      routerConfigRemoved: false,
       budgetOutcome: null,
     };
   }
@@ -400,8 +388,6 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     const result = await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
-      undefined,
       undefined,
       "copilot-cli",
       seams,
@@ -422,8 +408,6 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
-      undefined,
       undefined,
       "copilot-cli",
       seams,
@@ -445,8 +429,6 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
-      undefined,
       undefined,
       "copilot-cli",
       seams,
@@ -468,9 +450,7 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
       { thresholdUsd: 25 },
-      undefined,
       "api",
       seams,
     );
@@ -482,9 +462,7 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
       { thresholdUsd: 25 },
-      undefined,
       "copilot-cli",
       seams,
     );
@@ -500,8 +478,6 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
-      undefined,
       undefined,
       "copilot-cli",
       seams,
@@ -509,7 +485,7 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     assert.deepStrictEqual(captured.scaffoldBudgets, [undefined]);
   });
 
-  test("full+api: an explicit non-Copilot rebuild CLEARS a stale marker (S1 discovery Majors 1-2 fix)", async () => {
+  test("api: an explicit non-Copilot rebuild CLEARS a stale marker (S1 discovery Majors 1-2 fix)", async () => {
     // The verifier's finding: an operator who attempted Copilot, failed to
     // confirm, then explicitly rebuilds choosing Direct API has abandoned
     // that attempt -- the marker must be retired, not left to revive the
@@ -518,8 +494,6 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     await buildProjectStructureNoPrompt(
       fakeContext(),
       projectDir,
-      "full",
-      undefined,
       undefined,
       "api",
       seams,
@@ -529,39 +503,22 @@ suite("gitScaffold — buildProjectStructureNoPrompt (the REAL build path)", () 
     assert.deepStrictEqual(captured.recordSeatChoiceCalls, [{ dir: projectDir, chosen: false }]);
   });
 
-  test("full with no profile pick, or lightweight: seat setup never runs, marker never touched (indifferent callers)", async () => {
-    for (const [tier, profile] of [
-      ["full", undefined],
-      ["lightweight", undefined],
-    ] as const) {
-      const { captured, seams } = makeBuildSeams(true, venvPath);
-      await buildProjectStructureNoPrompt(
-        fakeContext(),
-        projectDir,
-        tier,
-        undefined,
-        undefined,
-        profile,
-        seams,
-      );
-      assert.ok(
-        !captured.events.includes("seat-setup"),
-        `seat setup must not run for tier=${tier} profile=${String(profile)}`,
-      );
-      assert.ok(
-        !captured.warnings.some((w) => w.includes("Copilot seat setup")),
-        "no seat-setup warning on the not-selected path",
-      );
-      // Set 097 (spec D1): neither of these callers answered the Copilot
-      // question at all -- the durable marker must be neither written nor
-      // cleared (a Lightweight rebuild, or a legacy Command-Palette build
-      // with no profile info, must not destroy evidence of an earlier
-      // unconfirmed Full+Copilot attempt it wasn't even asked about).
-      assert.deepStrictEqual(
-        captured.recordSeatChoiceCalls,
-        [],
-        `tier=${tier} profile=${String(profile)} must not touch the seat marker`,
-      );
-    }
+  test("no profile pick: seat setup never runs, marker never touched (indifferent callers)", async () => {
+    const { captured, seams } = makeBuildSeams(true, venvPath);
+    await buildProjectStructureNoPrompt(
+      fakeContext(),
+      projectDir,
+      undefined,
+      undefined,
+      seams,
+    );
+    assert.ok(!captured.events.includes("seat-setup"));
+    assert.ok(
+      !captured.warnings.some((w) => w.includes("Copilot seat setup")),
+      "no seat-setup warning on the not-selected path",
+    );
+    // Set 097 (spec D1): this caller did not answer the Copilot question
+    // at all -- the durable marker must be neither written nor cleared.
+    assert.deepStrictEqual(captured.recordSeatChoiceCalls, []);
   });
 });

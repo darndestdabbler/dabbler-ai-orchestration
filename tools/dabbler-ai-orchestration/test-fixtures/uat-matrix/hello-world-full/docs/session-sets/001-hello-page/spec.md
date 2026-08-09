@@ -27,9 +27,9 @@ totalSessions: 3
 ## Project Overview
 
 A single static page that greets the visitor and shows today's date.
-Used as the Full-tier control row in the UAT fixture matrix: session 2
+Used as the control row in the UAT fixture matrix: session 2
 is mid-flight, so the Explorer should show `1/3` with the in-flight
-annotation and no Lightweight markers of any kind.
+annotation and no markers of any kind.
 
 ---
 

@@ -222,13 +222,13 @@ remain advisory, no runtime gate reads them).
 `not-reproducible` \| `accepted-risk` \| `accepted-consequence` \|
 `advisory-disagreement` \| `needs-more-context` \| `escalate-human`.
 
-> **Flow-layer requirement (NOT in the shared schema).** The Lightweight
-> dedicated-verification flow additionally requires a verifier-created
-> **open** issue to carry `issueId` + `issueType` + `verificationMethod`
-> (`description` is already required by the base envelope;
-> `suggestedTestOrCheck` stays optional). That stricter rule is enforced
-> by the flow / writer, not by `session-issues.schema.json`, so the
-> shared schema stays additive for Full tier and for existing fixtures.
+> **The four promoted fields stay OPTIONAL here.** Set 057's Lightweight
+> dedicated-verification flow imposed a stricter rule at the flow layer
+> (a verifier-created **open** issue had to carry `issueId` +
+> `issueType` + `verificationMethod`). Set 112 removed that flow, and the
+> rule went with it; nothing enforces it now. The shared schema is
+> unchanged by either event — it was always additive, which is why
+> existing fixtures and every archived envelope stay valid.
 
 ### Resolution fields are advisory only
 

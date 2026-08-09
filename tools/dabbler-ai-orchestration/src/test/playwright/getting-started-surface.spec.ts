@@ -80,13 +80,19 @@ test.describe("Set 110 S3 — the re-homed Getting Started surface", () => {
     await expect(inner.locator(".gs-title")).toHaveText("Getting Started");
   });
 
-  test("seeds the Lightweight three-way choice from durable markers", async () => {
-    // Set 077 S3. A workspace whose durable markers say lightweight +
-    // dedicated-sessions must paint, on first render with no interaction:
-    // the Lightweight radio checked, the Lightweight-only verification-mode
-    // block with `dedicated` checked, NO Full-only budget block (omitted,
-    // not hidden), and no Python fault in the System Status strip.
-    per.tmpPath = makeTmpDir("dabbler-gs-threeway");
+  test("the tier fork is GONE; provider access is the first question", async () => {
+    // Set 112 S2. The form used to open with a Full/Lightweight tier radio
+    // and, on Lightweight, a verification-mode sub-choice. Both are deleted.
+    // This asserts the ABSENCE at the rendering layer, where the Layer-2
+    // builder tests cannot see it — Set 108 proved static gates stay green
+    // while a view is broken.
+    //
+    // The stale `.dabbler/tier` + `.dabbler/verification-mode` markers are
+    // written on purpose: a consumer upgrading from a Lightweight workspace
+    // still has them on disk, and they must now be INERT — no radio to
+    // re-check, no block to paint. The form must render the one-tier shape
+    // regardless.
+    per.tmpPath = makeTmpDir("dabbler-gs-no-tier-fork");
     const repoRoot = emptyWorkspace(per.tmpPath);
     const dabblerDir = path.join(repoRoot, ".dabbler");
     fs.mkdirSync(dabblerDir, { recursive: true });
@@ -103,16 +109,19 @@ test.describe("Set 110 S3 — the re-homed Getting Started surface", () => {
     await expect(inner.locator(".getting-started")).toBeVisible({
       timeout: 30_000,
     });
+    // No tier radio group, and no verification-mode block, at all.
+    expect(await inner.locator('input[name="gs-tier"]').count()).toBe(0);
+    expect(await inner.locator("[data-gs-verification-mode]").count()).toBe(0);
+    expect(
+      await inner.locator('input[name="gs-verification-mode"]').count(),
+    ).toBe(0);
+    // Provider access is the form's first (and only) setup question, with
+    // the Direct-API default checked and its budget block nested under it.
+    await expect(inner.locator("[data-gs-transport-profile]")).toBeVisible();
     await expect(
-      inner.locator('input[name="gs-tier"][value="lightweight"]'),
+      inner.locator('input[name="gs-transport-profile"][value="api"]'),
     ).toBeChecked();
-    await expect(inner.locator("[data-gs-verification-mode]")).toBeVisible();
-    await expect(
-      inner.locator(
-        'input[name="gs-verification-mode"][value="dedicated-sessions"]',
-      ),
-    ).toBeChecked();
-    expect(await inner.locator("[data-gs-budget]").count()).toBe(0);
+    await expect(inner.locator("[data-gs-budget]")).toBeVisible();
     expect(await inner.locator('[data-status-code="python"]').count()).toBe(0);
   });
 

@@ -6,12 +6,12 @@ You are **Claude Code**; you read this `CLAUDE.md` automatically. Codex and
 GitHub Copilot read `AGENTS.md`; Gemini Code Assist reads `GEMINI.md`. All
 three files share the body above — only this tail differs.
 
-- **API keys (Full tier):** Claude Code inherits the OS user environment, so
-  `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` /
-  `DABBLER_OPENAI_API_KEY` are normally already present. If a routed call fails
-  on a missing key, confirm it is set
-  in the user environment before retrying. (Lightweight tier makes no metered
-  calls, so keys are not required to run sessions.)
+- **API keys (Direct-API transport):** Claude Code inherits the OS user
+  environment, so `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` /
+  `DABBLER_OPENAI_API_KEY` are normally already present. If a routed call
+  fails on a missing key, confirm it is set in the user environment before
+  retrying. A `copilot-cli` seat carries no provider keys by design — their
+  absence is not an error there.
 - **Run the router through the venv interpreter:**
   `.venv/Scripts/python.exe -m ai_router.<module>` on Windows,
   `.venv/bin/python -m ai_router.<module>` on POSIX. A bare `python` often

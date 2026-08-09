@@ -38,11 +38,8 @@ import { registerFlagDecisionForReview } from "./commands/flagDecisionForReview"
 import { registerScanAnnotationsForActiveSet } from "./commands/scanAnnotationsForActiveSet";
 import { registerOpenOrchestratorWriterLog } from "./commands/openOrchestratorWriterLog";
 import { registerRegenerateNarrationTemplatesCommand } from "./commands/regenerateNarrationTemplates";
-import { registerExternalVerificationCommand } from "./commands/externalVerification";
 import { registerResolveSetNumberCommand } from "./commands/resolveSetNumber";
 import { registerUpgradeOlderSetsCommand } from "./commands/upgradeOlderSets";
-import { registerSwitchTierCommand } from "./commands/switchTier";
-import { registerSetupVerificationCommand } from "./commands/setupVerification";
 import { hasSubCurrentSets } from "./providers/SessionSetsModel";
 import { routesCost } from "./utils/routerConfig";
 import { SessionSet } from "./types";
@@ -57,12 +54,11 @@ import { markActivateEnd, markActivateStart } from "./utils/startupTiming";
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
 
-// Set 052 S2 (D3 tier gate): project whether ANY open workspace folder
+// Set 052 S2 (D3 gate): project whether ANY open workspace folder
 // routes through the AI router (resolvable `ai_router/router-config.yaml`)
 // into a context key. The cost icon/command is contributed only when this
-// is true — present on Full-tier routing repos, absent on Lightweight.
-// Folder existence alone is insufficient; `routesCost` requires the
-// config file itself.
+// is true. Folder existence alone is insufficient; `routesCost` requires
+// the config file itself.
 function evaluateRouterCapabilityContextKey(): void {
   const folders = vscode.workspace.workspaceFolders ?? [];
   let routes = false;
@@ -169,11 +165,11 @@ export function activate(context: vscode.ExtensionContext): void {
   const provider = new SetupStatusView(context, scanState);
   context.subscriptions.push({ dispose: () => provider.dispose() });
   // Set 077 S2 (Feature 1, A1): `retainContextWhenHidden` was evaluated
-  // here as belt-and-braces for the Getting Started tier-leak fix and
+  // here as belt-and-braces for the Getting Started state-leak fix and
   // deliberately NOT enabled. The webview persists its form state via
-  // `vscode.setState()` and re-seeds the tier from the durable
-  // `.dabbler/tier` marker on every load (client.js / tierMarkerStore),
-  // which covers BOTH teardown cases — hide/re-expand AND window reload —
+  // `vscode.setState()` and re-seeds the seat profile from the durable
+  // router config on every load (client.js), which covers BOTH teardown
+  // cases — hide/re-expand AND window reload —
   // whereas retainContextWhenHidden covers only the hide case, at a
   // standing memory cost VS Code's own guidance says to avoid when
   // getState/setState suffices.
@@ -491,9 +487,6 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerRegenerateNarrationTemplates", () =>
     registerRegenerateNarrationTemplatesCommand(context),
   );
-  safeRegister("registerExternalVerificationCommand", () =>
-    registerExternalVerificationCommand(context),
-  );
   // Set 050 S4 (Feature 2 + Explorer UX revision): the number->slug
   // quick-input resolver and the repo-level bulk-upgrade title-bar
   // action.
@@ -502,15 +495,6 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("registerUpgradeOlderSetsCommand", () =>
     registerUpgradeOlderSetsCommand(context, { refreshView: refreshAll }),
-  );
-  // Set 061 S3 (spec D4): tier switch on not-started sets.
-  safeRegister("registerSwitchTierCommand", () =>
-    registerSwitchTierCommand(context),
-  );
-  // Set 062 S2 (spec D3): verification-mode seed rewrite on
-  // not-started Lightweight sets.
-  safeRegister("registerSetupVerificationCommand", () =>
-    registerSetupVerificationCommand(context),
   );
 
   // Set 030 Session 5: flip scanState to "ready" once activation

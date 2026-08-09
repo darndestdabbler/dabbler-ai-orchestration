@@ -2121,7 +2121,6 @@ suite("moduleAuthoring — renderModule*SetSpec (Set 098 S2)", () => {
       const config = parseSessionSetConfig(specPath);
       assert.strictEqual(config.kind, "plan");
       assert.strictEqual(config.module, "greeter");
-      assert.strictEqual(config.tier, "full");
       assert.strictEqual(config.requiresUAT, false);
       assert.strictEqual(parsePrerequisites(specPath), null);
     } finally {

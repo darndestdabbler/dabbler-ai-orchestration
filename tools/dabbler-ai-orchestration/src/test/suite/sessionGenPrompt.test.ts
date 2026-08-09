@@ -1,6 +1,6 @@
 // Set 058 S2 — the session-set generation prompt must steer the AI to the
-// canonical spec shape (schemaVersion 4, NNN- slug, tier +
-// verificationMode) and never the retired schemaVersion: 2 / bare-slug
+// canonical spec shape (schemaVersion 4, NNN- slug) and never the retired
+// schemaVersion: 2 / bare-slug
 // form. Also covers the wizard's "start the next session" cold-start
 // closure copy.
 
@@ -8,8 +8,6 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
 import { buildSessionGenPrompt } from "../../wizard/sessionGenPrompt";
-import { scaffoldConsumerRepo } from "../../commands/gitScaffold";
-import { resolveDurableTier } from "../../utils/tierMarkerStore";
 import {
   TemplateBundle,
   loadTemplateBundle,
@@ -41,11 +39,9 @@ suite("buildSessionGenPrompt (Set 058 S2)", () => {
     assert.ok(prompt.includes("Read that file directly"));
   });
 
-  test("demands the canonical schemaVersion 4 / NNN- / tier shape", () => {
+  test("demands the canonical schemaVersion 4 / NNN- shape", () => {
     assert.ok(/schemaVersion.*4/.test(prompt));
     assert.ok(prompt.includes("NNN-"));
-    assert.ok(prompt.includes("tier"));
-    assert.ok(prompt.includes("verificationMode"));
   });
 
   test("never instructs the retired schemaVersion: 2 form", () => {
@@ -63,7 +59,6 @@ suite("buildSessionGenPrompt (Set 058 S2)", () => {
     assert.ok(prompt.includes("session-003/"));
     assert.ok(prompt.includes('"number": 3'));
     assert.ok(prompt.includes('"schemaVersion": 4'));
-    assert.ok(/tier:\s*full/.test(prompt));
   });
 
   test("leaves NO unsubstituted {{TOKEN}} placeholders (rendered, not raw)", () => {
@@ -124,7 +119,7 @@ suite("Getting Started instructions doc (Set 060 S3, D8)", () => {
     assert.ok(/Copy Eval/.test(doc), "right-click mirror is named");
   });
 
-  test("teaches the project-plan contract and both tiers", () => {
+  test("teaches the project-plan contract", () => {
     assert.ok(doc.includes("project-plan.md"));
     // Set 101: the onboarding flow is module-first — a fresh Build scaffolds
     // a `default` module, so the plan the doc teaches lives at the module's
@@ -133,112 +128,11 @@ suite("Getting Started instructions doc (Set 060 S3, D8)", () => {
       doc.includes("docs/modules/default/project-plan.md"),
       "teaches the default-module plan path (Set 101 module-first scaffold)",
     );
-    assert.ok(/Full tier/.test(doc));
-    assert.ok(/Lightweight tier/.test(doc));
   });
 
   test("explains the parallel worktree model (D7 companion copy)", () => {
     assert.ok(doc.includes("git worktrees"));
     assert.ok(doc.includes("merged back to the main branch"));
-  });
-});
-
-// Set 077 Session 2 (Feature 1, A1): the prompt's tier guidance claims
-// only what its resolution source supports, and the tier-less render is
-// no longer a silent Full steer. Routed test-generation (gemini-pro)
-// drafted this suite; adapted to the shipped wording.
-suite("buildSessionGenPrompt — tier truth (Set 077 S2)", () => {
-  test("form/marker source: operator-selected wording + matching exemplar", () => {
-    for (const source of ["form", "marker"] as const) {
-      const p = buildSessionGenPrompt(bundle, {
-        tier: "lightweight",
-        tierSource: source,
-      });
-      assert.ok(
-        p.includes("The operator selected the **lightweight** tier"),
-        `${source}: missing selected wording`,
-      );
-      assert.ok(p.includes("`tier: lightweight`"));
-      assert.ok(
-        /tier:\s*lightweight/.test(p),
-        `${source}: exemplar must render lightweight`,
-      );
-    }
-  });
-
-  test("inference source: hedged wording, never claims a selection", () => {
-    const p = buildSessionGenPrompt(bundle, {
-      tier: "full",
-      tierSource: "inference",
-    });
-    assert.ok(p.includes("inferred from the workspace's router configuration"));
-    assert.ok(!p.includes("The operator selected"));
-  });
-
-  test("no tier at all: names the illustration honestly, never fabricates a selection", () => {
-    const p = buildSessionGenPrompt(bundle, {});
-    assert.ok(p.includes("No tier choice is recorded in this workspace"));
-    assert.ok(p.includes("for illustration only"));
-    assert.ok(!p.includes("The operator selected"));
-  });
-
-  test("Set 076 regression replay: Lightweight scaffold ⇒ lightweight prompt", async () => {
-    // The reported incident chain: scaffold Lightweight, lose the
-    // volatile radio (reload), copy the decomposition prompt — pre-077
-    // it rendered Full exemplars with no tier guidance. Post-077 the
-    // scaffold writes .dabbler/tier, the resolver reads it back, and
-    // the prompt renders the truth.
-    const store = new Map<string, string>();
-    const norm = (p: string) => p.split(path.sep).join("/");
-    const ops = {
-      exists: (p: string) => store.has(norm(p)),
-      readFile: (p: string) => {
-        const c = store.get(norm(p));
-        if (c === undefined) throw new Error(`ENOENT: ${p}`);
-        return c;
-      },
-      writeFile: (p: string, c: string) => void store.set(norm(p), c),
-      writeFileExclusive: (p: string, c: string) => {
-        const k = norm(p);
-        if (store.has(k)) {
-          const e: NodeJS.ErrnoException = new Error(`EEXIST: ${p} exists`);
-          e.code = "EEXIST";
-          throw e;
-        }
-        store.set(k, c);
-      },
-      mkdirp: () => {},
-      copyDir: () => {},
-      removeRecursive: (p: string) => void store.delete(norm(p)),
-      mkdtemp: (prefix: string) => `/tmp/${prefix}0`,
-    };
-    await scaffoldConsumerRepo({
-      projectDir: "/repo",
-      ctx: {
-        repoName: "demo",
-        setTitle: "Demo",
-        purpose: "Replay the Set 076 tier leak.",
-        slug: "001-demo",
-        created: "2026-07-02",
-        tier: "lightweight",
-        verificationMode: "out-of-band-or-none",
-        totalSessions: 1,
-      },
-      bundle,
-      fileOps: ops,
-      installRouter: async () => ({ ok: true, message: "installed" }),
-    });
-
-    const durable = resolveDurableTier("/repo", ops);
-    assert.deepStrictEqual(durable, { tier: "lightweight", source: "marker" });
-
-    const p = buildSessionGenPrompt(bundle, {
-      tier: durable!.tier,
-      tierSource: durable!.source,
-    });
-    assert.ok(/tier:\s*lightweight/.test(p), "exemplar must carry tier: lightweight");
-    assert.ok(p.includes("The operator selected the **lightweight** tier"));
-    assert.ok(!p.includes("No tier choice is recorded"));
   });
 });
 
@@ -279,76 +173,6 @@ suite("buildSessionGenPrompt — module targeting (Set 087 S3)", () => {
     assert.ok(!/^module:/m.test(p));
     assert.ok(!p.includes("This decomposition targets"));
     assert.ok(p.includes("docs/planning/project-plan.md"));
-  });
-
-  test("module option composes with tier + verification-mode options", () => {
-    const p = buildSessionGenPrompt(bundle, {
-      module: mod,
-      tier: "lightweight",
-      tierSource: "form",
-      verificationMode: "dedicated-sessions",
-    });
-    assert.ok(/^module: greeter/m.test(p));
-    assert.ok(p.includes("verificationMode: dedicated-sessions"));
-    assert.ok(p.includes("The operator selected the **lightweight** tier"));
-  });
-});
-
-// ---------------------------------------------------------------------
-// Set 077 Session 3 (Feature 2) — the decomposition prompt's
-// verification-mode truth: the exemplar declares the operator's pick on
-// Lightweight, the guidance steers only when a non-default pick exists,
-// and Full ignores the rider (the field is inert there). Cases generated
-// via routed test-generation (gemini-pro) and adapted.
-// ---------------------------------------------------------------------
-
-suite("buildSessionGenPrompt — verification-mode truth (Set 077 S3)", () => {
-  test("lightweight + dedicated-sessions: exemplar declares it and guidance steers", () => {
-    const prompt = buildSessionGenPrompt(bundle, {
-      tier: "lightweight",
-      verificationMode: "dedicated-sessions",
-    });
-    assert.ok(prompt.includes("verificationMode: dedicated-sessions"));
-    assert.ok(
-      prompt.includes("The operator selected **dedicated verification sessions**"),
-    );
-  });
-
-  test("lightweight without a pick: exemplar keeps the default, no mode guidance", () => {
-    const prompt = buildSessionGenPrompt(bundle, { tier: "lightweight" });
-    assert.ok(prompt.includes("verificationMode: out-of-band-or-none"));
-    assert.ok(!prompt.includes("verificationMode: dedicated-sessions"));
-    assert.ok(
-      !prompt.includes("The operator selected **dedicated verification sessions**"),
-    );
-  });
-
-  test("full ignores a verificationMode option — exemplar omits the line (Set 082)", () => {
-    const prompt = buildSessionGenPrompt(bundle, {
-      tier: "full",
-      verificationMode: "dedicated-sessions",
-    });
-    // The Full exemplar spec carries NO verificationMode line at all —
-    // the field is Lightweight-only and Full scaffolds omit it. The only
-    // rendered `verificationMode` mentions are the hard-requirements
-    // prose scoping the field to Lightweight.
-    assert.ok(
-      !/^verificationMode:/m.test(prompt),
-      "a Full-resolved prompt must not render a verificationMode config line",
-    );
-    assert.ok(prompt.includes("`full` sets OMIT"));
-    assert.ok(
-      !prompt.includes("The operator selected **dedicated verification sessions**"),
-    );
-  });
-
-  // Set 082 pin: the riderless Full prompt (the common palette path)
-  // renders no verificationMode line either — buildSessionGenPrompt
-  // emits the field on Lightweight-resolved prompts only.
-  test("full without a rider: no verificationMode line anywhere (Set 082)", () => {
-    const prompt = buildSessionGenPrompt(bundle, { tier: "full" });
-    assert.ok(!/^verificationMode:/m.test(prompt));
-    assert.ok(prompt.includes("`full` sets OMIT"));
   });
 });
 

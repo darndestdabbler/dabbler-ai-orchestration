@@ -233,7 +233,6 @@ suite(
         skipped: manifestJustCreated ? [] : [MODULES_MANIFEST_DISPLAY],
         installOk: true,
         installMessage: "installed",
-        routerConfigRemoved: false,
         budgetOutcome: null,
       };
     }
@@ -283,8 +282,6 @@ suite(
       await buildProjectStructureNoPrompt(
         fakeContext(),
         projectDir,
-        "full",
-        undefined,
         undefined,
         undefined,
         seams,
@@ -299,39 +296,7 @@ suite(
       await buildProjectStructureNoPrompt(
         fakeContext(),
         projectDir,
-        "full",
         undefined,
-        undefined,
-        undefined,
-        seams,
-      );
-      assert.deepStrictEqual(calls, []);
-    });
-
-    test("gating is tier-independent: Lightweight also triggers on a fresh manifest", async () => {
-      const calls: string[] = [];
-      const seams = baseSeams(true, calls);
-      await buildProjectStructureNoPrompt(
-        fakeContext(),
-        projectDir,
-        "lightweight",
-        undefined,
-        "out-of-band-or-none",
-        undefined,
-        seams,
-      );
-      assert.deepStrictEqual(calls, [projectDir]);
-    });
-
-    test("gating is tier-independent: Lightweight also skips on a pre-existing manifest", async () => {
-      const calls: string[] = [];
-      const seams = baseSeams(false, calls);
-      await buildProjectStructureNoPrompt(
-        fakeContext(),
-        projectDir,
-        "lightweight",
-        undefined,
-        "out-of-band-or-none",
         undefined,
         seams,
       );
@@ -350,8 +315,6 @@ suite(
         await buildProjectStructureNoPrompt(
           fakeContext(),
           root,
-          "full",
-          undefined,
           undefined,
           undefined,
           seams,
@@ -391,8 +354,6 @@ suite(
         await buildProjectStructureNoPrompt(
           fakeContext(),
           root,
-          "full",
-          undefined,
           undefined,
           undefined,
           seams,
@@ -408,26 +369,24 @@ suite(
 );
 
 suite("gitScaffold — Work Explorer tree end-state (Set 101 S1 verification finding)", () => {
-  test("fresh Build: exactly one declared module (default), two pending sets, no pseudo-module, both tiers", () => {
-    for (const tier of ["full", "lightweight"] as const) {
-      const root = tmpRoot(`default-module-tree-${tier}-`);
-      try {
-        ensureModulesManifest(root);
-        scaffoldDefaultModuleAndLifecycleSets(root); // tier-agnostic — the scaffold itself never branches on tier
+  test("fresh Build: exactly one declared module (default), two pending sets, no pseudo-module", () => {
+    const root = tmpRoot("default-module-tree-");
+    try {
+      ensureModulesManifest(root);
+      scaffoldDefaultModuleAndLifecycleSets(root);
 
-        const modules = visibleModules(root);
-        assert.strictEqual(modules.length, 1, `exactly one visible module (${tier})`);
-        assert.strictEqual(modules[0].kind, "declared");
-        assert.strictEqual(modules[0].slug, "default");
-        const rows = modules[0].buckets.flatMap((b) => b.rows);
-        assert.strictEqual(rows.length, 2, `two pending rows under default (${tier})`);
-        assert.ok(
-          !modules.some((m) => m.kind === "pseudo"),
-          `no pseudo-module renders alongside the declared default (${tier})`,
-        );
-      } finally {
-        fs.rmSync(root, { recursive: true, force: true });
-      }
+      const modules = visibleModules(root);
+      assert.strictEqual(modules.length, 1, "exactly one visible module");
+      assert.strictEqual(modules[0].kind, "declared");
+      assert.strictEqual(modules[0].slug, "default");
+      const rows = modules[0].buckets.flatMap((b) => b.rows);
+      assert.strictEqual(rows.length, 2, "two pending rows under default");
+      assert.ok(
+        !modules.some((m) => m.kind === "pseudo"),
+        "no pseudo-module renders alongside the declared default",
+      );
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true });
     }
   });
 
@@ -473,8 +432,6 @@ suite("gitScaffold — Work Explorer tree end-state (Set 101 S1 verification fin
       await buildProjectStructureNoPrompt(
         fakeContext(),
         root,
-        "full",
-        undefined,
         undefined,
         undefined,
         seams,

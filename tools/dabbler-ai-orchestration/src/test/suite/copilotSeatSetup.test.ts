@@ -908,29 +908,21 @@ suite("copilotSeatSetup", () => {
         transportProfile: tp as GettingStartedActionMsg["transportProfile"],
       });
 
-      test("lightweight drops the rider outright", () => {
-        assert.strictEqual(
-          resolveTransportProfile(msg("copilot-cli"), "lightweight"),
-          undefined,
-        );
-        assert.strictEqual(resolveTransportProfile(msg(), "lightweight"), undefined);
+      test('defaults to "api" when the rider is absent', () => {
+        assert.strictEqual(resolveTransportProfile(msg(undefined)), "api");
+        assert.strictEqual(resolveTransportProfile(msg(null)), "api");
       });
 
-      test('full defaults to "api" when the rider is absent', () => {
-        assert.strictEqual(resolveTransportProfile(msg(undefined), "full"), "api");
-        assert.strictEqual(resolveTransportProfile(msg(null), "full"), "api");
-      });
-
-      test("full passes a present rider through narrowed", () => {
+      test("passes a present rider through narrowed", () => {
         assert.strictEqual(
-          resolveTransportProfile(msg("copilot-cli"), "full"),
+          resolveTransportProfile(msg("copilot-cli")),
           "copilot-cli",
         );
-        assert.strictEqual(resolveTransportProfile(msg("api"), "full"), "api");
+        assert.strictEqual(resolveTransportProfile(msg("api")), "api");
       });
 
-      test("full throws on a malformed rider", () => {
-        assert.throws(() => resolveTransportProfile(msg("invalid"), "full"));
+      test("throws on a malformed rider", () => {
+        assert.throws(() => resolveTransportProfile(msg("invalid")));
       });
     });
   });

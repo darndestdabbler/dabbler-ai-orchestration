@@ -155,7 +155,7 @@ def repo(tmp_path: Path) -> Path:
         "HELLO, WORLD!\n"
         "```\n"
         "\n"
-        "Next: [Adopt Dabbler](adopt-dabbler.md). Full tier adds independent\n"
+        "Next: [Adopt Dabbler](adopt-dabbler.md). A real project adds independent\n"
         "cross-provider verification.\n",
         encoding="utf-8",
     )
@@ -381,7 +381,7 @@ def test_missing_full_tier_sentence_is_flagged(repo: Path):
     _edit(
         repo,
         HELLO_WORLD,
-        "Full tier adds independent\ncross-provider verification.",
+        "A real project adds independent\ncross-provider verification.",
         "That is all.",
     )
     assert _checks(tutorial_gate.run_all(repo), "first-run-constraint")
@@ -391,7 +391,7 @@ def test_duplicated_full_tier_sentence_is_flagged(repo: Path):
     _append(
         repo,
         HELLO_WORLD,
-        "\nFull tier adds independent cross-provider verification.\n",
+        "\nA real project adds independent cross-provider verification.\n",
     )
     found = _checks(tutorial_gate.run_all(repo), "first-run-constraint")
     assert found and "found 2" in found[-1].detail

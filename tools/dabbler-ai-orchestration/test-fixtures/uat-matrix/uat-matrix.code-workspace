@@ -1,7 +1,6 @@
 {
   "folders": [
-    { "name": "hello-world-full", "path": "hello-world-full" },
-    { "name": "hello-world-lightweight", "path": "hello-world-lightweight" }
+    { "name": "hello-world-full", "path": "hello-world-full" }
   ],
   "settings": {
     "window.title": "Dabbler UAT fixture workspace"

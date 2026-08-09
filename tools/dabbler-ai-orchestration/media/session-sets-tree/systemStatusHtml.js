@@ -6,7 +6,7 @@
   }
 })(function () {
   var PROVIDER_KEY_TEXT =
-    "No provider API key was found for Full-tier direct API routing. Set at least one " +
+    "No provider API key was found for direct API routing. Set at least one " +
     "DABBLER_ANTHROPIC_API_KEY, DABBLER_OPENAI_API_KEY, or " +
     "DABBLER_GEMINI_API_KEY value, then reload the VS Code window.";
   var PYTHON_TEXT =
@@ -39,7 +39,6 @@
 
   function renderSystemStatus(status, controls) {
     if (!status || status.workspaceOpen === false) return "";
-    var tier = controls && controls.tier === "lightweight" ? "lightweight" : "full";
     var profile =
       controls && controls.transportProfile === "copilot-cli" ? "copilot-cli" : "api";
     var faults = [];
@@ -49,16 +48,16 @@
     if (status.pythonPresent === false) {
       faults.push({ code: "python", text: PYTHON_TEXT });
     }
-    if (tier === "full" && profile === "api" && status.providerKeyPresent === false) {
+    if (profile === "api" && status.providerKeyPresent === false) {
       faults.push({ code: "provider-key", text: PROVIDER_KEY_TEXT });
     }
-    if (tier === "full" && profile === "copilot-cli" && status.copilotCliPresent === false) {
+    if (profile === "copilot-cli" && status.copilotCliPresent === false) {
       faults.push({ code: "copilot-cli", text: COPILOT_TEXT });
     }
     // Set 097 (spec D1): gated on the HOST-COMPUTED durable signal only —
     // deliberately NOT on `profile` (the live/possibly-reverted control
     // state) — so the note survives the exact repaint the defect causes.
-    if (tier === "full" && status.copilotSeatChosenUnconfirmed === true) {
+    if (status.copilotSeatChosenUnconfirmed === true) {
       faults.push({
         code: "copilot-seat-unconfirmed",
         text: COPILOT_SEAT_UNCONFIRMED_TEXT + (status.copilotSeatRerunHint || ""),

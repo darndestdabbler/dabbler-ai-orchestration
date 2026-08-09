@@ -77,15 +77,21 @@ function scaffoldEnvironment(repoRoot: string, opts: { routerPkg: boolean }): vo
   }
   fs.mkdirSync(path.join(repoRoot, ".venv", "Scripts"), { recursive: true });
   fs.writeFileSync(path.join(repoRoot, ".venv", "Scripts", "python.exe"), "", "utf8");
-  // Lightweight tier gates out the provider-key fault, isolating the
-  // behaviour under test. The runner has Python, so no Python fault either.
-  fs.mkdirSync(path.join(repoRoot, ".dabbler"), { recursive: true });
-  fs.writeFileSync(
-    path.join(repoRoot, ".dabbler", "tier"),
-    "lightweight\n",
-    "utf8",
-  );
 }
+
+// Set 112 S2: a dummy provider key for the launched extension host.
+//
+// These tests need the provider-key probe to answer a KNOWN value, and the
+// Electron env allowlist deliberately strips the real `DABBLER_*` keys so a
+// developer's credentials can never decide a test. Until Set 112 the
+// isolation came from a `.dabbler/tier: lightweight` marker, which gated the
+// provider-key fault out of the strip entirely; the tier is gone, so the
+// dependency is made explicit here instead. The value is nonsense on
+// purpose — the probe is a non-empty-string presence check and never
+// authenticates anything.
+const SEEDED_PROVIDER_KEY: Record<string, string> = {
+  DABBLER_ANTHROPIC_API_KEY: "layer3-dummy-not-a-real-key",
+};
 
 test.describe("Set 110 S3 — diagnostics surfaces", () => {
   const per: PerTest = {};
@@ -103,7 +109,7 @@ test.describe("Set 110 S3 — diagnostics surfaces", () => {
     fs.writeFileSync(manifestPath, MODULES_YAML, "utf8");
     scaffoldEnvironment(fixture.repo_root, { routerPkg: true });
 
-    per.launch = await launchVSCode(fixture.repo_root);
+    per.launch = await launchVSCode(fixture.repo_root, [], SEEDED_PROVIDER_KEY);
     const pane = await openWorkExplorerTree(per.launch.page);
 
     // Healthy: the module renders and the view says nothing.
@@ -145,7 +151,7 @@ test.describe("Set 110 S3 — diagnostics surfaces", () => {
     const fixture = makeSet(per.tmpPath, "092-editable-install", 2);
     scaffoldEnvironment(fixture.repo_root, { routerPkg: false });
 
-    per.launch = await launchVSCode(fixture.repo_root);
+    per.launch = await launchVSCode(fixture.repo_root, [], SEEDED_PROVIDER_KEY);
     const pane = await openWorkExplorerTree(per.launch.page);
     await expect(treeRow(pane, "Default")).toBeVisible({ timeout: 30_000 });
 
@@ -200,7 +206,7 @@ test.describe("Set 110 S3 — diagnostics surfaces", () => {
       "utf8",
     );
 
-    per.launch = await launchVSCode(fixture.repo_root);
+    per.launch = await launchVSCode(fixture.repo_root, [], SEEDED_PROVIDER_KEY);
     const inner = await openSessionSetsView(per.launch.page);
     const strip = inner.getByTestId("system-status");
     await expect(strip).toBeVisible({ timeout: 30_000 });

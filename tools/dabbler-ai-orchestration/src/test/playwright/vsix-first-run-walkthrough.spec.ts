@@ -162,9 +162,9 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
     // ---- Step 1: Build project structure, through the REAL Getting
     // Started webview form — real git init, real template render, real
     // venv + pip install, and — the point of this session — the new
-    // default-module + lifecycle-set scaffold. Full tier is the form's
-    // default; the budget must be filled or the click is a client-side
-    // no-op (lesson 2). ----
+    // default-module + lifecycle-set scaffold. Direct-API is the form's
+    // default provider-access pick; the budget must be filled or the click
+    // is a client-side no-op (lesson 2). ----
     await inner.locator("#gs-budget-input").fill("25");
     const buildButton = inner.locator('[data-gs-action="build-structure"]');
     await expect(buildButton).toBeEnabled({ timeout: 15_000 });

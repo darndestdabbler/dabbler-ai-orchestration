@@ -57,7 +57,7 @@
   var OPEN_MODULES_BUTTON_LABEL = "Open modules.yaml";
   var COPY_DECOMPOSITION_BUTTON_LABEL = "Copy AI decomposition prompt";
 
-  // Set 063 S2 (spec D1): the Full-tier budget / NTE step inside the
+  // Set 063 S2 (spec D1): the budget / NTE step inside the
   // Build-project-structure step. The label/help copy frames the value
   // as the project's verification spending cap; the $0 copy is the
   // consult-resolved wording (no silent default — the operator picks
@@ -70,31 +70,12 @@
     "A $0 budget still needs a verification rule. Choose whether to " +
     "check each session in another engine or skip verification.";
 
-  // Set 077 S3 (Feature 2): the Lightweight-only verification-mode step
-  // inside step 1 — the mirror image of the Full-only budget block. The
-  // two radios map onto the existing spec-level `verificationMode` field
-  // (no new schema): the default keeps the copyable-review-prompt flow;
-  // dedicated sessions opt in to typed verification sessions on a
-  // different engine or provider. Together with the tier radios this is
-  // the operator's three-way setup choice (Full / Lightweight+dedicated /
-  // Lightweight+out-of-band).
-  var VERIFICATION_MODE_LABEL_TEXT = "Verification (per session set)";
-  // Set 079 S4 (Feature 2): plain-language rewrite of both descriptions
-  // (same meaning, same radio values — only the human-facing copy).
-  var VERIFICATION_MODE_OUT_OF_BAND_TEXT =
-    "Manual review (default) — paste a review prompt into a second AI " +
-    "assistant yourself and record what it says.";
-  var VERIFICATION_MODE_DEDICATED_TEXT =
-    "Separate verification sessions — a dedicated session on a different " +
-    "AI engine or provider reviews the work before the set can close.";
-
-  // Set 079 S1 (Feature 1): the Full-tier seat-profile sub-choice — how
-  // Full's routed calls dispatch. "api" keeps the current direct
-  // provider-key path (the unchanged default); "copilot-cli" is Set
-  // 078's GitHub Copilot seat profile (transport.profile: copilot-cli),
-  // which needs no DABBLER_* keys. Mirrors the Lightweight
-  // verification-mode sub-choice in UI shape only — the Build wiring
-  // (Sessions 2-3) is materially different.
+  // Set 079 S1 (Feature 1): the seat-profile choice — how routed calls
+  // dispatch. "api" keeps the direct provider-key path (the unchanged
+  // default); "copilot-cli" is Set 078's GitHub Copilot seat profile
+  // (transport.profile: copilot-cli), which needs no DABBLER_* keys.
+  // Set 112 S2: with the Lightweight tier gone this is the form's FIRST
+  // question — provider access, not tier.
   var TRANSPORT_PROFILE_LABEL_TEXT = "Provider access (how routed calls run)";
   var TRANSPORT_PROFILE_API_TEXT =
     "Direct provider API keys — calls use your DABBLER_* provider API " +
@@ -125,7 +106,7 @@
 
   /**
    * Validate the form's budget control state ahead of the Build action
-   * (Full tier only — the caller skips this entirely on Lightweight).
+   * (the caller skips this entirely under the Copilot seat profile).
    * Returns `{ ok: true, budgetUsd, zeroMethod }` (zeroMethod null for
    * values > 0) or `{ ok: false, error }` when Build must stay blocked.
    */
@@ -147,49 +128,29 @@
    * state — whatever `vscode.getState()` returned across a webview
    * teardown — back to a well-formed `gsState`. Untrusted input: every
    * field is validated and unrecognized values fall back to the
-   * defaults (Full radio, empty budget, no zero pick). `tierSeed` is
-   * the host's durable tier resolution (the
-   * `.dabbler/tier` marker → router-config inference chain) and
-   * `rootId` is the workspace root that resolution belongs to.
-   * Semantics (Set 077 S2 review Major 1 + verification round 1):
+   * defaults (Direct-API radio, empty budget, no zero pick). `rootId` is
+   * the workspace root the persisted state belongs to; state belonging
+   * to a DIFFERENT root is discarded outright (S077-S2-V1-001: one
+   * repo's form state must never bleed into another).
    *
-   *   - Persisted state belonging to a DIFFERENT root is discarded
-   *     outright (S077-S2-V1-001: one repo's form state must never
-   *     bleed into another).
-   *   - A present seed wins over an UNTOUCHED persisted radio — the
-   *     Set 076 leak is the untouched default snapping back to Full.
-   *   - `tierDirty` (the operator explicitly flipped the radio after
-   *     the last seed) protects that flip — but ONLY against the SAME
-   *     seed value it was flipped away from (`lastSeed`). A seed that
-   *     has CHANGED since the flip is a newer sanctioned choice
-   *     (re-scaffold / Switch Tier…) and re-applies, clearing the flag
-   *     (S077-S2-V1-002: dirty means "flipped after the last seed",
-   *     never "flipped ever").
-   *   - Whenever the tier ends up equal to the seed, the flag clears —
-   *     the durable truth caught up, nothing is owed protection.
+   * Set 079 S1 (Feature 1): `transportProfile` — the seat-profile
+   * choice ("api" default | "copilot-cli") — carries a durable seed
+   * (`profileSeed`, the host's resolution of the workspace's
+   * transport.profile) with `profileDirty` / `lastProfileSeed`
+   * protecting a post-seed explicit flip against the SAME seed value
+   * only. Set 097 (spec D2) added one carve-out: the FIRST-EVER seed
+   * (`lastProfileSeed` still null) never overrides a `profileDirty`
+   * flip, because the profile's durable source is confirmation-gated
+   * (Set 086) — its first post-build value is just the unconfirmed
+   * template default, not a newer sanctioned choice.
    *
-   * Set 077 S3 (Feature 2): `verificationMode` — the Lightweight
-   * three-way choice's second dimension — joins the persisted family
-   * with the SAME seed semantics, mirrored field-for-field (`modeSeed`
-   * is the host's durable `.dabbler/verification-mode` marker;
-   * `modeDirty` / `lastModeSeed` protect a post-seed explicit flip
-   * against the same seed value only).
-   *
-   * Set 079 S1 (Feature 1): `transportProfile` — the Full-tier
-   * seat-profile sub-choice ("api" default | "copilot-cli") — joins the
-   * family the same way (`profileSeed` is the durable seat-profile
-   * resolution the host will wire in Session 2; `profileDirty` /
-   * `lastProfileSeed` mirror the mode fields exactly) — WITH one
-   * exception, added Set 097 (spec D2): `transportProfile`'s FIRST-EVER
-   * seed (`lastProfileSeed` still null) never overrides a `profileDirty`
-   * flip, because unlike tier/mode the profile's durable source is
-   * confirmation-gated (Set 086) — its first post-build value is just the
-   * unconfirmed template default, not a newer sanctioned choice.
+   * Set 112 S2: the `tier` and `verificationMode` members of this
+   * family retired with the Lightweight tier.
    *
    * Pure so the Layer-2 suite replays teardown/re-init without a
    * webview.
    */
-  function restoreGsState(persisted, tierSeed, rootId, modeSeed, profileSeed) {
+  function restoreGsState(persisted, rootId, profileSeed) {
     var p = persisted && typeof persisted === "object" ? persisted : {};
     var persistedRootId = typeof p.rootId === "string" ? p.rootId : null;
     if (
@@ -201,27 +162,10 @@
       persistedRootId = null;
     }
     var state = {
-      tier: p.tier === "lightweight" || p.tier === "full" ? p.tier : "full",
       budget: typeof p.budget === "string" ? p.budget : "",
       zeroMethod:
         p.zeroMethod === "manual-via-other-engine" || p.zeroMethod === "skipped"
           ? p.zeroMethod
-          : null,
-      tierDirty: p.tierDirty === true,
-      lastSeed:
-        p.lastSeed === "full" || p.lastSeed === "lightweight"
-          ? p.lastSeed
-          : null,
-      verificationMode:
-        p.verificationMode === "dedicated-sessions" ||
-        p.verificationMode === "out-of-band-or-none"
-          ? p.verificationMode
-          : "out-of-band-or-none",
-      modeDirty: p.modeDirty === true,
-      lastModeSeed:
-        p.lastModeSeed === "dedicated-sessions" ||
-        p.lastModeSeed === "out-of-band-or-none"
-          ? p.lastModeSeed
           : null,
       transportProfile:
         p.transportProfile === "copilot-cli" || p.transportProfile === "api"
@@ -234,37 +178,6 @@
           : null,
       rootId: typeof rootId === "string" ? rootId : persistedRootId,
     };
-    // Set 097 (spec D2, L-069-1 sibling sweep): the tier and verification-
-    // mode seeds below do NOT need a first-seed carve-out. Their durable
-    // markers (`.dabbler/tier`, `.dabbler/verification-mode`) are written
-    // FROM the build rider itself — literally the value the operator just
-    // picked — so the post-build seed always EQUALS what they chose; there
-    // is no confirmation-gated intermediate value the way transport.profile
-    // has (Set 086's seat-confirmation gate). A first tier/mode seed can
-    // therefore never disagree with a same-build dirty flip, so the
-    // asymmetry this fix corrects for the profile family does not exist
-    // here. Left unchanged deliberately.
-    if (tierSeed === "full" || tierSeed === "lightweight") {
-      var seedChanged = state.lastSeed !== tierSeed;
-      if (!state.tierDirty || seedChanged) {
-        state.tier = tierSeed;
-        state.tierDirty = false;
-      }
-      if (state.tier === tierSeed) state.tierDirty = false;
-      state.lastSeed = tierSeed;
-    }
-    if (
-      modeSeed === "dedicated-sessions" ||
-      modeSeed === "out-of-band-or-none"
-    ) {
-      var modeSeedChanged = state.lastModeSeed !== modeSeed;
-      if (!state.modeDirty || modeSeedChanged) {
-        state.verificationMode = modeSeed;
-        state.modeDirty = false;
-      }
-      if (state.verificationMode === modeSeed) state.modeDirty = false;
-      state.lastModeSeed = modeSeed;
-    }
     if (profileSeed === "api" || profileSeed === "copilot-cli") {
       var profileSeedChanged = state.lastProfileSeed !== profileSeed;
       // Set 097 (spec D2): a seed's FIRST-EVER application — lastProfileSeed
@@ -296,23 +209,17 @@
   }
 
   /**
-   * Set 063 S2 (spec D1): the budget / NTE block inside step 1. Full
-   * tier ONLY — on Lightweight the block (input, zero-rule pair,
-   * validation element) is OMITTED from the DOM entirely, not rendered
-   * hidden (S2 verifier R1 Minor: the D1 lock says Lightweight never
-   * renders the input). Tier-radio changes therefore re-render the
-   * form surface (client.js) instead of visibility-flipping this
-   * block; gsState preserves the operator's values across the
-   * re-render. The nested $0 zero-rule radio pair keeps its own
+   * Set 063 S2 (spec D1): the budget / NTE block inside step 1.
+   * The nested $0 zero-rule radio pair keeps its own
    * `hidden` flip (input events are high-frequency; re-rendering on
    * every keystroke would drop focus). The validation element starts
    * hidden; client.js fills and reveals it when a Build click fails
    * validation.
    *
-   * Set 081 S1: the block is additionally scoped to the Direct-API
+   * Set 081 S1: the block is scoped to the Direct-API
    * sub-choice — the budget governs metered provider-API verification
-   * spend, which the Copilot seat profile excludes by design
-   * (docs/concepts/tier-model.md). OMITTED (not hidden) while the
+   * spend, which the Copilot seat profile excludes by design.
+   * OMITTED (not hidden) while the
    * copilot-cli sub-option is selected, matching the form's existing
    * conditional pattern for this block: sub-choice flips already
    * re-render the form surface (the Set 079 S1 radio listener), and
@@ -324,7 +231,6 @@
    * transportProfile field.
    */
   function budgetBlockHtml(controls) {
-    if (controls.tier === "lightweight") return "";
     if (controls.transportProfile === "copilot-cli") return "";
     var parsed = parseBudgetInput(controls.budget == null ? "" : controls.budget);
     var zeroVisible = parsed.ok && parsed.value === 0;
@@ -382,44 +288,9 @@
   }
 
   /**
-   * Set 077 S3 (Feature 2): the Lightweight-only verification-mode block
-   * inside step 1 — the mirror image of {@link budgetBlockHtml}: on FULL
-   * the block is OMITTED from the DOM entirely (tier flips re-render the
-   * form surface, so there is no visibility flip to manage). The default
-   * radio is out-of-band-or-none, matching the spec-level default.
-   * Set 080 S1: options render as {@link optionRowHtml} rows.
-   */
-  function verificationModeBlockHtml(controls) {
-    if (controls.tier !== "lightweight") return "";
-    var dedicated = controls.verificationMode === "dedicated-sessions";
-    return (
-      '<div class="gs-verification-mode" data-gs-verification-mode>' +
-        '<div class="gs-verification-mode-label">' +
-          escHtml(VERIFICATION_MODE_LABEL_TEXT) +
-        "</div>" +
-        optionRowHtml(
-          "gs-verification-mode",
-          "out-of-band-or-none",
-          !dedicated,
-          VERIFICATION_MODE_OUT_OF_BAND_TEXT,
-        ) +
-        optionRowHtml(
-          "gs-verification-mode",
-          "dedicated-sessions",
-          dedicated,
-          VERIFICATION_MODE_DEDICATED_TEXT,
-        ) +
-      "</div>"
-    );
-  }
-
-  /**
-   * Set 079 S1 (Feature 1): the Full-tier seat-profile block — the
-   * second radio group under the Full tier radio, mirroring
-   * {@link verificationModeBlockHtml}'s conditional-render shape: on
-   * LIGHTWEIGHT the block is OMITTED from the DOM entirely (tier flips
-   * re-render the form surface, so there is no visibility flip to
-   * manage). The default radio is "api" (direct provider keys),
+   * Set 079 S1 (Feature 1): the seat-profile block — the form's FIRST
+   * question since Set 112 S2 retired the tier radio above it. The
+   * default radio is "api" (direct provider keys),
    * matching Set 078's unchanged transport.profile default. Set 092
    * S2: the missing-CLI warning moved to the System Status strip
    * (systemStatusHtml.js) — no form-local warning renders here.
@@ -432,7 +303,6 @@
    * .gs-option-row` separator applies directly).
    */
   function transportProfileBlockHtml(controls) {
-    if (controls.tier === "lightweight") return "";
     var copilot = controls.transportProfile === "copilot-cli";
     var budget = budgetBlockHtml(controls);
     return (
@@ -506,29 +376,26 @@
    * section's completion flag) and the durable seeds are consumed here;
    * the environment faults live on the System Status strip (Set 092 S2).
    * `controls` is the webview-local control state
-   * `{ tier: "full"|"lightweight", budget: string, zeroMethod: string|null,
-   * transportProfile, verificationMode }` so re-renders keep the operator's
-   * picks (Set 060 S2; budget controls Set 063 S2). Set 081 S1: the budget
-   * block renders inside the transport-profile block (nested under the
-   * Direct-API option row), not as a sibling.
+   * `{ budget: string, zeroMethod: string|null, transportProfile }` so
+   * re-renders keep the operator's picks (Set 060 S2; budget controls Set
+   * 063 S2). Set 081 S1: the budget block renders inside the
+   * transport-profile block (nested under the Direct-API option row), not
+   * as a sibling.
+   *
+   * Set 112 S2: the tier radio group and the Lightweight-only
+   * verification-mode block are GONE. The Build section's first question
+   * is now provider access (the seat-profile sub-choice), which is the
+   * only setup fork the one-tier workflow still has.
    */
   function renderGettingStarted(gs, controls) {
-    var fullChecked = controls.tier === "lightweight" ? "" : " checked";
-    var lightChecked = controls.tier === "lightweight" ? " checked" : "";
     // Section 1 — Build project structure (substantially as before, NOT
-    // collapsible per the operator correction). The tier radio, the
-    // Full-tier seat-profile sub-choice (with the nested budget block), the
-    // Lightweight verification-mode sub-choice, and the no-prompt scaffold.
+    // collapsible per the operator correction). The provider-access
+    // choice (with the nested budget block) and the no-prompt scaffold.
     var step1 = gsStep(
       1,
       "Build project structure",
       gs.structureBuilt,
-      '<div class="gs-radio-group" role="radiogroup" aria-label="Project tier">' +
-        '<label class="gs-radio"><input type="radio" name="gs-tier" value="full"' + fullChecked + '> Full</label>' +
-        '<label class="gs-radio"><input type="radio" name="gs-tier" value="lightweight"' + lightChecked + '> Lightweight</label>' +
-      '</div>' +
       transportProfileBlockHtml(controls) +
-      verificationModeBlockHtml(controls) +
       '<button class="gs-button" type="button" data-gs-action="build-structure">' +
         'Build project structure' +
       '</button>',
@@ -571,7 +438,6 @@
     gsStep: gsStep,
     budgetBlockHtml: budgetBlockHtml,
     optionRowHtml: optionRowHtml,
-    verificationModeBlockHtml: verificationModeBlockHtml,
     transportProfileBlockHtml: transportProfileBlockHtml,
     parseBudgetInput: parseBudgetInput,
     validateBudgetControls: validateBudgetControls,
@@ -582,9 +448,6 @@
     BUDGET_LABEL_TEXT: BUDGET_LABEL_TEXT,
     BUDGET_HELP_TEXT: BUDGET_HELP_TEXT,
     BUDGET_ZERO_CHOICE_TEXT: BUDGET_ZERO_CHOICE_TEXT,
-    VERIFICATION_MODE_LABEL_TEXT: VERIFICATION_MODE_LABEL_TEXT,
-    VERIFICATION_MODE_OUT_OF_BAND_TEXT: VERIFICATION_MODE_OUT_OF_BAND_TEXT,
-    VERIFICATION_MODE_DEDICATED_TEXT: VERIFICATION_MODE_DEDICATED_TEXT,
     TRANSPORT_PROFILE_LABEL_TEXT: TRANSPORT_PROFILE_LABEL_TEXT,
     TRANSPORT_PROFILE_API_TEXT: TRANSPORT_PROFILE_API_TEXT,
     TRANSPORT_PROFILE_COPILOT_TEXT: TRANSPORT_PROFILE_COPILOT_TEXT,

@@ -1,25 +1,19 @@
 // Set 058 S2 — unit tests for the pure scaffolding core
-// (scaffoldConsumerRepo). The VS Code wiring (folder picker, tier prompt,
+// (scaffoldConsumerRepo). The VS Code wiring (folder picker,
 // progress notification) is exercised manually; this asserts the durable
-// contract: which files are written, the skip-existing guard, and the ONE
-// tier divergence the design lock allows (router config: Full keeps, the
-// Lightweight path removes the seeded copy).
+// contract: which files are written, the skip-existing guard, and install
+// outcome reporting.
 
 import * as assert from "assert";
 import * as path from "path";
 import * as os from "os";
 import * as vscode from "vscode";
 import {
-  asTier,
   buildProjectStructureNoPrompt,
   registerGitScaffoldCommand,
   scaffoldConsumerRepo,
 } from "../../commands/gitScaffold";
 import { FileOps } from "../../utils/aiRouterInstall";
-import {
-  TIER_MARKER_REL,
-  VERIFICATION_MODE_MARKER_REL,
-} from "../../utils/tierMarkerStore";
 import {
   BootstrapContext,
   TemplateBundle,
@@ -40,42 +34,6 @@ function canonicalBundleDir(): string {
   throw new Error("Could not locate the consumer-bootstrap bundle for tests.");
 }
 const bundle: TemplateBundle = loadTemplateBundle(canonicalBundleDir());
-
-// Set 059: the Get Started wizard forwards the operator's chosen tier into
-// `dabbler.setupNewProject` so it does not re-prompt (the double-prompt /
-// dead-end the operator hit on 0.28.0). `asTier` is the narrowing boundary
-// that decides whether the forwarded value is trusted (skip the prompt) or
-// ignored (fall back to prompting). The end-to-end wizard wiring is UAT-gated.
-// Set 077 S2 (A11): the narrowing is now case-insensitive and FAIL-LOUD —
-// a present-but-unrecognized value throws (callers surface it as an error
-// toast / rejected form action) instead of silently reading as undefined
-// and letting a `?? "full"` fallback scaffold Full over a typo.
-suite("gitScaffold — asTier (Set 077 fail-loud contract)", () => {
-  test("accepts the two valid tiers, case-insensitively, canonical lowercase out", () => {
-    assert.strictEqual(asTier("full"), "full");
-    assert.strictEqual(asTier("lightweight"), "lightweight");
-    assert.strictEqual(asTier("Full"), "full");
-    assert.strictEqual(asTier("FULL"), "full");
-    assert.strictEqual(asTier("Lightweight"), "lightweight");
-    assert.strictEqual(asTier("LIGHTWEIGHT"), "lightweight");
-  });
-  test("absent input (undefined/null) returns undefined so callers apply their defaults", () => {
-    assert.strictEqual(asTier(undefined), undefined);
-    assert.strictEqual(asTier(null), undefined);
-  });
-  test("throws on any other present value, naming it", () => {
-    for (const bad of ["", "lite", "f", 1, {}, "router", true]) {
-      assert.throws(
-        () => asTier(bad),
-        (err: unknown) =>
-          err instanceof Error &&
-          err.message.includes("Unrecognized tier value") &&
-          err.message.includes(JSON.stringify(bad)),
-        `asTier(${JSON.stringify(bad)}) should throw`,
-      );
-    }
-  });
-});
 
 /** Minimal in-memory FileOps over a normalized-path map. */
 function memFileOps(seed: Record<string, string> = {}): {
@@ -113,16 +71,12 @@ function ctx(over: Partial<BootstrapContext> = {}): BootstrapContext {
     purpose: "Do a thing.",
     slug: "001-first-feature",
     created: "2026-06-09",
-    tier: "full",
-    verificationMode: "out-of-band-or-none",
     totalSessions: 2,
     ...over,
   };
 }
 
 const PROJECT = "/repo";
-const cfgPath = path.join(PROJECT, "ai_router", "router-config.yaml").replace(/\\/g, "/");
-
 suite("scaffoldConsumerRepo — file writes", () => {
   test("writes the full-render artifacts under the project dir", async () => {
     const { ops, store } = memFileOps();
@@ -133,15 +87,12 @@ suite("scaffoldConsumerRepo — file writes", () => {
       fileOps: ops,
       installRouter: async () => ({ ok: true, message: "installed" }),
     });
-    // Sixteen writes: fourteen artifacts (the seven Set-060 artifacts,
+    // Fifteen writes: fourteen artifacts (the seven Set-060 artifacts,
     // the three Set 064 D7 docs/planning/ guidance-lifecycle starters,
     // the Set 077 S4 cross-provider verification doc, the two Set 087 S3
     // ownership/CI teaching templates, and the Set 107 S1
-    // azure-pipelines.yml), the Set 077 S2 durable tier marker, and the
-    // Set 094 docs/modules.yaml ensure-write. (The verification-mode
-    // marker is Lightweight-only as of Set 082; this is a Full scaffold,
-    // so it is not written.)
-    assert.strictEqual(result.written.length, 16);
+    // azure-pipelines.yml), plus the Set 094 docs/modules.yaml ensure-write.
+    assert.strictEqual(result.written.length, 15);
     assert.strictEqual(result.skipped.length, 0);
     assert.ok(store.has("/repo/CLAUDE.md"));
     assert.ok(store.has("/repo/AGENTS.md"));
@@ -174,50 +125,12 @@ suite("scaffoldConsumerRepo — file writes", () => {
     });
     assert.deepStrictEqual(result.skipped, ["CLAUDE.md"]);
     assert.strictEqual(store.get("/repo/CLAUDE.md"), "PRE-EXISTING");
-    // 13 artifacts + tier marker + modules.yaml (Full: no verification-mode
-    // marker, Set 082; Set 094: + the modules.yaml ensure-write; Set 107 S1:
-    // + azure-pipelines.yml).
-    assert.strictEqual(result.written.length, 15);
+    // 13 remaining artifacts + modules.yaml.
+    assert.strictEqual(result.written.length, 14);
   });
 });
 
-suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
-  test("Full keeps the seeded router-config.yaml", async () => {
-    const { ops, store } = memFileOps();
-    // Model the install seeding router-config.yaml (it ships as package data).
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: ctx({ tier: "full" }),
-      bundle,
-      fileOps: ops,
-      installRouter: async () => {
-        store.set(cfgPath, "models: {}\n");
-        return { ok: true, message: "installed" };
-      },
-    });
-    assert.strictEqual(result.routerConfigRemoved, false);
-    assert.ok(store.has(cfgPath), "Full tier must keep router-config.yaml");
-  });
-
-  test("Lightweight removes the seeded router-config.yaml", async () => {
-    const { ops, store } = memFileOps();
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: ctx({ tier: "lightweight" }),
-      bundle,
-      fileOps: ops,
-      installRouter: async () => {
-        store.set(cfgPath, "models: {}\n");
-        return { ok: true, message: "installed" };
-      },
-    });
-    assert.strictEqual(result.routerConfigRemoved, true);
-    assert.ok(!store.has(cfgPath), "Lightweight tier must not carry router config");
-    // The spec still carries tier: lightweight — the actual switch.
-    const spec = store.get("/repo/docs/session-sets/001-first-feature/spec.md")!;
-    assert.ok(/tier:\s*lightweight/.test(spec));
-  });
-
+suite("scaffoldConsumerRepo — install outcome", () => {
   test("surfaces a failed install without throwing", async () => {
     const { ops } = memFileOps();
     const result = await scaffoldConsumerRepo({
@@ -229,88 +142,8 @@ suite("scaffoldConsumerRepo — tier divergence (router config)", () => {
     });
     assert.strictEqual(result.installOk, false);
     assert.strictEqual(result.installMessage, "pip failed");
-    // artifacts + tier marker + modules.yaml still written (Full); Set 094.
-    assert.strictEqual(result.written.length, 16);
-  });
-});
-
-// Set 077 S2 (Feature 1, A1 + Critique-2 M1/M2): the scaffold persists
-// the operator's tier + verification-mode choice as durable markers,
-// written by the same path that shapes the scaffold — and OUTSIDE the
-// no-clobber loop, because they are write-through caches of the latest
-// sanctioned choice, not one-shot seeds. Set 082 narrows the
-// verification-mode marker to Lightweight only: the mode machinery is
-// inert on Full, so a Full scaffold records no phantom choice — it
-// neither writes nor deletes the marker (a prior Lightweight pick
-// survives a tier round-trip untouched).
-suite("scaffoldConsumerRepo — durable tier/verification-mode markers", () => {
-  test("Full scaffold writes the tier marker but SKIPS the verification-mode marker (Set 082)", async () => {
-    const { ops, store } = memFileOps();
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: ctx({ tier: "full" }),
-      bundle,
-      fileOps: ops,
-      installRouter: async () => ({ ok: true, message: "installed" }),
-    });
-    assert.strictEqual(store.get("/repo/.dabbler/tier"), "full\n");
-    assert.strictEqual(
-      store.get("/repo/.dabbler/verification-mode"),
-      undefined,
-      "a Full scaffold must not write a verification-mode marker",
-    );
-    assert.ok(result.written.includes(TIER_MARKER_REL));
-    assert.ok(!result.written.includes(VERIFICATION_MODE_MARKER_REL));
-  });
-
-  test("Full scaffold PRESERVES a pre-existing Lightweight marker (Set 082)", async () => {
-    const { ops, store } = memFileOps({
-      "/repo/.dabbler/verification-mode": "dedicated-sessions\n",
-    });
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: ctx({ tier: "full" }),
-      bundle,
-      fileOps: ops,
-      installRouter: async () => ({ ok: true, message: "installed" }),
-    });
-    // Neither written nor deleted: the prior Lightweight pick survives a
-    // tier round-trip untouched (the Set 081 "hiding never clears" posture).
-    assert.strictEqual(
-      store.get("/repo/.dabbler/verification-mode"),
-      "dedicated-sessions\n",
-    );
-    assert.ok(!result.written.includes(VERIFICATION_MODE_MARKER_REL));
-  });
-
-  test("Lightweight scaffold writes lightweight + its declared mode", async () => {
-    const { ops, store } = memFileOps();
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: ctx({ tier: "lightweight", verificationMode: "dedicated-sessions" }),
-      bundle,
-      fileOps: ops,
-      installRouter: async () => ({ ok: true, message: "installed" }),
-    });
-    assert.strictEqual(store.get("/repo/.dabbler/tier"), "lightweight\n");
-    assert.strictEqual(
-      store.get("/repo/.dabbler/verification-mode"),
-      "dedicated-sessions\n",
-    );
-    assert.ok(result.written.includes(VERIFICATION_MODE_MARKER_REL));
-  });
-
-  test("re-scaffold with a different tier UPDATES the marker (write-through, not no-clobber)", async () => {
-    const { ops, store } = memFileOps({ "/repo/.dabbler/tier": "full\n" });
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: ctx({ tier: "lightweight" }),
-      bundle,
-      fileOps: ops,
-      installRouter: async () => ({ ok: true, message: "installed" }),
-    });
-    assert.strictEqual(store.get("/repo/.dabbler/tier"), "lightweight\n");
-    assert.ok(result.written.includes(TIER_MARKER_REL));
+    // Artifacts + modules.yaml still written; Set 094.
+    assert.strictEqual(result.written.length, 15);
   });
 });
 
@@ -350,16 +183,13 @@ suite("gitScaffold — Python pre-flight leaves no artifacts (Set 077 S3, M7)", 
       const result = await buildProjectStructureNoPrompt(
         fakeContext,
         tmpDir,
-        "lightweight",
-        undefined,
-        "dedicated-sessions",
       );
       assert.strictEqual(result, undefined, "scaffold must not run");
       // The friendly explainer fired (not a raw ENOENT).
       assert.strictEqual(errors.length, 1);
       assert.ok(errors[0].includes("python.org"));
       assert.ok(errors[0].includes("NOT"), "must break the missing-keys mis-diagnosis");
-      // NO durable write of any kind: no .git, no .dabbler markers, no
+      // NO durable write of any kind: no .git, no rendered docs — the
       // rendered docs — the folder is exactly as it was.
       assert.deepStrictEqual(
         fs.readdirSync(tmpDir),
@@ -392,7 +222,7 @@ suite("gitScaffold — Python pre-flight leaves no artifacts (Set 077 S3, M7)", 
 // Reuses the missing-python pre-flight as a wiring probe (not because the
 // missing-interpreter case itself is interesting here, but because its
 // friendly error can ONLY fire if the callback correctly resolved
-// projectDir + tier and called all the way into
+// projectDir and called all the way into
 // buildProjectStructureNoPrompt's real pre-flight) — entirely offline, no
 // network install, no native-dialog automation, using the SAME
 // vscode-stub substitution this repo's own CONTRIBUTING.md already
@@ -410,8 +240,8 @@ suite("gitScaffold — dabbler.setupNewProject command wiring (Set 101 S1 third-
     const savedGetConfiguration = ws.getConfiguration;
     const savedShowError = win.showErrorMessage;
 
-    let captured: ((arg?: { tier?: string }) => Promise<void>) | undefined;
-    cmds.registerCommand = (id: string, cb: (arg?: { tier?: string }) => Promise<void>) => {
+    let captured: (() => Promise<void>) | undefined;
+    cmds.registerCommand = (id: string, cb: () => Promise<void>) => {
       if (id === "dabbler.setupNewProject") captured = cb;
       return { dispose() {} };
     };
@@ -438,12 +268,10 @@ suite("gitScaffold — dabbler.setupNewProject command wiring (Set 101 S1 third-
       registerGitScaffoldCommand(fakeContext);
       assert.ok(captured, "dabbler.setupNewProject must register a callback");
 
-      // An explicit tier arg skips the tier QuickPick (the command's own
-      // documented wizard-arg contract); the open workspace folder skips
-      // the folder picker — so invoking the callback drives the REAL
-      // dispatch (asTier parsing -> buildProjectStructureNoPrompt) with no
-      // further native-dialog interaction needed to reach the pre-flight.
-      await captured!({ tier: "full" });
+      // The open workspace folder skips the folder picker — so invoking the
+      // callback drives the REAL dispatch with no further native-dialog
+      // interaction needed to reach the pre-flight.
+      await captured!();
 
       assert.strictEqual(
         errors.length,

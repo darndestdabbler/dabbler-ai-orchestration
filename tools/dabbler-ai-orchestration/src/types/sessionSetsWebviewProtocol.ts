@@ -39,14 +39,7 @@ export interface RowPayload {
   // right-aligned bold colored list-icon column on the left side of
   // the row. Always non-empty when totalSessions > 0; may be "" only
   // when the set has no totalSessions on disk yet.
-  fraction: string;                // e.g. "3/6", "0/4", "3/3", "2/3+" (Set 061 D1)
-  // Set 061 Session 1 (spec D1): hover text for the fraction column.
-  // Non-empty ONLY when the fraction carries the `+` suffix (a
-  // Lightweight dedicated-sessions set whose typed verification
-  // session has not been appended yet); explains why the denominator
-  // can still grow. The webview sets it as the fraction span's
-  // `title` attribute when present.
-  fractionTooltip: string;
+  fraction: string;                // e.g. "3/6", "0/4", "3/3"
   description: string;             // remaining description after fraction extraction (e.g. "session 4 in flight  ·  2026-05-18")
   contextValue: string;            // for ActionRegistry membership tests (e.g., "sessionSet:in-progress:uat")
   iconSlug: string;                // "in-progress.svg" / "done.svg" / etc.
@@ -58,32 +51,15 @@ export interface RowPayload {
   // the row name with the tooltip as its `title` attribute.
   migrationMarker: string;
   migrationTooltip: string;
-  // Set 061 Session 1 (spec D2): the quiet "lw" marker + tooltip on
-  // Lightweight rows (Set 050 asterisk pattern — de-emphasized
-  // foreground, help cursor). Empty on Full rows (the default and the
-  // majority; marking the exception keeps rows quiet).
-  tierMarker: string;
-  tierTooltip: string;
   // Set 061 Session 2 (spec D3): the quiet blocked-by-prerequisites
   // marker + tooltip that replace the Set 047 `[BLOCKED BY PREREQS]`
   // description badge. `blockedMarker` is a single theme-safe glyph on
   // blocked non-terminal rows (else ""); `blockedTooltip` names EACH
   // unsatisfied prerequisite with its current state ("unknown set —
   // check the slug" for unresolvable slugs). Same rendering pattern as
-  // the migration / tier markers above.
+  // the migration marker above.
   blockedMarker: string;
   blockedTooltip: string;
-  // Set 062 Session 1 (spec D1): the quiet verification-posture marker
-  // (`v?` on completed Mode-A Lightweight rows with no out-of-band
-  // note; `v+` on Mode-B rows whose work is done but whose dedicated
-  // verification is owed or in flight) + its state-specific tooltip.
-  // Empty on every other row (no positive "verified" badge — absence
-  // is the signal). Unlike the markers above, the webview wires a
-  // click on this marker to the existing `showRowContextMenu` message
-  // (the same QuickPick the row's right-click opens) — the marker is
-  // an action surface, never a mutation path.
-  verificationMarker: string;
-  verificationTooltip: string;
   // Set 092 Session 1: the one winner retained for a duplicate global
   // session-set name fails loud in the tree. Empty strings keep the
   // unique-name path visually unchanged.
@@ -164,7 +140,6 @@ export interface SystemStatusPayload {
   providerKeyPresent: boolean;
   pythonPresent: boolean;
   copilotCliPresent: boolean;
-  tier: "full" | "lightweight";
   transportProfile: "api" | "copilot-cli";
   // Set 097 (spec D1): true when the workspace's DURABLE evidence says the
   // operator chose the Copilot seat but it is not confirmed yet (derived
@@ -173,7 +148,7 @@ export interface SystemStatusPayload {
   // transport.profile). Deliberately independent of the volatile
   // `transportProfile` control above — a repainted-back-to-api form must
   // not suppress this note, since the note exists exactly to survive that
-  // repaint. Ignored when `tier !== "full"`.
+  // repaint.
   copilotSeatChosenUnconfirmed: boolean;
   // The exact copy-pasteable re-run command (copilotSeatSetup.rerunRefreshHint),
   // computed host-side since the webview has no filesystem/process access.
@@ -208,33 +183,20 @@ export interface GettingStartedPayload {
   // are gone too — the System Status strip computes those independently
   // (SystemStatusPayload), so the form payload no longer carries them.
   structureBuilt: boolean;
-  // Set 077 Session 2 (Feature 1, A1): the workspace's durable tier
-  // resolution — the `.dabbler/tier` marker first, then the
-  // router-config inference (see utils/tierMarkerStore.ts) — or null
-  // when the workspace carries no durable signal. The webview applies
-  // it ONCE per script load, before the first form paint, so a webview
-  // teardown/reload can never re-check the Full radio over a scaffolded
-  // Lightweight choice. Only populated in "getting-started" mode (the
-  // one mode that renders the form); null otherwise.
-  tierSeed: "full" | "lightweight" | null;
   // Set 077 S2 (verification round 1, S077-S2-V1-001): the detection
   // root the seed (and the whole form) belongs to. The webview persists
   // it alongside gsState and discards persisted state whose root
   // differs, so form state from one repo can never bleed into another
-  // when the same webview survives a root switch. Same gating as
-  // tierSeed: populated only in "getting-started" mode.
+  // when the same webview survives a root switch. Populated only in
+  // "getting-started" mode.
   rootId: string | null;
-  // Set 077 S3 (Feature 2): the durable verification-mode seed — the
-  // `.dabbler/verification-mode` marker (no inference rung; absence is
-  // null). Seeds the Lightweight-only verification-mode radios with the
-  // same (rootId, seed) application semantics as tierSeed. Populated
-  // only in "getting-started" mode.
-  verificationModeSeed: "dedicated-sessions" | "out-of-band-or-none" | null;
   // Set 079 S1 (Feature 1): the durable seat-profile seed for the
-  // Full-tier sub-choice radios ("api" = direct provider keys, the
-  // default; "copilot-cli" = Set 078's Copilot seat profile). Same
-  // (rootId, seed) application semantics as tierSeed /
-  // verificationModeSeed. Populated only in "getting-started" mode.
+  // provider-access radios ("api" = direct provider keys, the default;
+  // "copilot-cli" = Set 078's Copilot seat profile). The webview applies
+  // it ONCE per script load, before the first form paint, so a webview
+  // teardown/reload can never re-check the Direct-API radio over a
+  // scaffolded Copilot-seat choice. Populated only in "getting-started"
+  // mode (the one mode that renders the form); null otherwise.
   transportProfileSeed: "api" | "copilot-cli" | null;
 }
 
@@ -395,8 +357,8 @@ export interface ReadyMsg {
 // host validates the action id against this closed set, runs the handler
 // (see commands/gettingStartedActions.ts), and refreshes the snapshot so
 // the form's live completion state repaints. This channel is separate from
-// `executeCommand` on purpose — the actions carry typed form state (tier /
-// budget / seat profile) rather than a command id, so the COMMAND_ALLOWLIST
+// `executeCommand` on purpose — the actions carry typed form state (seat
+// profile / budget) rather than a command id, so the COMMAND_ALLOWLIST
 // defense-in-depth contract is untouched.
 //
 // Set 094: the form shrank to two sections (Build project structure +
@@ -421,28 +383,21 @@ export interface GettingStartedActionMsg {
   type: "gettingStartedAction";
   action: GettingStartedActionId;
   // Form state riders (all untrusted webview input — the host narrows them
-  // before use), carried only by build-structure. `tier` is the
-  // Full/Lightweight radio.
-  tier?: "full" | "lightweight";
+  // before use), carried only by build-structure.
+  //
   // Set 063 S2 (spec D1): the budget / NTE step's riders on
-  // build-structure, Full + Direct-API only (the webview omits both on
-  // Lightweight and on the Copilot seat). `budgetUsd` is the validated
-  // dollar amount (>= 0); `zeroBudgetMethod` is the operator's required
-  // zero-rule pick, sent only when budgetUsd === 0. Host narrowing lives
-  // in utils/budgetYaml.ts (asBudgetUsd / asZeroBudgetMethod).
+  // build-structure, Direct-API only (the webview omits both on the
+  // Copilot seat). `budgetUsd` is the validated dollar amount (>= 0);
+  // `zeroBudgetMethod` is the operator's required zero-rule pick, sent
+  // only when budgetUsd === 0. Host narrowing lives in utils/budgetYaml.ts
+  // (asBudgetUsd / asZeroBudgetMethod).
   budgetUsd?: number;
   zeroBudgetMethod?: "manual-via-other-engine" | "skipped";
-  // Set 077 S3 (Feature 2): the Lightweight verification-mode pick. Rides
-  // build-structure (seeds the durable `.dabbler/verification-mode` marker
-  // + the scaffold context). The webview omits it on Full (the field is
-  // inert there); untrusted — the host narrows before use.
-  verificationMode?: "dedicated-sessions" | "out-of-band-or-none";
-  // Set 079 S2 (Feature 1): the Full-tier seat-profile pick. Rides
-  // build-structure only — on "copilot-cli" the host runs the guided
-  // Copilot seat setup (catalog refresh + transport.profile write) after
-  // the scaffold succeeds. The webview omits it on Lightweight (the
-  // sub-choice block is not rendered there); untrusted — the host
-  // narrows before use (absent defaults to "api", the seeded default).
+  // Set 079 S2 (Feature 1): the seat-profile pick. Rides build-structure
+  // only — on "copilot-cli" the host runs the guided Copilot seat setup
+  // (catalog refresh + transport.profile write) after the scaffold
+  // succeeds. Untrusted — the host narrows before use (absent defaults to
+  // "api", the seeded default).
   transportProfile?: "api" | "copilot-cli";
 }
 

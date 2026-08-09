@@ -6,8 +6,10 @@ import * as assert from "assert";
 import {
   isCurrentSessionInFlight,
   progressText,
+  verdictFractionTooltip,
 } from "../../providers/SessionSetsModel";
 import { LiveSession, SessionSet } from "../../types";
+import { isRecognizedVerdictToken } from "../../utils/verdictTokens";
 
 function fakeLive(over: Partial<LiveSession> = {}): LiveSession {
   return {
@@ -45,8 +47,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
       requiresUAT: false,
       requiresE2E: false,
       uatScope: "none",
-      tier: "full",
-      verificationMode: "out-of-band-or-none",
       module: null,
     },
     uatSummary: null,
@@ -57,11 +57,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     ...over,
   };
 }
@@ -129,6 +124,94 @@ suite("SessionSetsProvider — progressText", () => {
       liveSession: fakeLive({ currentSession: null, completedSessions: [1], status: "in-progress" }),
     }));
     assert.strictEqual(text, "1/4");
+  });
+
+  suite("SessionSetsProvider — verdictFractionTooltip", () => {
+    test("renders the persisted live verdict", () => {
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({ liveSession: fakeLive({ verificationVerdict: "VERIFIED" }) }),
+        ),
+        "Verification: VERIFIED",
+      );
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({ liveSession: fakeLive({ verificationVerdict: "ISSUES_FOUND" }) }),
+        ),
+        "Verification: ISSUES_FOUND",
+      );
+    });
+
+    test("is empty without a persisted live verdict", () => {
+      assert.strictEqual(verdictFractionTooltip(fakeSet({ liveSession: null })), "");
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({ liveSession: fakeLive({ verificationVerdict: null }) }),
+        ),
+        "",
+      );
+      assert.strictEqual(verdictFractionTooltip(fakeSet({})), "");
+    });
+
+    test("flags an unrecognized (confabulated) verdict token", () => {
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({
+            liveSession: fakeLive({
+              verificationVerdict: "manual-override-development",
+            }),
+          }),
+        ),
+        'Verification: "manual-override-development" is not a recognized verdict',
+      );
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({ liveSession: fakeLive({ verificationVerdict: "done!" }) }),
+        ),
+        'Verification: "done!" is not a recognized verdict',
+      );
+    });
+
+    test("accepts shipped extension + WAIVED tokens verbatim", () => {
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({
+            liveSession: fakeLive({
+              verificationVerdict: "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+            }),
+          }),
+        ),
+        "Verification: ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+      );
+      assert.strictEqual(
+        verdictFractionTooltip(
+          fakeSet({ liveSession: fakeLive({ verificationVerdict: "WAIVED" }) }),
+        ),
+        "Verification: WAIVED",
+      );
+    });
+
+    test("isRecognizedVerdictToken: canonical + extension prefixes vs non-verdicts", () => {
+      for (const good of [
+        "VERIFIED",
+        "verified",
+        " ISSUES_FOUND ",
+        "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+        "WAIVED",
+      ]) {
+        assert.strictEqual(isRecognizedVerdictToken(good), true, good);
+      }
+      for (const bad of [
+        "manual-override-development",
+        "done!",
+        "",
+        "   ",
+        null,
+        undefined,
+      ]) {
+        assert.strictEqual(isRecognizedVerdictToken(bad as string), false, String(bad));
+      }
+    });
   });
 
   test("appends 'session N in flight' annotation when currentSession not in completedSessions[]", () => {

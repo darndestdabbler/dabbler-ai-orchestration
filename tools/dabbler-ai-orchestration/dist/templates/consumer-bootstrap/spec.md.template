@@ -3,7 +3,7 @@
 > **Purpose:** {{PURPOSE}}
 > **Session Set:** `docs/session-sets/{{SLUG}}/`
 > **Created:** {{CREATED}}
-> **Workflow:** {{TIER}}
+> **Workflow:** Orchestrator -> AI Router -> Cross-provider verification
 > **Prerequisite:** None
 
 ---
@@ -11,21 +11,16 @@
 ## Session Set Configuration
 
 ```yaml
-tier: {{TIER}}                         # full | lightweight — see the tier model SSoT (link below)
 {{MODULE_LINE}}requiresUAT: false                     # true | false | "suggested"
 requiresE2E: false                     # true | false | "suggested"
 uatScope: none                         # none | per-session | per-set (only when requiresUAT)
 uatStyle: ad-hoc                       # ad-hoc | dsl (only when requiresUAT)
-{{VERIFICATION_MODE_LINE}}totalSessions: {{TOTAL_SESSIONS}}
+totalSessions: {{TOTAL_SESSIONS}}
 # prerequisites:                       # uncomment if this set depends on another
 #   - slug: <prerequisite-slug>
 #     condition: complete
 ```
 
-> **Tier:** `full` | `lightweight` is the single switch. The model is defined
-> once, in the SSoT — do not restate it here:
-> <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
->
 > Rationale: <one or two sentences on why these flags are set this way>.
 
 ---

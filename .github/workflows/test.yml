@@ -8,14 +8,19 @@ on:
 
 jobs:
   drift-guards:
-    name: Tier-model drift guards
+    name: Drift guards
     runs-on: ubuntu-latest
-    # Set 058 S3 (D6/D8): a fast gate that fails the build if the stale
-    # "Lightweight = no Python / no venv" framing reappears in any live doc, if
-    # more than one session set is in-progress at once, or if the committed
-    # dist/ template bundle drifts from its canonical source. The same checks
-    # also run inside the pytest suite (ai_router/tests/test_drift_guard.py);
-    # this job surfaces them as a clearly-named standalone gate.
+    # Set 058 S3 (D6/D8): a fast gate that fails the build if more than one
+    # session set is in-progress at once, if the committed dist/ template
+    # bundle drifts from its canonical source, if the model registry names an
+    # id its provider does not offer, or if a workflow action is not
+    # SHA-pinned. The same checks also run inside the pytest suite
+    # (ai_router/tests/test_drift_guard.py); this job surfaces them as a
+    # clearly-named standalone gate.
+    #
+    # Set 112 S2 retired the sixth check, the stale-framing guard: it policed
+    # the "Lightweight = no Python / no venv" framing, and the Lightweight
+    # tier it defended no longer exists.
     #
     # Set 110 S4 — THIS JOB HAD BEEN RED ON EVERY COMMIT, for two reasons that
     # both trace to one change: `run_all` grew
@@ -51,7 +56,7 @@ jobs:
       - name: Install ai_router (the model-registry check imports it)
         run: pip install -e .
 
-      - name: Run tier-model / consumer-bootstrap drift guards
+      - name: Run consumer-bootstrap / CI drift guards
         run: python ai_router/scripts/drift_guard.py
 
       # Set 107 S2: the tutorial-fidelity gate. Set 106 shipped an equivalent

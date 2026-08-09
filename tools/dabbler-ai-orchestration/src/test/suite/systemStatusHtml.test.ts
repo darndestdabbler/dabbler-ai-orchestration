@@ -26,7 +26,6 @@ const HEALTHY = {
   providerKeyPresent: true,
   pythonPresent: true,
   copilotCliPresent: true,
-  tier: "full",
   transportProfile: "api",
   copilotSeatChosenUnconfirmed: false,
   copilotSeatRerunHint: "",
@@ -36,7 +35,7 @@ const HEALTHY = {
 suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
   test("healthy state renders no strip", () => {
     assert.strictEqual(
-      statusHtml.renderSystemStatus(HEALTHY, { tier: "full", transportProfile: "api" }),
+      statusHtml.renderSystemStatus(HEALTHY, { transportProfile: "api" }),
       "",
     );
   });
@@ -49,7 +48,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
         pythonPresent: false,
         providerKeyPresent: false,
       },
-      { tier: "full", transportProfile: "api" },
+      { transportProfile: "api" },
     );
     assert.ok(html.includes('data-testid="system-status"'));
     assert.ok(html.includes('data-status-code="workspace-initialization"'));
@@ -62,21 +61,22 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
     assert.ok(html.includes(statusHtml.PROVIDER_KEY_TEXT));
   });
 
-  test("provider access fault follows the live tier and profile controls", () => {
+  test("provider access fault follows the live profile control", () => {
     const missingBoth = {
       ...HEALTHY,
       providerKeyPresent: false,
       copilotCliPresent: false,
     };
-    const lightweight = statusHtml.renderSystemStatus(
+    const api = statusHtml.renderSystemStatus(
       missingBoth,
-      { tier: "lightweight", transportProfile: "api" },
+      { transportProfile: "api" },
     );
-    assert.strictEqual(lightweight, "");
+    assert.ok(api.includes('data-status-code="provider-key"'));
+    assert.ok(api.includes(statusHtml.PROVIDER_KEY_TEXT));
 
     const copilot = statusHtml.renderSystemStatus(
       missingBoth,
-      { tier: "full", transportProfile: "copilot-cli" },
+      { transportProfile: "copilot-cli" },
     );
     assert.ok(copilot.includes('data-status-code="copilot-cli"'));
     assert.ok(copilot.includes(statusHtml.COPILOT_TEXT));
@@ -93,7 +93,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
           retainedLastKnownGood: true,
         }],
       },
-      { tier: "full", transportProfile: "api" },
+      { transportProfile: "api" },
     );
     assert.ok(html.includes('data-status-code="manifest-invalid"'));
     assert.ok(html.includes("last-known-good module tree"));
@@ -104,7 +104,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
   test("no-folder state stays quiet", () => {
     const html = statusHtml.renderSystemStatus(
       { ...HEALTHY, workspaceOpen: false, pythonPresent: false },
-      { tier: "full", transportProfile: "api" },
+      { transportProfile: "api" },
     );
     assert.strictEqual(html, "");
   });
@@ -116,7 +116,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
   suite("Copilot seat chosen-but-unconfirmed note (Set 097 D1)", () => {
     test("never chose: no note even if somehow flagged (defense in depth via HEALTHY)", () => {
       assert.strictEqual(
-        statusHtml.renderSystemStatus(HEALTHY, { tier: "full", transportProfile: "api" }),
+        statusHtml.renderSystemStatus(HEALTHY, { transportProfile: "api" }),
         "",
       );
     });
@@ -128,7 +128,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
           copilotSeatChosenUnconfirmed: true,
           copilotSeatRerunHint: 'run "Dabbler: Set Up Copilot Seat" from the Command Palette',
         },
-        { tier: "full", transportProfile: "api" },
+        { transportProfile: "api" },
       );
       assert.ok(html.includes('data-status-code="copilot-seat-unconfirmed"'));
       assert.ok(html.includes(statusHtml.COPILOT_SEAT_UNCONFIRMED_TEXT));
@@ -141,7 +141,7 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
       // durable host-computed flag still fires the note.
       const html = statusHtml.renderSystemStatus(
         { ...HEALTHY, copilotSeatChosenUnconfirmed: true, copilotSeatRerunHint: "cmd" },
-        { tier: "full", transportProfile: "api" },
+        { transportProfile: "api" },
       );
       assert.ok(html.includes('data-status-code="copilot-seat-unconfirmed"'));
     });
@@ -149,17 +149,9 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
     test("chose and confirmed: host reports false, no note (even with a stale marker on disk)", () => {
       const html = statusHtml.renderSystemStatus(
         { ...HEALTHY, copilotSeatChosenUnconfirmed: false, transportProfile: "copilot-cli" },
-        { tier: "full", transportProfile: "copilot-cli" },
+        { transportProfile: "copilot-cli" },
       );
       assert.ok(!html.includes('data-status-code="copilot-seat-unconfirmed"'));
-    });
-
-    test("Lightweight tier: never shown, whatever the durable flag says", () => {
-      const html = statusHtml.renderSystemStatus(
-        { ...HEALTHY, copilotSeatChosenUnconfirmed: true, copilotSeatRerunHint: "cmd" },
-        { tier: "lightweight", transportProfile: "api" },
-      );
-      assert.strictEqual(html, "");
     });
 
     test("no-folder state stays quiet even with the durable flag set", () => {
@@ -170,16 +162,15 @@ suite("systemStatusHtml — Set 092 S2 persistent diagnostics", () => {
           copilotSeatChosenUnconfirmed: true,
           copilotSeatRerunHint: "cmd",
         },
-        { tier: "full", transportProfile: "api" },
+        { transportProfile: "api" },
       );
       assert.strictEqual(html, "");
     });
   });
 
   // Set 092 S2 verification R1 (Major): the client must compute the
-  // strip only AFTER the durable tier/profile seed lands in gsState —
-  // a pre-seed strip can show a provider-key fault the seeded tier
-  // suppresses (or hide a Copilot fault it implies) on the first paint.
+  // strip only AFTER the durable profile seed lands in gsState —
+  // a pre-seed strip can show the wrong profile fault on the first paint.
   // The pure renderer cannot see the wiring order, so this pins the
   // client source: inside render(), the seed restore precedes the first
   // renderSystemStatus call.

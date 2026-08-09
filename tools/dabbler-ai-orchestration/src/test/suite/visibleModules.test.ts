@@ -72,8 +72,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
       requiresUAT: false,
       requiresE2E: false,
       uatScope: "none",
-      tier: "full",
-      verificationMode: "out-of-band-or-none",
       module: null,
     },
     uatSummary: null,
@@ -84,11 +82,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     ...over,
   };
 }
@@ -484,8 +477,6 @@ function bootstrapCtx(moduleSlug?: string): BootstrapContext {
     purpose: "Guard-test context.",
     slug: "001-example-feature",
     created: "2026-01-01",
-    tier: "full",
-    verificationMode: "out-of-band-or-none",
     totalSessions: 2,
     module: moduleSlug,
   };

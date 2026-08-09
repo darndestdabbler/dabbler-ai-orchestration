@@ -167,9 +167,9 @@ html, body {
 }
 .gs-note[hidden] { display: none; }
 
-/* Set 063 S2 (D1): the Full-tier budget / NTE block inside step 1.
-   OMITTED from the Lightweight render entirely; the nested $0
-   zero-rule pair and the validation message carry `hidden` flips. */
+/* Set 063 S2 (D1): the budget / NTE block inside step 1. OMITTED from
+   the Copilot-seat render entirely; the nested $0 zero-rule pair and
+   the validation message carry `hidden` flips. */
 .gs-budget {
   display: flex;
   flex-direction: column;
@@ -209,13 +209,11 @@ html, body {
 .gs-zero-choice[hidden] { display: none; }
 .gs-zero-copy { font-size: 11px; line-height: 1.45; }
 
-/* Set 080 S1: the second-level sub-choice groups (Full's provider
-   access, Lightweight's verification mode) render each option as a
-   table-like row — radio | short bold name | description — with a
+/* Set 080 S1: the provider-access sub-choice group renders each option
+   as a table-like row — radio | short bold name | description — with a
    light rule between rows so it is easy to see where one option ends
    and the next begins. The name column is percentage-based so the
    three parts stay aligned across rows at any view width. */
-.gs-verification-mode-label,
 .gs-transport-profile-label {
   font-size: 12px;
   font-weight: 600;
@@ -247,9 +245,8 @@ html, body {
 /* Set 081 S2 (UAT feedback): close each sub-choice group with the same
    light rule that separates its rows, so the "Build project structure"
    button below the group does not read as belonging to the last option
-   row. One rule covers both groups (only one renders per tier). */
-.gs-transport-profile,
-.gs-verification-mode {
+   row. */
+.gs-transport-profile {
   border-bottom: 1px solid var(--vscode-panel-border, rgba(128, 128, 128, 0.35));
   margin-bottom: 6px;
 }

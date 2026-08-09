@@ -109,16 +109,6 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabblerSessionSets.switchTier",
-        "title": "Switch Tier…",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.setupVerification",
-        "title": "Set Up Dedicated Verification…",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabblerSessionSets.openFolder",
         "title": "Reveal Folder",
         "category": "Dabbler"
@@ -186,16 +176,6 @@
       {
         "command": "dabbler.copyStartNextParallelSessionPrompt",
         "title": "Copy: Start the next parallel session",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.copyVerificationKickoffPrompt",
-        "title": "Copy: Verification kickoff prompt",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.openExternalVerificationDoc",
-        "title": "Open External Verification Document",
         "category": "Dabbler"
       },
       {
@@ -472,21 +452,6 @@
           "group": "5_actions@503"
         },
         {
-          "command": "dabblerSessionSets.switchTier",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-switchTier;/",
-          "group": "5_actions@504"
-        },
-        {
-          "command": "dabblerSessionSets.setupVerification",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-setupVerification;/",
-          "group": "5_actions@505"
-        },
-        {
-          "command": "dabbler.openExternalVerificationDoc",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openExternalVerificationDoc;/",
-          "group": "5_actions@506"
-        },
-        {
           "command": "dabblerSessionSets.migrate",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-migrate;/",
           "group": "8_migrate@801"
@@ -554,11 +519,6 @@
           "command": "dabbler.copyStartNextParallelSessionPrompt",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextParallelSessionPrompt;/",
           "group": "1@305"
-        },
-        {
-          "command": "dabbler.copyVerificationKickoffPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyVerificationKickoffPrompt;/",
-          "group": "1@306"
         }
       ]
     },
@@ -598,7 +558,7 @@
         "dabblerSessionSets.copilotCliPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "GitHub Copilot CLI executable used by the Full-tier Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` — on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
+          "markdownDescription": "GitHub Copilot CLI executable used by the Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` — on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
         },
         "dabblerSessionSets.gitHost": {
           "type": "string",

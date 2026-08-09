@@ -32,7 +32,6 @@ export function resolveBundledSampleDir(extensionPath: string): string {
 export interface SampleBundleMeta {
   bundleVersion: number;
   sampleSetSlug: string;
-  tier: string;
   programEntryPoint: string;
   testCommandArgs: string[];
   /**
@@ -105,7 +104,6 @@ export function loadSampleBundle(
   for (const key of [
     "bundleVersion",
     "sampleSetSlug",
-    "tier",
     "programEntryPoint",
     "testCommandArgs",
     "expectedTestCount",

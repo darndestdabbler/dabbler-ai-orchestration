@@ -20,21 +20,13 @@
 // only fs-touching surface; ``resolveBundledTemplateDir`` resolves where
 // the templates were copied inside the packaged extension (see esbuild.js).
 //
-// The one tier divergence the design lock allows lives in the *caller*
-// (gitScaffold writes ``ai_router/router-config.yaml`` on Full only); the
-// rendered artifacts here are identical across tiers except for the
-// ``tier:`` value carried into ``spec.md`` and the Lightweight-only
-// ``verificationMode:`` line (Set 082: Full-tier scaffolds omit the field
-// entirely — it is Lightweight-only, and absence means the default).
-// Lightweight is router-off, not Python-off — see the tier-model SSoT.
+// Set 112 S2: the Lightweight tier is gone, and with it the ``tier:`` and
+// ``verificationMode:`` fields this writer used to render. Every scaffold
+// now produces the one-tier artifacts, and the caller always writes
+// ``ai_router/router-config.yaml``.
 
 import * as fs from "fs";
 import * as path from "path";
-
-/** Default Lightweight verification mode; inert on Full (see spec schema). */
-export const DEFAULT_VERIFICATION_MODE = "out-of-band-or-none";
-
-export type Tier = "full" | "lightweight";
 
 /** The values the writer substitutes into the template bundle. */
 export interface BootstrapContext {
@@ -48,10 +40,6 @@ export interface BootstrapContext {
   slug: string;
   /** ISO date the set was created (``YYYY-MM-DD``). */
   created: string;
-  /** ``full`` or ``lightweight``. */
-  tier: Tier;
-  /** Lightweight verification mode; defaults to {@link DEFAULT_VERIFICATION_MODE}. */
-  verificationMode: string;
   /** Planned session count (>= 1). */
   totalSessions: number;
   /**
@@ -218,28 +206,12 @@ function assertPositiveSessionCount(totalSessions: number): void {
 }
 
 /**
- * The whole ``verificationMode:`` config line (text + trailing newline) for
- * the spec template's ``{{VERIFICATION_MODE_LINE}}`` token (Set 082). The
- * field is Lightweight-only, so a Full-tier scaffold omits the line entirely
- * — omission is schema-legal (absence means the documented default) and
- * avoids the phantom "choice" a Full spec would otherwise appear to declare.
- * The ``{{TOKEN}}`` engine has no conditionals, so the tier branch lives
- * here: the full current line on ``lightweight``, the empty string on
- * ``full`` (no blank-line residue — the token sits flush against the next
- * template line).
- */
-function verificationModeLine(ctx: BootstrapContext): string {
-  if (ctx.tier !== "lightweight") return "";
-  const mode = ctx.verificationMode || DEFAULT_VERIFICATION_MODE;
-  return `verificationMode: ${mode}  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full\n`;
-}
-
-/**
  * The whole ``module:`` config line (text + trailing newline) for the spec
- * template's ``{{MODULE_LINE}}`` token (Set 087 S3, ruling Q2 — the same
- * whole-line-token pattern as {@link verificationModeLine}): the line
+ * template's ``{{MODULE_LINE}}`` token (Set 087 S3, ruling Q2): the line
  * renders only when the context carries a module slug, so a repo with no
- * module manifest emits byte-identical pre-087 output.
+ * module manifest emits byte-identical pre-087 output. The ``{{TOKEN}}``
+ * engine has no conditionals, so a conditional line lives here as a
+ * whole-line token — the empty string leaves no blank-line residue.
  */
 function moduleLine(ctx: BootstrapContext): string {
   if (!ctx.module) return "";
@@ -254,9 +226,7 @@ function tokenTable(ctx: BootstrapContext): Record<string, string> {
     PURPOSE: ctx.purpose,
     SLUG: ctx.slug,
     CREATED: ctx.created,
-    TIER: ctx.tier,
     MODULE_LINE: moduleLine(ctx),
-    VERIFICATION_MODE_LINE: verificationModeLine(ctx),
     TOTAL_SESSIONS: String(ctx.totalSessions),
   };
 }
@@ -411,8 +381,8 @@ export function renderStartHere(
 
 /**
  * The rendered consumer-bootstrap artifacts, keyed by their path relative
- * to the consumer repo root. ``router-config.yaml`` is NOT here — it is
- * the one tier divergence and is materialized by the caller (Full only).
+ * to the consumer repo root. ``router-config.yaml`` is NOT here — the
+ * caller materializes it (it is machine configuration, not a template).
  */
 export interface RenderedArtifacts {
   files: Record<string, string>;
@@ -623,21 +593,10 @@ export function renderStructureBootstrap(
  * set-specific fields are deterministic placeholders — they feed no
  * rendered output (the structure templates consume ``{{REPO_NAME}}``
  * only) but keep the context type honest for the shared writer.
- *
- * Set 077 S3 (Feature 2, closing the A11 hardcode): ``verificationMode``
- * carries the operator's three-way-choice pick into the context — the
- * scaffold's durable ``.dabbler/verification-mode`` marker is written
- * from it. Callers without a pick omit it and the documented default
- * applies.
  */
 export function structureOnlyContext(
   repoName: string,
-  tier: Tier,
   created: string,
-  // The closed union, not `string` (S3 code-review Minor 3): the whole
-  // point of the fail-loud rider narrowing is that nothing wider can
-  // reach the durable marker write.
-  verificationMode: "dedicated-sessions" | "out-of-band-or-none" = DEFAULT_VERIFICATION_MODE,
 ): BootstrapContext {
   return {
     repoName,
@@ -645,8 +604,6 @@ export function structureOnlyContext(
     purpose: "(no starter set)",
     slug: "000-placeholder-unused",
     created,
-    tier,
-    verificationMode,
     totalSessions: 1,
   };
 }

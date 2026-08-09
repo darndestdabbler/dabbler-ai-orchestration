@@ -14,7 +14,6 @@
 ## Session Set Configuration
 
 ```yaml
-tier: full
 requiresUAT: false        # A planning document; no interaction surface ships here.
 requiresE2E: false
 uatScope: none

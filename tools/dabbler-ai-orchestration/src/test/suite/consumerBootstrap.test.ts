@@ -52,8 +52,6 @@ function ctx(over: Partial<BootstrapContext> = {}): BootstrapContext {
     purpose: "Add email + password sign-in.",
     slug: "001-user-authentication",
     created: "2026-06-09",
-    tier: "full",
-    verificationMode: "out-of-band-or-none",
     totalSessions: 3,
     ...over,
   };
@@ -82,26 +80,21 @@ suite("consumerBootstrap — slug helpers", () => {
 suite("consumerBootstrap — token substitution", () => {
   test("substitutes known tokens, leaves unknown ones for detection", () => {
     const out = substituteTokens("{{REPO_NAME}} / {{TIER}} / {{NOPE}}", ctx());
-    assert.strictEqual(out, "my-app / full / {{NOPE}}");
-    assert.deepStrictEqual(findUnsubstitutedTokens(out), ["{{NOPE}}"]);
+    assert.strictEqual(out, "my-app / {{TIER}} / {{NOPE}}");
+    assert.deepStrictEqual(findUnsubstitutedTokens(out), ["{{TIER}}", "{{NOPE}}"]);
   });
 });
 
 suite("consumerBootstrap — spec.md render", () => {
-  test("substitutes scalars and carries tier + verificationMode", () => {
-    const spec = renderSpec(bundle, ctx({ tier: "lightweight" }));
+  test("substitutes scalars", () => {
+    const spec = renderSpec(bundle, ctx());
     assert.ok(spec.includes("# User authentication"));
     assert.ok(spec.includes("**Purpose:** Add email + password sign-in."));
     assert.ok(spec.includes("docs/session-sets/001-user-authentication/"));
-    assert.ok(/tier:\s*lightweight/.test(spec));
-    assert.ok(/verificationMode:\s*out-of-band-or-none/.test(spec));
     assert.ok(/totalSessions:\s*3/.test(spec));
     assert.strictEqual(findUnsubstitutedTokens(spec).length, 0);
   });
 
-  // Set 082: the verificationMode field is Lightweight-only — a Full
-  // render omits the whole line (omission means the documented default),
-  // with no blank-line residue where the line used to be.
   test("module context renders the module: line; absent omits it (Set 087 S3)", () => {
     const withModule = renderSpec(bundle, ctx({ module: "greeter" }));
     assert.ok(/^module: greeter/m.test(withModule), "module line must render");
@@ -113,16 +106,17 @@ suite("consumerBootstrap — spec.md render", () => {
     assert.ok(!/^module:/m.test(without), "no module context — no module line");
     // Whole-line token: no blank-line residue where the token sat.
     assert.ok(
-      /^tier: full[^\n]*\nrequiresUAT/m.test(without),
-      "tier line must be directly followed by requiresUAT",
+      /^requiresUAT/m.test(without),
+      "requiresUAT must start the config block when module is absent",
     );
   });
 
-  test("Full render omits the verificationMode line entirely (Set 082)", () => {
-    const spec = renderSpec(bundle, ctx({ tier: "full" }));
+  test("render omits retired tier and verificationMode lines", () => {
+    const spec = renderSpec(bundle, ctx());
+    assert.ok(!/^tier:/m.test(spec), "spec must not mention tier");
     assert.ok(
       !/verificationMode/.test(spec),
-      "a Full-tier spec must not mention verificationMode",
+      "spec must not mention verificationMode",
     );
     // No blank-line residue: uatStyle is immediately followed by
     // totalSessions inside the config block.
@@ -131,24 +125,6 @@ suite("consumerBootstrap — spec.md render", () => {
       "the omitted line must leave no blank-line residue",
     );
     assert.strictEqual(findUnsubstitutedTokens(spec).length, 0);
-  });
-
-  test("Lightweight render keeps the exact line, comment included (Set 082)", () => {
-    const spec = renderSpec(bundle, ctx({ tier: "lightweight" }));
-    assert.ok(
-      spec.includes(
-        "\nverificationMode: out-of-band-or-none  # Lightweight only: out-of-band-or-none (default) | dedicated-sessions; inert on Full\ntotalSessions: 3\n",
-      ),
-      "the Lightweight line (with its comment) must render byte-identically to the pre-082 output",
-    );
-  });
-
-  test("Lightweight render carries a dedicated-sessions pick (Set 082)", () => {
-    const spec = renderSpec(
-      bundle,
-      ctx({ tier: "lightweight", verificationMode: "dedicated-sessions" }),
-    );
-    assert.ok(/^verificationMode: dedicated-sessions  #/m.test(spec));
   });
 
   test("expands to EXACTLY totalSessions numbered blocks with the right prefixes", () => {
@@ -284,16 +260,14 @@ suite("consumerBootstrap — full render", () => {
     ]);
   });
 
-  test("no rendered artifact contains an unsubstituted token (both tiers)", () => {
-    for (const tier of ["full", "lightweight"] as const) {
-      const { files } = renderConsumerBootstrap(bundle, ctx({ tier }));
-      for (const [rel, content] of Object.entries(files)) {
-        assert.deepStrictEqual(
-          findUnsubstitutedTokens(content),
-          [],
-          `${rel} (${tier}) has leftover tokens`,
-        );
-      }
+  test("no rendered artifact contains an unsubstituted token", () => {
+    const { files } = renderConsumerBootstrap(bundle, ctx());
+    for (const [rel, content] of Object.entries(files)) {
+      assert.deepStrictEqual(
+        findUnsubstitutedTokens(content),
+        [],
+        `${rel} has leftover tokens`,
+      );
     }
   });
 

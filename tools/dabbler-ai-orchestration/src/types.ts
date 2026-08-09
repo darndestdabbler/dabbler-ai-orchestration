@@ -52,24 +52,6 @@ export interface SessionStateV3 {
 // recorded in activity-log as a `suggestion_disposition` entry.
 export type TriStateFlag = boolean | "suggested";
 
-// Set 048 Session 2: tier field per audit §3.6. Lightweight tier
-// follows the same writer/Explorer/state-file process as Full but
-// suppresses AI router runtime calls and auto-verification (per
-// operator-locked premises P1-P4). Pre-Set-048 specs default to
-// `"full"` when the field is absent.
-export type SessionSetTier = "full" | "lightweight";
-
-// Set 061 Session 1 (spec D1): how a Lightweight set's per-set
-// verification runs (the Set 057 choice). `out-of-band-or-none` is the
-// default — copyable review prompts, no runtime session growth.
-// `dedicated-sessions` appends typed verification/remediation sessions
-// to the ledger at runtime, which is what makes the Explorer's `N/M+`
-// fraction warning meaningful. The spec-config field is the SEED only
-// (the durable record is the activity-log `verification_mode` entry);
-// the Explorer reads the seed because it is the cheap, always-present
-// declarative signal. Inert on Full tier.
-export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";
-
 // Set 098 Session 1 (module-lifecycle verdict decision 5): the two
 // module-lifecycle set kinds. `kind` is a small, optional,
 // machine-readable identity for scaffolded plan/decomposition sets —
@@ -82,48 +64,10 @@ export type VerificationMode = "out-of-band-or-none" | "dedicated-sessions";
 // pre-098 spec is untouched and valid.
 export type SessionSetKind = "plan" | "decomposition";
 
-// Set 062 Session 1 (spec D1): the quiet verification-posture marker on
-// Lightweight rows. "v?" = completed Mode-A set the Explorer cannot
-// vouch for (no external-verification.md, no typed session); "v+" =
-// Mode-B set whose work sessions are done but whose dedicated
-// verification is still owed or in flight; "" = no marker (Full rows,
-// terminal rows, note-bearing rows, verified rows — quiet is success).
-export type VerificationMarkerGlyph = "v?" | "v+" | "";
-
-// Set 077 Session 5 (Features 4–5): the Set 057 seven-state workflow
-// state, derived (never persisted — Set 047 rule) by
-// `deriveWorkflowState` in utils/tierLegibility.ts — the TS mirror of
-// Python's `dedicated_verification.derive_state`, so the Explorer's
-// owed-state words and copy-action auto-route follow the same ladder
-// the close gate and the start_session banner use.
-export type WorkflowState =
-  | "work-in-progress"
-  | "awaiting-verification"
-  | "awaiting-remediation"
-  | "awaiting-human"
-  | "closed-verified"
-  | "closed-dispositioned"
-  | "closed-no-verification";
-
-// Set 062 Session 1 (spec D1): the persisted outcome of a completed
-// `type: "verification"` session, lifted off the sessions[] ledger so
-// the fraction tooltip can surface it ("Verification: VERIFIED
-// (session 4)") without the renderer re-walking the ledger. `verdict`
-// is the per-session verificationVerdict string ("VERIFIED" /
-// "ISSUES_FOUND" / operator extensions); `sessionNumber` is the typed
-// session's 1-indexed ledger number (null when the entry carries a
-// malformed number).
-export interface CompletedVerificationInfo {
-  sessionNumber: number | null;
-  verdict: string | null;
-}
-
 export interface SessionSetConfig {
   requiresUAT: TriStateFlag;
   requiresE2E: TriStateFlag;
   uatScope: string;
-  tier: SessionSetTier;
-  verificationMode: VerificationMode;
   // Set 087 Session 1: the spec's declared `module:` key — the RAW value
   // as authored, before validation against `docs/modules.yaml`. A
   // grouping attribute only, never part of set identity (the Set 087
@@ -349,59 +293,13 @@ export interface SessionSet {
   // by the same cross-reference pass; never persisted. Empty when the
   // row is unblocked.
   unsatisfiedPrereqs: UnsatisfiedPrerequisite[];
-  // Set 061 Session 1 (spec D1): derived in-memory by `readSessionSets`
-  // via `shouldRenderPlusFraction` — true ONLY when the set is
-  // `tier: lightweight` AND `verificationMode: dedicated-sessions` AND
-  // no `type: "verification"` session exists yet in the sessions[]
-  // ledger. Drives the `N/M+` fraction suffix that warns the
-  // denominator will grow when typed verification/remediation sessions
-  // are appended. Never persisted (spec non-goal: no new state fields).
-  plusFraction: boolean;
-  // Set 062 Session 1 (spec D1): true iff `external-verification.md`
-  // exists in the set directory — the Set 057 sanctioned out-of-band
-  // verification record. Suppresses the `v?` marker on completed
-  // Mode-A rows (the record exists; quiet is success). Derived at scan
-  // time, never persisted. Session 2 also consults it for the
-  // `Open external verification note` row action.
-  externalVerificationNoteExists: boolean;
-  // Set 062 Session 1 (spec D1): the completed `type: "verification"`
-  // session's persisted verdict + ledger number (latest completed typed
-  // session when more than one exists), or null when no completed
-  // verification session is in the ledger. Drives the fraction
-  // tooltip's "Verification: <verdict> (session N)" enrichment on
-  // verified Mode-B rows. Derived from the normalized ledger, never
-  // persisted.
-  completedVerification: CompletedVerificationInfo | null;
-  // Set 062 Session 1 (spec D1): the derived verification-posture
-  // marker glyph for this row ("v?" / "v+" / ""). Computed by
-  // `verificationMarkerFor` in utils/tierLegibility.ts at scan time
-  // from (tier, verificationMode, ledger, note presence, row state).
-  // Never persisted.
-  verificationMarker: VerificationMarkerGlyph;
-  // Set 077 Session 2 (Feature 1): the workspace's durable tier-choice
-  // marker (`.dabbler/tier` under the set's root), or null when absent /
-  // unreadable. Read ONCE per root by `readSessionSets` and carried on
-  // every set from that root so the renderer can surface the
-  // tier-mismatch advisory (marker disagrees with the spec's declared
-  // tier — the manual-spec-edit drift the write-through cache cannot
-  // cover). Derived at scan time, never persisted per-set.
-  workspaceTierMarker: SessionSetTier | null;
-  // Set 077 Session 5 (Features 4–5): the derived seven-state workflow
-  // state, computed at scan time ONLY for Lightweight
-  // `dedicated-sessions` rows (null / absent everywhere else — the
-  // ladder is inert outside Mode B). Drives the row description's
-  // "verification owed" / "remediation owed" words and the
-  // Start-Next-Session copy-action auto-route. Optional so
-  // fixture-shaped records without the field read as "not derived".
-  workflowState?: WorkflowState | null;
   // Set 110 Session 2 (operator ask 1, 2026-08-04): the normalized
   // `sessions[]` ledger, surfaced so the Work Explorer's FOURTH tree
   // level (the sessions inside a set) can be built from memory. The
-  // scanner already parses and normalizes this array to derive
-  // `plusFraction` / `completedVerification` / `verificationMarker`
-  // and then discards it — carrying it costs **no additional disk
-  // read**, which is what keeps the fourth level off the startup path
-  // S1 measured. Empty array when the state file is unreadable or
+  // scanner already parses and normalizes this array while reading the
+  // state file and then discards it — carrying it costs **no additional
+  // disk read**, which is what keeps the fourth level off the startup
+  // path S1 measured. Empty array when the state file is unreadable or
   // carries no usable ledger. A set with NO state file is not one of
   // those cases: `ensureSessionStateFile` lazily synthesizes a
   // not-started state from the spec, so such a set lists its PLANNED

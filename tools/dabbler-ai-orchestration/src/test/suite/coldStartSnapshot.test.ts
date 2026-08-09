@@ -2,15 +2,17 @@
 //
 // Renders the shared template writer's output for a FIXED context and asserts
 // byte-equality against the committed golden fixture under repo-root
-// test-fixtures/cold-start/<tier>/. A template edit changes the render and
+// test-fixtures/cold-start/full/. A template edit changes the render and
 // fails this test until the golden is regenerated — that regeneration is the
 // deliberate, reviewed act that keeps generated stubs and the rendered
 // template bundle in lock-step.
 //
-// Set 112 S1 deleted the Lightweight tier and its golden tree, so only the
-// `full` render is snapshotted. The `Tier` type and the context's
-// `verificationMode` field are still threaded through consumerBootstrap; S2
-// removes them from the extension along with the Getting Started tier fork.
+// Set 112 S1 deleted the Lightweight tier and its golden tree; S2 removed the
+// `Tier` type and the context's `tier` / `verificationMode` fields from the
+// writer along with the Getting Started tier fork. ONE render is snapshotted.
+// The golden directory keeps its `full/` name so the Python acceptance test's
+// path and this repo's git history stay stable — it is a path, not a claim
+// that a second tier exists.
 //
 // The same golden tree is the input to the Python cold-start ACCEPTANCE test
 // (ai_router/tests/test_cold_start_acceptance.py), which boots a throwaway repo
@@ -30,7 +32,6 @@ import * as path from "path";
 import {
   BootstrapContext,
   TemplateBundle,
-  Tier,
   loadTemplateBundle,
   renderConsumerBootstrap,
   resolveBundledTemplateDir,
@@ -55,26 +56,25 @@ const bundle: TemplateBundle = loadTemplateBundle(canonicalBundleDir());
 
 // The fixed context the golden is rendered from. Stable on purpose — a change
 // here is a snapshot change and must regenerate the golden.
-function goldenCtx(tier: Tier): BootstrapContext {
+function goldenCtx(): BootstrapContext {
   return {
     repoName: "acme-app",
     setTitle: "Sample feature",
     purpose: "A representative consumer set used by the cold-start fixtures.",
     slug: "001-sample-feature",
     created: "2026-06-09",
-    tier,
-    verificationMode: "out-of-band-or-none",
     totalSessions: 3,
   };
 }
 
-const TIERS: Tier[] = ["full"];
+const GOLDEN_DIR_NAME = "full";
 const UPDATE = process.env.UPDATE_GOLDEN === "1";
 
 suite("consumerBootstrap — cold-start golden snapshot", () => {
-  for (const tier of TIERS) {
-    test(`rendered ${tier} bundle matches the committed golden`, () => {
-      const { files } = renderConsumerBootstrap(bundle, goldenCtx(tier));
+  {
+    const tier = GOLDEN_DIR_NAME;
+    test("rendered bundle matches the committed golden", () => {
+      const { files } = renderConsumerBootstrap(bundle, goldenCtx());
       const tierDir = path.join(GOLDEN_ROOT, tier);
 
       if (UPDATE) {
@@ -90,7 +90,7 @@ suite("consumerBootstrap — cold-start golden snapshot", () => {
 
       assert.ok(
         fs.existsSync(tierDir),
-        `golden missing for tier ${tier}; run "UPDATE_GOLDEN=1 npm run test:unit"`,
+        `golden missing at ${tierDir}; run "UPDATE_GOLDEN=1 npm run test:unit"`,
       );
       for (const [rel, content] of Object.entries(files)) {
         const goldenPath = path.join(tierDir, rel);
@@ -105,7 +105,7 @@ suite("consumerBootstrap — cold-start golden snapshot", () => {
         assert.strictEqual(
           got,
           want,
-          `render drifted from golden for ${tier}/${rel}; regenerate with UPDATE_GOLDEN=1 if intended`,
+          `render drifted from golden for ${rel}; regenerate with UPDATE_GOLDEN=1 if intended`,
         );
       }
 

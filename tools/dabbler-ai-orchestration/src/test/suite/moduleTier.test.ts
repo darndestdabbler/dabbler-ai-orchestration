@@ -9,7 +9,7 @@
 //     alongside module/moduleTitle; unknown/absent slugs stamp null.
 //   - Host + webview wiring source scans (house pattern — the private
 //     buildModules and the client.js IIFE are not importable from the
-//     unit harness; see verificationMarker.test.ts).
+//     unit harness; see gettingStartedHtml.test.ts for the same pattern).
 //
 // groupByModule's single-implicit-group contract is pinned here; the
 // SHIPPING renderer no longer uses it (Set 092 switched to
@@ -54,8 +54,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
       requiresUAT: false,
       requiresE2E: false,
       uatScope: "none",
-      tier: "full",
-      verificationMode: "out-of-band-or-none",
       module: null,
     },
     uatSummary: null,
@@ -66,11 +64,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     ...over,
   };
 }
@@ -281,19 +274,14 @@ suite("Set 087 S2 — buildModulePayloads payload shape (Layer 2 fixture)", () =
       name: set.name,
       state: set.state,
       fraction: "",
-      fractionTooltip: "",
       description: "",
       contextValue: "",
       iconSlug: "",
       needsMigration: false,
       migrationMarker: "",
       migrationTooltip: "",
-      tierMarker: "",
-      tierTooltip: "",
       blockedMarker: "",
       blockedTooltip: "",
-      verificationMarker: "",
-      verificationTooltip: "",
       duplicateNameBadge: "",
       duplicateNameTooltip: "",
       kindBadge: "",

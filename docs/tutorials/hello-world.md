@@ -159,6 +159,6 @@ and pick the *same* folder, and it picks up where it stopped.
 ## What next
 
 - Use Dabbler on code you actually keep: **[Adopt Dabbler](adopt-dabbler.md)**.
-- This sample ran on Lightweight tier; Full tier adds independent cross-provider
-  verification — a second AI, from a different provider, reviewing the work —
-  and configuring it is not part of a first run.
+- This sample deliberately skipped review; a real project adds independent
+  cross-provider verification — a second AI, from a different provider,
+  reviewing the work — and configuring it is not part of a first run.

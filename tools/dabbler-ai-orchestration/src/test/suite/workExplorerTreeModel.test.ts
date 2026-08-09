@@ -63,8 +63,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
       requiresUAT: false,
       requiresE2E: false,
       uatScope: "none",
-      tier: "full",
-      verificationMode: "out-of-band-or-none",
       module: null,
     },
     uatSummary: null,
@@ -75,11 +73,6 @@ function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     sessions: [],
     ...over,
   };
@@ -382,7 +375,7 @@ suite("Set 110 S2 — icon precedence", () => {
     assert.deepStrictEqual(setIcon(worstCase), { kind: "file", slug: "in-progress.svg" });
   });
 
-  test("ranks 2 to 5, each when nothing more severe applies", () => {
+  test("ranks remaining severities, each when nothing more severe applies", () => {
     assert.strictEqual(severityOf(fakeSet({ needsMigration: true })), "migration");
     assert.strictEqual(
       severityOf(
@@ -408,16 +401,6 @@ suite("Set 110 S2 — icon precedence", () => {
         }),
       ),
       "duplicate-name",
-    );
-    assert.strictEqual(
-      severityOf(
-        fakeSet({
-          state: "in-progress",
-          workspaceTierMarker: "lightweight",
-          config: { ...fakeSet().config, tier: "full" },
-        }),
-      ),
-      "tier-mismatch",
     );
   });
 

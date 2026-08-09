@@ -2,9 +2,8 @@
 
 The machine-readable lifecycle file for every session set. The Session
 Set Explorer extension, `ai_router`'s `close_session`, the cancel /
-restore commands, and the cost dashboard all read it; on Full tier
-`ai_router` writes it, on Lightweight tier the human (or AI
-orchestrator) maintains it by hand.
+restore commands, and the cost dashboard all read it; `ai_router`'s
+blessed writers own it.
 
 The schema is **strict where machines parse**: a fixed field set with
 canonical string values for `status`. Field-name drift or status-value
@@ -219,51 +218,19 @@ Each entry is an object with these fields:
 | `orchestrator` | object or null | Engine / provider / model / effort for the holder of THIS session, omit-null on disk. Null when this session has not yet started; populated by `start_session`; **preserved across `close_session`** as historical attribution on closed sessions. See **Per-session orchestrator block** below. |
 | `verificationVerdict` | string \| null | Set by `close_session` after gate checks via `resolve_close_verdict()`. Three-level precedence: (1) `disposition.verification_verdict` verbatim (wins even under `--force`); (2) for `verification_method == "api"` only, a status-derived fallback (`completed`→`"VERIFIED"`, `failed`/`requires_review`→`"ISSUES_FOUND"`) when no explicit field is set (backward compat for pre-Set-054 dispositions); (3) `null` for manual / skipped / `--no-router` / missing disposition when neither source applies. The canonical tokens are `"VERIFIED"`, `"ISSUES_FOUND"`, and `"WAIVED"`. **Set 086 (S1) added writer-side enforcement** on the active-set close path: the blessed writer accepts *only* an exact (case-insensitively normalized) allowlist — the three canonical tokens plus the intentionally-shipped extension token `"ISSUES_FOUND_RESOLVED_IN_FLIGHT"` — and **rejects anything else**, including a free-form non-verdict (`"manual-override-development"`, the 2026-07-08 confabulation incident) *and* an invented prefix look-alike (`"VERIFIED_NOT_REALLY"`). `null` remains valid (no verdict recorded: manual / skipped / `--no-router` / a mid-set session with no routed verifier). The writer/reader contract is deliberately **asymmetric**: the writer is *strict* (exact allowlist, fail-closed — see `ai_router/session_state.py` `_ALLOWED_VERDICT_TOKENS` / `validate_verification_verdict`), while *readers stay lenient* and match on prefix when bucketing, so a genuinely new extension token added to the writer allowlist is forward-compatible with existing readers. Shipping a new extension token is therefore a deliberate vocabulary change in `session_state.py`. Readers that surface the verdict to a human (e.g. the Session Set Explorer) additionally **flag an unrecognized token** rather than rendering it as a clean verdict (Set 086 S2). |
 
-### Per-session `type` (Set 057)
+### Per-session `type` — REMOVED (Set 112)
 
-A `sessions[N].type` field classifies the session for the Lightweight
-**dedicated-verification** workflow:
+A `sessions[N].type` field once classified a session as `work`,
+`verification` or `remediation`, so the Lightweight tier's Mode B could
+append typed verification and remediation sessions to a set at runtime.
+**Set 112 deleted the Lightweight tier and its typed-session writers.**
+Every session in a v4 ledger is a work session authored in `spec.md`;
+the set's session count no longer grows at runtime.
 
-| Value | Meaning | Authored where |
-|---|---|---|
-| `work` (default / absent) | A normal implementation session from `spec.md`. | `spec.md` `### Session K` headings; written by `start_session` (work path). |
-| `verification` | A dedicated cross-provider verification session, appended at runtime. | **Not in `spec.md`.** Appended by the blessed writer `start_session --type verification`. |
-| `remediation` | A remediation session that fixes findings from a verification round. | **Not in `spec.md`.** Appended by `start_session --type remediation`. |
-
-Key rules:
-
-- **Absent ⇒ `work`.** The field is additive and backward-compatible.
-  Only non-`work` values are persisted, so historical and Full-tier
-  ledgers are byte-identical to before Set 057. Readers MUST treat a
-  missing `type` as `work`.
-- **Typed sessions are appended at runtime, never authored in `spec.md`**
-  (Set 057 Q1 — the writer never mutates `spec.md`). The blessed writer
-  grows the runtime session count: a typed entry's `number` is
-  `len(sessions[]) + 1`, so the derived `totalSessions` increments by
-  one per appended typed session. The authored spec count stays fixed.
-- **Typed sessions take their step list from
-  [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md)**
-  (the generic, bounded dedicated-verification procedure), **not** from
-  a `spec.md` heading. `start_session --type …` prints a banner saying
-  so, so a pasted "Start the next session" prompt is self-describing.
-- The field is **preserved across boundary writes** — `start_session`
-  (work path) and `close_session` both carry an existing non-`work`
-  `type` forward when they rebuild `sessions[]`.
-- Only the blessed writer (`register_typed_session_start`) creates typed
-  sessions. Freehand creation is backstopped at close time by the
-  content-aware validator in `ai_router/dedicated_verification.py`
-  (`validate_dedicated_verification`); the seven workflow states are
-  derived from `type` + verdicts + the latest `sN-issues.json` by
-  `derive_workflow_state` (Set 057 Q3 — derived, never persisted).
-- Whether the dedicated flow applies is governed by the durable
-  verification-mode record in `activity-log.json`: the Set 057
-  once-at-set-start capture (`kind: "verification_mode"`) or the Set 062
-  sanctioned A→B transition (`kind: "verification_mode_change"`,
-  appended only by `python -m ai_router.change_verification_mode` on a
-  Lightweight Mode-A set with no typed sessions and nothing in flight —
-  B→A is refused). The read path honors the latest record of either
-  kind; see `docs/ai-led-session-workflow.md` → *Sanctioned Mode A →
-  Mode B transition*.
+Readers stay tolerant: an archived ledger may still carry `type` entries,
+and a reader that encounters one MUST treat a missing or unrecognized
+`type` as `work` rather than refusing the file. Nothing writes the field
+any more.
 
 The migration from v3 reorganized the lifecycle so that **per-session
 attribution survives the set's full lifetime**: who ran each session
@@ -583,12 +550,16 @@ over a violation.
 
 ---
 
-## Lightweight tier — one-field-flip worked example
+## One-field-flip worked example (repair / recovery reading)
 
-The Lightweight tier maintains `session-state.json` by hand. The v4
-shape preserves the v3 single-field-flip property by keeping the
-session transitions local to one `sessions[]` entry, plus an optional
-top-level `status` flip on the first/last transition.
+The blessed writers own this file at runtime — **do not hand-edit it to
+declare progress** (see *State-mutation discipline* in the session
+constitution; the sanctioned repair path is in
+[`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md)). This
+worked example exists so a reader can follow exactly what a boundary
+write does, one field at a time. The v4 shape keeps each transition
+local to one `sessions[]` entry, plus a top-level `status` flip on the
+first and last transition.
 
 Starting state (fresh set, 3 sessions planned):
 
@@ -1040,40 +1011,14 @@ write the plan-less carve-out shape (no `sessions[]` key, top-level
     **leaves `sessions[N-1].orchestrator` in place** as historical
     attribution, sets `sessions[N-1].verificationVerdict`, then
     re-derives top-level status (rule 6/7).
-- **Lightweight tier** (`tier: "lightweight"` in spec.md's Session
-  Set Configuration block): the AI router writers DO operate, but
-  under Set 048's `--no-router` mode the verification step is
-  short-circuited to a manual attestation rather than a routed call.
-  The Lightweight orchestrator follows the SAME process as Full for
-  model/effort identification, session-set identification, session
-  identification, and `session-state.json` updates at appropriate
-  times — the difference is operational (no metered API calls, no
-  auto-verification, copyable review prompts, suggested-not-required
-  UAT/E2E), not structural (same writer code paths, same on-disk
-  shape).
-  - `start_session` under `--no-router`: identical write path; no
-    LLM credentials needed (lazy imports per Set 048 §3.1 keep
-    `anthropic` / `openai` / `google-generativeai` out of the
-    Lightweight code path entirely).
-  - `close_session` under `--no-router`: skips the routed
-    verification call; records `verificationVerdict: null` (the
-    verdict field is strictly for the pass/fail outcome; method
-    provenance stays in `verification_method` and the attestation
-    event). A `--reason-file` text is recorded in the attestation
-    event, not in `verificationVerdict`. The
-    `external-verification.md` soft gate (§3.5 of Set 048's spec)
-    fires when the file is absent and the session is in-progress.
-  - **Hand-maintained Lightweight state files** are still supported
-    for consumers who can't or don't want to install
-    `dabbler-ai-router`. For those, the one-field-flip recipe above
-    applies; **always include and maintain `sessions[]`** — it is
-    the canonical authoritative ledger under hand-maintenance. The
-    per-consumer migrator `python -m
-    ai_router.migrate_lightweight_to_canonical_v4` recognizes
-    documented non-canonical Lightweight shapes (`sessionLog[]`
-    alias, missing `schemaVersion`, status aliases) and rewrites
-    them to canonical v4 with a `session-state.lwbak.json`
-    one-cycle-rollback backup.
+
+> **Set 112:** the Lightweight tier's variant of this section is gone.
+> There is no `--no-router` write path with different semantics: the
+> flag suppresses routed API calls and nothing else, the writers behave
+> identically under it, and no state shape is hand-maintained by
+> contract. The retired per-consumer migrator
+> (`ai_router.migrate_lightweight_to_canonical_v4`, which rewrote
+> non-canonical Lightweight shapes to canonical v4) was deleted with it.
 
 ---
 

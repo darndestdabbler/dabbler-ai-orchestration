@@ -6,7 +6,6 @@ import {
   buildSetAccomplishmentsPrompt,
   buildStartNextSessionPrompt,
   buildStartNextParallelSessionPrompt,
-  buildVerificationKickoffPrompt,
   sanitizeSlugForPrompt,
 } from "../../commands/copyPromptCommands";
 import { SessionSet, SessionState } from "../../types";
@@ -41,7 +40,7 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
     sessionsCompleted: 1,
     lastTouched: null,
     liveSession: null,
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", module: null },
     uatSummary: null,
     root,
     needsMigration: false,
@@ -50,11 +49,6 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     ...over,
   };
 }
@@ -190,102 +184,6 @@ suite("copyPromptCommands — start-next-parallel-session prompt (Set 049 S1 hyg
   });
 });
 
-suite("copyPromptCommands — verification kickoff prompt (Set 062 S2, spec D2)", () => {
-  const lwDedicated = () =>
-    fakeSet("062-fixture", {
-      config: {
-        requiresUAT: false,
-        requiresE2E: false,
-        uatScope: "none",
-        tier: "lightweight",
-        verificationMode: "dedicated-sessions",
-        module: null,
-      },
-    });
-
-  test("pointer-style: references the workflow doc section, never embeds its body", () => {
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(out.includes("docs/ai-led-session-workflow.md"), "must point at the workflow doc");
-    assert.ok(out.includes("Mode B"), "must name the dedicated-sessions section");
-    // Body text from the doc (e.g. the derived-state table or the
-    // resolution_status enum) must NOT be embedded — it would go stale.
-    assert.ok(!out.includes("resolution_status"), "doc rule tables must not be embedded");
-    assert.ok(!out.includes("closed-dispositioned"), "derived-state ladder must not be embedded");
-  });
-
-  test("instructs the blessed typed-session writer with the set's real directory", () => {
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    // Set 077 S1: the set-dir is quoted so pasted commands survive
-    // workspace paths containing spaces.
-    assert.ok(
-      out.includes(
-        'python -m ai_router.start_session --session-set-dir "docs/session-sets/062-fixture" --type verification',
-      ),
-      `kickoff must use the blessed writer; got: ${out}`,
-    );
-    assert.ok(!out.includes("\\"), "paths must be slash-separated regardless of OS");
-  });
-
-  test("demands engine OR provider difference and points at the orchestrator blocks", () => {
-    // Set 077 S5 (A6): the cross-provider property is engine OR model
-    // provider — the single-engine (Copilot model picker) pattern is
-    // sanctioned, so the prompt must not demand a different engine
-    // unconditionally.
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(/ENGINE or by model\s*\nPROVIDER|ENGINE or by model PROVIDER/i.test(out));
-    assert.ok(out.includes("--provider"));
-    assert.ok(out.includes("docs/session-sets/062-fixture/session-state.json"));
-  });
-
-  test("points at the remediation hand-off instead of inlining its command (A9)", () => {
-    // Set 077 S5 rewrite: prompts are pointers — the kickoff names the
-    // hand-off and defers its mechanics to the workflow doc's Mode B
-    // section rather than embedding a second command line that can
-    // drift from the doc.
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(/hand-off/i.test(out));
-    assert.ok(out.includes("docs/ai-led-session-workflow.md"));
-  });
-
-  test("surfaces the minimum router version (critique M6 version-skew)", () => {
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(out.includes("dabbler-ai-router >= 0.27.0"));
-  });
-
-  test("references the spec and activity log by path (L1)", () => {
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(out.includes("docs/session-sets/062-fixture/spec.md"));
-    assert.ok(out.includes("docs/session-sets/062-fixture/activity-log.json"));
-  });
-
-  test("is NOT the generic start-next-session prompt (D2: the dedicated flow is not generic)", () => {
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(!out.includes("Start the next session of"));
-  });
-
-  test("never instructs hand-editing the state file or UI-created sessions", () => {
-    const out = buildVerificationKickoffPrompt(lwDedicated());
-    assert.ok(/never hand-edit the state file/i.test(out));
-  });
-
-  test("sanitizes backticks in the slug like the other prompt builders", () => {
-    const out = buildVerificationKickoffPrompt(
-      fakeSet("evil`-name", {
-        config: {
-          requiresUAT: false,
-          requiresE2E: false,
-          uatScope: "none",
-          tier: "lightweight",
-          verificationMode: "dedicated-sessions",
-          module: null,
-        },
-      }),
-    );
-    assert.ok(out.includes("`evil'-name`"));
-    assert.ok(!out.includes("``"));
-  });
-});
-
 // ---------------------------------------------------------------------------
 // Set 077 S4 — pointer-style Evaluate prompts (Feature 3, A2/A9)
 // ---------------------------------------------------------------------------
@@ -300,7 +198,6 @@ import {
   ensureCrossProviderVerificationDoc,
   __forTests as copyPromptForTests,
 } from "../../commands/copyPromptCommands";
-import { buildExternalVerificationTemplate } from "../../commands/externalVerification";
 import {
   CROSS_PROVIDER_VERIFICATION_REL_PATH,
   resolveBundledTemplateDir,
@@ -323,7 +220,7 @@ suite("copyPromptCommands — pointer-style Evaluate prompts (Set 077 S4)", () =
     test(`${kind} prompt OPENS with the canonical-doc pointer + missing-doc fallback`, () => {
       const out = build(fakeSet("077-pointer"), noCriteria);
       assert.ok(
-        out.startsWith("Cross-provider review request (out-of-band verification)."),
+        out.startsWith("Cross-provider review request (advisory second opinion)."),
         `${kind}: must open with the review-request line`,
       );
       assert.ok(
@@ -340,21 +237,21 @@ suite("copyPromptCommands — pointer-style Evaluate prompts (Set 077 S4)", () =
       assert.ok(out.includes("WAIVED"), kind);
     });
 
-    test(`${kind} prompt CLOSES with the mandatory write-the-artifact instruction`, () => {
+    test(`${kind} prompt CLOSES with the advisory verdict instruction`, () => {
       const out = build(fakeSet("077-pointer"), noCriteria);
       assert.ok(
         out
           .trimEnd()
-          .endsWith("A verdict that exists only in this chat does not count."),
-        `${kind}: must close on the artifact instruction`,
+          .endsWith("router's own cross-provider round, which the close-out gate corroborates independently."),
+        `${kind}: must close on the advisory verdict instruction`,
       );
       assert.ok(
-        out.includes("docs/session-sets/077-pointer/external-verification.md"),
-        `${kind}: the artifact path must be spelled out relative to repo root`,
+        out.includes("Final step: report your verdict in the grammar that doc defines"),
+        `${kind}: the final verdict instruction must be present`,
       );
       assert.ok(
-        out.includes("append-only"),
-        `${kind}: append-only discipline must be stated`,
+        !out.includes("external-verification.md"),
+        `${kind}: advisory prompts must not instruct writing the retired artifact`,
       );
     });
 
@@ -379,7 +276,7 @@ suite("copyPromptCommands — pointer-style Evaluate prompts (Set 077 S4)", () =
         withCriteria("Repo-specific check: the frobnicator must frob."),
       );
       const criteriaIdx = out.indexOf("Repo-specific check");
-      const closeIdx = out.indexOf("Non-negotiable final step");
+      const closeIdx = out.indexOf("Final step:");
       assert.ok(criteriaIdx > 0, `${kind}: criteria embedded`);
       assert.ok(closeIdx > criteriaIdx, `${kind}: close comes after the trailer`);
     });
@@ -498,19 +395,5 @@ suite("copyPromptCommands — ensureCrossProviderVerificationDoc (Set 077 S4)", 
       ensureCrossProviderVerificationDoc(extensionPath, workspaceRoot),
       false,
     );
-  });
-});
-
-suite("externalVerification — seeded template (Set 077 S4, A2)", () => {
-  test("carries set name, dated Round 1 header, and a PENDING verdict", () => {
-    const t = buildExternalVerificationTemplate("077-my-set", "2026-07-02");
-    assert.ok(t.includes("# External Verification — 077-my-set"));
-    assert.ok(t.includes("## Round 1 — 2026-07-02"));
-    assert.ok(t.includes("Verdict: PENDING"));
-  });
-
-  test("points the reviewing engine at the canonical instruction doc", () => {
-    const t = buildExternalVerificationTemplate("077-my-set", "2026-07-02");
-    assert.ok(t.includes("docs/dabbler/cross-provider-verification.md"));
   });
 });

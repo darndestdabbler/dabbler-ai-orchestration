@@ -27,23 +27,14 @@ operative doc and follow it:
 
 ➡️ **[`docs/dabbler/start-here.md`](docs/dabbler/start-here.md)**
 
-That file resolves the active session set, tells you the tier, registers the
-session, and walks you through to close-out. **Do not improvise the
+That file resolves the active session set, registers the session, and walks
+you through to close-out. **Do not improvise the
 lifecycle** — `start-here.md` is the single home for the procedure, and it is
 generated (never hand-edited).
-
-## This project's tier
-
-This repo's sets declare `tier: full` or `tier: lightweight` in each
-`spec.md` (resolved per-set). The model is defined once — read it there, do
-not assume it: the tier-model SSoT is
-<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 
 ## Canonical references (online — this repo does not vendor them)
 
 - **Cold-start procedure:** [`docs/dabbler/start-here.md`](docs/dabbler/start-here.md)
-- **Tier model (SSoT):**
-  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
 - **Session constitution (the happy-path operating doc; open the full
   workflow doc only for rare branches):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/session-constitution.md>
@@ -52,8 +43,8 @@ not assume it: the tier-model SSoT is
 - **Spec schema:**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/spec-md-schema.md>
 
-Do not restate the tier model or the workflow in this file — link to the
-canonical sources above so this engine file never drifts stale.
+Do not restate the workflow in this file — link to the canonical sources
+above so this engine file never drifts stale.
 
 ---
 
@@ -63,12 +54,12 @@ You are **Claude Code**; you read this `CLAUDE.md` automatically. Codex and
 GitHub Copilot read `AGENTS.md`; Gemini Code Assist reads `GEMINI.md`. All
 three files share the body above — only this tail differs.
 
-- **API keys (Full tier):** Claude Code inherits the OS user environment, so
-  `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` /
-  `DABBLER_OPENAI_API_KEY` are normally already present. If a routed call fails
-  on a missing key, confirm it is set
-  in the user environment before retrying. (Lightweight tier makes no metered
-  calls, so keys are not required to run sessions.)
+- **API keys (Direct-API transport):** Claude Code inherits the OS user
+  environment, so `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` /
+  `DABBLER_OPENAI_API_KEY` are normally already present. If a routed call
+  fails on a missing key, confirm it is set in the user environment before
+  retrying. A `copilot-cli` seat carries no provider keys by design — their
+  absence is not an error there.
 - **Run the router through the venv interpreter:**
   `.venv/Scripts/python.exe -m ai_router.<module>` on Windows,
   `.venv/bin/python -m ai_router.<module>` on POSIX. A bare `python` often

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Set 058 S3 — CI drift guards for the tier model and consumer bootstrap.
+"""Set 058 S3 — CI drift guards for the consumer bootstrap and CI config.
 
-Three checks, run together by ``main()`` and exercised individually by
+Five checks, run together by ``main()`` and exercised individually by
 ``ai_router/tests/test_drift_guard.py``. All output is ASCII-only so it is
 safe on a Windows ``cp1252`` console (see ``lessons-learned.md``).
 
@@ -16,26 +16,29 @@ not change the PyPI surface. Tests import it by bare filename via the conftest
 Exit status is ``0`` when every check passes, ``1`` when any check finds a
 violation (so CI goes red).
 
-The three checks (Set 058 D6/D8):
+Set 112 S2 RETIRED the sixth check, the ``stale-framing`` guard. It forbade
+the stale "Lightweight = no Python / no venv / docs-only" framing from
+reappearing in live guidance docs — a guard that existed only to defend the
+Lightweight tier's meaning. The tier is gone, so the framing it policed can no
+longer be asserted about anything, and a guard whose subject does not exist is
+noise that a future reader would have to decode before deleting. Its
+banned-phrase catalogue, the ``<!-- drift-guard:allow-begin/end -->``
+allow-region machinery, and ``ALLOWED_MARKER_FILES`` went with it.
 
-1. **stale-framing guard** — forbids the stale, pre-Set-048 "Lightweight =
-   no Python / no venv / docs-only" framing from reappearing in any live
-   guidance doc. The banned phrase list IS the one documented in the tier-model
-   SSoT (``docs/concepts/tier-model.md`` -> "Banned framing"). Only the files on
-   the explicit ``ALLOWED_MARKER_FILES`` allowlist (those whose *purpose* is to
-   document the ban) may quote the phrases inside
-   ``<!-- drift-guard:allow-begin -->`` / ``<!-- drift-guard:allow-end -->``
-   regions, which the scan skips; a marker anywhere else is itself a violation.
-   Frozen historical records under
-   ``docs/session-sets/`` and ``docs/proposals/`` are out of scope (they record
-   the problem this set fixed; rewriting history is not the goal).
+What was deliberately KEPT is the doc-walking mechanism it used
+(:func:`iter_scanned_docs` and its exclusion rules): those encode "which files
+are LIVE guidance" versus "which are frozen history" — a repo fact, not a tier
+fact — and Set 112 Session 3's anti-resurrection grep gate needs exactly that
+distinction. Reuse it there rather than re-deriving the exclusions.
 
-2. **one-active-set guard** (D6) — at most one session set under
+The checks (Set 058 D6/D8):
+
+1. **one-active-set guard** (D6) — at most one session set under
    ``docs/session-sets/`` may be ``status: in-progress`` at a time, so a cold
    orchestrator can deterministically resolve THE active set (the rule rendered
    verbatim into every consumer repo's ``docs/dabbler/start-here.md``).
 
-3. **dist-bundle-in-sync guard** (D8 snapshot) — the consumer-bootstrap
+2. **dist-bundle-in-sync guard** (D8 snapshot) — the consumer-bootstrap
    template bundle copied into the extension's ``dist/templates/`` (the build
    artifact the published .vsix actually ships from) must byte-match the
    canonical ``docs/templates/consumer-bootstrap/`` source of truth. A stale
@@ -72,106 +75,14 @@ class Violation:
 
 
 # ---------------------------------------------------------------------------
-# Check 1 — stale-framing guard
+# Shared doc-walking mechanism
+#
+# Set 112 S2: this outlived the stale-framing guard that introduced it. It
+# answers "which files in this repo are LIVE guidance?" — everything under
+# docs/ except the frozen historical records — which is a repo fact
+# independent of any one check. Set 112 S3's anti-resurrection grep gate is
+# its next consumer.
 # ---------------------------------------------------------------------------
-
-# The banned phrases, lowercased. These are the unambiguous stale-tier
-# assertions from the tier-model SSoT's "Banned framing" list; none appears in
-# correctly-framed live docs (which say "router-off, not Python-off").
-# Matching is a case-insensitive substring test per line.
-#
-# The SSoT also lists "no close-out" / "no start_session / close_session", but
-# those phrasings are NOT enforced here: "no close-out event" / "No close-out
-# gate dependency" are common, legitimate, tier-agnostic statements about the
-# close-out machinery itself (see ai_router/docs/close-out.md,
-# docs/session-issues-schema.md). Any genuine stale-framing sentence
-# ("Lightweight = no Python / no venv / no close-out / ...") always co-occurs
-# with "no python" / "no venv", so the catalogue below catches it without the
-# false positives the close-out variants would produce.
-BANNED_PHRASES: tuple[str, ...] = (
-    "no python",
-    "no venv",
-    "no .venv",
-    "no pypi",
-    "docs-only",
-    "explorer-only",
-)
-
-# The ban targets a stale tier-framing *label* ("docs-only", "explorer-only"),
-# NOT a longer identifier that merely contains it as a sub-token. The Set 075
-# telemetry vocabulary uses `docs-only-excluded` and `targetClass=docs-only` as
-# legitimate diffClass identifiers; those must not trip the guard, while a bare
-# `docs-only` (even backtick-quoted, as documented deliberately under an
-# allow-region in the bootstrap README) still must.
-#
-# A label occurrence is exempt only when it is part of a *real compound
-# identifier* — i.e. the surrounding run of identifier characters (word chars
-# plus ``=`` / ``-``) contains an extra WORD component beyond the label itself.
-# So ``docs-only-excluded`` (extra word ``excluded``) and ``targetClass=docs-only``
-# (extra word ``targetClass``) are exempt, but a bare label is flagged whether it
-# stands alone, is backtick-quoted, ends a sentence (``docs-only.``), or is
-# adjacent only to a *dangling* separator (``docs-only-`` / ``=docs-only`` with no
-# further word) — a dangling ``-`` / ``=`` is not a compound identifier.
-_BANNED_LITERAL_RES: tuple[re.Pattern[str], ...] = tuple(
-    re.compile(re.escape(p), re.IGNORECASE) for p in BANNED_PHRASES
-)
-
-# Characters that can extend an identifier token around a banned label.
-_IDENT_CHARS = frozenset(
-    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_=-"
-)
-
-
-def _is_compound_identifier(raw: str, start: int, end: int) -> bool:
-    """True if the label at ``raw[start:end]`` is a sub-token of a longer id.
-
-    Expands left and right over identifier characters (word chars, ``=``, ``-``)
-    and reports whether the surrounding token carries an EXTRA word component
-    (an alphanumeric / underscore char outside the label span). A dangling ``-``
-    or ``=`` with no further word does not count — it is not a real identifier.
-    """
-    i = start
-    while i > 0 and raw[i - 1] in _IDENT_CHARS:
-        i -= 1
-    j = end
-    while j < len(raw) and raw[j] in _IDENT_CHARS:
-        j += 1
-    extra = raw[i:start] + raw[end:j]
-    return any(c.isalnum() or c == "_" for c in extra)
-_BANNED_RES: tuple[re.Pattern[str], ...] = tuple(
-    re.compile(r"(?<![\w=-])" + re.escape(p) + r"(?![\w=-])", re.IGNORECASE)
-    for p in BANNED_PHRASES
-)
-
-ALLOW_BEGIN = "drift-guard:allow-begin"
-ALLOW_END = "drift-guard:allow-end"
-
-# The allow-region escape hatch is NOT unrestricted: only these repo-relative
-# files may use it, and only for one of the two sanctioned reasons below. A
-# marker anywhere else is itself a violation, so a stray suppression cannot
-# silently hide real drift. To exempt a new file, add it here deliberately (a
-# reviewed decision), not by dropping a marker into it.
-#
-# Reason 1 -- quoting the banned-phrase catalogue while documenting the ban.
-# Reason 2 (Set 107 S1) -- a FROZEN proposal/review record in which the label
-#   carries its ordinary English sense ("a documentation-only change") and has
-#   nothing to do with tier framing. These four files are the git-transparency
-#   audit trail: they are historical records of what each reviewer wrote, so
-#   the honest fix is an auditable suppression rather than rewording another
-#   engine's review after the fact. `docs/proposals/` and `docs/session-sets/`
-#   get the same treatment wholesale via _EXCLUDED_DOC_SUBTREES; these live
-#   under docs/planning/ only because that is where the operator filed them.
-ALLOWED_MARKER_FILES: frozenset[str] = frozenset(
-    {
-        "docs/concepts/tier-model.md",
-        "docs/templates/consumer-bootstrap/README.md",
-        "tools/dabbler-ai-orchestration/CHANGELOG.md",
-        "docs/planning/git-transparency-proposal-v2.md",
-        "docs/planning/git-transparency-proposal-v3.md",
-        "docs/planning/git-transparency-proposal-gpt-v2.md",
-        "docs/planning/git-transparency-proposal-gpt-v3.md",
-    }
-)
 
 # Directories never scanned (relative to repo root, matched on any path part).
 _EXCLUDED_DIR_PARTS: frozenset[str] = frozenset(
@@ -217,79 +128,8 @@ def iter_scanned_docs(repo_root: Path) -> Iterable[Path]:
         yield path
 
 
-def scan_stale_framing(repo_root: Path) -> list[Violation]:
-    """Flag any banned stale-tier phrasing in live guidance docs.
-
-    Lines inside an ``<!-- drift-guard:allow-begin -->`` /
-    ``<!-- drift-guard:allow-end -->`` region are skipped, so the SSoT and the
-    bundle README can document the ban without tripping it.
-
-    A banned phrase is exempt only when the occurrence is part of a real compound
-    identifier (one carrying an extra word component, e.g. ``docs-only-excluded``
-    or ``targetClass=docs-only``); a bare label is still caught whether it stands
-    alone, is backtick-quoted, ends a sentence (``docs-only.``), or sits beside a
-    dangling ``-`` / ``=`` separator. See :func:`_is_compound_identifier`. The ban
-    targets the tier-framing label, not code identifiers that share the substring.
-    """
-    violations: list[Violation] = []
-    for path in iter_scanned_docs(repo_root):
-        rel = path.relative_to(repo_root).as_posix()
-        try:
-            text = path.read_text(encoding="utf-8")
-        except (UnicodeDecodeError, OSError):
-            continue  # binary or unreadable -> not a doc we guard
-        marker_allowed_here = rel in ALLOWED_MARKER_FILES
-        allowed = False
-        for lineno, raw in enumerate(text.splitlines(), start=1):
-            if ALLOW_BEGIN in raw or ALLOW_END in raw:
-                if not marker_allowed_here:
-                    # A suppression marker in a non-allowlisted file is itself a
-                    # violation — the escape hatch is auditable, not universal.
-                    violations.append(
-                        Violation(
-                            check="stale-framing",
-                            location=f"{rel}:{lineno}",
-                            detail=(
-                                "drift-guard allow marker used in a file not on "
-                                "ALLOWED_MARKER_FILES. Reword to drop the banned "
-                                "phrasing, or add this file to the allowlist in "
-                                "drift_guard.py as a reviewed decision."
-                            ),
-                        )
-                    )
-                    # Do NOT honor the marker here: keep scanning this line's
-                    # successors normally so real drift below is still caught.
-                    continue
-                allowed = ALLOW_BEGIN in raw
-                continue
-            if allowed:
-                continue
-            for phrase, rx in zip(BANNED_PHRASES, _BANNED_LITERAL_RES):
-                # Flag a banned label unless this occurrence is part of a real
-                # compound identifier (e.g. `docs-only-excluded` /
-                # `targetClass=docs-only`). A bare label -- prose, backtick-quoted,
-                # sentence-ending, or beside a dangling `-`/`=` -- still trips.
-                if any(
-                    not _is_compound_identifier(raw, m.start(), m.end())
-                    for m in rx.finditer(raw)
-                ):
-                    violations.append(
-                        Violation(
-                            check="stale-framing",
-                            location=f"{rel}:{lineno}",
-                            detail=(
-                                f"banned tier phrasing {phrase!r}; Lightweight is "
-                                "router-off, not Python-off. If this is a "
-                                "deliberate quote of the ban, wrap it in a "
-                                "<!-- drift-guard:allow-begin/end --> region."
-                            ),
-                        )
-                    )
-    return violations
-
-
 # ---------------------------------------------------------------------------
-# Check 2 — one-active-set guard (D6)
+# Check 1 — one-active-set guard (D6)
 # ---------------------------------------------------------------------------
 
 
@@ -336,7 +176,7 @@ def check_one_active_set(repo_root: Path) -> list[Violation]:
 
 
 # ---------------------------------------------------------------------------
-# Check 3 — dist-bundle-in-sync guard (D8 snapshot)
+# Check 2 — dist-bundle-in-sync guard (D8 snapshot)
 # ---------------------------------------------------------------------------
 
 _CANONICAL_BUNDLE = ("docs", "templates", "consumer-bootstrap")
@@ -643,7 +483,6 @@ def check_actions_are_sha_pinned(repo_root: Path) -> list[Violation]:
 # ---------------------------------------------------------------------------
 
 ALL_CHECKS = (
-    ("stale-framing", scan_stale_framing),
     ("one-active-set", check_one_active_set),
     ("dist-in-sync", check_dist_bundle_in_sync),
     ("sample-dist-in-sync", check_sample_bundle_in_sync),
@@ -666,7 +505,7 @@ def _default_repo_root() -> Path:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Set 058 tier-model / consumer-bootstrap drift guards."
+        description="Set 058 consumer-bootstrap / CI drift guards."
     )
     parser.add_argument(
         "--repo-root",
@@ -679,7 +518,7 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[drift-guard] scanning {repo_root}")
     violations = run_all(repo_root)
     if not violations:
-        print("[drift-guard] OK - no tier-model / bootstrap drift found.")
+        print("[drift-guard] OK - no bootstrap / CI drift found.")
         return 0
 
     by_check: dict[str, list[Violation]] = {}

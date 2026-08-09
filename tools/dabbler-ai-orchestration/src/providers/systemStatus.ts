@@ -38,7 +38,6 @@ import {
   readTransportProfile,
   rerunRefreshHint,
 } from "../utils/copilotSeatSetup";
-import { resolveDurableTier } from "../utils/tierMarkerStore";
 
 /**
  * Build the status payload for the first workspace folder.
@@ -61,7 +60,6 @@ export function buildSystemStatus(hasAnySets: boolean): SystemStatusPayload {
       providerKeyPresent: true,
       pythonPresent: true,
       copilotCliPresent: true,
-      tier: "full",
       transportProfile: "api",
       copilotSeatChosenUnconfirmed: false,
       copilotSeatRerunHint: "",
@@ -85,7 +83,6 @@ export function buildSystemStatus(hasAnySets: boolean): SystemStatusPayload {
     providerKeyPresent: providerKeyPresent(process.env),
     pythonPresent: probePythonPresence(root),
     copilotCliPresent: probeCopilotCliPresence(root),
-    tier: resolveDurableTier(root)?.tier ?? "full",
     transportProfile: durableTransportProfile ?? "api",
     copilotSeatChosenUnconfirmed: deriveCopilotSeatChosenUnconfirmed(
       readCopilotSeatStatusMarker(root),
@@ -144,7 +141,7 @@ export function resetStatusRendererCache(): void {
  * environment has at least one fault.
  *
  * The fault question is answered by asking the real renderer whether it would
- * emit anything, using the DURABLE tier/profile — which is exactly what the
+ * emit anything, using the DURABLE seat profile — which is exactly what the
  * webview passes in list mode. The webview's other mode passes live form
  * state instead, but that mode only ever runs when there are no sets, where
  * this function has already returned true, so the live-state path can never
@@ -162,7 +159,6 @@ export function isSetupNeeded(
   try {
     return (
       renderer.renderSystemStatus(status, {
-        tier: status.tier,
         transportProfile: status.transportProfile,
       }) !== ""
     );

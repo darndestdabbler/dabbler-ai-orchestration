@@ -29,12 +29,11 @@ A conforming `spec.md` has this skeleton:
 > **Purpose:** <one sentence>
 > **Session Set:** `docs/session-sets/<slug>/`
 > **Created:** YYYY-MM-DD
-> **Workflow:** Lightweight | Full
+> **Workflow:** <one line naming the pipeline>
 
 ## Session Set Configuration
 
 ```yaml
-tier: full|lightweight
 requiresUAT: true|false
 requiresE2E: true|false
 …
@@ -81,21 +80,13 @@ are required, two more are optional but recommended:
 > **Purpose:** <one sentence describing what this set delivers>
 > **Session Set:** `docs/session-sets/<slug>/`
 > **Created:** YYYY-MM-DD
-> **Workflow:** Lightweight | Full
+> **Workflow:** <one line naming the set's pipeline, e.g. Orchestrator -> AI Router -> Cross-provider verification>
 > **Prerequisite:** <optional — anything the human must do before session 1>
 ```
 
-The `Workflow:` line is a human-readable echo of the machine-parsed
-`tier:` field in the configuration block below. **Full** runs the AI
-router (cost-minded routing + the mandatory Step 6 cross-provider
-verification command on every session); **Lightweight** is
-**router-off, not Python-off** — it makes zero
-metered API calls but uses the *same* Python lifecycle (`.venv`,
-`start_session` / `close_session`, the blessed state-file writer, the
-close-out gate). Verification on Lightweight is per-set, governed by
-`verificationMode`. Do not restate the tier model in a spec — the
-single source of truth is
-[`docs/concepts/tier-model.md`](concepts/tier-model.md).
+The `Workflow:` line is human-readable prose, parsed by nothing. Before
+Set 112 it echoed a machine-parsed `tier:` field; that field is gone
+(see the configuration block below), so the line is now free text.
 
 ### 3. Session Set Configuration (L2)
 
@@ -103,58 +94,37 @@ Exactly one `## Session Set Configuration` heading, immediately
 followed by a fenced ```yaml block. Field reference:
 
 ```yaml
-tier: full | lightweight       # required for new specs; default "full" if omitted (back-compat)
 requiresUAT: true|false        # required
 requiresE2E: true|false        # required
 uatScope: none | per-session | per-set  # required when requiresUAT: true
 uatStyle: ad-hoc | dsl                  # optional; default ad-hoc
-verificationMode: out-of-band-or-none | dedicated-sessions  # Lightweight only; default out-of-band-or-none; inert on Full (Full-tier scaffolds omit it, Set 082)
-pathAwareCritique: none | advisory | required  # tier-orthogonal (both tiers); default none
+pathAwareCritique: none | advisory | required  # optional; default none
 kind: plan | decomposition              # optional (Set 098); scaffolder-emitted module-lifecycle identity
 effort: low | medium | high             # optional; orchestrator hint
 totalSessions: <int>                    # optional; canonical session count
 ```
 
-**`tier`** is the single declarative switch between the two tiers
-(Set 048+). `tier: lightweight` is what `ai_router/runtime_mode.py`
-reads to enter `--no-router` mode; `tier: full` (or an omitted field,
-for back-compat with pre-Set-048 specs) keeps the router on. The tier
-changes **only** whether metered API calls are made — see
-[`docs/concepts/tier-model.md`](concepts/tier-model.md) for the full
-model. The canonical spec template
-([`docs/templates/consumer-bootstrap/spec.md.template`](templates/consumer-bootstrap/spec.md.template))
-always emits `tier` explicitly; never emit a spec without it.
+> **REMOVED (Set 112): `tier` and `verificationMode`.** These declared the
+> Lightweight adoption tier and its two per-set verification modes. There
+> is one tier now, and one verification story — the routed cross-provider
+> round on every session. A spec that still declares
+> **`tier: lightweight` is REFUSED by the loader** with a migration
+> message; it does not silently convert. `tier: full` is accepted and
+> ignored, but new specs should omit the field entirely. Migration:
+> [`docs/cross-repo-lightweight-removal-notice.md`](cross-repo-lightweight-removal-notice.md);
+> history: [`docs/concepts/tier-model.md`](concepts/tier-model.md).
 
-**`verificationMode`** (Set 057; **Lightweight only**) selects how the
-set's per-set verification runs. `out-of-band-or-none` (**default**)
-uses the copyable-review-prompt flow (paste into a different
-path-aware assistant, record the verdict in `external-verification.md`)
-or opts out entirely. `dedicated-sessions` opts in to structured typed
-verification/remediation sessions on a different engine with a
-content-aware close-out gate. The field is **inert on Full tier**
-(which always runs automatic, rule-based cross-provider verification);
-**Full-tier scaffolds omit the field entirely** (Set 082) — omission is
-schema-legal, and every reader applies absence-means-default.
-The field only *seeds* the choice — the durable record is an
-`activity-log.json` entry written once at set start, superseded later
-only by the sanctioned A→B blessed writer
-(`python -m ai_router.change_verification_mode`, Set 062; a spec edit
-alone never changes a started set's effective mode). See
-[`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md)
-→ *Field semantics* for the seeding/recording contract.
-
-**`pathAwareCritique`** (Set 066; **tier-orthogonal** — applies on both
-Full and Lightweight) selects the set's path-aware critique policy: an
+**`pathAwareCritique`** (Set 066) selects the set's path-aware critique policy: an
 end-of-set, multi-provider review that retrieves repo ground truth itself
 (today an operator-run GitHub Copilot driving GPT-5.4 + Gemini-Pro; the
 first-party adapter is deferred to Set 067). `none` (**default**) is no
-gate — the feature is strictly opt-in, preserving the walk-away promise on
-both tiers. `advisory` recommends a critique (a missing/invalid artifact
+gate — the feature is strictly opt-in, preserving the walk-away promise.
+`advisory` recommends a critique (a missing/invalid artifact
 warns, never blocks). `required` arms the Set-066 close-out gate: a
 set-terminal close confirms a valid multi-provider
 [`path-aware-critique.json`](path-aware-critique-schema.md) artifact
-exists (hard-block in an interactive TTY, soft-warn headless). Like
-`verificationMode`, the spec field only *seeds* the choice — the durable
+exists (hard-block in an interactive TTY, soft-warn headless). The spec
+field only *seeds* the choice — the durable
 record is an `activity-log.json` entry written **once at set start and
 immutable thereafter**; `python -m ai_router.blast_radius` *recommends* a
 value from the set's changed surface (the operator confirms — never an
@@ -177,10 +147,7 @@ attribute is deliberately minimal (module-lifecycle verdict decision
 rule and human/tooling legibility, and it must not grow into a
 workflow/state schema. `ai_router` does not read the field.
 
-Both tiers declare the same field set; only `tier` (and, on
-Lightweight, `verificationMode`) drives a tier-conditional behavior
-difference — `pathAwareCritique` is **tier-orthogonal** (identical on
-both). The yaml block is parsed by `fileSystem.ts:parseSessionSetConfig`
+The yaml block is parsed by `fileSystem.ts:parseSessionSetConfig`
 and by `ai_router`'s spec reader; field names must match exactly.
 
 ### 4. Sessions parent (L2, named exactly `## Sessions`)
@@ -283,7 +250,7 @@ accessdb`'s global-counter specs — the migration is mechanical:
    padded per-set number (`sessions/001-foo.md`,
    `uat-checklists/001-foo.json`).
 
-## Worked example (Lightweight tier)
+## Worked example
 
 ```markdown
 # Detail Forms UAT
@@ -291,17 +258,15 @@ accessdb`'s global-counter specs — the migration is mechanical:
 > **Purpose:** Run UAT for the four primary data-entry detail forms.
 > **Session Set:** `docs/session-sets/001-forms-detail-uat/`
 > **Created:** 2026-05-11
-> **Workflow:** Lightweight
+> **Workflow:** Orchestrator -> AI Router -> Cross-provider verification
 > **Prerequisite:** Run `ResetForUAT` in the Access Immediate Window.
 
 ## Session Set Configuration
 
 ```yaml
-tier: lightweight
 requiresUAT: true
 requiresE2E: false
 uatScope: per-session
-verificationMode: out-of-band-or-none
 ```
 
 ## Project Overview

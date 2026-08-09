@@ -27,23 +27,14 @@ operative doc and follow it:
 
 ➡️ **[`docs/dabbler/start-here.md`](docs/dabbler/start-here.md)**
 
-That file resolves the active session set, tells you the tier, registers the
-session, and walks you through to close-out. **Do not improvise the
+That file resolves the active session set, registers the session, and walks
+you through to close-out. **Do not improvise the
 lifecycle** — `start-here.md` is the single home for the procedure, and it is
 generated (never hand-edited).
-
-## This project's tier
-
-This repo's sets declare `tier: full` or `tier: lightweight` in each
-`spec.md` (resolved per-set). The model is defined once — read it there, do
-not assume it: the tier-model SSoT is
-<https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
 
 ## Canonical references (online — this repo does not vendor them)
 
 - **Cold-start procedure:** [`docs/dabbler/start-here.md`](docs/dabbler/start-here.md)
-- **Tier model (SSoT):**
-  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
 - **Session constitution (the happy-path operating doc; open the full
   workflow doc only for rare branches):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/session-constitution.md>
@@ -52,5 +43,5 @@ not assume it: the tier-model SSoT is
 - **Spec schema:**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/spec-md-schema.md>
 
-Do not restate the tier model or the workflow in this file — link to the
-canonical sources above so this engine file never drifts stale.
+Do not restate the workflow in this file — link to the canonical sources
+above so this engine file never drifts stale.

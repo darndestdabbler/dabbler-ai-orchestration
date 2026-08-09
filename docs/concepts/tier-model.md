@@ -1,349 +1,99 @@
-# The Dabbler tier model — Full vs. Lightweight
+# The Dabbler tier model — retired (historical note)
 
-> **This is the single source of truth (SSoT) for the adoption tier model.**
-> README, the Getting Started form, the consumer-repo engine files
-> (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`), and
-> `docs/spec-md-schema.md` all **point here** rather than restating the model.
-> If you are about to explain "what Lightweight means" anywhere else, link to
-> this doc instead of paraphrasing it — paraphrases drift, and the drift this
-> doc exists to kill cost a real operator a stuck afternoon (see *Why this doc
-> exists*, below).
+> **Status: RETIRED.** Set 112 deleted the Lightweight tier. This document
+> used to be the single source of truth for a two-tier adoption model
+> (`tier: full` vs `tier: lightweight`); there is now exactly one tier, so
+> there is no model to be the source of truth for. The file survives only
+> so links from archived session sets, proposals, and changelogs resolve to
+> an explanation rather than a 404.
 >
-> Grounded in the code: [`ai_router/runtime_mode.py`](../../ai_router/runtime_mode.py)
-> is the authority for how the tier is resolved at runtime. Where this prose
-> and that module disagree, the module wins and this doc is the bug.
+> **Do not cite this doc as current behavior, and do not restore it.** If
+> you arrived here from a live doc, that link is a bug — the live doc
+> should not reference the tier model at all.
 
 ---
 
-## The one-sentence model
+## What the tier model was
 
-**The only thing the tier changes is the AI router — i.e. whether the
-project makes external, metered LLM API calls. `tier: lightweight` flips
-`--no-router` (zero API calls); everything else about a Dabbler project is
-identical across both tiers.**
+Between Sets 048 and 112 a session set declared `tier: full` or
+`tier: lightweight` in its `spec.md` Session Set Configuration block. The
+switch controlled exactly one thing: **whether the project made external,
+metered LLM API calls.** `tier: lightweight` resolved to `--no-router` (zero
+API calls); everything else — the `.venv`, `dabbler-ai-router`,
+`start_session` / `close_session`, the blessed state-file writer, the state
+schema, the close-out gate — was identical on both tiers.
 
-Said the other way, and worth memorizing because it is the exact fact four
-setup surfaces used to get wrong:
+The single most-repeated correction the doc carried was:
 
-> **Lightweight is router-off, not Python-off.**
+> Lightweight was **router-off, not Python-off.**
 
-Both tiers install Python and `dabbler-ai-router`, run `start_session` and
-`close_session`, use the blessed state-file writer, derive session state the
-same way, and pass through the same close-out gate. The router is the *only*
-moving part the tier switches off.
+Four setup surfaces got that wrong at various times, and a CI drift guard
+(`ai_router/scripts/drift_guard.py`, `stale-framing` check) existed purely to
+stop the stale "Lightweight = no Python, no venv, docs only" framing from
+reappearing. Set 112 S2 retired that guard along with the tier it defended.
 
----
+Because Lightweight made no routed calls, it could not run the routed
+cross-provider verification the Full tier requires. It substituted two
+per-set verification **modes**, selected by a `verificationMode` spec field:
 
-## What is the same on both tiers
+- **`out-of-band-or-none`** (Mode A, the default) — the operator pasted a
+  review prompt into a second AI assistant and recorded the verdict by hand
+  in an `external-verification.md` file.
+- **`dedicated-sessions`** (Mode B) — the set grew typed `verification` /
+  `remediation` sessions at runtime, run on a different engine or provider,
+  with a bounded re-verification loop and a content-aware close gate.
 
-Everything in this list is identical whether the project is `full` or
-`lightweight`:
+## Why it was removed
 
-| Surface | Both tiers |
-|---|---|
-| **Python environment** | A `.venv` and `pip install dabbler-ai-router`. |
-| **Lifecycle CLIs** | `python -m ai_router.start_session` / `close_session` at every session boundary. |
-| **State file** | `session-state.json` (schemaVersion 4), written only by the blessed writer; never hand-edited on a path that has the CLI. |
-| **State derivation** | The same `completedSessions[]` / events-ledger derivation and the same seven-state model. |
-| **Close-out gate** | The same `close_session` gate (disposition required, `change-log.md` on the final session, idempotent writes). |
-| **Engine files** | All three — `CLAUDE.md`, `AGENTS.md`, `GEMINI.md` — because the next session's orchestrator may be a different engine. |
-| **Cold-start operative doc** | `docs/dabbler/start-here.md` (generated, never hand-edited). |
-| **Spec shape** | One canonical `spec.md` template (schemaVersion 4, `NNN-` slug, required `tier`; Lightweight sets also declare `verificationMode` — Full-tier specs omit the field entirely, Set 082). |
-| **Work Explorer** | Same activity-bar view, same bucket transitions, same per-session orchestrator block. |
-| **Folder layout** | Same `docs/session-sets/<slug>/` artifact set. |
+The tier existed for shops with no provider API keys. Sets 078/079/084/086/104
+shipped the **Copilot CLI seat profile** (`transport.profile: copilot-cli`),
+which dispatches routed calls through an authenticated GitHub Copilot seat and
+needs no `DABBLER_*` keys at all. That covers the same population *without*
+giving up routed cross-provider verification.
 
-If you find a setup step, doc, or setup-form branch that asks a Lightweight
-project to *skip* one of these, that is the drift — fix it against this
-table.
+The gate that cleared the removal was measured on 2026-08-05: a probe of an
+enterprise Copilot seat confirmed 11/18 models across three provider families
+(`anthropic`, `google`, `openai`), which is enough for the verifier-exclusion
+guarantee to hold on a seat-only shop. The probe lockfile is archived at
+`docs/session-sets/112-remove-lightweight-tier/probe-evidence-copilot-catalog.lock`.
 
----
+With every known user reachable by the Full tier — keyed or seat-profile —
+the second tier bought nothing and cost a great deal: two verification modes,
+their typed-session machinery, a migrator, a tier-marker store, a
+Getting Started fork, a drift guard, and a dual-tier narrative in every
+teaching doc. Set 112 deleted all of it.
 
-## What the tier changes (the only divergence)
+## What replaced it
 
-There is exactly **one** intentional divergence, and it has two faces — one
-at setup time, one at verification time.
+- **One tier.** A spec declares no `tier` field. `tier: lightweight` in a
+  spec is refused by the loader with a migration message — deliberately
+  loud, never silently converted.
+- **One verification story.** Every session runs the router's routed
+  cross-provider `verify_session` round, and the close-out gate corroborates
+  it. There is no per-set mode.
+- **`--no-router` survives as a CI/test affordance only.** The CLI flag and
+  the `DABBLER_NO_ROUTER` env var still suppress routed API calls for
+  hermetic runs. Set 112 S1 additionally closed a hole here: those inputs
+  used to disarm two close gates on their own, which would have made an
+  environment variable an undocumented back door once the documented tier
+  was gone. `--no-router` now means exactly one thing — suppress routed
+  calls — and buys no gate relief. `--manual-verify` is the only attested
+  bypass.
+- **Zero-cost projects declare it honestly.** A project that genuinely
+  cannot verify (the shipped sample project, for one) declares
+  `threshold_usd: 0` with a matching `verification_method` in
+  `ai_router/budget.yaml`. That is an operator declaration on disk, which is
+  the point — an engine cannot record "skipped" and walk past the gate.
 
-### 1. Setup: router config is Full-only
+## Where the record lives
 
-- **Full** writes router config (`ai_router/router-config.yaml`, and a
-  `budget.yaml` if the operator sets a verification budget).
-- **Lightweight** writes **no** router config. The single declarative switch
-  is `tier: lightweight` in the active `spec.md`. That one field is what
-  `runtime_mode.py` reads to enter `--no-router` mode.
-
-Everything else the scaffolder writes (the `.venv`, the package install, the
-three engine files, `start-here.md`, the templated `spec.md`) is identical.
-
-### 2. Verification: who/what reviews the session's work
-
-- **Full** runs the router-backed, rule-based **cross-provider
-  verification** command on **every session — mandatory, no skip** (a model
-  from a *different* provider reviews the work; the verdict is recorded;
-  issues are remediated; the close gate refuses an unverified close).
-- **Lightweight** makes **zero metered API calls**, so the router cannot
-  auto-verify. Verification on Lightweight is **per-set, not per-session**,
-  and follows the `verificationMode` chosen once at set start (Set 057;
-  a completed Mode-A set can opt in later through the sanctioned A→B
-  blessed writer `python -m ai_router.change_verification_mode`,
-  Set 062):
-  - **`out-of-band-or-none`** (the default) — the operator pastes a copyable
-    review prompt into a *different* path-aware AI assistant and records the
-    verdict by hand in `external-verification.md`, **or** opts out entirely
-    for explicit reasons. Strictly opt-in cross-provider review.
-  - **`dedicated-sessions`** — a structured **typed-session** flow: a blessed
-    verification session run on a different engine, an optional remediation
-    session, a bounded re-verification loop, and a content-aware close-out
-    gate that confirms a different-engine verification ran.
-
-  See [`docs/ai-led-session-workflow.md`](../ai-led-session-workflow.md)
-  → *Lightweight tier — verification* for the full flow, and
-  [`docs/spec-md-schema.md`](../spec-md-schema.md) for where `verificationMode`
-  is declared and how it is recorded.
-
-That is the whole divergence. Two faces, one root cause: the router is off.
-
----
-
-## How the tier is resolved at runtime
-
-`runtime_mode.py` resolves `--no-router` mode **once at process start** from
-four precedence-ordered sources (highest wins):
-
-1. **CLI flag `--no-router`** — one-off override on any router CLI.
-2. **Env var `DABBLER_NO_ROUTER`** — truthy values `1` / `true` / `yes` /
-   `on` (case-insensitive); a CI- or shell-session-wide default.
-3. **`tier: lightweight` in the active `spec.md`** — the declarative,
-   per-set default. **This is the normal switch.**
-4. **Default** — full mode (router enabled).
-
-When a higher-precedence source overrides a lower one (for example,
-`--no-router` on a `tier: full` spec), the resolver logs an informational
-line naming the source that won. There is no refusal — explicit overrides
-always win.
-
-Two consequences worth internalizing:
-
-- **`tier:` lives in `spec.md`, and nowhere else is authoritative.** No new
-  per-tier state is persisted. The runtime reads the field; that is the
-  mechanism.
-- Because the tier is read per-set from the active spec, a single repo can
-  hold Full sets and Lightweight sets side by side. The tier is a property of
-  the *set*, not the *repo*.
-
----
-
-## Why this doc exists (the drift it kills)
-
-A human scaffolded a new **Lightweight** consumer repo and was left stuck: no
-engine files, no `.venv`, generated specs missing the `tier:` field, and no
-clear next step. The root cause was a **stale, pre-Set-048 tier model** that
-four setup surfaces still encoded:
-
-<!-- drift-guard:allow-begin (this blockquote quotes the banned framing in order to ban it) -->
-> ❌ "Lightweight = no Python, no venv, no close-out machinery, no
-> cross-provider verification — just a docs/Explorer-only workflow."
-<!-- drift-guard:allow-end -->
-
-That framing is **wrong** and contradicts the implemented `--no-router` mode.
-The pure-docs Lightweight tier was an illusion that the Set 048 runtime had
-already replaced. This SSoT is the corrected model; the four surfaces
-(`adoption-bootstrap.md` — since retired to a deprecation stub in Set 063 —
-the Getting Started form, `sessionGenPrompt`, `gitScaffold`) now
-point here, and a CI guard forbids the stale phrasing from reappearing in any
-doc.
-
-**Banned framing — never write any of these about Lightweight:**
-
-<!-- drift-guard:allow-begin (this list IS the banned-phrase catalogue the CI guard enforces) -->
-- "no Python" / "no `.venv`" / "no venv"
-- "no `ai_router` / no PyPI dependency"
-- "no close-out" / "no `start_session` / `close_session`"
-- "docs-only" / "Explorer-only" as the *definition* of the tier
-<!-- drift-guard:allow-end -->
-
-**Correct framing — always:** *router-off, not Python-off; `tier:` is the
-single switch; both tiers share the Python lifecycle.*
-
-> A CI drift guard (`ai_router/scripts/drift_guard.py`, Set 058 S3) scans all
-> live guidance docs for the banned phrasing above and fails the build if it
-> reappears outside an explicit `<!-- drift-guard:allow-begin/end -->` region.
-
----
-
-## Choosing a tier (one question)
-
-Pick the tier by answering one question: **do you want this project's
-sessions verified by an automatic, metered, cross-provider API call at the
-end of each session?**
-
-- **Yes, and I'm fine paying per-call for it** → **Full.** You also get
-  cost-minded routing of reasoning tasks and automatic metrics.
-- **No — I'd rather make zero metered calls and verify out-of-band (or via a
-  dedicated different-engine verification session), or not at all** →
-  **Lightweight.**
-
-Everything else is the same. You can move a set from Lightweight to Full by
-flipping `tier:` in its `spec.md` and adding router config; nothing else has
-to change.
-
----
-
-## The Full tier seat-profile option (Copilot-only shops)
-
-For organizations that cannot hold direct provider API keys (`DABBLER_*` env
-vars) under corporate policy but do have GitHub Copilot subscriptions, Full
-offers a **seat profile** (Set 078): `route()`/`verify()` keep every part of
-Full — task typing, tiering, cross-provider verification, metrics — but
-dispatch each call through the GitHub Copilot CLI's headless mode instead of
-a direct provider HTTPS API. This gives a Copilot-seat-only shop an
-*indirect* Full tier: work generated under one underlying model provider,
-independently verified under a different one, inside a single subscription.
-
-This is presented honestly as **Full-compatible with explicitly degraded
-guarantees** — never as byte-equivalent to the direct-API Full tier:
-
-- **Provider provenance is asserted, not confirmed.** The Copilot CLI has no
-  model-discovery command or first-party `provider` field, so provenance is
-  derived from a model-name-prefix heuristic (`claude-*` / `gpt-*` /
-  `gemini-*`) recorded in a seat-local catalog, not read off an API.
-- **A seat's identity is its underlying model, and the seat must declare it
-  (Set 084 F1).** A Copilot seat relays whatever model the picker selected, so
-  the seat *label* is never an identity. `start_session` **refuses** a Copilot
-  start (`--engine github-copilot` / `copilot`) without a registry-known
-  `--model` and records `identityProvenance: asserted` (vs. `direct` for
-  single-vendor engines). Every downstream identity consumer — the
-  verification-integrity close gate and verifier selection — derives the
-  **effective provider** by registry lookup on that model, never from the
-  free-text `--provider` label. Verifier selection then **excludes** that
-  effective provider (applied against the seat's catalog lockfile), so a seat
-  can never verify its own work under the same provider. If the seat's catalog
-  serves no different-provider verifier, the session yields
-  **`verification_unavailable`** — a hard blocked state (no verdict written),
-  resolvable only by the operator-attested `--manual-verify` path, never a
-  silent same-provider pass. And a Full-tier close that arrives unverified runs
-  the **close backstop** (Set 084): `close_session` performs the verification
-  itself in-process through the same exclusion, so the seat's orchestrator never
-  holds the last word.
-- **Seat billing is not locally meterable.** The only usage signal is a
-  per-call count (`result.usage.premiumRequests`) — no token cost, no dollar
-  figure, no remaining balance. Cost-keyed guards (dollar/token budgets,
-  price-table estimators, quota/balance preflights) are excluded under this
-  profile and the skip is always logged; a hard, non-cost-keyed circuit
-  breaker (`transport.max_invocations_per_session`, default 200) caps seat
-  burn instead.
-- **Large prompts dispatch via a file handoff (Set 104).** The whole prompt
-  travels as one `-p` argv element, and Windows caps the command line at
-  32,767 UTF-16 units, so a large dispatch (verification bundles especially)
-  could not spawn at all. At or above a rendered-argv threshold the transport
-  transparently writes the prompt to a per-request temp file and sends a short
-  bootstrap pointing the CLI at it, gated by a nonce EOF acknowledgement that
-  fails closed as `handoff-incomplete` on an under-read. Inline stays primary
-  and byte-identical below the threshold; the payload file is deleted on every
-  path. This fixes **argv transport only**, not model context capacity — the
-  longer-term direction for large verification payloads remains manifests +
-  path-aware retrieval, not ever-larger monolithic prompts.
-
-**Per-machine setup (do this first):** a Copilot-locked seat must have the
-`copilot` CLI installed and **interactively logged in** to its `.ghe.com`
-tenant before any activation path will work — an unauthenticated seat is the
-exact failure that made an orchestrator confabulate a verification result
-(Set 086). Follow the one-time runbook,
-[`docs/copilot-seat-setup-checklist.md`](../copilot-seat-setup-checklist.md),
-then run `python -m ai_router.copilot_preflight` to confirm the chain; the
-same preflight runs automatically at session start and blocks a mis-authed
-seat.
-
-**Activation (guided, the primary path — Set 079):** use the VS Code
-extension's Getting Started form. In step 1, choosing the **Full** tier
-surfaces a "Provider access (how routed calls run)" choice: **Direct
-provider API keys** (the default) or **GitHub Copilot CLI seat**.
-Selecting the seat option automates the setup: after the standard
-project scaffold succeeds, the form runs the seat's catalog refresh
-(`python -m ai_router.copilot_catalog --refresh`, invoked with the
-scaffolded `.venv`'s own interpreter and an auto-derived seat id/label —
-zero typing) as a cancellable progress notification, parses the
-refresh's actual confirmed-provider result rather than its exit code,
-and only when the seat confirms at least two distinct provider families
-renders `transport.profile: copilot-cli` into
-`ai_router/local-overrides.yaml`. If seat setup fails and no `DABBLER_*`
-key is present, the form says plainly that the scaffold completed but
-the router is **not yet functional**, with reason-specific guidance and
-the re-run command (re-run the refresh from the scaffolded `.venv`; no
-re-scaffold is needed). `api` is offered as a working fallback only
-when `DABBLER_*` keys are actually present.
-
-**Activation (manual, the fallback path):** set `transport.profile:
-copilot-cli` in `ai_router/local-overrides.yaml` (default is `api`, the
-unchanged direct-HTTPS path) and build the seat's local model catalog —
-run `python -m ai_router.copilot_catalog --refresh` to discover the
-seat's dispatchable models and write `ai_router/copilot-catalog.lock`.
-On either path, every routed call validates the lockfile against the
-live CLI and fails closed on version drift, missing provenance, or
-fewer than two distinct providers among confirmed entries.
-
-**Evidence basis:** validated end-to-end (design lock, live dogfood, UAT
-attestation) on a single operator's personal Copilot seat — Set 078 for
-the transport itself, and Set 079's live dogfood of the guided form ran
-on that **same** personal seat. Neither set validates multi-seat or
-enterprise-seat model availability: an enterprise-locked seat may expose
-only one provider family, which fails the ≥2-provider check even though
-the guided flow itself "worked", and whether a given team seat confirms
-two distinct providers is unknown until someone on that team actually
-runs the flow. A second, representative target-team seat and a GitHub
-Models enterprise-availability check were never completed and were
-dropped as a gate requirement by an explicit, recorded operator override
-rather than proven — see
-`docs/session-sets/078-copilot-cli-hybrid-tier/s1-cli-contract.md`.
-Two further recorded limits from Set 079's induced-failure dogfood: the
-POSIX process-tree kill on cancel is unit-tested but has not yet been
-exercised against a live POSIX process tree (the dogfood host was
-Windows), and the config write is atomic against process crash only —
-it makes no power-loss durability claim.
-
-**Verification integrity on a Copilot seat (Set 086):** the seat path adds
-three fail-loud guards on top of the degraded guarantees above, because a
-Copilot-CLI seat whose CLI was never authenticated used to fail *silently* at
-verification time and let the orchestrator confabulate a passing result. (1)
-An **auth-preflight** runs at `start_session` on a copilot-cli seat (binary →
-credential → a live auth probe) and **blocks a mis-authed seat from starting**
-a session it could never honestly verify, pointing at
-[`docs/copilot-seat-setup-checklist.md`](../copilot-seat-setup-checklist.md).
-(2) A Full-tier **close fails loud on missing evidence**: it will not record a
-session as verified without a real events ledger and the verification stamp —
-an *absent* ledger is a high-severity finding, not a skip. (3) **Verdict-token
-validation** at the blessed writer rejects a non-verdict
-(`manual-override-development`) or a prefix look-alike (`VERIFIED_NOT_REALLY`)
-from ever persisting into `verificationVerdict`. Together these mean the seat
-either verifies for real or stops loudly. Optional togglable **transport
-diagnostics** (`transports.copilot-cli.diagnostics.enabled`, or the
-`DABBLER_COPILOT_DIAGNOSTICS` env var) log every failed dispatch's
-`error_class` / argv (prompt-redacted) / auth-reprobe result so a dispatch
-failure is never invisible during a run.
-
-**Choose this profile when:** staff are corporate-policy-locked to Copilot
-seats only, no `DABBLER_*` key is possible, and Full's cross-provider
-verification guarantee (even in its degraded, seat-asserted form) is worth
-more than the honest gaps above. Otherwise, a keyed shop should use the
-direct-API `api` profile (the default), and a Copilot-locked shop that does
-not need Full's guarantees should consider Lightweight's Mode B
-(`dedicated-sessions`) provider-picker pattern instead.
-
----
-
-## See also
-
-- [`ai_router/runtime_mode.py`](../../ai_router/runtime_mode.py) — the
-  resolver; the authority for tier resolution.
-- [`docs/ai-led-session-workflow.md`](../ai-led-session-workflow.md) — the
-  execution mechanics, including the Lightweight per-set verification flow.
-- [`docs/spec-md-schema.md`](../spec-md-schema.md) — where `tier` and
-  `verificationMode` are declared in a spec's configuration block.
-- [`docs/adoption-bootstrap.md`](../adoption-bootstrap.md) — the retired
-  conversational setup flow (Set 063); now a deprecation stub pointing at
-  the extension's Getting Started form.
-- [`docs/templates/consumer-bootstrap/`](../templates/consumer-bootstrap/) —
-  the canonical templates every creation path renders.
-- [`ai_router/cli_transport.py`](../../ai_router/cli_transport.py) and
-  [`ai_router/copilot_catalog.py`](../../ai_router/copilot_catalog.py) — the
-  Copilot CLI seat-profile transport and catalog-discovery implementation
-  (Set 078).
+- The removal set: `docs/session-sets/112-remove-lightweight-tier/`
+  (`spec.md`, and `s1-kill-inventory.md` for the complete file-level
+  inventory of what was deleted).
+- The reservation and evidence basis:
+  `docs/proposals/2026-08-05-set-112-reservation-remove-lightweight-tier.md`.
+- The consumer migration notice:
+  [`docs/cross-repo-lightweight-removal-notice.md`](../cross-repo-lightweight-removal-notice.md).
+- The seat profile that replaced the tier:
+  `docs/session-sets/078-copilot-cli-hybrid-tier/spec.md` and
+  [`docs/copilot-seat-setup-checklist.md`](../copilot-seat-setup-checklist.md).

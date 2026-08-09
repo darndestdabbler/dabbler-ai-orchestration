@@ -126,7 +126,7 @@ function fakeSet(
       forceClosed: null,
       completedSessions: [],
     },
-    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", tier: "full", verificationMode: "out-of-band-or-none", module: null },
+    config: { requiresUAT: false, requiresE2E: false, uatScope: "none", module: null },
     uatSummary: null,
     root: "/tmp",
     needsMigration: false,
@@ -135,11 +135,6 @@ function fakeSet(
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
   };
 }
 

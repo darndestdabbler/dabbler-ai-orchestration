@@ -6,28 +6,28 @@
 > artifacts on every path, but **these template files are the durable
 > source.** A shared template writer (Session 2) renders them; CI snapshot
 > tests (Session 3) assert that the generated stubs match what these files
-> render, so the stale tier model cannot silently reappear.
+> render, so a stale generated stub cannot silently reappear.
 
 ## What is in this bundle
 
-| Template file | Renders to (in the consumer repo) | Both tiers? |
-|---|---|---|
-| [`spec.md.template`](spec.md.template) | `docs/session-sets/<NNN-slug>/spec.md` | yes |
-| [`session-state.json.template`](session-state.json.template) | `docs/session-sets/<NNN-slug>/session-state.json` (schemaVersion 4, `status: not-started`) | yes |
-| [`start-here.md.template`](start-here.md.template) | `docs/dabbler/start-here.md` | yes |
-| [`getting-started.md.template`](getting-started.md.template) | `docs/dabbler/getting-started.md` — the static Getting Started teaching doc (Set 060 D8). **Token-free by design** so the bundled copy can be opened in the editor before any scaffold has run. | yes |
-| [`engine-file.shared-body.md`](engine-file.shared-body.md) | the shared body of all three engine files | yes |
-| [`engine-file.claude-tail.md`](engine-file.claude-tail.md) | the `CLAUDE.md` bootstrap tail | yes |
-| [`engine-file.agents-tail.md`](engine-file.agents-tail.md) | the `AGENTS.md` bootstrap tail | yes |
-| [`engine-file.gemini-tail.md`](engine-file.gemini-tail.md) | the `GEMINI.md` bootstrap tail | yes |
-| [`lessons-learned.md.template`](lessons-learned.md.template) | `docs/planning/lessons-learned.md` — the always-loaded **active** guidance tier with the per-lesson metadata-trailer convention (Set 064 D7) | yes |
-| [`project-guidance.md.template`](project-guidance.md.template) | `docs/planning/project-guidance.md` — Principles/Conventions skeleton, ceiling-aware (Set 064 D7) | yes |
-| [`lessons-archive.md.template`](lessons-archive.md.template) | `docs/planning/lessons-archive.md` — the never-auto-loaded **archive** tier, seeded empty (Set 064 D7) | yes |
-| [`cross-provider-verification.md.template`](cross-provider-verification.md.template) | `docs/dabbler/cross-provider-verification.md` — the engine-facing out-of-band verification instructions (Set 077 S4); also ensure-written idempotently before any Evaluate pointer prompt | yes |
-| [`CODEOWNERS.template`](CODEOWNERS.template) | `.github/CODEOWNERS` — the module-ownership teaching template: worked three-person example + the integration `touches` review rule (Set 087 S3). **Token-free and comment-only** — inert until adapted to `docs/modules.yaml` | yes |
-| [`monorepo-ci.yml.template`](monorepo-ci.yml.template) | `.github/workflows/monorepo-ci.yml` — monorepo CI teaching template: commented path-scoped per-module jobs + the ACTIVE all-module guardrail job on every merge to `main` (its placeholder step succeeds, so the unadapted file never breaks a build) (Set 087 S3). **Token-free** | yes |
-| [`module-plan-set.spec.md.template`](module-plan-set.spec.md.template) | a `kind: plan` module-lifecycle set's `spec.md` (Set 098 S2) — the single source of truth, rendered directly (via `resolveModuleLifecycleTemplatesDir` + `{{TOKEN}}` substitution, no `BootstrapContext`/`TemplateBundle` coupling) by `renderModulePlanSetSpec` in `scaffoldModuleLifecycleSets` (`src/utils/moduleAuthoring.ts`) | full only |
-| [`module-decomposition-set.spec.md.template`](module-decomposition-set.spec.md.template) | a `kind: decomposition` module-lifecycle set's `spec.md` (Set 098 S2), `prerequisites:`-linked to its sibling plan set — same resolver, rendered by `renderModuleDecompositionSetSpec` | full only |
+| Template file | Renders to (in the consumer repo) |
+|---|---|
+| [`spec.md.template`](spec.md.template) | `docs/session-sets/<NNN-slug>/spec.md` |
+| [`session-state.json.template`](session-state.json.template) | `docs/session-sets/<NNN-slug>/session-state.json` (schemaVersion 4, `status: not-started`) |
+| [`start-here.md.template`](start-here.md.template) | `docs/dabbler/start-here.md` |
+| [`getting-started.md.template`](getting-started.md.template) | `docs/dabbler/getting-started.md` — the static Getting Started teaching doc (Set 060 D8). **Token-free by design** so the bundled copy can be opened in the editor before any scaffold has run. |
+| [`engine-file.shared-body.md`](engine-file.shared-body.md) | the shared body of all three engine files |
+| [`engine-file.claude-tail.md`](engine-file.claude-tail.md) | the `CLAUDE.md` bootstrap tail |
+| [`engine-file.agents-tail.md`](engine-file.agents-tail.md) | the `AGENTS.md` bootstrap tail |
+| [`engine-file.gemini-tail.md`](engine-file.gemini-tail.md) | the `GEMINI.md` bootstrap tail |
+| [`lessons-learned.md.template`](lessons-learned.md.template) | `docs/planning/lessons-learned.md` — the always-loaded **active** guidance tier with the per-lesson metadata-trailer convention (Set 064 D7) |
+| [`project-guidance.md.template`](project-guidance.md.template) | `docs/planning/project-guidance.md` — Principles/Conventions skeleton, ceiling-aware (Set 064 D7) |
+| [`lessons-archive.md.template`](lessons-archive.md.template) | `docs/planning/lessons-archive.md` — the never-auto-loaded **archive** tier, seeded empty (Set 064 D7) |
+| [`cross-provider-verification.md.template`](cross-provider-verification.md.template) | `docs/dabbler/cross-provider-verification.md` — the engine-facing advisory-review instructions (Set 077 S4); also ensure-written idempotently before any Evaluate pointer prompt |
+| [`CODEOWNERS.template`](CODEOWNERS.template) | `.github/CODEOWNERS` — the module-ownership teaching template: worked three-person example + the integration `touches` review rule (Set 087 S3). **Token-free and comment-only** — inert until adapted to `docs/modules.yaml` |
+| [`monorepo-ci.yml.template`](monorepo-ci.yml.template) | `.github/workflows/monorepo-ci.yml` — monorepo CI teaching template: commented path-scoped per-module jobs + the ACTIVE all-module guardrail job on every merge to `main` (its placeholder step succeeds, so the unadapted file never breaks a build) (Set 087 S3). **Token-free** |
+| [`module-plan-set.spec.md.template`](module-plan-set.spec.md.template) | a `kind: plan` module-lifecycle set's `spec.md` (Set 098 S2) — the single source of truth, rendered directly (via `resolveModuleLifecycleTemplatesDir` + `{{TOKEN}}` substitution, no `BootstrapContext`/`TemplateBundle` coupling) by `renderModulePlanSetSpec` in `scaffoldModuleLifecycleSets` (`src/utils/moduleAuthoring.ts`) |
+| [`module-decomposition-set.spec.md.template`](module-decomposition-set.spec.md.template) | a `kind: decomposition` module-lifecycle set's `spec.md` (Set 098 S2), `prerequisites:`-linked to its sibling plan set — same resolver, rendered by `renderModuleDecompositionSetSpec` |
 
 The three `docs/planning/` guidance starters are repo-level structure (not
 per-set), so they are written by **both** the full session-set scaffold and the
@@ -42,20 +42,6 @@ Each engine file in the consumer repo is rendered as
 short engine-specific tails. There are no inline, hand-maintained per-engine
 copies of the shared body; that is the D2 anti-drift rule.
 
-## The only tier divergence the writer applies
-
-Per [the tier model SSoT](../../concepts/tier-model.md), the writer's output
-is **identical across tiers except**:
-
-1. **Full** additionally writes `ai_router/router-config.yaml` (and
-   `budget.yaml` if a verification budget was set). **Lightweight** writes
-   neither.
-2. The rendered `spec.md` carries `tier: full` or `tier: lightweight`
-   accordingly.
-
-The `.venv`, the `pip install dabbler-ai-router`, all three engine files,
-`start-here.md`, and the templated `spec.md` are written on **both** tiers.
-
 ## Placeholder tokens
 
 Templates use `{{TOKEN}}` placeholders. The shared template writer substitutes
@@ -69,26 +55,17 @@ snapshot-test failure). Canonical token set:
 | `{{PURPOSE}}` | one-sentence purpose of the set | `Add email + password sign-in.` |
 | `{{SLUG}}` | full `NNN-`-prefixed set slug | `001-user-authentication` |
 | `{{CREATED}}` | ISO date the set was created | `2026-06-09` |
-| `{{TIER}}` | `full` or `lightweight` | `lightweight` |
 | `{{MODULE_LINE}}` | the whole `module:` config line (module-targeted sets only, Set 087 S3) | `module: greeter  # grouping only — …` + newline |
-| `{{VERIFICATION_MODE_LINE}}` | the whole `verificationMode:` config line (Lightweight only) | `verificationMode: out-of-band-or-none  # Lightweight only: …` + newline |
 | `{{TOTAL_SESSIONS}}` | planned session count | `3` |
 
-`{{VERIFICATION_MODE_LINE}}` is a **whole-line** token (Set 082): on
-`lightweight` the writer fills it with the full `verificationMode:` line
-(the context's mode, defaulting to `out-of-band-or-none`, plus its trailing
-newline); on `full` it fills the empty string, so a Full-tier spec **omits
-the field entirely** — the field is Lightweight-only and omission means the
-documented default. The token sits flush against the next template line, so
-the Full render leaves no blank-line residue. See
-[`docs/spec-md-schema.md`](../../spec-md-schema.md).
-
-`{{MODULE_LINE}}` follows the same whole-line pattern (Set 087 S3): when the
+`{{MODULE_LINE}}` is a **whole-line** token (Set 087 S3): when the
 context carries a module slug (a module-targeted decomposition) the writer
 fills the full `module: <slug>` line + newline; otherwise the empty string,
-so a repo with no module manifest renders byte-identical pre-087 output.
-`module` is a grouping attribute only — session-set names stay globally
-unique across all modules.
+so a repo with no module manifest renders byte-identical pre-087 output (the
+token sits flush against the next template line, leaving no blank-line
+residue). `module` is a grouping attribute only — session-set names stay
+globally unique across all modules. See
+[`docs/spec-md-schema.md`](../../spec-md-schema.md).
 
 ## Repeated session blocks (how `{{TOTAL_SESSIONS}}` is honored)
 
@@ -113,20 +90,13 @@ contract, so the templates cannot silently drift from a fixed count.
 
 ## Rules for editing these templates
 
-- **Never restate the tier *model* (what the tiers mean).** You may describe
-  strictly *local operational deltas* — what this writer concretely does on
-  each tier (e.g., "Full writes router config; Lightweight doesn't") — but the
-  meaning of the tiers is defined once, in
-  [`docs/concepts/tier-model.md`](../../concepts/tier-model.md). Rendered
-  consumer artifacts link there too (via a GitHub blob URL, since a fresh
-  consumer repo does not have this repo's `docs/` tree checked in).
-- **Never emit `schemaVersion: 2`, a bare (un-prefixed) slug, a spec missing
-  `tier`, or a Lightweight spec missing `verificationMode`.** Those are the
-  exact `sessionGenPrompt` drift instances Set 058 removed. (Full-tier specs
-  legitimately omit `verificationMode` — Set 082 — so its presence is a
-  Lightweight-only requirement.)
-<!-- drift-guard:allow-begin (documents the banned-phrase catalogue; see drift_guard.py) -->
-- **Keep the banned Lightweight framing out** (`no Python` / `no venv` /
-  `docs-only`). The CI drift guard (Session 3) fails the build if it
-  reappears in any doc, these templates included.
-<!-- drift-guard:allow-end -->
+- **Never restate a concept these templates only *use*.** Canonical
+  definitions live once, in this repo's `docs/`; rendered consumer artifacts
+  link there via a GitHub blob URL (a fresh consumer repo does not have this
+  repo's `docs/` tree checked in).
+- **Never emit `schemaVersion: 2` or a bare (un-prefixed) slug.** Those are
+  the exact `sessionGenPrompt` drift instances Set 058 removed.
+- **Never re-introduce a `tier:` or `verificationMode:` field.** Set 112
+  deleted the Lightweight tier; a spec declaring `tier: lightweight` is
+  refused by the router's loader, and a template that re-seeds either field
+  would hand every new consumer repo a spec that cannot run.

@@ -47,8 +47,6 @@ function fakeSet(
       requiresUAT: false,
       requiresE2E: false,
       uatScope: "none",
-      tier: "full",
-      verificationMode: "out-of-band-or-none",
       module: null,
     },
     uatSummary: null,
@@ -59,11 +57,6 @@ function fakeSet(
     prerequisites: null,
     blockedByPrereqs: false,
     unsatisfiedPrereqs: [],
-    plusFraction: false,
-    externalVerificationNoteExists: false,
-    completedVerification: null,
-    verificationMarker: "",
-    workspaceTierMarker: null,
     ...over,
   };
 }
@@ -75,7 +68,7 @@ function ids(set: SessionSet, supports: ActionSupports): string[] {
 }
 
 suite("ActionRegistry", () => {
-  test("ROW_ACTIONS exposes the 20 menu-surface actions (Set 048 S3 reshape + Set 049 S1 hygiene + Set 049 S4 rip-out + Set 061 S2 prereq spec + Set 061 S3 switch tier + Set 062 S2 verification affordance)", () => {
+  test("ROW_ACTIONS exposes the 16 menu-surface actions (Set 048 S3 reshape + Set 049 S1 hygiene + Set 049 S4 rip-out + Set 061 S2 prereq spec)", () => {
     // Set 048 S3 reshape:
     //   - L3 removed `dabblerSessionSets.openAiAssignment`.
     //   - L2 narrowed the Open File submenu to exactly 4 entries
@@ -104,18 +97,6 @@ suite("ActionRegistry", () => {
     //   - dabblerSessionSets.openPrerequisiteSpec — flat companion to
     //     the blocked marker, gated to non-terminal rows with at least
     //     one unsatisfied prerequisite.
-    // Set 061 S3 (spec D4):
-    //   - dabblerSessionSets.switchTier — rewrites the spec's `tier:`
-    //     value; gated to not-started rows only (mid-set switching is
-    //     deliberately unsupported).
-    // Set 062 S2 (spec D2/D3 + step 4):
-    //   - dabbler.copyVerificationKickoffPrompt — agent handoff into
-    //     the dedicated-verification flow; Lightweight Mode-B rows with
-    //     no completed verification session, cancelled excluded.
-    //   - dabblerSessionSets.setupVerification — verification-mode seed
-    //     rewrite; not-started Lightweight rows only at this session.
-    //   - dabbler.openExternalVerificationDoc — the sanctioned
-    //     out-of-band recording path, surfaced exactly on `v?` rows.
     const expected = new Set([
       "dabblerSessionSets.openSpec",
       "dabblerSessionSets.openActivityLog",
@@ -129,10 +110,6 @@ suite("ActionRegistry", () => {
       "dabblerSessionSets.copySlug",
       "dabbler.openOrchestratorWriterLog",
       "dabblerSessionSets.openPrerequisiteSpec",
-      "dabblerSessionSets.switchTier",
-      "dabbler.copyVerificationKickoffPrompt",
-      "dabblerSessionSets.setupVerification",
-      "dabbler.openExternalVerificationDoc",
       "dabblerSessionSets.migrate",
       "dabblerSessionSets.migrateToV4",
       "dabblerSessionSets.cancel",
@@ -140,7 +117,7 @@ suite("ActionRegistry", () => {
     ]);
     const got = new Set(ROW_ACTIONS.map((a) => a.id));
     assert.deepStrictEqual(got, expected);
-    assert.strictEqual(ROW_ACTIONS.length, 20);
+    assert.strictEqual(ROW_ACTIONS.length, 16);
   });
 
   test("openAiAssignment fully removed (L3)", () => {
@@ -353,8 +330,6 @@ suite("ActionRegistry", () => {
           requiresUAT: true,
           requiresE2E: true,
           uatScope: "",
-          tier: "full",
-          verificationMode: "out-of-band-or-none",
           module: null,
         },
         sessionsCompleted: 2,
@@ -408,41 +383,6 @@ suite("ActionRegistry", () => {
     }
   });
 
-  test("switchTier appears only on not-started rows (Set 061 S3, spec D4)", () => {
-    assert.ok(
-      ids(fakeSet("not-started"), ALL_SUPPORTED).includes("dabblerSessionSets.switchTier"),
-      "switchTier missing for state=not-started",
-    );
-    for (const st of ["in-progress", "complete", "cancelled"] as SessionState[]) {
-      assert.ok(
-        !ids(fakeSet(st), ALL_SUPPORTED).includes("dabblerSessionSets.switchTier"),
-        `switchTier leaked onto state=${st} — mid-set / terminal switching is deliberately unsupported`,
-      );
-    }
-    // The gate is state-only: tier, prereqs, and migration flags must
-    // not affect applicability on a not-started row.
-    const lightweightBlocked = fakeSet("not-started", {
-      config: {
-        requiresUAT: false,
-        requiresE2E: false,
-        uatScope: "none",
-        tier: "lightweight",
-        verificationMode: "dedicated-sessions",
-        module: null,
-      },
-      blockedByPrereqs: true,
-      unsatisfiedPrereqs: [
-        { slug: "044-prereq", condition: "complete" as const, targetState: "in-progress" as const },
-      ],
-      needsMigration: true,
-      migrationTargetSchemaVersion: 4,
-    });
-    assert.ok(
-      ids(lightweightBlocked, ALL_SUPPORTED).includes("dabblerSessionSets.switchTier"),
-      "switchTier should surface on any not-started row regardless of tier/prereq/migration state",
-    );
-  });
-
   test("categorizedActions on a complete set surfaces set-accomplishments and NOT start-next", () => {
     const cats = categorizedActions(
       fakeSet("complete", { sessionsCompleted: 5 }),
@@ -456,157 +396,4 @@ suite("ActionRegistry", () => {
       "start-next-parallel-session must not surface on complete (terminal) state");
   });
 
-  // ----- Set 062 S2: verification-affordance entries -----
-
-  const lwConfig = (verificationMode: "out-of-band-or-none" | "dedicated-sessions") => ({
-    requiresUAT: false as const,
-    requiresE2E: false as const,
-    uatScope: "none",
-    tier: "lightweight" as const,
-    verificationMode,
-    module: null,
-  });
-
-  test("copyVerificationKickoffPrompt — Lightweight Mode-B rows with no completed verification, cancelled excluded (spec D2)", () => {
-    // Eligible across every non-terminal-cancelled state.
-    for (const st of ["not-started", "in-progress", "complete"] as SessionState[]) {
-      assert.ok(
-        ids(fakeSet(st, { config: lwConfig("dedicated-sessions") }), ALL_SUPPORTED)
-          .includes("dabbler.copyVerificationKickoffPrompt"),
-        `kickoff missing for LW Mode-B state=${st}`,
-      );
-    }
-    assert.ok(
-      !ids(fakeSet("cancelled", { config: lwConfig("dedicated-sessions") }), ALL_SUPPORTED)
-        .includes("dabbler.copyVerificationKickoffPrompt"),
-      "kickoff leaked onto a cancelled row — verification on an abandoned set is not actionable",
-    );
-    // A completed verification session retires the handoff.
-    assert.ok(
-      !ids(
-        fakeSet("in-progress", {
-          config: lwConfig("dedicated-sessions"),
-          completedVerification: { sessionNumber: 4, verdict: "VERIFIED" },
-        }),
-        ALL_SUPPORTED,
-      ).includes("dabbler.copyVerificationKickoffPrompt"),
-      "kickoff must drop once a verification session completed",
-    );
-    // Mode A and Full tier never offer it.
-    assert.ok(
-      !ids(fakeSet("complete", { config: lwConfig("out-of-band-or-none") }), ALL_SUPPORTED)
-        .includes("dabbler.copyVerificationKickoffPrompt"),
-      "kickoff leaked onto Mode A",
-    );
-    assert.ok(
-      !ids(fakeSet("in-progress"), ALL_SUPPORTED)
-        .includes("dabbler.copyVerificationKickoffPrompt"),
-      "kickoff leaked onto a Full-tier row",
-    );
-    // It lives in the Copy Prompt submenu.
-    const cats = categorizedActions(
-      fakeSet("in-progress", { config: lwConfig("dedicated-sessions") }),
-      ALL_SUPPORTED,
-    );
-    assert.ok(
-      cats.copyEval.some((a) => a.id === "dabbler.copyVerificationKickoffPrompt"),
-      "kickoff must categorize under copyEval (Copy Prompt submenu)",
-    );
-  });
-
-  test("setupVerification — not-started (both modes) + complete Mode-A Lightweight rows (spec D3, S3 widening)", () => {
-    // Both modes are eligible on a not-started Lightweight row (the
-    // QuickPick offers both directions while no durable record exists).
-    for (const mode of ["out-of-band-or-none", "dedicated-sessions"] as const) {
-      assert.ok(
-        ids(fakeSet("not-started", { config: lwConfig(mode) }), ALL_SUPPORTED)
-          .includes("dabblerSessionSets.setupVerification"),
-        `setupVerification missing for not-started LW mode=${mode}`,
-      );
-    }
-    // Session 3: complete Mode-A rows go through the blessed writer —
-    // the realistic "work done, now verify it" entry point.
-    assert.ok(
-      ids(
-        fakeSet("complete", { config: lwConfig("out-of-band-or-none") }),
-        ALL_SUPPORTED,
-      ).includes("dabblerSessionSets.setupVerification"),
-      "setupVerification missing on a complete Mode-A LW row (the S3 blessed-writer path)",
-    );
-    // Complete Mode-B rows have nothing to set up — the kickoff prompt
-    // is their affordance (and B->A is never offered).
-    assert.ok(
-      !ids(
-        fakeSet("complete", { config: lwConfig("dedicated-sessions") }),
-        ALL_SUPPORTED,
-      ).includes("dabblerSessionSets.setupVerification"),
-      "setupVerification leaked onto a complete Mode-B row — B->A is never offered",
-    );
-    // In-flight rows are excluded deliberately (contention with a
-    // running session); cancelled rows are terminal.
-    for (const st of ["in-progress", "cancelled"] as SessionState[]) {
-      assert.ok(
-        !ids(fakeSet(st, { config: lwConfig("out-of-band-or-none") }), ALL_SUPPORTED)
-          .includes("dabblerSessionSets.setupVerification"),
-        `setupVerification leaked onto state=${st}`,
-      );
-    }
-    // Full tier never offers it (verificationMode is inert on Full).
-    for (const st of ["not-started", "complete"] as SessionState[]) {
-      assert.ok(
-        !ids(fakeSet(st), ALL_SUPPORTED)
-          .includes("dabblerSessionSets.setupVerification"),
-        `setupVerification leaked onto a Full-tier ${st} row`,
-      );
-    }
-  });
-
-  test("openExternalVerificationDoc — surfaced exactly on v? rows (spec step 4)", () => {
-    assert.ok(
-      ids(
-        fakeSet("complete", {
-          config: lwConfig("out-of-band-or-none"),
-          verificationMarker: "v?",
-        }),
-        ALL_SUPPORTED,
-      ).includes("dabbler.openExternalVerificationDoc"),
-      "external-note action missing on a v? row",
-    );
-    // The derived marker already encodes every suppression rule, so
-    // non-v? glyphs hide the action: v+ rows, markerless rows.
-    assert.ok(
-      !ids(
-        fakeSet("in-progress", {
-          config: lwConfig("dedicated-sessions"),
-          verificationMarker: "v+",
-        }),
-        ALL_SUPPORTED,
-      ).includes("dabbler.openExternalVerificationDoc"),
-      "external-note action leaked onto a v+ (Mode-B) row",
-    );
-    assert.ok(
-      !ids(
-        fakeSet("complete", {
-          config: lwConfig("out-of-band-or-none"),
-          externalVerificationNoteExists: true,
-          verificationMarker: "",
-        }),
-        ALL_SUPPORTED,
-      ).includes("dabbler.openExternalVerificationDoc"),
-      "external-note action should disappear once the note exists (marker cleared)",
-    );
-    assert.ok(
-      !ids(fakeSet("complete"), ALL_SUPPORTED).includes("dabbler.openExternalVerificationDoc"),
-      "external-note action leaked onto a Full-tier row",
-    );
-  });
-
-  test("openExternalVerificationDoc entry carries the marker-clearing detail copy (spec step 4)", () => {
-    const entry = ROW_ACTIONS.find((a) => a.id === "dabbler.openExternalVerificationDoc");
-    assert.ok(entry, "entry must exist");
-    assert.ok(
-      entry!.detail && /clears the v\? marker/.test(entry!.detail),
-      `detail must name the marker-clearing consequence; got: ${entry!.detail}`,
-    );
-  });
 });

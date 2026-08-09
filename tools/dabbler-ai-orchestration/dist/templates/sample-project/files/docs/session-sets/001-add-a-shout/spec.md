@@ -1,17 +1,17 @@
 # Add a shout
 
-> **Tier:** lightweight — no AI provider keys, no metered spend. The AI agent
-> the developer already has open does the work.
+> **Zero-budget project** — no AI provider keys, no metered spend. The AI
+> agent the developer already has open does the work, and
+> `ai_router/budget.yaml` declares that honestly (`threshold_usd: 0`,
+> `verification_method: "skipped"`).
 
 ---
 
 ## Session Set Configuration
 
 ```yaml
-tier: lightweight
 requiresUAT: false
 requiresE2E: false
-verificationMode: out-of-band-or-none
 ```
 
 ---

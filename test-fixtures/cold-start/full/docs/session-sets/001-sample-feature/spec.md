@@ -3,7 +3,7 @@
 > **Purpose:** A representative consumer set used by the cold-start fixtures.
 > **Session Set:** `docs/session-sets/001-sample-feature/`
 > **Created:** 2026-06-09
-> **Workflow:** full
+> **Workflow:** Orchestrator -> AI Router -> Cross-provider verification
 > **Prerequisite:** None
 
 ---
@@ -11,7 +11,6 @@
 ## Session Set Configuration
 
 ```yaml
-tier: full                         # full | lightweight — see the tier model SSoT (link below)
 requiresUAT: false                     # true | false | "suggested"
 requiresE2E: false                     # true | false | "suggested"
 uatScope: none                         # none | per-session | per-set (only when requiresUAT)
@@ -22,10 +21,6 @@ totalSessions: 3
 #     condition: complete
 ```
 
-> **Tier:** `full` | `lightweight` is the single switch. The model is defined
-> once, in the SSoT — do not restate it here:
-> <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
->
 > Rationale: <one or two sentences on why these flags are set this way>.
 
 ---

@@ -55,7 +55,7 @@ consults it only when the recorded `pathAwareCritique` policy is
 ## The policy attribute it backs
 
 `pathAwareCritique` is a **tier-orthogonal** per-set policy attribute —
-valid on both Full and Lightweight tiers — declared in `spec.md`'s Session
+declared in `spec.md`'s Session
 Set Configuration block and recorded once at set start (immutable
 thereafter), exactly mirroring the `verificationMode` attribute:
 

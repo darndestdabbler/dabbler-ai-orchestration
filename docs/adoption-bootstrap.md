@@ -34,7 +34,7 @@ hand-create `ai_router/router-config.yaml` and `ai_router/budget.yaml`.
 
 - **`budget.yaml` contract** (the schema this doc used to define):
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/budget-yaml-schema.md>
-- **Tier model (Full vs. Lightweight):**
+- **Tier model (retired — historical note):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
 - **Session workflow (execution mechanics):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/ai-led-session-workflow.md>

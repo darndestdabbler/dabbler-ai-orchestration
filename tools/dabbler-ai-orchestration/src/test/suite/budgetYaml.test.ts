@@ -238,7 +238,7 @@ suite("writeBudgetYaml — write discipline", () => {
   });
 });
 
-// ---------- scaffold integration: tier gate + outcome reporting ----------
+// ---------- scaffold integration: budget outcome reporting ----------
 
 function canonicalBundleDir(): string {
   const extRoot = path.resolve(__dirname, "../../..");
@@ -254,11 +254,11 @@ function canonicalBundleDir(): string {
 const bundle: TemplateBundle = loadTemplateBundle(canonicalBundleDir());
 
 suite("scaffoldConsumerRepo — budget write (Set 063 S2, spec D1)", () => {
-  test("Full tier with a budget writes budget.yaml at scaffold time", async () => {
+  test("with a budget writes budget.yaml at scaffold time", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
-      ctx: structureOnlyContext("repo", "full", "2026-06-12"),
+      ctx: structureOnlyContext("repo", "2026-06-12"),
       bundle,
       fileOps: ops,
       structureOnly: true,
@@ -272,27 +272,11 @@ suite("scaffoldConsumerRepo — budget write (Set 063 S2, spec D1)", () => {
     assert.strictEqual(doc.mode, "middle-tier");
   });
 
-  test("Lightweight NEVER writes budget.yaml, even when a budget rider arrives", async () => {
+  test("without a budget writes nothing (palette path)", async () => {
     const { ops, store } = memFileOps();
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
-      ctx: structureOnlyContext("repo", "lightweight", "2026-06-12"),
-      bundle,
-      fileOps: ops,
-      structureOnly: true,
-      budget: { thresholdUsd: 25 },
-      now: FIXED_NOW,
-      installRouter: async () => ({ ok: true, message: "installed" }),
-    });
-    assert.strictEqual(result.budgetOutcome, null);
-    assert.ok(!store.has(budgetPath), "Lightweight must not write budget.yaml");
-  });
-
-  test("Full tier without a budget writes nothing (palette path)", async () => {
-    const { ops, store } = memFileOps();
-    const result = await scaffoldConsumerRepo({
-      projectDir: PROJECT,
-      ctx: structureOnlyContext("repo", "full", "2026-06-12"),
+      ctx: structureOnlyContext("repo", "2026-06-12"),
       bundle,
       fileOps: ops,
       structureOnly: true,
@@ -306,7 +290,7 @@ suite("scaffoldConsumerRepo — budget write (Set 063 S2, spec D1)", () => {
     const { ops, store } = memFileOps({ [budgetPath]: "threshold_usd: 99\n" });
     const result = await scaffoldConsumerRepo({
       projectDir: PROJECT,
-      ctx: structureOnlyContext("repo", "full", "2026-06-12"),
+      ctx: structureOnlyContext("repo", "2026-06-12"),
       bundle,
       fileOps: ops,
       structureOnly: true,

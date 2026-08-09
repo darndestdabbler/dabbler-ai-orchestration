@@ -190,7 +190,6 @@ suite("sampleProject — the canonical bundle (proposal v3 §6)", () => {
   test("loads with the metadata three consumers pin", () => {
     assert.strictEqual(typeof realBundle.meta.bundleVersion, "number");
     assert.strictEqual(realBundle.meta.sampleSetSlug, "001-add-a-shout");
-    assert.strictEqual(realBundle.meta.tier, "lightweight");
     assert.strictEqual(realBundle.meta.programEntryPoint, "main.py");
     assert.deepStrictEqual(realBundle.meta.expectedProgramOutput, [
       "Hello, world!",
@@ -377,9 +376,9 @@ suite("sampleProject — the canonical bundle (proposal v3 §6)", () => {
     );
   });
 
-  test("the sample's task set is Lightweight and not-started", () => {
+  test("the sample's task set is not-started", () => {
     const spec = realBundle.files["docs/session-sets/001-add-a-shout/spec.md"];
-    assert.ok(/tier:\s*lightweight/.test(spec));
+    assert.ok(!/^tier:/m.test(spec));
     const state = JSON.parse(
       realBundle.files["docs/session-sets/001-add-a-shout/session-state.json"],
     );
@@ -617,34 +616,6 @@ suite("sampleProject — the happy path (steps 2-5)", () => {
     assert.ok(/enabled_at: 2026-07-30T00:00:00\.000Z/.test(body));
     // ASCII-only: this file is read on a Windows cp1252 console.
     assert.ok(/^[\x20-\x7e\n]*$/.test(renderLocalOnlyMarker("x")));
-  });
-
-  test("the Lightweight divergence: the seeded router config does not survive", async () => {
-    // The PyPI install seeds ai_router/router-config.yaml as package data.
-    // The sample is Lightweight -- router OFF -- so a project whose whole
-    // promise is that it is tiny must not ship a routing-configuration
-    // directory. Same rule the Getting Started scaffold already applies.
-    const mem = makeMemFs();
-    const result = await createSampleProject(
-      baseDeps(mem, makeGitSpy(), async () => {
-        mem.ops.writeFile(
-          path.join(TARGET, "ai_router", "router-config.yaml"),
-          "models: {}\n",
-        );
-        return {
-          ok: true,
-          message: "Installed dabbler-ai-router.",
-          venvPath: path.join(TARGET, ".venv"),
-        };
-      }),
-    );
-    assert.strictEqual(result.ok, true);
-    assert.ok(
-      !mem.exists(path.join(TARGET, "ai_router")),
-      "a Lightweight sample must not carry a seeded router config",
-    );
-    // The sample itself is untouched.
-    assert.ok(mem.exists(path.join(TARGET, "main.py")));
   });
 
   test("a missing git stops at step 3 without pretending to continue", async () => {

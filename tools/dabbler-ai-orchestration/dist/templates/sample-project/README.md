@@ -9,7 +9,7 @@ never disagree:
 2. **The tutorial** — `docs/tutorials/hello-world.md` quotes this sample's file
    paths, test counts, and program output. (Authored in Set 107 Session 2.)
 3. **The smoke test** — `src/test/suite/sampleProjectSmoke.test.ts` renders the
-   bundle, runs the Lightweight lifecycle, runs the sample's tests, and asserts
+   bundle, runs the zero-budget lifecycle, runs the sample's tests, and asserts
    the program output.
 
 **Do not** point any of them at a cold-start or UAT fixture instead. Those are

@@ -10,16 +10,7 @@ import {
   RowPayload,
 } from "../types/sessionSetsWebviewProtocol";
 import { listInProgressSets } from "./inProgressSetsService";
-import {
-  PLUS_FRACTION_TOOLTIP,
-  TIER_MISMATCH_MARKER,
-  isRecognizedVerdictToken,
-  tierMarkerFor,
-  tierMismatch,
-  tierMismatchTooltipFor,
-  tierTooltipFor,
-  verificationMarkerTooltipFor,
-} from "../utils/tierLegibility";
+import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 
 // Set 029 Session 3: data-layer extraction from SessionSetsProvider so
 // both the existing native `TreeView` (S3 ship) and the future custom
@@ -60,67 +51,18 @@ export function hasSubCurrentSets(allSets: SessionSet[]): boolean {
   return allSets.some((s) => s.needsMigration);
 }
 
-// Set 061 Session 1 (spec D2): the quiet per-row "lw" tier marker.
-// Same shape as migrationMarker/migrationTooltip above — pure
-// functions of the SessionSet so the renderer and tests share one
-// source. Full rows get no marker (Full is the default and the
-// majority; marking the exception keeps rows quiet).
-//
-// Set 077 Session 2 (Feature 1): the same slot carries the
-// tier-mismatch advisory ("t!") when the workspace's durable
-// `.dabbler/tier` marker disagrees with the set's declared tier on a
-// non-terminal row. Two ways to get there: a manual spec edit (drift —
-// the advisory's target) or a sanctioned per-set tier override (the
-// decomposition prompt allows a plan to pick a different tier for a
-// specific set). The marker slot stays quiet-styled and the tooltip
-// names both readings, closing with "if intentional, no action is
-// needed" — an advisory, never a nag.
-export function tierMarker(set: SessionSet): string {
-  const specTier = set.config?.tier ?? "full";
-  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
-    return TIER_MISMATCH_MARKER;
-  }
-  return tierMarkerFor(specTier);
-}
-
-export function tierTooltip(set: SessionSet): string {
-  const specTier = set.config?.tier ?? "full";
-  if (tierMismatch(specTier, set.workspaceTierMarker, set.state)) {
-    // Narrowed non-null by the predicate above.
-    return tierMismatchTooltipFor(specTier, set.workspaceTierMarker as NonNullable<typeof set.workspaceTierMarker>);
-  }
-  return tierTooltipFor(specTier);
-}
-
-// Set 061 Session 1 (spec D1): hover text for the `N/M+` fraction.
-// Non-empty only when the row's fraction carries the `+` suffix.
-export function fractionTooltip(set: SessionSet): string {
-  return set.plusFraction ? PLUS_FRACTION_TOOLTIP : "";
-}
-
-// Set 062 Session 1 (spec D1): the quiet verification-posture marker
-// (`v?` / `v+`) + tooltip. Same shape as migrationMarker/tierMarker —
-// pure functions of the SessionSet so the renderer and tests share one
-// source. The glyph itself is derived at scan time in fileSystem.ts
-// (it needs the ledger, which the SessionSet record does not carry).
-export function verificationMarker(set: SessionSet): string {
-  return set.verificationMarker ?? "";
-}
-
-export function verificationTooltip(set: SessionSet): string {
-  return verificationMarkerTooltipFor(set.verificationMarker ?? "");
-}
-
 // Set 062 Session 1 (spec D1): fraction-tooltip enrichment on verified
-// rows. A completed `type: "verification"` session suppresses the
-// marker (quiet is success); the persisted verdict surfaces here
-// instead, on the fraction the typed session grew. Empty when no
-// completed verification session exists or its verdict was never
-// persisted.
+// rows — the persisted verdict surfaces on the row's fraction. Empty
+// when the set carries no recorded verdict.
+//
+// Set 112 S2: the input is now the set's own live verdict record. The
+// old source was the last completed `type: "verification"` session in
+// the ledger — a typed session only the Lightweight tier's Mode B ever
+// appended — so with the tier gone the enrichment reads the same field
+// every other verdict surface reads.
 export function verdictFractionTooltip(set: SessionSet): string {
-  const cv = set.completedVerification;
-  if (!cv || !cv.verdict) return "";
-  const suffix = cv.sessionNumber != null ? ` (session ${cv.sessionNumber})` : "";
+  const verdict = set.liveSession?.verificationVerdict;
+  if (typeof verdict !== "string" || verdict.trim() === "") return "";
   // Set 086 S2 guardrail: a persisted verdict the reader does not recognize —
   // e.g. the confabulated `manual-override-development` the Set-086 root-cause
   // incident wrote — must NEVER render as if it were a clean verdict. Flag it
@@ -128,10 +70,10 @@ export function verdictFractionTooltip(set: SessionSet): string {
   // non-verdict into a legitimate-looking status. (The blessed writer now
   // rejects such tokens outright; this reader guards data that predates the
   // writer enforcement or was hand-authored around it.)
-  if (!isRecognizedVerdictToken(cv.verdict)) {
-    return `Verification: "${cv.verdict}" is not a recognized verdict${suffix}`;
+  if (!isRecognizedVerdictToken(verdict)) {
+    return `Verification: "${verdict}" is not a recognized verdict`;
   }
-  return `Verification: ${cv.verdict}${suffix}`;
+  return `Verification: ${verdict}`;
 }
 
 export const ICON_FILES: Record<SessionState, string> = {
@@ -173,14 +115,8 @@ export function progressText(set: SessionSet): string {
   //     really reached terminal state" cue.
   //   * `0/N · session 1 in flight` on rows where session N has
   //     started but not yet closed.
-  // Set 077 Session 5 (S1 bundle B): the `+` suffix mirrors
-  // `fractionFor` in CustomSessionSetsView — a Lightweight
-  // dedicated-sessions set whose typed sessions are still pending
-  // renders `N/M+` on BOTH fraction surfaces, so this text no longer
-  // contradicts the row's fraction column.
-  const plus = set.plusFraction ? "+" : "";
   const base = set.totalSessions && set.totalSessions > 0
-    ? `${set.sessionsCompleted}/${set.totalSessions}${plus}`
+    ? `${set.sessionsCompleted}/${set.totalSessions}`
     : set.sessionsCompleted > 0
       ? `${set.sessionsCompleted} complete`
       : "";
@@ -194,27 +130,6 @@ export function progressText(set: SessionSet): string {
     return base ? `${base} · ${annotation}` : annotation;
   }
   return base;
-}
-
-// Set 077 Session 5 (Feature 5, A9): the owed-state WORDS for the row
-// description — the derived workflow state said out loud instead of
-// compressed into the `v+` glyph (which drops after the first completed
-// verification round, exactly when "remediation owed" matters most).
-// Pure function of the derived state; empty everywhere the ladder is
-// quiet. `awaiting-human` deliberately stays out of this surface: it
-// has no auto-routable next prompt (a human decides), and its signal
-// remains the marker/tooltip channel.
-export function verificationOwedText(set: SessionSet): string {
-  // Terminal-row suppression (the same rule every Set 061/062 marker
-  // follows): a cancelled set's owed verification is not actionable —
-  // and "cancelled" is non-terminal to the derivation ladder (only
-  // "complete" is), so without this guard an abandoned Mode-B set
-  // would nag "verification owed" forever. (S5 code-review
-  // adjudication catch.)
-  if (set.state === "cancelled") return "";
-  if (set.workflowState === "awaiting-verification") return "verification owed";
-  if (set.workflowState === "awaiting-remediation") return "remediation owed";
-  return "";
 }
 
 export function touchedDate(set: SessionSet): string {

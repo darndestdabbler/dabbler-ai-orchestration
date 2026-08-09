@@ -8,15 +8,6 @@ import { readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./progress";
 import {
-  LedgerSessionLike,
-  completedVerificationInfo,
-  deriveWorkflowState,
-  durableVerificationModeFrom,
-  shouldRenderPlusFraction,
-  verificationMarkerFor,
-} from "./tierLegibility";
-import { readTierMarker } from "./tierMarkerStore";
-import {
   DuplicateNameCollision,
   ModuleManifestEntry,
   SessionRecord,
@@ -29,7 +20,6 @@ import {
   UnsatisfiedPrerequisite,
   UatSummary,
   LiveSession,
-  WorkflowState,
 } from "../types";
 
 export const SESSION_SETS_REL = path.join("docs", "session-sets");
@@ -451,14 +441,8 @@ export function normalizeLedgerSessions(raw: unknown): SessionRecord[] {
 }
 
 export function parseSessionSetConfig(specPath: string): SessionSetConfig {
-  // Set 048 Session 2: defaults are full-tier-conservative — `tier: "full"`,
-  // `requiresUAT: false`, `requiresE2E: false`. Pre-Set-048 specs without
-  // explicit `tier:` resolve to `"full"` so existing 47 sets continue to
-  // run under canonical Full-tier discipline.
-  // Set 061 Session 1: `verificationMode` joins the parsed fields —
-  // the Set 057 per-set verification choice's spec-config seed.
-  // Absent defaults to `"out-of-band-or-none"` (the strictly-opt-in
-  // Set 057 contract).
+  // Set 048 Session 2: defaults are conservative — `requiresUAT: false`,
+  // `requiresE2E: false`.
   // Set 087 Session 1: `module` joins the parsed fields — the raw
   // declared grouping slug, validated against docs/modules.yaml by the
   // caller (readSessionSets), never here (the parser has no root
@@ -466,12 +450,15 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   // Set 098 Session 1: `kind` joins the parsed fields — the raw
   // declared lifecycle-set identity, validated by the caller the same
   // way. Absent stays undefined (an ordinary work set).
+  // Set 112 S2: `tier` and `verificationMode` are gone with the
+  // Lightweight tier. A spec that still declares `tier: lightweight` is
+  // refused by the router's loader (ai_router/spec_config.py); the
+  // Explorer is a READER, so it neither honors nor flags the dead field
+  // — the routed CLIs are the boundary that fails loud.
   const config: SessionSetConfig = {
     requiresUAT: false,
     requiresE2E: false,
     uatScope: "none",
-    tier: "full",
-    verificationMode: "out-of-band-or-none",
     module: null,
   };
   if (!fs.existsSync(specPath)) return config;
@@ -495,8 +482,6 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   // Set 061 S1 (verifier fix S061-S1-V1-001): accept optional single or
   // double quotes around scalar enum values — YAML allows either, and
   // the tri-state parser above already accepts quoted "suggested".
-  // Without this, tier: "lightweight" / verificationMode:
-  // "dedicated-sessions" silently fell back to their defaults.
   const stringRe = (key: string) =>
     new RegExp(
       `^\\s*${key}\\s*:\\s*(?:"([\\w-]+)"|'([\\w-]+)'|([\\w-]+))\\s*(?:#.*)?$`,
@@ -519,21 +504,6 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
   if (e2e !== null) config.requiresE2E = e2e;
   const scope = stringValue(block.match(stringRe("uatScope")));
   if (scope) config.uatScope = scope;
-  const tier = stringValue(block.match(stringRe("tier")));
-  if (tier) {
-    const v = tier.toLowerCase();
-    if (v === "full" || v === "lightweight") config.tier = v;
-    // Unknown tier values silently fall back to "full" — schema validator
-    // (separate from this parser) is responsible for surfacing the typo.
-  }
-  const vm = stringValue(block.match(stringRe("verificationMode")));
-  if (vm) {
-    const v = vm.toLowerCase();
-    if (v === "out-of-band-or-none" || v === "dedicated-sessions") {
-      config.verificationMode = v;
-    }
-    // Unknown values fall back to the default, same posture as `tier`.
-  }
   const mod = stringValue(block.match(stringRe("module")));
   if (mod) config.module = mod;
   // Set 098 Session 1: `kind` joins the parsed fields — the optional
@@ -874,11 +844,6 @@ export function readSessionSets(root: string): SessionSet[] {
   if (!fs.existsSync(sessionSetsDir)) return [];
   const entries = fs.readdirSync(sessionSetsDir, { withFileTypes: true });
   const sets: SessionSet[] = [];
-  // Set 077 Session 2 (Feature 1): the workspace's durable tier-choice
-  // marker, read ONCE per root and carried on every set so the renderer
-  // can surface the tier-mismatch advisory. Tolerant reader — missing /
-  // unreadable / unknown values read as null (no advisory).
-  const workspaceTierMarker = readTierMarker(root);
   // Set 087 Session 1: the module manifest, read ONCE per root. Null =
   // no manifest → every set lands in the single implicit module.
   const modulesManifest = readModulesManifest(root);
@@ -1200,18 +1165,6 @@ export function readSessionSets(root: string): SessionSet[] {
     }
 
     const config = parseSessionSetConfig(specPath);
-    // Set 077 Session 5 (A7): the durable activity-log record outranks
-    // the spec-config seed. Python's `read_verification_mode` (which
-    // the Q6 close gate and the S4 gate stand-down key off) has always
-    // preferred the record; the Explorer read only the seed, so a
-    // blessed A→B transition whose seed-alignment failed left the
-    // kickoff/setup actions and the `v?`/`v+`/`N/M+` markers
-    // contradicting the gate. With the record applied here, every
-    // downstream consumer of `config.verificationMode` (ActionRegistry
-    // gates, tierLegibility predicates, the workflow-state derivation
-    // below) reads the same effective mode the gate does (critique M5).
-    const durableMode = durableVerificationModeFrom(activityLogParsed);
-    if (durableMode !== null) config.verificationMode = durableMode;
     // Set 087 Session 1: validate the spec's declared `module:` against
     // the manifest. Only a manifest-known slug attributes the set; an
     // unknown slug (typo, module removed, manifest absent) reads as the
@@ -1254,7 +1207,7 @@ export function readSessionSets(root: string): SessionSet[] {
     // ordinary work set — a typo must never block or reclassify a row
     // (the Set 091 warn-and-degrade posture); the raw declared value
     // stays on `config.kind` so later surfaces can name the mismatch.
-    // Case-tolerant, matching the `tier` / `verificationMode` parses.
+    // Case-tolerant, matching the `module` parse.
     let kind: SessionSetKind | undefined;
     if (config.kind !== undefined) {
       const v = config.kind.toLowerCase();
@@ -1270,56 +1223,6 @@ export function readSessionSets(root: string): SessionSet[] {
     }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
-    // Set 061 Session 1 (spec D1): derived, never persisted.
-    const plusFraction = shouldRenderPlusFraction(
-      config.tier,
-      config.verificationMode,
-      ledgerSessions as LedgerSessionLike[] | null,
-    );
-    // Set 062 Session 1 (spec D1): the verification-posture inputs +
-    // marker — all derived at scan time, never persisted. The note
-    // presence is a plain existence probe (the Set 057 out-of-band
-    // record); the completed-verification info and the marker glyph
-    // come from the same normalized ledger the plus-fraction reads.
-    const externalVerificationNoteExists = fs.existsSync(
-      path.join(dir, "external-verification.md"),
-    );
-    const completedVerification = completedVerificationInfo(
-      ledgerSessions as LedgerSessionLike[] | null,
-    );
-    const verificationMarker = verificationMarkerFor(
-      config.tier,
-      config.verificationMode,
-      ledgerSessions as LedgerSessionLike[] | null,
-      externalVerificationNoteExists,
-      state,
-    );
-    // Set 077 Session 5 (Features 4–5): derived only where the ladder
-    // is live — Lightweight Mode-B rows. The issues-envelope read is
-    // scoped the same way so Full/Mode-A rows pay no extra I/O.
-    //
-    // The ladder's set-terminal input is the RAW set-level status from
-    // the parsed state file (Python parity: derive_state compares
-    // set_status == "complete"), NOT the canonicalized bucket `state`
-    // (whose mid-set-complete downgrade / cancelled mapping would
-    // diverge from Python). `liveSession.status` carries exactly that
-    // raw `sd.status` for every readable state file — despite the
-    // record's name it is the normalized snapshot, populated for
-    // complete sets too, not an in-flight-only tracker (two reviewers
-    // misread this; hence the explicit local).
-    let workflowState: WorkflowState | null = null;
-    if (
-      config.tier === "lightweight" &&
-      config.verificationMode === "dedicated-sessions"
-    ) {
-      const rawSetStatus = liveSession?.status ?? null;
-      workflowState = deriveWorkflowState(
-        ledgerSessions as LedgerSessionLike[] | null,
-        config.verificationMode,
-        rawSetStatus,
-        readLatestIssuesEnvelope(dir),
-      );
-    }
 
     sets.push({
       name: entry.name,
@@ -1352,12 +1255,6 @@ export function readSessionSets(root: string): SessionSet[] {
       // prerequisites stay at false in both passes.
       blockedByPrereqs: false,
       unsatisfiedPrereqs: [],
-      plusFraction,
-      externalVerificationNoteExists,
-      completedVerification,
-      verificationMarker,
-      workspaceTierMarker,
-      workflowState,
       // Set 110 S2: the fourth tree level's data, taken from the ledger
       // this scan already parsed — no extra read, no extra stat.
       sessions: normalizeLedgerSessions(ledgerSessions),

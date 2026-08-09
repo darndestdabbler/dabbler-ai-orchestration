@@ -264,13 +264,11 @@ external tooling) which gates apply to this set.
 ```yaml
 ## Session Set Configuration
 
-tier: full               # full | lightweight (Set 048+; pre-Set-048 specs default to "full")
 requiresUAT: false       # true | false | "suggested" — human UAT review required before set closes
 requiresE2E: false       # true | false | "suggested" — E2E test coverage required before notifying
 uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true; default ad-hoc)
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
-verificationMode: out-of-band-or-none  # Lightweight only (Set 057); dedicated-sessions | out-of-band-or-none (default). Seeds the once-at-set-start choice. Omit on Full-tier sets (Set 082).
-pathAwareCritique: none  # tier-orthogonal (Set 066); none | advisory | required (default none). Seeds the once-at-set-start choice.
+pathAwareCritique: none  # optional (Set 066); none | advisory | required (default none). Seeds the once-at-set-start choice.
 kind: plan               # optional (Set 098); plan | decomposition — scaffolder-emitted module-lifecycle identity. Hand-authored work sets omit it.
 prerequisites:           # optional; sets that must complete before this one is workable
   - slug: 047-state-file-schema-v4-audit
@@ -286,62 +284,19 @@ prerequisites:           # optional; sets that must complete before this one is 
 
 ### Field semantics
 
-- **`tier: "full"`** — the set runs through the full AI router:
-  cross-provider verification, automated close-out, metrics. Default
-  for any spec authored before Set 048. Backwards-compatible for
-  every existing spec.
+> **REMOVED (Set 112): `tier` and `verificationMode`.** Do not author
+> either field. The Lightweight tier and its two per-set verification
+> modes are gone; every set runs the routed cross-provider verification
+> round on every session. A spec declaring `tier: lightweight` is
+> **refused by the loader**, so re-introducing the field in a template or
+> a generated spec would hand the consumer a set that cannot run. The
+> `sessions[N].type` field those modes appended at runtime
+> (`verification` / `remediation`) is retired with them — the authored
+> session count is now the whole count. History:
+> [`docs/concepts/tier-model.md`](../concepts/tier-model.md).
 
-- **`tier: "lightweight"`** (Set 048+) — the set runs under
-  `--no-router` mode: no metered API calls, no auto-verification.
-  The orchestrator follows the same write discipline as Full (same
-  state-file shape, same Work Explorer UX, same model /
-  effort / session identification), but verification is handled
-  per-set (not per-session) via one of two `verificationMode` flows
-  (see below). See `docs/ai-led-session-workflow.md` Step 6
-  → "Lightweight tier — verification (per-set; two modes)" for the flow.
-
-- **`verificationMode`** (Set 057; **Lightweight only**) — how the set's
-  per-set verification runs. `out-of-band-or-none` (**default**) keeps the
-  copyable-review-prompt flow: the operator pastes a prompt into a second
-  assistant and records the verdict by hand in `external-verification.md`.
-  `dedicated-sessions` opts in to structured **typed sessions** — a blessed
-  verification session on a different engine, an optional remediation
-  session when issues are found, a bounded re-verification loop (rounds 1–2
-  automatic, 3+ human), and a content-aware close-out gate that confirms a
-  different-engine verification ran (hard-blocks in an interactive TTY,
-  soft-warns headless). The field here only **seeds** the choice; the
-  durable record is an `activity-log.json` entry (`kind:
-  "verification_mode"`) written **once at set start** — either from this
-  seed (recorded automatically at the first `start_session` when no choice
-  exists yet) or from an explicit `start_session --verification-mode …`.
-  Omitting both leaves the default `out-of-band-or-none` applying
-  implicitly (strictly opt-in). A set that already started under Mode A
-  can still opt in later through the sanctioned blessed writer
-  (`python -m ai_router.change_verification_mode <slug>`, Set 062 —
-  A→B only, gated, recorded as a superseding `verification_mode_change`
-  entry; see `docs/ai-led-session-workflow.md` → *Sanctioned Mode A →
-  Mode B transition*). The field is inert on Full tier (which
-  keeps automatic, rule-based cross-provider verification) —
-  **Full-tier specs omit the field entirely** (Set 082: the scaffolder
-  renders the `verificationMode:` line on Lightweight only; omission
-  means the default, so never declare it on a `tier: full` set).
-
-  **Session `type` (Set 057).** The `dedicated-sessions` flow appends
-  runtime sessions to `session-state.json`'s `sessions[]` carrying a
-  `type` field: `work` (default; absent on every existing and Full-tier
-  entry), `verification`, or `remediation`. `type` is a **session-state**
-  field, not a spec config field — spec authors never write it; the blessed
-  writers (`start_session --type …` to open a typed session, and
-  `start_session --type … --handoff` to chain one) do — never a freehand
-  edit. See
-  [`docs/session-state-schema.md`](../session-state-schema.md) for the
-  per-session shape. Verification/remediation sessions are **not** authored
-  in spec.md and take their step list from the workflow doc, so the
-  authored session count in the spec stays fixed even as the runtime count
-  grows.
-
-- **`pathAwareCritique`** (Set 066; **tier-orthogonal** — valid on both
-  Full and Lightweight) — the set's path-aware critique policy: an
+- **`pathAwareCritique`** (Set 066) — the set's path-aware critique
+  policy: an
   end-of-set, **multi-provider** review that retrieves repo ground truth
   itself rather than reviewing a snippet the biased author pasted (the
   Set 065 evidence: 12 unique real defects incl. two Criticals a
@@ -356,17 +311,14 @@ prerequisites:           # optional; sets that must complete before this one is 
   - `required` — the Set-066 close-out gate confirms a valid multi-provider
     [`path-aware-critique.json`](../path-aware-critique-schema.md) artifact
     exists at the set-terminal close (hard-block in an interactive TTY,
-    soft-warn headless — the Set 057 Q6 fail-posture pattern).
+    soft-warn headless).
 
-  Like `verificationMode`, the spec field only **seeds** the choice: the
+  The spec field only **seeds** the choice: the
   durable record is an `activity-log.json` entry written **once at set
   start and immutable thereafter** (a later
   `start_session --path-aware-critique …` on a started set is a no-op, so a
   mid-set downgrade cannot silently disarm a gate the set already opted
-  into). Unlike `verificationMode` (Lightweight-only), this attribute is
-  **tier-orthogonal** — the close-out wiring is net-new on the Full-tier
-  close path precisely *because* the existing `dedicated-sessions` gate is
-  Lightweight-only, not because the attribute is Full-tier-specific. The
+  into). The
   close-out gate itself ships in **Set 066 Session 2**; Session 1 ships the
   attribute, the saved-artifact contract, and the blast-radius predicate
   that recommends a value (`python -m ai_router.blast_radius <paths…>` —
@@ -421,8 +373,7 @@ prerequisites:           # optional; sets that must complete before this one is 
   entry and the close-out gate derives from that recorded answer.
   This replaces the originally-proposed triple-redundancy reminder
   pattern (toast + log + close-out warning) with a single upfront
-  positive-confirmation prompt. Applies to both Full and Lightweight
-  tiers.
+  positive-confirmation prompt.
 
 - **`requiresE2E: true`** — every functional checklist item (when UAT
   is also required AND `uatStyle: "dsl"`) must have matching E2E test
@@ -501,15 +452,14 @@ prerequisites:           # optional; sets that must complete before this one is 
 ### Defaults
 
 If the configuration block is **omitted entirely**, the spec is
-treated as `tier: full`, `requiresUAT: false`, `requiresE2E: false`,
+treated as `requiresUAT: false`, `requiresE2E: false`,
 `uatStyle: ad-hoc`, `uatScope: none`. Same outcome as writing the
-block with all five values spelled out as their defaults.
+block with all four values spelled out as their defaults.
 
 If the block is **present but a field is omitted**, the missing field
-takes its default (`"full"` for `tier`, `false` for boolean tri-state
-flags, `"ad-hoc"` for `uatStyle`, no scope for `uatScope`, and — for the
-opt-in attributes — `out-of-band-or-none` for `verificationMode` and
-`none` for `pathAwareCritique`, i.e. no path-aware critique gate). An
+takes its default (`false` for boolean tri-state
+flags, `"ad-hoc"` for `uatStyle`, no scope for `uatScope`, and `none`
+for `pathAwareCritique`, i.e. no path-aware critique gate). An
 omitted `kind` has no default value at all — the set is simply an
 ordinary work set. An omitted `uatScope` matters only when
 `requiresUAT: true`, where it resolves to `per-set` (see above).

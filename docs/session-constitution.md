@@ -25,7 +25,7 @@ schema doc, close-out doc, and authoring guide are **on-demand
 references** — authoritative for their domains, opened at the trigger
 moments in the per-step pointer table at the end of this file.
 
-## The session, start to stop (happy path, Full tier)
+## The session, start to stop (happy path)
 
 Run every router CLI through the workspace venv
 (`.venv/Scripts/python.exe` on Windows, `.venv/bin/python` on POSIX) —
@@ -69,7 +69,7 @@ Run every router CLI through the workspace venv
   last code change**; record that run
   (`python -m ai_router.run_of_record record --suite <s> --outcome
   passed`) or the `test_run_fresh` close gate refuses the close.
-- **6. Verify (mandatory, every Full-tier session).** Run the phased
+- **6. Verify (mandatory, every session).** Run the phased
   loop: `python -m ai_router.verify_session --phase discovery` for the
   set (fan-out sized by config; all severities). It routes the evidence
   to a **different-provider** verifier and writes the raw round
@@ -126,14 +126,11 @@ Run every router CLI through the workspace venv
 ## State-mutation discipline — blessed writers only
 
 - `start_session` and `close_session` are the only writers of
-  `session-state.json` and the events ledger on Full tier. Typed
-  verification/remediation sessions, mode transitions, and
-  cancel/restore go through their blessed writers. **Never
-  freehand-edit state to declare progress** — that is mixed-mode drift;
-  recover through the close-out doc's sanctioned repair path, not a
-  hand edit.
-- Lightweight tier hand-maintains the same v4 shape under the same
-  invariants — open the schema doc when a state question arises.
+  `session-state.json` and the events ledger; cancel/restore goes
+  through its own blessed writer. **Never freehand-edit state to declare
+  progress** — that is mixed-mode drift; recover through the close-out
+  doc's sanctioned repair path, not a hand edit. Open the schema doc
+  when a state question arises.
 - Guidance files: never delete a lesson — archival moves text to
   `lessons-archive.md`, operator-reviewed. Machine-stamped overhead
   headers change only via `guidance_report --write-headers`.
@@ -173,16 +170,13 @@ answer. Batch briefs; never trickle. Full rubric:
 
 ## Definition of done
 
-- **Full tier:** the session plan's Ends-with is satisfied; suite
-  green; a non-blocking cross-provider verdict (VERIFIED or Minor-only)
-  is recorded; `disposition.json` is complete; the work is committed
-  and pushed; `close_session` succeeded; the notification fired after
-  success (never on a failed gate). The final session additionally
-  produces `change-log.md`, the Step 9 review, and — when armed — the
-  path-aware critique artifact.
-- **Lightweight tier:** same CLIs and state shape with `--no-router`;
-  zero metered API calls; verification is **per-set** per the recorded
-  `verificationMode`; close through the same gate.
+The session plan's Ends-with is satisfied; suite green; a non-blocking
+cross-provider verdict (VERIFIED or Minor-only) is recorded;
+`disposition.json` is complete; the work is committed and pushed;
+`close_session` succeeded; the notification fired after success (never
+on a failed gate). The final session additionally produces
+`change-log.md`, the Step 9 review, and — when armed — the path-aware
+critique artifact.
 
 ## Recovery and escalation
 
@@ -234,14 +228,14 @@ Open the named reference at the step's trigger moment — not before.
 | Step | Open on demand | When |
 |---|---|---|
 | 0 | `docs/quick-start.md` | First-time orientation only — never per session |
-| 1 | `docs/ai-led-session-workflow.md` | Trigger-phrase variants: parallel worktrees, maxout, typed Lightweight sessions |
+| 1 | `docs/ai-led-session-workflow.md` | Trigger-phrase variants: parallel worktrees, maxout |
 | 1 | `docs/planning/repo-worktree-layout.md` | Worktree layout, migration, drift recovery |
 | 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, **session-size cap**, slugs) |
 | 2 | `docs/ai-led-session-workflow.md` | The set declares `requiresUAT` / `requiresE2E` — the gated UAT/E2E procedures |
 | 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy and the run-of-record freshness gate |
 | 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
 | 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |
-| 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options, Lightweight modes |
+| 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options |
 | 8 | `ai_router/docs/close-out.md` | Close failure, stranded session, mixed-mode drift, manual-flag matrix |
 | 8 | `docs/disposition-schema.md` | Authoring `disposition.json` |
 | 9 | `docs/guidance-lifecycle.md` | Citation, archival, ceilings, the preload admission test |

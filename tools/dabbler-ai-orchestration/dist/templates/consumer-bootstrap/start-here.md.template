@@ -9,13 +9,8 @@
 
 This is the **cold-start operative doc**. If you are an AI orchestrator (any
 engine) and you were told only *"start the next session"*, this file tells you
-exactly what to do, in order, with no guessing. The procedure is the same on
-both tiers; the **only** branch is one flag at `start_session`.
-
-> **Tier is a property of the set, not the repo** — read it from the active
-> set's `spec.md` (Step 2), since one repo may hold both Full and Lightweight
-> sets. Tier model SSoT:
-> <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>.
+exactly what to do, in order, with no guessing. Every session follows the same
+procedure: register, work, verify against a different provider, close.
 
 ---
 
@@ -28,14 +23,9 @@ Follow these links in order; each step hands you the input for the next:
 2. **This file** (`docs/dabbler/start-here.md`) — the procedure below.
 3. **The active `spec.md`** — resolve it with the one rule in the next
    section. Do not guess among sets.
-4. **Read `tier` + `verificationMode`** from that spec's *Session Set
-   Configuration* block.
-5. **Run `start_session`** (routed for Full, `--no-router` for Lightweight —
-  the resolver does this for you from `tier:`).
-6. **Do the session's work**, then verify and close — on **Full**,
-  `verify_session` (mandatory, every session) then `close_session`; on
-  **Lightweight**, verification is per-set per `verificationMode`
-  (Step 5 tells you which branch applies), then `close_session`.
+4. **Run `start_session`** to register the session.
+5. **Do the session's work**, then `verify_session` (mandatory, every
+   session) and `close_session`.
 
 ---
 
@@ -68,25 +58,9 @@ set" check will already be red).
 > sets); rename or delete "Default" any time from the Work Explorer once
 > the project's real module names are known.
 
-## Step 2 — Read the tier and verification mode
+## Step 2 — Register the session start (state first, work second)
 
-Open the active set's `spec.md` and read its *Session Set Configuration*
-block:
-
-- **`tier: full`** → the session runs through the AI router; run the Step 5
-  verification command below before close-out. Verification is **mandatory
-  on every Full-tier session** — there is no skip, and the close gate
-  refuses an unverified close.
-- **`tier: lightweight`** → the session makes **zero metered API calls**;
-  verification is **per-set** per `verificationMode`
-  (`out-of-band-or-none` default, or `dedicated-sessions`). See the workflow
-  doc's Lightweight verification section.
-
-## Step 3 — Register the session start (state first, work second)
-
-Run the lifecycle CLI as the **first action** of the session. The
-`--no-router` mode is resolved automatically from `tier: lightweight` in the
-spec, so the *same command* is correct on both tiers:
+Run the lifecycle CLI as the **first action** of the session:
 
 ```bash
 # Windows
@@ -115,29 +89,22 @@ spec, so the *same command* is correct on both tiers:
 > **"No module named ai_router" is not a missing-keys problem** — it almost
 > always means you ran a bare `python` instead of the **venv** interpreter.
 > Always invoke `.venv/Scripts/python.exe` (Windows) or `.venv/bin/python`
-> (POSIX). Both tiers have a `.venv` and `dabbler-ai-router` installed.
+> (POSIX).
 
 This writes `session-state.json` (`status: "in-progress"`), appends a
 `work_started` event, and is idempotent (safe to re-run after a context
 reset).
 
-## Step 4 — Do the work
+## Step 3 — Do the work
 
 Follow the active spec's step list for the current session. Log progress;
 make file edits, run tests, commit at the end.
 
-## Step 5 — Run cross-provider verification (Full tier: mandatory; Lightweight: skip to Step 6)
+## Step 4 — Run cross-provider verification (mandatory)
 
-> **Tier branch (from Step 2):** this step's command is **Full-tier
-> only**. On `tier: lightweight` do **not** run it — the Lightweight
-> contract is zero metered API calls, and verification is **per-set**
-> per the set's `verificationMode` (see the workflow doc's Lightweight
-> verification section). Go straight to Step 6.
-
-Every **Full-tier** session verifies before it closes. **There is no
-skip** — an engine cannot decide a diff is "too small to verify", and
-the close gate hard-refuses a Full-tier close with no corroborated
-verification evidence. Run:
+Every session verifies before it closes. **There is no skip** — an engine
+cannot decide a diff is "too small to verify", and the close gate
+hard-refuses a close with no corroborated verification evidence. Run:
 
 ```bash
 .venv/Scripts/python.exe -m ai_router.verify_session \
@@ -160,20 +127,19 @@ a hard blocked state with **no verdict written**, resolvable only by the
 operator-attested `--manual-verify` path (never a silent same-provider pass).
 
 The only exception is operator-declared, never per-session: a repo whose
-`ai_router/budget.yaml` sets `threshold_usd: 0` (the zero-budget tier) uses
-the manual verification path documented there instead.
+`ai_router/budget.yaml` sets `threshold_usd: 0` uses the manual verification
+path documented there instead.
 
-## Step 6 — Close via the shared gate
+## Step 5 — Close via the shared gate
 
 ```bash
 .venv/Scripts/python.exe -m ai_router.close_session \
     --session-set-dir docs/session-sets/<active-slug>
 ```
 
-The gate is the same on both tiers: it requires a disposition, requires
-`change-log.md` on the **final** session, writes idempotently, and emits the
-schema-drift advisory as a soft note. On Full, the close gate corroborates the
-verification verdict against a **stamped** cross-provider metrics row — one the
+The gate requires a disposition, requires `change-log.md` on the **final**
+session, writes idempotently, and emits the schema-drift advisory as a soft
+note. It corroborates the verification verdict against a **stamped** cross-provider metrics row — one the
 `verify_session` CLI wrote (`source: verify_session_cli`) **or** the close
 backstop wrote (`source: close_session_backstop`) — **and** the raw
 `sN-verification*.md` artifact; a bare `route()` row no longer corroborates a
@@ -184,21 +150,18 @@ backstop): it assembles the evidence, picks a different-provider verifier by the
 same exclusion, then proceeds on `VERIFIED` / refuses with the findings on
 `ISSUES_FOUND` / blocks on `verification_unavailable`. You **cannot skip**
 verification — you can only **pre-empt** the backstop by running `verify_session`
-yourself first. On Lightweight, the per-set `verificationMode` flow governs how
-verification is attested.
+yourself first.
 
 ---
 
 ## The canonical references (read when you need depth)
 
-- **Tier model (SSoT):**
-  <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/concepts/tier-model.md>
 - **Session constitution (the happy-path operating doc; open the full
   workflow doc only for rare branches):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/session-constitution.md>
 - **Full execution mechanics (the 10-step procedure, rules, verification — on demand):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/ai-led-session-workflow.md>
-- **Spec schema (`tier`, `verificationMode`, the config block):**
+- **Spec schema (the Session Set Configuration block):**
   <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/spec-md-schema.md>
 
 You're ready. Resolve the active set (Step 1) and start the next session.

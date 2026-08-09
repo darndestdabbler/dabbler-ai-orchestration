@@ -19,7 +19,7 @@ surface, isolating *surface* as the only variable):
 arms' RAW verdicts plus a recorded **attestation** that provider, model, and
 framing strength were equal across arms. There is **NO merge yet** (S2 adds the
 provenance merge + the fair-shake scoring; S2 wires the recorded
-``verificationMode``-pattern option and the CLI).
+once-at-set-start mode option and the CLI).
 
 **Why framing is enforced here, not trusted.** L-069-2: framing strength is a
 cheap, prompt-only lever orthogonal to surface and provider count; a push-vs-pull
@@ -1672,12 +1672,15 @@ def aggregate_retire_telemetry(
 
 
 # ===========================================================================
-# Session 2: the dual-surface verification MODE (a verificationMode-pattern option)
+# Session 2: the dual-surface verification MODE
 #
-# Mirrors the Set 057 verification-mode / Set 066 pathAwareCritique pattern: a
+# Mirrors the Set 066 ``pathAwareCritique`` pattern: a
 # choice recorded ONCE at set start as a durable ``activity-log.json`` entry, read
 # back via the "last valid entry of a record kind wins" rule, with a distinct
-# entry ``kind`` so it never overloads either of those enums. Two non-off modes:
+# entry ``kind`` so it never overloads that enum. (Set 057's
+# ``verificationMode`` was the other exemplar of this pattern; Set 112 deleted
+# it with the Lightweight tier, but the recording discipline is unchanged.)
+# Two non-off modes:
 #
 # - ``sampled`` - the random-sample hook: a fraction of qualifying sessions run
 #   the dual-surface comparison automatically. UNBIASED telemetry. The random
@@ -1816,7 +1819,7 @@ def read_spec_dual_surface_mode(session_set_dir: Union[str, Path]) -> Optional[s
     """Return the optional ``dualSurfaceMode`` seed from spec.md config, or ``None``.
 
     Reuses the shared Session Set Configuration block extractor so the attribute is
-    parsed exactly like ``tier`` / ``verificationMode`` / ``pathAwareCritique`` (no
+    parsed exactly like ``pathAwareCritique`` (no
     separate parser). Never raises - a malformed spec degrades to "no seed".
     """
     spec_path = Path(session_set_dir) / "spec.md"

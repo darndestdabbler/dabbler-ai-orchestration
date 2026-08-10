@@ -1,42 +1,50 @@
 {
   "status": "completed",
-  "summary": "Set 114 S2 gave the step checklist its forward half. start_session now parses the session's numbered steps out of spec.md (via spec_admission.parse_step_texts - the same parser that enforces the session-size cap, so the size a spec is admitted at and the plan an operator is shown cannot disagree) and writes them into activity-log.json as pending entries carrying kind: plan-step. This does not reopen Set 111 S4's decision that the renderer never synthesizes plan rows; it is that decision's own remedy - the plan goes INTO the record, so the renderer keeps one rule. build_rows reconciles plan against reality: the plan owns each row's position, the logged step owns its content, an unplanned step appears (appended), a planned step nobody logged stays visibly [ ], and the here-marker prefers the unfinished logged step over an earlier pending planned row. Seeded once, never re-seeded, so a re-registration writes nothing and no mid-session write can stale a verification stamp. Four rounds. Round 1 (both discovery lenses independently) and round 2 found the same defect: the gate filters excluded only plan-step while path_aware_critique / contract_gate records - written at registration for any configured set - still counted as real work, so check_activity_log_entry could pass before any work existed. Fixed with one predicate, session_checklist.is_logged_step, used by _reconcile and both gates. Round 2 also found that an ordinal-first claim cascades when a spec is edited mid-flight: the inserted step claims one planned row, the shifted step claims the next, and the last planned row vanishes. The round-2 fix (identity before ordinal) was rejected by round 3, correctly - it only rescued the case where the shifted step's key matched a seeded slug. There is no signal inside the ledger (N logged steps, N planned rows, each number used once is the shape of both the intact and the renumbered case), so the fix looks outside it: plan_matches_spec compares the seeded step texts against spec.md now, and an edited, missing or unparseable spec withdraws ordinal matching entirely - unmatched steps append and no planned row can be evicted. No row ever comes from the spec. Round 4 VERIFIED with all four fixes accepted. 3765 pytest passed / 9 skipped; 33 Playwright passed (run because start_session is a state-file writer and now writes to activity-log.json, which the extension watches).",
+  "summary": "Set 114 S3 (terminal) put the step checklist in the surface the operator already has open. The Work Explorer's tree gained a FIFTH level: an in-flight session row expands to its steps -- the plan start_session seeded from spec.md, reconciled against what the orchestrator actually logged, with the same authored lifecycle glyphs the other rows use and '<- here' on the current step. It is the same list `python -m ai_router.session_checklist` prints, in the panel that is already open. This is the half Set 111 S4 recorded and deliberately did not build, on the grounds that it belonged to a session allowed to touch the rendering surface. Three limits are decisions rather than omissions, each journaled or tested: only the IN-FLIGHT session expands (every other session row stays a leaf -- the checklist answers 'where is this session', and it keeps the scan cost off the 45 sets that are not in progress); an absent, unreadable, wrong-session or empty ledger degrades to NO CHILDREN rather than a stale or invented list, and the row becomes a leaf rather than a twisty that opens onto nothing; and step rows carry no actions, with the menu-parity test asserting no `when` clause targets them so adding one later is a decision rather than a leak. THE ONE THING THIS SESSION DID THAT IT WAS WARNED ABOUT: the row-building rule now has two implementations, because the Explorer is TypeScript and the checklist is Python. Set 114 S2's own routed ai-assignment named that hazard for this session (L-069-1, the duplicate-parser defect this repo repeats most) and named the only acceptable mitigation -- 'port the rule with a shared fixture that proves the two agree row-for-row'. The alternative, spawning `python -m ai_router.session_checklist` on expand, was rejected on the record: it puts a process spawn on the expand path of a tree that refreshes on every watcher tick and a 30-second poll, and makes a DISPLAY feature fail whenever the interpreter or the package is unresolvable -- the exact coupling utils/migrateSessionState.ts was written to remove. So the mitigation shipped: ai_router/tests/fixtures/session-step-parity.json, twelve cases, asserted by test_step_row_parity.py against the real Python build_rows/read_spec_steps AND by sessionStepModel.test.ts against the TypeScript mirror. Change either implementation alone and a test fails; change the corpus alone and both fail. The corpus carries the cases that are easy to get wrong -- identity-before-ordinal claiming, a plan that moved under the session mid-flight (the L-112-1 planted defect: with ordinal matching left on, the last planned row silently vanishes), bookkeeping entries that must not claim a planned row, an append-only log that logged the same step twice, and a legacy set with no seeded plan at all. The scan-side lift is free by construction: readSessionSets already parses activity-log.json, so the only new I/O is one spec.md parse, on in-flight sets only, for the single question the renderer asks the spec (has the plan moved since registration?). Verification: round 1 discovery, both lenses (gpt-5.5, anthropic excluded as the orchestrator's effective provider), VERIFIED with zero findings. Suites after the last code change: pytest 3791 passed / 0 failed / 9 skipped (17m32s); Layer 3 Playwright 36 passed / 0 failed (9.8m), run because this session touches the Explorer rendering surface. One Layer 3 failure was found and fixed mid-session, and it was the test's fault rather than the product's: the e2e harness derives stepNumber as max+1, which lands PAST every seeded planned step and therefore always appends instead of claiming, so make-activity gained --step-number / --step-key / --status overrides with the defaults unchanged. Extension bumped 0.50.0 -> 0.51.0 (staged, publish operator-gated, superseding the never-published 0.50.0 and 0.49.0); ai_router stays 1.0.0 and was deliberately NOT bumped -- no router runtime code changed, and the only Python touched is test-support that pyproject excludes from the wheel.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
     "ai_router/CHANGELOG.md",
-    "ai_router/gate_checks.py",
-    "ai_router/session_checklist.py",
-    "ai_router/session_log.py",
-    "ai_router/spec_admission.py",
-    "ai_router/start_session.py",
-    "ai_router/tests/test_plan_seeding.py",
-    "docs/planning/session-set-authoring-guide.md",
-    "docs/session-constitution.md",
+    "ai_router/tests/e2e/fixtures.py",
+    "ai_router/tests/e2e/harness_cli.py",
+    "ai_router/tests/fixtures/session-step-parity.json",
+    "ai_router/tests/test_step_row_parity.py",
+    "docs/planning/uat-improvement-notes.md",
+    "docs/repository-reference.md",
     "docs/session-sets/114-rolling-task-list-and-progress-visibility/ai-assignment.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-conventions.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-remediation-round-1.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-remediation-round-2.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-remediation-round-3.md"
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/change-log.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s3-conventions.md",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionStepModel.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts",
+    "tools/dabbler-ai-orchestration/src/types.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 3 renders in the Work Explorer what Sessions 1 and 2 put in the record. The tree's children are build_rows' output; an orchestrator that does not know why a row can be is_planned, why ordinal reconciliation is gated on plan_matches_spec, or why the renderer is forbidden from inventing rows will either re-derive the plan in TypeScript - reopening a decision two sessions have now closed - or render a tree that disagrees with the checklist. It is also the set's terminal session (change-log.md, Step 9 review, advisory path-aware critique). Full reasoning and the four things S3 must not inherit uncritically are in ai-assignment.md."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": [],
   "checklist": {
-    "status": "posted"
+    "status": "waived",
+    "attestation": "Operator, 2026-08-10, from a batched education-mode brief: 'Attested waiver - disposition.checklist = {status: waived, attestation}; identical to what you authorized for Set 114 S1, keeps the omission on the record with your name against it, and leaves every other gate enforcing.' The two uncovered transitions: (1) the operator-stop at 06:24:20 that waived UAT - the post landed at 06:41:06, one second AFTER the next transition (the Playwright run-of-record at 06:41:05), so it covered that one rather than the stop; (2) the Layer 2 mocha run recorded at 07:49:19 - the post at 07:49:06 preceded the record, and the next transition (the pytest run-of-record at 08:22:42) arrived before any later post. Both are the same mistake: two transitions recorded in quick succession, posted once, on the wrong side of the record. Session 3 posted twelve times in total; this is a cadence miss, not a silent session. Every other gate passed, including a fresh close-backstop verification round (round 2, gpt-5.5, anthropic excluded, VERIFIED). Second time this set's own gate has refused its own orchestrator - recorded as deferred-UAT judgment 8 (is the cadence followable by hand?) in docs/planning/uat-improvement-notes.md.",
+    "missedTransitions": [
+      "operator-stop (verification-reduction) at 2026-08-10T06:24:20.751-04:00",
+      "test-run-recorded (mocha) at 2026-08-10T07:49:19.790737-04:00"
+    ]
+  },
+  "uat": {
+    "status": "waived",
+    "attestation": "Operator, 2026-08-10: 'Right now, UAT is a broken, arduous process, which we shouldn't depend upon until Set 113 is finished. That said, I am going to authorize skipping UAT in this session. Please make a durable note of any features that you believe require UAT input. Later, I may create a remediation UAT set to address these things -- but only after set 113 is done. I am deferring because I think that set 113 will take some time to complete, and we need for this set, as well as set 115 to ship before 113.' The set declares requiresUAT: true and this session owed a guided-look walk; Set 113 (narrated video walkthroughs) has not landed, so the walk would have used the format the operator suspended once (Set 077) and waived once (Set 111 S4). Journaled as a verification REDUCTION under operator authority (decisions.jsonl, session 3) because it removes the operator-eyes layer this set's own spec armed. The waiver is not a write-off: the ten judgments that genuinely need eyes are itemized in docs/planning/uat-improvement-notes.md -> 'Deferred UAT -- owed judgments, by set', each naming what would decide it and the cheap remedy if the answer is no, so a remediation UAT set after Set 113 is authorable from that list alone. The two most likely to be wrong are flagged in the change log as well: the seeded step LABELS can read as ungrammatical fragments ('Work explorer expansion an in flight'), and blocked/failed steps borrow the cancelled glyph, which may read as 'this session was cancelled'."
   },
   "lessons_cited": [
     "L-069-1",
     "L-112-1",
-    "L-064-8"
+    "L-064-9"
   ]
 }

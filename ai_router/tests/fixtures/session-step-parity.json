@@ -1,0 +1,262 @@
+{
+  "_readme": [
+    "Set 114 Session 3 — the cross-language parity corpus for the step",
+    "checklist's row builder.",
+    "",
+    "Session 3 renders an in-flight session's steps in the Work Explorer.",
+    "The Explorer is TypeScript, the checklist is Python, and Set 114 S2's",
+    "routed ai-assignment.md is explicit about the one acceptable way to",
+    "bridge them: 'port the rule with a shared fixture that proves the two",
+    "agree row-for-row'. This is that fixture.",
+    "",
+    "TWO suites assert against it, and neither one owns it:",
+    "",
+    "  ai_router/tests/test_step_row_parity.py",
+    "      writes each case to a tmpdir and drives the real",
+    "      session_checklist.build_rows / read_spec_steps.",
+    "",
+    "  tools/dabbler-ai-orchestration/src/test/suite/sessionStepModel.test.ts",
+    "      drives providers/sessionStepModel.ts's buildStepRows /",
+    "      parseSpecSteps over the same inputs.",
+    "",
+    "So: change Python alone and the Python test fails. Change TypeScript",
+    "alone and the TypeScript test fails. Change this file alone and BOTH",
+    "fail. There is no edit that silently diverges the two.",
+    "",
+    "expectedRows is the RENDERED row list in order. expectedSpecSteps is",
+    "what spec.md declares for that session, which decides only whether",
+    "ordinal reconciliation is trustworthy — it never contributes a row."
+  ],
+  "cases": [
+    {
+      "name": "plan-only",
+      "why": "Session start: start_session seeded the plan and nothing has been logged. This is the forward view Set 114 S2 exists for — every row pending, the marker on the first, and no logged step anywhere.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isHere": false, "isPlanned": true}
+      ]
+    },
+    {
+      "name": "plan-partly-executed-ordinal",
+      "why": "The common case. The orchestrator's own step keys are prose-free handles that do NOT equal the slugs the seeder derived from the spec's sentences, so every claim here is made by the ordinal pass. Steps 1-2 are logged and own their rows' content; step 3 is still the spec's own words, and the marker sits on the first unfinished LOGGED row.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered and read the preload.", "status": "complete"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "registration", "description": "Registered and read the preload.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress", "isHere": true, "isPlanned": false},
+        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isHere": false, "isPlanned": true}
+      ]
+    },
+    {
+      "name": "identity-beats-ordinal",
+      "why": "A logged step whose stepKey EQUALS a planned key claims that row even though its stepNumber points elsewhere. A key match asserts identity and cannot be wrong; an ordinal match is an inference. Round 2 of Set 114 S2's verification is why the passes are in this order.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete", "isHere": false, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "plan-moved-under-the-session",
+      "why": "THE PLANTED DEFECT (L-112-1). The spec gained a step after registration, so the seeded plan no longer matches spec.md and the ordinal pass is switched OFF. With it on, the inserted step would claim the old step 2's row, that step would claim step 3's, and the LAST planned row would vanish — a planned step nobody executed, silently dropped. Here every planned row survives and the logged step appends.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Do the newly-inserted thing.\n3. Build it.\n4. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Do the newly-inserted thing.", "Build it.", "Verify, close."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete", "isHere": false, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "bookkeeping-cannot-claim-a-planned-row",
+      "why": "An entry carrying a `kind` is machinery's record ABOUT the session — several are written at registration, before any work exists. It RENDERS (it is part of the record and Set 111 S4 showed it) but it may not mark a planned step done. Without this rule a set with pathAwareCritique configured would show step 1 as complete before the session started.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "kind": "path_aware_critique"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "isHere": false, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "legacy-set-with-no-seeded-plan",
+      "why": "Every set that started before Set 114 S2, and any spec whose steps do not parse. The renderer falls back to exactly its Set 111 S4 behaviour: the logged steps, collapsed by stepKey, in first-logged order, marker on the first unfinished one.",
+      "sessionNumber": 2,
+      "specMarkdown": "# Fixture spec\n\nNo session headings at all, so nothing parses.\n",
+      "expectedSpecSteps": [],
+      "entries": [
+        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete"},
+        {"sessionNumber": 2, "stepNumber": 2, "stepKey": "the-work", "description": "Doing the work.", "status": "in-progress"},
+        {"sessionNumber": 2, "stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "the-work", "description": "Doing the work.", "status": "in-progress", "isHere": true, "isPlanned": false},
+        {"stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending", "isHere": false, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "repeated-key-collapses-to-the-latest-at-the-first-position",
+      "why": "activity-log.json is append-only, so a step logged in-progress and later complete appears twice. Rendering both duplicates the row AND strands the marker on the stale entry. The collapse keeps the LATEST entry at the position the step FIRST appeared.",
+      "sessionNumber": 2,
+      "specMarkdown": "# Fixture spec\n",
+      "expectedSpecSteps": [],
+      "entries": [
+        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "the-work", "description": "Starting the work.", "status": "in-progress"},
+        {"sessionNumber": 2, "stepNumber": 2, "stepKey": "second-thing", "description": "Second thing.", "status": "pending"},
+        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "second-thing", "description": "Second thing.", "status": "pending", "isHere": true, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "anonymous-steps-are-not-collapsed",
+      "why": "Steps logged with no stepKey cannot be collapsed: two anonymous steps are two steps, not one shown twice.",
+      "sessionNumber": 2,
+      "specMarkdown": "# Fixture spec\n",
+      "expectedSpecSteps": [],
+      "entries": [
+        {"sessionNumber": 2, "stepNumber": 1, "description": "First anonymous step.", "status": "complete"},
+        {"sessionNumber": 2, "stepNumber": 2, "description": "Second anonymous step.", "status": "complete"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "", "description": "First anonymous step.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "", "description": "Second anonymous step.", "status": "complete", "isHere": true, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "everything-finished-marks-the-last-row",
+      "why": "With no unfinished row anywhere the marker falls to the last one, so the checklist never renders without a 'here'.",
+      "sessionNumber": 2,
+      "specMarkdown": "# Fixture spec\n",
+      "expectedSpecSteps": [],
+      "entries": [
+        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "a", "description": "A.", "status": "complete"},
+        {"sessionNumber": 2, "stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "a", "description": "A.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done", "isHere": true, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "planned-row-takes-the-marker-only-when-no-logged-step-is-unfinished",
+      "why": "The marker prefers the first unfinished LOGGED step over an earlier still-pending PLANNED one. Without that ordering, a session on step 3 whose planned step 2 was never claimed would point the operator at step 2 — the 'where is this session' question answered wrongly.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
+        {"stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress", "isHere": true, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "steps-in-a-fenced-block-are-not-this-specs-steps",
+      "why": "A spec that quotes a template full of numbered lines must not have that template read as its own plan — the seeded plan would then never match spec.md and ordinal reconciliation would be off for no reason.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 1: With a sample\n\n1. Register.\n2. Build it.\n\n```markdown\n1. Not a step.\n2. Also not a step.\n```\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete"}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": true, "isPlanned": true}
+      ]
+    },
+    {
+      "name": "a-falsy-non-string-kind-is-no-kind-at-all",
+      "why": "THE PATH-AWARE CRITIQUE'S CATCH (gpt-5.5, Set 114 S3). `kind` is untrusted on-disk data, and Python reads it with `str(x or \"\")` -- so `0` and `false` are 'no kind', i.e. an ORDINARY LOGGED STEP that may claim a planned row. The TypeScript mirror originally used `String(x ?? \"\")`, which falls back only on null/undefined and turned those into the literal strings \"0\" and \"false\" -- bookkeeping, forbidden from claiming. The two surfaces then disagreed about which row was current and whether a planned step had been executed. No shipping writer emits this, which is exactly why only a second reading lens found it and why it belongs here now: the corpus is what stops it reopening.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": ["Register.", "Build it."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "kind": 0},
+        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "kind": false}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "isHere": true, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "falsy-non-string-fields-read-as-empty",
+      "why": "The same coercion class as the case above, on the other string-ish fields. Python's `str(x or \"\")` turns a falsy non-string `stepKey` / `description` / `status` into the empty string, so such a step is ANONYMOUS (uncollapsible -- two of them are two rows) and its status is unknown rather than the literal text \"0\". A mirror using `??` would render \"0\" as a label and as a status token, and would collapse the two rows into one.",
+      "sessionNumber": 2,
+      "specMarkdown": "# Fixture spec\n",
+      "expectedSpecSteps": [],
+      "entries": [
+        {"sessionNumber": 2, "stepNumber": 1, "stepKey": 0, "description": false, "status": "complete"},
+        {"sessionNumber": 2, "stepNumber": 2, "stepKey": 0, "description": "Second one.", "status": 0}
+      ],
+      "expectedRows": [
+        {"stepNumber": 1, "stepKey": "", "description": "", "status": "complete", "isHere": false, "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "", "description": "Second one.", "status": "", "isHere": true, "isPlanned": false}
+      ]
+    },
+    {
+      "name": "a-session-with-no-entries-renders-nothing",
+      "why": "The Work Explorer's required degradation: no rows means no children, never a stale or invented list.",
+      "sessionNumber": 3,
+      "specMarkdown": "# Fixture spec\n\n### Session 3 of 3: Untouched\n\n1. Register.\n",
+      "expectedSpecSteps": ["Register."],
+      "entries": [
+        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete"}
+      ],
+      "expectedRows": []
+    }
+  ]
+}

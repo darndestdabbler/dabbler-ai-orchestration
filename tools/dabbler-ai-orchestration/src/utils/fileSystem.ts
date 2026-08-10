@@ -7,6 +7,7 @@ import { listGitWorktrees } from "./git";
 import { readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./progress";
+import { parseSpecSteps } from "../providers/sessionStepModel";
 import {
   DuplicateNameCollision,
   ModuleManifestEntry,
@@ -16,6 +17,8 @@ import {
   SessionSetConfig,
   SessionSetKind,
   SessionSetPrerequisite,
+  SessionStepEntry,
+  SessionStepLedger,
   TriStateFlag,
   UnsatisfiedPrerequisite,
   UatSummary,
@@ -839,6 +842,63 @@ export function readLatestIssuesEnvelope(dir: string): unknown | null {
   return bestPayload;
 }
 
+/**
+ * Set 114 Session 3: assemble the in-flight session's step-ledger payload,
+ * or `null` when there is nothing honest to show.
+ *
+ * Returns `null` — never a partial or synthesized list — in every failure
+ * direction the spec's step 3 names: a set that is not in flight, a ledger
+ * that never resolved a current session, an absent or unreadable activity
+ * log (the caller hands in `null` for those), and a session with no
+ * entries of its own. "No children" is the required degradation; a stale
+ * or invented list is the failure mode being avoided.
+ *
+ * The `spec.md` read is the ONLY new I/O this feature adds, it happens at
+ * most once per in-flight set, and it is tolerant: an unreadable spec
+ * yields `[]`, which makes `planMatchesSpec` answer `false` and costs only
+ * the ordinal half of reconciliation.
+ */
+export function buildStepLedger(
+  state: SessionState,
+  currentSession: number | null,
+  entries: SessionStepEntry[] | null,
+  specPath: string,
+): SessionStepLedger | null {
+  if (state !== "in-progress") return null;
+  if (currentSession === null || !Array.isArray(entries)) return null;
+
+  const mine = entries.filter(
+    (entry) =>
+      entry &&
+      typeof entry === "object" &&
+      !Array.isArray(entry) &&
+      entry.sessionNumber === currentSession,
+  );
+  if (mine.length === 0) return null;
+
+  let specSteps: string[] = [];
+  try {
+    specSteps = parseSpecSteps(fs.readFileSync(specPath, "utf8"), currentSession);
+  } catch {
+    /* an unreadable spec is not an error here — see the docstring */
+  }
+
+  // Narrowed on the way in, so a large `routedApiCalls` payload on a step
+  // entry is not retained for the lifetime of the scan cache.
+  return {
+    sessionNumber: currentSession,
+    entries: mine.map((e) => ({
+      sessionNumber: e.sessionNumber,
+      stepNumber: e.stepNumber,
+      stepKey: e.stepKey,
+      description: e.description,
+      status: e.status,
+      kind: e.kind,
+    })),
+    specSteps,
+  };
+}
+
 export function readSessionSets(root: string): SessionSet[] {
   const sessionSetsDir = path.join(root, SESSION_SETS_REL);
   if (!fs.existsSync(sessionSetsDir)) return [];
@@ -937,6 +997,10 @@ export function readSessionSets(root: string): SessionSet[] {
     // asterisk tooltip ("Ran under schema v<N>"). null when absent /
     // non-numeric (the asterisk then reads "an older schema").
     let schemaVersionOnDisk: number | null = null;
+    // Set 114 S3: the in-flight set's raw activity-log entries, retained
+    // from the parse below so the fifth tree level (an in-flight session's
+    // steps) needs no second read. Stays null on every other set.
+    let rawStepEntries: SessionStepEntry[] | null = null;
     const eventsPath = path.join(dir, "session-events.jsonl");
 
     // Activity log is a step log, not a count source. The activity-log
@@ -961,6 +1025,15 @@ export function readSessionSets(root: string): SessionSet[] {
         if (typeof data.totalSessions === "number") totalSessions = data.totalSessions;  // noqa: D13 - activity-log.json carrier field, not session-state
         for (const e of data.entries ?? []) {
           if (e.dateTime && (!lastTouched || e.dateTime > lastTouched)) lastTouched = e.dateTime;
+        }
+        // Set 114 S3: the fifth tree level's raw material. Retained ONLY
+        // for an in-flight set — the checklist answers "where is THIS
+        // session", so a complete / not-started / cancelled set has no
+        // step children and no reason to carry entries. That gate is what
+        // keeps this off the startup path S1 measured: the parse above
+        // already happened, and everything here is a narrowing of it.
+        if (state === "in-progress" && Array.isArray(data.entries)) {
+          rawStepEntries = data.entries as SessionStepEntry[];
         }
       } catch { /* ignore */ }
     }
@@ -1223,6 +1296,17 @@ export function readSessionSets(root: string): SessionSet[] {
     }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
+    // Set 114 S3: the fifth level's data, assembled once the ledger has
+    // told us WHICH session is in flight. `liveSession.currentSession` is
+    // `readProgress`'s derivation, which is the same session
+    // `session_checklist.current_session_number` resolves for the CLI —
+    // both read `sessions[]`, never file presence.
+    const stepLedger = buildStepLedger(
+      state,
+      liveSession?.currentSession ?? null,
+      rawStepEntries,
+      specPath,
+    );
 
     sets.push({
       name: entry.name,
@@ -1258,6 +1342,10 @@ export function readSessionSets(root: string): SessionSet[] {
       // Set 110 S2: the fourth tree level's data, taken from the ledger
       // this scan already parsed — no extra read, no extra stat.
       sessions: normalizeLedgerSessions(ledgerSessions),
+      // Set 114 S3: the fifth level's data. Null on every set that is not
+      // in flight, and on an in-flight set whose activity log is absent,
+      // unreadable, or silent about the current session.
+      stepLedger,
     });
   }
 

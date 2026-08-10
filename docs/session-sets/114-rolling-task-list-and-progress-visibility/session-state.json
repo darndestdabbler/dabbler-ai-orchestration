@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "114-rolling-task-list-and-progress-visibility",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -36,11 +36,17 @@
     {
       "number": 3,
       "title": "Session 3",
-      "status": "not-started",
-      "startedAt": null,
-      "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "status": "complete",
+      "startedAt": "2026-08-10T05:33:22.966565-04:00",
+      "completedAt": "2026-08-10T08:40:32.169257-04:00",
+      "orchestrator": {
+        "engine": "copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "effort": "high",
+        "identityProvenance": "asserted"
+      },
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

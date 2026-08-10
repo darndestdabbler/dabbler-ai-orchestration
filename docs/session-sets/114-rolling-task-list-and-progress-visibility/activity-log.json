@@ -201,6 +201,91 @@
       "dateTime": "2026-08-10T05:21:30.120344-04:00",
       "description": "Full pytest 3765 passed / 9 skipped after the final code change; Layer 3 33 passed (state-file-writer trigger). Four verification rounds, round 4 VERIFIED with all four fixes accepted. Committed and pushed 812695e7.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T05:33:22.975683-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "work-explorer-expansion-an-in-flight",
+      "dateTime": "2026-08-10T05:33:22.975683-04:00",
+      "description": "**Work Explorer expansion:** an in-flight session node expands to show its steps, with the same status glyphs and the current step marked. This is the half Set 111 S4 recorded and deliberately did not build.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "keep-it-honest-under-refresh",
+      "dateTime": "2026-08-10T05:33:22.975683-04:00",
+      "description": "**Keep it honest under refresh:** the tree reflects the ledger as it changes during a session, and an unreadable or absent activity log degrades to no children rather than to a stale or invented list.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "walk-it",
+      "dateTime": "2026-08-10T05:33:22.975683-04:00",
+      "description": "**Walk it.** Full Layer 3 after freeze (this session touches the rendering surface), then the UAT walk. **If Set 113 has landed, use the narrated-video format** \u2014 Set 111 S4's walk was waived because the old format is not worth the operator's time, and repeating it here would reproduce that outcome.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "verify-close",
+      "dateTime": "2026-08-10T05:33:22.975683-04:00",
+      "description": "Verify, close. `change-log.md`, Step 9 review, advisory path-aware critique.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T05:37:26.786047-04:00",
+      "description": "Registered session 3 via start_session (copilot / anthropic / claude-opus-5 / high); preload read (constitution, project-guidance, lessons-learned, AGENTS.md); plan seeded by Set 114 S2 machinery and the start-of-session checklist posted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "tree-expansion",
+      "dateTime": "2026-08-10T05:54:04.314478-04:00",
+      "description": "Work Explorer expansion: shipped the fifth tree level. New pure module providers/sessionStepModel.ts mirrors session_checklist.build_rows (collapse by stepKey, identity-then-ordinal reconciliation, here-marking) and spec_admission.parse_session_plans/parse_step_texts. Drift is gated by a committed cross-language corpus, ai_router/tests/fixtures/session-step-parity.json, asserted from BOTH sides (test_step_row_parity.py and sessionStepModel.test.ts) - 12 cases, all green in both languages. Scan lifts the in-flight session entries in fileSystem.readSessionSets (no extra activity-log read) plus one spec.md parse, carried as SessionSet.stepLedger. Tree model gains StepNode, stepNodes, stepDescriptor, NODE_TOKEN.step and the shared HERE_MARKER; a session row is Collapsed only when it has steps.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "refresh-honesty",
+      "dateTime": "2026-08-10T05:54:04.316371-04:00",
+      "description": "Keep it honest under refresh: the activity-log.json watcher already drives refresh(), which clears the scan cache, so the tree follows the ledger as it changes; step row ids are stable across refreshes so expansion survives the 30s poll. Every degradation path returns NO children rather than a stale or invented list - absent log, unreadable log, log silent about the current session, ledger belonging to a different session, and a session that is not in flight. Covered by 12 tree-model tests and 6 scanner tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "walk-it",
+      "dateTime": "2026-08-10T06:59:05.699209-04:00",
+      "description": "Walk it: full Layer 3 run after the last code change - 36 passed / 0 failed (9.8m), including three new work-explorer-steps scenarios (lazy expansion with the plan and the current step marked; a step-less session row is a leaf with no aria-expanded; the list follows the ledger, a logged step claims its planned row and the marker moves). One round-1 failure was my own assertion, not the code: the e2e harness derives stepNumber as max+1, which lands past every seeded planned step, so make-activity gained --step-number / --step-key / --status overrides (defaults unchanged, every existing caller byte-identical). Full pytest re-run after that change: 3791 passed / 0 failed / 9 skipped. The UAT walk is WAIVED on operator authority (2026-08-10) because Set 113 has not landed; the ten owed judgments are itemized in docs/planning/uat-improvement-notes.md under Deferred UAT.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "verify-close",
+      "dateTime": "2026-08-10T08:25:04.808467-04:00",
+      "description": "Verify, close. Routed discovery round 1 (both lenses, gpt-5.5, anthropic excluded as the orchestrator's effective provider): VERIFIED, 0 findings. Then the advisory end-of-set path-aware critique, two distinct providers each reading the repo itself: gemini-3.1-pro-preview VERIFIED + 3 nits, gpt-5.5 ISSUES_FOUND with one Major the routed round structurally could not see (it reads a diff; this was a semantic difference between two files neither of which changed suspiciously) - a falsy non-string kind (0 / false) read as absent in Python and as the literal strings in the TypeScript mirror, flipping whether an entry may claim a planned row. Reproduced first, then fixed as a CLASS (one pyStr coercion at every string-ish field read, not one patched site) and pinned with two new shared-corpus cases; two gemini nits fixed (array-is-not-an-entry, FENCE_RE whitespace), one dismissed as factually wrong about the code. The Layer 2 re-run that remediation prompted found two close-gate regressions this set had ALREADY shipped: S2's check_activity_log_entry and S1's checklist_posted both refused the sample-project smoke close. Fixed through the shipping writers rather than hand-written ledger lines. Final suites, all after the last code change: pytest 3795 passed / 0 failed / 9 skipped; mocha 1672 passing / 0 failing; Playwright 36 passed / 0 failed. change-log.md written including the Step 9 review (no guidance edits - both preload files are at their ceilings, so the one recommendation is recorded for the operator rather than squeezed in). UAT waived on operator authority with the owed judgments itemized.",
+      "status": "complete"
     }
   ]
 }

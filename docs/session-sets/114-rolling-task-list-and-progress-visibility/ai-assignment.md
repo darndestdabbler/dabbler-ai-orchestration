@@ -185,3 +185,44 @@ context.
 **Verification for S3:** must again use a non-anthropic effective
 provider. Full Layer 3 after freeze, then the UAT walk — narrated-video
 format if Set 113 has landed.
+
+---
+
+## After Set 114 — next-set recommendations (authored at Session 3 step 3.5)
+
+Set 114 is the terminal session's set, so there is no next-orchestrator
+handoff inside it. What follows is the next-**set** recommendation, in
+priority order, recorded here per the constitution's step 3.5.
+
+**1. Publish the two staged artifacts.** `dabbler-ai-router 1.0.0` and
+extension `0.51.0` have both been staged, gated green, and deliberately
+held: the operator deferred the publish "until Set 114 completes" at the
+Set 112 UAT walk. That condition is now met. This is not a session set —
+it is an operator action (tag `v1.0.0`, tag `vsix-v0.51.0`, both
+GitHub-Actions tag-driven) and it is human-only by the
+irreversible-actions rule. It should happen before any set that adds
+more unpublished surface, because the staged lineage is already three
+sets deep (110, 112, 114) and every further deferral makes the eventual
+release harder to reason about.
+
+**2. Set 113 — narrated video walkthroughs.** It was reserved before 114
+and is still `not-started`. Set 114 S3's own walk had to fall back to the
+old UAT format for exactly the reason 113 exists: Set 111 S4's walk was
+waived because the old format is not worth the operator's time, and this
+set could only repeat it. That is now the second set in a row to pay that
+cost, which is the strongest argument available for doing 113 next.
+
+**3. The two unenforced cadence moments.** Set 114 S1 shipped seven named
+transitions and gate-checks five of them; the two "before X" posts are
+prescribed and unchecked, and the operator adjudicated that as an
+accepted residual with a named owner. The residual is only worth
+reopening if something ever produces a real *start* record — a launcher
+that stamps a command's beginning, or a `verify_session` round-started
+line. Do not reopen it speculatively: the gate cannot prove a post
+preceded an event, and a flag that let the orchestrator declare "I posted
+first" is the self-reported attestation this set exists to avoid.
+
+**Verification for the terminal session:** must again use a non-anthropic
+effective provider. This session touches the rendering surface, so it
+owes the full Layer 3 after freeze, and the set's `pathAwareCritique:
+advisory` stage runs before the set-terminal close.

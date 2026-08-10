@@ -197,6 +197,7 @@ suite("Set 110 S2 — menu parity, backward: no menu entry is unreachable", () =
       "dabblerBucket",
       "dabblerSet",
       "dabblerSession",
+      "dabblerStep",
       "module-declared",
       "module-fallback",
       "module-pseudo",
@@ -260,10 +261,10 @@ suite("Set 110 S2 — the two spike-proven constraints", () => {
     }
   });
 
-  test("no menu entry targets bucket or session rows — neither has actions yet", () => {
+  test("no menu entry targets bucket, session or step rows — none has actions yet", () => {
     // Stated so a future addition is a DECISION rather than a leak. The
-    // operator confirmed a mapping for module and set rows only; bucket
-    // and session rows are display-only in this session.
+    // operator confirmed a mapping for module and set rows only; bucket,
+    // session and (Set 114 S3) step rows are display-only.
     for (const entry of allNativeEntries) {
       const when = entry.when ?? "";
       assert.ok(
@@ -273,6 +274,10 @@ suite("Set 110 S2 — the two spike-proven constraints", () => {
       assert.ok(
         !when.includes(tokenMatcher("dabblerSession")),
         `unexpected session-row action: ${entry.command}`,
+      );
+      assert.ok(
+        !when.includes(tokenMatcher("dabblerStep")),
+        `unexpected step-row action: ${entry.command}`,
       );
     }
   });

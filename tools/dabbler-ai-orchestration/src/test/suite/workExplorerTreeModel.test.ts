@@ -36,6 +36,8 @@ import {
   setTooltip,
   severityOf,
   setIcon,
+  stepDescriptor,
+  stepNodes,
   verdictIsUnclean,
 } from "../../providers/workExplorerTreeModel";
 
@@ -124,7 +126,8 @@ suite("Set 110 S2 — Work Explorer tree shape", () => {
       sessions.map((s) => (s.kind === "session" ? s.session.number : -1)),
       [1, 2],
     );
-    // The fourth level is a leaf.
+    // A COMPLETE session is a leaf: the fifth level (Set 114 S3) belongs
+    // to the session in flight, which is session 2 here.
     assert.deepStrictEqual(childrenOf(sessions[0]), []);
   });
 
@@ -637,5 +640,184 @@ suite("Set 110 S2 — bucket ordering is shared with the webview, not re-impleme
     );
     assert.strictEqual(withCancelled.length, 4);
     assert.strictEqual(withCancelled[3].label, "Cancelled");
+  });
+});
+
+suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
+  // The half Set 111 S4 recorded and deliberately did not build. The row
+  // CONTENT is proven against the cross-language corpus in
+  // `sessionStepModel.test.ts`; what is asserted here is the tree-shape
+  // contract around it — which rows expand, which stay leaves, and what
+  // an unreadable ledger degrades to.
+
+  const PLAN = [
+    { sessionNumber: 2, stepNumber: 1, stepKey: "register", description: "Register.", status: "pending", kind: "plan-step" },
+    { sessionNumber: 2, stepNumber: 2, stepKey: "build-it", description: "Build it.", status: "pending", kind: "plan-step" },
+  ];
+  const LOGGED = [
+    { sessionNumber: 2, stepNumber: 1, stepKey: "registration", description: "Registered.", status: "complete" },
+  ];
+  const SPEC_STEPS = ["Register.", "Build it."];
+
+  function inFlightSet(over: Partial<SessionSet> = {}): SessionSet {
+    return fakeSet({
+      name: "114-live",
+      state: "in-progress",
+      sessions: ledger("complete", "in-progress", "not-started"),
+      stepLedger: {
+        sessionNumber: 2,
+        entries: [...PLAN, ...LOGGED],
+        specSteps: SPEC_STEPS,
+      },
+      ...over,
+    });
+  }
+
+  function sessionNode(set: SessionSet, number: number) {
+    const node = sessionNodes({ kind: "set", set }).find(
+      (n) => n.session.number === number,
+    );
+    assert.ok(node, `no session ${number} on ${set.name}`);
+    return node;
+  }
+
+  test("the in-flight session expands to its reconciled steps", () => {
+    const set = inFlightSet();
+    const steps = childrenOf(sessionNode(set, 2));
+    assert.deepStrictEqual(
+      steps.map((s) => (s.kind === "step" ? [s.row.stepKey, s.row.status, s.row.isPlanned] : ["?"])),
+      [
+        ["registration", "complete", false],
+        ["build-it", "pending", true],
+      ],
+    );
+    // The fifth level is the last one.
+    assert.deepStrictEqual(childrenOf(steps[0]), []);
+  });
+
+  test("a session that is not in flight is a leaf, however full the ledger", () => {
+    // The checklist answers "where is THIS session". A finished session is
+    // answered by its own status glyph, and its steps stay one click away
+    // in the activity log (decisions.jsonl, session 3).
+    const set = inFlightSet();
+    for (const n of [1, 3]) {
+      assert.deepStrictEqual(stepNodes(sessionNode(set, n)), []);
+      assert.strictEqual(sessionDescriptor(sessionNode(set, n)).collapsible, "none");
+    }
+    assert.strictEqual(sessionDescriptor(sessionNode(set, 2)).collapsible, "collapsed");
+  });
+
+  test("an absent or unreadable activity log degrades to NO children", () => {
+    // Spec step 3, stated as the failure to avoid: no children is the
+    // right answer; a stale or invented list is not.
+    for (const ledgerValue of [undefined, null]) {
+      const set = inFlightSet({ stepLedger: ledgerValue });
+      assert.deepStrictEqual(stepNodes(sessionNode(set, 2)), []);
+      assert.strictEqual(sessionDescriptor(sessionNode(set, 2)).collapsible, "none");
+    }
+  });
+
+  test("a ledger about a DIFFERENT session says nothing about this one", () => {
+    // A state file and an activity log that disagree. The ledger is
+    // authoritative for its own session and silent about every other, so
+    // the row must not borrow another session's steps.
+    const set = inFlightSet({
+      stepLedger: { sessionNumber: 1, entries: [...PLAN, ...LOGGED], specSteps: SPEC_STEPS },
+    });
+    assert.deepStrictEqual(stepNodes(sessionNode(set, 2)), []);
+  });
+
+  test("a ledger whose rows come back empty leaves the row a leaf", () => {
+    const set = inFlightSet({
+      stepLedger: { sessionNumber: 2, entries: [], specSteps: SPEC_STEPS },
+    });
+    assert.deepStrictEqual(stepNodes(sessionNode(set, 2)), []);
+    assert.strictEqual(sessionDescriptor(sessionNode(set, 2)).collapsible, "none");
+  });
+
+  test("step row ids are unique and stable across a refresh", () => {
+    // Without a stable, unique id VS Code derives one from the label, and
+    // two steps can legitimately share a label — the tree would then tie
+    // their expansion/selection state together, and the 30-second poll
+    // would fold rows under the operator.
+    const set = inFlightSet();
+    const ids = childrenOf(sessionNode(set, 2)).map((n) =>
+      n.kind === "step" ? stepDescriptor(n).id : "?",
+    );
+    assert.strictEqual(new Set(ids).size, ids.length);
+    // A second scan builds fresh node objects; the ids must not move.
+    const again = childrenOf(sessionNode(inFlightSet(), 2)).map((n) =>
+      n.kind === "step" ? stepDescriptor(n).id : "?",
+    );
+    assert.deepStrictEqual(again, ids);
+    for (const id of ids) assert.ok(id.startsWith("step:114-live/2/"), id);
+  });
+
+  test("exactly one step row carries the current-step marker", () => {
+    const set = inFlightSet();
+    const descriptors = childrenOf(sessionNode(set, 2)).map((n) =>
+      n.kind === "step" ? stepDescriptor(n) : null,
+    );
+    const marked = descriptors.filter((d) => d?.description === "<- here");
+    assert.strictEqual(marked.length, 1);
+    // Quiet everywhere else: the marker is only findable at a glance if
+    // it is the only thing in the description column.
+    assert.strictEqual(
+      descriptors.filter((d) => d?.description !== undefined).length,
+      1,
+    );
+  });
+
+  test("a step row's label is the humanized key and its tooltip carries the prose", () => {
+    const set = inFlightSet();
+    const [first] = childrenOf(sessionNode(set, 2));
+    assert.strictEqual(first.kind, "step");
+    const d = stepDescriptor(first as never);
+    assert.strictEqual(d.label, "Registration");
+    assert.ok(d.tooltip?.includes("Registered."), d.tooltip);
+    assert.strictEqual(d.collapsible, "none");
+  });
+
+  test("step rows carry the same authored lifecycle glyphs the other rows use", () => {
+    const set = inFlightSet();
+    const icons = childrenOf(sessionNode(set, 2)).map((n) =>
+      n.kind === "step" ? stepDescriptor(n).icon : undefined,
+    );
+    assert.deepStrictEqual(icons, [
+      { kind: "file", slug: "done.svg" },
+      { kind: "file", slug: "not-started.svg" },
+    ]);
+  });
+
+  test("step rows carry their own node token and no set/session token", () => {
+    // The token vocabulary is what every `when` clause gates on; a step
+    // row inheriting `dabblerSession` would leak session actions onto it
+    // the moment any are added.
+    const set = inFlightSet();
+    const [first] = childrenOf(sessionNode(set, 2));
+    const cv = stepDescriptor(first as never).contextValue;
+    assert.ok(hasToken(cv, NODE_TOKEN.step), cv);
+    assert.ok(!hasToken(cv, NODE_TOKEN.session), cv);
+    assert.ok(!hasToken(cv, NODE_TOKEN.set), cv);
+    assert.ok(hasToken(cv, "step-logged"), cv);
+    assert.ok(hasToken(cv, "step-complete"), cv);
+  });
+
+  test("a planned row is distinguishable from a step logged `pending`", () => {
+    // `isPlanned` is carried rather than re-derived (Set 114 S2's
+    // assignment note 2): "the spec promised this" and "the orchestrator
+    // logged it as pending" are different facts.
+    const set = inFlightSet();
+    const [, second] = childrenOf(sessionNode(set, 2));
+    const cv = stepDescriptor(second as never).contextValue;
+    assert.ok(hasToken(cv, "step-planned"), cv);
+    assert.ok(stepDescriptor(second as never).tooltip?.includes("planned"));
+  });
+
+  test("the session tooltip says how many steps are under it", () => {
+    const set = inFlightSet();
+    assert.ok(sessionDescriptor(sessionNode(set, 2)).tooltip?.includes("2 steps"));
+    // A leaf session row says nothing about steps it does not have.
+    assert.ok(!sessionDescriptor(sessionNode(set, 1)).tooltip?.includes("step"));
   });
 });

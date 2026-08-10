@@ -115,6 +115,7 @@ def cmd_make_set(args: argparse.Namespace) -> int:
         model=args.model,
         provider=args.provider,
         effort=args.effort,
+        with_session_steps=args.with_session_steps,
     )
     _emit(_handle_to_dict(handle))
     return 0
@@ -133,6 +134,9 @@ def cmd_make_activity(args: argparse.Namespace) -> int:
         handle,
         args.session_number,
         description=args.description,
+        step_number=args.step_number,
+        step_key=args.step_key,
+        status=args.status,
         commit=True,
     )
     _emit({"ok": True})
@@ -239,6 +243,15 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--model", default="claude-opus-4-7")
     p.add_argument("--provider", default="anthropic")
     p.add_argument("--effort", default="high")
+    p.add_argument(
+        "--with-session-steps",
+        action="store_true",
+        help=(
+            "Set 114 S3: give the fixture spec a numbered step list per "
+            "session, so start_session seeds a plan and the Work Explorer "
+            "has step rows to render."
+        ),
+    )
     p.set_defaults(func=cmd_make_set)
 
     p = sub.add_parser("start")
@@ -250,6 +263,13 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_handle_args(p)
     p.add_argument("--session-number", type=int, required=True)
     p.add_argument("--description", default="harness work step")
+    # Set 114 S3: override the derived step identity so a logged step can
+    # CLAIM a seeded planned row instead of appending past it. The derived
+    # default is max(stepNumber for this session) + 1, which lands beyond
+    # every planned step once start_session has seeded a plan.
+    p.add_argument("--step-number", type=int, default=None)
+    p.add_argument("--step-key", default=None)
+    p.add_argument("--status", default="complete")
     p.set_defaults(func=cmd_make_activity)
 
     p = sub.add_parser("make-disposition")

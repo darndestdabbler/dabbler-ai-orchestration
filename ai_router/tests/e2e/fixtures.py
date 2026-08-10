@@ -224,8 +224,32 @@ effort: normal
 ```
 """
 
+# Set 114 S3: an OPT-IN per-session plan block. ``start_session`` seeds
+# whatever steps a spec declares into ``activity-log.json``, and the Work
+# Explorer's fifth tree level renders that plan — so a Layer 3 scenario
+# about step rows needs a fixture spec that actually declares steps.
+#
+# Off by default. Every pre-114 fixture keeps a spec with no ``### Session``
+# headings at all, which is itself a case worth preserving: it is what a
+# consumer repo's older spec looks like, and it must seed nothing.
+_SPEC_SESSION_BLOCK = """
+### Session {n} of {total_sessions}: Fixture session {n}
 
-def _write_spec(set_dir: Path, slug: str, total_sessions: int) -> None:
+1. Register.
+2. Build the thing.
+3. Verify, close.
+
+**Creates:** nothing real
+"""
+
+
+def _write_spec(
+    set_dir: Path,
+    slug: str,
+    total_sessions: int,
+    *,
+    with_session_steps: bool = False,
+) -> None:
     """Write the minimal spec.md the orchestrator's parser expects.
 
     The parser (``session_state._extract_session_set_configuration_block``)
@@ -233,11 +257,18 @@ def _write_spec(set_dir: Path, slug: str, total_sessions: int) -> None:
     fenced block beneath it. Only ``totalSessions`` is read by the
     Python layer post-Set-026, but the other fields are included so
     the fixture matches what an operator-authored spec looks like.
+
+    With *with_session_steps*, a ``### Session N of M`` block carrying
+    three numbered steps is appended per session (Set 114 S3), so
+    ``start_session`` has a plan to seed.
     """
-    (set_dir / "spec.md").write_text(
-        _SPEC_TEMPLATE.format(slug=slug, total_sessions=total_sessions),
-        encoding="utf-8",
-    )
+    text = _SPEC_TEMPLATE.format(slug=slug, total_sessions=total_sessions)
+    if with_session_steps:
+        text += "".join(
+            _SPEC_SESSION_BLOCK.format(n=n, total_sessions=total_sessions)
+            for n in range(1, total_sessions + 1)
+        )
+    (set_dir / "spec.md").write_text(text, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -254,6 +285,7 @@ def make_session_set(
     model: str = "claude-opus-4-7",
     provider: str = "anthropic",
     effort: str = "high",
+    with_session_steps: bool = False,
 ) -> HarnessHandle:
     """Build a tmpdir-scoped session set ready for the e2e harness.
 
@@ -262,6 +294,12 @@ def make_session_set(
     under ``docs/session-sets/<slug>/`` with a minimal spec.md, and
     lands a baseline commit so the branch has somewhere for subsequent
     pushes to fast-forward from.
+
+    With *with_session_steps* (Set 114 S3) the spec also declares a
+    numbered step list per session, so ``drive_start_session`` seeds a
+    plan into ``activity-log.json`` and the Work Explorer has step rows
+    to render. Default off — a spec with no session headings is what
+    every pre-114 fixture and every older consumer-repo spec looks like.
 
     Returns a :class:`HarnessHandle` carrying everything the per-step
     helpers need. Tests typically just pass the handle around without
@@ -307,7 +345,7 @@ def make_session_set(
 
     set_dir = repo_root / "docs" / "session-sets" / slug
     set_dir.mkdir(parents=True)
-    _write_spec(set_dir, slug, total_sessions)
+    _write_spec(set_dir, slug, total_sessions, with_session_steps=with_session_steps)
 
     # Lay down the not-started state file matching production
     # bootstrap. The start_session CLI reads ``totalSessions`` from
@@ -478,6 +516,9 @@ def make_activity_log_entry(
     session_number: int,
     *,
     description: str = "harness work step",
+    step_number: Optional[int] = None,
+    step_key: Optional[str] = None,
+    status: str = "complete",
     commit: bool = True,
 ) -> None:
     """Append a single entry for *session_number* to ``activity-log.json``.
@@ -491,6 +532,16 @@ def make_activity_log_entry(
     The file is created on first call with the session-set metadata
     block. Subsequent calls append to ``entries[]`` and bump the
     step number.
+
+    Set 114 S3: *step_number*, *step_key* and *status* are overridable so
+    a caller can log a step that **claims a seeded planned row** rather
+    than appending beside it. The derived default takes the highest
+    ``stepNumber`` already recorded for the session and adds one — which,
+    once ``start_session`` seeds a plan, lands *past* every planned step
+    and therefore always appends. That default is right for the gate-only
+    callers it was written for and wrong for anything asserting
+    reconciliation, so the override is the fix rather than a change to
+    the default (every existing caller keeps its exact behaviour).
     """
     path = _activity_log_path(handle)
     if path.is_file():
@@ -505,24 +556,27 @@ def make_activity_log_entry(
         }
 
     entries = data.setdefault("entries", [])
-    step_number = (
-        max(
-            (
-                e.get("stepNumber", 0)
-                for e in entries
-                if e.get("sessionNumber") == session_number
-            ),
-            default=0,
+    if step_number is None:
+        step_number = (
+            max(
+                (
+                    e.get("stepNumber", 0)
+                    for e in entries
+                    if e.get("sessionNumber") == session_number
+                ),
+                default=0,
+            )
+            + 1
         )
-        + 1
-    )
+    if step_key is None:
+        step_key = f"session-{session_number}/step-{step_number}"
     entries.append({
         "sessionNumber": session_number,
         "stepNumber": step_number,
-        "stepKey": f"session-{session_number}/step-{step_number}",
+        "stepKey": step_key,
         "dateTime": "2026-05-16T01:00:00-04:00",
         "description": description,
-        "status": "complete",
+        "status": status,
         "routedApiCalls": [],
     })
 

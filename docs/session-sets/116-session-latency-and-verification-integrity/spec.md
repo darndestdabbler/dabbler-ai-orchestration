@@ -96,6 +96,16 @@ and `mocha` are `expensive=False`; only Playwright is `expensive=True`. The
 once-per-session-at-close rule therefore never applied to the 14-minute
 suite.
 
+**The doctrine's test ordering is self-contradictory.**
+`docs/session-constitution.md` Step 5 says expensive suites run *"fully
+once, after the last code change"* — but Step 7 (remediation) **is** a code
+change, and verification finds something in nearly every session (7 of 8
+supplementary rounds produced Majors). The instruction is therefore
+unsatisfiable wherever it matters: every remediation invalidates the run,
+so the suite runs again. That is how Set 112 S3 reached **15 test runs and
+186 minutes — 59% of the session**. The orchestrator was not being
+wasteful; it was obeying a rule that cannot be satisfied where it sits.
+
 ## Decisions already made — do not reopen
 
 1. **No test-pruning campaign.** Measured at 0.4% payoff. Deleting from the
@@ -209,17 +219,27 @@ session, including Sessions 2 and 3 of this set.
    and `verification_method_vocabulary`: each check still runs and still
    prints, but it cannot refuse a close.
 
-4. **Make `test_run_fresh` govern the applicable suites.** pytest is
-   `expensive=False` today, which is why a session could run 15 suites
-   unremarked. Scope it to the surfaces the session actually touched, so a
-   docs-only session never owes Playwright.
+4. **Fix what "a fresh test run" means — and when it happens.** Two halves
+   of one bug. **(a)** `test_run_fresh` does not govern pytest: `pytest` and
+   `mocha` are `expensive=False` in `run_of_record.py`, which is why a
+   session could run 15 suites unremarked. Scope it to the surfaces the
+   session actually touched, so a docs-only session never owes Playwright.
+   **(b) Move the full-suite run from Step 5 to Step 8** in
+   `docs/session-constitution.md`. Step 5 today says expensive suites run
+   *"fully once, after the last code change"* — but **Step 7 remediation is
+   a code change**, so the instruction is unsatisfiable in any session where
+   verification finds anything, which is nearly all of them. Targeted tests
+   during the loop; **one applicable full run after remediation, before
+   close.** This depends on Session 2's staleness fix and must not ship
+   before it.
 5. Close: `change-log.md`, the **required** path-aware critique, Step 9
    review; verify, close.
 
-**Creates:** the journaled gate ruling, the reduced gate set, applicable-suite scoping, `change-log.md`
-**Touches:** `ai_router/gate_checks.py`, `ai_router/close_session.py`, `ai_router/run_of_record.py`, `docs/`
-**Ends with:** three gates the operator believes in, plus preconditions that protect the write — and no gate that survives only because deleting it felt risky.
-**Progress keys:** `gateRulingJournaled`, `gatesReduced`, `applicableSuites`, `changeLog`
+**Creates:** the journaled gate ruling, the reduced gate set, applicable-suite scoping, the Step 5 → Step 8 reordering, `change-log.md`
+**Touches:** `ai_router/gate_checks.py`, `ai_router/close_session.py`, `ai_router/run_of_record.py`, `docs/session-constitution.md`, `docs/`
+**Ends with:** three gates the operator believes in, plus preconditions that protect the write — and the expensive suite runs once, after the last code change actually happens.
+**Progress keys:** `gateRulingJournaled`, `gatesReduced`, `applicableSuites`, `suiteRunsLast`, `changeLog`
+
 
 ---
 

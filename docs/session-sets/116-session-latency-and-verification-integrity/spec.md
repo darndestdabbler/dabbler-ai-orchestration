@@ -13,13 +13,13 @@
 > **Session Set:** `docs/session-sets/116-session-latency-and-verification-integrity/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
 
-> **Sequencing constraint, not a prerequisite.** Sessions 1 and 2 touch
-> `run_of_record.py`, `close_backstop.py`, `verification_stamp.py` and docs —
-> none of which Set 114 has open, so they may run immediately and
-> concurrently with it. **Session 3 collides with Set 114** (`gate_checks.py`,
-> `spec_admission.py`, `start_session.py`) and must not start until 114 has
-> closed. This is deliberately not a spec-level `prerequisites:` block: the
-> urgent, self-funding half must not be blocked behind an in-flight set.
+> **Sequencing.** Set 114 **completed 2026-08-10 at 08:40** (all three
+> sessions VERIFIED, `change-log.md` written), so the collision that would
+> have blocked Session 3 no longer exists and **all three sessions may run**.
+> Session 3 still opens by confirming 114 is complete and by **reading what
+> it shipped** — 114 changed `gate_checks.py`, `spec_admission.py` and
+> `start_session.py`, and Session 3 edits the first of those.
+
 
 > **Operator notes are required reading.**
 > [`operator-notes.md`](operator-notes.md) carries the operator's
@@ -117,7 +117,9 @@ suite.
 
 - **No new gates.** A set about removing ceremony that adds ceremony has
   failed.
-- **No test deletion**, beyond tests belonging to gates deleted in Session 3.
+- **No test deletion.** No gate is deleted by the operator's ruling, so no
+  gate's tests go with it either. This set reduces test *runtime*, not test
+  count.
 - **No test-selection tooling.**
 - **No session-splitting.** The operator's constraint is explicit: shorter
   sessions, *not* more of them.
@@ -187,12 +189,10 @@ session, including Sessions 2 and 3 of this set.
 
 ### Session 3 of 3: Ten gates to three
 
-**Blocked on Set 114.** It has `gate_checks.py` open.
-
 **Steps:**
 
-1. Register. **Stop immediately if Set 114 is not complete** — this session
-   edits files it currently owns.
+1. Register. **Confirm Set 114 is complete** (it was, 2026-08-10 08:40) and
+   read what it shipped before editing `gate_checks.py`.
 2. **Operator decision, journaled.** Reducing gates is a verification
    reduction and sits inside the decision-rights hard carve-out; it is never
    self-authorized. **The operator ruled on 2026-08-10 — see
@@ -203,11 +203,11 @@ session, including Sessions 2 and 3 of this set.
 3. **Implement the ruling.** Keep `verification_integrity`,
    `uat_walk_recorded` and `test_run_fresh` as gates. Keep
    `working_tree_clean` and `pushed_to_remote` as **transactional
-   preconditions** — they protect the write, not the ceremony. **Delete**
-   `checklist_posted`, and its tests with it. **Demote to warn-not-block**
-   `activity_log_entry`, `next_orchestrator_present`, `change_log_fresh` and
-   `verification_method_vocabulary`: the check still runs and still prints,
-   but it cannot refuse a close.
+   preconditions** — they protect the write, not the ceremony. **Delete
+   nothing.** **Demote to warn-not-block** `checklist_posted`,
+   `activity_log_entry`, `next_orchestrator_present`, `change_log_fresh`
+   and `verification_method_vocabulary`: each check still runs and still
+   prints, but it cannot refuse a close.
 
 4. **Make `test_run_fresh` govern the applicable suites.** pytest is
    `expensive=False` today, which is why a session could run 15 suites
@@ -245,9 +245,12 @@ session, including Sessions 2 and 3 of this set.
 - **Session 2 edits the machinery that judges Session 2.** Changing the
   round budget while a round budget governs the session is genuinely
   delicate. Expect to re-read the ledger by hand at least once.
-- **Deleting a gate is irreversible in practice.** Nothing will re-add
-  `checklist_posted` once it is gone. That is the point, and it is why step 2
-  is operator-held and journaled rather than inferred from this spec.
+- **Deleting a gate is irreversible in practice.** The operator's ruling
+  deletes nothing precisely for this reason — `checklist_posted` was revised
+  from deletion to demotion once it emerged it had shipped that same
+  morning. A demoted check that never surfaces anything is a deletion
+  candidate later, **on evidence**. Session 3 must not quietly convert a
+  demotion into a deletion because the code reads more cleanly that way.
 - **The 20-minute goal is not this set's promise.** This set removes ~10
   minutes of suite time per run and an unbounded loop. Whether a session then
   fits in 20 minutes is a scope question, and it should be re-measured here

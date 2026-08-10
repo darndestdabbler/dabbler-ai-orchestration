@@ -39,14 +39,29 @@ data integrity.
 
 ### Delete
 
-| Gate | Reason |
-| :--- | :--- |
-| `checklist_posted` | **Delete first.** It proves a render, not a reading — the operator's own principle is that discipline whose context is avoided is worse than none. Its very first dogfood required an operator-attested waiver after a 6.83h blocked gap, which is the whole argument in one data point. |
+**Nothing.** `checklist_posted` was originally ruled for deletion, then
+**revised to demotion on 2026-08-10** once it emerged that Set 114 Session 1
+shipped it *that morning* (completed 03:15; the ruling was made ~09:45).
+
+The case for deleting it was real — it proves a render, not a reading, and
+its very first dogfood was the **6.83h `waiver-escape` gap** in Set 114 S1,
+the second-largest single stall in the dataset, ending in an
+operator-attested waiver. The case against deleting it is also real, and is
+written into the gate's own docstring: Set 111 S4 posted the checklist
+**once** across many hours and dozens of transitions, and *nothing noticed,
+because a close gate cannot observe a chat window*.
+
+Demotion resolves both. The post ledger (`checklist-posts.jsonl`), the
+cadence definition and the comparison all survive and still print; only the
+veto that produced the stall is removed. Deletion remains available in a
+later set **on evidence** — if the demoted check never surfaces anything
+worth acting on, that is an argument; six hours of hindsight is not.
 
 ### Demote to warn-not-block
 
 | Gate | Reason |
 | :--- | :--- |
+| `checklist_posted` | See above. Signal kept, veto removed. |
 | `activity_log_entry` | A log with one entry proves nothing about whether the log is honest. |
 | `next_orchestrator_present` | Bookkeeping. A missing value is a nuisance, not a reason to refuse a close. |
 | `change_log_fresh` | Bookkeeping. Worth a warning at the set boundary; not worth blocking on. |
@@ -59,12 +74,14 @@ deletion in a later set, on evidence.
 
 ### Two consequences worth stating
 
-1. **Test count falls as a side effect.** Each deleted gate takes its tests
-   with it. `test_checklist_posts.py` and the demoted gates' refusal tests
-   are a real slice of the ~3,800. This is the *only* test reduction this
-   set endorses — a consequence of removing machinery, never a pruning
-   target in its own right.
-2. **Ten becomes three plus two.** Three gates the operator believes in,
-   two preconditions protecting the write, four demoted signals, one
-   deletion. If a future set wants to add a gate, it should have to argue
-   against this table.
+1. **No tests are removed by this ruling.** An earlier draft claimed test
+   count would fall as a side effect of deleting gates; with the
+   `checklist_posted` revision, **nothing is deleted**, so no test suite goes
+   with it. This set therefore delivers **zero** reduction in the ~3,800
+   tests — which is consistent with its own finding that test count is not
+   where the time is.
+2. **Ten becomes three plus two plus five.** Three gates the operator
+   believes in, two preconditions protecting the write, five demoted
+   signals, no deletions. If a future set wants to add a gate, it should
+   have to argue against this table.
+

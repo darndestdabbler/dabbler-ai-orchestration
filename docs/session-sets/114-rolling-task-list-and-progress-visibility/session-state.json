@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Session 1",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-09T16:52:21.036590-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-10T03:15:35.726117-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

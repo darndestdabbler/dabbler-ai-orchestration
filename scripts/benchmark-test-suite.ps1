@@ -30,8 +30,7 @@
 
 .PARAMETER OutFile
     Where to write the report. Defaults to test-suite-benchmark-<host>.txt in
-    the repo root (gitignored territory -- send the file contents back rather
-    than committing it).
+    the repo root (docs/ is TRACKED, not gitignored -- send the file contents back, or commit deliberately).
 
 .EXAMPLE
     .\scripts\benchmark-test-suite.ps1

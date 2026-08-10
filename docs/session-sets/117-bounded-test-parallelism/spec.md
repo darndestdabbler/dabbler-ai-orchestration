@@ -42,10 +42,36 @@ sessions actually run on.
 | `workers: 1` (today) | **10.1 min** | — |
 | `workers: 4` | **7.08 min** | **1.43x** |
 
-36 tests passed under both. **The isolation already works** —
-`electronLaunch.ts` gives every launch a fresh `user-data-dir`, a fresh
-extensions-dir and a tmpdir-scoped `HOME`/`USERPROFILE`, which is normally
-the hard part of parallel Electron testing. No flakiness appeared.
+36 tests passed under both. **Isolation is PARTIAL — the first draft of this
+spec overstated it.** `electronLaunch.ts:613-620` does create a fresh
+`user-data-dir` and a fresh extensions-dir per launch, but
+`scripts/vscode-launch.js:60,69` **inherits `HOME`, `USERPROFILE`,
+`APPDATA` and `LOCALAPPDATA`** — they are *not* tmpdir-scoped. Shared
+`APPDATA`/`LOCALAPPDATA` is where VS Code writes state, and is a live
+candidate cause of the two 8-worker failures. **Do not assume those
+failures were CPU starvation; that was never verified.**
+
+**Runner capabilities differ, and the difference matters.** Playwright 1.60
+natively supports percentage workers (`workers: '50%'`) and built-in
+`retries`. **`pytest-xdist` does NOT support percentages**: it accepts
+`auto` (**physical** cores, not logical), `logical` (needs `psutil`), an
+explicit integer, or `0`. It also exposes `--maxprocesses=N`, the
+`PYTEST_XDIST_AUTO_NUM_WORKERS` environment variable, and a
+`pytest_xdist_auto_num_workers` hook a `conftest.py` may implement to
+compute the count itself — which is the portable place to put this logic,
+since `conftest.py` ships to PyPI consumers who have no extension.
+
+**`local-overrides.yaml` will not accept a `testing:` block as it stands.**
+`ai_router/config.py::_apply_local_overrides` raises on paths outside
+`_LOCAL_OVERRIDE_ALLOWED` and **silently warns-and-ignores unknown
+top-level keys**. Using it for worker settings requires adding the key to
+that allowlist in the same change, or the setting is written and never read.
+
+**The first draft's projections were wrong.** It claimed ~2.5 min for the
+parallel pool and ~4.5 min total. The measured 8-worker run of 35 tests took
+**5.08 min and went red**, so the realistic target after quarantine is
+**~7 min against 10.1 today**. Session 1 records what it measures; it must
+not inherit these numbers.
 
 **One test explains the entire poor speedup.**
 `real-host-baseline.spec.ts` — *"measures cold launch-to-first-row for the
@@ -108,20 +134,25 @@ slowest job, not the sum — but CI wall clock gates **releases** through the
    so the cold-launch number it exists to produce is measured under the
    conditions it claims. Record the isolated figure (1.9 min measured
    2026-08-10) beside it, so a future contended reading is visibly wrong.
-3. **Parallelize the remaining 35** with a bounded worker count, chosen by
-   sweeping 2 / 4 / 6 on the session machine and keeping the best that
-   leaves the desktop usable. Expected ~2.5 min against ~8 min serial;
-   **record the sweep, not just the winner.**
-4. **Prove it is not flaky before trusting it.** Run the full suite **three
-   times** at the chosen setting. An intermittently-failing UI suite is
-   worse than a slow one, and "it passed once" is not evidence. Any shared
-   fixed path (port, lock, shared `test-fixtures/` tree) surfaces here — that
-   is a finding, not a reason to abandon the change.
+3. **Parallelize the remaining 35** with a bounded worker count, sweeping
+   **2 / 3 / 4** on the session machine — **not 6 or 8**, which are already
+   measured red and must stay untested until the failures are triaged.
+   Keep the best that leaves the desktop usable; **record the sweep, not
+   just the winner.** Realistic target is ~7 min total against 10.1 today.
+4. **Prove it is not flaky, and triage the two known failures.** Run the
+   full suite **three times** at the chosen setting. Then determine whether
+   `icon-render-mechanism.spec.ts:158` and `module-tier.spec.ts:157` failed
+   from CPU starvation or from **shared `APPDATA`/`LOCALAPPDATA`** — the
+   suite has only ever run serially, so these may be pre-existing product
+   races this schedule is exercising for the first time. Record the answer;
+   fixing it is out of scope, **calling it "flakiness" without evidence is
+   not.**
+
 5. Full suite at close after freeze; verify, close.
 
 **Creates:** the quarantined baseline project, the bounded worker setting, the sweep record, the triple-run evidence
 **Touches:** `tools/dabbler-ai-orchestration/playwright.config.ts`, `src/test/playwright/`
-**Ends with:** Layer 3 costs ~4.5 minutes instead of ~10, and the one test that measures performance is measured under conditions that make its number true.
+**Ends with:** Layer 3 costs ~7 minutes instead of ~10, and the one test that measures performance is measured under conditions that make its number true.
 **Progress keys:** `baselineQuarantined`, `workerSweep`, `flakinessTripleRun`
 
 ---
@@ -158,7 +189,7 @@ slowest job, not the sum — but CI wall clock gates **releases** through the
 
 ## End-of-set deliverables
 
-- Layer 3 at roughly 4.5 minutes, proven non-flaky over three consecutive
+- Layer 3 at roughly 7 minutes, proven non-flaky over three consecutive
   runs at the chosen setting.
 - A cold-launch baseline measured alone, so its number means what it says.
 - A bounded worker count for each suite, each recorded with the sweep that

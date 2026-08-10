@@ -222,6 +222,11 @@ changes what is required — only when you can find out.
 
 ### Session 3 of 3: Restore the backstop's recovery path, and delete what nothing reaches
 
+> **Deletion note.** `pricing.py` is **not** in the deletion list even
+> though the operator has ruled cost calculations unnecessary for Copilot.
+> It is load-bearing on the Direct API path. Only the rate-fetching CLI
+> and the cost report go.
+
 **Steps:**
 
 1. Register.
@@ -236,18 +241,27 @@ changes what is required — only when you can find out.
    instruction must actually work, and the message should name the phase to
    run. A test asserts the named command succeeds from the exact state the
    message is printed in.
-4. **Delete the unreachable gate machinery** — `contract_gate.py`,
+4. **Delete what nothing reaches.** Two groups, same proof obligation.
+   **(a) The unreachable gate machinery:** `contract_gate.py`,
    `floor_ratchet.py`, `replacement_gate.py`, `spec_admission.py`,
-   `routed_gate.py` and their tests (**3,285 LOC, ~220 tests**). Prove
-   unreachability first: no import from any close path, no console-script
-   entry point, no reference in `router-config.yaml`. A module that turns
-   out to be reachable **stays and is reported**, not forced.
+   `routed_gate.py` and their tests (**3,285 LOC, ~220 tests**).
+   **(b) The cost surface that a Copilot seat cannot populate:**
+   `pricing_proposal.py` and `cost_report.py` and their tests
+   (**1,880 LOC, ~150 tests**) — across 83 routed calls every metrics row
+   carries `billed_usage_unavailable: true` and `cost_usd: 0.0`.
+   **`pricing.py` STAYS** — `models.py`, `pull_verifier.py`, `config.py`
+   and `__init__.py` import it, and it feeds the api-profile verifier's
+   `max_cost_multiplier` guard; deleting it breaks the Direct API path.
+   Prove unreachability first for every module: no import from any close
+   path, no console-script entry point, no reference in
+   `router-config.yaml`. A module that turns out to be reachable **stays
+   and is reported**, not forced.
 5. Full pytest at close after freeze; verify, close.
 
 **Creates:** the backstop baseline record, a truthful refusal message
-**Touches:** `ai_router/close_backstop.py`, `ai_router/verify_session.py`, the five deleted modules and their tests, `pyproject.toml` (if entry points reference them), `ai_router/tests/`
-**Ends with:** a backstop-blocked close can be remediated for ~$0.07 instead of ~$0.88, and 3,285 lines no close path reaches are gone.
-**Progress keys:** `backstopBaseline`, `truthfulRefusal`, `unreachableDeleted`
+**Touches:** `ai_router/close_backstop.py`, `ai_router/verify_session.py`, the seven deleted modules and their tests, `ai_router/__init__.py` (drop the `cost_report` re-exports), `pyproject.toml` (if entry points reference them), `ai_router/tests/`
+**Ends with:** a backstop-blocked close can be remediated for ~$0.07 instead of ~$0.88, and 5,165 lines nothing reaches are gone.
+**Progress keys:** `backstopBaseline`, `truthfulRefusal`, `unreachableDeleted`, `costSurfaceDeleted`
 
 ---
 

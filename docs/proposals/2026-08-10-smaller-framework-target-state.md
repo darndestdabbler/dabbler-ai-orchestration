@@ -287,13 +287,30 @@ recorded reason why it could not be executable.
 
 **The part worth keeping is 12% of the extension.**
 
-### 6.2 Retained (R2, R7)
+### 6.2 Retained (R2, R7) — confirmed by operator usage, 2026-08-10
 
 A **read-only tree** over the JSON artifacts:
 
 - **Hierarchy:** module → session set → session. (Modules collapse to a single implicit root when `modules.yaml` is absent.)
 - **Icons:** the existing `media/{dark,light}/{not-started,in-progress,done,cancelled}.svg`.
-- **~11 commands:** `refresh`, `openSpec`, `openActivityLog`, `openChangeLog`, `openSessionState`, `openFolder`, `copySlug`, `activateSet`, `cancel`, `restore`, plus **`copyStartNextSessionPrompt`** — which is R7.
+
+**The context menus stay.** The operator names them *"hard won and currently
+valuable."* Both submenus are kept whole:
+
+| submenu | entries | why |
+| :--- | :--- | :--- |
+| **Open File** | `openSpec`, `openActivityLog`, `openChangeLog`, `openSessionState` | These are exactly the four retained artifacts (§3.1). The menu *is* the artifact contract, rendered. |
+| **Copy Prompt** | `copyStartNextSessionPrompt` (**R7 — named as the most-used**), `copyStartNextParallelSessionPrompt`, `copySpecReviewPrompt`, `copySessionAccomplishmentsPrompt`, `copySetAccomplishmentsPrompt` | Hard-won and in daily use. An earlier draft proposed replacing four of the five with CLI output; **that is withdrawn.** |
+
+**Click-a-set-to-open-the-spec stays.** Operator: *"I use that a lot."*
+It is the tree item's default command and costs nothing to keep.
+
+Plus `refresh`, `copySlug`, `activateSet`, `cancel`, `restore`.
+
+**Demote to command-palette-only** (kept, but off the context menu — the
+operator reports these were used for troubleshooting, not routine work):
+`openOrchestratorWriterLog`, `openPrerequisiteSpec`, `revealPlaywrightTests`,
+`migrate`, `migrateToV4`, `troubleshoot`.
 
 **Task checklists: recommend keeping them OUT of the tree.** The step
 ledger is the highest-churn, lowest-value surface in the extension — Set
@@ -311,11 +328,32 @@ chat.** Cost: one instruction line. Code: zero.
 | `wizard/` + `dashboard/` | 905 | README + a Python scaffold CLI |
 | `moduleAuthoring.ts` | 2,458 | `python -m ai_router.module` CLI — **pending §9.4** |
 | **git/PR/release commands** (`openPrForSet`, `finalizeMergedSet`, `startHotfixFromTag`, `rollBackToTag`) | ~4,000 | **documented `gh` commands** — per the operator's note, these become user instructions |
-| prompt-copy commands (4 of 5) | — | printed by the Python CLI at session start |
+| prompt-copy commands (4 of 5) | — | **WITHDRAWN** — see §6.2; all five stay on the Copy Prompt submenu |
 
 **Parallel modules (R1c)** need no extension support: one worktree per
 module (`~/source/repos/<repo>-worktrees/<slug>/`, the documented standard),
 manual merges, `gh` for PRs.
+
+### 6.4 Cost and pricing — mostly deletable, but not all of it
+
+Operator, 2026-08-10: *"the whole cost calculations are not useful for
+Copilot — so we don't need any of that."* The measurement agrees for that
+seat: across **83 routed calls**, every row carries
+`billed_usage_unavailable: true`, `input_tokens: 0` and `cost_usd: 0.0`.
+Total recorded spend: **$0.00**.
+
+But both transports run, on two machines, and cost is real on the `api`
+one — so this needs a split rather than a blanket delete:
+
+| module | LOC | tests | disposition |
+| :--- | ---: | ---: | :--- |
+| `pricing_proposal.py` | 1,398 | 110 | **delete** — a rate-fetching maintenance CLI; a Copilot seat has no rates to maintain |
+| `cost_report.py` | 482 | 40 | **delete** — reporting over numbers that are structurally zero on the seat running most sessions |
+| **`pricing.py`** | **344** | 65 | **KEEP — load-bearing.** Imported by `models.py`, `pull_verifier.py`, `config.py` and `__init__.py`; feeds model selection and the api-profile verifier's `max_cost_multiplier` guard (`__init__.py:1632`). Deleting it breaks the Direct API path. |
+| `metrics.py` | 555 | 16 | **KEEP** — the routed-call ledger, and the evidence base for §10.1. Cost is one field among thirty. |
+
+**Deletable: 1,880 LOC and ~150 tests**, without touching the api cost
+guard.
 
 **Rationale — this is the bus-factor fix.** The successor is not facing
 "complex"; they are facing *complex in two languages with two test stacks*,
@@ -407,6 +445,7 @@ What it does deliver, in confidence order:
 | 4 | Total round budget + artifact cap | operator (verification) | **yes** |
 | 5 | Backstop `discoveryBaselineTree` fix | self | **yes** |
 | 6 | Delete the 5 unreachable gate modules | self | maintenance |
+| 6b | Delete `pricing_proposal.py` + `cost_report.py` (§6.4) | self | maintenance — −1,880 LOC, −150 tests |
 | 7 | Transport detect → confirm → persist (R3) | self | correctness |
 | 8 | Add `evidencePaths` to findings | self | prerequisite |
 | 9 | Cap doc-only findings at Minor | **operator** (reduces verification) | likely |
@@ -462,7 +501,7 @@ session plans drift; treat the high end as likely.
 | # | step | sessions | note |
 | ---: | :--- | :---: | :--- |
 | 4+5 | Round budget, artifact cap, backstop baseline fix | **1** | small and localized; step 5 is a few lines |
-| 6 | Delete 5 unreachable gate modules | **1** | mechanical: −3,285 LOC, −220 tests |
+| 6 | Delete 5 unreachable gate modules + the two cost modules | **1** | mechanical: −5,165 LOC, −370 tests |
 | 9 | Cap doc-only findings at Minor | **1** | small code + operator attestation |
 | 1 | Close-out preflight | **1–2** | reuses existing gate predicates |
 | 7 | Transport detect → confirm → persist | **1** | most of it exists |
@@ -476,7 +515,7 @@ session plans drift; treat the high end as likely.
 
 | phase | steps | sessions | attended hours | delivers |
 | :--- | :--- | :---: | :---: | :--- |
-| **A — the guaranteed wins** | 4+5, 6, 9, 1 | **4–5** | **6–13** | round bound, −3,285 LOC, doc-only cap, and a preflight targeting ~148 of 212 close-out failures |
+| **A — the guaranteed wins** | 4+5, 6, 9, 1 | **4–5** | **6–13** | round bound, −5,165 LOC, doc-only cap, and a preflight targeting ~148 of 212 close-out failures |
 | **B — the reduction** | 7, 3, 8, 2, 10 | **8–13** | **12–33** | preload 11,849 → ~2,000 tokens; extension 25.6k → ~5k LOC |
 
 **Phase A is one set**, and it compounds: every session in Phase B then

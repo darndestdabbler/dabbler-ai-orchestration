@@ -1,0 +1,60 @@
+{
+  "sessionSetName": "119-close-preflight-and-doc-only-findings",
+  "createdDate": "2026-08-10T18:21:07.920963-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T18:21:07.920745-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "add-evidencepaths-to-the-finding-contract",
+      "dateTime": "2026-08-10T18:21:07.920745-04:00",
+      "description": "**Add `evidencePaths` to the finding contract.** A list of repo-relative paths, **required on any finding whose severity is Critical or Major**, on **both** surfaces: the markdown parse in `ai_router/verification.py` and the structured `submit_verdict` tool schema in `ai_router/pull_verifier.py` (today `{description, severity, category}`, `required: [\"description\"]`). Update the reviewer templates so verifiers are asked for it. A blocking finding with no paths is **unknown**, and unknown still blocks \u2014 the anti-laundering default is unchanged.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "operator-decision-journaled-this-is-the",
+      "dateTime": "2026-08-10T18:21:07.920745-04:00",
+      "description": "**Operator decision, journaled \u2014 this is the hard carve-out.** Capping any finding's severity is a **verification reduction**; `decision_journal.py` refuses it under AI authority. Present the evidence (Set 116 S3's four rounds; 520 of 572 findings Major) and record the attestation with `authority=\"human\"`, `rubric_line=\"verification-reduction\"`, `verification_effect=\"reduces\"` and a non-empty operator attestation. **No cap is implemented before this record exists.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "implement-the-cap-at-the-one",
+      "dateTime": "2026-08-10T18:21:07.920745-04:00",
+      "description": "**Implement the cap at the one shared chokepoint.** In `is_blocking_issue` / `classify_blocking` \u2014 the surface-agnostic predicate both surfaces already consult \u2014 a finding whose `evidencePaths` are **all** documentation records at Minor and does not open a round. Ship the falsifiers `L-112-1` requires: one planting a doc-only finding and asserting it does **not** open a round, one planting a mixed doc-and-code finding and asserting it **does**.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-10T18:21:07.920745-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T18:24:46.202475-04:00",
+      "description": "Registered session 1 of set 119 (engine=copilot, provider=anthropic, model=claude-opus-5, effort=high); no decision-review-queue entries to triage; preload read.",
+      "status": "complete"
+    }
+  ]
+}

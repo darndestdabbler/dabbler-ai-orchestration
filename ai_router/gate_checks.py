@@ -61,8 +61,8 @@ The checks land in this module:
 
 Blocking, precondition, advisory (Set 116 S3)
 ---------------------------------------------
-Every check above still runs and still prints. What differs is whether
-it may **refuse** a close, per the operator's 2026-08-10 ruling
+On an ordinary close, every check above runs and prints. What differs is
+whether it may **refuse** one, per the operator's 2026-08-10 ruling
 (attested in Set 116's ``decisions.jsonl``; the per-gate rationale is in
 that set's ``operator-notes.md``). :data:`ADVISORY_CHECKS` is the
 authority, and :func:`is_blocking_check` is the one predicate every
@@ -88,16 +88,35 @@ caller asks:
   never surfaces anything worth acting on is a deletion candidate in a
   later set, **on evidence**.
 
-One consequence is worth naming where a maintainer will find it:
-demoting ``verification_method_vocabulary`` leaves **no** close-time
-enforcement of :data:`disposition.VERIFICATION_METHODS`, because
-``validate_disposition``'s rule 4 is not run at close and this check was
-its only enforcement point. The Set 083 incident disposition is still
-refused — by :func:`check_verification_integrity`'s evidence layer,
-which is unchanged — but a corroborated close (or an attested
-``--manual-verify`` close) can now persist an illegal token into
-``session-state.json``. That residual was named in the education-mode
-brief and accepted by the operator on the record.
+Two qualifications, because the loose readings of the above are wrong in
+ways a maintainer would otherwise discover the hard way.
+
+**"Every close" excludes ``--force``.** That path was already narrower
+than the gate chain before this ruling: ``close_session.run`` under
+``--force`` constructs the ``verification_integrity`` row alone and runs
+no other predicate, which is the whole point of the flag (force bypasses
+bookkeeping, never evidence). So a forced close prints no advisory
+warnings — not because they were demoted, but because they were never
+run there. ``--force`` is hard-scoped to incident recovery.
+
+**The vocabulary demotion is narrower than "an illegal token can now
+close."** It leaves no close-time enforcement of
+:data:`disposition.VERIFICATION_METHODS` — ``validate_disposition``'s
+rule 4 is not run at close and this check was its only enforcement
+point — but ``verification_method`` also *selects* the corroboration
+path, so on an ordinary repo an unknown token still cannot pass
+:func:`check_verification_integrity`: it falls through to the
+zero-budget arm and is refused there. Exactly two paths let an illegal
+token reach ``session-state.json``: an attested ``--manual-verify``
+close, and a repo that has declared the zero-budget tier and written the
+same non-standard token into ``budget.yaml``.
+
+The education-mode brief that preceded the operator's attestation
+described this residual as the *broader* "a corroborated close can
+persist an illegal token". That overstated the exposure rather than
+understating it, so the attestation covers strictly more than the code
+actually does and needs no revisiting; the journal entry is left as
+written, because a decision journal records what was said at the time.
 
 Why a separate module
 ---------------------
@@ -867,12 +886,17 @@ def check_change_log_fresh(
       clock skew or pre-stage editing.
 
     Non-final sessions skip this check (return pass). Missing
-    ``change-log.md`` on the final session is a hard fail with a clear
-    remediation.
-        **Advisory since Set 116 S3** (operator ruling, 2026-08-10): this
-    check still runs and still reports, but it cannot refuse a close.
-    The verdict below is unchanged — the demotion lives in
-    :data:`ADVISORY_CHECKS`, so re-arming it is one line.
+    ``change-log.md`` on the final session returns a failing verdict
+    with a clear remediation.
+
+    **Advisory since Set 116 S3** (operator ruling, 2026-08-10): this
+    check still runs and still reports, but it cannot refuse a close —
+    so that failing verdict is a warning at close, not the "hard fail"
+    this docstring used to promise. The verdict itself is unchanged; the
+    demotion lives in :data:`ADVISORY_CHECKS`, so re-arming it is one
+    line. ``_flip_state_to_closed`` no longer keys on ``change-log.md``
+    either (Set 116 S3 removed that mirror after it turned this
+    demotion into a raised ``SessionStateInvariantError``).
     """
     _ = disposition
     _ = allow_empty_commit

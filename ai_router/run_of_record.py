@@ -54,8 +54,17 @@ It does not run the suite, and it cannot tell a passing run from a failing
 one beyond the ``outcome`` string the recorder was handed -- recording a
 green result for a red run is a false attestation, not a defeated check.
 It also only governs suites whose covered surfaces this session actually
-touched: a docs-only session owes nothing and the gate stays silent, even
-though every declared suite is now ``expensive``.
+touched, so a session that touched nothing under any suite's ``covers``
+owes nothing and the gate stays silent, even though every declared suite
+is now ``expensive``.
+
+Say that precisely, because the loose version ("a docs-only session owes
+nothing") is FALSE here: ``covers`` is a path prefix, not a file type.
+``pytest`` covers ``ai_router/``, so editing ``ai_router/docs/close-out.md``
+-- documentation, no code -- owes a pytest run. That is deliberate: the
+prefix is what makes the rule cheap to evaluate and impossible to argue
+with, and the failure direction is running a suite you did not need
+rather than skipping one you did.
 """
 
 from __future__ import annotations

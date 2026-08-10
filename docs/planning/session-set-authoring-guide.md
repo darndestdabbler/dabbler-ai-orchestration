@@ -752,9 +752,17 @@ Canonizes the policy piloted in Set 110's operator notes. The waste
 pattern being eliminated is **invalidated runs**, not full runs.
 
 - **Every suite runs in two modes:** *targeted* — the specific tests
-  covering what you just changed, any time; and *full* — **exactly once
-  per session, at Step 8, AFTER remediation and before close.** Never
-  start a full run you might invalidate.
+  covering what you just changed, any time; and *full*. **Exactly one
+  full run per suite is the RUN OF RECORD, taken at Step 8, AFTER
+  remediation and before close.** Never start a full run you might
+  invalidate.
+
+  The rule bounds the run of record, not your curiosity: a full run
+  taken mid-session to see where you stand is targeted testing with a
+  wide net, and it costs only its own wall clock. What it must not do
+  is get *recorded* as the run of record — because the next code change
+  invalidates it, and a recorded stale run is the Set 110 S3 defect this
+  whole mechanism exists to catch.
 - **"After the last code change" means Step 8, not Step 5** (Set 116 S3).
   Step 7 remediation *is* a code change and verification finds something
   in nearly every session, so a full run at Step 5 is invalidated
@@ -810,8 +818,16 @@ no-op save rewrites mtimes without changing a byte, and both directions
 of that error are unacceptable in a gate.
 
 The gate is inert where it should be: a suite whose surfaces this session
-did not touch is not required, so a session that changed only
-documentation owes nothing.
+did not touch is not required.
+
+Read `covers` literally — it is a **path prefix, not a file type**. A
+session that changed only documentation owes nothing *if that
+documentation sits outside every suite's `covers`*. In this repo
+`pytest` covers `ai_router/`, so editing `ai_router/docs/close-out.md`
+owes a pytest run even though no code changed. That is deliberate: a
+prefix is cheap to evaluate and impossible to argue with at close, and
+it errs toward running a suite you did not need rather than skipping one
+you did.
 Suites are declared in `router-config.yaml` under `testing.suites`
 (`name`, `command`, `covers`, `expensive`).
 

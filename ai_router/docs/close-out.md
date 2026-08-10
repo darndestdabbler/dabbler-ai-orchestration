@@ -407,9 +407,13 @@ returns the corresponding exit code without touching downstream state.
     (I-084-S2-9).
 7. **Run deterministic gate checks** (`ai_router.gate_checks`).
 
-   **Blocking, precondition, advisory — the Set 116 S3 ruling.** Every
-   check below runs and prints on every close. What differs is whether
-   it may *refuse* one. The operator ruled on 2026-08-10 (attested in
+   **Blocking, precondition, advisory — the Set 116 S3 ruling.** On an
+   ordinary close every check below runs and prints; what differs is
+   whether it may *refuse* one. (`--force` is the standing exception and
+   predates this ruling: it runs `verification_integrity` alone and no
+   other predicate, so a forced close prints no advisory warnings —
+   they were never run there, not demoted away. Incident recovery only.)
+   The operator ruled on 2026-08-10 (attested in
    Set 116's `decisions.jsonl`), and `gate_checks.ADVISORY_CHECKS` is
    the executable form of that ruling; `is_blocking_check(name)` is the
    one predicate every consumer asks, and every `gate_results` row

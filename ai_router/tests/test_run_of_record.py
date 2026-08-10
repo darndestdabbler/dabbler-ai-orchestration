@@ -420,17 +420,44 @@ class TestEverySuiteIsGoverned:
             "CONTRIBUTING.md",
         ],
     )
-    def test_a_docs_only_session_owes_nothing(self, changed, repo):
+    def test_a_session_outside_every_covers_prefix_owes_nothing(
+        self, changed, repo
+    ):
         """The other half of the operator's instruction, and the reason
         making every layer expensive is affordable: scoping is by
-        touched surface, so a docs-only session still owes no suite at
-        all. Widening `expensive` must not become "every change pays"."""
+        touched surface, so a session that touched nothing under any
+        suite's `covers` still owes no suite at all. Widening
+        `expensive` must not become "every change pays"."""
         _root, set_dir = repo
         verdicts = ror.evaluate_freshness(
             set_dir, [changed], ror.DEFAULT_SUITES
         )
         assert verdicts, "expensive suites must still be evaluated"
         assert not [v for v in verdicts if v.required]
+
+    @pytest.mark.parametrize(
+        "changed",
+        ["ai_router/docs/close-out.md", "ai_router/CHANGELOG.md"],
+    )
+    def test_docs_UNDER_a_covers_prefix_do_owe_that_suite(
+        self, changed, repo
+    ):
+        """The boundary, pinned, because the loose phrasing of the rule
+        ("a docs-only session owes nothing") is false here and both
+        round-1 verification lenses said so independently.
+
+        `covers` is a path prefix, not a file type: `pytest` covers
+        `ai_router/`, so documentation living under it owes a pytest
+        run. Asserting only the exempt side would let someone "fix" the
+        wording by narrowing `covers` and never notice they had made
+        the gate skippable by putting code in a docs-named folder.
+        """
+        _root, set_dir = repo
+        verdicts = ror.evaluate_freshness(
+            set_dir, [changed], ror.DEFAULT_SUITES
+        )
+        pytest_verdict = next(v for v in verdicts if v.suite == "pytest")
+        assert pytest_verdict.required is True
 
     def test_a_router_change_now_owes_pytest(self, repo):
         """The falsifier for the repair. Before Set 116 S3 this returned

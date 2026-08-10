@@ -939,7 +939,10 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   every `gate_results` row in `close_session --json` now carries a
   `blocking` boolean, and human-readable output prints `[WARN]` beside
   a failed advisory check instead of `[FAIL]`. A close that reports a
-  warning and succeeds is now a normal outcome.
+  warning and succeeds is now a normal outcome. (`--force` is unchanged
+  and remains narrower than the whole chain: it runs
+  `verification_integrity` alone, so a forced close prints no advisory
+  warnings — they were never run on that path.)
 
   Two consequences are stated rather than discovered:
 
@@ -953,8 +956,13 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
      token with no path falls through to the zero-budget arm. The
      demotion bites in two places: under `--manual-verify`, and on a
      repo that has declared the zero-budget tier and written the same
-     non-standard token into `budget.yaml`. Both were named to the
-     operator before the ruling was attested.
+     non-standard token into `budget.yaml`. The education-mode brief
+     that preceded the attestation described the residual in its
+     *broader* form ("a corroborated close can persist an illegal
+     token"), which overstates the exposure rather than understating
+     it — so the attestation covers strictly more than the code does
+     and needs no revisiting. The narrower statement above is the one
+     the tests assert.
   2. **`checklist_posted` was ruled for deletion and revised to
      demotion**, once it emerged that Set 114 S1 had shipped it that
      same morning. A demoted check that never surfaces anything worth
@@ -1166,7 +1174,8 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
   The redundant condition is removed: `is_last_session` is the
   completion arithmetic (or `forced`), and the gate remains the
-  enforcement point for "the orchestrator wrapped the set up". The
+  place "the orchestrator wrapped the set up" is checked and reported
+  (advisory since the same ruling, so it warns rather than refuses). The
   regression test asserts the resulting **state**, not merely that the
   close succeeded — "succeeded" alone does not catch a writer that
   produced a valid-looking outcome from an invalid snapshot.

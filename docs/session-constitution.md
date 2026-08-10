@@ -100,7 +100,8 @@ Run every router CLI through the workspace venv
   record each (`python -m ai_router.run_of_record record --suite <s>
   --outcome passed --duration-seconds <n>`, required) or
   `test_run_fresh` refuses the close. All three layers are governed
-  (Set 116 S3); a docs-only session owes none. Recording does **not**
+  (Set 116 S3); what you touched decides what you owe, and `covers` is
+  by path — docs under `ai_router/` owe pytest. Recording does **not**
   stale the verification that just passed (Set 116 S2), which is what
   makes this a last step and not a loop. Then author
   `disposition.json`

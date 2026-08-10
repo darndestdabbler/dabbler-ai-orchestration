@@ -180,6 +180,30 @@ code read correctly and was wrong.
    into `budget.yaml`. That boundary is now asserted from both sides, so
    a future reader cannot mistake the demotion for a reopened incident.
 
+## What round-1 verification found, and why it was fixed anyway
+
+Session 3's discovery round returned **VERIFIED from both lenses with
+zero Critical/Major** — a non-blocking round that opens no remediation
+loop. It raised five nits, and all five were fixed, because three of them
+were places where a document written *in this session* said something
+false about the code beside it, and this set's entire subject is making
+the doctrine true.
+
+Two lenses converged independently on the two that mattered most:
+
+- **"A docs-only session owes nothing" is false under `ai_router/`.**
+  `covers` is a path prefix, not a file type, so editing
+  `ai_router/docs/close-out.md` — which this session did — owes a pytest
+  run. Narrowing `covers` to exempt docs folders was considered and
+  rejected: it would make the gate skippable by putting code in a
+  docs-named folder. The wording was corrected instead, and **both**
+  sides of the boundary are now pinned by tests.
+- **`--force` was never covered by "every close".** It runs
+  `verification_integrity` alone and no other predicate. Correct, and
+  older than this ruling; the documentation now says so.
+
+Full per-nit dispositions: [`s3-nit-dispositions.md`](s3-nit-dispositions.md).
+
 ## What this set deliberately did NOT do
 
 - **No test deletion.** The ruling deletes no gate, so no gate's tests go

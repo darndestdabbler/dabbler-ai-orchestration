@@ -1324,8 +1324,10 @@ def _flip_state_to_closed(
     # session is complete — which rule 6 rejects. The close raised
     # ``SessionStateInvariantError`` instead of closing, so demoting a
     # gate to a warning had turned a clean refusal into a crash. The
-    # gate is the enforcement point for "the orchestrator wrapped the
-    # set up"; the writer's job is to record what the arithmetic says.
+    # gate is where "the orchestrator wrapped the set up" is checked
+    # and reported (advisory since the same ruling, so it warns rather
+    # than refuses); the writer's job is to record what the arithmetic
+    # says, not to re-adjudicate it.
     #
     # Set 030 Session 2: totalSessions MUST be resolvable. When the
     # on-disk value is missing/zero, we backfill from spec.md +

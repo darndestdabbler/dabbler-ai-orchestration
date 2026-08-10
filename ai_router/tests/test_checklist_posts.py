@@ -642,7 +642,9 @@ class TestChecklistGateWiring:
 
     def test_it_was_appended_so_index_based_consumers_keep_position(self):
         names = [name for name, _fn in gate_checks.GATE_CHECKS]
-        assert names[-1] == gate_checks.CHECKLIST_POSTED_CHECK_NAME
+        # Set 116 S3 appended verification_method_vocabulary after this
+        # one, for the same append-never-insert reason.
+        assert names[-2] == gate_checks.CHECKLIST_POSTED_CHECK_NAME
         assert names[:5] == [
             "working_tree_clean",
             "pushed_to_remote",

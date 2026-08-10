@@ -380,6 +380,72 @@ class TestDefaultSuiteCoverage:
     def test_the_playwright_suite_is_still_the_expensive_one(self):
         assert self._playwright().expensive is True
 
+
+class TestEverySuiteIsGoverned:
+    """Set 116 S3 — the operator's repair of gate (c).
+
+    `test_run_fresh` is one of the three gates the ruling kept, and it
+    was broken: `expensive` is the flag that decides whether the gate
+    has an opinion at all, and pytest and mocha carried False. So the
+    once-per-session-after-the-last-code-change rule never governed the
+    14-minute suite it was written for, and Set 112 S3 ran 15 suites
+    across 186 minutes unremarked.
+    """
+
+    @staticmethod
+    def _suite(name):
+        (suite,) = [s for s in ror.DEFAULT_SUITES if s.name == name]
+        return suite
+
+    @pytest.mark.parametrize("name", ["pytest", "mocha", "playwright"])
+    def test_all_three_layers_are_expensive(self, name):
+        assert self._suite(name).expensive is True
+
+    def test_pytest_covers_the_router(self):
+        assert ror.session_touched(
+            "", self._suite("pytest").covers, ["ai_router/gate_checks.py"]
+        )
+
+    def test_pytest_records_the_parallel_command(self):
+        """Set 116 S1 made `-n auto` the default and proved parity. A
+        run of record that names the serial command is recording a run
+        nobody performs."""
+        assert "-n auto" in self._suite("pytest").command
+
+    @pytest.mark.parametrize(
+        "changed",
+        [
+            "docs/planning/project-guidance.md",
+            "README.md",
+            "CONTRIBUTING.md",
+        ],
+    )
+    def test_a_docs_only_session_owes_nothing(self, changed, repo):
+        """The other half of the operator's instruction, and the reason
+        making every layer expensive is affordable: scoping is by
+        touched surface, so a docs-only session still owes no suite at
+        all. Widening `expensive` must not become "every change pays"."""
+        _root, set_dir = repo
+        verdicts = ror.evaluate_freshness(
+            set_dir, [changed], ror.DEFAULT_SUITES
+        )
+        assert verdicts, "expensive suites must still be evaluated"
+        assert not [v for v in verdicts if v.required]
+
+    def test_a_router_change_now_owes_pytest(self, repo):
+        """The falsifier for the repair. Before Set 116 S3 this returned
+        `required=False` for pytest no matter what changed, because the
+        suite was declared cheap — a gate that could never fire looks
+        exactly like a gate with nothing to say."""
+        _root, set_dir = repo
+        verdicts = ror.evaluate_freshness(
+            set_dir, ["ai_router/close_session.py"], ror.DEFAULT_SUITES
+        )
+        pytest_verdict = next(v for v in verdicts if v.suite == "pytest")
+        assert pytest_verdict.required is True
+        assert pytest_verdict.passed is False
+        assert "no run of record exists" in pytest_verdict.reason
+
     def test_matches_an_exact_file_prefix(self):
         assert ror.session_touched(
             "", ("tools/x/package.json",), ["tools/x/package.json"]

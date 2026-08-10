@@ -1,7 +1,8 @@
 """Test run-of-record: recording an expensive suite run, and proving it fresh.
 
-**Who uses this:** the orchestrator at Step 5 (record the full run after the
-last code change) and ``close_session``'s ``test_run_fresh`` gate at Step 8.
+**Who uses this:** the orchestrator at Step 8 (record each applicable full
+run, after remediation) and ``close_session``'s ``test_run_fresh`` gate in
+the same step.
 **See also:** ``docs/planning/session-set-authoring-guide.md`` -> *The
 test-run policy*; ``gate_checks.py`` (the gate wrapper);
 ``verification_stamp.compute_work_diff_sha256`` (the same content-digest
@@ -12,12 +13,21 @@ idea, applied to the verification freshness question).
 Why this exists
 ---------------
 The test-run policy (piloted in Set 110's operator notes, canonized by Set
-111 S4) says an expensive suite runs **fully exactly once per session, at
-session close, AFTER the last code change**. Set 110 S3 tried to close on a
-full run that predated three test fixes, *disclosed it in the sidecar*, and
-was correctly refused by the backstop -- the orchestrator agreed with the
-policy and slipped anyway. Prose does not survive end-of-session pressure.
-A timestamp comparison does.
+111 S4) says an expensive suite runs **fully exactly once per session,
+after the last code change**. Set 110 S3 tried to close on a full run that
+predated three test fixes, *disclosed it in the sidecar*, and was correctly
+refused by the backstop -- the orchestrator agreed with the policy and
+slipped anyway. Prose does not survive end-of-session pressure. A timestamp
+comparison does.
+
+Set 116 S3 fixed the two things that made the policy unlivable rather than
+merely strict. **When**: "after the last code change" now names Step 8,
+after remediation, because Step 7 remediation *is* a code change and
+verification finds something in nearly every session -- at Step 5 the
+instruction was unsatisfiable wherever it mattered, and Set 112 S3 obeyed
+it into 15 runs and 186 minutes. **What**: all three layers are now
+``expensive``. ``pytest`` and ``mocha`` were declared cheap, so the gate
+had no opinion about the 14-minute suite it was written to govern.
 
 Why a content digest and not an mtime
 -------------------------------------
@@ -43,9 +53,9 @@ What the gate does NOT do
 It does not run the suite, and it cannot tell a passing run from a failing
 one beyond the ``outcome`` string the recorder was handed -- recording a
 green result for a red run is a false attestation, not a defeated check.
-It also only governs suites declared ``expensive: true`` whose covered
-surfaces this session actually touched: a docs-only session owes no
-Playwright run and the gate stays silent.
+It also only governs suites whose covered surfaces this session actually
+touched: a docs-only session owes nothing and the gate stays silent, even
+though every declared suite is now ``expensive``.
 """
 
 from __future__ import annotations
@@ -98,7 +108,10 @@ class SuiteSpec:
 
     ``covers`` is a list of repo-relative path prefixes (posix separators).
     ``expensive`` marks the suites the once-per-session-at-close rule
-    governs; cheap suites are recordable but never gate-required.
+    governs; cheap suites are recordable but never gate-required. It is
+    a statement about *whether the gate has an opinion*, not about the
+    clock -- all three of this repo's layers carry it since Set 116 S3,
+    and a consumer repo is free to declare a suite cheap.
     """
 
     name: str
@@ -112,9 +125,23 @@ class SuiteSpec:
 DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
     SuiteSpec(
         name="pytest",
-        command=".venv/Scripts/python.exe -m pytest ai_router/tests -q",
+        # Set 116 S1 made this the parallel default: 3.61x faster
+        # (845.76s serial -> 234.55s with -n auto) with identical
+        # results, measured at commit 9277e104.
+        command=".venv/Scripts/python.exe -m pytest ai_router/tests -q -n auto",
         covers=("ai_router/",),
-        expensive=False,
+        # Set 116 S3, the operator's gate ruling: `test_run_fresh` is one
+        # of the three gates that survive, and it was BROKEN — pytest was
+        # declared cheap, so the once-per-session-after-the-last-code-
+        # change rule never governed the suite that costs the time. Set
+        # 112 S3 ran 15 test runs across 186 minutes (59% of the session)
+        # entirely unremarked by this gate.
+        #
+        # `expensive` is not a statement about the clock; it is the flag
+        # that decides whether the gate has an opinion. A 4-minute suite
+        # that guards every close-out path in the framework is exactly
+        # what a close should have to prove it ran.
+        expensive=True,
     ),
     SuiteSpec(
         name="mocha",
@@ -127,7 +154,16 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # evidence named a suite nobody could execute on the dev platform.
         command="npm run test:unit",
         covers=("tools/dabbler-ai-orchestration/src/",),
-        expensive=False,
+        # Set 116 S3: same repair as pytest, and Set 114 S3 is the
+        # evidence. Layer 2 is in CONTRIBUTING.md's canonical full pass,
+        # but Sessions 1 and 2 of that set recorded only pytest and
+        # Playwright — and when Layer 2 was finally run during a
+        # remediation it found `sampleProjectSmoke` broken by that set's
+        # own new gates, a regression that would have reached every
+        # consumer following the sample path. A suite that is in the
+        # contributing guide but not in the recorded run set is a suite
+        # that will not notice.
+        expensive=True,
     ),
     SuiteSpec(
         name="playwright",

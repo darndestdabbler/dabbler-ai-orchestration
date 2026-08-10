@@ -23,9 +23,13 @@ What the backstop respects (all spec-locked):
 - **budget.yaml** — the operator-declared zero-budget tier
   (``threshold_usd: 0``) skips the backstop entirely; the existing
   manual/attested flow is untouched.
-- **Method vocabulary** — an illegal ``verification_method`` token
-  skips the backstop (the vocabulary gate refuses that close anyway;
-  a metered call against a doomed close would be waste).
+- **Method vocabulary** — an illegal ``verification_method`` token skips
+  the backstop, because no evidence a round could buy would let that
+  close pass: the token is what selects a corroboration path, and
+  ``check_verification_integrity`` refuses a token it has no path for.
+  (Set 116 S3 re-derived this skip after the operator's ruling demoted
+  the vocabulary *gate* to warn-not-block, which falsified the reason
+  the skip used to give without touching its conclusion.)
 - **The two-attempt ladder** — one retry on a transport failure; a
   second failure blocks the close (never a pass).
 - **``verification_unavailable``** — an exclusion that leaves no
@@ -528,9 +532,19 @@ def run_close_backstop(
             messages=["backstop skipped: no disposition/session to close"],
         )
 
-    # An illegal verification_method token dooms this close at the
-    # vocabulary gate regardless of evidence — running a metered
-    # verification first would be pure waste.
+    # An illegal verification_method token dooms this close regardless of
+    # evidence, so a metered verification first would be pure waste.
+    #
+    # Set 116 S3 re-derived this. The operator's ruling demoted the
+    # vocabulary GATE to warn-not-block, which falsifies the reason this
+    # early-out used to give ("the vocabulary gate refuses that close
+    # anyway") — but not its conclusion. verification_method is what
+    # selects a corroboration path, so a token with no path still cannot
+    # reach a passing close: check_verification_integrity falls through
+    # to the zero-budget arm and refuses there. And on a repo that HAS
+    # declared the zero-budget tier, the very next check skips the
+    # backstop too. Either way the round buys nothing, so the skip stays
+    # and only its justification changed.
     vocab_ok, _ = check_verification_method_vocabulary(
         str(set_dir), disposition,
     )
@@ -539,7 +553,10 @@ def run_close_backstop(
             status=STATUS_SKIPPED_VOCABULARY,
             messages=[
                 "backstop skipped: disposition.verification_method is "
-                "illegal; the vocabulary gate refuses this close"
+                "illegal, so no evidence this round could buy would let "
+                "the close pass; fix the token (or close with "
+                "--manual-verify, which the operator's ruling now lets "
+                "through with a warning)"
             ],
         )
 

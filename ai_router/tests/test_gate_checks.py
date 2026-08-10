@@ -619,8 +619,9 @@ def test_gate_checks_registry_order_is_stable():
 
     verification_integrity (Set 083) appends after the original five,
     test_run_fresh / uat_walk_recorded (Set 111 S4) append after that,
-    and checklist_posted (Set 114 S1) after those, so consumers pinned
-    against any earlier prefix keep their positions.
+    checklist_posted (Set 114 S1) after those, and
+    verification_method_vocabulary (Set 116 S3) last, so consumers
+    pinned against any earlier prefix keep their positions.
     """
     names = tuple(name for name, _fn in gate_checks.GATE_CHECKS)
     original_prefix = (
@@ -638,4 +639,110 @@ def test_gate_checks_registry_order_is_stable():
         "test_run_fresh",
         "uat_walk_recorded",
         "checklist_posted",
+        "verification_method_vocabulary",
     )
+
+
+# ---------------------------------------------------------------------------
+# Set 116 S3 — the operator's gate ruling, as an executable table
+# ---------------------------------------------------------------------------
+
+class TestGateRulingClassification:
+    """The 2026-08-10 ruling: three gates, two preconditions, five
+    advisory, nothing deleted.
+
+    These assert the TABLE, not the mechanism. A future set is free to
+    re-arm a check — but it has to change this test to do it, which is
+    the point: a demotion should never be something a refactor can do
+    quietly, in either direction.
+    """
+
+    def test_every_registered_check_is_classified(self):
+        names = {name for name, _fn in gate_checks.GATE_CHECKS}
+        # Every advisory name must actually be a registered check, or
+        # the demotion is demoting nothing and would silently stop
+        # applying if the check were renamed.
+        assert gate_checks.ADVISORY_CHECKS <= names
+
+    def test_the_three_gates_block(self):
+        for name in (
+            "verification_integrity",
+            "uat_walk_recorded",
+            "test_run_fresh",
+        ):
+            assert gate_checks.is_blocking_check(name), name
+
+    def test_the_two_preconditions_block(self):
+        # Not ceremony: they protect the write. A close computed against
+        # a dirty or unpushed tree records something that was never true.
+        for name in ("working_tree_clean", "pushed_to_remote"):
+            assert gate_checks.is_blocking_check(name), name
+
+    def test_the_five_demotions_do_not_block(self):
+        for name in (
+            "activity_log_entry",
+            "next_orchestrator_present",
+            "change_log_fresh",
+            "checklist_posted",
+            "verification_method_vocabulary",
+        ):
+            assert not gate_checks.is_blocking_check(name), name
+
+    def test_nothing_was_deleted(self):
+        """A demoted check still runs. The ruling deleted nothing, and
+        the tidier code that would come from deleting one is exactly the
+        pressure the spec named as a risk."""
+        registered = dict(gate_checks.GATE_CHECKS)
+        for name in gate_checks.ADVISORY_CHECKS:
+            assert callable(registered[name]), name
+
+    def test_an_unclassified_name_blocks(self):
+        """The safe direction. A check nobody classified is a check
+        nobody demoted, so a gate added later blocks by default."""
+        assert gate_checks.is_blocking_check("some_future_gate")
+
+    def test_a_demoted_predicate_still_returns_its_verdict(self, tmp_path):
+        """The demotion lives in ADVISORY_CHECKS, not inside the
+        predicates. A predicate that softened its own answer would leave
+        callers unable to tell "passed" from "was excused" — and would
+        make re-arming it a re-derivation rather than a one-line edit."""
+        from disposition import Disposition
+
+        set_dir = tmp_path / "docs" / "session-sets" / "demo"
+        set_dir.mkdir(parents=True)
+        passed, remediation = (
+            gate_checks.check_verification_method_vocabulary(
+                str(set_dir),
+                Disposition(
+                    status="completed",
+                    summary="s",
+                    verification_method="carrier-pigeon",
+                ),
+            )
+        )
+        assert passed is False
+        assert "carrier-pigeon" in remediation
+
+    def test_the_runner_stamps_blocking_on_every_row(self, tmp_path):
+        """The classification reaches the wire.
+
+        `_run_gate_checks` is where the ruling becomes an artifact a
+        consumer can read: every `gate_results` row carries `blocking`,
+        so the JSON says which kind of check it was without anyone
+        keeping a lookup table in sync.
+        """
+        import close_session
+
+        set_dir = tmp_path / "docs" / "session-sets" / "demo"
+        set_dir.mkdir(parents=True)
+        rows = close_session._run_gate_checks(
+            str(set_dir), None, allow_empty_commit=False
+        )
+        assert rows, "the runner must emit a row per registered check"
+        for row in rows:
+            assert row.blocking is gate_checks.is_blocking_check(row.check), (
+                row.check
+            )
+        assert {r.check for r in rows if not r.blocking} == set(
+            gate_checks.ADVISORY_CHECKS
+        )

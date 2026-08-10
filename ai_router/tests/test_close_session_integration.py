@@ -254,10 +254,18 @@ def test_uncommitted_file_triggers_gate_failed(closeable_set: Path, monkeypatch)
     assert "working_tree_clean" in failed_names
 
 
-def test_missing_change_log_triggers_gate_failed_on_final_session(
+def test_missing_change_log_warns_but_does_not_block_the_final_session(
     tmp_path: Path, monkeypatch,
 ):
-    """The final session of a set with no change-log.md fails change_log_fresh."""
+    """Set 116 S3: change_log_fresh warns; it no longer refuses a close.
+
+    Until the operator's 2026-08-10 ruling this exact fixture was
+    ``gate_failed``. The ruling demoted the check as bookkeeping --
+    "worth a warning at the set boundary; not worth blocking on" -- so
+    the close now SUCCEEDS while the check still runs, still reports,
+    and is still marked failed-but-advisory. Losing the message would
+    make this a deletion; losing the veto is the demotion.
+    """
     root = tmp_path / "repo"
     root.mkdir()
     _git(root, "init", "-b", "main")
@@ -278,8 +286,8 @@ def test_missing_change_log_triggers_gate_failed_on_final_session(
     (set_dir / "spec.md").write_text("# spec\n", encoding="utf-8")
     register_session_start(
         session_set=str(set_dir),
-        session_number=2,
-        total_sessions=2,
+        session_number=1,
+        total_sessions=1,
         orchestrator_engine="claude-code",
         orchestrator_model="claude-opus-4-7",
         orchestrator_effort="high",
@@ -289,11 +297,11 @@ def test_missing_change_log_triggers_gate_failed_on_final_session(
         json.dumps({
             "sessionSetName": "final-set",
             "createdDate": "2026-04-30T00:00:00-04:00",
-            "totalSessions": 2,
+            "totalSessions": 1,
             "entries": [{
-                "sessionNumber": 2,
+                "sessionNumber": 1,
                 "stepNumber": 1,
-                "stepKey": "session-2/work",
+                "stepKey": "session-1/work",
                 "dateTime": "2026-04-30T01:00:00-04:00",
                 "description": "did work",
                 "status": "complete",
@@ -313,17 +321,39 @@ def test_missing_change_log_triggers_gate_failed_on_final_session(
     ))
     # Set 084: settle the verification evidence so the close backstop
     # stands down and change_log_fresh stays the gate under test.
-    record_post(str(set_dir), 2, [])
-    _corroborate_api_close(set_dir, 2, monkeypatch, tmp_path)
+    record_post(str(set_dir), 1, [])
+    _corroborate_api_close(set_dir, 1, monkeypatch, tmp_path)
     _git(root, "add", "-A")
     _git(root, "commit", "-m", "land final set")
     _git(root, "push", "origin", "main")
 
     args = _ns(close_session, session_set_dir=str(set_dir))
     outcome = close_session.run(args)
-    assert outcome.result == "gate_failed"
-    failed_names = {g.check for g in outcome.gate_results if not g.passed}
-    assert "change_log_fresh" in failed_names
+    assert outcome.result == "succeeded", outcome.messages
+    row = next(
+        g for g in outcome.gate_results if g.check == "change_log_fresh"
+    )
+    assert row.passed is False
+    assert row.blocking is False
+    assert row.remediation
+    assert any(
+        "change_log_fresh WARNING" in m for m in outcome.messages
+    ), outcome.messages
+
+    # And the state flip actually happened. This half is the falsifier
+    # for the sibling the demotion exposed: `_flip_state_to_closed` used
+    # to require change-log.md to be PRESENT before it would call a
+    # session the last one, mirroring the gate. Once the gate stopped
+    # refusing, that mirror judged this close mid-set and wrote
+    # top-status `in-progress` over a sessions[] where every session was
+    # complete -- an invariant violation, so close_session RAISED rather
+    # than closing. Asserting "succeeded" alone does not catch that;
+    # asserting the resulting state does.
+    state = json.loads(
+        (set_dir / "session-state.json").read_text(encoding="utf-8")
+    )
+    assert state["status"] == "complete"
+    assert [s["status"] for s in state["sessions"]] == ["complete"]
 
 
 # ---------------------------------------------------------------------------

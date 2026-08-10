@@ -53,6 +53,7 @@ from gate_checks import (
     _claimed_close_verdict,
     _verify_session_command,
     check_verification_integrity,
+    check_verification_method_vocabulary,
 )
 from session_state import (
     NextOrchestrator,
@@ -217,23 +218,50 @@ class TestMethodVocabulary:
         assert "Set 026" in joined and "retired" in joined
 
     def test_unknown_token_fails_with_generic_message(self, tmp_path):
+        # Set 116 S3: the vocabulary rule is its own check now, so it is
+        # asked directly. It used to be layer 1 of
+        # check_verification_integrity, which asserted the same message
+        # one level up.
         set_dir = _make_set(tmp_path)
         d = Disposition(
             status="completed", summary="s",
             verification_method="carrier-pigeon",
         )
-        passed, remediation = check_verification_integrity(str(set_dir), d)
+        passed, remediation = check_verification_method_vocabulary(
+            str(set_dir), d
+        )
         assert not passed
         assert "carrier-pigeon" in remediation
         assert "unknown token" in remediation
 
-    def test_gate_rejects_incident_token_before_anything_else(self, tmp_path):
+    def test_the_incident_token_gets_a_naming_message(self, tmp_path):
         set_dir = _make_set(tmp_path)
-        passed, remediation = check_verification_integrity(
+        passed, remediation = check_verification_method_vocabulary(
             str(set_dir), Disposition(**INCIDENT_DISPOSITION)
         )
         assert not passed
         assert "manual-via-other-engine" in remediation
+
+    def test_an_unknown_token_still_cannot_pass_the_integrity_gate(
+        self, tmp_path
+    ):
+        """Demoting the spelling check did not open the gate.
+
+        `verification_method` selects the corroboration path, so a token
+        with no path cannot reach a passing close — it falls through to
+        the zero-budget arm and is refused there. The message is no
+        longer about the word; the refusal is.
+        """
+        set_dir = _make_set(tmp_path)
+        passed, remediation = check_verification_integrity(
+            str(set_dir),
+            Disposition(
+                status="completed", summary="s",
+                verification_method="carrier-pigeon",
+            ),
+        )
+        assert not passed
+        assert "carrier-pigeon" in remediation
 
     def test_retired_map_covers_exactly_queue_and_manual(self):
         assert set(RETIRED_VERIFICATION_METHODS) == {"queue", "manual"}
@@ -1039,8 +1067,18 @@ class TestCloseSessionEndToEnd:
         outcome = close_session.run(_ns(session_set_dir=str(incident_repo)))
         assert outcome.result == "gate_failed"
         assert outcome.exit_code == 1
-        failed = {g.check for g in outcome.gate_results if not g.passed}
+        # Set 116 S3: the incident's illegal token also fails the now-
+        # advisory vocabulary check. What must stay true is that the
+        # BLOCKING failure is verification_integrity alone.
+        failed = {
+            g.check for g in outcome.gate_results
+            if not g.passed and g.blocking
+        }
         assert failed == {VERIFICATION_INTEGRITY_CHECK_NAME}
+        assert {
+            g.check for g in outcome.gate_results
+            if not g.passed and not g.blocking
+        } == {"verification_method_vocabulary"}
         blocked = next(
             g for g in outcome.gate_results
             if g.check == VERIFICATION_INTEGRITY_CHECK_NAME
@@ -1122,12 +1160,23 @@ class TestCloseSessionEndToEnd:
         assert outcome.result == "succeeded", outcome.messages
         assert outcome.verification_method == "skipped"
 
-    def test_manual_verify_bypasses_evidence_but_not_vocabulary(
+    def test_manual_verify_now_warns_on_the_incident_token(
         self, incident_repo, tmp_path, monkeypatch
     ):
-        """--manual-verify does NOT launder the incident's illegal token:
-        the vocabulary layer runs on every path (S2 round-2 finding), so
-        the attested close of the exact incident shape still fails."""
+        """The named residual of the Set 116 S3 ruling, pinned.
+
+        Until 2026-08-10, --manual-verify bypassed the evidence layer but
+        the vocabulary layer still refused the incident's illegal token,
+        so an attested close of the exact incident shape failed. The
+        operator's ruling demoted that check to warn-not-block, having
+        been shown this consequence by name, so the close now SUCCEEDS
+        and the illegal token reaches session-state.json.
+
+        What must remain true, and is asserted here: the check still ran,
+        it still returned its refusal, the refusal is still reported, and
+        it is marked non-blocking rather than quietly passed. A demotion
+        that lost the signal would be a deletion wearing its name.
+        """
         monkeypatch.setenv(
             "AI_ROUTER_METRICS_PATH",
             str(incident_repo.parent / "no-metrics.jsonl"),
@@ -1142,13 +1191,45 @@ class TestCloseSessionEndToEnd:
             manual_verify=True,
             reason_file=str(reason),
         ))
-        assert outcome.result == "gate_failed"
-        vi = next(
+        assert outcome.result == "succeeded", outcome.messages
+        vocab = next(
             g for g in outcome.gate_results
-            if g.check == VERIFICATION_INTEGRITY_CHECK_NAME
+            if g.check == "verification_method_vocabulary"
         )
-        assert not vi.passed
-        assert "manual-via-other-engine" in vi.remediation
+        assert vocab.passed is False
+        assert vocab.blocking is False
+        assert "manual" in vocab.remediation
+        # The warning reaches the operator-facing message list, not just
+        # the JSON: a kept signal nobody prints is not a kept signal.
+        assert any(
+            "verification_method_vocabulary WARNING" in m
+            for m in outcome.messages
+        ), outcome.messages
+
+    def test_the_incident_token_still_blocks_without_manual_verify(
+        self, incident_repo, monkeypatch
+    ):
+        """The demotion's boundary, from the other side.
+
+        The Set 083 incident shape — an illegal token plus a
+        self-attested verdict — still cannot close on an ordinary
+        (unattested) path. It is refused by verification_integrity,
+        which has no corroboration path for a token it does not know,
+        rather than by the spelling check. Without this test the
+        demotion would look like it had reopened the incident.
+        """
+        monkeypatch.setenv(
+            "AI_ROUTER_METRICS_PATH",
+            str(incident_repo.parent / "no-metrics.jsonl"),
+        )
+        outcome = close_session.run(_ns(session_set_dir=str(incident_repo)))
+        assert outcome.result == "gate_failed"
+        blocked = {
+            g.check for g in outcome.gate_results
+            if not g.passed and g.blocking
+        }
+        assert blocked
+        assert "verification_method_vocabulary" not in blocked
 
     def test_manual_verify_is_the_sanctioned_evidence_bypass(
         self, incident_repo, tmp_path, monkeypatch
@@ -1196,7 +1277,6 @@ class TestCloseSessionEndToEnd:
         )
         assert vi.passed
         assert "--manual-verify" in vi.remediation
-        assert "vocabulary still enforced" in vi.remediation
 
 
 # ---------------------------------------------------------------------------

@@ -1307,15 +1307,25 @@ def _flip_state_to_closed(
         new_completed = sorted(set(effective_completed_before))
 
     # Final-session detection (Set 022): the canonical signal is
-    # ``len(new_completed) == totalSessions``. change-log.md presence
-    # remains a belt-and-suspenders check — both must indicate "done"
-    # before the set flips to complete, so a stray hand-written
-    # change-log doesn't promote a mid-set close to a set-done flip,
-    # and a missing change-log doesn't let the math alone flip a set
-    # the orchestrator hasn't actually wrapped up. ``forced=True``
-    # still short-circuits to last-session because incident recovery
-    # is explicit operator intent (close-out.md, "--force is
-    # hard-scoped to incident recovery").
+    # ``len(new_completed) == totalSessions``. ``forced=True``
+    # short-circuits to last-session because incident recovery is
+    # explicit operator intent (close-out.md, "--force is hard-scoped
+    # to incident recovery").
+    #
+    # Set 116 S3 removed a second condition here — ``change-log.md``
+    # had to be present too, as a belt-and-suspenders mirror of the
+    # ``change_log_fresh`` gate. It was redundant in one direction
+    # (``sessions_done`` already stops a stray hand-written change-log
+    # from promoting a mid-set close) and, once the operator's ruling
+    # demoted that gate to warn-not-block, actively wrong in the other:
+    # a final session with no change log would pass the gate chain,
+    # arrive here, be judged NOT the last session, and write
+    # ``top_status=in-progress`` over a sessions[] array in which every
+    # session is complete — which rule 6 rejects. The close raised
+    # ``SessionStateInvariantError`` instead of closing, so demoting a
+    # gate to a warning had turned a clean refusal into a crash. The
+    # gate is the enforcement point for "the orchestrator wrapped the
+    # set up"; the writer's job is to record what the arithmetic says.
     #
     # Set 030 Session 2: totalSessions MUST be resolvable. When the
     # on-disk value is missing/zero, we backfill from spec.md +
@@ -1351,10 +1361,7 @@ def _flip_state_to_closed(
         )
 
     sessions_done = len(new_completed) == total_sessions
-    change_log_present = os.path.isfile(
-        os.path.join(session_set, "change-log.md")
-    )
-    is_last_session = forced or (sessions_done and change_log_present)
+    is_last_session = forced or sessions_done
 
     # Build the v4 sessions[] reflecting the post-close state.
     #
@@ -1589,16 +1596,32 @@ def mark_session_complete(
     # imports session_state for read_session_state and (in the repair
     # path) for _flip_state_to_closed.
     try:
-        from close_session import run_gate_checks  # type: ignore[import-not-found]
+        from close_session import (  # type: ignore[import-not-found]
+            advisory_failures,
+            blocking_failures,
+            run_gate_checks,
+        )
     except ImportError:
-        from .close_session import run_gate_checks  # type: ignore[no-redef]
+        from .close_session import (  # type: ignore[no-redef]
+            advisory_failures,
+            blocking_failures,
+            run_gate_checks,
+        )
 
     gate_results = run_gate_checks(session_set)
+    # Set 116 S3 (L-069-1 sibling site): this is the second consumer of
+    # the gate verdict, and it must classify blocking-ness the same way
+    # close_session.run does or a check would be demoted on one close
+    # path and not the other. Both ask blocking_failures().
     failures = [
         GateCheckFailure(check=g.check, remediation=g.remediation)
-        for g in gate_results
-        if not g.passed
+        for g in blocking_failures(gate_results)
     ]
+    for g in advisory_failures(gate_results):
+        _logger.warning(
+            "gate %s WARNING (advisory, does not block) on %s: %s",
+            g.check, session_set, g.remediation,
+        )
 
     if failures and not force:
         raise CloseoutGateFailure(failures)

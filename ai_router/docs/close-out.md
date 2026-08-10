@@ -392,8 +392,12 @@ returns the corresponding exit code without touching downstream state.
     not merely the same refusal); incident recovery under a dead
     provider goes through the attested `--manual-verify` path.
     An illegal
-    `verification_method` token skips the backstop because the
-    vocabulary gate refuses that close anyway. The backstop runs inside
+    `verification_method` token skips the backstop because no evidence
+    that round could buy would let the close pass — the token selects
+    the corroboration path, and `check_verification_integrity` refuses
+    one it has no path for. (Set 116 S3 re-derived this after demoting
+    the vocabulary *gate*: the ruling falsified the reason this skip
+    used to give, not its conclusion.) The backstop runs inside
     the close lock and is idempotent: a re-run after a
     backstop-verified close finds the stamped evidence and skips — and
     the skip rediscovers that evidence's bookkeeping paths (artifact,
@@ -401,19 +405,63 @@ returns the corresponding exit code without touching downstream state.
     working-tree gate keeps tolerating them when a prior round's close
     failed on a LATER gate and the artifacts are still uncommitted
     (I-084-S2-9).
-7. **Run deterministic gate checks** (`ai_router.gate_checks`):
-   - `check_working_tree_clean` — `git status` is clean (or only
-     ignored patterns remain). Catches "agent forgot to commit".
-   - `check_pushed_to_remote` — local HEAD has been pushed to the
-     remote tracking branch. Catches "committed but never pushed".
-   - `check_activity_log_entry` — the current session has an
-     `activity-log.json` entry whose `session_number` matches.
-   - `check_next_orchestrator_present` — every session except the
-     last has a routed next-orchestrator recommendation. Catches
-     drift from the workflow's "always route, never self-opine" rule.
-   - `check_change_log_fresh` — last-session-only: the change log was
-     updated in the same commit window (timestamp within tolerance).
-   - `check_verification_method_vocabulary` / `check_verification_integrity`
+7. **Run deterministic gate checks** (`ai_router.gate_checks`).
+
+   **Blocking, precondition, advisory — the Set 116 S3 ruling.** Every
+   check below runs and prints on every close. What differs is whether
+   it may *refuse* one. The operator ruled on 2026-08-10 (attested in
+   Set 116's `decisions.jsonl`), and `gate_checks.ADVISORY_CHECKS` is
+   the executable form of that ruling; `is_blocking_check(name)` is the
+   one predicate every consumer asks, and every `gate_results` row
+   carries a `blocking` field so the JSON says which kind it was.
+
+   - **Gates (blocking):** `verification_integrity`,
+     `uat_walk_recorded`, `test_run_fresh`. The three the operator
+     believes in.
+   - **Transactional preconditions (blocking, different reason):**
+     `working_tree_clean`, `pushed_to_remote`. Not ceremony — they
+     protect the *write*. A close computed against a dirty surface, or
+     an unpushed close, records something that was never true.
+   - **Advisory (warn-not-block):** `activity_log_entry`,
+     `next_orchestrator_present`, `change_log_fresh`,
+     `checklist_posted`, `verification_method_vocabulary`. Signal kept,
+     veto removed. **Nothing was deleted** — each keeps its
+     implementation, its message and its tests, so re-arming one is a
+     single-line edit to `ADVISORY_CHECKS`. A demoted check that never
+     surfaces anything worth acting on is a deletion candidate later,
+     **on evidence**.
+
+   The checks themselves:
+
+   - `check_working_tree_clean` (**precondition**) — `git status` is
+     clean (or only ignored patterns remain). Catches "agent forgot to
+     commit".
+   - `check_pushed_to_remote` (**precondition**) — local HEAD has been
+     pushed to the remote tracking branch. Catches "committed but never
+     pushed".
+   - `check_activity_log_entry` (**advisory**) — the current session has
+     an `activity-log.json` entry whose `session_number` matches.
+   - `check_next_orchestrator_present` (**advisory**) — every session
+     except the last has a routed next-orchestrator recommendation.
+     Catches drift from the workflow's "always route, never self-opine"
+     rule.
+   - `check_change_log_fresh` (**advisory**) — last-session-only: the
+     change log was updated in the same commit window (timestamp within
+     tolerance).
+   - `check_test_run_fresh` (**gate**) — every **expensive** suite whose
+     covered surfaces this session touched has a green run of record
+     whose content digest still matches. All three layers are expensive
+     as of Set 116 S3 (pytest and mocha were declared cheap, so the
+     once-per-session rule never governed the suite that cost the time);
+     a session that touched none of a suite's surfaces owes it nothing.
+     The run belongs at **Step 8**, after remediation — see
+     `docs/session-constitution.md`.
+   - `check_uat_walk_recorded` (**gate**) — a `requiresUAT` session
+     closes with its recorded walk or an operator-attested waiver.
+   - `check_checklist_posted` (**advisory**) — the step checklist was
+     posted at each transition the session's own records show.
+   - `check_verification_method_vocabulary` (**advisory**) /
+     `check_verification_integrity` (**gate**)
      — Set 083: `verification_method` must be a legal disposition token
      (`api`, `manual-via-other-engine`, `skipped`), and per-session
      cross-provider verification is **mandatory** on every Full-tier close
@@ -438,9 +486,12 @@ returns the corresponding exit code without touching downstream state.
      own call). The refusal message names the exact venv-qualified
      `.venv/Scripts/python.exe -m ai_router.verify_session
      --session-set-dir ...` remediation.
-   Each gate returns `(passed: bool, remediation: str)`. The first
-   failing gate stops the phase; the script emits `closeout_failed`
-   with the remediation and exits 1.
+   Each gate returns `(passed: bool, remediation: str)`. **Every gate
+   runs** — none short-circuits the others, so one close reports every
+   problem rather than one problem per re-run. Advisory failures are
+   printed as `[WARN]` and stepped over. If any *blocking* failure
+   remains, the script emits `closeout_failed` with every blocking
+   remediation and exits 1.
 7b. **Content-aware close-out gates** (run after the deterministic gates,
     before the state flip; each fires only on the **set-terminal** close
     and never on a non-terminal work-session close):
@@ -481,9 +532,13 @@ returns the corresponding exit code without touching downstream state.
      declaration, with or without a claimed verdict (Set 083: a null-verdict
      Full-tier close is no longer legal outside that declaration).
    - **Manual override** (`--manual-verify`) — record the attestation text from
-     stdin or `--reason-file` and proceed through the evidence layer. The
-     disposition method vocabulary still runs, so the retired `"manual"` and
-     `"queue"` tokens cannot be laundered by attestation.
+     stdin or `--reason-file` and proceed through the evidence layer. Set 116
+     S3 note: the method-vocabulary check is now **advisory**, so on this path
+     it warns rather than refuses — an attested close can persist a retired
+     `"manual"` / `"queue"` token. That residual was named to the operator and
+     accepted with the ruling. It is data hygiene, not a verification hole:
+     the evidence layer is what the attestation is excusing, and the
+     attestation is recorded in the events ledger.
 9. **Idempotent writes.** Each of these is safe to retry:
    - `_flip_state_to_closed(session_set_dir, verification_verdict=verdict)` —
      flips `session-state.json` from `in-progress` to `complete`,
@@ -844,9 +899,10 @@ the contents.
   waiver can never mask a real "forgot to push to an existing remote" miss.
 - **Marker absent** → behavior is **unchanged** in every case.
 
-The other four gates (`working_tree_clean`, `activity_log_entry`,
-`next_orchestrator_present`, `change_log_fresh`) still apply unchanged on a
-local-only repo.
+Every other check applies unchanged on a local-only repo, each at the
+blocking-ness the Set 116 S3 ruling gave it — `working_tree_clean` still
+blocks as a precondition; `activity_log_entry`, `next_orchestrator_present`
+and `change_log_fresh` warn.
 
 **Managing the marker.** The marker is just a file, so an operator *could*
 create it by hand — but the blessed CLI removes the guesswork and records an

@@ -751,16 +751,28 @@ prerequisites.
 Canonizes the policy piloted in Set 110's operator notes. The waste
 pattern being eliminated is **invalidated runs**, not full runs.
 
-- **Cheap suites run freely.** The Layer 2 stub-mocha pass (~2 min) costs
-  less than deciding whether to run it. Run it whenever useful.
-- **Expensive suites (Layer 3 Playwright, ~13 min) run in two modes
-  only:** *targeted* — the specific specs covering what you just changed,
-  any time; and *full* — **exactly once per session, at session close,
-  AFTER the last code change.** Never start a full expensive run you
-  might invalidate.
+- **Every suite runs in two modes:** *targeted* — the specific tests
+  covering what you just changed, any time; and *full* — **exactly once
+  per session, at Step 8, AFTER remediation and before close.** Never
+  start a full run you might invalidate.
+- **"After the last code change" means Step 8, not Step 5** (Set 116 S3).
+  Step 7 remediation *is* a code change and verification finds something
+  in nearly every session, so a full run at Step 5 is invalidated
+  wherever it matters — the instruction was unsatisfiable, not merely
+  ignored. Set 112 S3 obeyed it into 15 test runs and 186 minutes, 59%
+  of the session. Recording a run at Step 8 does not stale the
+  verification that just passed (Set 116 S2), which is what lets this be
+  a last step rather than a loop.
+- **All three layers are `expensive: true`** (Set 116 S3). Layer 1 was
+  declared cheap while costing 14 minutes, so the gate had no opinion
+  about the suite that cost the time; Layer 2 was declared cheap and
+  then went unrun for two whole sessions of Set 114, which is how that
+  set shipped two close-gate regressions into its own sample project.
+  `expensive` is not a claim about the clock — it is the flag that
+  decides whether `test_run_fresh` has an opinion.
 - **Verification rounds do not each trigger suite runs.** The remediation
   sidecar's acceptance checks are the per-round evidence; the full run
-  belongs to the session close, once.
+  belongs to Step 8, once.
 - **Non-negotiable exception:** any session touching the Explorer
   rendering surface, a state-file writer, the extension MANIFEST, or the
   fixture harness runs the full Layer 3 at its own close. Layer 2 and
@@ -781,7 +793,7 @@ Prose does not survive end-of-session pressure, so the run of record is
 now recorded and checked:
 
 ```bash
-# after the last code change, and after the suite goes green:
+# at Step 8, after remediation, and after the suite goes green:
 python -m ai_router.run_of_record record \
     --session-set-dir docs/session-sets/<slug> \
     --suite playwright --outcome passed --detail "35 passed / 0 failed" \
@@ -818,7 +830,7 @@ hours and nothing noticed.
 just changed.** Five of them, and no more — a checklist posted after
 every step is scrolled past like any other banner:
 
-| Transition | Post when | Gate-checked? |
+| Transition | Post when | Checked? |
 | :--- | :--- | :--- |
 | **Session start** | Right after `start_session`, once the plan's steps are logged. | Yes |
 | **A test suite's run is recorded** | After a blocking suite finishes **and its record is written** — `run_of_record record` first, then post. | Yes |
@@ -827,6 +839,18 @@ every step is scrolled past like any other banner:
 | **An operator stop is journaled** | After `decision_journal` records the human-authority decision. | Yes |
 | **Before the education-mode brief** | Immediately before you put the question to the human, so they see where the session is while they decide. | **No** — see below |
 | **Before close** | After the last logged step, before `close_session`. | Yes |
+
+> **"Checked" no longer means "blocked" (Set 116 S3).** The operator's
+> 2026-08-10 gate ruling demoted `checklist_posted` to warn-not-block:
+> the ledger, the cadence above, and the comparison all survive and
+> still print at close, but a missed post cannot refuse the close. The
+> case for keeping the signal is written into the gate's own docstring
+> — Set 111 S4 posted once across dozens of transitions and nothing
+> noticed, *because a close gate cannot observe a chat window*. The case
+> against the veto is that its first two dogfoods, Set 114 S1 and both
+> of Set 116's own earlier sessions, all ended in operator-attested
+> waivers. Signal kept, veto removed; deletion stays available in a
+> later set, on evidence.
 
 ### Posting is recorded by the act of posting
 

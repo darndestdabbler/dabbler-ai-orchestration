@@ -214,6 +214,83 @@
       "dateTime": "2026-08-10T13:07:15.215192-04:00",
       "description": "Frozen, then: full pytest 3829 passed / 5 skipped in 255.58s (parallel), and full Layer 3 Playwright 36 passed in 11.7m (owed because close_session.py is on the playwright covers list). Both recorded with durations. Verification round 1 (discovery, 2-lens fan-out) VERIFIED from both lenses, zero Critical/Major, anthropic excluded, $0.78. Two record-level nits fixed; three adjudicated-minor residuals journaled and carried in the disposition.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T13:14:41.135598-04:00",
+      "description": "Register. **Confirm Set 114 is complete** (it was, 2026-08-10 08:40) and read what it shipped before editing `gate_checks.py`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "operator-decision-journaled",
+      "dateTime": "2026-08-10T13:14:41.135598-04:00",
+      "description": "**Operator decision, journaled.** Reducing gates is a verification reduction and sits inside the decision-rights hard carve-out; it is never self-authorized. **The operator ruled on 2026-08-10 \u2014 see [`operator-notes.md`](operator-notes.md) for the per-gate disposition.** That is direction; this step still records the attestation in `decisions.jsonl` at the time of implementation, and confirms the ruling still stands before acting on it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "implement-the-ruling",
+      "dateTime": "2026-08-10T13:14:41.135598-04:00",
+      "description": "**Implement the ruling.** Keep `verification_integrity`, `uat_walk_recorded` and `test_run_fresh` as gates. Keep `working_tree_clean` and `pushed_to_remote` as **transactional preconditions** \u2014 they protect the write, not the ceremony. **Delete nothing.** **Demote to warn-not-block** `checklist_posted`, `activity_log_entry`, `next_orchestrator_present`, `change_log_fresh` and `verification_method_vocabulary`: each check still runs and still prints, but it cannot refuse a close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "fix-what-a-fresh-test-run",
+      "dateTime": "2026-08-10T13:14:41.135598-04:00",
+      "description": "**Fix what \"a fresh test run\" means \u2014 and when it happens.** Two halves of one bug. **(a)** `test_run_fresh` does not govern pytest: `pytest` and `mocha` are `expensive=False` in `run_of_record.py`, which is why a session could run 15 suites unremarked. Scope it to the surfaces the session actually touched, so a docs-only session never owes Playwright. **(b) Move the full-suite run from Step 5 to Step 8** in `docs/session-constitution.md`. Step 5 today says expensive suites run *\"fully once, after the last code change\"* \u2014 but **Step 7 remediation is a code change**, so the instruction is unsatisfiable in any session where verification finds anything, which is nearly all of them. Targeted tests during the loop; **one applicable full run after remediation, before close.** This depends on Session 2's staleness fix and must not ship before it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "close",
+      "dateTime": "2026-08-10T13:14:41.135598-04:00",
+      "description": "Close: `change-log.md`, the **required** path-aware critique, Step 9 review; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T13:18:42.083273-04:00",
+      "description": "Registered session 3 (claude/anthropic/claude-opus-5, effort high). Read the four preload files. Confirmed Set 114 COMPLETE (all 3 sessions VERIFIED, terminal close 2026-08-10T08:40) and read its change-log.md before touching gate_checks.py: 114 shipped the checklist_posted gate + checklist-posts.jsonl ledger, start_session plan-step seeding, the Explorer's fifth tree level, and a fix to check_activity_log_entry so seeded plan rows cannot satisfy it. Appended the Session 3 block to ai-assignment.md (step 3.5) recording the orchestrator choice, the three things this session must not do, and the fact that BOTH prior sessions of this set closed on an operator-attested checklist_posted waiver.",
+      "status": "completed"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "operator-decision-journaled",
+      "dateTime": "2026-08-10T13:22:53.742613-04:00",
+      "description": "Presented the 2026-08-10 gate ruling as an education-mode brief and got the operator's attestation at the moment of implementation, as the spec requires (operator-notes.md is direction, never the attestation). The brief named three things the ruling did not have in front of it: (1) verification_method_vocabulary is the ONLY close-time enforcement of a legal verification_method token, because validate_disposition's rule 4 is never called at close; (2) the gate-(c) repair is an enforcement INCREASE that has never actually run, since evaluate_freshness already scopes by touched path and only the `expensive` flag was wrong; (3) both prior sessions of this set closed on an operator-attested checklist_posted waiver, which is this set's own evidence for that demotion. Operator chose 'Attest the ruling as written' -- all five demotions, accepting the token-hygiene residual. Journaled to decisions.jsonl with authority=human, rubric_line=verification-reduction, verification_effect=reduces.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "implement-the-ruling",
+      "dateTime": "2026-08-10T13:47:50.100463-04:00",
+      "description": "Implemented the attested ruling. gate_checks.ADVISORY_CHECKS is the executable form of the table and is_blocking_check() is the single predicate every consumer asks; GateResult carries a `blocking` field so gate_results JSON says which kind each row was. verification_method_vocabulary became its own registry row (appended last, never inserted) and its blocking layer left check_verification_integrity; the --manual-verify substitution in _run_gate_checks collapsed to a plain pass, deleting a second spelling of a check that already runs. Sibling site fixed per L-069-1: session_state.mark_session_complete is the OTHER consumer of the gate verdict and now asks blocking_failures() too, logging advisory failures as warnings. Nothing deleted -- every demoted check keeps its predicate, message and tests. THREE things the tests caught that reading did not: (1) removing the backstop's vocabulary early-out was wrong -- the ruling falsified its stated REASON but not its conclusion, since an unknown token still has no corroboration path, so the skip was restored with corrected reasoning; (2) demoting change_log_fresh exposed a sibling in the state writer -- _flip_state_to_closed required change-log.md to be PRESENT before calling a session the last one, so a final session without one passed the gate chain and then wrote top-status in-progress over an all-complete sessions[], raising SessionStateInvariantError instead of closing (a demotion had turned a clean refusal into a CRASH); the redundant condition was removed and the crash pinned by asserting the flipped state, not just 'succeeded'; (3) an illegal token still cannot pass check_verification_integrity on an ordinary repo -- it falls through to the zero-budget arm -- so the demotion bites only under --manual-verify and on a declared zero-budget repo, which is now asserted from both sides.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "fix-what-a-fresh-test-run",
+      "dateTime": "2026-08-10T13:47:50.101567-04:00",
+      "description": "Both halves. (a) pytest and mocha are now expensive=True: `expensive` is the flag deciding whether test_run_fresh has an OPINION, not a claim about the clock, and the path-level scoping the operator asked for already existed in evaluate_freshness -- a docs-only session still owes nothing, which is what makes widening affordable. pytest's recorded command also picked up Session 1's `-n auto` default, since a run of record naming the serial command records a run nobody performs. Evidence cited in the code: Set 112 S3's 15 runs / 186 minutes for pytest, and Set 114 S3's two close-gate regressions shipped into the sample project while Layer 2 sat unrun. (b) The full-suite run moved from Step 5 to Step 8 in session-constitution.md, with Step 5 rewritten as targeted-only and the reason stated (Step 7 remediation IS a code change, so the old instruction was unsatisfiable rather than merely ignored). Propagated to every live echo (L-065-1): the authoring guide's test-run policy, its record-command comment, close-out.md's gate list, and run_of_record.py's own docstrings. Historical session artifacts left untouched -- they are records.",
+      "status": "complete"
     }
   ]
 }

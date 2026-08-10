@@ -563,9 +563,11 @@ def test_happy_path_skeleton_succeeds(started_with_disposition):
     outcome = run(args)
     assert outcome.result == "succeeded"
     assert outcome.exit_code == 0
-    # Every named gate appears in the output (shape stability;
+    # Every named check appears in the output (shape stability;
     # verification_integrity joined in Set 083, test_run_fresh and
-    # uat_walk_recorded in Set 111 S4, checklist_posted in Set 114 S1).
+    # uat_walk_recorded in Set 111 S4, checklist_posted in Set 114 S1,
+    # verification_method_vocabulary in Set 116 S3). A demoted check is
+    # still REPORTED — the ruling removed vetoes, not rows.
     assert {g.check for g in outcome.gate_results} == {
         "working_tree_clean",
         "pushed_to_remote",
@@ -576,6 +578,7 @@ def test_happy_path_skeleton_succeeds(started_with_disposition):
         "test_run_fresh",
         "uat_walk_recorded",
         "checklist_posted",
+        "verification_method_vocabulary",
     }
     assert all(g.passed for g in outcome.gate_results)
 

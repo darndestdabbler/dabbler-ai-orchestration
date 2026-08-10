@@ -130,7 +130,7 @@ try:
         GATE_CHECKS,
         VERIFICATION_INTEGRITY_CHECK_NAME,
         check_verification_integrity,
-        check_verification_method_vocabulary,
+        is_blocking_check,
     )
     from close_lock import (  # type: ignore[import-not-found]
         LockContention,
@@ -162,7 +162,7 @@ except ImportError:
         GATE_CHECKS,
         VERIFICATION_INTEGRITY_CHECK_NAME,
         check_verification_integrity,
-        check_verification_method_vocabulary,
+        is_blocking_check,
     )
     from .close_lock import (  # type: ignore[no-redef]
         LockContention,
@@ -211,11 +211,18 @@ class GateResult:
     ``passed`` is the boolean. ``remediation`` is non-empty when
     ``passed`` is False — a one-line hint the orchestrator surfaces to
     the human or includes in the JSON output.
+
+    ``blocking`` (Set 116 S3) says whether a failure refuses the close.
+    It is carried on the row rather than re-derived by each consumer, so
+    the JSON output tells a reader *why* a failed check did not stop the
+    close instead of leaving them to look it up. Defaults to True: a
+    row built without an opinion is a row that blocks.
     """
 
     check: str
     passed: bool
     remediation: str = ""
+    blocking: bool = True
 
 
 @dataclass
@@ -252,6 +259,7 @@ class CloseoutOutcome:
                     "check": g.check,
                     "passed": g.passed,
                     "remediation": g.remediation,
+                    "blocking": g.blocking,
                 }
                 for g in self.gate_results
             ],
@@ -819,13 +827,14 @@ def _run_gate_checks(
     declared order of :data:`gate_checks.GATE_CHECKS` so the JSON
     output's ``gate_results`` list is shape-stable across runs.
 
-    ``manual_verify`` narrows the verification-integrity check (Set 083)
-    to its vocabulary layer: ``--manual-verify`` is the sanctioned,
-    attested, logged bypass of the EVIDENCE corroboration, but an
-    illegal ``verification_method`` token still fails closed on every
-    path (the S2 round-2 finding — an attested close must not persist
-    the incident's retired token). The result row stays in the list so
-    the JSON shape (and the audit trail of *why* it passed) is stable.
+    ``manual_verify`` excuses the verification-integrity check (Set 083):
+    ``--manual-verify`` is the sanctioned, attested, logged bypass of the
+    EVIDENCE corroboration. Set 116 S3 simplified this: the vocabulary
+    rule that used to be substituted here is now its own registry row
+    (and, per the operator's ruling, an advisory one), so the substitution
+    became a second spelling of a check that already runs. The result row
+    stays in the list so the JSON shape — and the audit trail of *why* it
+    passed — is stable.
 
     ``extra_clean_ignore`` (Set 084 S2): paths the close backstop wrote
     mid-close (artifacts, issues envelope, the patched disposition).
@@ -836,33 +845,17 @@ def _run_gate_checks(
     results: List[GateResult] = []
     for name, predicate in GATE_CHECKS:
         if manual_verify and name == VERIFICATION_INTEGRITY_CHECK_NAME:
-            try:
-                vocab_passed, vocab_remediation = (
-                    check_verification_method_vocabulary(
-                        session_set_dir,
-                        disposition,
-                        allow_empty_commit=allow_empty_commit,
-                    )
-                )
-            except Exception as exc:  # pragma: no cover — defensive
-                vocab_passed = False
-                vocab_remediation = (
-                    f"gate predicate raised {type(exc).__name__}: {exc}"
-                )
             results.append(
                 GateResult(
                     check=name,
-                    passed=bool(vocab_passed),
+                    passed=True,
                     remediation=(
-                        vocab_remediation
-                        if not vocab_passed
-                        else (
-                            "evidence corroboration bypassed by "
-                            "--manual-verify (sanctioned, attested "
-                            "override; attestation recorded in the events "
-                            "ledger); method vocabulary still enforced"
-                        )
+                        "evidence corroboration bypassed by "
+                        "--manual-verify (sanctioned, attested "
+                        "override; attestation recorded in the events "
+                        "ledger)"
                     ),
+                    blocking=is_blocking_check(name),
                 )
             )
             continue
@@ -883,9 +876,33 @@ def _run_gate_checks(
                 check=name,
                 passed=bool(passed),
                 remediation=remediation,
+                blocking=is_blocking_check(name),
             )
         )
     return results
+
+
+def blocking_failures(results: List[GateResult]) -> List[GateResult]:
+    """The failures that must refuse a close.
+
+    Set 116 S3. One spelling for every consumer — ``run``,
+    ``session_state.mark_session_complete``, and any future caller —
+    so re-arming a demoted check stays a one-line edit to
+    :data:`gate_checks.ADVISORY_CHECKS` rather than a hunt for the
+    places that spell ``not g.passed``.
+    """
+    return [g for g in results if not g.passed and g.blocking]
+
+
+def advisory_failures(results: List[GateResult]) -> List[GateResult]:
+    """The failures that are reported and then stepped over.
+
+    Kept as a named counterpart to :func:`blocking_failures` because the
+    demotion is only honest if the signal still reaches a human. A
+    caller that drops these is deleting the check, which the operator's
+    ruling explicitly did not do.
+    """
+    return [g for g in results if not g.passed and not g.blocking]
 
 
 def run_gate_checks(
@@ -1398,7 +1415,15 @@ def _emit_output(outcome: CloseoutOutcome, *, json_mode: bool) -> None:
     if outcome.gate_results:
         print("  gate_results:")
         for g in outcome.gate_results:
-            mark = "PASS" if g.passed else "FAIL"
+            # Set 116 S3: a demoted check that fails is WARN, not FAIL.
+            # Printing FAIL beside a close that succeeded anyway is how a
+            # kept signal turns into noise a reader learns to skip.
+            if g.passed:
+                mark = "PASS"
+            elif g.blocking:
+                mark = "FAIL"
+            else:
+                mark = "WARN"
             line = f"    [{mark}] {g.check}"
             if not g.passed and g.remediation:
                 line += f" — {g.remediation}"
@@ -1971,6 +1996,9 @@ def run(
                     check=VERIFICATION_INTEGRITY_CHECK_NAME,
                     passed=bool(vi_passed),
                     remediation=vi_remediation,
+                    blocking=is_blocking_check(
+                        VERIFICATION_INTEGRITY_CHECK_NAME
+                    ),
                 )
             ]
         else:
@@ -1982,7 +2010,18 @@ def run(
                 extra_clean_ignore=backstop_written_paths,
             )
 
-        failed = [g for g in outcome.gate_results if not g.passed]
+        # Set 116 S3: a demoted check still runs and still reports; it
+        # just cannot refuse. Report the advisory failures FIRST, so the
+        # signal the operator kept is not buried under the refusal that
+        # follows it — and so a close that succeeds still says out loud
+        # what it stepped over.
+        for g in advisory_failures(outcome.gate_results):
+            outcome.messages.append(
+                f"gate {g.check} WARNING (advisory, does not block): "
+                f"{g.remediation}"
+            )
+
+        failed = blocking_failures(outcome.gate_results)
         if failed:
             outcome.result = "gate_failed"
             for g in failed:

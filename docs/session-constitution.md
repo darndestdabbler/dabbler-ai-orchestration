@@ -73,12 +73,11 @@ Run every router CLI through the workspace venv
     `session-verification`, which must use a different effective provider;
     own the mechanics (file edits, shell, git, and mechanical single-file
     edits under ~50 lines).
-- **5. Build + test.** Run the repo's suite; log the result. Expensive
-  suites run targeted during the session and **fully once, after the
-  last code change**; record that run
-  (`python -m ai_router.run_of_record record --suite <s> --outcome
-  passed --duration-seconds <n>`, required) or the `test_run_fresh`
-  close gate refuses the close.
+- **5. Build + test — targeted only.** Run the tests covering what you
+  just changed; log the result. **The full run belongs at Step 8**:
+  Step 7 remediation is a code change, so a full run here is
+  invalidated in nearly every session. Set 112 S3 obeyed the old
+  ordering into 15 runs and 186 minutes (Set 116 S3).
 - **6. Verify (mandatory, every session).** Run the phased
   loop: `python -m ai_router.verify_session --phase discovery` for the
   set (fan-out sized by config; all severities). It routes the evidence
@@ -96,7 +95,15 @@ Run every router CLI through the workspace venv
   fails pre-fix and passes post-fix), then `--phase remediation-review`
   on the fix delta. Bounds and no-resurrection: *Recovery and escalation*
   below.
-- **8. Close.** Author `disposition.json`
+- **8. Close — full suite first.** After remediation, fully run **every
+  expensive suite whose `covers` surfaces this session touched** and
+  record each (`python -m ai_router.run_of_record record --suite <s>
+  --outcome passed --duration-seconds <n>`, required) or
+  `test_run_fresh` refuses the close. All three layers are governed
+  (Set 116 S3); a docs-only session owes none. Recording does **not**
+  stale the verification that just passed (Set 116 S2), which is what
+  makes this a last step and not a loop. Then author
+  `disposition.json`
   (`verification_verdict` always; `next_orchestrator` on a mid-set
   completion; `uat` when the set declares `requiresUAT`), commit **and
   push**, run

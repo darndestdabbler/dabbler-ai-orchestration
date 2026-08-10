@@ -912,6 +912,85 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **(Set 116 S3) Ten close-out checks became three gates, two
+  transactional preconditions, and five warnings. Nothing was deleted.**
+  Operator ruling of 2026-08-10, attested at the time of implementation
+  in Set 116's `decisions.jsonl` (`authority: human`,
+  `rubric_line: verification-reduction` — this is inside the
+  decision-rights hard carve-out and cannot be self-authorized).
+
+  - **Gates, which refuse a close:** `verification_integrity`,
+    `uat_walk_recorded`, `test_run_fresh`.
+  - **Transactional preconditions, which also refuse but for a
+    different reason:** `working_tree_clean`, `pushed_to_remote`. They
+    protect the *write* — a close computed against a dirty or unpushed
+    tree records something that was never true. Calling them gates is
+    what made "ten gates" sound like ten pieces of ceremony when two of
+    them are data integrity.
+  - **Advisory, which run and print and cannot refuse:**
+    `activity_log_entry`, `next_orchestrator_present`,
+    `change_log_fresh`, `checklist_posted`, and
+    `verification_method_vocabulary`.
+
+  `gate_checks.ADVISORY_CHECKS` is the executable form of the table and
+  `is_blocking_check()` is the single predicate every consumer asks, so
+  re-arming a demoted check is a one-line edit rather than a hunt
+  through the places that spell `not passed`. **Consumer-visible:**
+  every `gate_results` row in `close_session --json` now carries a
+  `blocking` boolean, and human-readable output prints `[WARN]` beside
+  a failed advisory check instead of `[FAIL]`. A close that reports a
+  warning and succeeds is now a normal outcome.
+
+  Two consequences are stated rather than discovered:
+
+  1. **There is no longer a close-time check that
+     `verification_method` is a legal token.** `validate_disposition`'s
+     rule 4 is not run at close, and this check was its only
+     enforcement point. The Set 083 bypass incident is still refused —
+     by `check_verification_integrity`'s evidence layer, which is
+     unchanged, and on an ordinary repo even an unknown token cannot
+     pass it, because the token *selects* the corroboration path and a
+     token with no path falls through to the zero-budget arm. The
+     demotion bites in two places: under `--manual-verify`, and on a
+     repo that has declared the zero-budget tier and written the same
+     non-standard token into `budget.yaml`. Both were named to the
+     operator before the ruling was attested.
+  2. **`checklist_posted` was ruled for deletion and revised to
+     demotion**, once it emerged that Set 114 S1 had shipped it that
+     same morning. A demoted check that never surfaces anything worth
+     acting on is a deletion candidate later, **on evidence**; six
+     hours of hindsight is not evidence.
+
+- **(Set 116 S3) `test_run_fresh` now governs every layer, and the full
+  run moved from Step 5 to Step 8.** Two halves of one defect.
+
+  `pytest` and `mocha` carried `expensive: false`, and `expensive` is
+  the flag that decides whether the gate has an *opinion* — not a claim
+  about the clock. So the once-per-session-after-the-last-code-change
+  rule never governed the suite that cost the time: Set 112 S3 ran 15
+  suites across 186 minutes, 59% of the session, entirely unremarked,
+  and Set 114 shipped two close-gate regressions into its own sample
+  project while Layer 2 sat unrun for two sessions. All three layers
+  are now `expensive`, and pytest's recorded command picked up Set 116
+  S1's `-n auto` default (a run of record naming the serial command
+  records a run nobody performs). The path-level scoping is unchanged,
+  so a docs-only session still owes nothing — which is what makes the
+  widening affordable.
+
+  And "after the last code change" now names **Step 8**, after
+  remediation. Step 7 remediation *is* a code change and verification
+  finds something in nearly every session, so the Step 5 instruction
+  was unsatisfiable wherever it mattered rather than merely ignored.
+  This depends on Set 116 S2's staleness fix: recording a run no longer
+  stales the verification that just passed, which is what lets the full
+  run be a last step instead of a loop.
+
+  **Consumer-visible:** a session that changes `ai_router/` (or the
+  extension's `src/`) now owes a green, digest-fresh recorded run of
+  that suite before `close_session` will proceed. Repos that declare
+  their own `testing.suites` are unaffected — the change is to this
+  repo's bundled defaults.
+
 - **(Set 111 S1) The Copilot CLI transport's dispatch ceilings are
   configurable, and the total one is raised.** `cli_transport.py` hardcoded
   `spawn` / `first_byte` / `total` timeouts (10s / 30s / **300s**) with no
@@ -1070,6 +1149,27 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   > fix during Set 109 S4 and is the worked example.
 
 ### Fixed
+
+- **(Set 116 S3) A set-terminal close with no `change-log.md` raised
+  instead of closing.** Found by this session's own test suite while
+  demoting `change_log_fresh`, and it is the more interesting half of
+  that change. `_flip_state_to_closed` required `change-log.md` to be
+  **present** before it would judge a session the last one — a
+  belt-and-suspenders mirror of the gate. While the gate refused such a
+  close, the mirror was unreachable. The moment the gate became a
+  warning, a final session without a change log passed the whole gate
+  chain, arrived at the writer, was judged mid-set, and wrote
+  `status: in-progress` over a `sessions[]` in which every session was
+  complete — which the writer's own invariant validator rejects. The
+  close raised `SessionStateInvariantError`, so demoting a gate to a
+  warning had converted a clean refusal into a crash.
+
+  The redundant condition is removed: `is_last_session` is the
+  completion arithmetic (or `forced`), and the gate remains the
+  enforcement point for "the orchestrator wrapped the set up". The
+  regression test asserts the resulting **state**, not merely that the
+  close succeeded — "succeeded" alone does not catch a writer that
+  produced a valid-looking outcome from an invalid snapshot.
 
 - **(Set 116 S2) The verification round cap was bypassed by a second code
   path: the close backstop.** `verify_session` has refused past the bounded

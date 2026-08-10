@@ -844,24 +844,33 @@ class TestBackstopMechanics:
             status="completed",
             summary="rerun idempotency",
             verification_method="api",
-            files_changed=[],
+            # Set 116 S3: this used to lean on change_log_fresh as the
+            # "later gate", and that check is advisory now — the close
+            # would succeed and the test would prove nothing. It needs a
+            # gate that still REFUSES, so the session declares a pytest-
+            # covered surface with no run of record and fails
+            # test_run_fresh instead. The I-084-S2-9 property under test
+            # is unchanged: whatever the later gate is, the rerun must
+            # fail on IT and never on working_tree_clean.
+            files_changed=["ai_router/foo.py"],
             verification_message_ids=[],
             next_orchestrator=None,
             blockers=[],
             verification_verdict="VERIFIED",
         ))
         _git(root, "add", "-A")
-        _git(root, "commit", "-m", "land work (no change-log yet)")
+        _git(root, "commit", "-m", "land work (no run of record yet)")
         _git(root, "push", "origin", "main")
 
-        # Run 1: backstop verifies live, then change_log_fresh fails.
+        # Run 1: backstop verifies live, then test_run_fresh fails.
         first = close_session.run(_ns(session_set_dir=str(set_dir)))
         assert first.result == "gate_failed", first.messages
         assert len(fake.calls) == 1
         failed_first = {
-            g.check for g in first.gate_results if not g.passed
+            g.check for g in first.gate_results
+            if not g.passed and g.blocking
         }
-        assert failed_first == {"change_log_fresh"}, failed_first
+        assert failed_first == {"test_run_fresh"}, failed_first
 
         # Run 2: the backstop skips on the existing evidence, its
         # uncommitted bookkeeping stays tolerated, and only the same
@@ -870,9 +879,10 @@ class TestBackstopMechanics:
         assert second.result == "gate_failed", second.messages
         assert len(fake.calls) == 1  # no second verification
         failed_second = {
-            g.check for g in second.gate_results if not g.passed
+            g.check for g in second.gate_results
+            if not g.passed and g.blocking
         }
-        assert failed_second == {"change_log_fresh"}, failed_second
+        assert failed_second == {"test_run_fresh"}, failed_second
 
     def test_diff_base_is_the_last_pre_session_commit(self, closeable):
         """The caller commits before close, so a HEAD diff is empty —

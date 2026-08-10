@@ -1,10 +1,10 @@
 """Deterministic close-out gate checks — Full-tier consumers only.
 
 **Who uses this:** Called by ``close_session.run_gate_checks()`` on every
-close-out attempt. Six predicates: working-tree-clean, pushed-to-remote,
-activity-log-entry, next-orchestrator-present, change-log-fresh, and
-verification-integrity (Set 083 — the one gate ``--force`` does NOT
-bypass; ``--manual-verify`` is its only sanctioned override).
+close-out attempt. Ten predicates, of which five may refuse a close —
+see *Blocking, precondition, advisory* below. ``verification_integrity``
+(Set 083) is the one ``--force`` does NOT bypass; ``--manual-verify`` is
+its only sanctioned override.
 **See also:** ``close_session.py`` (the gate runner); ``disposition.py``
 (the disposition_present synthetic gate).
 
@@ -59,6 +59,46 @@ The checks land in this module:
   Rendering it is what records it, so the gate compares records against
   records and never asks anyone to attest they posted.
 
+Blocking, precondition, advisory (Set 116 S3)
+---------------------------------------------
+Every check above still runs and still prints. What differs is whether
+it may **refuse** a close, per the operator's 2026-08-10 ruling
+(attested in Set 116's ``decisions.jsonl``; the per-gate rationale is in
+that set's ``operator-notes.md``). :data:`ADVISORY_CHECKS` is the
+authority, and :func:`is_blocking_check` is the one predicate every
+caller asks:
+
+- **Gates (blocking).** ``verification_integrity`` — a claimed verdict
+  must be corroborated; ``uat_walk_recorded`` — a ``requiresUAT``
+  session closes with its walk or an attested waiver; ``test_run_fresh``
+  — the expensive suites this session touched have a fresh green run.
+  Three checks the operator believes in.
+- **Transactional preconditions (blocking, different reason).**
+  ``working_tree_clean`` and ``pushed_to_remote`` are not discipline:
+  they protect the *write*. A close computed against a dirty surface, or
+  an unpushed close, records something that was never true. They block
+  because the record would otherwise be wrong, not because anyone should
+  want the ceremony.
+- **Advisory (warn-not-block).** ``activity_log_entry``,
+  ``next_orchestrator_present``, ``change_log_fresh``,
+  ``checklist_posted`` and ``verification_method_vocabulary``. The
+  signal is kept and the veto is removed. **Nothing was deleted** —
+  every advisory check keeps its implementation, its remediation text
+  and its tests, so a demotion stays a demotion. A demoted check that
+  never surfaces anything worth acting on is a deletion candidate in a
+  later set, **on evidence**.
+
+One consequence is worth naming where a maintainer will find it:
+demoting ``verification_method_vocabulary`` leaves **no** close-time
+enforcement of :data:`disposition.VERIFICATION_METHODS`, because
+``validate_disposition``'s rule 4 is not run at close and this check was
+its only enforcement point. The Set 083 incident disposition is still
+refused — by :func:`check_verification_integrity`'s evidence layer,
+which is unchanged — but a corroborated close (or an attested
+``--manual-verify`` close) can now persist an illegal token into
+``session-state.json``. That residual was named in the education-mode
+brief and accepted by the operator on the record.
+
 Why a separate module
 ---------------------
 Keeping the predicates here lets ``close_session.py`` stay focused on
@@ -85,7 +125,7 @@ import os
 import re
 import subprocess
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import FrozenSet, List, Optional, Tuple
 
 try:
     from .disposition import (  # type: ignore[import-not-found]
@@ -649,6 +689,10 @@ def check_activity_log_entry(
 
     Returns a configuration-error failure when the log file is missing
     or unparseable; both are recoverable but the operator needs to know.
+        **Advisory since Set 116 S3** (operator ruling, 2026-08-10): this
+    check still runs and still reports, but it cannot refuse a close.
+    The verdict below is unchanged — the demotion lives in
+    :data:`ADVISORY_CHECKS`, so re-arming it is one line.
     """
     _ = disposition
     _ = allow_empty_commit
@@ -740,6 +784,10 @@ def check_next_orchestrator_present(
     ``next_orchestrator`` field, the failure cites the missing field.
     Sub-field validation errors are joined into the remediation string
     so the operator can see exactly which field is malformed.
+        **Advisory since Set 116 S3** (operator ruling, 2026-08-10): this
+    check still runs and still reports, but it cannot refuse a close.
+    The verdict below is unchanged — the demotion lives in
+    :data:`ADVISORY_CHECKS`, so re-arming it is one line.
     """
     _ = allow_empty_commit
 
@@ -821,6 +869,10 @@ def check_change_log_fresh(
     Non-final sessions skip this check (return pass). Missing
     ``change-log.md`` on the final session is a hard fail with a clear
     remediation.
+        **Advisory since Set 116 S3** (operator ruling, 2026-08-10): this
+    check still runs and still reports, but it cannot refuse a close.
+    The verdict below is unchanged — the demotion lives in
+    :data:`ADVISORY_CHECKS`, so re-arming it is one line.
     """
     _ = disposition
     _ = allow_empty_commit
@@ -1230,14 +1282,23 @@ def check_verification_method_vocabulary(
     *,
     allow_empty_commit: bool = False,
 ) -> GateOutcome:
-    """Layer 1 alone: ``verification_method`` must be a legal token.
+    """``verification_method`` must be a legal token. **Advisory.**
 
-    Split out of :func:`check_verification_integrity` (S2 round-2
-    verifier finding) so ``--manual-verify`` can bypass the EVIDENCE
-    corroboration while the vocabulary rule stays universal — the
-    incident's retired ``"manual"`` token fails closed on every path,
-    attested or not. Retired/renamed tokens get a naming message; every
-    refusal teaches the sanctioned Step 6 command.
+    Split out of :func:`check_verification_integrity` by Set 083 S2 so
+    ``--manual-verify`` could bypass the EVIDENCE corroboration while the
+    vocabulary rule stayed universal. Set 116 S3 promoted it to its own
+    registry entry and the operator's ruling made that entry advisory:
+    the check still runs and still prints its message, but it cannot
+    refuse a close ("a spelling check on a token").
+
+    It therefore returns ``(False, ...)`` for an illegal token exactly as
+    it always did — the demotion lives in :data:`ADVISORY_CHECKS`, not
+    here. A predicate that softened its own verdict would leave every
+    caller unable to tell "passed" from "was excused", and would make the
+    demotion impossible to reverse without re-deriving the rule.
+
+    Retired/renamed tokens get a naming message; every refusal teaches
+    the sanctioned Step 6 command.
     """
     _ = allow_empty_commit
     if disposition is None:
@@ -1322,12 +1383,34 @@ def check_verification_integrity(
     the offender's own console is toothless (operator-confirmed deviation
     from the Q6 TTY-block/headless-warn split). ``--manual-verify``
     (attested, logged) is the only sanctioned bypass, and it bypasses
-    **layer 2 (evidence corroboration) only** — layer 1's vocabulary rule
-    runs on every path via
-    :func:`check_verification_method_vocabulary` (S2 round-2 finding:
-    an attested close must still refuse the incident's illegal token).
-    ``--force`` bypasses NEITHER layer. Every refusal names the exact
-    sanctioned command so the blocked engine learns the easy path.
+    the **evidence corroboration** below. ``--force`` bypasses neither.
+    Every refusal names the exact sanctioned command so the blocked
+    engine learns the easy path.
+
+    Set 116 S3 — the vocabulary layer left this gate. It is now its own
+    registry entry, ``verification_method_vocabulary``, and the
+    operator's 2026-08-10 ruling made that entry **advisory**: it runs,
+    it prints, and it cannot refuse a close. What survives here is the
+    substance of the Set 083 incident — an uncorroborated claimed
+    verdict — which the evidence layers below refuse exactly as before.
+
+    What that demotion does and does not change, stated exactly, because
+    "the vocabulary check no longer blocks" is easy to over-read:
+
+    * An illegal token still cannot reach a passing close on an ordinary
+      repo. ``verification_method`` *selects the corroboration path*, so
+      a token this gate has no path for is not a spelling problem — it
+      falls through to the zero-budget arm below and is refused there
+      because ``budget.yaml`` does not declare ``threshold_usd: 0``.
+      The refusal is now "I cannot corroborate this", which is this
+      gate's own job, rather than "that word is not in the list".
+    * The demotion bites in exactly two places, both named to the
+      operator before it was attested: under ``--manual-verify`` (where
+      the caller excuses this gate entirely, so nothing checks the
+      token), and on a repo that has *declared* the zero-budget tier and
+      written the same non-standard token into ``budget.yaml`` — three
+      deliberate operator declarations agreeing with each other, which
+      is a declaration and not drift.
     """
     _ = allow_empty_commit
 
@@ -1339,17 +1422,6 @@ def check_verification_integrity(
 
     command = _verify_session_command(session_set_dir)
     method = disposition.verification_method
-
-    # Layer 1 — method vocabulary (fail-closed on unknown tokens). This is
-    # the close-time enforcement point for validate_disposition's rule 4:
-    # the incident's exact disposition dies here. The sub-check is also
-    # runnable standalone (check_verification_method_vocabulary) because
-    # --manual-verify bypasses ONLY the evidence layers below, never this.
-    vocab_passed, vocab_remediation = check_verification_method_vocabulary(
-        session_set_dir, disposition,
-    )
-    if not vocab_passed:
-        return False, vocab_remediation
 
     # Layer 2a — ledger axis (Set 086 S1). Orthogonal to the verdict/stamp
     # axis below and checked FIRST with a short-circuit: a fully-simulated
@@ -1601,6 +1673,7 @@ def check_verification_integrity(
 TEST_RUN_FRESH_CHECK_NAME = "test_run_fresh"
 UAT_WALK_CHECK_NAME = "uat_walk_recorded"
 CHECKLIST_POSTED_CHECK_NAME = "checklist_posted"
+VERIFICATION_METHOD_VOCABULARY_CHECK_NAME = "verification_method_vocabulary"
 
 
 def _router_config_or_none() -> Optional[dict]:
@@ -2100,6 +2173,10 @@ def check_checklist_posted(
       would decay exactly as the prose obligation did. The
       ``operator-stop`` transition therefore means "a stop was journaled
       and the session posted after it", and the docs say so.
+        **Advisory since Set 116 S3** (operator ruling, 2026-08-10): this
+    check still runs and still reports, but it cannot refuse a close.
+    The verdict below is unchanged — the demotion lives in
+    :data:`ADVISORY_CHECKS`, so re-arming it is one line.
     """
     _ = disposition
     _ = allow_empty_commit
@@ -2245,7 +2322,11 @@ def check_checklist_posted(
 # ``gate_results`` list. Skeleton ordering is preserved so consumers
 # (Set 5 VS Code extension) don't have to re-pin against a new shape.
 # Set 111 S4 appends two checks rather than inserting them, so every
-# existing index-based consumer keeps its position.
+# existing index-based consumer keeps its position. Set 116 S3 appends
+# verification_method_vocabulary for the same reason: it was already a
+# check (layer 1 of verification_integrity, and the whole of that gate
+# under --manual-verify), and the operator's ruling names it, so it
+# needs a row of its own to be demoted in.
 GATE_CHECKS: Tuple[Tuple[str, "callable"], ...] = (  # type: ignore[name-defined]
     ("working_tree_clean", check_working_tree_clean),
     ("pushed_to_remote", check_pushed_to_remote),
@@ -2256,4 +2337,48 @@ GATE_CHECKS: Tuple[Tuple[str, "callable"], ...] = (  # type: ignore[name-defined
     (TEST_RUN_FRESH_CHECK_NAME, check_test_run_fresh),
     (UAT_WALK_CHECK_NAME, check_uat_walk_recorded),
     (CHECKLIST_POSTED_CHECK_NAME, check_checklist_posted),
+    (
+        VERIFICATION_METHOD_VOCABULARY_CHECK_NAME,
+        check_verification_method_vocabulary,
+    ),
 )
+
+
+# ---------------------------------------------------------------------------
+# Which checks may refuse a close (Set 116 S3 — the operator's ruling)
+# ---------------------------------------------------------------------------
+# Operator ruling, 2026-08-10, attested in Set 116's decisions.jsonl
+# (authority=human, rubric_line=verification-reduction). Every name here
+# still RUNS and still PRINTS its remediation; it simply cannot refuse a
+# close. Removing a name from this set re-arms it; nothing is deleted, so
+# a demotion is one line to reverse.
+#
+# The complement is deliberately NOT spelled out as a "blocking" list.
+# Membership of GATE_CHECKS is what makes a check exist, and blocking is
+# the default — a check added later blocks unless someone deliberately
+# demotes it, which is the safe direction for a list to fail in.
+ADVISORY_CHECKS: FrozenSet[str] = frozenset(
+    {
+        "activity_log_entry",
+        "next_orchestrator_present",
+        "change_log_fresh",
+        CHECKLIST_POSTED_CHECK_NAME,
+        VERIFICATION_METHOD_VOCABULARY_CHECK_NAME,
+    }
+)
+
+
+def is_blocking_check(name: str) -> bool:
+    """True when a failure of *name* must refuse the close.
+
+    The single predicate every caller asks — ``close_session.run``,
+    ``close_session.run_gate_checks``'s consumers, and
+    ``session_state.mark_session_complete``. One spelling of the rule,
+    because three copies of ``name not in {...}`` is exactly the sibling
+    drift L-069-1 is about: a later set that re-arms one check would
+    otherwise re-arm it in one place and not the others.
+
+    Unknown names block. A check nobody classified is a check nobody
+    demoted.
+    """
+    return name not in ADVISORY_CHECKS

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The canonical numbered workflow no longer explicitly instructs the required path-aware critique to run before the full suite**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** An orchestrator follows `docs/session-constitution.md`, the mandatory workflow document: it completes Steps 6–7, reaches Step 8, runs and records the applicable full suites, and attempts close without ever running the armed path-aware critique. The critique is either skipped entirely or a close-time check forces it afterward, invalidating the full run and requiring another. This is probable because the only explicit instruction to run the critique was deleted from Step 9, while Step 8 merely assumes that its remediation has happened. Armed critiques routinely produce changes, as this session itself demonstrates.\n  - **Acceptance criterion:** JUDGMENT - `docs/session-constitution.md` must explicitly require an armed path-aware critique and any resulting remediation before Step 8’s single applicable full-suite run.\n  - **Details:**\n    - **Violation:** The accepted round-2 remediation requires “all expected code-changing verification and path-aware critique remediation before the single applicable full run,” and the original task requires “the **required** path-aware critique.” The constitution removed: “the multi-provider path-aware critique stage runs before the set-terminal close.”\n    - **Location:** `docs/session-constitution.md`, Steps 8–9.\n    - **Impact:** The main workflow can omit a required verification stage or recreate the exact invalidated-full-run loop this session is intended to eliminate. That materially changes the merge decision for a latency-and-verification-integrity change.\n    - **Evidence:** Step 8 now says only “After every code-changing stage … and the path-aware critique’s remediation when armed” before directing the suite run. It contains no instruction to execute the critique. Step 9’s former explicit instruction was deleted. The authoring guide contains the intended sequence, but the mandatory numbered constitution does not.\n    - **Fix:** Add an explicit critique action and sequence before the full-suite instruction: verify → remediate → run armed path-aware critique → remediate → run each applicable full suite once → close.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "An orchestrator follows `docs/session-constitution.md`, the mandatory workflow document: it completes Steps 6–7, reaches Step 8, runs and records the applicable full suites, and attempts close without ever running the armed path-aware critique. The critique is either skipped entirely or a close-time check forces it afterward, invalidating the full run and requiring another. This is probable because the only explicit instruction to run the critique was deleted from Step 9, while Step 8 merely assumes that its remediation has happened. Armed critiques routinely produce changes, as this session itself demonstrates.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "`docs/session-constitution.md` must explicitly require an armed path-aware critique and any resulting remediation before Step 8’s single applicable full-suite run."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "3f21ac420f8edf80aab0f7fdd36d72df46165267"
+}

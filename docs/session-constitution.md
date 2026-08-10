@@ -95,9 +95,11 @@ Run every router CLI through the workspace venv
   fails pre-fix and passes post-fix), then `--phase remediation-review`
   on the fix delta. Bounds and no-resurrection: *Recovery and escalation*
   below.
-- **8. Close — full suite first.** After **every** code-changing stage
-  (Step 7 remediation, and the path-aware critique's remediation when
-  armed — it lands before the set-terminal close), fully run every
+- **8. Close.** **First, if the set's `pathAwareCritique` is
+  `advisory`/`required`, RUN the multi-provider path-aware critique now
+  and remediate it** — it is code-changing and its artifact is gated at
+  the set-terminal close. Then, after **every** code-changing stage is
+  finished, fully run every
   expensive suite whose `covers` surfaces this session touched and
   record each (`python -m ai_router.run_of_record record --suite <s>
   --outcome passed --duration-seconds <n>`, required) or

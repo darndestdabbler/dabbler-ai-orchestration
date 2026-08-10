@@ -260,6 +260,68 @@ def test_working_tree_clean_ignores_universal_patterns(set_dir_in_repo):
     assert passed
 
 
+def test_working_tree_clean_ignores_close_machinery_bookkeeping(set_dir_in_repo):
+    """The close's OWN bookkeeping does not block the close (Set 117 S1).
+
+    ``check_checklist_posted``'s remediation says "post the checklist and
+    re-run close", but rendering the checklist is what RECORDS the post --
+    so following that advice writes ``checklist-posts.jsonl`` and this gate
+    then refused the close. Two gates contradicting each other is what this
+    exemption removes; ``session-events.jsonl`` has been exempt for the
+    identical reason since the close-out machinery was written.
+    """
+    (set_dir_in_repo / "checklist-posts.jsonl").write_text(
+        '{"sessionNumber": 1}\n', encoding="utf-8",
+    )
+    (set_dir_in_repo / "session-events.jsonl").write_text(
+        '{"event": "closeout_requested"}\n', encoding="utf-8",
+    )
+    disp = Disposition(
+        status="completed",
+        summary="x",
+        verification_method="api",
+        files_changed=[],
+        verification_message_ids=[],
+        next_orchestrator=_valid_next_orc(),
+        blockers=[],
+    )
+    passed, _remediation = gate_checks.check_working_tree_clean(
+        str(set_dir_in_repo), disp,
+    )
+    assert passed
+
+
+def test_working_tree_clean_still_blocks_on_real_work(set_dir_in_repo):
+    """The falsifier for the exemption above (L-112-1).
+
+    An ignore list that grows one entry at a time is exactly the kind of
+    gate that quietly stops gating, and a passing exemption test looks
+    identical to a gate that no longer refuses anything. This plants
+    ORDINARY uncommitted work beside the exempt bookkeeping and asserts the
+    gate still refuses -- so the exemption is proven to be narrow rather
+    than assumed to be.
+    """
+    (set_dir_in_repo / "checklist-posts.jsonl").write_text(
+        '{"sessionNumber": 1}\n', encoding="utf-8",
+    )
+    (set_dir_in_repo / "real-work.txt").write_text("uncommitted\n", encoding="utf-8")
+    disp = Disposition(
+        status="completed",
+        summary="x",
+        verification_method="api",
+        files_changed=[],
+        verification_message_ids=[],
+        next_orchestrator=_valid_next_orc(),
+        blockers=[],
+    )
+    passed, remediation = gate_checks.check_working_tree_clean(
+        str(set_dir_in_repo), disp,
+    )
+    assert not passed
+    assert "real-work.txt" in remediation
+    assert "checklist-posts.jsonl" not in remediation
+
+
 def test_working_tree_clean_ignores_out_of_scope_paths(set_dir_in_repo, repo_with_remote):
     """An untracked file outside the session set tree does NOT block (when disposition is present)."""
     (repo_with_remote / "elsewhere.txt").write_text("orphan\n", encoding="utf-8")

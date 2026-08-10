@@ -267,6 +267,29 @@ _WORKING_TREE_IGNORE_PATTERNS = (
     ".lifecycle.lock",
     ".close_session.lock",
     "session-events.jsonl",
+    # Set 117 S1 (operator-authorized 2026-08-10, out of that session's
+    # scope but blocking its close). Same class as session-events.jsonl,
+    # and it closed a genuine catch-22: `check_checklist_posted`'s own
+    # remediation says "post the checklist and re-run close", but rendering
+    # the checklist is what RECORDS the post, so following that advice
+    # dirties the tree with checklist-posts.jsonl and the very next gate --
+    # this one -- refuses the close. The two gates contradicted each other,
+    # and the only exits were an extra commit or a waiver.
+    #
+    # This was not theoretical. `sampleProjectSmoke` ("close_session closes
+    # cleanly on the local-only repo") had been red on master: it commits,
+    # posts through the shipping CLI, then closes -- which is the documented
+    # order -- and failed on exactly this file. The sample project is the
+    # NEW-USER path, so the first close a new adopter runs was the one that
+    # could not succeed.
+    #
+    # Loosening a close gate is normally operator-only territory, and this
+    # was authorized as such. Note what it does NOT relax: the file is
+    # ignored for the tree-clean check only, and the orchestrator still
+    # commits it in the close-out commit exactly as it does the events
+    # ledger. Falsifier: `test_working_tree_clean_still_blocks_on_real_work`
+    # plants an ordinary dirty file and asserts the gate still refuses.
+    "checklist-posts.jsonl",
 )
 
 

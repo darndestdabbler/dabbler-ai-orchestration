@@ -1,0 +1,68 @@
+{
+  "status": "completed",
+  "summary": "Set 119 Session 1 gives every verification finding a provenance and stops documentation wording from buying a metered review round. `evidencePaths` is now contract on BOTH verification surfaces: the markdown parse in `ai_router/verification.py` reads a tolerant `Evidence paths:` line, and `ai_router/pull_verifier.py` offers an ungated `evidencePaths` array on the `submit_verdict` tool, parsing it into `Finding.evidence_paths` and serializing it as `evidencePaths`. `normalize_evidence_path` strips the decoration reviewers actually write (backticks, emphasis, `./`, backslashes, `:<line>`, `#anchor`) so the same file compares equal across rounds. Both reviewer templates ask for it and call it mandatory on a Critical/Major finding; both artifact schemas declare it optional, deliberately, because its absence must not launder a blocking finding. On top of that contract sits the doc-only severity cap, applied at the one shared chokepoint `is_blocking_issue`: a finding whose cited paths are ALL documentation prose is recorded at Minor and opens no round, and `classify_blocking` reports the demoted findings in a new `doc_capped_issues` list and names the count in its reason so the cap is auditable rather than silent. The cap is an operator-attested verification reduction, journaled BEFORE any cap code was written (authority=human, rubric_line=verification-reduction, verification_effect=reduces), with the narrower Major-only alternative recorded as considered and rejected. Three properties keep it from being the anti-laundering rule in reverse: doc-ness is derived from paths and never self-declared; absence is not doc-ness (an uncited blocking finding is never cheaper); and behaviour-bearing markdown (`ai_router/prompt-templates/**`) is code that happens to be spelled in markdown. Shipped with exactly 30 test functions -- the spec's irony budget to the digit -- including the L-112-1 falsifier pairs that plant each rule both ways. Two changes the spec did not enumerate were required for correctness, not scope: `TEMPLATE_ID` moved `session-verification-v7` -> `v8` with a freshly computed pin, because the reviewer template is hash-pinned and an unbumped edit fails closed by design (16 integrity-gate tests said so); and `docs/path-aware-critique.schema.json` plus its pure-Python validator both learned the field, because a producer emitting a key its own artifact schema does not declare is exactly the L-066-1 drift. Cross-provider verification returned VERIFIED on round 1 from both discovery lenses, with two Minor nits recorded below.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "ai_router/verification.py",
+    "ai_router/pull_verifier.py",
+    "ai_router/path_aware_critique.py",
+    "ai_router/verification_stamp.py",
+    "ai_router/prompt-templates/verification.md",
+    "ai_router/prompt-templates/path-aware-critique.md",
+    "ai_router/tests/test_doc_only_cap.py",
+    "ai_router/CHANGELOG.md",
+    "docs/session-issues.schema.json",
+    "docs/session-issues-schema.md",
+    "docs/path-aware-critique.schema.json",
+    "docs/path-aware-critique-schema.md",
+    "docs/ai-led-session-workflow.md",
+    "docs/planning/lessons-learned.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/ai-assignment.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s1-conventions.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/decisions.jsonl",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/test-runs.jsonl",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/activity-log.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/checklist-posts.jsonl",
+    "docs/session-sets/117-bounded-test-parallelism/CANCELLED.md",
+    "docs/session-sets/117-bounded-test-parallelism/session-state.json"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 builds `ai_router.close_preflight` against the same gate predicates this session's orchestrator has just read end to end (`gate_checks.py`, `run_of_record`, `close_backstop`, the verification stamp), and its step 4 replays history over `session-events.jsonl` -- the same ledger this session's evidence came from. Continuity of that context is worth more than provider diversity here, and cross-provider independence is preserved where it matters: verification still routes to a different effective provider. Session 2 also inherits two owed residuals from this session, both named in `ai-assignment.md` and in the nits below."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-112-1",
+    "L-064-9",
+    "L-064-8"
+  ],
+  "notes": {
+    "adjudicated_minor_nits": [
+      {
+        "finding": "Doc-capped findings are classified and reported as Minor/nit, but the raw finding dict preserves its original `severity` value, so a durable artifact may still read `Major` for a capped finding. (Discovery call 1, spec-conformance lens.)",
+        "disposition": "working-as-intended, recorded",
+        "rationale": "Verification artifacts are RAW RECORDS and are never edited after they are written (session-constitution: `sN-issues*.json` is immutable). Rewriting a verifier's declared severity in the envelope would make the artifact say something the verifier did not say -- the same class of laundering the cap is guarded against, running through the writer instead of the classifier. The classification, not the stored label, is authoritative: every loop and gate consults `is_blocking_issue`, as the verifier itself observed. `classify_blocking.doc_capped_issues` exists precisely so a reader can see which findings were demoted without re-deriving it."
+      },
+      {
+        "finding": "`docs/path-aware-critique.schema.json` accepts a whitespace-only `evidencePaths` entry (a single space satisfies `minLength: 1`) while `ai_router/path_aware_critique.py` rejects it via `p.strip()`. A small schema/validator parity gap. (Discovery call 2, failure-scenario lens.)",
+        "disposition": "owed residual, owner: Set 119 Session 2",
+        "rationale": "Correct, and it is the L-066-1 class this repo names explicitly. It is Minor on consequence: the gap is FAIL-CLOSED (the Python validator is the stricter side, so nothing invalid is ever accepted at runtime), and the producer cannot emit the value -- `_coerce_evidence_paths` normalizes whitespace-only entries away before a `Finding` is built. The fix is one token: give the schema item the non-whitespace `pattern` that the sibling `description` property in the same file already carries. It is deliberately NOT applied in this session: the tree is frozen and stamped, and a post-verdict edit would stale `work_diff_sha256`, forcing a fresh routed backstop round to re-settle a one-character schema tightening. Session 2 already touches `ai_router/` and can fold it in before its own run of record."
+      }
+    ],
+    "operator_decisions_this_session": [
+      "Doc-only severity cap authorized (journaled in decisions.jsonl BEFORE any cap code was written, as spec step 3 requires).",
+      "Copilot catalog lockfile refreshed after the seat's CLI moved 1.0.78 -> 1.0.79: the fail-closed version-drift check was refusing every route() call, so the mandatory verification round was unrunnable. The refresh probes 18 model ids and spends premium requests, so it was the operator's call. Result: 11/18 confirmed across anthropic/google/openai. The lockfile is gitignored and seat-local -- no repo change.",
+      "Set 117 parked with the sanctioned, reversible `cancel_session_set` writer so the `one-active-set` drift check (and therefore the full suite, and therefore the blocking `test_run_fresh` gate) could pass. Sessions 2-3 of Set 117 are PENDING, NOT ABANDONED: `preCancelStatus: in-progress` is recorded and `restore_session_set` puts it back."
+    ],
+    "test_run_of_record": "pytest: 3912 passed, 0 failed, 9 skipped in 899.54s (14:59), run on the frozen tree after the last code change and recorded in test-runs.jsonl. An earlier full run showed 2 failures; both were environmental (the Copilot CLI version drift and the two-in-progress-sets condition) and both are resolved above -- neither was in this session's changed code.",
+    "scope_notes": "Session 1 of 3. Sessions 2 (`close_preflight`) and 3 (the backstop baseline plus the unreachable-module deletion) are out of scope; `change-log.md` is authored at the set-terminal session. Nothing is published: `pyproject.toml` stays at 1.0.0 and the router changelog entry is filed under [Unreleased] on purpose."
+  }
+}

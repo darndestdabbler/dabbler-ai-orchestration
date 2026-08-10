@@ -1071,6 +1071,45 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 
+- **(Set 116 S2) The verification round cap was bypassed by a second code
+  path: the close backstop.** `verify_session` has refused past the bounded
+  totals since Set 111 S1, but `close_backstop` resolved a round and routed
+  with **no bound at all** — so the cap the workflow documented did not exist
+  on the path that runs at every close without stamped evidence. Router
+  metrics show the backstop reaching rounds **5–10** (Set 111 S2), **5–12**
+  (Set 112 S3) and **5–7** (Set 114 S1): none requiring
+  `--operator-authorized-round`, none appearing in `sN-rounds.jsonl`, and none
+  visible to the arithmetic meant to be capping them at 2.
+
+  The backstop now evaluates the same bound through the same function
+  (`evaluate_phase_bound`) **before any metered call**. Carrying no `--phase`,
+  its round is a classic round and consumes the classic budget — one budget,
+  not a second allowance. At the cap it refuses deterministically with a new
+  `round_bound_reached` outcome and the close **blocks**, naming the two exits
+  that already exist rather than inventing a third: `close_session
+  --manual-verify` when nothing material is left, or the operator adjudicating
+  / authorizing one more round via `verify_session
+  --operator-authorized-round`. The check sits **after** the settling-evidence
+  skip, so a session that ran a long loop and then verified clean still closes
+  normally.
+
+  **Consumer-visible:** a close that previously ground through unbounded
+  metered rounds now stops and asks. If a close begins failing with
+  `round_bound_reached`, the loop was already past its cap — the resolution is
+  an operator decision, not a retry.
+
+- **(Set 116 S2) Backstop rounds are now in the ledger.** Every round the
+  backstop runs is appended to `sN-rounds.jsonl` like any other, tagged
+  `source: "close_session_backstop"` (the F3 stamp's existing producer
+  vocabulary, not a second one), so the ledger is the true round count instead
+  of something reconstructed from router metrics after the fact. The ledger is
+  declared as mid-close bookkeeping on both the run and the rerun-after-a-
+  later-gate-failure path, so it cannot trip `working_tree_clean`
+  (the I-084-S2-9 sibling). A backstop round is deliberately **not** a
+  step-checklist transition: it is written during the close, so its "post
+  after this" window would open after the last moment the orchestrator could
+  post into it.
+
 - **(Set 109 S3) The Google, OpenAI, and Anthropic request timeouts could not
   complete a mandatory verification.** `providers.google` and
   `providers.openai` carried `timeout_seconds: 300` while `anthropic` has

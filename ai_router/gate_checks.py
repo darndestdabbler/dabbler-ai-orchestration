@@ -1917,6 +1917,28 @@ def _checklist_transitions(
     rounds_path = os.path.join(
         session_set_dir, f"s{session_number}-rounds.jsonl"
     )
+    # Set 116 S2: the close backstop now ledgers its rounds too, so the
+    # ledger is the true count. A backstop round is NOT a checklist
+    # transition: it runs in-process DURING the close, which means its
+    # window ("post at or after the last transition") opens after the
+    # last moment the orchestrator could ever post into it. Left in, it
+    # would fail every backstop-verified close on a post that was
+    # impossible to make -- an obligation the session cannot discharge is
+    # not discipline, it is a trap. The cadence governs the ORCHESTRATOR
+    # showing the operator where it is; a round the framework runs for
+    # itself at close has no "after" to show.
+    #
+    # The token comes from the stamp's closed producer vocabulary rather
+    # than being spelled out here: one definition, so a rename cannot
+    # silently turn this skip into a no-op (L-069-1).
+    try:
+        from .verification_stamp import (  # type: ignore[import-not-found]
+            STAMP_SOURCE_CLOSE_BACKSTOP,
+        )
+    except ImportError:
+        from verification_stamp import (  # type: ignore[no-redef]
+            STAMP_SOURCE_CLOSE_BACKSTOP,
+        )
     try:
         with open(rounds_path, "r", encoding="utf-8") as fh:
             for line in fh:
@@ -1932,6 +1954,9 @@ def _checklist_transitions(
                 if record.get("event") != "round-completed":
                     continue
                 if record.get("sessionNumber") != session_number:
+                    continue
+                # A backstop round is not a transition -- see above.
+                if record.get("source") == STAMP_SOURCE_CLOSE_BACKSTOP:
                     continue
                 when = _parse_iso_timestamp(record.get("recordedAt"))
                 if when is not None:

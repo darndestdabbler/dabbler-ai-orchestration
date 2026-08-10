@@ -172,6 +172,15 @@ try:
         parse_fix_verdicts,
         parse_verification_response,
     )
+    # Set 116 S2: the round ledger's `source` vocabulary IS the stamp's
+    # producer vocabulary -- the two describe the same rounds, so they
+    # get one definition, not two that can drift (L-069-1). Safe at
+    # module level: verification_stamp imports stdlib only, so no cycle
+    # exists in either direction.
+    from verification_stamp import (  # type: ignore[import-not-found]
+        STAMP_SOURCE_CLOSE_BACKSTOP as ROUND_SOURCE_CLOSE_BACKSTOP,
+        STAMP_SOURCE_VERIFY_SESSION as ROUND_SOURCE_VERIFY_SESSION,
+    )
 except ImportError:
     from .progress import (  # type: ignore[no-redef]
         SessionStateInvariantError,
@@ -188,6 +197,10 @@ except ImportError:
         is_blocking_issue,
         parse_fix_verdicts,
         parse_verification_response,
+    )
+    from .verification_stamp import (  # type: ignore[no-redef]
+        STAMP_SOURCE_CLOSE_BACKSTOP as ROUND_SOURCE_CLOSE_BACKSTOP,
+        STAMP_SOURCE_VERIFY_SESSION as ROUND_SOURCE_VERIFY_SESSION,
     )
 
 
@@ -232,6 +245,9 @@ PHASE_BOUND_CLASSIC = 2
 # the post-call record of a completed round (the bounded-totals input).
 ROUND_EVENT_AUTHORIZATION = "operator-authorization"
 ROUND_EVENT_COMPLETED = "round-completed"
+# ROUND_SOURCE_VERIFY_SESSION / ROUND_SOURCE_CLOSE_BACKSTOP are imported
+# above from verification_stamp -- WHICH route ran a ledgered round, in
+# the stamp's own closed producer vocabulary (Set 116 S2).
 
 # --- Set 111 S1: discovery LENSES -------------------------------------------
 # The K=2 fan-out is already paid for; sending the SAME prompt twice buys
@@ -1756,6 +1772,7 @@ def record_round_completed(
     verdict: str,
     blocking: bool,
     ended_loop: bool,
+    source: str = ROUND_SOURCE_VERIFY_SESSION,
 ) -> dict:
     """Append the completed round's record — the bounded-totals input.
 
@@ -1764,12 +1781,23 @@ def record_round_completed(
     prior discovery blockers still stand does (the loop continues to
     remediation), and that round writes no findings envelope to be
     counted from.
+
+    ``source`` names WHICH route ran the round (Set 116 S2). The ledger
+    was a verify_session-only artifact, so the close backstop's rounds --
+    5-10 in Set 111 S2, 5-12 in Set 112 S3, 5-7 in Set 114 S1 -- were
+    invisible in the one file that is supposed to be the true count. It
+    reuses the stamp's closed producer vocabulary rather than minting a
+    second one, and it is deliberately NOT part of the family filter: a
+    backstop round is an unphased round and consumes the same budget as
+    any other, which is the point of unifying them. Readers must tolerate
+    its absence -- ledgers written before this set carry no ``source``.
     """
     return _append_round_ledger(path, {
         "event": ROUND_EVENT_COMPLETED,
         "sessionNumber": session_number,
         "verificationRound": round_number,
         "phase": phase,
+        "source": source,
         "verdict": verdict,
         "blocking": blocking,
         "endedLoop": ended_loop,

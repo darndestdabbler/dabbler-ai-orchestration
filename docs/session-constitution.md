@@ -198,7 +198,10 @@ critique artifact.
   delta. **Bounded totals, machine-ENFORCED: at most 2 discovery passes
   and 2 remediation-review cycles** (classic no-`--phase` path: 2
   rounds). Past a bound `verify_session` **refuses the round** — the loop
-  suspends, it does not keep opening rounds:
+  suspends, it does not keep opening rounds. The **close backstop** is
+  under the same budget (Set 116 S2): it evaluates the bound before its
+  metered call, refuses at the cap, and ledgers every round it runs, so
+  `sN-rounds.jsonl` is the true count.
   - **No Critical/Major after the cap** (only Minor, or *unrated*/
     unknown-severity nits remain) → treat as **Minor-only / effectively
     VERIFIED**, record the residual as adjudicated-minor, and stop.

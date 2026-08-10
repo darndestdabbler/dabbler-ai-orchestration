@@ -348,6 +348,13 @@ returns the corresponding exit code without touching downstream state.
       `session-events.jsonl` precedent): the working-tree gate
       tolerates them for this one close and the operator commits them
       in the close-out commit. The verification cost is printed.
+      Every backstop round — clean or blocking — is also appended to
+      `sN-rounds.jsonl` with `source: "close_session_backstop"` (Set 116
+      S2), so the ledger is the true round count rather than something
+      to be reconstructed from router metrics afterwards. That record is
+      **not** a step-checklist transition: it is written during the close
+      itself, so its "post after this" window opens after the last moment
+      the orchestrator could post into it.
     - **Blocking ISSUES_FOUND** → the close is refused with the
       findings (`gate_failed`, `failed_checks:
       ["verification_backstop"]`); the disposition now records the
@@ -359,6 +366,21 @@ returns the corresponding exit code without touching downstream state.
       explicitly — never a pass. The only sanctioned resolution for
       the unavailable state is the operator-attested `--manual-verify`
       path.
+    - **The round budget is already spent** (Set 116 S2) → the close
+      BLOCKS (`round_bound_reached`) *before* any metered call. The
+      backstop is under the **same** bounded totals as `verify_session`
+      and evaluates them through the same function; carrying no
+      `--phase`, its round is a **classic** round and consumes the
+      classic budget. Until this shipped the backstop had no bound at
+      all, and router metrics show it reaching rounds 5–10 (Set 111 S2),
+      5–12 (Set 112 S3) and 5–7 (Set 114 S1). The refusal names the two
+      exits, and neither is the orchestrator's to take alone: record the
+      residual as adjudicated-minor and close via `--manual-verify` when
+      nothing material is left, or have the operator adjudicate /
+      authorize one more round via `verify_session
+      --operator-authorized-round`. Note the ordering — this is checked
+      **after** the settling-evidence skip, so a session that ran a long
+      loop and then verified clean still closes.
     Scope and skips: `verify_session` **pre-empts** the backstop (valid
     stamped evidence with a `VERIFIED` — or Minor-only-settled
     `ISSUES_FOUND` — claim stands it down); the operator-declared
@@ -375,9 +397,10 @@ returns the corresponding exit code without touching downstream state.
     the close lock and is idempotent: a re-run after a
     backstop-verified close finds the stamped evidence and skips — and
     the skip rediscovers that evidence's bookkeeping paths (artifact,
-    findings envelope, patched disposition) so the working-tree gate
-    keeps tolerating them when a prior round's close failed on a LATER
-    gate and the artifacts are still uncommitted (I-084-S2-9).
+    findings envelope, patched disposition, **round ledger**) so the
+    working-tree gate keeps tolerating them when a prior round's close
+    failed on a LATER gate and the artifacts are still uncommitted
+    (I-084-S2-9).
 7. **Run deterministic gate checks** (`ai_router.gate_checks`):
    - `check_working_tree_clean` — `git status` is clean (or only
      ignored patterns remain). Catches "agent forgot to commit".

@@ -1820,6 +1820,7 @@ def run(
                     BACKSTOP_CHECK_NAME,
                     STATUS_BLOCKING,
                     STATUS_IDENTITY_UNRESOLVABLE,
+                    STATUS_ROUND_BOUND_REACHED,
                     STATUS_ROUTE_FAILED,
                     STATUS_UNAVAILABLE,
                     STATUS_VERIFIED,
@@ -1830,6 +1831,7 @@ def run(
                     BACKSTOP_CHECK_NAME,
                     STATUS_BLOCKING,
                     STATUS_IDENTITY_UNRESOLVABLE,
+                    STATUS_ROUND_BOUND_REACHED,
                     STATUS_ROUTE_FAILED,
                     STATUS_UNAVAILABLE,
                     STATUS_VERIFIED,
@@ -1845,6 +1847,12 @@ def run(
                 STATUS_UNAVAILABLE,
                 STATUS_ROUTE_FAILED,
                 STATUS_IDENTITY_UNRESOLVABLE,
+                # Set 116 S2: the round budget is spent and this close
+                # has no settling evidence. Blocking (never a pass) for
+                # the same reason provider unavailability blocks -- the
+                # backstop has no verdict to offer, and the resolution
+                # is the operator's, not another metered round.
+                STATUS_ROUND_BOUND_REACHED,
             ):
                 outcome.result = "gate_failed"
                 outcome.gate_results = [

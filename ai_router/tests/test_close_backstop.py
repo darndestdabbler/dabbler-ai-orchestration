@@ -1073,3 +1073,357 @@ class TestBackstopMechanics:
 
         artifact_bytes = (set_dir / "s1-verification.md").read_bytes()
         assert rows[-1]["artifact_sha256"] == sha256_hex(artifact_bytes)
+
+
+# ---------------------------------------------------------------------------
+# Set 116 S2 — one round budget, every route.
+# ---------------------------------------------------------------------------
+
+def _seed_consumed_rounds(
+    set_dir: Path, session_number: int, count: int
+) -> None:
+    """Seed *count* findings-bearing rounds that did NOT end the loop.
+
+    Both halves are load-bearing and seeding only one tests nothing:
+    ``resolve_round`` infers the next round number from the ARTIFACTS on
+    disk, while ``count_phase_family_rounds`` counts the LEDGER records.
+    A fixture with ledger lines but no artifacts resolves back to round 1
+    and the bound never trips.
+
+    A completed round is a checklist transition, so the seeded session
+    posts after each one exactly as the cadence requires. That is not
+    decoration: without it the fixture depends on the clock being too
+    COARSE to separate the fixture's own post from the seeded rounds
+    (``datetime.now()`` resolves to ~15.6ms on Windows, so all of them
+    land on one tick when the machine is idle). It passed alone and
+    failed under parallel load, which is the worst way for a test to be
+    wrong -- it would have read as flaky CI rather than as a fixture bug.
+    """
+    import verify_session as _vs
+
+    for round_number in range(1, count + 1):
+        _vs.verification_artifact_path(
+            set_dir, session_number, round_number
+        ).write_text(
+            "ISSUES FOUND\n\nIssue 1: broken\nSeverity: Major\n",
+            encoding="utf-8", newline="",
+        )
+        _vs.record_round_completed(
+            _vs.round_ledger_path(set_dir, session_number),
+            session_number=session_number,
+            round_number=round_number,
+            phase=None,
+            verdict="ISSUES_FOUND",
+            blocking=True,
+            ended_loop=False,
+        )
+        record_post(str(set_dir), session_number, [])
+
+
+class TestRoundBudgetCoversTheBackstop:
+    """The backstop resolved a round and routed with NO bound at all, while
+    ``verify_session`` refused past one. That is how router metrics show
+    backstop rounds 5-10 (Set 111 S2), 5-12 (Set 112 S3) and 5-7 (Set 114
+    S1): unauthorized, unledgered, and invisible to the arithmetic that was
+    supposed to be capping them at 2.
+
+    Per L-112-1 each rule is pinned from both sides: the planted violation
+    that must refuse, and the legitimate look-alike that must NOT.
+    """
+
+    def test_refuses_past_the_bound_before_any_metered_call(
+        self, closeable, monkeypatch,
+    ):
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, _vs.PHASE_BOUND_CLASSIC)
+        # A route call would mean the backstop bought the round anyway --
+        # the whole defect. It must refuse BEFORE spending money.
+        monkeypatch.setattr(
+            close_backstop, "_default_route",
+            lambda *a, **k: pytest.fail("routed past the round bound"),
+        )
+
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        assert outcome.status == close_backstop.STATUS_ROUND_BOUND_REACHED
+        assert outcome.verdict is None
+
+    def test_the_refusal_names_both_operator_exits(
+        self, closeable, monkeypatch,
+    ):
+        """A deterministic refusal that does not say what it wants is just
+        a wall. Both exits already exist -- a set about removing ceremony
+        does not get to invent a third flag."""
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, _vs.PHASE_BOUND_CLASSIC)
+        monkeypatch.setattr(
+            close_backstop, "_default_route",
+            lambda *a, **k: pytest.fail("routed past the round bound"),
+        )
+
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        assert "--manual-verify" in outcome.remediation
+        assert "--operator-authorized-round" in outcome.remediation
+        assert "s1-rounds.jsonl" in outcome.remediation
+        assert "operator" in outcome.remediation.lower()
+
+    def test_the_close_blocks_on_the_refusal_rather_than_passing(
+        self, closeable, monkeypatch,
+    ):
+        import verify_session as _vs
+
+        root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, _vs.PHASE_BOUND_CLASSIC)
+        monkeypatch.setattr(
+            close_backstop, "_default_route",
+            lambda *a, **k: pytest.fail("routed past the round bound"),
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "gate_failed", outcome.messages
+        assert outcome.gate_results[0].check == (
+            close_backstop.BACKSTOP_CHECK_NAME
+        )
+
+    def test_under_the_bound_the_backstop_still_runs(
+        self, closeable, fake_route,
+    ):
+        """The look-alike: one consumed round is a session mid-loop, not a
+        spent one. The budget must not fire early."""
+        _root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, 1)
+
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        assert outcome.status == close_backstop.STATUS_VERIFIED
+        assert len(fake_route.calls) == 1
+
+    def test_a_spent_budget_never_blocks_a_close_that_verified_clean(
+        self, closeable, fake_route,
+    ):
+        """The look-alike that matters most: the bound is checked AFTER the
+        settling-evidence skip, so a session that ran a long loop and then
+        verified clean still closes. The budget bites only when the close
+        has no settling evidence AND the loop is already spent -- the state
+        that should stop for a human, not buy round 11."""
+        root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, 4)  # well past the bound of 2
+        row = write_stamped_evidence(set_dir, round_number=5)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "succeeded", outcome.messages
+        assert fake_route.calls == []
+
+
+class TestBackstopRoundsAreAuditable:
+    """Every round the backstop runs is written to ``sN-rounds.jsonl`` like
+    any other, so the ledger is the true count rather than something to be
+    reconstructed from router metrics after the fact."""
+
+    def test_the_round_lands_in_the_ledger_with_its_source(
+        self, closeable, fake_route,
+    ):
+        import verify_session as _vs
+
+        root, set_dir = closeable
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+
+        completed = [
+            r for r in _vs.read_round_ledger(set_dir, 1)
+            if r.get("event") == _vs.ROUND_EVENT_COMPLETED
+        ]
+        assert len(completed) == 1
+        assert completed[0]["source"] == _vs.ROUND_SOURCE_CLOSE_BACKSTOP
+        assert completed[0]["verificationRound"] == 1
+        assert completed[0]["verdict"] == "VERIFIED"
+        # A clean round settles the close, so it consumes no budget.
+        assert completed[0]["endedLoop"] is True
+
+    def test_a_verify_session_round_keeps_its_own_source(self, closeable):
+        """The look-alike: the field distinguishes the two producers, so a
+        wrong default would have to be wrong for one of them."""
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, 1)
+
+        completed = [
+            r for r in _vs.read_round_ledger(set_dir, 1)
+            if r.get("event") == _vs.ROUND_EVENT_COMPLETED
+        ]
+        assert completed[0]["source"] == _vs.ROUND_SOURCE_VERIFY_SESSION
+
+    def test_the_ledger_write_does_not_trip_the_working_tree_gate(
+        self, closeable, fake_route,
+    ):
+        """The ledger is now a mid-close write like the artifacts beside it.
+        The close SUCCEEDING is the assertion: ``s*-rounds.jsonl`` is not in
+        ``gate_checks._WORKING_TREE_IGNORE_PATTERNS``, so without the
+        backstop declaring it in ``written_paths`` this close would fail on
+        working_tree_clean."""
+        root, set_dir = closeable
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "succeeded", outcome.messages
+        assert (set_dir / "s1-rounds.jsonl").exists()
+
+    def test_a_backstop_round_is_not_a_checklist_transition(self, closeable):
+        """It runs in-process DURING the close, so the window for "post at
+        or after this transition" opens after the last moment anyone could
+        post into it. An obligation the session cannot discharge is a trap,
+        not discipline."""
+        import gate_checks
+        import verify_session as _vs
+        from session_state import read_session_state
+
+        _root, set_dir = closeable
+        _vs.record_round_completed(
+            _vs.round_ledger_path(set_dir, 1),
+            session_number=1,
+            round_number=1,
+            phase=None,
+            verdict="VERIFIED",
+            blocking=False,
+            ended_loop=True,
+            source=_vs.ROUND_SOURCE_CLOSE_BACKSTOP,
+        )
+
+        state = read_session_state(str(set_dir))
+        labels = [
+            label for _when, label
+            in gate_checks._checklist_transitions(str(set_dir), 1, state)
+        ]
+        assert not any(
+            label.startswith(gate_checks.CHECKLIST_TRANSITION_ROUND)
+            for label in labels
+        ), labels
+
+    def test_a_verify_session_round_is_still_a_checklist_transition(
+        self, closeable,
+    ):
+        """The look-alike: the cadence still binds for rounds the
+        orchestrator itself ran, which is the whole point of the gate."""
+        import gate_checks
+        from session_state import read_session_state
+
+        _root, set_dir = closeable
+        _seed_consumed_rounds(set_dir, 1, 1)
+
+        state = read_session_state(str(set_dir))
+        labels = [
+            label for _when, label
+            in gate_checks._checklist_transitions(str(set_dir), 1, state)
+        ]
+        assert any(
+            label.startswith(gate_checks.CHECKLIST_TRANSITION_ROUND)
+            for label in labels
+        ), labels
+
+
+class TestRunningTestsLastDoesNotReopenTheLoop:
+    """The staleness half of the same bug, end to end.
+
+    ``verification_stamp`` excluded ``s*-rounds.jsonl`` and
+    ``checklist-posts.jsonl`` from freshness but not ``test-runs.jsonl``,
+    so recording the final full-suite run -- the constitution's own
+    ordering -- staled the round that had just passed and sent the close
+    into a fresh, then-unbounded backstop round. Set 116 S1 added the
+    exclusion; this pins the behaviour at the level the bug actually bit.
+    """
+
+    def _record_final_run(self, root: Path, set_dir: Path) -> None:
+        import run_of_record as ror
+
+        ror.record_run(
+            str(set_dir),
+            ror.SuiteSpec(
+                name="pytest",
+                command="python -m pytest",
+                covers=("ai_router/",),
+                expensive=True,
+            ),
+            ror.OUTCOME_PASSED,
+            duration_seconds=244.20,
+            session_number=1,
+            repo_root=str(root),
+        )
+        # Recording a run IS a checklist transition ("once its run is
+        # recorded"), so a real session posts here. Without this the close
+        # fails on checklist_posted and the test would prove nothing about
+        # staleness -- which is exactly what the first cut did.
+        record_post(str(set_dir), 1, [])
+        _git(root, "add", "-A")
+        _git(root, "commit", "-m", "record the final suite run")
+        _git(root, "push", "origin", "main")
+
+    def test_a_run_recorded_after_a_passed_round_does_not_stale_it(
+        self, closeable, fake_route,
+    ):
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        # Exactly the documented ordering: the expensive suite runs last,
+        # after the last code change, and its record lands after the round
+        # that verified it.
+        self._record_final_run(root, set_dir)
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "succeeded", outcome.messages
+        # The passed round still settles the close: no fresh metered round.
+        assert fake_route.calls == []
+
+    def test_real_work_landing_after_the_round_still_stales_it(
+        self, closeable, fake_route,
+    ):
+        """The look-alike that keeps the exemption narrow. A bookkeeping
+        ledger is a RECORD about the work; the work itself must still bind,
+        or the exemption would be a blanket pass on post-verification
+        edits."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        self._record_final_run(root, set_dir)
+        # ...and then a real edit lands on top of the verified state.
+        (set_dir / "spec.md").write_text(
+            "# spec\n\nchanged after the round\n", encoding="utf-8",
+        )
+        _git(root, "add", "-A")
+        _git(root, "commit", "-m", "post-verification code change")
+        _git(root, "push", "origin", "main")
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1  # stale -> the backstop re-verified

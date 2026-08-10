@@ -116,6 +116,10 @@ STATUS_BLOCKING = "blocking_findings"
 STATUS_UNAVAILABLE = "verification_unavailable"
 STATUS_ROUTE_FAILED = "route_failed"
 STATUS_IDENTITY_UNRESOLVABLE = "identity_unresolvable"
+# Set 116 S2: the round budget is spent and this close has no settling
+# evidence. The backstop refuses rather than buying another round; the
+# close blocks and names the operator's two exits.
+STATUS_ROUND_BOUND_REACHED = "round_bound_reached"
 
 # The gate-result / closeout_failed check names the backstop surfaces
 # through close_session's output shape.
@@ -434,12 +438,67 @@ def _settling_bookkeeping_paths(
         os.path.basename(str(artifact_path)),
     )
     if match:
+        session_number = int(match.group(1))
         envelope = _vs.issues_artifact_path(
-            session_set_dir, int(match.group(1)), int(match.group(2) or 1)
+            session_set_dir, session_number, int(match.group(2) or 1)
         )
         if envelope.exists():
             paths.append(str(envelope))
+        # Set 116 S2 (the I-084-S2-9 sibling, L-069-1): a backstop round
+        # now also appends to the round ledger, so that file is one of
+        # the mid-close writes a rerun must keep tolerating.
+        # `s*-rounds.jsonl` is NOT in
+        # gate_checks._WORKING_TREE_IGNORE_PATTERNS, so without this the
+        # rerun fails on working_tree_clean instead of on the gate that
+        # actually failed -- exactly the bug I-084-S2-9 fixed for the
+        # artifact and envelope beside it. Unlike the envelope this is
+        # appended without an exists() check: the ledger is tolerance for
+        # a path, and naming one that was never written costs nothing.
+        paths.append(
+            str(_vs.round_ledger_path(session_set_dir, session_number))
+        )
     return paths
+
+
+def _round_bound_remediation(
+    session_set_dir: Path,
+    session_number: int,
+    status: "_vs.PhaseBoundStatus",
+) -> str:
+    """What the backstop wants when the round budget is spent.
+
+    Set 116 S2. The refusal has to be actionable, and the two exits are
+    the ones that ALREADY exist -- a set about removing ceremony does not
+    get to invent a third flag. Which exit applies is a judgement about
+    the findings, so the message states both and refuses to pick: at the
+    bound, that choice is the operator's by the decision-rights hard
+    carve-out, never the closing orchestrator's.
+    """
+    ledger = _vs.round_ledger_path(session_set_dir, session_number).name
+    return (
+        f"the close backstop refused to open {status.label} "
+        f"{status.prior_rounds + 1} of a bounded {status.bound} for "
+        f"session {session_number}. This close carries no settling "
+        "verification evidence and the loop's budget is already spent, "
+        "so the backstop STOPS here rather than buying another metered "
+        "round (Set 116 S2: it previously ran rounds 5-12 unbounded, "
+        "unauthorized, and absent from the ledger). Neither exit is the "
+        "orchestrator's to take alone:\n"
+        "  - Nothing material left (only Minor or unrated nits): the "
+        "loop is effectively VERIFIED. Record the residual as "
+        "adjudicated-minor in disposition.json and close on the "
+        "operator-attested path: close_session --manual-verify "
+        "\"<attestation naming the verifying surface, model, effective "
+        "provider, template, timestamp and raw artifact>\".\n"
+        "  - A material Critical/Major still standing or disputed: the "
+        "operator adjudicates, or authorizes exactly one more round -- "
+        "python -m ai_router.verify_session --session-set-dir "
+        f"{session_set_dir} --operator-authorized-round \"<the "
+        "operator's reason>\" -- which records the attestation in "
+        f"{ledger} and produces the settling evidence this close wants. "
+        "An adjudication settles the STOP, not the truth: a finding "
+        "waived at the bound is an owed residual with a named owner."
+    )
 
 
 def run_close_backstop(
@@ -529,6 +588,40 @@ def run_close_backstop(
             ),
         )
 
+    # --- Set 116 S2: ONE round budget, every route.
+    #
+    # verify_session evaluates the bounded totals BEFORE its metered call
+    # and refuses past them (Set 111 S1). The backstop resolved a round
+    # and routed with no bound at all -- which is how router metrics show
+    # backstop rounds 5-10 (Set 111 S2), 5-12 (Set 112 S3) and 5-7 (Set
+    # 114 S1): none authorized, none in the ledger, none visible to the
+    # arithmetic that was supposed to be enforcing a cap of 2.
+    #
+    # Same function, same arithmetic, same numbers -- no second budget is
+    # invented here. A backstop round carries no --phase, so it is a
+    # CLASSIC round: it is bounded by PHASE_BOUND_CLASSIC and counted
+    # against every findings-bearing round the session has run, exactly
+    # as a classic verify_session round would be. That is the unification;
+    # a separate backstop allowance would just be the same hole with a
+    # number written next to it.
+    #
+    # Note the ordering: this sits AFTER the settling-evidence skip, so a
+    # session that verified clean still closes no matter how many rounds
+    # it took to get there. The budget only bites when the close has no
+    # settling evidence AND the loop is already spent -- which is the
+    # state that should stop for a human, not buy round 11.
+    round_number = _vs.resolve_round(set_dir, session_number, None)
+    bound_status = _vs.evaluate_phase_bound(
+        set_dir, session_number, round_number, None
+    )
+    if bound_status.exceeds:
+        return BackstopOutcome(
+            status=STATUS_ROUND_BOUND_REACHED,
+            remediation=_round_bound_remediation(
+                set_dir, session_number, bound_status
+            ),
+        )
+
     # --- The backstop runs. Same machinery as verify_session, end to
     # --- end: evidence -> template -> exclusion -> stamped row ->
     # --- raw artifacts -> disposition patch.
@@ -551,7 +644,6 @@ def run_close_backstop(
             ),
         )
     try:
-        round_number = _vs.resolve_round(set_dir, session_number, None)
         evidence = _vs.assemble_evidence(
             set_dir, session_number, diff_base,
             list(_vs.DEFAULT_DIFF_EXCLUDES),
@@ -740,6 +832,32 @@ def run_close_backstop(
             issues_path, session_number, round_number, verdict, issues
         )
         written.append(str(issues_path))
+
+    # Set 116 S2: the ledger is the true count, so every round goes in it
+    # -- including this one. Written BEFORE the disposition patch (the
+    # same ordering verify_session uses) so the bounded-totals input
+    # exists even if a later step fails, and marked with its source so
+    # the audit trail says WHO ran the round rather than leaving the
+    # backstop's rounds to be reconstructed from router metrics.
+    #
+    # `ended_loop` follows the same rule as everywhere else: a clean
+    # round settles the close and consumes no budget; a blocking one
+    # sends the session back to remediation and does. There is no
+    # supplementary-blockers case to consider here -- the backstop runs
+    # unphased, and it never reaches this point when settling evidence
+    # already exists.
+    ledger_path = _vs.round_ledger_path(set_dir, session_number)
+    _vs.record_round_completed(
+        ledger_path,
+        session_number=session_number,
+        round_number=round_number,
+        phase=None,
+        verdict=verdict,
+        blocking=classification.blocking,
+        ended_loop=not classification.blocking,
+        source=_vs.ROUND_SOURCE_CLOSE_BACKSTOP,
+    )
+    written.append(str(ledger_path))
 
     disposition_path = _vs.patch_disposition(set_dir, verdict)
     written.append(str(disposition_path))

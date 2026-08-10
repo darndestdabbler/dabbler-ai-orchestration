@@ -1,7 +1,7 @@
 {
   "sessionSetName": "116-session-latency-and-verification-integrity",
   "createdDate": "2026-08-10T13:59:37.669557+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -120,6 +120,99 @@
       "stepKey": "remediate-round-3-findings-operator-authorized",
       "dateTime": "2026-08-10T11:47:32.362994-04:00",
       "description": "Round 3 (remediation-review cycle 2) hit the enforced bound with L1/L2 still rejected (L3 accepted). Operator authorized one more round via AskUserQuestion (journaled in decisions.jsonl). Checked in two raw pytest-transcript evidence files (s1-e2e-parity-benchmark.txt, s1-full-suite-parity-benchmark.txt) mirroring the DENICI benchmark format; all 4 underlying runs (e2e serial/parallel, full serial/parallel) share the identical surfaceDigest fb69075938a4, cryptographically proving one tree. CONTRIBUTING.md now links both files directly. Sidecar: s1-remediation-round-3.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T12:12:45.448497-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "put-every-route-under-one-budget",
+      "dateTime": "2026-08-10T12:12:45.448497-04:00",
+      "description": "**Put every route under one budget.** `close_backstop.py:554` resolves a round with no bounds while `verify_session.py` enforces them. Unify them: one cap covering `verify_session` rounds, backstop rounds and the discovery fan-out. **Stop on a clean result**; never encode a round *quota*.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "refuse-deterministically-at-the-cap",
+      "dateTime": "2026-08-10T12:12:45.448497-04:00",
+      "description": "**Refuse deterministically at the cap.** The backstop must not silently buy rounds 5-12. At the cap it stops and says what it wants \u2014 an operator waiver or an adjudication \u2014 exactly as `verify_session` already refuses.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "make-backstop-rounds-auditable",
+      "dateTime": "2026-08-10T12:12:45.448497-04:00",
+      "description": "**Make backstop rounds auditable.** Every round it runs is written to `sN-rounds.jsonl` like any other, so the ledger is the true count. Add a test that a backstop round past the cap cannot proceed unauthorized, and a regression test that recording the final test run does **not** stale a passed verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-10T12:12:45.448497-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "put-every-route-under-one-budget",
+      "dateTime": "2026-08-10T12:26:16.536493-04:00",
+      "description": "close_backstop now evaluates evaluate_phase_bound(phase=None) before any metered call -- same function, same arithmetic, same PHASE_BOUND_CLASSIC as verify_session. A backstop round is an unphased round and consumes the classic budget; no second allowance invented. Placed AFTER the settling-evidence skip so a clean session still closes.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "refuse-deterministically-at-the-cap",
+      "dateTime": "2026-08-10T12:26:16.536493-04:00",
+      "description": "New STATUS_ROUND_BOUND_REACHED + _round_bound_remediation() naming the two EXISTING operator exits (close_session --manual-verify, verify_session --operator-authorized-round); wired into close_session gate-failure mapping so the close blocks rather than buying rounds 5-12.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "make-backstop-rounds-auditable",
+      "dateTime": "2026-08-10T12:38:09.332397-04:00",
+      "description": "Backstop rounds now append round-completed to sN-rounds.jsonl with a source field (reusing verification_stamp STAMP_SOURCES, not a second vocabulary); ledger added to written_paths and to _settling_bookkeeping_paths (the I-084-S2-9 sibling, L-069-1) so it does not trip working_tree_clean on the run or the rerun. gate_checks._checklist_transitions now skips backstop-sourced rounds -- they run DURING the close, so their post window opens after the last moment anyone could post. 15 new tests: bound refusal + look-alikes, ledger/source auditability, checklist non-transition + look-alike, staleness end-to-end + narrowness look-alike, and 3 fan-out one-budget tests.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 35,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-08-10T12:40:35.430974-04:00",
+      "description": "Appended the Session 2 assignment block: orchestrator recorded as actually run (claude-opus-5, not the recommended sonnet), and the self-judging risk named in advance -- if the new bound fires on this session own close, the correct response is the operator exit, never widening the cap.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T12:41:17.278173-04:00",
+      "description": "Registered session 2 via start_session (claude/anthropic/claude-opus-5, effort high); preload read; transport profile api with all three DABBLER_* keys present; no decision-review-queue entries.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-10T13:07:15.215192-04:00",
+      "description": "Frozen, then: full pytest 3829 passed / 5 skipped in 255.58s (parallel), and full Layer 3 Playwright 36 passed in 11.7m (owed because close_session.py is on the playwright covers list). Both recorded with durations. Verification round 1 (discovery, 2-lens fan-out) VERIFIED from both lenses, zero Critical/Major, anthropic excluded, $0.78. Two record-level nits fixed; three adjudicated-minor residuals journaled and carried in the disposition.",
       "status": "complete"
     }
   ]

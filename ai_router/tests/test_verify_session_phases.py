@@ -2124,3 +2124,73 @@ class TestMinorOnlyStop:
         assert "no findings" not in next_action
         assert "no Critical/Major findings" in next_action
         assert "Record any nits from the raw artifact" in next_action
+
+
+class TestFanoutCostsOneRoundOfBudget:
+    """Set 116 S2, the third leg of "one cap covering verify_session
+    rounds, backstop rounds and the discovery fan-out".
+
+    The fan-out is K parallel calls INSIDE one round, so it must consume
+    exactly one unit of budget however wide it is. That already held --
+    ``fanout_artifact_path`` writes ``-fanout-<k>`` siblings that
+    ``resolve_round``'s scan deliberately ignores, and
+    ``record_round_completed`` fires once per round -- but it held as an
+    unasserted property. A later widening of K that quietly started
+    costing K rounds would burn the budget in a single pass and reduce
+    the loop to one discovery round, with nothing red to show for it.
+    """
+
+    def test_a_three_call_fanout_writes_one_ledger_record(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch, fan_out=3)
+        set_dir = _set_dir(repo)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE] * 3)
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        ) == vs.EXIT_BLOCKING
+
+        assert len(fake.calls) == 3  # the fan-out really did fan out
+        completed = _ledger(set_dir, vs.ROUND_EVENT_COMPLETED)
+        assert len(completed) == 1
+        assert completed[0]["verificationRound"] == 1
+
+    def test_a_three_call_fanout_consumes_one_unit_of_budget(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch, fan_out=3)
+        set_dir = _set_dir(repo)
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([BLOCKING_RESPONSE] * 3),
+        ) == vs.EXIT_BLOCKING
+
+        # One pass spent, not three: the SECOND discovery-family pass is
+        # still available, and only the third is refused.
+        assert vs.count_phase_family_rounds(
+            set_dir, 1, 2, vs.DISCOVERY_FAMILY_PHASES
+        ) == 1
+        status = vs.evaluate_phase_bound(
+            set_dir, 1, 2, vs.PHASE_DISCOVERY
+        )
+        assert status.prior_rounds == 1
+        assert status.exceeds is False
+
+    def test_the_fanout_siblings_do_not_bump_the_round_number(
+        self, repo: Path, monkeypatch
+    ):
+        """The mechanism behind it: only the canonical artifact names
+        advance ``resolve_round``, so widening K never skips rounds."""
+        _phase_config(monkeypatch, fan_out=3)
+        set_dir = _set_dir(repo)
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([BLOCKING_RESPONSE] * 3),
+        ) == vs.EXIT_BLOCKING
+
+        assert (set_dir / "s1-verification-fanout-2.md").exists()
+        assert (set_dir / "s1-verification-fanout-3.md").exists()
+        assert vs.resolve_round(set_dir, 1, None) == 2

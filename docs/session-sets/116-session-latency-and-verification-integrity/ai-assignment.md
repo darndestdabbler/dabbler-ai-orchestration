@@ -31,3 +31,37 @@ step 4) rather than deferring it to Session 2, which owns the reasoning
 but must not be the one shipping a new un-excluded writer.
 
 ---
+
+## Session 2 — Close the two holes in the verification loop
+
+**Orchestrator:** `claude` / `anthropic` / `claude-opus-5`, effort
+`high` (Direct APIs transport). Session 1's disposition recommended the
+same engine and provider under `continue-current-trajectory`, on the
+reasoning that S1's own verification loop lived the exact bug S2 fixes
+(four rounds, the 2-cycle bound hit twice, and a close backstop that
+would have been free to buy more). The model is opus rather than
+sonnet — the operator's seat selection at session start, recorded as it
+actually is rather than as recommended.
+
+**Verification:** routes to a non-anthropic effective provider, as the
+cross-provider rule requires.
+
+**The session verifies the machinery that judges it.** The spec names
+this as a risk, and it is the real one: Session 2 changes the round
+budget while a round budget governs Session 2. Two consequences worth
+recording before the fact rather than discovering after it:
+
+- The new bound applies to **this** session's own close. If the loop
+  runs long here, the backstop will refuse exactly as designed, and the
+  correct response is the operator exit — not a code change to widen the
+  cap, which would be self-authorizing a verification reduction.
+- The ledger (`s2-rounds.jsonl`) is the artifact under change *and* the
+  input to the arithmetic being changed. Expect to read it by hand at
+  least once rather than trusting the count.
+
+**Recommended next orchestrator (Session 3):** recorded at close in
+`disposition.json`, not pre-committed here — Session 3 implements an
+operator gate ruling and its needs depend on what this session's
+verification surfaces.
+
+---

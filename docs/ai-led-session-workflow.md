@@ -1646,6 +1646,33 @@ practice (one session ran 13 verification calls over 379 minutes *after*
 the cap shipped), which is why enforcement — not a different number —
 was the fix.
 
+**One budget, every route (Set 116 S2).** Enforcement originally lived
+only in the `verify_session` CLI, so the **close backstop** — which runs
+the same verification in-process during a close — resolved a round and
+routed with no bound at all. Router metrics show it reaching rounds
+**5–10** (Set 111 S2), **5–12** (Set 112 S3) and **5–7** (Set 114 S1):
+unauthorized, absent from `sN-rounds.jsonl`, and invisible to the very
+arithmetic that was supposed to be capping them. A backstop round now
+evaluates the same bound through the same function before any metered
+call, and — carrying no `--phase` — consumes the **classic** budget like
+any other unphased round. At the cap it **refuses** and names the two
+exits that already exist (`close_session --manual-verify`, or the
+operator authorizing one more round through `verify_session`); the close
+blocks rather than buying another round. Every backstop round is
+appended to `sN-rounds.jsonl` like any other, tagged with a `source` of
+`close_session_backstop`, so the ledger is the true count instead of
+something to be reconstructed from router metrics afterwards. The order
+matters: the bound is checked **after** the settling-evidence skip, so a
+session that ran a long loop and then verified clean still closes — the
+budget bites only when a close has no settling evidence *and* the loop is
+already spent.
+
+The discovery **fan-out** is the third route, and it was already inside
+this budget: its K parallel calls are one round (the `-fanout-<k>`
+siblings are outside `resolve_round`'s scan, and one `round-completed`
+record is written per round), so widening K never costs extra budget.
+That property is now asserted rather than merely true.
+
 Only **findings-bearing** rounds consume a budget, with one exception the
 loop's own record had to be extended to see: a clean round ends the loop
 on its own, and a `--wording-only` re-verify re-collects the verdict

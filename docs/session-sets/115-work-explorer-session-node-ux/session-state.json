@@ -5,7 +5,7 @@
   "sessions": [
     {
       "number": 1,
-      "title": "Session 1",
+      "title": "The titles both writers already know",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -14,7 +14,7 @@
     },
     {
       "number": 2,
-      "title": "Session 2",
+      "title": "Left-click a session, land on its plan",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -23,7 +23,16 @@
     },
     {
       "number": 3,
-      "title": "Session 3",
+      "title": "The menu \u2014 the prompt, and the evidence",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 4,
+      "title": "The checklist tells the truth about what remains",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

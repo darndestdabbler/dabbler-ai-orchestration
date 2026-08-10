@@ -1,10 +1,12 @@
 # Work Explorer Session-Node UX Spec
 
-> **Purpose:** Make the session node in the Work Explorer worth clicking.
-> Today it says `Session 3` and does nothing. After this set it says what
-> the session is *about*, opens the part of the plan that belongs to it, and
-> offers the two things the operator actually wants from a session row: the
-> prompt to run it, and the files it produced.
+> **Purpose:** Make the session node in the Work Explorer worth clicking,
+> and make its checklist tell the truth. Today the node says `Session 3`
+> and does nothing, and a fully-ticked checklist can still hide an hour of
+> close-out — measured at a mean of 57 minutes, 18% of a session. After
+> this set the node says what the session is *about*, opens the part of the
+> plan that belongs to it, offers the prompt to run it and the files it
+> produced, and the checklist stays honest about what remains.
 >
 > **Created:** 2026-08-10, from operator direction.
 > **Prerequisites:** Set 114 complete — its Session 3 expands the session
@@ -119,7 +121,7 @@ computes the title map it fails to use.
 
 ## Sessions
 
-### Session 1 of 3: The titles both writers already know
+### Session 1 of 4: The titles both writers already know
 
 **Steps:**
 
@@ -156,7 +158,7 @@ computes the title map it fails to use.
 
 ---
 
-### Session 2 of 3: Left-click a session, land on its plan
+### Session 2 of 4: Left-click a session, land on its plan
 
 **Steps:**
 
@@ -183,7 +185,7 @@ computes the title map it fails to use.
 
 ---
 
-### Session 3 of 3: The menu — the prompt, and the evidence
+### Session 3 of 4: The menu — the prompt, and the evidence
 
 **Steps:**
 
@@ -203,17 +205,64 @@ computes the title map it fails to use.
    this case. **Discover them by convention (`s<N>-*`), never by a
    hardcoded list**, so the menu survives artifact churn; show an honest
    empty state when a session has produced nothing yet.
-5. **Walk it, then close.** This set's UAT is the guided look — titles,
-   left-click, both menu actions, and the empty states. Full Layer 3 at
-   close after freeze, then the full matrix once at the release boundary;
-   verify, close; `change-log.md`, Step 9 review, advisory path-aware
-   critique. Coordinate the extension version bump with whatever is
-   unpublished at that point.
+5. Full Layer 3 at close after freeze; verify, close.
 
-**Creates:** the session context menu, the prompt and artifact actions, this set's walk, `change-log.md`
+**Creates:** the session context menu, the prompt and artifact actions
 **Touches:** `tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts`, `commands/`, `package.json` menus, Layer 3 specs
 **Ends with:** a session row offers the prompt to run it and the files it produced, and says so plainly when there are none.
-**Progress keys:** `menuWired`, `runPromptAction`, `artifactAction`, `uatWalk`
+**Progress keys:** `menuWired`, `runPromptAction`, `artifactAction`
+
+---
+
+### Session 4 of 4: The checklist tells the truth about what remains
+
+The operator's observation, 2026-08-10: *"you can have all tasks checked
+off and there is still a lot of outstanding work to be done (e.g., a final
+test run) and other close out steps."*
+
+**Measured:** across sets 108-114, a mean of **57 minutes — 18% of a
+session — elapses after the last box ticks**, and in six sessions it was
+45% or more (402 min in 111 S4, 246 in 111 S2, 200 in 108 S4).
+
+**Cause:** Set 114 seeds the checklist from `spec.md`'s steps, and every
+spec compresses the lifecycle into one trailing step. Set 114 S3's own
+seeded plan ended `plan-step | verify-close` — a single box standing for
+the discovery round, the supplementary round, remediation,
+remediation-review, the final full suite, `disposition.json`,
+`change-log.md`, the Step 9 review, the path-aware critique, commit, push
+and `close_session`. The checklist therefore reads 5/5 at the moment
+verification *begins*.
+
+**Steps:**
+
+1. Register.
+2. **Render the lifecycle, not just the plan.** Extend the checklist model
+   so close-out phases are rows in their own right: verification rounds,
+   remediation, the final applicable suite, disposition, close. The spec's
+   steps remain what they are — the *implementation* plan — and stop being
+   mistaken for the whole session.
+3. **Derive them from ledgers that already exist** — `sN-rounds.jsonl`
+   (phase, verdict, `endedLoop`), `sN-remediation-round-*.md`,
+   `test-runs.jsonl`, `disposition.json`, `session-state.json`. **No new
+   writer and no new artifact**; the data is on disk and only the renderer
+   is wrong. Keep Set 114's discipline: render what is *recorded*, never
+   what is merely planned.
+4. **Ship it in `ai_router/session_checklist.py` first**, so consumers who
+   install from PyPI and have no extension get it, then render the same
+   model in the tree. Same reasoning as every other decision in this set:
+   the CLI is the portable surface.
+5. **Walk it, then close.** This set's UAT is the guided look across all
+   four sessions — titles, left-click, both menu actions, the empty states,
+   and a checklist that still shows work outstanding when work is
+   outstanding. Full matrix once at the release boundary; verify, close;
+   `change-log.md`, Step 9 review, advisory path-aware critique. Coordinate
+   the extension version bump with whatever is unpublished at that point.
+
+**Creates:** the lifecycle-aware checklist model, the CLI renderer, the tree rendering, this set's walk, `change-log.md`
+**Touches:** `ai_router/session_checklist.py`, `tools/dabbler-ai-orchestration/src/providers/`, Layer 3 specs
+**Ends with:** a fully-ticked checklist means the session is actually finished — and while close-out is running, the operator can see which phase it is in.
+**Progress keys:** `lifecycleRows`, `derivedFromLedgers`, `cliFirst`, `uatWalk`, `changeLog`
+
 
 ---
 

@@ -3,6 +3,77 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [0.51.0] — 2026-08-10 (staged; publish operator-gated)
+
+> **An in-flight session's steps now render in the Work Explorer.** Expand
+> the session that is in flight and you see its checklist: the plan
+> `start_session` seeded from `spec.md`, reconciled against what the
+> orchestrator has actually logged, with the same lifecycle glyphs the
+> other rows use and `<- here` on the step the session is on. It is the
+> same list `python -m ai_router.session_checklist` prints — in the panel
+> that is already open, rather than in a terminal command you have to
+> remember to run.
+>
+> **This release supersedes `0.50.0`, which was staged 2026-08-09 and never
+> published.** Set 112's Lightweight-tier removal and Set 110's native-tree
+> Work Explorer both ship for the first time in this artifact; the
+> `0.50.0` section below stands as the record of when that work was
+> written.
+>
+> **Requires `dabbler-ai-router` 1.0.0 or newer** — the step rows are read
+> from the plan that router version seeds into `activity-log.json`. Against
+> an older router the rows still render; they simply show only what has
+> been logged, which is exactly the pre-114 behaviour.
+>
+> **Publish stays operator-gated**, on the same deferral the `0.50.0`
+> section records: this VSIX and `dabbler-ai-router` `1.0.0` are expected
+> to ship together.
+>
+> **Not yet published.** No tag, no publish run.
+
+### Added
+
+- **(Set 114 S3) The Work Explorer's fifth level: an in-flight session's
+  steps.** The tree already went module → bucket → set → session. A
+  session that is **in flight** now expands one level further, to the
+  step rows the checklist renders: the seeded plan for what is coming,
+  the logged steps for what is done, and one row marked `<- here`.
+
+  This is the half Set 111 S4 recorded and deliberately did not build,
+  on the grounds that it belonged to a session allowed to touch the
+  rendering surface.
+
+  Deliberate limits, each one a decision rather than an omission:
+
+  - **Only the in-flight session expands.** Every other session row stays
+    a leaf. The checklist answers "where is *this* session"; a finished
+    session is answered by its own status glyph, and its steps remain one
+    click away in `activity-log.json`. It also keeps the cost off the
+    startup scan — a set that is not in progress does no extra work at
+    all.
+  - **An absent, unreadable, or silent activity log degrades to NO
+    children.** The session row becomes a leaf rather than offering a
+    twisty that opens onto nothing, and never shows a stale or invented
+    list.
+  - **No actions on step rows.** They are display-only, and the menu
+    parity test asserts that no `when` clause targets them, so adding one
+    later is a decision rather than a leak.
+
+- **(Set 114 S3) A cross-language parity corpus for the checklist's row
+  builder.** The Explorer is TypeScript and the checklist is Python, so
+  the rule that decides which rows exist now has two implementations —
+  the duplicate-parser defect this repo repeats most.
+
+  It is taken deliberately (a process spawn on the expand path of a tree
+  that polls every 30 seconds, for a display feature, was the worse
+  trade), with one mitigation: a committed corpus of twelve cases that
+  **both** suites assert against. Change either implementation alone and
+  a test fails; change the corpus alone and both fail. The cases include
+  the ones that are easy to get wrong — identity-before-ordinal claiming,
+  a plan that moved under the session mid-flight, bookkeeping entries
+  that must not claim a planned row, and a legacy set with no seeded plan
+  at all.
+
 ## [0.50.0] — 2026-08-09 (staged; publish operator-gated)
 
 > **The Getting Started form no longer asks which tier you want.** Set 112

@@ -52,6 +52,12 @@ import {
   uatBadge,
 } from "./SessionSetsModel";
 import { isRecognizedVerdictToken } from "../utils/verdictTokens";
+import {
+  StepRow,
+  buildStepRows,
+  glyphStatusOf,
+  stepRowLabel,
+} from "./sessionStepModel";
 
 // ---------------------------------------------------------------------------
 // Nodes
@@ -70,7 +76,12 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
  * re-registration. Renaming that property would silently break every
  * context-menu action while still compiling.
  */
-export type WorkExplorerNode = ModuleNode | BucketNode | SetNode | SessionNode;
+export type WorkExplorerNode =
+  | ModuleNode
+  | BucketNode
+  | SetNode
+  | SessionNode
+  | StepNode;
 
 export interface ModuleNode {
   readonly kind: "module";
@@ -97,6 +108,30 @@ export interface SessionNode {
   readonly kind: "session";
   readonly set: SessionSet;
   readonly session: SessionRecord;
+}
+
+/**
+ * Set 114 Session 3 — the FIFTH level: one step of the in-flight session,
+ * exactly as `python -m ai_router.session_checklist` renders it.
+ *
+ * This is the half Set 111 S4 recorded and deliberately did not build: a
+ * terminal command you must remember to run is a worse surface than a
+ * panel already open on screen.
+ *
+ * It carries `set` for the same reason `SessionNode` does — every existing
+ * row command reads `item.set` — even though no menu targets a step row.
+ * `position` is the row's index in the rendered list and exists only to
+ * make the node's `TreeItem.id` unique: two steps can legitimately share a
+ * `stepKey` (a logged step that claimed no planned row appends alongside
+ * one that did), and a colliding id would tie their selection state
+ * together.
+ */
+export interface StepNode {
+  readonly kind: "step";
+  readonly set: SessionSet;
+  readonly session: SessionRecord;
+  readonly row: StepRow;
+  readonly position: number;
 }
 
 /** Stable identity for a module across refreshes (declared slug, or the pseudo sentinel). */
@@ -172,6 +207,43 @@ export function sessionNodes(node: SetNode): SessionNode[] {
     .map((session) => ({ kind: "session", set: node.set, session }));
 }
 
+/**
+ * The fifth level (Set 114 S3). The in-flight session's steps, built from
+ * the ledger the scan carried — the plan `start_session` seeded, reconciled
+ * against what the orchestrator has actually logged.
+ *
+ * Empty in four cases, all of which make the session row a LEAF rather
+ * than a twisty that opens onto nothing:
+ *
+ *   1. the session is not in flight — the checklist answers "where is THIS
+ *      session", and a finished one is answered by its own status glyph
+ *      (decisions.jsonl, session 3);
+ *   2. the set carries no step ledger — no activity log, an unreadable
+ *      one, or one that says nothing about this session. **Degrading to no
+ *      children is the requirement**: a stale or invented list is worse
+ *      than an empty one;
+ *   3. the ledger belongs to a different session than this row (a state
+ *      file and an activity log that disagree — the ledger wins for its
+ *      own session and says nothing about any other);
+ *   4. the rows come back empty anyway.
+ */
+export function stepNodes(node: SessionNode): StepNode[] {
+  if (node.session.status !== "in-progress") return [];
+  const ledger = node.set.stepLedger;
+  if (!ledger || ledger.sessionNumber !== node.session.number) return [];
+  return buildStepRows(
+    ledger.entries,
+    ledger.sessionNumber,
+    ledger.specSteps,
+  ).map((row, position) => ({
+    kind: "step",
+    set: node.set,
+    session: node.session,
+    row,
+    position,
+  }));
+}
+
 export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
   switch (node.kind) {
     case "module":
@@ -181,6 +253,8 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
     case "set":
       return sessionNodes(node);
     case "session":
+      return stepNodes(node);
+    case "step":
       return [];
   }
 }
@@ -267,7 +341,15 @@ export const NODE_TOKEN = {
   bucket: "dabblerBucket",
   set: "dabblerSet",
   session: "dabblerSession",
+  step: "dabblerStep",
 } as const;
+
+/**
+ * The current-step marker, in the vocabulary
+ * `python -m ai_router.session_checklist` already prints. Shared so the
+ * panel and the terminal cannot name the same signal two ways.
+ */
+export const HERE_MARKER = "<- here";
 
 /** Module-row capability tokens. */
 export const MODULE_TOKEN = {
@@ -504,15 +586,85 @@ export function setDescriptor(set: SessionSet, supports: ActionSupports): RowDes
  */
 export function sessionDescriptor(node: SessionNode): RowDescriptor {
   const { session } = node;
+  // Set 114 S3: computed here as well as in `childrenOf`, deliberately.
+  // It is a pure transform over data the scan already carried, it runs
+  // only for the at-most-one in-flight session per set, and the
+  // alternative — reporting Collapsed unconditionally — is the dead
+  // twisty the bucket and set rows both refuse.
+  const steps = stepNodes(node);
   return {
     id: `session:${node.set.name}/${session.number}`,
     label: session.title || `Session ${session.number}`,
     // Short labels, so `description` survives truncation here. Only the
     // in-flight session says anything — quiet is the default state.
     description: session.status === "in-progress" ? "in flight" : undefined,
-    tooltip: `**${session.title || `Session ${session.number}`}** — ${session.status.replace("-", " ")}`,
+    tooltip: sessionTooltip(node, steps.length),
     icon: sessionIcon(session.status),
     contextValue: tokenString([NODE_TOKEN.session, `session-${session.status}`]),
+    // Collapsed only when there is something under it. A session with no
+    // steps to show — every session that is not in flight, and an
+    // in-flight one whose activity log is absent or unreadable — is a
+    // leaf, which is the same rule an empty bucket and a ledger-less set
+    // already follow.
+    collapsible: steps.length > 0 ? "collapsed" : "none",
+  };
+}
+
+function sessionTooltip(node: SessionNode, stepCount: number): string {
+  const { session } = node;
+  const title = session.title || `Session ${session.number}`;
+  const lines = [`**${title}** — ${session.status.replace("-", " ")}`];
+  if (stepCount > 0) {
+    lines.push("", `${stepCount} step${stepCount === 1 ? "" : "s"}`);
+  }
+  return lines.join("\n");
+}
+
+/**
+ * A step row (Set 114 S3).
+ *
+ * The LABEL is the humanized `stepKey`, not the description: descriptions
+ * are audit-trail prose written for close-out review and routinely run to
+ * several sentences, and a tree row that wraps is not a tree row. The full
+ * text is in the tooltip. This is the same trade
+ * `session_checklist._summarize` makes for the terminal.
+ *
+ * The DESCRIPTION slot carries the current-step marker and nothing else.
+ * `<- here` is the vocabulary the CLI already uses for this exact signal,
+ * so the two surfaces name the same thing the same way; and keeping every
+ * other row's description empty is what makes the marked one findable at a
+ * glance, which is the whole point of the surface.
+ *
+ * The ICON is the same authored lifecycle glyph the session and set rows
+ * use, mapped from the step's status by `glyphStatusOf` — "the same status
+ * glyphs" is the spec's phrase, and it is met by reusing the assets rather
+ * than by inventing a fifth-level vocabulary.
+ */
+export function stepDescriptor(node: StepNode): RowDescriptor {
+  const { row } = node;
+  const glyph = glyphStatusOf(row.status);
+  const tooltipLines = [`**${stepRowLabel(row)}**`];
+  const state = row.isPlanned
+    ? "planned — not started"
+    : String(row.status || "unknown").replace(/[-_]/g, " ");
+  tooltipLines.push("", state);
+  if (row.isHere) tooltipLines.push("", "_the session is here_");
+  const description = String(row.description || "").trim();
+  if (description) tooltipLines.push("", description);
+
+  return {
+    // `position` disambiguates: an unplanned logged step can append
+    // alongside a planned row that carries the same key.
+    id: `step:${node.set.name}/${node.session.number}/${node.position}`,
+    label: stepRowLabel(row),
+    description: row.isHere ? HERE_MARKER : undefined,
+    tooltip: tooltipLines.join("\n"),
+    icon: { kind: "file", slug: ICON_FILES[glyph] },
+    contextValue: tokenString([
+      NODE_TOKEN.step,
+      `step-${glyph}`,
+      row.isPlanned ? "step-planned" : "step-logged",
+    ]),
     collapsible: "none",
   };
 }
@@ -530,5 +682,7 @@ export function descriptorFor(
       return setDescriptor(node.set, supports);
     case "session":
       return sessionDescriptor(node);
+    case "step":
+      return stepDescriptor(node);
   }
 }

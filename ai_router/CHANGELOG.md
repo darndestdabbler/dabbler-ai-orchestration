@@ -125,6 +125,25 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 114 S3) `session_checklist`'s row builder now has a second
+  implementation, and a corpus that keeps the two honest.** The Work
+  Explorer renders an in-flight session's steps, and it is TypeScript —
+  so `_collapse_by_step_key`, `is_logged_step`, `_reconcile`,
+  `_mark_here`, `plan_matches_spec` and the `spec_admission` step parse
+  are mirrored in `tools/dabbler-ai-orchestration/src/providers/
+  sessionStepModel.ts`.
+
+  **If you change any of those functions, run
+  `ai_router/tests/test_step_row_parity.py`.** It drives the real
+  `build_rows` / `read_spec_steps` against
+  `ai_router/tests/fixtures/session-step-parity.json`, a twelve-case
+  corpus the extension's own Layer 2 suite asserts against as well.
+  Changing this package alone fails that test, which is the point: the
+  panel and the terminal must not disagree about where a session is.
+
+  No `ai_router` runtime behaviour changes in this session — the corpus
+  is a record of what the current implementation already does.
+
 - **(Set 114 S2) The step checklist shows what is coming, sourced from
   the record.** `start_session` now parses the session's numbered steps
   out of `spec.md` and writes them into `activity-log.json` as `pending`

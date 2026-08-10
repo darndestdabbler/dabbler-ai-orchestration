@@ -329,7 +329,36 @@ suite("sampleProject — smoke: the sample really goes red to green (v3 §8)", f
     );
     fs.writeFileSync(
       path.join(setAbs, "activity-log.json"),
-      JSON.stringify({ entries: [{ sessionNumber: 1, kind: "sample_smoke" }] }, null, 2),
+      JSON.stringify(
+        {
+          entries: [
+            // A REAL logged step — no `kind`. Set 114 S2 tightened
+            // `check_activity_log_entry` so that `kind`-bearing entries no
+            // longer satisfy it: `start_session` seeds the spec's steps as
+            // `kind: "plan-step"` at registration, and the policy captures
+            // write their own kinds, so counting them left a gate that could
+            // no longer fail. This fixture previously carried a single
+            // `kind: "sample_smoke"` entry and therefore stopped closing —
+            // caught by Set 114 S3's Layer 2 run, because S1 and S2 recorded
+            // only pytest and Playwright.
+            //
+            // The bookkeeping entry is kept ALONGSIDE it rather than
+            // replaced, so the fixture still exercises the mixed shape a
+            // real set has: one record the session wrote, one written for it.
+            {
+              sessionNumber: 1,
+              stepNumber: 1,
+              stepKey: "add-shout",
+              dateTime: "2026-05-16T01:00:00-04:00",
+              description: "Added the shout function to hello/greeting.py.",
+              status: "complete",
+            },
+            { sessionNumber: 1, kind: "sample_smoke" },
+          ],
+        },
+        null,
+        2,
+      ),
       "utf8",
     );
     assert.strictEqual(run("git", ["add", "-A"], target).code, 0);
@@ -337,6 +366,23 @@ suite("sampleProject — smoke: the sample really goes red to green (v3 §8)", f
       run("git", ["commit", "-m", "Add the shout greeting"], target).code,
       0,
       "the repo-local identity must let a later commit succeed with no global config",
+    );
+
+    // Set 114 S1: rendering the step checklist is what RECORDS that it was
+    // posted, and `check_checklist_posted` compares that ledger against the
+    // transitions the session's own records show. A sample session that
+    // never posts cannot close — so the smoke posts, through the shipping
+    // CLI rather than by hand-writing `checklist-posts.jsonl`, because the
+    // point is that the real path works.
+    const posted = run(
+      python,
+      ["-m", "ai_router.session_checklist", "--session-set-dir", setDir],
+      target,
+    );
+    assert.strictEqual(
+      posted.code,
+      0,
+      `session_checklist failed: ${posted.stderr || posted.stdout}`,
     );
 
     const closed = run(

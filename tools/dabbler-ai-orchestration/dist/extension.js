@@ -15521,6 +15521,209 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
   }
 }
 
+// src/providers/sessionStepModel.ts
+var PLAN_STEP_KIND = "plan-step";
+var TERMINAL_STATUSES = /* @__PURE__ */ new Set(["complete", "done"]);
+var STATUS_GLYPHS = {
+  complete: "complete",
+  done: "complete",
+  "in-progress": "in-progress",
+  in_progress: "in-progress",
+  started: "in-progress",
+  pending: "not-started",
+  "not-started": "not-started",
+  blocked: "cancelled",
+  failed: "cancelled"
+};
+function glyphStatusOf(status) {
+  return STATUS_GLYPHS[pyStr(status).toLowerCase()] ?? "not-started";
+}
+function pyStr(value) {
+  return value ? String(value) : "";
+}
+function isLoggedStep(entry) {
+  if (!entry || typeof entry !== "object" || Array.isArray(entry))
+    return false;
+  return pyStr(entry.kind).trim() === "";
+}
+function stepNumberOf(entry) {
+  const value = entry.stepNumber;
+  return typeof value === "number" && Number.isInteger(value) ? value : null;
+}
+function keyOf(entry) {
+  return pyStr(entry.stepKey).trim();
+}
+function collapseByStepKey(entries) {
+  const order = [];
+  const latest = /* @__PURE__ */ new Map();
+  let anonymous = 0;
+  for (const entry of entries) {
+    let key = keyOf(entry);
+    if (!key) {
+      anonymous += 1;
+      key = `\0anon-${anonymous}`;
+    }
+    if (!latest.has(key))
+      order.push(key);
+    latest.set(key, entry);
+  }
+  return order.map((key) => latest.get(key));
+}
+function rowFromEntry(entry, isPlanned) {
+  return {
+    stepNumber: stepNumberOf(entry),
+    stepKey: pyStr(entry.stepKey),
+    description: pyStr(entry.description),
+    status: pyStr(entry.status),
+    isHere: false,
+    isPlanned
+  };
+}
+function reconcile(plan, real, allowOrdinal) {
+  const planRows = plan.map((entry) => rowFromEntry(entry, true));
+  const byNumber = /* @__PURE__ */ new Map();
+  const byKey = /* @__PURE__ */ new Map();
+  plan.forEach((entry, index) => {
+    const number = stepNumberOf(entry);
+    if (number !== null && !byNumber.has(number))
+      byNumber.set(number, index);
+    const key = keyOf(entry);
+    if (key && !byKey.has(key))
+      byKey.set(key, index);
+  });
+  const claims = /* @__PURE__ */ new Map();
+  const claimed = /* @__PURE__ */ new Set();
+  const claim = (target, position) => {
+    if (target === void 0 || claimed.has(target))
+      return;
+    claimed.add(target);
+    claims.set(position, target);
+  };
+  real.forEach((entry, position) => {
+    if (!isLoggedStep(entry))
+      return;
+    claim(byKey.get(keyOf(entry)), position);
+  });
+  if (allowOrdinal) {
+    real.forEach((entry, position) => {
+      if (claims.has(position) || !isLoggedStep(entry))
+        return;
+      const number = stepNumberOf(entry);
+      if (number === null)
+        return;
+      claim(byNumber.get(number), position);
+    });
+  }
+  for (const [position, target] of claims) {
+    planRows[target] = rowFromEntry(real[position], false);
+  }
+  const extra = real.filter((_entry, position) => !claims.has(position)).map((entry) => rowFromEntry(entry, false));
+  return [...planRows, ...extra];
+}
+function markHere(rows) {
+  if (rows.length === 0)
+    return [];
+  const unfinished = (row) => !TERMINAL_STATUSES.has(String(row.status).toLowerCase());
+  let here = rows.findIndex((row) => !row.isPlanned && unfinished(row));
+  if (here === -1) {
+    const planned = rows.findIndex(unfinished);
+    here = planned === -1 ? rows.length - 1 : planned;
+  }
+  return rows.map((row, index) => ({ ...row, isHere: index === here }));
+}
+var SESSION_HEAD_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+(\d+))?\s*:\s*(.*)$/gm;
+var STEP_RE = /^(\s{0,3})(\d+)\.\s+\S/gm;
+var FENCE_RE = /^\s*(?:```|~~~)/;
+function stripFencedBlocks(text) {
+  let inFence = false;
+  return text.split("\n").map((line) => {
+    if (FENCE_RE.test(line)) {
+      inFence = !inFence;
+      return "";
+    }
+    return inFence ? "" : line;
+  }).join("\n");
+}
+function parseStepTexts(segment) {
+  const bounds = [];
+  STEP_RE.lastIndex = 0;
+  let match;
+  while ((match = STEP_RE.exec(segment)) !== null) {
+    const digitStart = match.index + match[1].length;
+    bounds.push(segment.lastIndexOf("\n", digitStart - 1) + 1);
+  }
+  return bounds.map((start, i2) => {
+    const end = i2 + 1 < bounds.length ? bounds[i2 + 1] : segment.length;
+    const lines = segment.slice(start, end).split("\n");
+    const kept = lines.length > 0 ? [lines[0]] : [];
+    for (const line of lines.slice(1)) {
+      if (line.trim() !== "" && !/^\s/.test(line.slice(0, 1)))
+        break;
+      kept.push(line);
+    }
+    return kept.join(" ").replace(/^\s*\d+\.\s*/, "").replace(/\s+/g, " ").trim();
+  });
+}
+function parseSpecSteps(specText, sessionNumber) {
+  const body = stripFencedBlocks(specText);
+  const heads = [];
+  SESSION_HEAD_RE.lastIndex = 0;
+  let match;
+  while ((match = SESSION_HEAD_RE.exec(body)) !== null) {
+    heads.push({
+      number: Number(match[1]),
+      headStart: match.index,
+      contentStart: match.index + match[0].length
+    });
+    if (match[0].length === 0)
+      SESSION_HEAD_RE.lastIndex += 1;
+  }
+  for (let i2 = 0; i2 < heads.length; i2 += 1) {
+    if (heads[i2].number !== sessionNumber)
+      continue;
+    const end = i2 + 1 < heads.length ? heads[i2 + 1].headStart : body.length;
+    return parseStepTexts(body.slice(heads[i2].contentStart, end)).filter(
+      (step) => step.trim() !== ""
+    );
+  }
+  return [];
+}
+function planMatchesSpec(plan, specSteps) {
+  if (specSteps.length === 0)
+    return false;
+  const seeded = plan.map((entry) => pyStr(entry.description));
+  return seeded.length === specSteps.length && seeded.every((text, i2) => text === specSteps[i2]);
+}
+function buildStepRows(entries, sessionNumber, specSteps) {
+  const mine = entries.filter(
+    (entry) => entry && typeof entry === "object" && !Array.isArray(entry) && entry.sessionNumber === sessionNumber
+  );
+  if (mine.length === 0)
+    return [];
+  const plan = collapseByStepKey(mine.filter((e) => e.kind === PLAN_STEP_KIND));
+  const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
+  if (plan.length === 0) {
+    return markHere(real.map((entry) => rowFromEntry(entry, false)));
+  }
+  return markHere(reconcile(plan, real, planMatchesSpec(plan, specSteps)));
+}
+function humanizeStepKey(stepKey) {
+  const text = pyStr(stepKey).replace(/[_-]/g, " ").trim();
+  if (!text)
+    return "";
+  return text[0].toUpperCase() + text.slice(1);
+}
+function stepRowLabel(row) {
+  const label = humanizeStepKey(row.stepKey);
+  if (label)
+    return label;
+  const description = pyStr(row.description).trim();
+  if (!description)
+    return "(unnamed step)";
+  const clause = /^[^.:;]*[.:;]?/.exec(description);
+  return (clause?.[0] ?? description).trim() || description;
+}
+
 // src/utils/fileSystem.ts
 var SESSION_SETS_REL = path4.join("docs", "session-sets");
 var MODULES_MANIFEST_REL = path4.join("docs", "modules.yaml");
@@ -15968,6 +16171,34 @@ function parseUatChecklist(checklistPath) {
   }
   return { totalItems: items.length, pendingItems: pending, e2eRefs: Array.from(e2eRefs) };
 }
+function buildStepLedger(state, currentSession, entries, specPath) {
+  if (state !== "in-progress")
+    return null;
+  if (currentSession === null || !Array.isArray(entries))
+    return null;
+  const mine = entries.filter(
+    (entry) => entry && typeof entry === "object" && !Array.isArray(entry) && entry.sessionNumber === currentSession
+  );
+  if (mine.length === 0)
+    return null;
+  let specSteps = [];
+  try {
+    specSteps = parseSpecSteps(fs4.readFileSync(specPath, "utf8"), currentSession);
+  } catch {
+  }
+  return {
+    sessionNumber: currentSession,
+    entries: mine.map((e) => ({
+      sessionNumber: e.sessionNumber,
+      stepNumber: e.stepNumber,
+      stepKey: e.stepKey,
+      description: e.description,
+      status: e.status,
+      kind: e.kind
+    })),
+    specSteps
+  };
+}
 function readSessionSets(root) {
   const sessionSetsDir = path4.join(root, SESSION_SETS_REL);
   if (!fs4.existsSync(sessionSetsDir))
@@ -16014,6 +16245,7 @@ function readSessionSets(root) {
     let migrationTargetSchemaVersion = null;
     let ledgerSessions = null;
     let schemaVersionOnDisk = null;
+    let rawStepEntries = null;
     const eventsPath = path4.join(dir, "session-events.jsonl");
     if (fs4.existsSync(activityPath)) {
       try {
@@ -16023,6 +16255,9 @@ function readSessionSets(root) {
         for (const e of data.entries ?? []) {
           if (e.dateTime && (!lastTouched || e.dateTime > lastTouched))
             lastTouched = e.dateTime;
+        }
+        if (state === "in-progress" && Array.isArray(data.entries)) {
+          rawStepEntries = data.entries;
         }
       } catch {
       }
@@ -16133,6 +16368,12 @@ function readSessionSets(root) {
     }
     const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
     const prerequisites = parsePrerequisites(specPath);
+    const stepLedger = buildStepLedger(
+      state,
+      liveSession?.currentSession ?? null,
+      rawStepEntries,
+      specPath
+    );
     sets.push({
       name: entry.name,
       module: module2,
@@ -16166,7 +16407,11 @@ function readSessionSets(root) {
       unsatisfiedPrereqs: [],
       // Set 110 S2: the fourth tree level's data, taken from the ledger
       // this scan already parsed — no extra read, no extra stat.
-      sessions: normalizeLedgerSessions(ledgerSessions)
+      sessions: normalizeLedgerSessions(ledgerSessions),
+      // Set 114 S3: the fifth level's data. Null on every set that is not
+      // in flight, and on an in-flight set whose activity log is absent,
+      // unreadable, or silent about the current session.
+      stepLedger
     });
   }
   deriveBlockedByPrereqs(sets);
@@ -29195,6 +29440,24 @@ function setNodes(node) {
 function sessionNodes(node) {
   return [...node.set.sessions ?? []].sort((a, b2) => a.number - b2.number).map((session) => ({ kind: "session", set: node.set, session }));
 }
+function stepNodes(node) {
+  if (node.session.status !== "in-progress")
+    return [];
+  const ledger = node.set.stepLedger;
+  if (!ledger || ledger.sessionNumber !== node.session.number)
+    return [];
+  return buildStepRows(
+    ledger.entries,
+    ledger.sessionNumber,
+    ledger.specSteps
+  ).map((row, position) => ({
+    kind: "step",
+    set: node.set,
+    session: node.session,
+    row,
+    position
+  }));
+}
 function childrenOf(node) {
   switch (node.kind) {
     case "module":
@@ -29204,6 +29467,8 @@ function childrenOf(node) {
     case "set":
       return sessionNodes(node);
     case "session":
+      return stepNodes(node);
+    case "step":
       return [];
   }
 }
@@ -29215,8 +29480,10 @@ var NODE_TOKEN = {
   module: "dabblerModule",
   bucket: "dabblerBucket",
   set: "dabblerSet",
-  session: "dabblerSession"
+  session: "dabblerSession",
+  step: "dabblerStep"
 };
+var HERE_MARKER = "<- here";
 var MODULE_TOKEN = {
   declared: "module-declared",
   fallback: "module-fallback",
@@ -29376,15 +29643,57 @@ function setDescriptor(set, supports) {
 }
 function sessionDescriptor(node) {
   const { session } = node;
+  const steps = stepNodes(node);
   return {
     id: `session:${node.set.name}/${session.number}`,
     label: session.title || `Session ${session.number}`,
     // Short labels, so `description` survives truncation here. Only the
     // in-flight session says anything — quiet is the default state.
     description: session.status === "in-progress" ? "in flight" : void 0,
-    tooltip: `**${session.title || `Session ${session.number}`}** \u2014 ${session.status.replace("-", " ")}`,
+    tooltip: sessionTooltip(node, steps.length),
     icon: sessionIcon(session.status),
     contextValue: tokenString([NODE_TOKEN.session, `session-${session.status}`]),
+    // Collapsed only when there is something under it. A session with no
+    // steps to show — every session that is not in flight, and an
+    // in-flight one whose activity log is absent or unreadable — is a
+    // leaf, which is the same rule an empty bucket and a ledger-less set
+    // already follow.
+    collapsible: steps.length > 0 ? "collapsed" : "none"
+  };
+}
+function sessionTooltip(node, stepCount) {
+  const { session } = node;
+  const title = session.title || `Session ${session.number}`;
+  const lines = [`**${title}** \u2014 ${session.status.replace("-", " ")}`];
+  if (stepCount > 0) {
+    lines.push("", `${stepCount} step${stepCount === 1 ? "" : "s"}`);
+  }
+  return lines.join("\n");
+}
+function stepDescriptor(node) {
+  const { row } = node;
+  const glyph = glyphStatusOf(row.status);
+  const tooltipLines = [`**${stepRowLabel(row)}**`];
+  const state = row.isPlanned ? "planned \u2014 not started" : String(row.status || "unknown").replace(/[-_]/g, " ");
+  tooltipLines.push("", state);
+  if (row.isHere)
+    tooltipLines.push("", "_the session is here_");
+  const description = String(row.description || "").trim();
+  if (description)
+    tooltipLines.push("", description);
+  return {
+    // `position` disambiguates: an unplanned logged step can append
+    // alongside a planned row that carries the same key.
+    id: `step:${node.set.name}/${node.session.number}/${node.position}`,
+    label: stepRowLabel(row),
+    description: row.isHere ? HERE_MARKER : void 0,
+    tooltip: tooltipLines.join("\n"),
+    icon: { kind: "file", slug: ICON_FILES[glyph] },
+    contextValue: tokenString([
+      NODE_TOKEN.step,
+      `step-${glyph}`,
+      row.isPlanned ? "step-planned" : "step-logged"
+    ]),
     collapsible: "none"
   };
 }
@@ -29398,6 +29707,8 @@ function descriptorFor(node, supports) {
       return setDescriptor(node.set, supports);
     case "session":
       return sessionDescriptor(node);
+    case "step":
+      return stepDescriptor(node);
   }
 }
 

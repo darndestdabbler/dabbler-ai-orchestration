@@ -133,26 +133,46 @@ export function makeSet(
   tmpPath: string,
   slug: string,
   totalSessions: number,
+  opts: { withSessionSteps?: boolean } = {},
 ): FixtureHandle {
-  return runHarness([
+  const args = [
     "make-set",
     "--tmp-path", tmpPath,
     "--slug", slug,
     "--total-sessions", String(totalSessions),
-  ]) as FixtureHandle;
+  ];
+  // Set 114 S3: give the fixture spec a numbered step list per session,
+  // so `startSession` seeds a plan into `activity-log.json` and the Work
+  // Explorer's fifth level has rows to render. Off by default — a spec
+  // with no `### Session N` headings is what every older consumer-repo
+  // spec looks like, and every pre-114 scenario keeps that shape.
+  if (opts.withSessionSteps) args.push("--with-session-steps");
+  return runHarness(args) as FixtureHandle;
 }
 
 export function startSession(h: FixtureHandle, n: number): void {
   runHarness(["start", ..._handleArgs(h), "--session-number", String(n)]);
 }
 
-export function makeActivity(h: FixtureHandle, n: number): void {
-  runHarness([
+export function makeActivity(
+  h: FixtureHandle,
+  n: number,
+  opts: { stepNumber?: number; stepKey?: string; status?: string; description?: string } = {},
+): void {
+  const args = [
     "make-activity",
     ..._handleArgs(h),
     "--session-number", String(n),
-    "--description", "playwright rendering smoke",
-  ]);
+    "--description", opts.description ?? "playwright rendering smoke",
+  ];
+  // Set 114 S3: without an explicit step identity the harness derives
+  // `max(stepNumber) + 1`, which lands PAST every seeded planned step and
+  // therefore always appends. Pass these to log a step that claims a
+  // planned row, which is what a real orchestrator's log_step does.
+  if (opts.stepNumber !== undefined) args.push("--step-number", String(opts.stepNumber));
+  if (opts.stepKey !== undefined) args.push("--step-key", opts.stepKey);
+  if (opts.status !== undefined) args.push("--status", opts.status);
+  runHarness(args);
 }
 
 export function makeDisposition(

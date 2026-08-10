@@ -1110,3 +1110,155 @@ suite("fileSystem — readSessionSets needsMigration + migrationTargetSchemaVers
     fs.rmSync(dir, { recursive: true });
   });
 });
+
+suite("fileSystem — readSessionSets stepLedger (Set 114 S3)", () => {
+  // The scan-side half of the fifth tree level. `sessionStepModel.test.ts`
+  // proves the ROWS match Python; these prove the scan hands the model the
+  // right inputs, and hands it nothing at all when there is nothing honest
+  // to hand over.
+
+  const SPEC = [
+    "# live-set",
+    "",
+    "## Session Set Configuration",
+    "",
+    "```yaml",
+    "totalSessions: 2",
+    "requiresUAT: false",
+    "requiresE2E: false",
+    "```",
+    "",
+    "### Session 1 of 2: The work",
+    "",
+    "1. Register.",
+    "2. Build it.",
+    "",
+    "**Creates:** a thing",
+    "",
+  ].join("\n");
+
+  const STATE = JSON.stringify({
+    schemaVersion: 4,
+    sessionSetName: "live-set",
+    status: "in-progress",
+    sessions: [
+      { number: 1, title: "Session 1", status: "in-progress", startedAt: "2026-08-10T00:00:00-04:00", completedAt: null, orchestrator: null, verificationVerdict: null },
+      { number: 2, title: "Session 2", status: "not-started", startedAt: null, completedAt: null, orchestrator: null, verificationVerdict: null },
+    ],
+  });
+
+  function stage(
+    opts: { activity?: unknown; spec?: string; state?: string } = {},
+  ): { root: string; setDir: string } {
+    const root = makeTmpDir();
+    const setDir = path.join(root, "docs", "session-sets", "live-set");
+    fs.mkdirSync(setDir, { recursive: true });
+    fs.writeFileSync(path.join(setDir, "spec.md"), opts.spec ?? SPEC);
+    fs.writeFileSync(path.join(setDir, "session-state.json"), opts.state ?? STATE);
+    if (opts.activity !== undefined) {
+      fs.writeFileSync(
+        path.join(setDir, "activity-log.json"),
+        typeof opts.activity === "string"
+          ? opts.activity
+          : JSON.stringify(opts.activity),
+      );
+    }
+    return { root, setDir };
+  }
+
+  const LOG = {
+    sessionSetName: "live-set",
+    totalSessions: 2,
+    entries: [
+      { sessionNumber: 1, stepNumber: 1, stepKey: "register", dateTime: "2026-08-10T00:00:00-04:00", description: "Register.", status: "pending", kind: "plan-step" },
+      { sessionNumber: 1, stepNumber: 2, stepKey: "build-it", dateTime: "2026-08-10T00:00:00-04:00", description: "Build it.", status: "pending", kind: "plan-step" },
+      { sessionNumber: 1, stepNumber: 1, stepKey: "registration", dateTime: "2026-08-10T01:00:00-04:00", description: "Registered.", status: "complete", routedApiCalls: [] },
+      { sessionNumber: 2, stepNumber: 1, stepKey: "later", dateTime: "2026-08-10T02:00:00-04:00", description: "A later session's step.", status: "pending" },
+    ],
+  };
+
+  test("an in-flight set carries its current session's entries and spec steps", () => {
+    const { root } = stage({ activity: LOG });
+    const [set] = readSessionSets(root);
+    assert.ok(set.stepLedger, "no stepLedger on an in-flight set");
+    assert.strictEqual(set.stepLedger.sessionNumber, 1);
+    assert.deepStrictEqual(set.stepLedger.specSteps, ["Register.", "Build it."]);
+    // Only this session's entries, and only the fields the row builder
+    // reads — a large `routedApiCalls` payload must not be retained for
+    // the lifetime of the scan cache.
+    assert.deepStrictEqual(
+      set.stepLedger.entries.map((e) => e.stepKey),
+      ["register", "build-it", "registration"],
+    );
+    for (const e of set.stepLedger.entries) {
+      assert.deepStrictEqual(
+        Object.keys(e).sort(),
+        ["description", "kind", "sessionNumber", "status", "stepKey", "stepNumber"],
+      );
+    }
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a set that is not in flight carries no step ledger at all", () => {
+    // The gate that keeps this feature off the startup path: every
+    // complete / not-started / cancelled set pays nothing.
+    const { root } = stage({
+      activity: LOG,
+      state: JSON.stringify({
+        schemaVersion: 4,
+        sessionSetName: "live-set",
+        status: "complete",
+        sessions: [
+          { number: 1, title: "Session 1", status: "complete", startedAt: "2026-08-10T00:00:00-04:00", completedAt: "2026-08-10T03:00:00-04:00", orchestrator: null, verificationVerdict: "VERIFIED" },
+          { number: 2, title: "Session 2", status: "complete", startedAt: "2026-08-10T04:00:00-04:00", completedAt: "2026-08-10T05:00:00-04:00", orchestrator: null, verificationVerdict: "VERIFIED" },
+        ],
+      }),
+    });
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.state, "complete");
+    assert.strictEqual(set.stepLedger ?? null, null);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("an absent activity log yields no step ledger", () => {
+    const { root } = stage();
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.state, "in-progress");
+    assert.strictEqual(set.stepLedger ?? null, null);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("an UNREADABLE activity log yields no step ledger, not a crash", () => {
+    // Spec step 3's named failure mode. The scan must survive a truncated
+    // or hand-mangled log; the row degrades to no children.
+    const { root } = stage({ activity: "{ this is not json" });
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.state, "in-progress");
+    assert.strictEqual(set.stepLedger ?? null, null);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a log that says nothing about the current session yields no ledger", () => {
+    const { root } = stage({
+      activity: { ...LOG, entries: LOG.entries.filter((e) => e.sessionNumber !== 1) },
+    });
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.stepLedger ?? null, null);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("an unparseable spec still yields a ledger, with no spec steps", () => {
+    // Conservative in the failure direction: empty `specSteps` makes
+    // `planMatchesSpec` answer false, which costs only the ordinal half of
+    // reconciliation. It must NOT cost the rows.
+    const { root } = stage({
+      activity: LOG,
+      spec: "# live-set\n\nNo session headings here at all.\n",
+    });
+    const [set] = readSessionSets(root);
+    assert.ok(set.stepLedger);
+    assert.deepStrictEqual(set.stepLedger.specSteps, []);
+    assert.strictEqual(set.stepLedger.entries.length, 3);
+    fs.rmSync(root, { recursive: true });
+  });
+});

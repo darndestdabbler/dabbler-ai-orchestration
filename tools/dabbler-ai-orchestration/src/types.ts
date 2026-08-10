@@ -199,6 +199,41 @@ export interface LiveSession {
   completedSessions: number[] | null;
 }
 
+/**
+ * Set 114 Session 3: everything the pure model needs to build one
+ * in-flight session's step rows, lifted at scan time.
+ *
+ * Deliberately raw. The rows themselves are built on EXPAND by
+ * `providers/sessionStepModel.ts`, so a set that is never expanded pays
+ * only the (already-performed) activity-log parse plus one spec read.
+ */
+export interface SessionStepLedger {
+  /** The session the entries and `specSteps` belong to. */
+  sessionNumber: number;
+  /**
+   * `activity-log.json` entries for that session, in file order, narrowed
+   * to the fields the row builder reads. Empty when the log is absent,
+   * unreadable, or has nothing for this session.
+   */
+  entries: SessionStepEntry[];
+  /**
+   * The step texts `spec.md` currently declares for that session. Used for
+   * one question only — whether the seeded plan still matches the spec —
+   * and never as a source of rows.
+   */
+  specSteps: string[];
+}
+
+/** One `activity-log.json` entry, narrowed to the row builder's inputs. */
+export interface SessionStepEntry {
+  sessionNumber?: number;
+  stepNumber?: number;
+  stepKey?: string;
+  description?: string;
+  status?: string;
+  kind?: string;
+}
+
 export interface SessionSet {
   name: string;
   // Set 087 Session 1: the VALIDATED module attribution — the spec's
@@ -314,6 +349,20 @@ export interface SessionSet {
   // production construction site — `readSessionSets` in `fileSystem.ts` —
   // always populates it.
   sessions?: SessionRecord[];
+  // Set 114 Session 3: the source data for the FIFTH tree level — the
+  // in-flight session's steps, as the step checklist renders them.
+  //
+  // Carried, not computed, and populated ONLY for a set whose state is
+  // `in-progress` (decisions.jsonl, session 3): 45 of this repo's 46 sets
+  // pay nothing, and the entries come out of the `activity-log.json` parse
+  // the scan already performs, so the only added cost on an in-flight set
+  // is one `spec.md` read for `specSteps` — the same file
+  // `parseSessionSetConfig` and `parsePrerequisites` each already read.
+  //
+  // `undefined` / `null` means "no step children", which is exactly the
+  // degradation an absent or unreadable activity log must produce: no
+  // children, never a stale or invented list.
+  stepLedger?: SessionStepLedger | null;
   // Set 087 Session 1: the fail-loud duplicate-set-name flag, set by
   // `readAllSessionSetsWithDiagnostics` on the ONE merged row shown for
   // a collided name. Undefined everywhere else (and always on the

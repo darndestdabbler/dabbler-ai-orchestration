@@ -1,7 +1,7 @@
 {
   "sessionSetName": "114-rolling-task-list-and-progress-visibility",
   "createdDate": "2026-08-09T20:52:21.043390+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -107,6 +107,91 @@
       "stepKey": "waiver-escape",
       "dateTime": "2026-08-10T02:50:35.344469-04:00",
       "description": "Dogfood refused this session: added the operator-attested waiver escape (disposition.checklist) so a missed post window is a recorded decision, not a --force.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T03:18:45.230160-04:00",
+      "description": "Set 114 Session 2 registered; preload read (constitution, project-guidance, lessons-learned, AGENTS.md); copilot-cli transport confirmed so no provider keys needed; decision-review-queue empty.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "plan-seeding",
+      "dateTime": "2026-08-10T03:23:01.705544-04:00",
+      "description": "Seed the session plan into activity-log.json at start_session as kind=plan-step pending entries, parsed by spec_admission (one parser).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "plan-seeding",
+      "dateTime": "2026-08-10T03:31:48.491424-04:00",
+      "description": "start_session seeds spec steps as kind=plan-step pending entries via spec_admission.parse_step_texts (one parser); SessionLog.append_entry is the writer.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "reconciliation",
+      "dateTime": "2026-08-10T03:31:48.492933-04:00",
+      "description": "build_rows reconciles plan against reality: plan owns row position, logged step owns content; unplanned steps append; check_activity_log_entry and _checklist_transitions no longer count plan entries.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T03:39:20.721087-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "seed-the-plan-at-session-start",
+      "dateTime": "2026-08-10T03:39:20.721087-04:00",
+      "description": "**Seed the plan at session start.** `start_session` writes the session's spec steps into `activity-log.json` as `pending` entries with stable `stepKey`s. `ai_router.spec_admission` already parses those step lists to enforce the size cap \u2014 reuse it rather than writing a second parser (L-069-1: the duplicate-parser bug is this repo's most repeated defect).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "reconcile-plan-against-reality",
+      "dateTime": "2026-08-10T03:39:20.721087-04:00",
+      "description": "**Reconcile plan against reality.** A step the orchestrator logs that the plan did not predict must appear; a planned step never executed must remain visibly `[ ]`. Neither may be silently dropped, and the collapse rule must not let a real step overwrite a planned one out of order.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "handle-the-messy-cases-with-tests",
+      "dateTime": "2026-08-10T03:39:20.721087-04:00",
+      "description": "**Handle the messy cases with tests:** a spec with no parseable steps, a session whose plan changed mid-flight, a re-registered session, and a consumer repo whose specs predate the format.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-10T03:39:20.721087-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "handle-the-messy-cases-with-tests",
+      "dateTime": "2026-08-10T03:41:30.360290-04:00",
+      "description": "test_plan_seeding.py: 50 tests covering the four named messy cases plus falsifiers that plant a plan-only session and a plan seeded after the last real step.",
       "status": "complete"
     }
   ]

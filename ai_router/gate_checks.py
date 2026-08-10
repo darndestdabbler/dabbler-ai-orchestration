@@ -120,6 +120,29 @@ except ImportError:
         validate_next_orchestrator,
     )
 
+try:
+    from .session_checklist import (  # type: ignore[import-not-found]
+        PLAN_STEP_KIND,
+        is_logged_step,
+    )
+except ImportError:  # pragma: no cover - direct-script fallback
+    try:
+        from session_checklist import (  # type: ignore[no-redef]
+            PLAN_STEP_KIND,
+            is_logged_step,
+        )
+    except ImportError:  # pragma: no cover - defensive
+        # One spelling of these rules lives in session_checklist; this
+        # fallback exists only so an odd import path degrades to the
+        # pre-Set-114-S2 behavior rather than taking down every gate in
+        # the module.
+        PLAN_STEP_KIND = "plan-step"
+
+        def is_logged_step(entry: object) -> bool:  # type: ignore[misc]
+            return isinstance(entry, dict) and not str(
+                entry.get("kind") or ""
+            ).strip()
+
 
 GateOutcome = Tuple[bool, str]
 
@@ -607,6 +630,23 @@ def check_activity_log_entry(
     never called ``log_step`` or the activity log was deleted between
     work and close-out.
 
+    **Plan entries do not count, and neither does writer bookkeeping**
+    (Set 114 S2). ``start_session`` seeds the session's spec steps as
+    ``kind: "plan-step"`` entries, and the ``pathAwareCritique`` /
+    ``contractGate`` policy captures write their own ``kind``-bearing
+    entries — all at registration, before any work exists. Counting any
+    of them would leave a gate that can no longer fail, which is worse
+    than no gate because it still reads like coverage. The rule is one
+    predicate, :func:`session_checklist.is_logged_step`: an entry with
+    no ``kind`` is a step the orchestrator logged; an entry with one is
+    a record written *for* the session, not *by* it.
+
+    Set 114 S1 predicted this exact failure when it rejected an
+    activity-log entry kind for the post ledger; seeding is
+    spec-directed, so the predicted consequence is paid here. Round 1's
+    first cut excluded only ``plan-step`` and both discovery lenses
+    independently caught the bookkeeping half.
+
     Returns a configuration-error failure when the log file is missing
     or unparseable; both are recoverable but the operator needs to know.
     """
@@ -645,9 +685,29 @@ def check_activity_log_entry(
 
     matching = [
         e for e in entries
-        if isinstance(e, dict) and e.get("sessionNumber") == current
+        if isinstance(e, dict)
+        and e.get("sessionNumber") == current
+        and is_logged_step(e)
     ]
     if not matching:
+        kinds = sorted(
+            {
+                str(e.get("kind")).strip()
+                for e in entries
+                if isinstance(e, dict)
+                and e.get("sessionNumber") == current
+                and str(e.get("kind") or "").strip()
+            }
+        )
+        if kinds:
+            return (
+                False,
+                f"activity-log.json has no logged step for session "
+                f"{current} — only writer bookkeeping "
+                f"({', '.join(kinds)}). Those records are written FOR a "
+                f"session at registration, not BY it doing work. Log what "
+                f"this session did (SessionLog.log_step) before closing.",
+            )
         return (
             False,
             f"activity-log.json has no entries for session {current}",
@@ -1932,7 +1992,13 @@ def _checklist_transitions(
         stamps = [
             (parsed, e)
             for e in entries
-            if isinstance(e, dict) and e.get("sessionNumber") == session_number
+            if isinstance(e, dict)
+            and e.get("sessionNumber") == session_number
+            # Set 114 S2: only a LOGGED step is the work moving on. A
+            # seeded plan row, or a policy record the writer emitted at
+            # registration, would invent a transition the session never
+            # reached — and both are written before any work exists.
+            and is_logged_step(e)
             for parsed in [_parse_iso_timestamp(e.get("dateTime"))]
             if parsed is not None
         ]

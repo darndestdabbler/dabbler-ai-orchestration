@@ -125,6 +125,91 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 114 S2) The step checklist shows what is coming, sourced from
+  the record.** `start_session` now parses the session's numbered steps
+  out of `spec.md` and writes them into `activity-log.json` as `pending`
+  entries carrying `kind: "plan-step"`, so an operator sees the whole
+  session on the first post rather than one row that grows.
+
+  This does **not** reverse Set 111 S4's decision that the renderer never
+  synthesizes plan rows — it is that decision's own remedy. A checklist
+  invented at render time would disagree with the file close-out gates
+  on; a plan written *into* the record leaves the renderer with exactly
+  one rule.
+
+  Step texts come from `spec_admission.parse_step_texts`, the parser that
+  already enforces the session-size cap, so the size a spec is admitted
+  at and the plan an operator is shown cannot disagree (L-069-1: the
+  duplicate-parser bug is this repo's most repeated defect). That parser
+  gained the step **text** alongside the count, and a slicing fix:
+  `_STEP_RE`'s leading `\s{0,3}` can consume the newline before a marker,
+  so the first step of every session sliced empty — invisible to
+  counting, fatal to seeding.
+
+  **Reconciliation: the plan owns each row's position, the logged step
+  owns its content.** A logged step claims the planned row with the same
+  `stepKey` first — identity — and only then by `stepNumber`; only
+  ordinary `log_step` entries can claim, so a `path_aware_critique` /
+  `contract_gate` / `suggestion_disposition` record written by machinery
+  never marks a planned step done. Nothing is dropped in either
+  direction: an unplanned step appears (appended after the plan), and a
+  planned step nobody logged stays a visible `[ ]`. Logging out of order
+  does not reorder the plan. The `<- here` marker now prefers the
+  unfinished **logged** step over an earlier still-pending planned row —
+  otherwise a session on step 3 would point the operator at step 2.
+
+  **The ordinal half is an inference, so it is gated on the spec.**
+  "Logged step 2 is planned step 2" holds only while the numbers the
+  orchestrator logs are the numbers the plan was seeded with. Edit the
+  spec mid-session to *insert* a step and it stops holding, and an
+  ordinal claim then relabels one planned row and evicts the last one —
+  a planned step nobody executed, silently dropped. Inside the ledger
+  the intact and renumbered cases have the identical shape, so there is
+  nothing to detect; `plan_matches_spec` looks **outside** it, comparing
+  the seeded step texts against `spec.md` now. An intact plan reconciles
+  as before; an edited, missing, or unparseable spec withdraws the
+  ordinal pass, so unmatched steps append and no planned row can be
+  evicted. No row ever comes from `spec.md` — Set 111 S4's rule that the
+  renderer renders the record is untouched; the spec answers one
+  question, and the answer only decides whether an inference is
+  trustworthy. **Stated limit:** an orchestrator that renumbers its
+  `log_step` calls *without* editing the spec leaves no signal anywhere,
+  and the ordinal pass will mislabel a row.
+
+  **Seeded once, never re-seeded.** A re-registration after a context
+  reset writes nothing, so no mid-session write can stale a verification
+  evidence stamp (the risk the spec named, and the one Set 111 S4 lost a
+  round to with `cite_lessons`), and a spec edited mid-flight cannot
+  mutate the plan under an operator who read it an hour ago — its new
+  work appears when that work is logged, as an unplanned row.
+
+  **The plan is not work, and neither is writer bookkeeping.** One
+  predicate — `session_checklist.is_logged_step`, an entry with no
+  `kind` — now decides this for `_reconcile`,
+  `check_activity_log_entry` (which gained its own refusal message
+  naming the kinds it found) and `check_checklist_posted`'s "the work
+  moved on" transition. Without it, every session would satisfy those
+  checks at registration: seeding writes plan entries, and the
+  `pathAwareCritique` / `contractGate` policy captures write their own
+  `kind`-bearing entries at the same moment. A gate that can no longer
+  fail is worse than no gate, because it still reads like coverage. Set
+  114 S1 predicted this exact failure when it rejected an activity-log
+  entry kind for the post ledger; seeding is spec-directed, so the
+  predicted consequence is paid rather than inherited.
+
+  A spec the parser cannot read costs nothing: no `spec.md`, no
+  `### Session N of M:` headings, no numbered steps, or a session the
+  spec does not describe, and seeding is a no-op with the checklist
+  rendering exactly as before — which is what a consumer repo with older
+  specs gets. A seeding failure never blocks the boundary write, and
+  names itself on stderr rather than leaving a silently absent plan that
+  looks like a session which has not started (L-079-1).
+
+  `SessionLog.append_entry` is the new writer for a pre-built entry, so
+  `activity-log.json` keeps one writer instead of a fourth hand-rolled
+  read-modify-write; `SessionLog`'s own reads and writes now pin
+  `encoding="utf-8"` rather than inheriting the Windows `cp1252` default.
+
 - **(Set 114 S1) The step checklist is now recorded by the act of posting
   it, and a close gate checks the cadence.** Set 111 S4 shipped
   `session_checklist` and wrote the obligation to post it "at every

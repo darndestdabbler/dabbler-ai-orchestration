@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "d131d4d255642cd680e3e8a59025cf8f6d7b3795",
+  "fixedTree": "01bec08ff66c8c3b1c7f62760f9d4a52abd05123",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-10T08:27:49.479232+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The “real work” gate still counts non-plan bookkeeping records as logged work. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** A typical first session in a set with `pathA ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A session whose activity log contains only seeded plan entries and kind-bearing policy/bookkeeping entries must fail check_activity_log_entry, and _checklist_transitions must not produce a last-logged-step transition until an ordinary SessionLog.log_step entry exists.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `check_activity_log_entry` still passes on bookkeeping-only activity logs. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** Session 1 of a configured set, such as one with ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "check_activity_log_entry must fail when the current session has only seeded plan entries and/or writer-bookkeeping entries such as path_aware_critique or contract_gate, and must pass only after an ordinary SessionLog.log_step-style entry exists.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

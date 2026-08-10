@@ -115,7 +115,7 @@ class SessionLog:
         self._data = None
 
         if os.path.exists(self.log_path):
-            with open(self.log_path) as f:
+            with open(self.log_path, encoding="utf-8") as f:
                 self._data = json.load(f)
         else:
             name = os.path.basename(session_set_dir)
@@ -185,6 +185,28 @@ class SessionLog:
         self._data["entries"].append(entry)
         self._save()
 
+    def append_entry(self, entry: dict):
+        """Append a pre-built entry to the activity log.
+
+        Set 114 S2. ``log_step`` builds the entry for the orchestrator's
+        own steps and stamps ``dateTime`` itself; a seeded plan step
+        (``kind: "plan-step"``) needs to carry a ``kind`` and share one
+        timestamp across the whole plan, so it is built by its writer and
+        appended here. Routing it through this class keeps
+        ``activity-log.json`` with a single writer rather than a fourth
+        hand-rolled copy of the read-modify-write.
+
+        Raises ``ValueError`` on anything that is not a dict carrying a
+        ``sessionNumber`` — a malformed entry poisons every reader of the
+        log, so it is refused at the writer rather than discovered later.
+        """
+        if not isinstance(entry, dict):
+            raise ValueError(f"activity-log entry must be a dict, got {type(entry)}")
+        if "sessionNumber" not in entry:
+            raise ValueError("activity-log entry must carry a sessionNumber")
+        self._data["entries"].append(dict(entry))
+        self._save()
+
     def save_session_review(self, session_number: int,
                             review_text: str, round_number: int = 1):
         """Save or append the verifier's raw output."""
@@ -240,5 +262,7 @@ class SessionLog:
         }
 
     def _save(self):
-        with open(self.log_path, "w") as f:
+        # encoding pinned (L-079-1): the platform default is cp1252 on
+        # Windows, and this file is read and written by several modules.
+        with open(self.log_path, "w", encoding="utf-8") as f:
             json.dump(self._data, f, indent=2)

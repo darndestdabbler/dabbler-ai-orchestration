@@ -55,7 +55,10 @@ Run every router CLI through the workspace venv
     verification-only policy window. Set 111 owns the next routing-policy
     revision, so do not expand outsourcing before that set decides it.
   - **4. Execute.** Do the plan's steps; log every step to
-    `activity-log.json` (`log_step`), and **post the step checklist**
+    `activity-log.json` (`log_step`) **using the spec's own step
+    numbers** — `start_session` seeded the plan there as `pending`
+    rows, and the key (else the number) is what reconciles a logged
+    step to its planned one — and **post the step checklist**
     (`python -m ai_router.session_checklist`, `--markdown` for a chat
     surface) at each named transition: session start; before a
     long-running command and again once its run is **recorded**; after

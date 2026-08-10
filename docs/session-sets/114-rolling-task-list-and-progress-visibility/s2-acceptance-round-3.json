@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "54240bc484eb40fa908b0c1f25d406cf9f8252f2",
+  "fixedTree": "00014d11fc393517ff7655c976b5fe7068b632be",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-10T08:56:37.432032+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Ordinal fallback can still let an inserted step overwrite an unfinished seeded row when logged keys do not exactly match seeded keys. - **Category:** Correctness - **Severity:** Major - **Failure s ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In a seeded plan, after a mid-flight insertion, a logged row with a non-empty stepKey that does not match any seeded planned step must not ordinal-claim and replace a different planned row; unfinished original planned rows remain visible pending.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

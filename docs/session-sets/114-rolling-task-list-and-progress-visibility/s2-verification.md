@@ -1,0 +1,13 @@
+**ISSUES FOUND**
+
+- **Issue 1:** The “real work” gate still counts non-plan bookkeeping records as logged work.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Failure scenario:** A typical first session in a set with `pathAwareCritique: advisory|required` or `contractGate` starts, posts the checklist, but never calls `SessionLog.log_step`. The policy capture writes a `kind`-bearing activity-log entry at registration, and the changed filters count it as real work, so `check_activity_log_entry` passes and `_checklist_transitions` reports it as `last-logged-step`. This is probable because these policy records are a standard session-start path, and the gate exists specifically because logging omissions are realistic.
+  - **Acceptance criterion:** `JUDGMENT - A session whose activity log contains only seeded plan entries and kind-bearing policy/bookkeeping entries must fail check_activity_log_entry, and _checklist_transitions must not produce a last-logged-step transition until an ordinary SessionLog.log_step entry exists.`
+  - **Details:** **Violation:** the session claims “check_activity_log_entry now ignores plan entries and still demands a real logged step,” and `_checklist_transitions` is described as excluding seeded entries from the “last logged step” gate. **Impact:** a close gate can still be satisfied before any actual session work is logged, which is exactly the false-coverage failure this session says it fixed. **Evidence:** `gate_checks.py` filters only `e.get("kind") != PLAN_STEP_KIND` at both the activity-log gate and transition scan, so `path_aware_critique`, `contract_gate`, and similar bookkeeping entries are included. A direct probe with only `pathAwareCritique: advisory` plus seeded plan entries returned `check_activity_log_entry == (True, "")` and produced `last-logged-step (session-001/path-aware-critique)`.
+
+#### NITS
+
+- **Nit:** `start_session` claims seeding failures are named on stderr, but `session_checklist.seed_session_plan` catches internal writer/read failures and returns `[]`, so the wrapper never prints. This is non-blocking because it only affects degraded/error states, but the operator-facing claim is overstated.
+- **Nit:** The older `session_checklist.py` module prose still says “It renders logged steps, not planned ones” and “A step the orchestrator never logged does not appear,” which now contradicts the later Set 114 S2 section and the implementation.

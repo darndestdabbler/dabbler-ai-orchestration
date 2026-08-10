@@ -104,11 +104,22 @@ _EXCEPTION_RE = re.compile(
 
 @dataclass(frozen=True)
 class SessionPlan:
-    """One session's parsed plan."""
+    """One session's parsed plan.
+
+    ``steps`` carries the step **text** in spec order, added by Set 114 S2
+    so ``start_session`` can seed the plan into ``activity-log.json``
+    without a second spec parser (L-069-1: the duplicate-parser bug is
+    this repo's most repeated defect). It defaults to ``()`` so a
+    consumer-repo caller that constructs a ``SessionPlan`` positionally
+    keeps working; ``step_count`` stays an independent field for the
+    same reason, and :func:`parse_session_plans` always sets it to
+    ``len(steps)``.
+    """
 
     number: int
     title: str
     step_count: int
+    steps: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -165,6 +176,47 @@ def parse_size_exceptions(text: str) -> Dict[int, str]:
     return out
 
 
+def parse_step_texts(segment: str) -> List[str]:
+    """Return the text of each top-level step in a session's *segment*.
+
+    Set 114 S2. The admission test only ever needed the step **count**;
+    seeding the plan into the activity log needs the step **text**, and
+    a second parser for the same list is exactly the duplicate-parser
+    defect this repo repeats most (L-069-1). So the text extractor is
+    the primitive and :func:`parse_session_plans` counts what it finds —
+    the two cannot disagree about what a step is.
+
+    A step runs from its ``N.`` marker to the next one, and ends early at
+    the first following line that starts in **column 0** — that is how a
+    Markdown list ends, and it is what keeps the ``**Creates:**`` /
+    ``**Touches:**`` trailer out of the last step's text. Continuation
+    lines and nested bullets (all indented) stay with their step.
+    Internal whitespace is collapsed to single spaces so the result is
+    one line fit for a log entry's description.
+
+    Spans are cut at the marker's own **line start**, not at
+    ``match.start()``: ``_STEP_RE``'s leading ``\\s{0,3}`` can consume the
+    preceding newline, so a step introduced by a blank line matches from
+    that blank line. Counting never noticed (the match count is the
+    same); slicing did — the first step of every session came out empty.
+    """
+    marks = list(_STEP_RE.finditer(segment))
+    bounds = [segment.rfind("\n", 0, m.start(1)) + 1 for m in marks]
+    texts: List[str] = []
+    for i, start in enumerate(bounds):
+        end = bounds[i + 1] if i + 1 < len(bounds) else len(segment)
+        lines = segment[start:end].split("\n")
+        kept = [lines[0]] if lines else []
+        for line in lines[1:]:
+            if line.strip() and not line[:1].isspace():
+                break
+            kept.append(line)
+        body = " ".join(kept)
+        body = re.sub(r"^\s*\d+\.\s*", "", body)
+        texts.append(re.sub(r"\s+", " ", body).strip())
+    return texts
+
+
 def parse_session_plans(text: str) -> List[SessionPlan]:
     """Parse ``### Session N of M: Title`` blocks and count their steps.
 
@@ -179,12 +231,13 @@ def parse_session_plans(text: str) -> List[SessionPlan]:
     for i, m in enumerate(heads):
         start = m.end()
         end = heads[i + 1].start() if i + 1 < len(heads) else len(body)
-        segment = body[start:end]
+        steps = tuple(parse_step_texts(body[start:end]))
         plans.append(
             SessionPlan(
                 number=int(m.group(1)),
                 title=(m.group(3) or "").strip(),
-                step_count=len(_STEP_RE.findall(segment)),
+                step_count=len(steps),
+                steps=steps,
             )
         )
     return plans
@@ -413,6 +466,7 @@ __all__ = [
     "load_max_steps",
     "parse_session_plans",
     "parse_size_exceptions",
+    "parse_step_texts",
     "main",
     "run",
 ]

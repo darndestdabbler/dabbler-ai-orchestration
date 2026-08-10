@@ -467,6 +467,50 @@ def _capture_contract_gate(
         pass
 
 
+def _seed_session_plan(
+    session_set_dir: str,
+    session_number: int,
+    total_sessions: Optional[int],
+) -> None:
+    """Set 114 (S2): write this session's spec steps into the ledger.
+
+    The forward half of the step checklist. Set 111 S4 ruled out
+    synthesizing plan rows at render time — a checklist that disagrees
+    with ``activity-log.json`` undermines the file close-out gates on —
+    so the plan is put **into the record** here instead, as ``pending``
+    entries the renderer reconciles against what actually gets logged.
+
+    Best-effort in the same shape as the policy captures above, with one
+    difference: a skip is NAMED on stderr (L-079-1 — a fail-open branch
+    around I/O must say so in operator-facing output), because a silently
+    absent plan looks exactly like a session that has not started yet.
+    Seeding is idempotent by construction: it writes nothing when the
+    session already has plan entries, so a re-registration after a
+    context reset does not touch the ledger.
+    """
+    try:
+        try:
+            from .session_checklist import (  # type: ignore[import-not-found]
+                seed_session_plan,
+            )
+        except ImportError:  # pragma: no cover - direct-script fallback
+            from session_checklist import (  # type: ignore[no-redef]
+                seed_session_plan,
+            )
+        seed_session_plan(
+            session_set_dir,
+            session_number,
+            total_sessions=total_sessions or 0,
+        )
+    except Exception as exc:
+        print(
+            f"start_session: could not seed the session plan into "
+            f"activity-log.json ({exc}); the step checklist will show "
+            f"only logged steps for session {session_number}.",
+            file=sys.stderr,
+        )
+
+
 def _refuse_unresolvable_identity(args: argparse.Namespace) -> Optional[str]:
     """Set 084 (F1): the start-time identity boundary.
 
@@ -926,6 +970,13 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     _capture_contract_gate(
         session_set_dir, requested, getattr(args, "contract_gate", None)
     )
+
+    # Set 114 (S2): seed this session's spec steps into activity-log.json
+    # so the checklist shows what is COMING, not only what is done. Runs
+    # after the policy captures so a seeding problem can never cost the
+    # set its gate-policy records, and after the state write so the
+    # session total is resolvable. Seeds once per session; never re-seeds.
+    _seed_session_plan(session_set_dir, requested, total_sessions)
 
     # Set 049 (T5): best-effort observability log so a post-hoc
     # forensic walk can identify the most recent claimant without

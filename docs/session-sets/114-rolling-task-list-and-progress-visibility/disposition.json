@@ -1,35 +1,23 @@
 {
   "status": "completed",
-  "summary": "Set 114 S1 made posting the step checklist observable and then enforced it. Rendering the checklist is now what records it: every CLI render appends one line to checklist-posts.jsonl (session, timestamp, step count, which step carried the here-marker), and the new checklist_posted close gate compares that ledger against the transitions the session's own records already show - startedAt in session-state.json, each test-runs.jsonl record, each completed round in sN-rounds.jsonl, each human-authority row in decisions.jsonl, and the newest activity-log.json entry. One post per transition, consumed in time order, so a single post at the end cannot cover a whole session. A sibling ledger rather than a new activity-log entry kind, because an entry would be rendered by the checklist itself and would satisfy the existing activity_log_entry gate for a session that logged no real step. The ledger is freshness-exempt (a post after a stamped round would otherwise stale it and buy a fresh metered backstop round, making posting cost money and guaranteeing the obligation decays again) but evidence-visible (hiding it from the verifier would be a self-authorized reduction in verifier visibility). The cadence is defined in session-constitution.md Step 4 and the authoring guide, whose table marks each moment gate-checked or not: the two before-X moments cannot be checked because every record this framework keeps is written after the thing it describes, and a declared one would be the self-attestation the spec's Decision 3 forbids. That residual was disputed by the verifier and settled by operator adjudication. Four verification rounds; five of six blocking findings fixed, the sixth adjudicated. 3693 pytest passed, 33 Playwright passed.",
+  "summary": "Set 114 S2 gave the step checklist its forward half. start_session now parses the session's numbered steps out of spec.md (via spec_admission.parse_step_texts - the same parser that enforces the session-size cap, so the size a spec is admitted at and the plan an operator is shown cannot disagree) and writes them into activity-log.json as pending entries carrying kind: plan-step. This does not reopen Set 111 S4's decision that the renderer never synthesizes plan rows; it is that decision's own remedy - the plan goes INTO the record, so the renderer keeps one rule. build_rows reconciles plan against reality: the plan owns each row's position, the logged step owns its content, an unplanned step appears (appended), a planned step nobody logged stays visibly [ ], and the here-marker prefers the unfinished logged step over an earlier pending planned row. Seeded once, never re-seeded, so a re-registration writes nothing and no mid-session write can stale a verification stamp. Four rounds. Round 1 (both discovery lenses independently) and round 2 found the same defect: the gate filters excluded only plan-step while path_aware_critique / contract_gate records - written at registration for any configured set - still counted as real work, so check_activity_log_entry could pass before any work existed. Fixed with one predicate, session_checklist.is_logged_step, used by _reconcile and both gates. Round 2 also found that an ordinal-first claim cascades when a spec is edited mid-flight: the inserted step claims one planned row, the shifted step claims the next, and the last planned row vanishes. The round-2 fix (identity before ordinal) was rejected by round 3, correctly - it only rescued the case where the shifted step's key matched a seeded slug. There is no signal inside the ledger (N logged steps, N planned rows, each number used once is the shape of both the intact and the renumbered case), so the fix looks outside it: plan_matches_spec compares the seeded step texts against spec.md now, and an edited, missing or unparseable spec withdraws ordinal matching entirely - unmatched steps append and no planned row can be evicted. No row ever comes from the spec. Round 4 VERIFIED with all four fixes accepted. 3765 pytest passed / 9 skipped; 33 Playwright passed (run because start_session is a state-file writer and now writes to activity-log.json, which the extension watches).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
     "ai_router/CHANGELOG.md",
-    "ai_router/disposition.py",
     "ai_router/gate_checks.py",
     "ai_router/session_checklist.py",
-    "ai_router/tests/e2e/fixtures.py",
-    "ai_router/tests/test_checklist_posts.py",
-    "ai_router/tests/test_close_backstop.py",
-    "ai_router/tests/test_close_session_integration.py",
-    "ai_router/tests/test_close_session_skeleton.py",
-    "ai_router/tests/test_close_session_snapshot_flip.py",
-    "ai_router/tests/test_close_session_verdict.py",
-    "ai_router/tests/test_disposition.py",
-    "ai_router/tests/test_gate_checks.py",
-    "ai_router/tests/test_mark_session_complete_gate.py",
-    "ai_router/tests/test_reconciler.py",
-    "ai_router/tests/test_verification_integrity_gate.py",
-    "ai_router/verification_stamp.py",
-    "docs/disposition-schema.md",
+    "ai_router/session_log.py",
+    "ai_router/spec_admission.py",
+    "ai_router/start_session.py",
+    "ai_router/tests/test_plan_seeding.py",
     "docs/planning/session-set-authoring-guide.md",
     "docs/session-constitution.md",
     "docs/session-sets/114-rolling-task-list-and-progress-visibility/ai-assignment.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-close-backstop-notes.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-1.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-2.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-3.md",
-    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-4.md"
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-conventions.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-remediation-round-1.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-remediation-round-2.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s2-remediation-round-3.md"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -39,16 +27,16 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 reverses a recorded design decision (Set 111 S4's render-the-record-never-synthesize-the-plan) in the one way that decision's own reasoning permits - by writing the plan into the record at start_session. That is a continuation of the argument this session made about where a record belongs and what a renderer may invent, not a fresh problem. Full reasoning, and the three things S2 must not inherit uncritically, are in ai-assignment.md."
+      "specifics": "Session 3 renders in the Work Explorer what Sessions 1 and 2 put in the record. The tree's children are build_rows' output; an orchestrator that does not know why a row can be is_planned, why ordinal reconciliation is gated on plan_matches_spec, or why the renderer is forbidden from inventing rows will either re-derive the plan in TypeScript - reopening a decision two sessions have now closed - or render a tree that disagrees with the checklist. It is also the set's terminal session (change-log.md, Step 9 review, advisory path-aware critique). Full reasoning and the four things S3 must not inherit uncritically are in ai-assignment.md."
     }
   },
   "blockers": [],
   "checklist": {
-    "status": "waived",
-    "attestation": "Operator adjudication, 2026-08-09: the checklist_posted gate this session ships correctly refused this session -- no post was recorded after verification round 2 (18:34) or round 4 (19:58). Both are genuine cadence misses by the orchestrator, and the ledger shows them. A closed window cannot be re-entered, and the only other exit was --force, which bypasses every other gate; the operator chose to add the attested-waiver escape and waive these two posts with the omission left on the record."
+    "status": "posted"
   },
   "lessons_cited": [
     "L-069-1",
-    "L-112-1"
+    "L-112-1",
+    "L-064-8"
   ]
 }

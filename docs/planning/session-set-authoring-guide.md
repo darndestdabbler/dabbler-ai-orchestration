@@ -910,6 +910,67 @@ backstop into a fresh metered round, making posting cost money and
 guaranteeing the obligation decays again), and in
 `EVIDENCE_VISIBLE_BOOKKEEPING`, so the verifier still reads it.
 
+### The plan in the ledger (Set 114 S2)
+
+The checklist also shows what is **coming**. `start_session` parses this
+session's numbered steps out of `spec.md` and writes them into
+`activity-log.json` as `pending` entries carrying `kind: "plan-step"`,
+so an operator sees the whole session on the first post rather than one
+row that grows.
+
+This does not reopen Set 111 S4's decision that the renderer never
+invents rows. It is the opposite: the plan is put **into the record**,
+and the renderer keeps its one rule. What that buys, and what it costs
+a spec author:
+
+- **The step's opening phrase becomes its label.** `**Seed the plan at
+  session start.** ...` renders as `Seed the plan at session start`, and
+  the full prose stays behind `--verbose`. A step that opens with a bold
+  lead — which this guide's template already asks for — reads well; one
+  that opens mid-sentence reads badly. That is the only new authoring
+  consequence.
+- **Reconciliation: the plan owns each row's position, the logged step
+  owns its content.** A logged step claims the planned row with the same
+  `stepKey` first — identity — and only then by `stepNumber`, so keep
+  `log_step`'s step numbers aligned with the spec's; the long-standing
+  convention is now load-bearing. Logging out of order does not reorder
+  the plan.
+- **Editing the plan mid-session is safe, and costs only tidiness.** The
+  ordinal half of that match is an inference — "logged step 2 is planned
+  step 2" — and it stops being true the moment a step is inserted and
+  later work renumbered. So it is gated: `plan_matches_spec` compares the
+  seeded step texts against `spec.md` as it stands now, and an edited (or
+  missing, or newly unparseable) spec withdraws ordinal matching for that
+  session. The checklist then shows every original planned step still
+  `[ ]` and the new work as unplanned rows, rather than quietly
+  relabelling one row and losing another. Nothing is ever rendered *from*
+  the spec; it answers one question, and only decides whether an
+  inference can be trusted.
+- **Nothing is dropped in either direction.** A step the plan did not
+  predict appears, appended after the plan; a planned step nobody logged
+  stays a visible `[ ]`. A close that leaves `[ ]` rows is not blocked —
+  the checklist reports, the disposition explains.
+- **Seeded once, never re-seeded.** The plan is a snapshot of what the
+  session set out to do. A re-registration after a context reset writes
+  nothing, and a spec edited mid-session shows its new work when that
+  work is *logged*, as an unplanned row. Re-seeding would write to the
+  activity log mid-session and let the plan mutate under an operator who
+  read it an hour ago.
+- **The plan is not work, and neither is writer bookkeeping.**
+  `check_activity_log_entry` counts only entries with **no `kind`** —
+  the seeded plan, the `pathAwareCritique` and `contractGate` policy
+  records, and every other `kind`-bearing entry are written *for* a
+  session at registration, not *by* it doing work. The checklist-post
+  gate applies the same rule to "the work moved on". A session cannot
+  close on the strength of records `start_session` wrote for it.
+- **A spec the parser cannot read costs nothing.** No `spec.md`, no
+  `### Session N of M:` headings, no numbered steps, or a session the
+  spec does not describe: seeding is a no-op and the checklist renders
+  exactly as it did before — which is what a consumer repo with older
+  specs gets. The step texts come from `ai_router.spec_admission`, the
+  same parser that enforces the session-size cap, so the size a spec is
+  admitted at and the plan an operator is shown can never disagree.
+
 ---
 
 ## The guided-look UAT (Set 111 S4)

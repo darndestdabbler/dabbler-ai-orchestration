@@ -29,6 +29,15 @@
       "completedAt": null,
       "orchestrator": null,
       "verificationVerdict": null
+    },
+    {
+      "number": 4,
+      "title": "Session 4",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
     }
   ]
 }

@@ -158,6 +158,22 @@ judgment and feel.
    the cadence table is one document and the gate reads it; dropping a
    transition is a table edit plus a gate constant.
 
+   **Hard evidence, added 2026-08-10:** the gate has now refused its own
+   orchestrator **twice — in Sets 114 S1 and 114 S3**, the two sessions
+   written by the people who designed it. S3 posted **twelve** times and
+   still missed two windows, and both misses were the same shape: two
+   transitions recorded seconds apart, one post, landing on the wrong
+   side of the record. That is not a discipline problem so much as a
+   design signal — the cadence is defined in terms of *records the gate
+   can see*, and a human (or an orchestrator) reasoning about "moments"
+   does not naturally align with that. Worth putting in front of the
+   operator alongside the noise question: **is the cadence followable by
+   hand at all, or should posting be a side effect of the writers
+   (`run_of_record record`, `decision_journal`, `verify_session`)
+   rather than a separate act?** That would delete the failure mode
+   entirely rather than adding another reminder — the removal-over-
+   addition principle applied to this set's own gate.
+
 9. **Is the markdown table the right chat-surface shape?** `--markdown`
    was chosen for chat and plain text for consoles. Nobody has judged the
    rendered result in the surface it is posted into.

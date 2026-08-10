@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "118-test-retirement-and-coupling-budget",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Make the suite legible to itself",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "The retirement rule, ruled and journaled",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "The first retirement pass, and the question that keeps the slope down",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

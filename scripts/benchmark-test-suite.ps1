@@ -53,7 +53,7 @@ if (-not (Test-Path $python)) {
 }
 
 if (-not $OutFile) {
-    $OutFile = Join-Path $repoRoot "test-suite-benchmark-$env:COMPUTERNAME.txt"
+    $OutFile = Join-Path $repoRoot "docs\test-suite-benchmark-$env:COMPUTERNAME.txt"
 }
 
 $lines = New-Object System.Collections.Generic.List[string]

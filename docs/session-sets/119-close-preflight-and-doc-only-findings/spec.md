@@ -204,13 +204,17 @@ changes what is required — only when you can find out.
    it. Exit non-zero when anything blocking is unmet.
 3. **Cover the expensive case.** The preflight must answer *"would the
    verification backstop fire?"* — does a stamped round exist for this
-   session — **without** spending the round. That one line is 78 of the 212
-   historical failures.
+   session — **without** spending the round. That one line is 78 of the
+   **148 still-blocking** historical failures (the other 64 of the 212
+   belong to checks Set 116 S3 demoted, so pre-empting those is worth
+   nothing now).
 4. **Prove it against history.** Replay the preflight's predicates over the
    recorded failures in `session-events.jsonl` and report how many it would
-   have pre-empted. The ~148-of-212 figure in this spec is a **prediction**;
-   the session records the measured number, and a discrepancy is a finding
-   about the tool, not about the spec.
+   have pre-empted. The ~148-of-212 figure in this spec is a **prediction
+   derived from a one-off query, not from an instrument.** The session
+   records the measured number, and a discrepancy is a finding — **about
+   the tool *or* about this spec's prediction, and the session must say
+   which.**
 5. Full pytest at close after freeze; verify, close.
 
 **Creates:** `ai_router/close_preflight.py`, its report format, the historical replay measurement

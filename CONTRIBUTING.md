@@ -101,6 +101,23 @@ npx tsc --noEmit && npm run test:unit
 npm run test:playwright
 ```
 
+**Iterating on failures.** `pytest.ini` sets `--ff` (failed-first), so a
+re-run puts the previously-failed tests first and a fix that did not take
+surfaces in seconds rather than ~4 minutes. When you are still iterating,
+run only the failures:
+
+```bash
+python -m pytest --lf     # just the previous failures -- seconds
+python -m pytest          # then the full run of record
+```
+
+`--lf` is a **hand-iteration** tool and must never enter `addopts`: it runs
+only the previously-failed tests, which would silently turn the run of
+record into a partial run. The final run before commit, push and close is
+always the full suite. This is not the `testmon`-style impact analysis
+ruled out in Sets 116 and 118 — nothing is *inferred* and nothing is
+skipped from the run of record.
+
 **Same-tree parity proof (Set 116 S1, 2026-08-10, round-4 remediation):**
 raw serial (`-n 0`) and parallel (`-n auto`, the default) output for
 the full suite is checked in at

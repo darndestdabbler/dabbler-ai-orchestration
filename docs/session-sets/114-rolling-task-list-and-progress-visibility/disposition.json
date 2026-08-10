@@ -1,4 +1,46 @@
 {
+  "status": "completed",
+  "summary": "Set 114 S1 made posting the step checklist observable and then enforced it. Rendering the checklist is now what records it: every CLI render appends one line to checklist-posts.jsonl (session, timestamp, step count, which step carried the here-marker), and the new checklist_posted close gate compares that ledger against the transitions the session's own records already show - startedAt in session-state.json, each test-runs.jsonl record, each completed round in sN-rounds.jsonl, each human-authority row in decisions.jsonl, and the newest activity-log.json entry. One post per transition, consumed in time order, so a single post at the end cannot cover a whole session. A sibling ledger rather than a new activity-log entry kind, because an entry would be rendered by the checklist itself and would satisfy the existing activity_log_entry gate for a session that logged no real step. The ledger is freshness-exempt (a post after a stamped round would otherwise stale it and buy a fresh metered backstop round, making posting cost money and guaranteeing the obligation decays again) but evidence-visible (hiding it from the verifier would be a self-authorized reduction in verifier visibility). The cadence is defined in session-constitution.md Step 4 and the authoring guide, whose table marks each moment gate-checked or not: the two before-X moments cannot be checked because every record this framework keeps is written after the thing it describes, and a declared one would be the self-attestation the spec's Decision 3 forbids. That residual was disputed by the verifier and settled by operator adjudication. Four verification rounds; five of six blocking findings fixed, the sixth adjudicated. 3693 pytest passed, 33 Playwright passed.",
   "verification_method": "api",
-  "verification_verdict": "ISSUES_FOUND"
+  "verification_verdict": "ISSUES_FOUND_RESOLVED_IN_FLIGHT",
+  "files_changed": [
+    "ai_router/CHANGELOG.md",
+    "ai_router/gate_checks.py",
+    "ai_router/session_checklist.py",
+    "ai_router/verification_stamp.py",
+    "ai_router/tests/e2e/fixtures.py",
+    "ai_router/tests/test_checklist_posts.py",
+    "ai_router/tests/test_close_backstop.py",
+    "ai_router/tests/test_close_session_integration.py",
+    "ai_router/tests/test_close_session_skeleton.py",
+    "ai_router/tests/test_close_session_snapshot_flip.py",
+    "ai_router/tests/test_close_session_verdict.py",
+    "ai_router/tests/test_gate_checks.py",
+    "ai_router/tests/test_mark_session_complete_gate.py",
+    "ai_router/tests/test_reconciler.py",
+    "ai_router/tests/test_verification_integrity_gate.py",
+    "docs/planning/session-set-authoring-guide.md",
+    "docs/session-constitution.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/ai-assignment.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-1.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-2.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-3.md",
+    "docs/session-sets/114-rolling-task-list-and-progress-visibility/s1-remediation-round-4.md"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "detail": "Session 2 reverses a recorded design decision (Set 111 S4's render-the-record-never-synthesize-the-plan) in the one way that decision's own reasoning permits - by writing the plan into the record at start_session. That is a continuation of the argument this session made about where a record belongs and what a renderer may invent, not a fresh problem. Full reasoning, and the three things S2 must not inherit uncritically, are in ai-assignment.md."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-069-1",
+    "L-112-1"
+  ]
 }

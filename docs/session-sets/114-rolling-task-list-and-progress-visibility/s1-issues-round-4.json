@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The cadence docs dropped the explicit post-after-verification transition while the gate still enforces it.\n- **Category:** Completeness\n- **Severity:** Major\n- **Failure scenario:** A normal session follows the compact preload constitution, runs mandatory verification, and does not post afterward because Step 4 no longer names that transition; close then fails on `verification-round N` even though the operator followed the documented cadence. This is probable because every session must run verification and `docs/session-constitution.md` is the per-session operating doc.\n- **Acceptance criterion:** `JUDGMENT - docs/session-constitution.md Step 4 and the authoring-guide cadence table must explicitly name completed verification rounds / sN-rounds.jsonl as a checked transition that owes a post, separate from test-run run_of_record records.`\n- **Details:** Violation: the task required the cadence docs to name “after verification,” and the gate still appends `verification-round` transitions from `sN-rounds.jsonl`; the edited constitution list now says session start, before/after long-running command, operator stop, and before close, but omits verification. Impact: the canonical instructions no longer teach a gate-enforced main-path obligation, so the work is not complete. Evidence: `gate_checks.py` still enforces completed verification rounds, while the changed Step 4 text removed “after each verification round.”",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A normal session follows the compact preload constitution, runs mandatory verification, and does not post afterward because Step 4 no longer names that transition; close then fails on `verification-round N` even though the operator followed the documented cadence. This is probable because every session must run verification and `docs/session-constitution.md` is the per-session operating doc.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "docs/session-constitution.md Step 4 and the authoring-guide cadence table must explicitly name completed verification rounds / sN-rounds.jsonl as a checked transition that owes a post, separate from test-run run_of_record records."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 late checklist post laundering earlier transitions",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 pre-long-running-command post is not gate-enforced",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 operator-stop records are now gate-visible",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 test-run post order now matches the enforced record timestamp",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 pre-brief operator-stop timing remains prescribed but not gate-checked",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L7"
+    }
+  ]
+}

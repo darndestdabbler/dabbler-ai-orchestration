@@ -137,7 +137,7 @@ full text in `lessons-archive.md`:
 
 
 ## A Gate That Only Ever Passes Proves Nothing — Ship It With Falsifiers
-<!-- lesson: id="L-112-1" added-set="112" last-used-set="112" status="active" scope="portable" -->
+<!-- lesson: id="L-112-1" added-set="112" last-used-set="114" status="active" scope="portable" -->
 
 - A pattern-matching gate (grep guard, banned-phrase scan) that matches
   nothing looks **identical** to one that finds nothing, and reviewing

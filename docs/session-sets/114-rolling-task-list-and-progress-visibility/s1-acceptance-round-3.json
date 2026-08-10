@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "a3d1aba23bdd450f51b77425466ba8ccf14b107b",
+  "fixedTree": "57bdd3318428d97b92a2326aba39f5f751cddbf2",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-09T23:56:27.584896+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The required “before a long-running command” post is still not gate-enforced. - **Category:** Completeness - **Severity:** Major - **Failure scenario:** A normal session starts a full suite or rout ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "check_checklist_posted must have an enforceable command-start transition, or equivalent non-attestation mechanism, and must fail when the pre-command checklist post is missing.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** Operator-stop enforcement checks a post after the decision record, not the required post before the education-mode brief. - **Category:** Correctness - **Severity:** Major - **Failure scenario:** T ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A human-authority operator stop must not be considered covered solely by a checklist post after the decision_journal timestamp; the gate must enforce the documented pre-brief post or the contract must stop claiming that timing is gate-checked.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

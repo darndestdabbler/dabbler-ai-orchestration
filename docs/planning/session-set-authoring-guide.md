@@ -820,8 +820,9 @@ every step is scrolled past like any other banner:
 | Transition | Post when | Gate-checked? |
 | :--- | :--- | :--- |
 | **Session start** | Right after `start_session`, once the plan's steps are logged. | Yes |
-| **A long-running command returns** | After a blocking command (a full suite, a routed round) finishes **and its record is written** — `run_of_record record` first, then post. | Yes |
-| **Before a long-running command** | Before you start one you expect to block for minutes. | **No** — see below |
+| **A test suite's run is recorded** | After a blocking suite finishes **and its record is written** — `run_of_record record` first, then post. | Yes |
+| **A verification round completes** | After `verify_session` returns and appends its `round-completed` line to `sN-rounds.jsonl`, before remediating or moving on. | Yes |
+| **Before a long-running command** | Before you start one you expect to block for minutes (a full suite, a routed round). | **No** — see below |
 | **An operator stop is journaled** | After `decision_journal` records the human-authority decision. | Yes |
 | **Before the education-mode brief** | Immediately before you put the question to the human, so they see where the session is while they decide. | **No** — see below |
 | **Before close** | After the last logged step, before `close_session`. | Yes |
@@ -842,7 +843,9 @@ happens, so a single post at the end does not cover a whole session.
 **Order matters around a long-running command.** The transition's
 timestamp is the `recordedAt` of the run-of-record line, so record the
 run and *then* post. Posting before you record leaves the transition
-uncovered and the close gate will say so.
+uncovered and the close gate will say so. A verification round needs no
+such care: `verify_session` writes its own `round-completed` line before
+it returns, so any post after the command finishes covers it.
 
 Three limits worth stating plainly:
 

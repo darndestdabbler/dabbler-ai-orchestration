@@ -92,6 +92,14 @@
       "dateTime": "2026-08-09T17:10:04.225150-04:00",
       "description": "Full pytest after freeze, cross-provider verification, close.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "verify-and-close",
+      "dateTime": "2026-08-09T20:00:49.883801-04:00",
+      "description": "Four verification rounds; 5 of 6 blocking findings fixed, 1 adjudicated by the operator. Full pytest 3693 passed, Layer 3 33 passed. Disposition authored.",
+      "status": "complete"
     }
   ]
 }

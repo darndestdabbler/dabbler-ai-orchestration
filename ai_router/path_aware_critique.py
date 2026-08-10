@@ -662,6 +662,22 @@ def validate_path_aware_critique_artifact(
                                 f"critiques[{i}].findings[{j}].{opt} must be "
                                 "a string"
                             )
+                    # Set 119 S1: evidencePaths is an optional array of
+                    # non-empty strings in the JSON Schema -- type-check it
+                    # here too, or a schema-only consumer would reject an
+                    # artifact this validator accepted (the both-directions
+                    # parity rule, L-066-1).
+                    ep_val = finding.get("evidencePaths")
+                    if ep_val is not None and not (
+                        isinstance(ep_val, list)
+                        and all(
+                            isinstance(p, str) and p.strip() for p in ep_val
+                        )
+                    ):
+                        reasons.append(
+                            f"critiques[{i}].findings[{j}].evidencePaths must "
+                            "be an array of non-empty strings"
+                        )
                     # Set 069 S1: evidence-tier rule. An untagged finding is
                     # ASSERTED (ok); a REPRODUCED finding is valid only with a
                     # falsifier transcript (pristine replay + meta-oracle).

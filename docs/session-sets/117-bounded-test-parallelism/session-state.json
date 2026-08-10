@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "117-bounded-test-parallelism",
-  "status": "in-progress",
+  "status": "cancelled",
   "sessions": [
     {
       "number": 1,
@@ -36,5 +36,6 @@
       "orchestrator": null,
       "verificationVerdict": null
     }
-  ]
+  ],
+  "preCancelStatus": "in-progress"
 }

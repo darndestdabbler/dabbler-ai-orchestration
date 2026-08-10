@@ -55,6 +55,54 @@
       "dateTime": "2026-08-10T18:24:46.202475-04:00",
       "description": "Registered session 1 of set 119 (engine=copilot, provider=anthropic, model=claude-opus-5, effort=high); no decision-review-queue entries to triage; preload read.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "add-evidencepaths-to-the-finding-contract",
+      "dateTime": "2026-08-10T18:27:41.615424-04:00",
+      "description": "Adding evidencePaths to the finding contract on both surfaces (markdown parse + submit_verdict tool schema), the reviewer templates, and the two artifact schemas.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "add-evidencepaths-to-the-finding-contract",
+      "dateTime": "2026-08-10T18:31:51.324616-04:00",
+      "description": "evidencePaths added on both surfaces: tolerant Evidence-paths parse + normalize_evidence_path in verification.py; Finding.evidence_paths + ungated submit_verdict schema field + _coerce_evidence_paths in pull_verifier.py; both reviewer templates ask for it; declared optional in docs/session-issues.schema.json and docs/path-aware-critique.schema.json with a matching pure-Python type check in path_aware_critique.py (L-066-1 parity); companion schema docs updated.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "operator-decision-journaled-this-is-the",
+      "dateTime": "2026-08-10T18:32:37.782615-04:00",
+      "description": "Operator attested in-session before any cap code was written, overriding the verification-reduction block. Journaled to decisions.jsonl with authority=human, rubric_line=verification-reduction, verification_effect=reduces, three options with consequences, the Set 116 S3 / 520-of-572 evidence, and the reversal path.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "implement-the-cap-at-the-one",
+      "dateTime": "2026-08-10T18:32:37.784628-04:00",
+      "description": "Implementing the doc-only cap in is_blocking_issue with the two L-112-1 falsifiers.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "implement-the-cap-at-the-one",
+      "dateTime": "2026-08-10T18:46:10.191612-04:00",
+      "description": "Doc-only cap implemented in is_blocking_issue (the one shared chokepoint) via is_doc_only_issue/is_documentation_path; classify_blocking gains doc_capped_issues + names the count in reason. 30 test functions in test_doc_only_cap.py (exactly the spec cap) including the L-112-1 falsifier pairs. TEMPLATE_ID bumped v7->v8 with a new pinned hash (the template edit is a deliberate revision, per the verification-integrity protocol). Workflow doc rule 2a and the router CHANGELOG record it. Targeted suites: 788 passed, 3 skipped.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-10T18:47:09.593085-04:00",
+      "description": "Code frozen; ai-assignment.md authored (Step 3.5). Starting the full pytest run of record.",
+      "status": "in-progress"
     }
   ]
 }

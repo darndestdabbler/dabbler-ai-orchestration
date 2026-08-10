@@ -162,6 +162,14 @@ Begin with a one-line **VERDICT**: `VERIFIED` (no significant issues) or
     under NITS)
   - **Category:** correctness / contract-drift / completeness / false-confidence / other
   - **Location:** the exact `file:line` (or file + symbol)
+  - **Evidence paths:** MANDATORY on Critical/Major — the repo-relative paths you
+    actually opened that prove it. When you submit through the `submit_verdict`
+    tool, put them in the finding's `evidencePaths` array; in prose, list them
+    comma-separated on an `Evidence paths:` line. This is the finding's
+    **provenance** and it is read mechanically: a finding whose evidence is
+    **entirely** documentation prose (`.md` / `.rst` / `.txt`) is recorded as a
+    Minor nit and does not open another review round, so if the defect is in
+    code, name the code file.
   - **Description:** the three-part "so what?" — the **violation** (quote it), the
     concrete **impact** (which merge decision it changes), the **evidence** you read
     that proves it — and the concrete fix.

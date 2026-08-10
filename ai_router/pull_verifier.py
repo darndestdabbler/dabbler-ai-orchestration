@@ -79,10 +79,39 @@ except ImportError:  # pragma: no cover - test/bare context
     )
 
 
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .verification import normalize_evidence_path
+except ImportError:  # pragma: no cover - test/bare context
+    from verification import normalize_evidence_path  # type: ignore
+
+
 # ---------------------------------------------------------------------------
 # Result / trace data model (the stable surface S2 bindings + S3 harness bind
 # to). See tool-contract.md sections 4-5.
 # ---------------------------------------------------------------------------
+
+
+def _coerce_evidence_paths(raw) -> tuple:
+    """Normalize a ``submit_verdict`` finding's ``evidencePaths`` value.
+
+    Set 119 S1. The tool schema asks for an array of strings, but a model
+    that answers with a single string, or with decorated entries, must not
+    lose its provenance to a type quibble — the field is evidence, and the
+    parser's job is to read it, not to grade it. Anything unusable
+    normalizes away, which leaves the finding with no paths and therefore
+    blocking as before (the safe direction).
+    """
+    if raw is None:
+        return ()
+    items = raw if isinstance(raw, (list, tuple)) else [raw]
+    out: list = []
+    for item in items:
+        if not isinstance(item, str):
+            continue
+        path = normalize_evidence_path(item)
+        if path and path not in out:
+            out.append(path)
+    return tuple(out)
 
 
 @dataclass(frozen=True)
@@ -97,6 +126,14 @@ class Finding:
     serialized as the on-disk ``evidenceTier`` key the Set 066 artifact validator
     (S1-extended) checks, and ``transcript`` is the falsifier transcript a
     REPRODUCED finding must carry.
+
+    Set 119 S1 adds ``evidence_paths`` — the repo-relative paths the critic
+    actually read, serialized as ``evidencePaths``. It is the finding's
+    **provenance**, required by the tool schema's description on any
+    Critical/Major finding, and it is what
+    :func:`ai_router.verification.is_doc_only_issue` reads: doc-ness is derived
+    from the paths, never self-declared. Absent or empty, it changes nothing —
+    a blocking finding with no paths keeps its declared severity.
     """
 
     description: str
@@ -104,6 +141,7 @@ class Finding:
     category: str = ""
     evidence_tier: str = ""  # "" => default ASSERTED (no on-disk field)
     transcript: Optional[dict] = None  # falsifier transcript for REPRODUCED
+    evidence_paths: tuple = ()  # Set 119: "" => no on-disk evidencePaths key
 
     def to_dict(self) -> dict:
         out: dict = {"description": self.description}
@@ -117,6 +155,8 @@ class Finding:
             out["evidenceTier"] = self.evidence_tier
         if self.transcript is not None:
             out["transcript"] = self.transcript
+        if self.evidence_paths:
+            out["evidencePaths"] = list(self.evidence_paths)
         return out
 
 
@@ -1399,14 +1439,29 @@ def _verdict_tool_schema(
     added when ANY lane is active. The orchestrator confers REPRODUCED only by
     replaying a TRUSTED probe (command/template) on a fresh checkout (you cannot
     self-grant it), and an authored-probe-backed finding is capped at HYPOTHESIS.
-    When ALL flags are False the schema is byte-for-byte the Set 067/068 read-only
-    shape, so the no-config agent-facing surface is unchanged (GPT-5.4 S2
-    verification, finding 2).
+    When ALL flags are False the schema is the read-only shape: the Set 067/068
+    fields plus the ungated ``evidencePaths`` provenance field Set 119 S1 made
+    core contract on every configuration.
     """
     finding_props: dict = {
         "description": {"type": "string"},
         "severity": {"type": "string"},
         "category": {"type": "string"},
+        # Set 119 S1: the finding's provenance. Ungated (unlike the evidence
+        # lanes below) — it is core contract on every configuration, so the
+        # read-only shape carries it too.
+        "evidencePaths": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": (
+                "REQUIRED on any finding you grade Critical or Major: the "
+                "repo-relative paths you actually read that prove it (e.g. "
+                "['ai_router/verification.py', 'docs/quick-start.md']). One "
+                "entry per file; a ':<line>' suffix is allowed. Name only "
+                "files you opened - this is the finding's provenance, not a "
+                "guess, and it is read mechanically."
+            ),
+        },
     }
     if allow_evidence or allow_template_evidence or allow_authored_evidence:
         # The agent may PROPOSE an evidence tier; it is advisory only. The
@@ -1520,6 +1575,7 @@ def _parse_verdict(provider: str, model: str, payload: dict) -> PullCritique:
                 description=desc,
                 severity=sev if isinstance(sev, str) else str(sev),
                 category=cat if isinstance(cat, str) else str(cat),
+                evidence_paths=_coerce_evidence_paths(f.get("evidencePaths")),
             )
         )
     # Content non-triviality: the Set 066 per-entry rule (validate_path_aware_

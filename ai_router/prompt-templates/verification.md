@@ -91,6 +91,7 @@ If ISSUES FOUND, list each issue:
 - **Issue N:** [description]
   - **Category:** Correctness / Completeness / False Positive
   - **Severity:** Critical / Major (a blocking Issue is never Minor — Minor goes under NITS)
+  - **Evidence paths:** MANDATORY — the repo-relative paths you actually opened that prove this Issue, comma-separated (e.g. `ai_router/verification.py, docs/quick-start.md`). A `:<line>` suffix is fine. Name only files you read: this is the finding's **provenance**, it is read mechanically, and a finding that cannot name one is a nit. An Issue whose evidence is **entirely** documentation prose (`.md` / `.rst` / `.txt`) is recorded as a Minor nit and does not open another review round — so if the defect is in code, name the code file.
   - **Failure scenario:** MANDATORY — the concrete scenario in which the consequence materializes for a real user of the deliverable, plus why that scenario is **probable rather than merely possible**. An Issue whose failure scenario you cannot state plausibly is Minor by definition and belongs under NITS, not here.
   - **Acceptance criterion:** MANDATORY — the **closed question** that settles whether this finding is fixed, so a later reviewer asks "does it pass?" instead of "is it right yet?". See **Writing an acceptance criterion** below for the two allowed forms and the rules a command must obey.
   - **Acceptance expectation:** executable criteria only — `exit 0` (or `exit <n>`), optionally followed by `output contains "<substring>"`. Omit this line entirely for a JUDGMENT criterion.

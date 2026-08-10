@@ -1943,6 +1943,30 @@ loop (Step 7's *"Re-run verification (max 2 retries)"*).
    merge-impact anchor in the templates (Major = *would change a reasonable
    reviewer's merge decision*) plus the plausible-path-to-harm escalation are what
    keep the demotion honest.
+2a. **The doc-only cap (Set 119 S1) — the one exception, and it is
+   path-derived.** Every finding now carries `evidencePaths`: the
+   repo-relative paths the verifier actually read, mandatory in the
+   templates on a Critical/Major finding, parsed from the `Evidence
+   paths:` line on the push surface and the `evidencePaths` array of
+   `submit_verdict` on the pull surface. A finding whose cited paths are
+   **all documentation prose** (`.md` / `.markdown` / `.rst` / `.txt`) is
+   recorded at **Minor** and opens **no** round — `is_blocking_issue`
+   applies it at the one shared chokepoint, so both surfaces inherit it
+   identically, and `classify_blocking` reports the demoted findings in
+   `doc_capped_issues` and names the count in its `reason`. This is an
+   **operator-attested verification reduction** (Set 119 S1
+   `decisions.jsonl`, `authority=human` / `rubric_line=verification-reduction`),
+   authorized on the measurement that 520 of 572 findings in this repo's
+   history are Major and that Set 116 S3 spent 13 routed calls / $4.75 on
+   rounds whose every Critical/Major concerned the wording of one markdown
+   doc — two of the three *created by fixing the previous one*. Three
+   properties keep it from being rule 2 running in reverse: **doc-ness is
+   derived from paths, never self-declared** (a verifier's `category` or
+   prose claim changes nothing); **absence is not doc-ness** (a finding
+   citing no paths is unchanged — unknown still blocks, so an uncited
+   blocking finding is not cheaper); and **behaviour-bearing markdown is
+   not documentation** (`ai_router/prompt-templates/**` are the verifier's
+   own instructions, so a defect there keeps its declared severity).
 3. **A round continues only on new or unresolved Critical/Major** — tracked by
    the **cross-round issue ledger**, which is machinery since Set 096:
    `verify_session` auto-assembles it from prior rounds' immutable

@@ -312,6 +312,59 @@ def _parse_acceptance(block: str) -> Optional[dict]:
     return acceptance
 
 
+def normalize_evidence_path(raw: str) -> str:
+    """Normalize one verifier-written path to a repo-relative comparison form.
+
+    Set 119 S1. Verifiers write paths the way they read them, so the same
+    file arrives as ``ai_router/verification.py``, ``.\\ai_router\\verification.py``
+    or ``ai_router/verification.py:613`` from one round to the next. This
+    strips the decoration a reviewer adds (markdown emphasis, backticks,
+    quotes, surrounding brackets, a trailing ``:<line>`` / ``:<line>-<line>``
+    reference or ``#anchor``) and normalizes separators, returning ``""``
+    for anything that is not a path at all.
+
+    Mis-normalization is deliberately biased toward blocking: an entry this
+    function cannot recognize does not match the documentation predicate,
+    so the finding keeps its declared severity (see :func:`is_doc_only_issue`).
+    """
+    text = str(raw or "")
+    # Separators first, so decoration stripping below sees one alphabet and a
+    # trailing markdown backslash cannot survive as a path separator.
+    text = text.replace("\\", "/")
+    text = re.sub(r'/{2,}', '/', text)
+    text = text.strip().strip("`'\"*_[]()<>,;").strip()
+    if not text:
+        return ""
+    # A ``file.py:613`` / ``file.py:613-620`` line reference, or a
+    # ``doc.md#anchor`` fragment, names the same file.
+    text = re.sub(r'[:#][0-9]+(?:-[0-9]+)?$', '', text)
+    text = re.sub(r'#.*$', '', text)
+    text = text.strip().strip("`'\"*_,;.").strip()
+    while text.startswith("./"):
+        text = text[2:]
+    text = text.lstrip("/")
+    if len(text) > 1:
+        text = text.rstrip("/")
+    if not text or text in (".", ".."):
+        return ""
+    return text
+
+
+def _parse_evidence_paths(text: str) -> list:
+    """Parse an ``Evidence paths:`` line's value into normalized paths.
+
+    Separators are commas, semicolons and whitespace — the three shapes a
+    reviewer actually writes (``a.py, b.md``; ``a.py b.md``). Entries that
+    normalize to nothing are dropped rather than kept as noise.
+    """
+    out: list = []
+    for chunk in re.split(r'[,;\s]+', str(text or "")):
+        path = normalize_evidence_path(chunk)
+        if path and path not in out:
+            out.append(path)
+    return out
+
+
 def _parse_issue_blocks(body: str) -> list:
     """Parse explicit ``Issue N:`` blocks from a header/NITS-stripped body.
 
@@ -360,6 +413,18 @@ def _parse_issue_blocks(body: str) -> list:
             scenario = fs_match.group(1).strip().strip("*").strip()
             if scenario:
                 issue["failureScenario"] = scenario
+        # Evidence paths (Set 119 S1): the repo-relative paths the verifier
+        # actually looked at. MANDATORY on a Critical/Major issue per the
+        # template, but parsed TOLERANTLY here: an absent line leaves the key
+        # off, and a finding with no paths keeps its declared severity (the
+        # anti-laundering default is unchanged — see is_doc_only_issue).
+        ep_match = re.search(
+            r'Evidence[\s*_-]*paths?[\s*:.\-_]*([^\n]+)', match, re.IGNORECASE
+        )
+        if ep_match:
+            paths = _parse_evidence_paths(ep_match.group(1))
+            if paths:
+                issue["evidencePaths"] = paths
         # Acceptance criterion (Set 111 S2): the closed question that
         # settles the finding. Tolerant, optional; the harness — never
         # this parser — decides whether it discriminates.
@@ -604,6 +669,93 @@ BLOCKING_SEVERITIES = frozenset({"critical", "major"})
 # The only severity that is recorded but never loop-opening on its own.
 NONBLOCKING_SEVERITIES = frozenset({"minor"})
 
+# ---------------------------------------------------------------------------
+# Set 119 S1: the doc-only severity cap.
+#
+# Operator-attested verification reduction (decisions.jsonl, Set 119 S1,
+# authority=human / rubric_line=verification-reduction). Measured: Set 116 S3
+# spent 13 routed calls and $4.75 on a session whose code was clean at round 1
+# and stayed clean; every Critical/Major after round 1 concerned the WORDING of
+# a markdown doc, and two of the three were created by fixing the previous one.
+# Across 572 findings in this repo's history, 520 (91%) are Major -- a scale on
+# which 91% of findings block is not a scale.
+#
+# The rule: a finding that NAMES its evidence, and whose named evidence is
+# ENTIRELY documentation prose, is recorded at Minor and opens no round.
+#
+# Three properties keep this from being the laundering vector in reverse:
+#
+#  1. **Doc-ness is derived from paths, never self-declared.** The only input is
+#     ``evidencePaths``. A verifier asserting "this is only a doc issue" in its
+#     description or ``category`` changes nothing -- ``category`` is free text
+#     that reads "docs" twice across all 572 findings anyway.
+#  2. **Absence is not doc-ness.** A finding with no ``evidencePaths`` is
+#     UNCHANGED: Critical/Major/unknown all still block. The anti-laundering
+#     default ("unknown severity blocks") is untouched, and so is the incentive
+#     to cite evidence -- an uncited blocking finding is not cheaper.
+#  3. **Behaviour-bearing markdown is not documentation.** The reviewer prompt
+#     templates ARE the verifier's instructions: a defect in one changes what
+#     every routed call does, so it is code that happens to be spelled in
+#     markdown and it keeps its declared severity.
+# ---------------------------------------------------------------------------
+
+# File extensions that make a path documentation PROSE. Deliberately extension-
+# based and not directory-based: ``docs/`` also holds machine contracts
+# (``docs/session-issues.schema.json``, the disposition schema) whose defects are
+# real defects, and a schema is not prose because of where it lives.
+DOC_EVIDENCE_SUFFIXES = frozenset({".md", ".markdown", ".rst", ".txt"})
+
+# Path prefixes whose markdown is BEHAVIOUR, not prose. A finding citing only
+# these keeps its declared severity. See property 3 above.
+BEHAVIOURAL_MARKDOWN_PREFIXES = ("ai_router/prompt-templates/",)
+
+
+def is_documentation_path(path: str) -> bool:
+    """Whether one evidence path is documentation prose.
+
+    Extension-based (see :data:`DOC_EVIDENCE_SUFFIXES`), minus the
+    behaviour-bearing markdown in :data:`BEHAVIOURAL_MARKDOWN_PREFIXES`.
+    Anything unrecognized -- an empty string, a bare prose phrase, a path this
+    function cannot normalize -- is **not** documentation, which is the safe
+    direction: it leaves the finding blocking.
+    """
+    normalized = normalize_evidence_path(path)
+    if not normalized:
+        return False
+    lowered = normalized.lower()
+    if lowered.startswith(BEHAVIOURAL_MARKDOWN_PREFIXES):
+        return False
+    dot = lowered.rfind(".")
+    if dot <= lowered.rfind("/"):
+        return False  # no extension in the final segment
+    return lowered[dot:] in DOC_EVIDENCE_SUFFIXES
+
+
+def is_doc_only_issue(issue: dict) -> bool:
+    """Whether a finding's cited evidence is ENTIRELY documentation prose.
+
+    True only when the finding names at least one evidence path and **every**
+    named path is documentation (:func:`is_documentation_path`). A finding with
+    no ``evidencePaths``, or one that names a single non-doc path alongside any
+    number of docs, is False -- so a mixed doc-and-code finding keeps its
+    declared severity and still opens a round.
+    """
+    raw = (issue or {}).get("evidencePaths")
+    if isinstance(raw, str):
+        raw = [raw]
+    if not isinstance(raw, (list, tuple)) or not raw:
+        return False
+    seen_any = False
+    for entry in raw:
+        if not isinstance(entry, str):
+            return False
+        if not normalize_evidence_path(entry):
+            continue  # decoration that normalized away is not evidence
+        seen_any = True
+        if not is_documentation_path(entry):
+            return False
+    return seen_any
+
 
 def _severity_of(issue: dict) -> str:
     """The lower-cased severity of a parsed issue ('' when missing)."""
@@ -620,7 +772,17 @@ def is_blocking_issue(issue: dict) -> bool:
     Major — or any unknown/missing severity (a real defect must never be
     laundered into a nit by an absent label) — is blocking; only an explicit
     Minor is non-blocking.
+
+    Set 119 S1 adds the one exception, and it is the operator-attested doc-only
+    cap: a finding whose cited ``evidencePaths`` are **all** documentation prose
+    records at Minor and does not open a round. It is applied here, at the one
+    shared chokepoint, so both verification surfaces inherit it identically —
+    and it reads ``evidencePaths`` alone, so it can never be self-declared. The
+    unknown-severity default above is unchanged: a finding that cites nothing
+    still blocks.
     """
+    if is_doc_only_issue(issue):
+        return False
     return _severity_of(issue) not in NONBLOCKING_SEVERITIES
 
 
@@ -643,6 +805,9 @@ def is_blocking_verdict(verdict: str, issues: list) -> bool:
     * any finding whose severity is unknown /
       missing / unrecognised               -> **blocking** (a real defect must not
       be laundered into a nit by an absent label).
+    * a finding whose cited ``evidencePaths``
+      are **all** documentation prose      -> non-blocking (Set 119 S1, the
+      operator-attested doc-only cap; see :func:`is_blocking_issue`).
     * findings present, **all** Minor      -> non-blocking (the VERIFIED-with-nits
       and the Minor-only-ISSUES_FOUND shapes both land here).
     * **no** findings + ``VERIFIED``       -> non-blocking.
@@ -680,12 +845,19 @@ class BlockingClassification:
         blocking_issues: issues that justify a round (Critical/Major or
             unknown-severity in a non-VERIFIED result).
         nit_issues: issues recorded as Minor (non-blocking on their own).
+            Includes the doc-only-capped findings below — they are nits now.
+        doc_capped_issues: the subset of ``nit_issues`` that would have blocked
+            on their declared severity and were capped at Minor because every
+            path they cited is documentation prose (Set 119 S1). Recorded
+            separately so the cap is **auditable**: a reader can see which
+            findings it fired on without re-deriving it.
         reason: a short human-readable explanation, for the session log.
     """
     blocking: bool
     blocking_issues: list = field(default_factory=list)
     nit_issues: list = field(default_factory=list)
     reason: str = ""
+    doc_capped_issues: list = field(default_factory=list)
 
 
 def classify_blocking(verdict: str, issues: list) -> BlockingClassification:
@@ -694,30 +866,40 @@ def classify_blocking(verdict: str, issues: list) -> BlockingClassification:
     Same decision as :func:`is_blocking_verdict`, but returns the partition the
     loop discipline and the session log want: which findings opened the round and
     which were recorded as non-blocking nits. The ``reason`` mirrors the rule that
-    fired so a skipped re-verify round is an auditable decision.
+    fired so a skipped re-verify round is an auditable decision — including the
+    Set 119 doc-only cap, which is named explicitly whenever it fires.
     """
     issues = issues or []
     # Partition by severity FIRST (severity-derived, same as is_blocking_verdict).
-    blocking_issues, nit_issues = [], []
+    blocking_issues, nit_issues, doc_capped = [], [], []
     for issue in issues:
         if is_blocking_issue(issue):
             blocking_issues.append(issue)
-        else:
-            nit_issues.append(issue)
+            continue
+        nit_issues.append(issue)
+        # A finding the cap demoted: it declared a blocking severity and was
+        # kept out of the loop solely because every path it cited is docs.
+        if _severity_of(issue) not in NONBLOCKING_SEVERITIES:
+            doc_capped.append(issue)
+    capped_note = (
+        f" ({len(doc_capped)} doc-only capped at Minor)" if doc_capped else ""
+    )
     if blocking_issues:
         return BlockingClassification(
             blocking=True,
             blocking_issues=blocking_issues,
             nit_issues=nit_issues,
+            doc_capped_issues=doc_capped,
             reason=f"{len(blocking_issues)} Critical/Major (or unknown-severity) "
-                   f"finding(s) -> blocking",
+                   f"finding(s) -> blocking{capped_note}",
         )
     if nit_issues:
         return BlockingClassification(
             blocking=False,
             nit_issues=nit_issues,
+            doc_capped_issues=doc_capped,
             reason=f"all {len(nit_issues)} finding(s) Minor -> non-blocking "
-                   f"(effectively VERIFIED for the loop)",
+                   f"(effectively VERIFIED for the loop){capped_note}",
         )
     # No findings parsed: the verdict token resolves it.
     if str(verdict or "").strip().upper().startswith("VERIFIED"):

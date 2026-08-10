@@ -71,7 +71,7 @@ STAMP_SOURCES = (STAMP_SOURCE_VERIFY_SESSION, STAMP_SOURCE_CLOSE_BACKSTOP)
 # template bumps this constant in the same change — the PINNED hash
 # registry below makes an unbumped edit fail closed rather than pass
 # accidentally.
-TEMPLATE_ID = "session-verification-v7"
+TEMPLATE_ID = "session-verification-v8"
 
 # The immutable id -> normalized-hash registry (I-084-S2-2): each
 # version id pins exactly one normalized content hash, recorded here at
@@ -133,6 +133,16 @@ TEMPLATE_HASHES = {
     # path. v7 is the active id.
     "session-verification-v7": (
         "f3d3a418c34faff47c7960b5801c6b1248fd237bbb7f6c870ff8ab4123779fc3"
+    ),
+    # Set 119 S1: minted when the per-Issue "Evidence paths" line became
+    # mandatory on a Critical/Major Issue. The line is the finding's
+    # PROVENANCE, and it is the only input to the operator-attested
+    # doc-only severity cap (a finding whose cited paths are all
+    # documentation prose records at Minor and opens no round), so a
+    # verifier that is not asked for it cannot be capped by it. v8 is the
+    # active id.
+    "session-verification-v8": (
+        "d1c6e2d2f6db38a0361e6fac35c3600bd7b0a019ac8072bac6d5f20db4bc5af2"
     ),
 }
 

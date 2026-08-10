@@ -171,6 +171,7 @@ object).
 | `category` | string | no | critic (loose) |
 | `evidenceTier` | string | no | **orchestrator** (`REPRODUCED` \| `ASSERTED` \| `HYPOTHESIS`) |
 | `transcript` | object | conditional | orchestrator (required when `evidenceTier` is `REPRODUCED`) |
+| `evidencePaths` | array of string | no | critic (Set 119 S1). The repo-relative paths the critic actually read that prove the finding — its **provenance**, taken from the `submit_verdict` tool's `evidencePaths` array and normalized. The tool description makes it mandatory on a Critical/Major finding; the schema keeps it optional because its **absence must not launder a blocking finding**. It is the only input to the doc-only severity cap (`ai_router.verification.is_blocking_issue`): a finding whose paths are *all* documentation prose records at Minor and opens no round. |
 
 The Set 069 **execution-evidence** fields are additive and optional — every
 pre-069 artifact (no evidence tags) stays valid. `evidenceTier` is applied by

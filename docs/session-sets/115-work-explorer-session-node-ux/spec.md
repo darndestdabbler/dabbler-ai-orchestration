@@ -250,7 +250,15 @@ verification *begins*.
 4. **Ship it in `ai_router/session_checklist.py` first**, so consumers who
    install from PyPI and have no extension get it, then render the same
    model in the tree. Same reasoning as every other decision in this set:
-   the CLI is the portable surface.
+   the CLI is the portable surface. **While in the step rows, fix the
+   in-flight glyph**: `stepDescriptor` derives its icon from `row.status`
+   alone, so the row the session is actually on shows `<- here` in the
+   description and **no in-progress icon** — a logged step reads `complete`
+   (it is recorded after it happens) and the planned row ahead reads
+   `not-started`. Nothing is missing but the wiring: `glyphStatusOf`
+   already maps `in-progress`, and `ICON_FILES["in-progress"]` already
+   resolves `in-progress.svg`, which session rows use. Let `isHere` reach
+   the icon.
 5. **Walk it, then close.** This set's UAT is the guided look across all
    four sessions — titles, left-click, both menu actions, the empty states,
    and a checklist that still shows work outstanding when work is
@@ -261,7 +269,7 @@ verification *begins*.
 **Creates:** the lifecycle-aware checklist model, the CLI renderer, the tree rendering, this set's walk, `change-log.md`
 **Touches:** `ai_router/session_checklist.py`, `tools/dabbler-ai-orchestration/src/providers/`, Layer 3 specs
 **Ends with:** a fully-ticked checklist means the session is actually finished — and while close-out is running, the operator can see which phase it is in.
-**Progress keys:** `lifecycleRows`, `derivedFromLedgers`, `cliFirst`, `uatWalk`, `changeLog`
+**Progress keys:** `lifecycleRows`, `derivedFromLedgers`, `cliFirst`, `inFlightGlyph`, `uatWalk`, `changeLog`
 
 
 ---

@@ -100,6 +100,14 @@
       "dateTime": "2026-08-09T20:00:49.883801-04:00",
       "description": "Four verification rounds; 5 of 6 blocking findings fixed, 1 adjudicated by the operator. Full pytest 3693 passed, Layer 3 33 passed. Disposition authored.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "waiver-escape",
+      "dateTime": "2026-08-10T02:50:35.344469-04:00",
+      "description": "Dogfood refused this session: added the operator-attested waiver escape (disposition.checklist) so a missed post window is a recorded decision, not a --force.",
+      "status": "complete"
     }
   ]
 }

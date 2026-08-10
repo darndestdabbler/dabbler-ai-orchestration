@@ -1984,8 +1984,18 @@ def check_checklist_posted(
     session's transitions at all and are dropped before any of that: a
     session cannot owe a post for a moment that preceded it.
 
-    Two deliberate limits, stated rather than hidden:
+    A missed window cannot be re-entered — you cannot post into the
+    past — so the escape is an **operator-attested waiver**, the same
+    shape ``check_uat_walk_recorded`` uses: ``disposition.checklist``
+    with ``status: "waived"`` and a non-empty ``attestation``. Found by
+    this gate's own dogfood, which refused the session that shipped it:
+    without a waiver the only exit is ``--force``, which bypasses every
+    *other* gate too, so an unrecoverable check makes the close-out
+    weaker overall. A waiver keeps the omission on the record with a
+    name against it, which is the whole point — laundering it silently
+    is what the positional windows exist to prevent.
 
+    Two deliberate limits, stated rather than hidden:
     * **A post proves a render, not a reader.** The gate can be satisfied
       mechanically. That is an acceptable floor: it converts an invisible
       omission into a visible one, which is strictly what it claims.
@@ -2106,13 +2116,34 @@ def check_checklist_posted(
 
     if not missing:
         return True, ""
+
+    # A missed window cannot be re-entered, so the only honest exit is an
+    # operator-attested waiver that leaves the omission on the record.
+    waiver = getattr(disposition, "checklist", None) if disposition else None
+    if isinstance(waiver, dict) and waiver.get("status") == "waived":
+        attestation = waiver.get("attestation")
+        if not isinstance(attestation, str) or attestation.strip() == "":
+            return (
+                False,
+                "disposition.checklist.status is 'waived' but "
+                "attestation is empty; an unattested waiver records "
+                "nobody's decision. State what the operator actually "
+                "said, and name the missed transitions: "
+                f"{'; '.join(missing)}",
+            )
+        return True, ""
+
     return (
         False,
         f"session {current} owes a step-checklist post at "
         f"{len(missing)} transition(s) that left a record and no post: "
         f"{'; '.join(missing)}. Post the checklist ({command}) and re-run "
         f"close — a post recorded now covers the last transition. Each "
-        f"transition needs its own post, before the next one happens.",
+        f"transition needs its own post, before the next one happens. A "
+        f"window already passed cannot be re-entered: if one was missed, "
+        f"the exit is an operator-attested waiver "
+        f"(disposition.checklist = {{'status': 'waived', 'attestation': "
+        f"'...'}}), never a silent retry.",
     )
 
 

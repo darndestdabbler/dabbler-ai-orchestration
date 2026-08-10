@@ -95,6 +95,12 @@ UAT_STATUS_WALKED = "walked"
 UAT_STATUS_WAIVED = "waived"
 UAT_STATUSES = (UAT_STATUS_WALKED, UAT_STATUS_WAIVED)
 
+# Set 114 S1: the only legal value of ``checklist.status``. There is no
+# "posted" counterpart — a session that posted on cadence needs no block
+# at all, because the ledger already proves it. The block exists solely
+# to put a name against an omission.
+CHECKLIST_STATUS_WAIVED = "waived"
+
 
 @dataclass
 class Disposition:
@@ -150,6 +156,14 @@ class Disposition:
       declare no UAT, so older readers never see an unexpected key. The
       ``uat_walk_recorded`` close gate reads it — a ``requiresUAT``
       session with no block does not close.
+    - ``checklist``: Set 114 S1 — the operator-attested waiver for a
+      step-checklist post that was missed. A mapping with
+      ``status: "waived"`` and a non-empty ``attestation``. A missed
+      post window cannot be re-entered (you cannot post into the past),
+      so without this the only exit from ``checklist_posted`` is
+      ``--force``, which bypasses every *other* gate too. Omit-null:
+      absent on the overwhelming majority of sessions, which simply
+      post on cadence.
     """
 
     status: str
@@ -162,6 +176,7 @@ class Disposition:
     verification_verdict: Optional[str] = None
     lessons_cited: List[str] = field(default_factory=list)
     uat: Optional[dict] = None
+    checklist: Optional[dict] = None
 
 
 def _disposition_path(session_set_dir: str) -> str:
@@ -249,6 +264,9 @@ def disposition_to_dict(disposition: Disposition) -> dict:
     # Omit-null (Set 111 S4): absent on sets that declare no UAT.
     if disposition.uat is not None:
         d["uat"] = dict(disposition.uat)
+    # Omit-null (Set 114 S1): absent unless a missed post was waived.
+    if disposition.checklist is not None:
+        d["checklist"] = dict(disposition.checklist)
     return d
 
 
@@ -271,6 +289,11 @@ def disposition_from_dict(data: dict) -> Disposition:
         verification_verdict=data.get("verification_verdict"),
         lessons_cited=list(data.get("lessons_cited") or []),
         uat=data.get("uat") if isinstance(data.get("uat"), dict) else None,
+        checklist=(
+            data.get("checklist")
+            if isinstance(data.get("checklist"), dict)
+            else None
+        ),
     )
 
 
@@ -532,5 +555,33 @@ def validate_disposition(
                         "uat.walkArtifact must name the walk file when "
                         "uat.status == 'walked'"
                     )
+
+    # Set 114 S1: the checklist-post waiver. Shape-only, for the same
+    # reason as the UAT block above — a malformed block that silently
+    # parsed as "no waiver" would turn a typo into a confusing refusal,
+    # and one that parsed as a waiver without an attestation would turn
+    # a typo into a bypass.
+    checklist = data.get("checklist")
+    if checklist is not None:
+        if not isinstance(checklist, dict):
+            errors.append(
+                f"checklist must be a mapping or null "
+                f"(got {type(checklist).__name__})"
+            )
+        else:
+            if checklist.get("status") != CHECKLIST_STATUS_WAIVED:
+                errors.append(
+                    f"checklist.status must be "
+                    f"{CHECKLIST_STATUS_WAIVED!r} (got "
+                    f"{checklist.get('status')!r}) — the block exists "
+                    f"only to record a waived post"
+                )
+            attestation = checklist.get("attestation")
+            if not isinstance(attestation, str) or attestation.strip() == "":
+                errors.append(
+                    "checklist.attestation must be a non-empty string — "
+                    "a waived post is only auditable if it records what "
+                    "the operator actually said"
+                )
 
     return (len(errors) == 0), errors

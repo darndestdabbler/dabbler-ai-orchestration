@@ -873,6 +873,32 @@ Three limits worth stating plainly:
   refused outright. Records older than the session's own `startedAt` are
   not its transitions at all.
 
+### When a post was missed
+
+You cannot post into the past, so a window that closed cannot be
+re-entered. The exit is an **operator-attested waiver**, the same shape
+the UAT gate uses:
+
+```json
+"checklist": {
+  "status": "waived",
+  "attestation": "Operator, <date>: missed the post after <transition>; waived with the omission on the record."
+}
+```
+
+An unattested or blank waiver is refused by both the gate and the
+disposition validator, and a waiver never excuses a session that posted
+**nothing** — that is still a flat refusal.
+
+This escape exists because Set 114 S1's own dogfood refused the session
+that shipped the gate: two verification rounds went by without a post,
+and with no waiver the only remaining exit was `close_session --force`,
+which bypasses every *other* gate as well. A check whose sole remedy is
+`--force` makes the close-out weaker, not stronger. The waiver keeps the
+omission on the record with a name against it, which is the point —
+silently letting a late post cover it is what the positional windows
+exist to prevent.
+
 `--no-record` renders without recording, for scripted or repeated reads.
 It can only ever weaken the caller's own position at close, never
 strengthen it.

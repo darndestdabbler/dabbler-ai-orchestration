@@ -26,6 +26,7 @@ import pytest
 
 import gate_checks
 from ai_router import session_checklist as sc
+from disposition import Disposition
 
 
 BASE = datetime(2026, 8, 9, 12, 0, 0, tzinfo=timezone.utc)
@@ -655,6 +656,157 @@ class TestChecklistGateWiring:
         _, remediation = gate_checks.check_checklist_posted(set_dir, None)
         assert "-m ai_router.session_checklist" in remediation
         assert "--session-set-dir" in remediation
+
+
+class TestChecklistWaiver:
+    """A missed window cannot be re-entered, so the exit is attested.
+
+    Found by this gate's own dogfood: the session that shipped it was
+    refused, and without a waiver the only exit is ``--force``, which
+    bypasses every OTHER gate too.
+    """
+
+    def _missed(self, tmp_path):
+        set_dir = _make_set(
+            tmp_path,
+            entries=[
+                _entry(1, "register", "complete", at=_iso(1)),
+                _entry(2, "close", "complete", at=_iso(50)),
+            ],
+        )
+        _post(set_dir, _iso(0.5))
+        _rounds(set_dir, records=[_round(_iso(30))])  # ...no post after it
+        _post(set_dir, _iso(51))
+        return set_dir
+
+    def test_the_fixture_really_is_a_miss(self, tmp_path):
+        passed, remediation = gate_checks.check_checklist_posted(
+            self._missed(tmp_path), None
+        )
+        assert passed is False
+        assert "verification-round 1" in remediation
+        assert "operator-attested waiver" in remediation
+
+    def test_an_attested_waiver_closes_it(self, tmp_path):
+        disposition = Disposition(
+            status="completed",
+            summary="s",
+            verification_method="api",
+            checklist={
+                "status": "waived",
+                "attestation": "Operator, 2026-08-09: missed the post "
+                "after round 1; waived with the omission on the record.",
+            },
+        )
+        passed, remediation = gate_checks.check_checklist_posted(
+            self._missed(tmp_path), disposition
+        )
+        assert passed is True, remediation
+
+    def test_an_unattested_waiver_is_refused(self, tmp_path):
+        disposition = Disposition(
+            status="completed",
+            summary="s",
+            verification_method="api",
+            checklist={"status": "waived"},
+        )
+        passed, remediation = gate_checks.check_checklist_posted(
+            self._missed(tmp_path), disposition
+        )
+        assert passed is False
+        assert "attestation" in remediation
+        # The refusal still names what is being waived.
+        assert "verification-round 1" in remediation
+
+    def test_a_blank_attestation_is_refused(self, tmp_path):
+        disposition = Disposition(
+            status="completed",
+            summary="s",
+            verification_method="api",
+            checklist={"status": "waived", "attestation": "   "},
+        )
+        passed, _ = gate_checks.check_checklist_posted(
+            self._missed(tmp_path), disposition
+        )
+        assert passed is False
+
+    def test_a_waiver_does_not_excuse_never_posting_at_all(self, tmp_path):
+        """The waiver forgives a missed window, not the whole obligation."""
+        set_dir = _make_set(tmp_path)
+        disposition = Disposition(
+            status="completed",
+            summary="s",
+            verification_method="api",
+            checklist={"status": "waived", "attestation": "nothing to see"},
+        )
+        passed, remediation = gate_checks.check_checklist_posted(
+            set_dir, disposition
+        )
+        assert passed is False
+        assert "no step-checklist post" in remediation
+
+    def test_a_waiver_is_inert_when_nothing_was_missed(self, tmp_path):
+        set_dir = _make_set(
+            tmp_path,
+            entries=[_entry(1, "register", "complete", at=_iso(1))],
+        )
+        _post(set_dir, _iso(2))
+        disposition = Disposition(
+            status="completed",
+            summary="s",
+            verification_method="api",
+        )
+        passed, remediation = gate_checks.check_checklist_posted(
+            set_dir, disposition
+        )
+        assert passed is True, remediation
+
+    def test_the_waiver_round_trips_through_the_disposition_file(
+        self, tmp_path
+    ):
+        from disposition import (
+            disposition_from_dict,
+            disposition_to_dict,
+            validate_disposition,
+        )
+
+        block = {"status": "waived", "attestation": "operator said so"}
+        d = Disposition(
+            status="completed",
+            summary="s",
+            verification_method="api",
+            checklist=block,
+        )
+        as_dict = disposition_to_dict(d)
+        assert as_dict["checklist"] == block
+        assert disposition_from_dict(as_dict).checklist == block
+        ok, errors = validate_disposition(as_dict)
+        assert not [e for e in errors if "checklist" in e], errors
+
+    def test_an_unattested_waiver_fails_disposition_validation(self):
+        from disposition import disposition_to_dict, validate_disposition
+
+        as_dict = disposition_to_dict(
+            Disposition(
+                status="completed",
+                summary="s",
+                verification_method="api",
+                checklist={"status": "waived"},
+            )
+        )
+        ok, errors = validate_disposition(as_dict)
+        assert ok is False
+        assert any("checklist.attestation" in e for e in errors)
+
+    def test_omitted_when_absent(self):
+        from disposition import disposition_to_dict
+
+        as_dict = disposition_to_dict(
+            Disposition(
+                status="completed", summary="s", verification_method="api"
+            )
+        )
+        assert "checklist" not in as_dict
 
 
 class TestFreshnessAndEvidence:

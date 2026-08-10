@@ -47,5 +47,9 @@
   "lessons_cited": [
     "L-069-1",
     "L-112-1"
-  ]
+  ],
+  "checklist": {
+    "status": "waived",
+    "attestation": "Operator, 2026-08-10, education-mode brief via AskUserQuestion ('Attest the waiver, close now'). Session 2 missed ONE step-checklist post: the pytest run-of-record at 13:02:48, whose window closed 5.6 seconds later when the playwright run was recorded at 13:02:53; the post landed at 13:02:58, inside playwright’s window instead. Six posts were made across the session (start, pre-long-running-command, after each recorded run, after the verification round, pre-close). The miss exists because a round-1 verifier nit was FIXED: the original pytest record at 12:50:36 was correctly posted at 12:50:40, and re-recording that row to add the missing sessionNumber and correct a wrong test count (18 -> the true 15) moved its timestamp into an unposted window. Attested as immaterial: every fact the missed post would have shown is independently recorded in test-runs.jsonl (both runs, with durations and surface digests), s2-rounds.jsonl (both verification rounds, including the backstop’s own tagged source=close_session_backstop) and decisions.jsonl. All eight other gates passed and the session carries two independent VERIFIED verdicts with zero Critical/Major."
+  }
 }

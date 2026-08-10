@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The implementation weakens “one applicable full run” into “one designated run of record,” explicitly permitting unlimited earlier full-suite runs.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Failure scenario:** Orchestrators following the new canonical policy continue running full suites during implementation or verification, then run them again at Step 8. This is probable rather than hypothetical: the current session executed a preliminary full pytest run and recorded two further full pytest runs, while prior evidence documents 15 runs in one session. Repeated 4–12 minute suites materially defeat this set’s central latency objective.\n  - **Acceptance criterion:** JUDGMENT - The canonical workflow must distinguish targeted subsets from full-suite runs, require all expected code-changing verification and path-aware critique remediation before the single applicable full run, and must not relabel an earlier full-suite execution as “targeted testing with a wide net.”\n  - **Details:**\n    - **Violation:** The task requires: “Targeted tests during the loop; **one applicable full run after remediation, before close**,” and ends with “the expensive suite runs once.” Instead, `docs/planning/session-set-authoring-guide.md` says: “a full run taken mid-session to see where you stand is targeted testing with a wide net,” limiting only which run is recorded.\n    - **Impact:** This preserves the exact repeated-full-suite behavior the set was intended to eliminate. A reasonable reviewer should not merge a latency-policy change that canonically authorizes the measured source of latency under a different label.\n    - **Evidence:** `s3-conventions.md` records a preliminary full 3,848-test run. `test-runs.jsonl` then contains two Session 3 full pytest records at 14:15 and 14:44. The second was required because the path-aware critique occurred after the first Step 8 run and caused another change. The response therefore both documents and demonstrates that its ordering does not reliably produce one full run after the actual last change.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Orchestrators following the new canonical policy continue running full suites during implementation or verification, then run them again at Step 8. This is probable rather than hypothetical: the current session executed a preliminary full pytest run and recorded two further full pytest runs, while prior evidence documents 15 runs in one session. Repeated 4–12 minute suites materially defeat this set’s central latency objective.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The canonical workflow must distinguish targeted subsets from full-suite runs, require all expected code-changing verification and path-aware critique remediation before the single applicable full run, and must not relabel an earlier full-suite execution as “targeted testing with a wide net.”"
+      }
+    }
+  ]
+}

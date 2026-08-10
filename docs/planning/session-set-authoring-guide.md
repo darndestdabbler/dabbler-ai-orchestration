@@ -752,17 +752,29 @@ Canonizes the policy piloted in Set 110's operator notes. The waste
 pattern being eliminated is **invalidated runs**, not full runs.
 
 - **Every suite runs in two modes:** *targeted* — the specific tests
-  covering what you just changed, any time; and *full*. **Exactly one
-  full run per suite is the RUN OF RECORD, taken at Step 8, AFTER
-  remediation and before close.** Never start a full run you might
-  invalidate.
+  covering what you just changed, any time; and *full* — **exactly once
+  per suite per session, at Step 8, after every code-changing stage is
+  finished.** That single full run is the run of record. Never start a
+  full run you might invalidate.
 
-  The rule bounds the run of record, not your curiosity: a full run
-  taken mid-session to see where you stand is targeted testing with a
-  wide net, and it costs only its own wall clock. What it must not do
-  is get *recorded* as the run of record — because the next code change
-  invalidates it, and a recorded stale run is the Set 110 S3 defect this
-  whole mechanism exists to catch.
+  **A full suite run during the loop is not "targeted testing with a
+  wide net."** Set 116 S3 briefly wrote that it was, and the close
+  backstop refused the close over it, correctly: the wording relabels
+  the exact behaviour this policy exists to eliminate, and the session
+  that wrote it had by then run the full pytest suite **three times**.
+  If you want a signal mid-loop, run the tests that cover what you
+  changed — that is what *targeted* means, and it is seconds, not
+  minutes. The rule bounds the runs, not merely which one is recorded.
+- **Count the path-aware critique as a code-changing stage** (Set 116
+  S3, learned the expensive way). On a set whose `pathAwareCritique` is
+  `advisory` or `required`, the critique reads the repo and routinely
+  produces remediation — and it is produced *before* the set-terminal
+  close, which is *after* Step 8's run in the naive reading. Set 116 S3
+  ran its Step 8 pytest, then ran the critique, then had to re-run the
+  whole suite because the critique changed code. **On an armed set the
+  order is: verify → remediate → critique → remediate → full run →
+  close.** The full run goes last because "last" means last, not
+  "last among the stages you happened to think of."
 - **"After the last code change" means Step 8, not Step 5** (Set 116 S3).
   Step 7 remediation *is* a code change and verification finds something
   in nearly every session, so a full run at Step 5 is invalidated

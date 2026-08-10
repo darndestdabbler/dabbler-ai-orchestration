@@ -74,8 +74,8 @@ Run every router CLI through the workspace venv
     own the mechanics (file edits, shell, git, and mechanical single-file
     edits under ~50 lines).
 - **5. Build + test — targeted only.** Run the tests covering what you
-  just changed; log the result. **The full run belongs at Step 8**:
-  Step 7 remediation is a code change, so a full run here is
+  just changed; log the result. **Do not run a full suite here** — not
+  even "just to see": Step 7 remediation is a code change, so it is
   invalidated in nearly every session. Set 112 S3 obeyed the old
   ordering into 15 runs and 186 minutes (Set 116 S3).
 - **6. Verify (mandatory, every session).** Run the phased
@@ -95,16 +95,17 @@ Run every router CLI through the workspace venv
   fails pre-fix and passes post-fix), then `--phase remediation-review`
   on the fix delta. Bounds and no-resurrection: *Recovery and escalation*
   below.
-- **8. Close — full suite first.** After remediation, fully run **every
-  expensive suite whose `covers` surfaces this session touched** and
+- **8. Close — full suite first.** After **every** code-changing stage
+  (Step 7 remediation, and the path-aware critique's remediation when
+  armed — it lands before the set-terminal close), fully run every
+  expensive suite whose `covers` surfaces this session touched and
   record each (`python -m ai_router.run_of_record record --suite <s>
   --outcome passed --duration-seconds <n>`, required) or
   `test_run_fresh` refuses the close. All three layers are governed
-  (Set 116 S3); what you touched decides what you owe, and `covers` is
-  by path — docs under `ai_router/` owe pytest. Recording does **not**
-  stale the verification that just passed (Set 116 S2), which is what
-  makes this a last step and not a loop. Then author
-  `disposition.json`
+  (Set 116 S3); `covers` is by path, so docs under `ai_router/` owe
+  pytest. Recording does **not** stale the verification that just
+  passed (Set 116 S2) — which makes this a last step, not a loop. Then
+  author `disposition.json`
   (`verification_verdict` always; `next_orchestrator` on a mid-set
   completion; `uat` when the set declares `requiresUAT`), commit **and
   push**, run
@@ -114,10 +115,7 @@ Run every router CLI through the workspace venv
   final commit.
 - **9. Last session only (post-notify).** Run the reorganization review
   of `project-guidance.md` / `lessons-learned.md` — "no changes
-  recommended" is a valid outcome, skipping the review is not. If the
-  set's recorded `pathAwareCritique` policy is `advisory`/`required`,
-  the multi-provider path-aware critique stage runs before the
-  set-terminal close.
+  recommended" is a valid outcome, skipping the review is not.
 - **10. Stop.** Report verdict, deferred issues, cost, sessions
   remaining. One session per conversation; the human starts the next.
 

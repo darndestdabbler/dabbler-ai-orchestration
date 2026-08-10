@@ -23,9 +23,28 @@ each layer's runtime grows ~3× over the previous.
 python -m pytest -m e2e
 ```
 
-~30s. Covers `session-state.json`, the events ledger, the
+Covers `session-state.json`, the events ledger, the
 `completedSessions[]` array, and the change-log handoff. Data
-assertions belong here.
+assertions belong here. The `-m e2e` command shown above (8 tests)
+measured **113.13s serial / 64.32s under `-n auto`**, 2026-08-10 (Set
+116 S1) — raw pytest output for both runs, plus the exact tree identity
+(a content digest, not just a commit), is checked in at
+[`docs/session-sets/116-session-latency-and-verification-integrity/s1-e2e-parity-benchmark.txt`](docs/session-sets/116-session-latency-and-verification-integrity/s1-e2e-parity-benchmark.txt);
+`git log`/`git blame` on that file names the exact commit it shipped
+in. An earlier "~30s" figure here predated most of the current test
+matrix and was never re-measured as it grew.
+
+The **full** `ai_router/` suite (not just the `e2e`-marked subset)
+measured **~14 min serial / ~4 min under `-n auto`** at commit
+`9277e104` (3,774 tests then) — see
+[`docs/test-suite-benchmark-DENICI.txt`](docs/test-suite-benchmark-DENICI.txt)
+for that original raw benchmark. Set 116 S1 re-proved parity on the
+**current** tree (3,814 tests, after its own code changes) with a raw
+serial-vs-parallel transcript pair, both bound to the identical content
+digest as the e2e pair above — see
+[`docs/session-sets/116-session-latency-and-verification-integrity/s1-full-suite-parity-benchmark.txt`](docs/session-sets/116-session-latency-and-verification-integrity/s1-full-suite-parity-benchmark.txt).
+`pytest-xdist` (`-n auto`, wired into `pytest.ini`'s `addopts`) is the
+default for every `python -m pytest` invocation.
 
 ### Layer 2 — tree-provider harness
 
@@ -48,10 +67,16 @@ file-watcher logic belongs here.
 cd tools/dabbler-ai-orchestration && npm run test:playwright
 ```
 
-~90s for ~10 scenarios. Covers rendered-text invariants that the
-operator actually sees painted on screen (bucket counts, badges,
-group counts, "N/N", "in flight" annotations, signal badges,
-conflict pills).
+**~9.6 min median across 33 scenarios** (range ~7.5–19.7 min across the
+recorded runs in Sets 111–114's `test-runs.jsonl` files, 2026-08-07 to
+2026-08-10). An earlier "~90s for ~10 scenarios" figure predated most of
+the current spec matrix and was never re-measured as scenarios were
+added; `test-runs.jsonl`'s free-text `detail` field is where these
+numbers live today (Set 116 S1 adds a structured `durationSeconds`
+field so this stops being a grep-and-guess exercise). Covers
+rendered-text invariants that the operator actually sees painted on
+screen (bucket counts, badges, group counts, "N/N", "in flight"
+annotations, signal badges, conflict pills).
 
 > **Rebuild trap (Set 045 lesson):** `npm run test:playwright` is
 > wired to `npm run compile && npx tsc --outDir out && npx
@@ -75,6 +100,16 @@ cd tools/dabbler-ai-orchestration
 npx tsc --noEmit && npm run test:unit
 npm run test:playwright
 ```
+
+**Same-tree parity proof (Set 116 S1, 2026-08-10, round-4 remediation):**
+raw serial (`-n 0`) and parallel (`-n auto`, the default) output for
+the full suite is checked in at
+[`docs/session-sets/116-session-latency-and-verification-integrity/s1-full-suite-parity-benchmark.txt`](docs/session-sets/116-session-latency-and-verification-integrity/s1-full-suite-parity-benchmark.txt)
+— **3,814 passed / 5 skipped both ways**, 648.72s serial vs 244.20s
+parallel (2.66x), both bound to the identical `surfaceDigest`
+(`fb69075938a4...`) as the corresponding rows in
+[`test-runs.jsonl`](docs/session-sets/116-session-latency-and-verification-integrity/test-runs.jsonl),
+which is cryptographic proof of one tree, not just a commit claim.
 
 `guidance_report --check` is the ratcheting preload-ceiling gate: it
 fails if any required-reading file is over its per-file ceiling or the

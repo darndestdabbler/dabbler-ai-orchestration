@@ -319,7 +319,8 @@ class TestTestRunFreshGate:
             gate_checks, "_router_config_or_none", lambda: None
         )
         ror.record_run(
-            str(set_dir), suite, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), suite, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         assert gate_checks.check_test_run_fresh(
             str(set_dir), _disp(files_changed=["src/a.ts"])

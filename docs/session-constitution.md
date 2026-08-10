@@ -77,7 +77,8 @@ Run every router CLI through the workspace venv
   suites run targeted during the session and **fully once, after the
   last code change**; record that run
   (`python -m ai_router.run_of_record record --suite <s> --outcome
-  passed`) or the `test_run_fresh` close gate refuses the close.
+  passed --duration-seconds <n>`, required) or the `test_run_fresh`
+  close gate refuses the close.
 - **6. Verify (mandatory, every session).** Run the phased
   loop: `python -m ai_router.verify_session --phase discovery` for the
   set (fan-out sized by config; all severities). It routes the evidence

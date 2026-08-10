@@ -32,6 +32,12 @@ dependencies = [
 [project.optional-dependencies]
 tests = [
     "pytest>=7.0",
+    # Set 116 S1: measured 3.6x wall-clock reduction (14.1min -> 3.9min,
+    # identical 3769 passed / 5 skipped) on a 20-core machine; see
+    # docs/test-suite-benchmark-DENICI.txt. Default parallelism is wired
+    # via pytest.ini's addopts, so every `python -m pytest` invocation
+    # (local, CI, run_of_record) inherits it without a duplicated flag.
+    "pytest-xdist>=3.5",
     "jsonschema>=4.0.0",
     "ruamel.yaml>=0.17",
 ]

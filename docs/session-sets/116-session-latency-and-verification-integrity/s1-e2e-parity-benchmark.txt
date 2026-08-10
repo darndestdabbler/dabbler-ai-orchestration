@@ -1,0 +1,44 @@
+==============================================================
+ ai_router `-m e2e` layer benchmark (Set 116 S1, round-4 remediation)
+==============================================================
+generated      : 2026-08-10 (Set 116 Session 1)
+machine        : DENICI, 20 logical CPUs
+python         : Python 3.11.9
+tree           : the working tree of this session's changes, on top of
+                 base commit d11d8d6288e118773d57c9291c2d87d3f5144e71
+                 (`git log`/`git blame` on this file names the exact
+                 commit it shipped in -- more durable than a hand-typed
+                 SHA, which cannot self-reference the commit it is
+                 written into)
+surfaceDigest  : fb69075938a4... (ai_router/ content digest -- see
+                 test-runs.jsonl rows recorded at 2026-08-10T11:45:29
+                 and 11:45:30; IDENTICAL to the full-suite parity pair
+                 in s1-full-suite-parity-benchmark.txt, proving all
+                 four runs in this set share one tree)
+
+This corroborates CONTRIBUTING.md's Layer 1 section, which cites
+113.69s/63.47s from an earlier measurement on the same commands; the
+figures below are the post-remediation re-measurement on the tree that
+ships in this session's close, command-for-command identical.
+
+--- [1/2] SERIAL: python -m pytest -m e2e -n 0 ---
+
+........                                                                 [100%]
+8 passed, 3811 deselected in 113.13s (0:01:53)
+
+--- [2/2] PARALLEL: python -m pytest -m e2e (n auto, the shipped default) ---
+
+bringing up nodes...
+
+........                                                                 [100%]
+8 passed in 64.32s (0:01:04)
+
+==============================================================
+ SUMMARY
+==============================================================
+  serial   : 113.13s  (0:01:53)  8 passed, 0 failed
+  parallel : 64.32s   (0:01:04)  8 passed, 0 failed
+  identical pass count, no failures either way.
+  speedup  : 1.76x (a small, worker-startup-dominated suite -- the
+             real payoff of -n auto is the full suite below, not this
+             8-test subset)

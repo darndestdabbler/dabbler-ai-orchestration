@@ -784,7 +784,8 @@ now recorded and checked:
 # after the last code change, and after the suite goes green:
 python -m ai_router.run_of_record record \
     --session-set-dir docs/session-sets/<slug> \
-    --suite playwright --outcome passed --detail "35 passed / 0 failed"
+    --suite playwright --outcome passed --detail "35 passed / 0 failed" \
+    --duration-seconds 210.4   # required (Set 116 S1): wall-clock, not a guess
 
 python -m ai_router.run_of_record suites          # what is declared
 python -m ai_router.run_of_record check --session-set-dir <dir> --check

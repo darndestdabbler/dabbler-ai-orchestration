@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The corrected timing documentation does not provide a timing for the command whose published timing was wrong**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** A typical contributor consults the layered test instructions to estimate the cost of `python -m pytest -m e2e`. The former `~30s` estimate is gone, but the replacement describes the entire 3,774-test suite instead of that command, so the contributor still cannot determine the e2e layer’s cost. This is probable because the timing appears directly beneath that command and cost visibility is the session’s primary objective.\n  - **Acceptance criterion:** `JUDGMENT - Does CONTRIBUTING.md state a measured timing for the documented python -m pytest -m e2e command, with a reviewable measurement source and commit, rather than substituting the full-suite timing?`\n  - **Details:**\n    - **Violation:** The plan requires “**Correct every published test timing**” and says to “**Cite the measurement and its commit so the next reader can re-derive it**.”\n    - **Location:** `CONTRIBUTING.md`, immediately after `python -m pytest -m e2e`.\n    - **Impact:** One of the two specifically identified incorrect timings remains unresolved rather than corrected, materially defeating the session’s “make its cost visible” deliverable.\n    - **Evidence:** The replacement says the **full** suite takes approximately 14 minutes serial or 4 minutes parallel. It gives no measured duration for the preceding `-m e2e` command. The Playwright replacement likewise identifies dates and session-set ledgers but cites no commit.\n    - **Fix:** Publish the measured duration for the exact e2e command and cite its raw measurement and commit. Add commit citations for the Playwright measurements as required.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A typical contributor consults the layered test instructions to estimate the cost of `python -m pytest -m e2e`. The former `~30s` estimate is gone, but the replacement describes the entire 3,774-test suite instead of that command, so the contributor still cannot determine the e2e layer’s cost. This is probable because the timing appears directly beneath that command and cost visibility is the session’s primary objective.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Does CONTRIBUTING.md state a measured timing for the documented python -m pytest -m e2e command, with a reviewable measurement source and commit, rather than substituting the full-suite timing?"
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "The required serial/parallel parity proof and timing evidence are not substantiated**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** The repository adopts `-n auto` by default, but a typical maintainer cannot verify that serial and parallel runs covered the same tree with identical results. This is probable because the supplied evidence contains only repeated assertions of “3,769 passed / 5 skipped”; the referenced benchmark contents and the excluded `test-runs.jsonl` are not provided. Merging without the required proof risks adopting a parallel default that silently changes or omits test behavior.\n  - **Acceptance criterion:** JUDGMENT - checked-in evidence must show the serial and parallel commands, durations, and complete passed/skipped results from the same precisely identified tree, and the documentation must cite that evidence and reproducible revision.\n  - **Details:**\n    - **Violation:** The plan requires: “**Prove parity before adopting**: identical passed/skipped counts serial vs parallel, and record both timings,” and timing documentation must “Cite the measurement and its commit so the next reader can re-derive it.”\n    - **Location:** `CONTRIBUTING.md`, `pyproject.toml`, and `pytest.ini` assert the result and cite `docs/test-suite-benchmark-DENICI.txt`; the supplied complete diff does not contain that artifact, while `test-runs.jsonl` is explicitly excluded and not inlined.\n    - **Impact:** The core adoption gate cannot be independently audited, which materially changes whether enabling xdist globally is safe to merge.\n    - **Evidence:** No raw commands, outputs, or serial/parallel records are in the response. Moreover, the cited commit identifies `HEAD` while the presented functional and test changes are uncommitted, so the response does not establish whether the counts describe the reviewed tree or the clean cited commit.\n    - **Fix:** Include durable parity evidence for one exact tree, with both commands, counts, skip details, timings, and a revision/work-diff identity that reproduces that tree.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "The repository adopts `-n auto` by default, but a typical maintainer cannot verify that serial and parallel runs covered the same tree with identical results. This is probable because the supplied evidence contains only repeated assertions of “3,769 passed / 5 skipped”; the referenced benchmark contents and the excluded `test-runs.jsonl` are not provided. Merging without the required proof risks adopting a parallel default that silently changes or omits test behavior.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "checked-in evidence must show the serial and parallel commands, durations, and complete passed/skipped results from the same precisely identified tree, and the documentation must cite that evidence and reproducible revision."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    },
+    {
+      "description": "New run records can still omit `durationSeconds` by default**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Failure scenario:** Existing callers continue invoking `record_run` or the `record` CLI without the newly optional argument, which is the probable path because all old invocations remain valid and the CLI default is `None`. Those new records omit `durationSeconds`, leaving the framework unable to calculate testing cost and preserving the “sometimes there is no measurement” condition this session was meant to eliminate.\n  - **Acceptance criterion:** JUDGMENT - every newly written test-run record must contain a finite positive `durationSeconds`, while reading legacy records without the field remains backward-compatible.\n  - **Details:**\n    - **Violation:** The plan requires: “**Record `durationSeconds` as a structured field** in `test-runs.jsonl`” so “the framework can report what testing costs it.”\n    - **Location:** `ai_router/run_of_record.py` defines `duration_seconds: Optional[float] = None`, conditionally serializes it, and gives `--duration-seconds` a `None` default. `test_duration_is_omitted_when_not_given` explicitly preserves omission for newly written records.\n    - **Impact:** The primary structured-measurement deliverable is opt-in rather than an invariant, so routine records remain unusable for cost reporting.\n    - **Evidence:** `TestRunRecord.to_dict()` emits the field only when non-`None`; both `record_run()` and the CLI accept omission.\n    - **Fix:** Require or automatically measure duration at the writer boundary. Keep only the reader tolerant of legacy records lacking the field.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "Existing callers continue invoking `record_run` or the `record` CLI without the newly optional argument, which is the probable path because all old invocations remain valid and the CLI default is `None`. Those new records omit `durationSeconds`, leaving the framework unable to calculate testing cost and preserving the “sometimes there is no measurement” condition this session was meant to eliminate.",
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "every newly written test-run record must contain a finite positive `durationSeconds`, while reading legacy records without the field remains backward-compatible."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "e1669b1128ad3e1d55ecfed4b6cc2a8b85b0f4e9"
+}

@@ -99,7 +99,8 @@ class TestRecordRun:
         root, set_dir = repo
         rec = ror.record_run(
             str(set_dir), SUITE, ror.OUTCOME_PASSED,
-            session_number=2, detail="35 passed", repo_root=str(root),
+            session_number=2, detail="35 passed", duration_seconds=1.0,
+            repo_root=str(root),
         )
         assert rec.suite == "playwright"
         lines = (set_dir / ror.TEST_RUNS_FILENAME).read_text(
@@ -111,10 +112,12 @@ class TestRecordRun:
     def test_a_rerun_appends_rather_than_rewrites(self, repo):
         root, set_dir = repo
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_FAILED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_FAILED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         records = ror.read_records(str(set_dir))
         assert [r.outcome for r in records] == ["failed", "passed"]
@@ -123,14 +126,60 @@ class TestRecordRun:
         root, set_dir = repo
         with pytest.raises(ValueError):
             ror.record_run(
-                str(set_dir), SUITE, "greenish", repo_root=str(root)
+                str(set_dir), SUITE, "greenish",
+                duration_seconds=1.0, repo_root=str(root),
             )
 
     def test_raises_when_the_surface_cannot_be_digested(self, tmp_path):
         with pytest.raises(RuntimeError):
             ror.record_run(
                 str(tmp_path), SUITE, ror.OUTCOME_PASSED,
+                duration_seconds=1.0,
                 repo_root=str(tmp_path / "not-a-repo"),
+            )
+
+    def test_records_a_structured_duration(self, repo):
+        """Set 116 S1: durationSeconds is a real field, not a detail-string grep."""
+        root, set_dir = repo
+        rec = ror.record_run(
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=234.55, repo_root=str(root),
+        )
+        assert rec.duration_seconds == 234.55
+        line = (set_dir / ror.TEST_RUNS_FILENAME).read_text(
+            encoding="utf-8"
+        ).strip()
+        assert json.loads(line)["durationSeconds"] == 234.55
+
+    def test_duration_seconds_is_required(self, repo):
+        """Set 116 S1 round-2 remediation-review: an optional duration at
+        the write boundary never gets populated. record_run() itself
+        requires it now, not just the CLI -- so every new record, from
+        any caller, carries a real measurement."""
+        root, set_dir = repo
+        with pytest.raises(TypeError):
+            ror.record_run(
+                str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            )
+
+    def test_rejects_a_non_positive_duration(self, repo):
+        root, set_dir = repo
+        with pytest.raises(ValueError):
+            ror.record_run(
+                str(set_dir), SUITE, ror.OUTCOME_PASSED,
+                duration_seconds=0, repo_root=str(root),
+            )
+
+    @pytest.mark.parametrize("bad", [float("nan"), float("inf"), float("-inf"), True])
+    def test_rejects_non_finite_or_boolean_durations(self, repo, bad):
+        """Round-1 verification nit: NaN/Infinity survive `<= 0` unscathed
+        and json.dumps() would emit them as non-standard JSON tokens; a
+        bool duration_seconds=True would silently record 1.0 second."""
+        root, set_dir = repo
+        with pytest.raises(ValueError):
+            ror.record_run(
+                str(set_dir), SUITE, ror.OUTCOME_PASSED,
+                duration_seconds=bad, repo_root=str(root),
             )
 
 
@@ -151,6 +200,107 @@ class TestReadRecords:
     def test_missing_file_is_empty(self, repo):
         _root, set_dir = repo
         assert ror.read_records(str(set_dir)) == []
+
+    def test_reads_back_the_structured_duration(self, repo):
+        _root, set_dir = repo
+        path = set_dir / ror.TEST_RUNS_FILENAME
+        path.write_text(
+            '{"suite":"playwright","surfaceDigest":"abc","durationSeconds":9.6}\n',
+            encoding="utf-8",
+        )
+        records = ror.read_records(str(set_dir))
+        assert records[0].duration_seconds == 9.6
+
+    def test_a_non_numeric_duration_is_dropped_not_crashed_on(self, repo):
+        _root, set_dir = repo
+        path = set_dir / ror.TEST_RUNS_FILENAME
+        path.write_text(
+            '{"suite":"playwright","surfaceDigest":"abc","durationSeconds":"fast"}\n',
+            encoding="utf-8",
+        )
+        records = ror.read_records(str(set_dir))
+        assert records[0].duration_seconds is None
+
+
+class TestFreshnessAndEvidence:
+    """Set 116 S1: test-runs.jsonl joins decisions.jsonl and checklist-posts.jsonl
+    as a freshness-exempt bookkeeping ledger -- "run the full suite last" must
+    not stale the verification round that just passed.
+    """
+
+    def test_the_run_ledger_is_freshness_exempt(self):
+        from ai_router.verification_stamp import WORK_DIFF_SET_BOOKKEEPING
+
+        assert ror.TEST_RUNS_FILENAME in WORK_DIFF_SET_BOOKKEEPING
+
+    def test_the_run_ledger_stays_visible_to_the_verifier(self):
+        """Set 116 S1 round-2 remediation-review: a reviewer asked to
+        corroborate a parity/duration claim must be able to see the ledger
+        that backs it, or the claim is unverifiable by construction --
+        exactly the rejection Session 1's own round-2 review raised."""
+        from ai_router.verification_stamp import (
+            EVIDENCE_VISIBLE_BOOKKEEPING,
+            PHASED_EVIDENCE_SET_EXCLUDES,
+        )
+
+        assert ror.TEST_RUNS_FILENAME in EVIDENCE_VISIBLE_BOOKKEEPING
+        assert ror.TEST_RUNS_FILENAME not in PHASED_EVIDENCE_SET_EXCLUDES
+
+    def test_the_filename_has_exactly_one_spelling(self):
+        from ai_router.verification_stamp import (
+            EVIDENCE_VISIBLE_BOOKKEEPING,
+            WORK_DIFF_SET_BOOKKEEPING,
+        )
+
+        assert ror.TEST_RUNS_FILENAME == "test-runs.jsonl"
+        assert sum(
+            1 for n in WORK_DIFF_SET_BOOKKEEPING if n == ror.TEST_RUNS_FILENAME
+        ) == 1
+        assert sum(
+            1 for n in EVIDENCE_VISIBLE_BOOKKEEPING if n == ror.TEST_RUNS_FILENAME
+        ) == 1
+
+    def test_recording_a_run_does_not_change_the_work_diff_digest(
+        self, tmp_path
+    ):
+        """The concrete failure this exemption prevents: running the full
+        suite last (the constitution's own Step 5 order) must not stale the
+        stamp a verifier just signed off on."""
+        import subprocess
+
+        from ai_router.verification_stamp import compute_work_diff_sha256
+        from pathlib import Path
+
+        root = tmp_path / "repo"
+        root.mkdir()
+
+        def _git(*args):
+            subprocess.run(
+                ["git", *args], cwd=str(root), capture_output=True, check=True
+            )
+
+        _git("init", "-b", "main")
+        _git("config", "user.email", "t@example.invalid")
+        _git("config", "user.name", "T")
+        (root / "README.md").write_text("x\n", encoding="utf-8")
+        _git("add", "-A")
+        _git("commit", "-m", "base")
+
+        set_dir = root / "docs" / "session-sets" / "116-fixture"
+        set_dir.mkdir(parents=True)
+
+        before = compute_work_diff_sha256(Path(set_dir), "HEAD")
+        assert before is not None
+        ror.record_run(
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=234.55, repo_root=str(root),
+        )
+        after = compute_work_diff_sha256(Path(set_dir), "HEAD")
+        assert after == before
+
+        # ...while real work in the same directory still binds.
+        (set_dir / "spec.md").write_text("changed\n", encoding="utf-8")
+        assert compute_work_diff_sha256(Path(set_dir), "HEAD") != before
 
 
 class TestSessionTouched:
@@ -258,7 +408,8 @@ class TestEvaluateFreshness:
     def test_fresh_green_record_passes(self, repo):
         root, set_dir = repo
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         (v,) = ror.evaluate_freshness(
             str(set_dir), ["src/a.ts"], [SUITE], repo_root=str(root)
@@ -269,7 +420,8 @@ class TestEvaluateFreshness:
         """Green run, then a code change, then a close attempt."""
         root, set_dir = repo
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         (root / "src" / "a.ts").write_text("export const a = 3;\n", encoding="utf-8")
         (v,) = ror.evaluate_freshness(
@@ -281,7 +433,8 @@ class TestEvaluateFreshness:
     def test_a_fresh_but_red_record_fails(self, repo):
         root, set_dir = repo
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_FAILED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_FAILED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         (v,) = ror.evaluate_freshness(
             str(set_dir), ["src/a.ts"], [SUITE], repo_root=str(root)
@@ -292,11 +445,13 @@ class TestEvaluateFreshness:
     def test_re_running_after_the_change_restores_freshness(self, repo):
         root, set_dir = repo
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         (root / "src" / "a.ts").write_text("export const a = 3;\n", encoding="utf-8")
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         (v,) = ror.evaluate_freshness(
             str(set_dir), ["src/a.ts"], [SUITE], repo_root=str(root)
@@ -374,7 +529,8 @@ class TestCli:
         monkeypatch.setattr(ror, "_load_router_config", lambda: None)
         monkeypatch.setattr(ror, "DEFAULT_SUITES", (SUITE,))
         ror.record_run(
-            str(set_dir), SUITE, ror.OUTCOME_PASSED, repo_root=str(root)
+            str(set_dir), SUITE, ror.OUTCOME_PASSED,
+            duration_seconds=1.0, repo_root=str(root),
         )
         (root / "src" / "a.ts").write_text("changed\n", encoding="utf-8")
         code = ror.run(
@@ -396,12 +552,50 @@ class TestCli:
                 "record",
                 "--session-set-dir", str(set_dir),
                 "--suite", "no-such-suite",
+                "--duration-seconds", "1.0",
             ]
         )
         assert code == 2
         assert "unknown suite" in capsys.readouterr().err
 
+    def test_record_requires_duration_seconds(self, repo, capsys, monkeypatch):
+        """Set 116 S1 (round-1 verification): an optional field at the
+        writer boundary never gets populated -- require it at the CLI."""
+        _root, set_dir = repo
+        monkeypatch.setattr(ror, "_load_router_config", lambda: None)
+        with pytest.raises(SystemExit) as exc_info:
+            ror.run(
+                [
+                    "record",
+                    "--session-set-dir", str(set_dir),
+                    "--suite", "playwright",
+                    "--outcome", "passed",
+                ]
+            )
+        assert exc_info.value.code == 2
+        assert "--duration-seconds" in capsys.readouterr().err
+
     def test_suites_lists_the_declared_suites(self, capsys):
         assert ror.run(["suites"]) == 0
         out = capsys.readouterr().out
         assert "playwright" in out and "expensive" in out
+
+    def test_record_accepts_and_prints_duration_seconds(
+        self, repo, capsys, monkeypatch
+    ):
+        root, set_dir = repo
+        monkeypatch.setattr(ror, "_load_router_config", lambda: None)
+        monkeypatch.setattr(ror, "DEFAULT_SUITES", (SUITE,))
+        code = ror.run(
+            [
+                "record",
+                "--session-set-dir", str(set_dir),
+                "--suite", "playwright",
+                "--outcome", "passed",
+                "--duration-seconds", "234.55",
+            ]
+        )
+        assert code == 0
+        assert "duration=234.6s" in capsys.readouterr().out
+        records = ror.read_records(str(set_dir))
+        assert records[-1].duration_seconds == 234.55

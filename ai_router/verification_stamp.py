@@ -251,6 +251,27 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # session produced -- binds the diff normally. NOT an evidence
     # exclusion: see EVIDENCE_VISIBLE_BOOKKEEPING below.
     "checklist-posts.jsonl",
+    # Set 116 S1: the test run-of-record ledger (run_of_record.TEST_RUNS_FILENAME)
+    # -- one line per recorded suite run. Same class as decisions.jsonl and
+    # checklist-posts.jsonl above: the constitution's own Step 5 says "run
+    # the full suite last, after the last code change", which means the
+    # record is written AFTER the round that will be stamped. Without this
+    # entry, "run tests last" stales the verification that just passed and
+    # sends the close backstop into a fresh, unbounded round -- exactly the
+    # bug this set exists to fix (measured live in Sets 111 S2, 112 S3, 114
+    # S1). Safe because a run-of-record is a RECORD about work whose
+    # substance -- the code the suite exercised -- binds the diff normally.
+    # ADDED to EVIDENCE_VISIBLE_BOOKKEEPING below (round-2 remediation-review
+    # correction): a session-verification round can only check a parity or
+    # duration claim against the raw ledger if the evidence bundle actually
+    # contains it. Session 1's own round-2 review rejected the fix for
+    # exactly this reason -- it could not see test-runs.jsonl's rows to
+    # confirm the same-tree serial/parallel proof the CONTRIBUTING.md prose
+    # cited by digest prefix. Same reasoning as checklist-posts.jsonl: a
+    # reviewer of the set that SHIPS the duration-recording cadence must be
+    # able to see whether the session shipping it actually recorded real
+    # durations.
+    "test-runs.jsonl",
     "disposition.json",
     "session-events.jsonl",
     "session-state.json",
@@ -285,7 +306,18 @@ WORK_DIFF_SET_BOOKKEEPING = (
 # reviewer of the set that SHIPS the posting cadence should be able to
 # see whether the session shipping it followed it, and suppressing that
 # would be the same self-authorized reduction.
-EVIDENCE_VISIBLE_BOOKKEEPING = ("decisions.jsonl", "checklist-posts.jsonl")
+#
+# Set 116 S1 adds the test run-of-record ledger on the same reasoning,
+# added in remediation round 2 after the reviewer's round-2 review
+# rejected the round-1 fix specifically because it could not see the
+# ledger it was asked to corroborate: a reviewer of the set that SHIPS
+# structured test-duration recording must be able to see whether the
+# session shipping it actually recorded real durations.
+EVIDENCE_VISIBLE_BOOKKEEPING = (
+    "decisions.jsonl",
+    "checklist-posts.jsonl",
+    "test-runs.jsonl",
+)
 
 # What a --phase round's evidence bundle excludes: the loop's own
 # immutable machinery (round artifacts, envelopes, sidecars, ledgers,

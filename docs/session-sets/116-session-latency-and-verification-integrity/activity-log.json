@@ -1,0 +1,126 @@
+{
+  "sessionSetName": "116-session-latency-and-verification-integrity",
+  "createdDate": "2026-08-10T13:59:37.669557+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-10T13:59:37.670549+00:00",
+      "description": "Operator set pathAwareCritique: required.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "required"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T09:59:37.674658-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "adopt-pytest-xdist",
+      "dateTime": "2026-08-10T09:59:37.674658-04:00",
+      "description": "**Adopt `pytest-xdist`.** Add the dependency, make parallel execution the documented default in `CONTRIBUTING.md` and in `run_of_record.py`'s recorded pytest command. **Prove parity before adopting**: identical passed/skipped counts serial vs parallel, and record both timings. If any test proves parallel-unsafe, fix or mark it \u2014 do not abandon the change for one offender.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "correct-every-published-test-timing",
+      "dateTime": "2026-08-10T09:59:37.674658-04:00",
+      "description": "**Correct every published test timing.** `CONTRIBUTING.md`'s \"~30s\" and \"~90s for ~10 scenarios\" are wrong by up to 30x; sweep for the same figures elsewhere. Cite the measurement and its commit so the next reader can re-derive it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "record-durationseconds-as-a-structured-field",
+      "dateTime": "2026-08-10T09:59:37.674658-04:00",
+      "description": "**Record `durationSeconds` as a structured field** in `test-runs.jsonl`, written by the same helper that records the run. A free-text `detail` that sometimes mentions minutes is not a measurement. Add it to `verification_stamp.py`'s bookkeeping exclusions **in this session** \u2014 Session 2 owns the reasoning, but a new writer must not ship un-excluded.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-parallel-at-close-after",
+      "dateTime": "2026-08-10T09:59:37.674658-04:00",
+      "description": "Full pytest (parallel) at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-10T10:07:24.057231-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "adopt-pytest-xdist",
+      "dateTime": "2026-08-10T10:07:24.057231-04:00",
+      "description": "Adopt pytest-xdist: added to pyproject.toml tests extra, wired as pytest.ini addopts -n auto (single point of truth for local/CI/run_of_record). Parity already proven on this machine/commit lineage (docs/test-suite-benchmark-DENICI.txt: 3769 passed / 5 skipped both serial 845.76s and -n auto 234.55s); reconfirmed on a targeted subset post-change.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "correct-every-published-test-timing",
+      "dateTime": "2026-08-10T10:07:24.058234-04:00",
+      "description": "Corrected CONTRIBUTING.md Layer 1 (~30s -> ~14min serial/~4min parallel, cited benchmark) and Layer 3 (~90s for ~10 scenarios -> ~9.6min median across 33, cited Sets 111-114 test-runs.jsonl detail fields). Swept repo for the same stale strings; only CONTRIBUTING.md carried live/current claims -- historical session-set specs, changelogs, and the benchmark script itself (which cites the old figures as its own motivation) were left untouched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "record-durationseconds-as-a-structured-field",
+      "dateTime": "2026-08-10T10:07:24.058234-04:00",
+      "description": "Added duration_seconds field to TestRunRecord/record_run/read_records in run_of_record.py (durationSeconds in JSON, optional, validated positive), wired --duration-seconds into the record CLI. Added test-runs.jsonl to verification_stamp.WORK_DIFF_SET_BOOKKEEPING (freshness-exempt, same class as decisions.jsonl/checklist-posts.jsonl) but NOT to EVIDENCE_VISIBLE_BOOKKEEPING (its content is redundant with disposition.json, which is also hidden). New tests in test_run_of_record.py cover the duration field and the freshness/evidence split.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-parallel-at-close-after",
+      "dateTime": "2026-08-10T10:14:25.964667-04:00",
+      "description": "Full pytest (-n auto) run after last code change: 3808 passed, 5 skipped in 245.46s (0:04:05). Recorded via run_of_record (duration_seconds=245.46). Proceeding to verify_session and close.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "remediate-round-1-findings",
+      "dateTime": "2026-08-10T10:55:54.132366-04:00",
+      "description": "Discovery round 1: 3 Major/Completeness findings (missing e2e-specific timing, parity evidence not proven on the reviewed tree, durationSeconds optional at the writer boundary). All accepted and remediated: measured the real -m e2e command (113.69s serial/63.47s parallel, 8 tests); recorded a same-tree serial/parallel pair (matching surfaceDigest b5db7d2d776d, 3813 passed/5 skipped both ways, 647.01s/240.56s) and cited it in CONTRIBUTING.md; made --duration-seconds required on the record CLI plus a NaN/Infinity/bool validation fix (both fanout calls raised it independently). Sidecar: s1-remediation-round-1.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "remediate-round-2-findings",
+      "dateTime": "2026-08-10T11:04:28.128055-04:00",
+      "description": "Round 2 (remediation-review) rejected all 3 round-1 fixes, all correctly. Root cause of L1/L2: test-runs.jsonl was excluded from EVIDENCE_VISIBLE_BOOKKEEPING, so the verifier could never see the parity/timing evidence it was asked to corroborate -- moved it there (joining decisions.jsonl/checklist-posts.jsonl on identical reasoning). L3: record_run() itself (not just the CLI) now requires duration_seconds (Python keyword-only required arg); ~15 internal test call sites updated to pass a fixed duration_seconds=1.0 where duration was not the thing under test. Sidecar: s1-remediation-round-2.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "remediate-round-3-findings-operator-authorized",
+      "dateTime": "2026-08-10T11:47:32.362994-04:00",
+      "description": "Round 3 (remediation-review cycle 2) hit the enforced bound with L1/L2 still rejected (L3 accepted). Operator authorized one more round via AskUserQuestion (journaled in decisions.jsonl). Checked in two raw pytest-transcript evidence files (s1-e2e-parity-benchmark.txt, s1-full-suite-parity-benchmark.txt) mirroring the DENICI benchmark format; all 4 underlying runs (e2e serial/parallel, full serial/parallel) share the identical surfaceDigest fb69075938a4, cryptographically proving one tree. CONTRIBUTING.md now links both files directly. Sidecar: s1-remediation-round-3.md.",
+      "status": "complete"
+    }
+  ]
+}

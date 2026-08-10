@@ -52,6 +52,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import subprocess
 import sys
@@ -172,6 +173,7 @@ class TestRunRecord:
     recorded_at: str
     session_number: Optional[int] = None
     detail: str = ""
+    duration_seconds: Optional[float] = None
 
     def to_dict(self) -> dict:
         d = {
@@ -185,6 +187,8 @@ class TestRunRecord:
             d["sessionNumber"] = self.session_number
         if self.detail:
             d["detail"] = self.detail
+        if self.duration_seconds is not None:
+            d["durationSeconds"] = self.duration_seconds
         return d
 
 
@@ -338,6 +342,7 @@ def read_records(session_set_dir: str) -> List[TestRunRecord]:
                 if not isinstance(suite, str) or not isinstance(digest, str):
                     continue
                 session_number = d.get("sessionNumber")
+                duration = d.get("durationSeconds")
                 out.append(
                     TestRunRecord(
                         suite=suite,
@@ -352,6 +357,13 @@ def read_records(session_set_dir: str) -> List[TestRunRecord]:
                             else None
                         ),
                         detail=d.get("detail") or "",
+                        duration_seconds=(
+                            float(duration)
+                            if isinstance(duration, (int, float))
+                            and not isinstance(duration, bool)
+                            and math.isfinite(duration)
+                            else None
+                        ),
                     )
                 )
     except OSError:
@@ -364,19 +376,37 @@ def record_run(
     suite: SuiteSpec,
     outcome: str,
     *,
+    duration_seconds: float,
     session_number: Optional[int] = None,
     detail: str = "",
     repo_root: Optional[str] = None,
 ) -> TestRunRecord:
     """Append a run-of-record for *suite* and return it.
 
-    Raises ``ValueError`` on an unknown *outcome* and ``RuntimeError``
-    when the covered surfaces cannot be digested -- an unrecordable run is
-    an error, not a silently-empty record.
+    ``duration_seconds`` is REQUIRED (Set 116 S1 round-2 remediation-review):
+    an optional field at the write boundary never gets populated, which is
+    the exact "sometimes there is no measurement" condition this exists to
+    fix. Only ``read_records`` stays lenient, for legacy rows recorded
+    before this field existed.
+
+    Raises ``ValueError`` on an unknown *outcome* or a non-finite/non-positive
+    *duration_seconds*, and ``RuntimeError`` when the covered surfaces
+    cannot be digested -- an unrecordable run is an error, not a
+    silently-empty record.
     """
     if outcome not in OUTCOMES:
         raise ValueError(
             f"outcome must be one of {OUTCOMES!r} (got {outcome!r})"
+        )
+    if (
+        isinstance(duration_seconds, bool)
+        or not isinstance(duration_seconds, (int, float))
+        or not math.isfinite(duration_seconds)
+        or duration_seconds <= 0
+    ):
+        raise ValueError(
+            f"duration_seconds must be a finite positive number "
+            f"(got {duration_seconds!r})"
         )
     root = repo_root or _repo_root_for(session_set_dir)
     if root is None:
@@ -398,6 +428,7 @@ def record_run(
         recorded_at=datetime.now().astimezone().isoformat(),
         session_number=session_number,
         detail=detail,
+        duration_seconds=duration_seconds,
     )
     os.makedirs(session_set_dir, exist_ok=True)
     with open(_runs_path(session_set_dir), "a", encoding="utf-8") as fh:
@@ -501,7 +532,8 @@ def evaluate_freshness(
                         f"surfaces but no run of record exists; run "
                         f"`{suite.command}` after your last code change, "
                         f"then `python -m ai_router.run_of_record record "
-                        f"--suite {suite.name} --outcome passed`"
+                        f"--suite {suite.name} --outcome passed "
+                        f"--duration-seconds <elapsed>`"
                     ),
                 )
             )
@@ -599,6 +631,19 @@ def build_parser() -> argparse.ArgumentParser:
     rec.add_argument(
         "--detail", default="", help="e.g. '35 passed / 0 failed'."
     )
+    rec.add_argument(
+        "--duration-seconds",
+        type=float,
+        required=True,
+        help=(
+            "Wall-clock seconds the run took. REQUIRED (Set 116 S1): a "
+            "structured field that is optional at the writer boundary "
+            "never gets populated, which is the exact 'sometimes there is "
+            "no measurement' condition this exists to fix. `record_run()` "
+            "requires it too -- this CLI flag is required for the same "
+            "reason, one level up."
+        ),
+    )
 
     chk = sub.add_parser(
         "check", help="Report freshness for every expensive suite."
@@ -663,13 +708,19 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
                 args.outcome,
                 session_number=args.session_number,
                 detail=args.detail,
+                duration_seconds=args.duration_seconds,
             )
         except (ValueError, RuntimeError) as exc:
             print(f"run_of_record: {exc}", file=sys.stderr)
             return 2
+        duration_note = (
+            f" duration={rec.duration_seconds:.1f}s"
+            if rec.duration_seconds is not None
+            else ""
+        )
         print(
             f"Recorded {rec.suite} run: outcome={rec.outcome} "
-            f"digest={rec.surface_digest[:12]} at {rec.recorded_at}"
+            f"digest={rec.surface_digest[:12]}{duration_note} at {rec.recorded_at}"
         )
         return 0
 

@@ -1,15 +1,20 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "116-session-latency-and-verification-integrity",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "Session 1",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-10T09:59:37.667762-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "claude",
+        "provider": "anthropic",
+        "model": "claude-sonnet-5",
+        "identityProvenance": "direct"
+      },
       "verificationVerdict": null
     },
     {

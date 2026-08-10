@@ -651,7 +651,7 @@ The answer — locked by an operator-initiated cross-provider consult
 (openai:gpt-5-6 + google:gemini-3-1-pro, `task_type: architecture`,
 **aligned**;
 `docs/session-sets/104-copilot-cli-large-prompt-handoff/authoring-consult-synthesis.md`)
-— is **no new machinery.** The existing blessed cancel/restore writers
+— is **no new machinery.** The existing sanctioned cancel/restore writers
 *are* the pause. This differs from the "not a pause for the day"
 caveat above: that caveat rejects casually cancelling a *mid-session,
 self-resumable* set. Cancel-to-pause is the opposite case — a genuine
@@ -2873,7 +2873,7 @@ pre-approve judgment calls, they are given a reviewable record of them.
 - **Artifact:** `<session-set-dir>/decisions.jsonl`, append-only, one
   JSON object per decision, git-tracked so the trail travels with the
   repo.
-- **Blessed writer:** `ai_router/decision_journal.py`. Nothing else
+- **Sanctioned writer:** `ai_router/decision_journal.py`. Nothing else
   writes the file — a hand-appended line is the decision-rights
   equivalent of a freehand state edit.
 - **Every record carries** the question, the decision, the `authority`,

@@ -1,6 +1,6 @@
 """Tests for the ``ai_router.local_only`` CLI (Set 076 Session 2).
 
-The CLI is the blessed enable / disable / inspect surface for the
+The CLI is the sanctioned enable / disable / inspect surface for the
 ``.dabbler/local-only`` marker that :mod:`gate_checks` consults. These tests
 exercise the pure helpers (idempotency, the audit note, status reading) and the
 ``main()`` argument surface, plus the integration invariant that an enabled

@@ -55,7 +55,7 @@ numbered session sets for the `{{MODULE_SLUG}}` module.
    `module: {{MODULE_SLUG}}`, per the authoring guide. Do **not**
    hand-author `session-state.json` for these new sets: each one's own
    first `start_session` run bootstraps it from the spec's
-   `totalSessions`, per the blessed-writer contract — state files are
+   `totalSessions`, per the sanctioned-writer contract — state files are
    the runtime writers' job, never authored by hand.
 3. Verify (mandatory cross-provider session verification).
 4. Author `disposition.json`; commit + push; `close_session`.

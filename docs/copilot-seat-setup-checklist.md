@@ -146,7 +146,7 @@ engine's imagination — produced the artifacts:
 
 - [ ] `session-state.json` was written by `start_session`/`close_session`
       (canonical v4 shape), and `verificationVerdict` is a real verdict.
-      The blessed writer now enforces an **exact allowlist** (Set 086):
+      The sanctioned writer now enforces an **exact allowlist** (Set 086):
       the canonical `VERIFIED` / `ISSUES_FOUND` / `WAIVED` (plus the
       intentionally-shipped extension token
       `ISSUES_FOUND_RESOLVED_IN_FLIGHT`) — a free-form non-verdict like
@@ -174,7 +174,7 @@ router — go back to Step 3/5.
 | Login succeeds but `-p` still fails auth | Logged into the wrong host (github.com instead of the tenant), or no Copilot license on the tenant | Re-run login with the correct `.ghe.com` subdomain; confirm the license is on the tenant |
 | Confusing token errors even after login | A stray `GH_TOKEN` / `GITHUB_TOKEN` in the environment is shadowing the persisted login | Unset it, or (CI only) use `COPILOT_GITHUB_TOKEN`, which takes priority |
 | `--model` value rejected | Model name not available on the seat's plan | Run `copilot` interactively and check `/models` for the exact available ids |
-| Verdict shows a weird string like `manual-override-development` | The seat ran sessions before this checklist — the engine confabulated | Re-run setup; Set-086 both blocks the write (the blessed writer rejects a non-verdict) and flags any such token already on disk in the Explorer. Historical drifted sets are reconciled via the router (re-verify, then `close_session --repair`), never a hand edit |
+| Verdict shows a weird string like `manual-override-development` | The seat ran sessions before this checklist — the engine confabulated | Re-run setup; Set-086 both blocks the write (the sanctioned writer rejects a non-verdict) and flags any such token already on disk in the Explorer. Historical drifted sets are reconciled via the router (re-verify, then `close_session --repair`), never a hand edit |
 
 ---
 

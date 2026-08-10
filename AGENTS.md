@@ -63,7 +63,7 @@ extension build, the publish runbook, and the CI matrix all live in
 [`docs/session-state-schema.md`](docs/session-state-schema.md) is the
 authoritative reference for `session-state.json` (the v4 shape),
 consulted on demand whenever a state-file
-question arises (Set 085) — the blessed writers own the shape at
+question arises (Set 085) — the sanctioned writers own the shape at
 runtime, and an orchestrator that hand-touches a state file without
 consulting the schema is the usual cause of the N−1/N display drift the
 Work Explorer surfaces. The per-session `orchestrator` block (the four `engine` /

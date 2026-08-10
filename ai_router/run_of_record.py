@@ -182,7 +182,7 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # full Layer 3 -- the Explorer rendering surface, a state-file
         # writer, the extension manifest, and the fixture harness -- but
         # this map originally carried only the first and third. A session
-        # that changed a blessed writer or the harness that stages the
+        # that changed a sanctioned writer or the harness that stages the
         # fixtures could therefore close with Playwright reported "not
         # required", which is precisely the rendering-regression class
         # Layer 2 and the static gates cannot see. The writers are listed
@@ -197,7 +197,7 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
             "tools/dabbler-ai-orchestration/scripts/",
             "tools/dabbler-ai-orchestration/test-fixtures/",
             "ai_router/tests/e2e/",
-            # the blessed state-file writers whose shape the views render
+            # the sanctioned state-file writers whose shape the views render
             "ai_router/session_state.py",
             "ai_router/start_session.py",
             "ai_router/close_session.py",

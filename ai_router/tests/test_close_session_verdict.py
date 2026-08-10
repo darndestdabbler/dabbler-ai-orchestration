@@ -453,7 +453,7 @@ class TestR4VerdicClobberInvariant:
 
 
 # ---------------------------------------------------------------------------
-# Set 086 S1 — verdict-token validation at the blessed writer
+# Set 086 S1 — verdict-token validation at the sanctioned writer
 # ---------------------------------------------------------------------------
 
 from session_state import (  # noqa: E402

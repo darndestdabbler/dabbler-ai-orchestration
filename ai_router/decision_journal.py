@@ -523,7 +523,7 @@ def record_decision(
     *,
     session_set_dir: str | os.PathLike[str],
 ) -> Path:
-    """The blessed writer: validate, then append. Nothing else writes here.
+    """The sanctioned writer: validate, then append. Nothing else writes here.
 
     Validation runs first and in full, so a refused decision never leaves
     a partial or half-legal line behind.

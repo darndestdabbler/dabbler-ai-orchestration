@@ -16,7 +16,7 @@
 // like `ISSUES_FOUND_RESOLVED_IN_FLIGHT` classifies via its canonical prefix
 // without a schema bump. This mirrors the STRICT (exact-allowlist) writer side
 // of the same asymmetry (ai_router/session_state.py `_CANONICAL_VERDICT_TOKENS`):
-// the blessed writer refuses to persist a non-verdict, and this reader refuses
+// the sanctioned writer refuses to persist a non-verdict, and this reader refuses
 // to render an unrecognized one as if it were a clean verdict.
 export const RECOGNIZED_VERDICT_PREFIXES = [
   "VERIFIED",

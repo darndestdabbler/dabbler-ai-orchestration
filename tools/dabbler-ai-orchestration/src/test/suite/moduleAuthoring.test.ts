@@ -2148,7 +2148,7 @@ suite("moduleAuthoring — renderModule*SetSpec (Set 098 S2)", () => {
       assert.deepStrictEqual(prereqs, [{ slug: "102-greeter-plan", condition: "complete" }]);
       // Verification round 1, finding 1 (Major, Correctness): the guidance for
       // newly authored child sets must NOT instruct hand-authoring
-      // session-state.json — that contradicts "state files are the blessed
+      // session-state.json — that contradicts "state files are the sanctioned
       // runtime writers' job" and can produce invalid/duplicated lifecycle
       // state. Pin the corrected guidance so it cannot silently regress.
       assert.ok(

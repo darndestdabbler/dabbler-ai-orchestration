@@ -297,7 +297,7 @@ export function probePythonPresenceCore(
  * True when an already-RESOLVED interpreter path/command plausibly
  * exists: an absolute path must exist on disk; a bare command must be
  * findable on PATH. The pre-spawn check for call sites that already
- * hold a resolved interpreter (e.g. the blessed-writer spawn) — a
+ * hold a resolved interpreter (e.g. the sanctioned-writer spawn) — a
  * cheaper, earlier, friendlier failure than `spawn ... ENOENT`.
  */
 export function interpreterResolves(
@@ -339,7 +339,7 @@ export function probePythonPresence(
  * precisely and the three remedies, so neither an operator nor an AI
  * orchestrator mis-reads a missing base interpreter as a missing-keys
  * or extension problem. Shared by the scaffold pre-flight and the
- * blessed-writer spawn pre-check.
+ * sanctioned-writer spawn pre-check.
  */
 export function describeMissingPython(actionLabel: string): string {
   return (

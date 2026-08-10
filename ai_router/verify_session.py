@@ -420,18 +420,18 @@ DEFAULT_DIFF_EXCLUDES = (
     "*.vsix",
 )
 
-# Framework state/ledger bookkeeping written by blessed writers or read-triggered
+# Framework state/ledger bookkeeping written by sanctioned writers or read-triggered
 # lazy-synth (Set 105). An all-sets status scan / Work Explorer refresh calls
 # ``read_status`` -> ``ensure_session_state_file`` for every spec folder lacking a
 # state file (the Set 7 "every spec folder carries a session-state.json"
 # invariant), materializing UNTRACKED ``not-started`` state files out of band.
 # When the untracked collector inlines their content as "deliverables", the
-# cross-provider verifier -- correctly applying the "blessed writers only, never
+# cross-provider verifier -- correctly applying the "sanctioned writers only, never
 # hand-author session-state.json" discipline -- flags them as violations. They
 # are machine-written, so the finding is a false positive that never clears
 # (the files re-synth between rounds). Classified by BASENAME so the fix covers
 # the set-under-review's own in-progress state file AND sibling sets' not-started
-# files uniformly; both are blessed-writer output that needs no cross-provider
+# files uniformly; both are sanctioned-writer output that needs no cross-provider
 # review. Deliberately NOT a ``DEFAULT_DIFF_EXCLUDES`` entry: a blanket pathspec
 # exclude would also drop TRACKED changes to these files from the diff, blinding
 # the verifier to legitimate state-machinery work (schema/meta sets, committed
@@ -817,7 +817,7 @@ class EvidenceBundle:
     # be safely inlined (reported as explicitly uncovered).
     untracked_included: List[tuple] = field(default_factory=list)
     untracked_omitted: List[tuple] = field(default_factory=list)
-    # Set 105: untracked FRAMEWORK_BOOKKEEPING_FILES (blessed-writer / lazy-synth
+    # Set 105: untracked FRAMEWORK_BOOKKEEPING_FILES (sanctioned-writer / lazy-synth
     # state + ledger output). Neither inlined (untracked_included) nor placed in
     # the "review directly / do not assume clean" bucket (untracked_omitted):
     # they are expected framework output, not reviewed work. Kept as bare paths
@@ -891,10 +891,10 @@ class EvidenceBundle:
                 f"- `{path}`" for path in self.untracked_bookkeeping
             )
             parts.append(
-                "\n\n#### Expected framework bookkeeping (blessed-writer / "
+                "\n\n#### Expected framework bookkeeping (sanctioned-writer / "
                 "lazy-synth output -- NOT reviewed work)\n\n"
                 "These untracked files are framework state/ledger bookkeeping "
-                "materialized by a blessed writer or by the read-triggered "
+                "materialized by a sanctioned writer or by the read-triggered "
                 "`not-started` state synth (the Set 7 \"every spec folder carries "
                 "a `session-state.json`\" invariant, fired by any all-sets status "
                 "scan). They are machine-written, carry no reviewed content, and "
@@ -981,7 +981,7 @@ def _collect_untracked_contents(
     is ``[(path, reason), ...]`` for files that cannot be safely inlined --
     **generated-bundle-excluded**, symlink, oversized, binary/non-UTF-8, or
     unreadable; ``bookkeeping`` is ``[path, ...]`` for
-    :data:`FRAMEWORK_BOOKKEEPING_FILES` (Set 105 -- blessed-writer / lazy-synth
+    :data:`FRAMEWORK_BOOKKEEPING_FILES` (Set 105 -- sanctioned-writer / lazy-synth
     state + ledger output that is expected framework bookkeeping, not reviewed
     work). Every non-inlined file is reported EXPLICITLY (including excluded and
     bookkeeping ones) so a reviewer never mistakes silence for coverage.

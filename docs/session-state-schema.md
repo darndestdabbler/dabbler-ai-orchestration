@@ -3,7 +3,7 @@
 The machine-readable lifecycle file for every session set. The Session
 Set Explorer extension, `ai_router`'s `close_session`, the cancel /
 restore commands, and the cost dashboard all read it; `ai_router`'s
-blessed writers own it.
+sanctioned writers own it.
 
 The schema is **strict where machines parse**: a fixed field set with
 canonical string values for `status`. Field-name drift or status-value
@@ -216,7 +216,7 @@ Each entry is an object with these fields:
 | `startedAt` | ISO 8601 or null | Set on `start_session`. Null until the session begins. |
 | `completedAt` | ISO 8601 or null | Set on `close_session`. Null until the session closes. |
 | `orchestrator` | object or null | Engine / provider / model / effort for the holder of THIS session, omit-null on disk. Null when this session has not yet started; populated by `start_session`; **preserved across `close_session`** as historical attribution on closed sessions. See **Per-session orchestrator block** below. |
-| `verificationVerdict` | string \| null | Set by `close_session` after gate checks via `resolve_close_verdict()`. Three-level precedence: (1) `disposition.verification_verdict` verbatim (wins even under `--force`); (2) for `verification_method == "api"` only, a status-derived fallback (`completed`→`"VERIFIED"`, `failed`/`requires_review`→`"ISSUES_FOUND"`) when no explicit field is set (backward compat for pre-Set-054 dispositions); (3) `null` for manual / skipped / `--no-router` / missing disposition when neither source applies. The canonical tokens are `"VERIFIED"`, `"ISSUES_FOUND"`, and `"WAIVED"`. **Set 086 (S1) added writer-side enforcement** on the active-set close path: the blessed writer accepts *only* an exact (case-insensitively normalized) allowlist — the three canonical tokens plus the intentionally-shipped extension token `"ISSUES_FOUND_RESOLVED_IN_FLIGHT"` — and **rejects anything else**, including a free-form non-verdict (`"manual-override-development"`, the 2026-07-08 confabulation incident) *and* an invented prefix look-alike (`"VERIFIED_NOT_REALLY"`). `null` remains valid (no verdict recorded: manual / skipped / `--no-router` / a mid-set session with no routed verifier). The writer/reader contract is deliberately **asymmetric**: the writer is *strict* (exact allowlist, fail-closed — see `ai_router/session_state.py` `_ALLOWED_VERDICT_TOKENS` / `validate_verification_verdict`), while *readers stay lenient* and match on prefix when bucketing, so a genuinely new extension token added to the writer allowlist is forward-compatible with existing readers. Shipping a new extension token is therefore a deliberate vocabulary change in `session_state.py`. Readers that surface the verdict to a human (e.g. the Session Set Explorer) additionally **flag an unrecognized token** rather than rendering it as a clean verdict (Set 086 S2). |
+| `verificationVerdict` | string \| null | Set by `close_session` after gate checks via `resolve_close_verdict()`. Three-level precedence: (1) `disposition.verification_verdict` verbatim (wins even under `--force`); (2) for `verification_method == "api"` only, a status-derived fallback (`completed`→`"VERIFIED"`, `failed`/`requires_review`→`"ISSUES_FOUND"`) when no explicit field is set (backward compat for pre-Set-054 dispositions); (3) `null` for manual / skipped / `--no-router` / missing disposition when neither source applies. The canonical tokens are `"VERIFIED"`, `"ISSUES_FOUND"`, and `"WAIVED"`. **Set 086 (S1) added writer-side enforcement** on the active-set close path: the sanctioned writer accepts *only* an exact (case-insensitively normalized) allowlist — the three canonical tokens plus the intentionally-shipped extension token `"ISSUES_FOUND_RESOLVED_IN_FLIGHT"` — and **rejects anything else**, including a free-form non-verdict (`"manual-override-development"`, the 2026-07-08 confabulation incident) *and* an invented prefix look-alike (`"VERIFIED_NOT_REALLY"`). `null` remains valid (no verdict recorded: manual / skipped / `--no-router` / a mid-set session with no routed verifier). The writer/reader contract is deliberately **asymmetric**: the writer is *strict* (exact allowlist, fail-closed — see `ai_router/session_state.py` `_ALLOWED_VERDICT_TOKENS` / `validate_verification_verdict`), while *readers stay lenient* and match on prefix when bucketing, so a genuinely new extension token added to the writer allowlist is forward-compatible with existing readers. Shipping a new extension token is therefore a deliberate vocabulary change in `session_state.py`. Readers that surface the verdict to a human (e.g. the Session Set Explorer) additionally **flag an unrecognized token** rather than rendering it as a clean verdict (Set 086 S2). |
 
 ### Per-session `type` — REMOVED (Set 112)
 
@@ -552,7 +552,7 @@ over a violation.
 
 ## One-field-flip worked example (repair / recovery reading)
 
-The blessed writers own this file at runtime — **do not hand-edit it to
+The sanctioned writers own this file at runtime — **do not hand-edit it to
 declare progress** (see *State-mutation discipline* in the session
 constitution; the sanctioned repair path is in
 [`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md)). This

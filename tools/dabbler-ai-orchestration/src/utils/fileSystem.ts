@@ -396,7 +396,7 @@ export function countDistinctCloseoutSessions(eventsPath: string): number {
 // failing the whole scan, because a malformed ledger must degrade to
 // "fewer session rows", never to "this set does not render".
 //
-// `title` falls back to `Session <n>` — the same label the blessed
+// `title` falls back to `Session <n>` — the same label the sanctioned
 // Python writer emits — so a ledger written by an older schema (or
 // hand-edited to drop the field) still produces a legible row instead
 // of an empty one.

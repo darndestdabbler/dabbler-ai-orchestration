@@ -14,7 +14,7 @@ Set 030 replaced the legacy progress triple
 single canonical `sessions[]` ledger. **New writes are always v3.**
 The committed example shows the v3 closed shape with the legacy
 triple still present — that is the **dual-write steady state** the
-The blessed writers emit through Set 030 (per spec decision D5):
+The sanctioned writers emit through Set 030 (per spec decision D5):
 canonical `sessions[]` plus the legacy triple derived from it, so
 consumer repos pinned to older readers keep working through the
 migration.

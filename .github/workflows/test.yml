@@ -76,7 +76,7 @@ jobs:
       # tier. Set 112 deleted the tier; this is the executable proof that
       # the deletion holds, so the tier cannot come back one plausible
       # commit at a time. It classifies by POSITION, not by an allowlist of
-      # blessed files: comments, docstrings and markdown prose may explain
+      # sanctioned files: comments, docstrings and markdown prose may explain
       # the removal freely (the migration message, the historical note, the
       # cross-repo notice and the changelogs all name it), while code
       # outside comments, fenced code blocks, and YAML/JSON bodies may not

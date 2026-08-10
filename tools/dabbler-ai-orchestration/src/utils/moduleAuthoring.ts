@@ -2510,7 +2510,7 @@ export interface ModuleLifecycleScaffoldResult {
  * numbers (mirrors `ai_router.resolve_set.next_session_set_number`), renders
  * both templates into `docs/session-sets/NNN-<module>-plan/` and
  * `docs/session-sets/NNN-<module>-decomposition/` (spec.md only — state
- * files are the blessed runtime writers' job, per `start_session`), and
+ * files are the sanctioned runtime writers' job, per `start_session`), and
  * cross-links the decomposition set's `prerequisites:` to its sibling plan.
  *
  * Skip-existing (identity, not merely path): a module that already has a

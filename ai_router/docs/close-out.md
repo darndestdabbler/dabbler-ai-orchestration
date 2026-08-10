@@ -909,7 +909,7 @@ blocks as a precondition; `activity_log_entry`, `next_orchestrator_present`
 and `change_log_fresh` warn.
 
 **Managing the marker.** The marker is just a file, so an operator *could*
-create it by hand — but the blessed CLI removes the guesswork and records an
+create it by hand — but the sanctioned CLI removes the guesswork and records an
 audit note inside the marker file on enable (an `enabled_at` timestamp, the
 provenance, and an optional reason):
 

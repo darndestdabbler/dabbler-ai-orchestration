@@ -130,7 +130,7 @@ What Set 086 delivered (all on `master`, now shipping):
   `session-events.jsonl` is a high-severity finding that **hard-blocks the close**
   (`gate_checks.check_verification_integrity` + `writer_discipline` ledger check),
   not a silent skip.
-- **Verdict-token validation at the blessed writer**
+- **Verdict-token validation at the sanctioned writer**
   (`session_state.validate_verification_verdict`): an exact normalized allowlist
   (`VERIFIED` / `ISSUES_FOUND` / `WAIVED` + `ISSUES_FOUND_RESOLVED_IN_FLIGHT`); a
   free-form or prefix look-alike token (`VERIFIED_NOT_REALLY`) is **rejected**.

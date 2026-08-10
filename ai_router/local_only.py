@@ -1,4 +1,4 @@
-"""Blessed enable / disable / inspect for the ``.dabbler/local-only`` marker.
+"""Sanctioned enable / disable / inspect for the ``.dabbler/local-only`` marker.
 
 A repository that is *deliberately* remote-less (no git remote, by operator
 decision — and never will have one) carries a ``.dabbler/local-only`` marker
@@ -12,7 +12,7 @@ The full rationale and the behavior matrix live in
 Why a CLI
 ---------
 The marker is just a file — an operator *could* ``touch`` it by hand — but a
-blessed entry point (1) removes the guesswork about the exact path, (2) is
+sanctioned entry point (1) removes the guesswork about the exact path, (2) is
 idempotent so re-running is always safe, and (3) records a small human-readable
 **audit note** *inside the marker file itself* on enable (when, by what, why).
 That note is the durable record explaining why the push gate later

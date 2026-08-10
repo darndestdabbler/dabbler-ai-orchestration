@@ -747,7 +747,7 @@ each id is in the active tier (D2: one id, one trailer).
   right, wrong on the writer** — which is exactly why the "delete before each
   run" workaround failed. Diagnostic move: before deleting an evidence artifact
   a verifier keeps flagging, find *who writes it and when*; if it is a
-  read-triggered/blessed writer, the fix belongs in the **evidence-assembly
+  read-triggered/sanctioned writer, the fix belongs in the **evidence-assembly
   layer** (reclassify the machine-written file as expected bookkeeping, not
   reviewed work), not in the file or the writer.
 - **Archival rationale (born archived, Set 105):** the fix shipped an

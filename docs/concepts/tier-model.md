@@ -20,7 +20,7 @@ Between Sets 048 and 112 a session set declared `tier: full` or
 switch controlled exactly one thing: **whether the project made external,
 metered LLM API calls.** `tier: lightweight` resolved to `--no-router` (zero
 API calls); everything else — the `.venv`, `dabbler-ai-router`,
-`start_session` / `close_session`, the blessed state-file writer, the state
+`start_session` / `close_session`, the sanctioned state-file writer, the state
 schema, the close-out gate — was identical on both tiers.
 
 The single most-repeated correction the doc carried was:

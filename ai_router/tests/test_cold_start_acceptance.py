@@ -11,7 +11,7 @@ This is the regression guard for the operator failure that motivated the set:
 a freshly scaffolded repo whose missing engine files / start-here left the
 orchestrator with no next step. The test asserts the rendered artifacts
 (a) carry the cold-start pointers and the verbatim active-set rule, and
-(b) register and close cleanly through the blessed lifecycle.
+(b) register and close cleanly through the sanctioned lifecycle.
 
 Set 112 deleted the Lightweight tier, so the ``lightweight`` fixture tree and
 the tier-drives-router-mode link are gone. The router mode is now decided by

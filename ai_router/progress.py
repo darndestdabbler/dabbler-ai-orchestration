@@ -74,7 +74,7 @@ LIFECYCLE_STATE_CLOSED = "closed"
 
 # Set 057: per-session ``type`` field. Default ``work``; absent or ``work``
 # for every entry a current writer produces. Set 112 deleted the Lightweight
-# dedicated-verification flow and its blessed typed-session writer, so
+# dedicated-verification flow and its sanctioned typed-session writer, so
 # ``verification`` and ``remediation`` entries are no longer CREATED — the
 # tokens survive as READ vocabulary so archived sets that recorded typed
 # sessions still parse and render. The field is additive and

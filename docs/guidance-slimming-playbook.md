@@ -97,7 +97,7 @@ per-session operating doc (the origin repo budgets it at ≤4k tokens:
 
 - the session step sequence (happy path only);
 - source-of-truth and conflict-resolution rules;
-- state-mutation discipline (blessed writers only);
+- state-mutation discipline (sanctioned writers only);
 - the irreversible-action operator-approval list;
 - definition of done per tier;
 - recovery/escalation rules (when to stop retrying, who adjudicates);

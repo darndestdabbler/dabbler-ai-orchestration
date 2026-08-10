@@ -141,11 +141,11 @@ Run every router CLI through the workspace venv
   `sN-issues*.json`, and `path-aware-critique.json` are never edited
   after they are written; retries append sibling round files.
 
-## State-mutation discipline — blessed writers only
+## State-mutation discipline — sanctioned writers only
 
 - `start_session` and `close_session` are the only writers of
   `session-state.json` and the events ledger; cancel/restore goes
-  through its own blessed writer. **Never freehand-edit state to declare
+  through its own sanctioned writer. **Never freehand-edit state to declare
   progress** — that is mixed-mode drift; recover through the close-out
   doc's sanctioned repair path, not a hand edit. Open the schema doc
   when a state question arises.

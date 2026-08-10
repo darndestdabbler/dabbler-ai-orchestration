@@ -23,7 +23,7 @@ changelogs, and the comments that tell a future reader why a branch is
 missing. A gate that failed on those would either fail on its own
 documentation or force the removal to go undocumented.
 
-So this gate does not keep an allowlist of blessed files (an allowlist ages
+So this gate does not keep an allowlist of sanctioned files (an allowlist ages
 into a blanket exemption — anything could resurrect inside a listed file).
 It classifies by *position*:
 

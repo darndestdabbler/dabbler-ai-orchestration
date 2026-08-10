@@ -433,7 +433,7 @@ class TestEvidenceAssembly:
 
 class TestFrameworkBookkeepingReclassification:
     """An untracked, lazily-synthesized ``session-state.json`` (and the ledger
-    siblings) is blessed-writer output, not a session deliverable. It must
+    siblings) is sanctioned-writer output, not a session deliverable. It must
     render as *expected framework bookkeeping* -- never inlined as content the
     verifier grades, and never in the "review directly / do not assume clean"
     bucket -- so the cross-provider "never hand-author state" rule stops
@@ -497,7 +497,7 @@ class TestFrameworkBookkeepingReclassification:
 
     def test_events_and_activity_log_covered_symmetrically(self, repo: Path):
         # session-events.jsonl and activity-log.json are the ledger siblings --
-        # same blessed-writer / lazy-synth class, same reclassification.
+        # same sanctioned-writer / lazy-synth class, same reclassification.
         (repo / "session-events.jsonl").write_text(
             '{"event": "' + self._SENTINEL + '"}\n', encoding="utf-8"
         )

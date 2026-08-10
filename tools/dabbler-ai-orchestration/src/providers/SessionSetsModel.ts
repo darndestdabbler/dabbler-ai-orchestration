@@ -67,7 +67,7 @@ export function verdictFractionTooltip(set: SessionSet): string {
   // e.g. the confabulated `manual-override-development` the Set-086 root-cause
   // incident wrote — must NEVER render as if it were a clean verdict. Flag it
   // as unrecognized so the reader surfaces the anomaly instead of laundering a
-  // non-verdict into a legitimate-looking status. (The blessed writer now
+  // non-verdict into a legitimate-looking status. (The sanctioned writer now
   // rejects such tokens outright; this reader guards data that predates the
   // writer enforcement or was hand-authored around it.)
   if (!isRecognizedVerdictToken(verdict)) {

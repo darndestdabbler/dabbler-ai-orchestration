@@ -102,7 +102,7 @@ except ImportError:
 
 SESSION_STATE_FILENAME = "session-state.json"
 
-# Set 086 S1: verdict-token validation at the blessed writer.
+# Set 086 S1: verdict-token validation at the sanctioned writer.
 #
 # ``verificationVerdict`` is a typed string (not an enum) on disk because
 # readers PREFIX-MATCH it — that reader-tolerant contract lets a reader
@@ -133,7 +133,7 @@ _ALLOWED_VERDICT_TOKENS = frozenset(
 
 
 class InvalidVerificationVerdictError(ValueError):
-    """Raised by the blessed writer when asked to persist a non-verdict token
+    """Raised by the sanctioned writer when asked to persist a non-verdict token
     into ``verificationVerdict``. A ``ValueError`` subclass so existing
     ``except ValueError`` callers still catch it."""
 
@@ -181,17 +181,17 @@ def validate_verification_verdict(token: object) -> Optional[str]:
 
 
 def normalize_verification_verdict(token: object) -> Optional[str]:
-    """Return the CANONICAL blessed token for an accepted verdict, ``None`` for
+    """Return the CANONICAL sanctioned token for an accepted verdict, ``None`` for
     ``None``, or raise :class:`InvalidVerificationVerdictError` for a
     non-verdict.
 
     Round-4 finding: validation alone is not enough — a tolerated but
     non-canonical spelling (``'verified'``, ``' VERIFIED '``) must be
-    canonicalized to its exact blessed token before it is persisted, because
+    canonicalized to its exact sanctioned token before it is persisted, because
     the on-disk value is load-bearing for EXACT-match readers (the extension's
     ``verdict === "VERIFIED"``). Since every allowed token is stored
     upper-cased, the canonical form is ``token.strip().upper()``. This is the
-    writer's single normalization+validation entry point; the blessed writer
+    writer's single normalization+validation entry point; the sanctioned writer
     calls it so no non-canonical verdict can ever reach disk.
     """
     if token is None:
@@ -586,7 +586,7 @@ def _build_sessions_array(
     spec_titles = _spec_titles_for_set(session_set_dir)
     # Set 057: carry forward any non-``work`` ``type`` from the prior
     # on-disk ledger so a verification / remediation session appended by
-    # the blessed writer is not silently demoted to ``work`` when a later
+    # the sanctioned writer is not silently demoted to ``work`` when a later
     # boundary write (register_session_start / _flip_state_to_closed)
     # rebuilds sessions[]. Only non-``work`` types are emitted — absent
     # ``type`` means ``work`` everywhere, so historical and Full-tier
@@ -1239,7 +1239,7 @@ def _flip_state_to_closed(
     Returns the file path if it existed and was updated, ``None`` if no
     state file existed.
 
-    Set 086 S1: the blessed writer refuses to persist a non-verdict token.
+    Set 086 S1: the sanctioned writer refuses to persist a non-verdict token.
     Validation runs FIRST — before any file read or mutation — so an illegal
     verdict raises :class:`InvalidVerificationVerdictError` with no on-disk
     side effect (no partial close). The active-set close path
@@ -1249,7 +1249,7 @@ def _flip_state_to_closed(
     confabulated verdict into ``verificationVerdict``.
     """
     # Validate AND canonicalize (Round-4 finding): a tolerated but
-    # non-canonical spelling is normalized to its exact blessed token before
+    # non-canonical spelling is normalized to its exact sanctioned token before
     # anything is written, so an exact-match reader never sees ' verified '.
     # Runs first — before any file read/mutation — so an invalid token raises
     # with no on-disk side effect.

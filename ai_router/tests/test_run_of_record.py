@@ -337,7 +337,7 @@ class TestDefaultSuiteCoverage:
     The authoring guide's non-negotiable Layer 3 list is four surfaces:
     the Explorer rendering surface, a state-file writer, the extension
     manifest, and the fixture harness. The map originally carried only the
-    first and third, so a session that changed a blessed writer or the
+    first and third, so a session that changed a sanctioned writer or the
     harness staging the fixtures could close with Playwright reported "not
     required" — the exact rendering-regression class the static gates and
     Layer 2 cannot see.

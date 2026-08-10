@@ -598,7 +598,7 @@ def check_pushed_to_remote(
     missing-upstream / ahead-of-upstream failures apply unchanged. A repo
     without the marker is unchanged in every case.
 
-    Set/clear the marker through the blessed CLI
+    Set/clear the marker through the sanctioned CLI
     (``python -m ai_router.local_only --enable | --disable | --status``),
     which records an audit note inside the marker on enable. The sanctioned
     local-only close path — and how it contrasts with incident-recovery
@@ -1214,7 +1214,7 @@ def _check_session_ledger_present(session_set_dir: str) -> GateOutcome:
 
     A Full-tier close must be corroborated by a real router-written events
     ledger (``session-events.jsonl``, created by ``start_session`` and
-    appended by every blessed writer). Its **absence** is the one signature a
+    appended by every sanctioned writer). Its **absence** is the one signature a
     fully-simulated session leaves — no canonical writer ever ran — and it is
     exactly the case ``writer_discipline`` historically *skipped*. Here we opt
     into its strict ``require_ledger=True`` mode so an absent or empty ledger

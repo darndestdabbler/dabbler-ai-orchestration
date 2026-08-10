@@ -672,7 +672,7 @@ export async function openSessionSetsView(
   page: Page,
 ): Promise<import("@playwright/test").FrameLocator> {
   const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]',
+    '.activitybar .action-label[aria-label*="AI Work Explorer"]',
   );
   await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
   await activityIcon.click();
@@ -806,7 +806,7 @@ export function stampModule(h: FixtureHandle, moduleSlug: string): void {
  */
 export async function openDabblerContainer(page: Page): Promise<void> {
   const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="Dabbler AI Orchestration"]',
+    '.activitybar .action-label[aria-label*="AI Work Explorer"]',
   );
   await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
   await activityIcon.click();

@@ -4,6 +4,10 @@
   "verification_method": "api",
   "verification_verdict": "WAIVED",
   "verification_message_ids": [],
+  "checklist": {
+    "status": "waived",
+    "attestation": "Operator, 2026-08-10, third AskUserQuestion brief this session: the step-checklist was not posted at 11 transitions during the long 4-round verification loop (each round, each test-run-recorded event, the operator-stop) -- posted at session start, once mid-session, and before close, but not at every individual transition the cadence requires. Attested waiver, close now: every fact the missed posts would have shown is independently recorded in activity-log.json, s1-rounds.jsonl and test-runs.jsonl, and every other gate (verification-integrity via --manual-verify, test freshness, activity log, next-orchestrator, working tree, push) passed."
+  },
   "next_orchestrator": {
     "engine": "claude",
     "provider": "anthropic",

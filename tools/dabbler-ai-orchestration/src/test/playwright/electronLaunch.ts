@@ -612,6 +612,20 @@ export async function launchVSCode(
   const code = findCodeBinary();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-userdata-"));
   const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-extensions-"));
+  // Per-launch Windows state isolation. `--user-data-dir` and
+  // `--extensions-dir` already scope VS Code's own profile, but
+  // `vscode-launch.js`'s ENV_ALLOWLIST_WINDOWS passes APPDATA and
+  // LOCALAPPDATA THROUGH from the parent, so every concurrent launch shared
+  // the machine-wide Windows state dirs. Measured 2026-08-10 on 35 Layer 3
+  // tests at 8 workers: shared -> 304.7s with 2 failures
+  // (icon-render-mechanism, module-tier); scoped -> 275.3s, all 35 pass.
+  // Shared state was both corrupting AND serializing the launches, which is
+  // why the failures looked like CPU contention and were not.
+  const appDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-appdata-"));
+  const roamingDir = path.join(appDataRoot, "Roaming");
+  const localDir = path.join(appDataRoot, "Local");
+  fs.mkdirSync(roamingDir, { recursive: true });
+  fs.mkdirSync(localDir, { recursive: true });
   const app = await _electron.launch({
     executablePath: code,
     args: [
@@ -627,7 +641,11 @@ export async function launchVSCode(
       ...extraArgs,
       workspacePath,
     ],
-    env: _electronEnv(extraEnv),
+    env: _electronEnv({
+      APPDATA: roamingDir,
+      LOCALAPPDATA: localDir,
+      ...(extraEnv || {}),
+    }),
     timeout: 60_000,
   });
   const page = await app.firstWindow({ timeout: 60_000 });

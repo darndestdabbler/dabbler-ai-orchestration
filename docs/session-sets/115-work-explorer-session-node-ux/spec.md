@@ -15,6 +15,14 @@
 > **Session Set:** `docs/session-sets/115-work-explorer-session-node-ux/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
 
+> **Operator notes are required reading.**
+> [`operator-notes.md`](operator-notes.md) carries three step-list
+> defects the operator observed live in the Explorer on 2026-08-10
+> — a completed step rendering as not-done, `<- here` on the wrong
+> row, and an unplanned step ordered after a pending planned one —
+> with root causes diagnosed from the session that produced them.
+> Two are bugs; the third is a design question to decide, not patch.
+
 ---
 
 ## Session Set Configuration

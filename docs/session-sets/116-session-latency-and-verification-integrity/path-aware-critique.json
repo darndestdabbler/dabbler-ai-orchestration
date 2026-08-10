@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "116-session-latency-and-verification-integrity",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-08-10T14:33:39.383178-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I reviewed the Set 116 S3 implementation in ai_router/gate_checks.py, close_session.py, session_state.py, run_of_record.py, close_backstop.py, and the related tests/docs. The blocking/advisory split is mostly wired through consistently, but one load-bearing claim in the docs is contradicted by the code and would materially change operator behavior on a supported close path.",
+      "findings": [
+        {
+          "description": "Violation: ai_router/docs/close-out.md now states of the manual override path that \"Set 116 S3 note: the method-vocabulary check is now advisory, so on this path it warns rather than refuses\" and that an attested close can persist a retired token. Impact: that is false on the actual close path and would change a reasonable reviewer's merge decision, because it misinstructs operators about when an illegal verification_method will be surfaced. Under --manual-verify, close_session._run_gate_checks() marks verification_integrity passed without running its predicate, and close_session.run() only appends advisory WARNING lines after the backstop branch. But close_backstop.run_close_backstop() is entered before that gate phase and still short-circuits on an illegal token, returning STATUS_SKIPPED_VOCABULARY with the message \"fix the token (or close with --manual-verify, which the operator's ruling now lets through with a warning)\"; on the manual-verify path the backstop is skipped entirely, so that message is never what actually governs the close. The only real on-disk behavior change for --manual-verify is the later advisory gate row from gate_checks.check_verification_method_vocabulary, not the backstop skip rationale the docs now cite. Evidence: ai_router/close_session.py enters the backstop only when not force/manual_verify/no_router, while ai_router/docs/close-out.md Section 3 step 8 says the warning applies on the manual override path as if it were a general close-time fact. Fix: rewrite the docs to distinguish ordinary closes from --manual-verify explicitly, and avoid claiming the backstop's illegal-token rationale applies on a path that never runs the backstop.",
+          "severity": "Major",
+          "category": "contract-drift"
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I have reviewed the changes, focusing on the re-classification of close-out gates into blocking, precondition, and advisory checks. I verified the implementation in `ai_router/gate_checks.py` and its correct usage in consumers `ai_router/close_session.py` and `ai_router/session_state.py`. The claimed bug fix preventing a crash when the `change_log_fresh` gate was demoted is correctly implemented and covered by a regression test. The strengthening of the `test_run_fresh` gate was also confirmed in `ai_router/run_of_record.py` and its associated tests. The documentation has been updated to be consistent with all code changes. The implementation is robust, well-tested, and I found no inconsistencies or defects.",
+      "findings": []
+    }
+  ]
+}

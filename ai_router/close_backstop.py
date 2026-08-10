@@ -554,9 +554,11 @@ def run_close_backstop(
             messages=[
                 "backstop skipped: disposition.verification_method is "
                 "illegal, so no evidence this round could buy would let "
-                "the close pass; fix the token (or close with "
-                "--manual-verify, which the operator's ruling now lets "
-                "through with a warning)"
+                "the close pass. Fix the token. (A separate invocation, "
+                "close_session --manual-verify, does not reach this "
+                "backstop at all and would close with only an advisory "
+                "warning about the token -- that is a different, "
+                "attested path, not this one.)"
             ],
         )
 

@@ -242,6 +242,79 @@ Full per-nit dispositions: [`s3-nit-dispositions.md`](s3-nit-dispositions.md).
   reconcile the declared default with whatever it fixes** — the two
   should not be left disagreeing.
 
+## The end-of-set path-aware critique (`required`)
+
+Two critics, each reading the repo itself: **`gemini-2.5-pro` returned
+VERIFIED** — *"the documentation has been updated to be consistent with
+all code changes"* — and **`gpt-5.4` returned ISSUES_FOUND with one
+Major**, claiming `close-out.md`'s attested-override bullet was false on
+the actual close path.
+
+**The Major was dismissed as a false positive, on operator adjudication,
+with an executable citation rather than an opinion.** The doc statement
+is true and a passing regression test asserts precisely it: the test
+closes the real Set 083 incident disposition on the attested-override
+path and gets `result=succeeded`, `vocab.passed=False`,
+`vocab.blocking=False`. On that path the backstop is skipped,
+`verification_integrity` is excused by the attestation, and every other
+predicate — including the new vocabulary row — still runs and warns. The
+critic's own text concedes this before labelling the doc that says so
+false.
+
+**Its one real grain was taken.** The *backstop's* refusal message read
+"…or close with the attested override, which the operator's ruling now
+lets through with a warning" — accurate advice about a different
+invocation, but a careful reader could take it as describing the
+backstop path. It now says explicitly that the attested override is a
+separate invocation which never reaches the backstop at all.
+
+This is the second time in this set that a path-aware critique earned
+its cost by disagreeing with a clean routed round, and the first time it
+was *wrong* — worth recording both ways. The adjudication, its options
+and the attestation are in `decisions.jsonl`.
+
+## Step 9 — the reorganization review (terminal session)
+
+**Outcome: no guidance edits made. One recommendation for the operator.**
+
+Both preload files sit **at their ceilings** — `project-guidance.md`
+3,499/3,499 and `lessons-learned.md` 2,379/2,385, with the corpus at
+11,843/12,000. Ceilings ratchet down only, so adding prose means
+removing prose, and that is an operator action. The honest outcome is no
+edit plus the recommendation below, not a silent squeeze.
+
+**Lessons cited, and why.** `L-064-8` (*a replacement doc inherits the
+retired doc's claims at its peril*) was instrumental in the most literal
+way available: **three of round 1's five nits were exactly that defect**
+— text written *this session* asserting current behaviour that the code
+beside it contradicted. `L-112-1` (*a gate that only ever passes proves
+nothing — ship it with falsifiers*) is why both sides of the `covers`
+boundary are now planted rather than only the exempt one.
+
+**Recommended addition, if the operator ever frees the budget** — a
+Conventions entry under *Workflow Expectations*, roughly:
+
+> **Demoting a gate is not a local change — find every sibling of the
+> guarantee you are removing.** L-069-1 says a bug is a bug *class*;
+> this is the same rule read backwards. While a gate blocks, every other
+> code path that keyed on the condition it enforced is **unreachable,
+> and therefore untested**. Remove the veto and those paths run for the
+> first time. Set 116 S3 demoted `change_log_fresh` and discovered that
+> `_flip_state_to_closed` had independently required `change-log.md` to
+> be present before calling a session the last one; the demotion turned
+> a clean refusal into a raised `SessionStateInvariantError`. Before
+> demoting or deleting a check, grep for every other consumer of the
+> condition it asserted, and assert the resulting **state**, not merely
+> that the operation succeeded.
+
+It meets four of the five preload admission criteria — high miss cost, weak
+automated detectability, no executable-gate equivalent, well under 150
+tokens — and fails the fifth: **one occurrence is not recurrence.** A
+second instance in a later set would settle it. `cite_lessons` also
+flagged that `L-069-1` is archived-promoted and suggested reactivation;
+that too is a budget decision, and the backwards reading above is the
+part that is actually new.
+
 ## Where the canonical detail lives
 
 | Topic | Canonical |

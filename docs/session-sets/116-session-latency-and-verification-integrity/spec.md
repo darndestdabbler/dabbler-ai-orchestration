@@ -21,6 +21,11 @@
 > closed. This is deliberately not a spec-level `prerequisites:` block: the
 > urgent, self-funding half must not be blocked behind an in-flight set.
 
+> **Operator notes are required reading.**
+> [`operator-notes.md`](operator-notes.md) carries the operator's
+> 2026-08-10 **gate ruling** — the per-gate disposition Session 3
+> implements. It is direction; Session 3 still journals the attestation.
+
 ---
 
 ## Session Set Configuration
@@ -190,19 +195,20 @@ session, including Sessions 2 and 3 of this set.
    edits files it currently owns.
 2. **Operator decision, journaled.** Reducing gates is a verification
    reduction and sits inside the decision-rights hard carve-out; it is never
-   self-authorized. Present the ten current gates
-   (`working_tree_clean`, `pushed_to_remote`, `activity_log_entry`,
-   `next_orchestrator_present`, `change_log_fresh`,
-   `verification_method_vocabulary`, `verification_integrity`,
-   `test_run_fresh`, `uat_walk_recorded`, `checklist_posted`) against the
-   operator's three, and record the ruling per gate with its reason.
-3. **Implement the ruling.** Expected shape, subject to step 2: keep
-   `verification_integrity`, `uat_walk_recorded`, `test_run_fresh`; keep
+   self-authorized. **The operator ruled on 2026-08-10 — see
+   [`operator-notes.md`](operator-notes.md) for the per-gate disposition.**
+   That is direction; this step still records the attestation in
+   `decisions.jsonl` at the time of implementation, and confirms the ruling
+   still stands before acting on it.
+3. **Implement the ruling.** Keep `verification_integrity`,
+   `uat_walk_recorded` and `test_run_fresh` as gates. Keep
    `working_tree_clean` and `pushed_to_remote` as **transactional
-   preconditions** rather than gates — they protect the write, not the
-   ceremony; delete `checklist_posted` first, since it proves a render
-   rather than a reading, and its first dogfood required a waiver after a
-   6.83h blocked gap. Delete each removed gate's tests with it.
+   preconditions** — they protect the write, not the ceremony. **Delete**
+   `checklist_posted`, and its tests with it. **Demote to warn-not-block**
+   `activity_log_entry`, `next_orchestrator_present`, `change_log_fresh` and
+   `verification_method_vocabulary`: the check still runs and still prints,
+   but it cannot refuse a close.
+
 4. **Make `test_run_fresh` govern the applicable suites.** pytest is
    `expensive=False` today, which is why a session could run 15 suites
    unremarked. Scope it to the surfaces the session actually touched, so a

@@ -96,6 +96,14 @@ Two distinct defects, not one:
 speedup curve flattens long before core count, so the final few cores trade
 a usable machine for seconds.
 
+**The operator observed NO machine slowdown at 8 workers.** That is the
+decisive datum. If the machine was not saturated, the 2 failures were not
+CPU starvation — and the poor speedup (35 tests, 8 workers, only ~1.6x over
+serial) is not saturation either. Both point at the same suspect: **shared
+`APPDATA` / `LOCALAPPDATA` serializing and colliding across launches.**
+Shared state would explain the failures *and* the missing speedup, which
+CPU contention alone does not.
+
 **CI runs everything again, three times.** `.github/workflows/test.yml`
 matrices both pytest and Playwright across `ubuntu-latest`, `macos-latest`
 and `windows-latest`. Those jobs run in parallel, so CI *wall clock* is the
@@ -104,85 +112,128 @@ slowest job, not the sum — but CI wall clock gates **releases** through the
 
 ## Decisions already made — do not reopen
 
-1. **Parallelism is bounded by measurement, never by `auto`.** A worker
+1. **Isolation is fixed before the worker ceiling is chosen.** The ceiling
+   is a consequence of how well launches are isolated, so choosing it first
+   would cap the suite at a number that only reflects a bug.
+2. **Parallelism is bounded by measurement, never by `auto`.** A worker
    count is chosen because it was measured on the target machine, and the
-   config records the number *and the reason*. "Use all the cores" is how
-   this becomes a problem again.
-2. **The baseline-measurement test is quarantined, not deleted.** Its number
+   config records the number *and the reason*.
+3. **The baseline-measurement test is quarantined, not deleted.** Its number
    is the only real-host cold-launch datum the repo has. It runs alone.
-3. **No test deletion, and no test-selection tooling.** Same as Set 116:
+4. **Retries never turn red into green.** A failure that passes in isolation
+   is a *diagnostic*, not a pass.
+5. **No test deletion, and no test-selection tooling.** Same as Set 116:
    measured payoff is near zero and the risk is shipping a regression.
+6. **Probe-and-adjust is refused for now.** Both consulted reviewers priced
+   it at 250-500 lines for under a minute of typical benefit, and it needs a
+   custom two-invocation runner that partitions the suite and stitches two
+   reports together. Revisit only if telemetry later shows load-driven
+   variance actually costing time.
+7. **The `Dabbler: Adjust Test Workers` command is deferred**, not refused.
+   Tuning should be rare once the default is safe. If it ships later it only
+   shows/sets/resets, writing through a shared CLI so PyPI consumers keep
+   parity.
 
 ## Non-goals
 
 - **No new Playwright tests.**
 - **No change to what the tests assert.** This set changes how they are
-  scheduled, and nothing else.
+  scheduled and isolated, and nothing else.
 - **No sharding across machines.** One machine, bounded workers.
+- **No fixing of product races**, if that is what Session 1 finds. Recording
+  them precisely is in scope; repairing them is a later set.
 
 ---
 
 ## Sessions
 
-### Session 1 of 2: Quarantine the measurement, parallelize the rest
+### Session 1 of 3: Isolate the launch, then re-test the ceiling
+
+The hypothesis this session exists to settle: **the failures and the poor
+speedup have one cause, and it is shared state, not CPU.**
+
+**Steps:**
+
+1. Register.
+2. **Give every launch its own `APPDATA` / `LOCALAPPDATA`** (and
+   `HOME` / `USERPROFILE`) pointing at a fresh tmpdir.
+   `vscode-launch.js::electronEnv` merges its `extra` argument **after**
+   allowlist filtering, and `electronLaunch.ts` already has a
+   `homeOverride` path for `HOME`/`USERPROFILE` — so this extends an
+   existing seam rather than inventing one. Keep the allowlist discipline
+   intact: the point is to *scope* these variables, not to widen what is
+   inherited.
+3. **Re-test the ceiling.** Re-run the 8-worker configuration that
+   previously failed. If isolation fixes both the failures and the speedup,
+   the ceiling is far above 4 and the whole "bounded workers" framing
+   relaxes. Sweep upward from the last known-good rather than assuming a cap.
+4. **Record the outcome either way.** If failures persist under full
+   isolation, they are **product races** exposed by a schedule this suite
+   has never run — a real finding, out of scope to fix, and it must be
+   written down rather than relabelled as flakiness.
+5. Full Layer 3 and pytest at close after freeze; verify, close.
+
+**Creates:** per-launch env isolation, the re-measured ceiling, the race-vs-contention verdict
+**Touches:** `tools/dabbler-ai-orchestration/scripts/vscode-launch.js`, `src/test/playwright/electronLaunch.ts`
+**Ends with:** launches no longer share machine-wide state, and the worker ceiling is a measurement rather than a guess.
+**Progress keys:** `envIsolated`, `ceilingRetested`, `raceVerdict`
+
+---
+
+### Session 2 of 3: Quarantine the measurement, and make retries loud
 
 **Steps:**
 
 1. Register.
 2. **Quarantine `real-host-baseline`.** Give it its own Playwright project
-   (or `describe.serial`) pinned to **one worker with nothing else running**,
-   so the cold-launch number it exists to produce is measured under the
-   conditions it claims. Record the isolated figure (1.9 min measured
-   2026-08-10) beside it, so a future contended reading is visibly wrong.
-3. **Parallelize the remaining 35** with a bounded worker count, sweeping
-   **2 / 3 / 4** on the session machine — **not 6 or 8**, which are already
-   measured red and must stay untested until the failures are triaged.
-   Keep the best that leaves the desktop usable; **record the sweep, not
-   just the winner.** Realistic target is ~7 min total against 10.1 today.
-4. **Prove it is not flaky, and triage the two known failures.** Run the
-   full suite **three times** at the chosen setting. Then determine whether
-   `icon-render-mechanism.spec.ts:158` and `module-tier.spec.ts:157` failed
-   from CPU starvation or from **shared `APPDATA`/`LOCALAPPDATA`** — the
-   suite has only ever run serially, so these may be pre-existing product
-   races this schedule is exercising for the first time. Record the answer;
-   fixing it is out of scope, **calling it "flakiness" without evidence is
-   not.**
+   pinned to one worker **with nothing else running** — a `describe.serial`
+   alone does not guarantee that, so use a project dependency or a separate
+   invocation. Record the isolated figure (1.9 min, 2026-08-10) beside it so
+   a later contended reading is visibly wrong.
+3. **Set the worker count from Session 1's re-measurement**, sweeping around
+   it and keeping the best that leaves the desktop usable. **Record the
+   sweep, not just the winner**, and the reason in the config comment.
+4. **Loud retries, never forgiving ones.** Primary run at `retries: 0`; on
+   failure, re-run `--last-failed --workers=1 --retries=0`; **preserve the
+   original red exit regardless of isolated success**; report either
+   `FAILED; PASSED IN ISOLATION — RACE/CONTENTION CANDIDATE` or
+   `FAILED AGAIN IN ISOLATION`. Keep both attempts' artifacts. A green
+   "flaky" annotation that hides a race is the outcome this framework exists
+   to prevent.
+5. **Three consecutive green runs** at the chosen setting before it is
+   trusted; then full Layer 3 at close after freeze; verify, close.
 
-5. Full suite at close after freeze; verify, close.
-
-**Creates:** the quarantined baseline project, the bounded worker setting, the sweep record, the triple-run evidence
-**Touches:** `tools/dabbler-ai-orchestration/playwright.config.ts`, `src/test/playwright/`
-**Ends with:** Layer 3 costs ~7 minutes instead of ~10, and the one test that measures performance is measured under conditions that make its number true.
-**Progress keys:** `baselineQuarantined`, `workerSweep`, `flakinessTripleRun`
+**Creates:** the quarantined baseline project, the worker setting and its sweep, the loud-retry path
+**Touches:** `tools/dabbler-ai-orchestration/playwright.config.ts`, `src/test/playwright/`, `package.json` scripts
+**Ends with:** Layer 3 is fast, its performance test is measured honestly, and a failure can never become a silent pass.
+**Progress keys:** `baselineQuarantined`, `workerSweep`, `loudRetries`, `tripleGreen`
 
 ---
 
-### Session 2 of 2: One bounded-parallelism policy, including CI
+### Session 3 of 3: One bounded-parallelism policy, including CI
 
 **Steps:**
 
 1. Register.
-2. **Audit what Set 116 S1 chose for pytest.** If it adopted `-n auto`,
-   replace it with a bounded count that leaves headroom on a 14-core
-   machine, and **write the reason into the config comment** — otherwise the
-   next reader "optimizes" it back to `auto` and re-creates the unusable
-   desktop. If S1 already bounded it, confirm the number against a sweep on
-   the session machine rather than inheriting it untested.
-3. **State the policy once, in one place**: parallel by default, bounded by
-   measurement, headroom preserved, and any test that *measures performance*
-   runs alone. Put it where the test-run policy already lives so it is found
-   by someone reading about tests, not buried in a set folder.
-4. **Adopt bounded parallelism in CI**, with its own expectation stated:
-   GitHub-hosted runners are small (2-4 cores), so the gain is roughly 2x
-   rather than the 3.6x seen locally, and CI wall clock gates **releases**
-   via `require-green-test`, not sessions. Measure one run before and after
-   rather than assuming the local number transfers.
+2. **Audit what Set 116 S1 chose for pytest.** If it adopted bare `-n auto`,
+   bound it. Note `-n auto` means **physical** cores, not logical, and
+   xdist has **no percentage form** — the portable mechanism is the
+   `pytest_xdist_auto_num_workers` hook in `conftest.py`, which ships to
+   PyPI consumers who have no extension, plus
+   `PYTEST_XDIST_AUTO_NUM_WORKERS` and `--maxprocesses` for overrides.
+3. **State the policy once, where the test-run policy already lives:**
+   parallel by default, bounded by measurement, headroom preserved, and any
+   test that *measures performance* runs alone.
+4. **Adopt bounded parallelism in CI**, with its expectation stated:
+   runners are small (2-4 cores), so expect roughly 2x rather than the
+   local figure, and CI wall clock gates **releases** via
+   `require-green-test`, not sessions. Measure one run before and after.
 5. Full suite at close after freeze; verify, close; `change-log.md`,
    Step 9 review, advisory path-aware critique.
 
 **Creates:** the pytest worker audit, the written policy, the CI change, `change-log.md`
-**Touches:** `pyproject.toml`, `CONTRIBUTING.md`, `docs/planning/session-set-authoring-guide.md`, `.github/workflows/test.yml`
-**Ends with:** one rule for parallelism that a reader can apply without re-deriving it, and CI that benefits without anyone claiming the local speedup applies there.
+**Touches:** `ai_router/conftest.py`, `pyproject.toml`, `CONTRIBUTING.md`, `docs/planning/session-set-authoring-guide.md`, `.github/workflows/test.yml`
+**Ends with:** one rule for parallelism a reader can apply without re-deriving it, and CI that benefits without anyone claiming the local speedup transfers.
 **Progress keys:** `pytestWorkersAudited`, `policyWritten`, `ciParallelized`, `changeLog`
 
 ---

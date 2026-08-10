@@ -5,7 +5,7 @@
   "sessions": [
     {
       "number": 1,
-      "title": "Session 1",
+      "title": "Isolate the launch, then re-test the ceiling",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,
@@ -14,7 +14,16 @@
     },
     {
       "number": 2,
-      "title": "Session 2",
+      "title": "One bounded-parallelism policy, including CI",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "One bounded-parallelism policy, including CI",
       "status": "not-started",
       "startedAt": null,
       "completedAt": null,

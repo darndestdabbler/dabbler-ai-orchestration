@@ -542,6 +542,10 @@ const _launch = require("../../../scripts/vscode-launch.js") as {
     platform?: NodeJS.Platform,
     io?: BinaryProbeIo,
   ) => string;
+  makeLaunchStateDirs: (opts?: {
+    baseDir?: string;
+    platform?: NodeJS.Platform;
+  }) => { root: string; env: { [key: string]: string } };
 };
 
 /** The filesystem surface {@link resolveCodeExecutable} needs. */
@@ -582,6 +586,12 @@ export interface LaunchedVSCode {
   page: Page;
   userDataDir: string;
   extensionsDir: string;
+  /**
+   * The per-launch platform state root (APPDATA / LOCALAPPDATA / HOME). One
+   * directory, so teardown removes it with a single call — see
+   * `makeLaunchStateDirs` in `scripts/vscode-launch.js` for why it exists.
+   */
+  stateRoot: string;
 }
 
 /**
@@ -612,21 +622,22 @@ export async function launchVSCode(
   const code = findCodeBinary();
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-userdata-"));
   const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-extensions-"));
-  // Per-launch Windows state isolation. `--user-data-dir` and
-  // `--extensions-dir` already scope VS Code's own profile, but
-  // `vscode-launch.js`'s ENV_ALLOWLIST_WINDOWS passes APPDATA and
-  // LOCALAPPDATA THROUGH from the parent, so every concurrent launch shared
-  // the machine-wide Windows state dirs. Measured 2026-08-10 on 35 Layer 3
-  // tests at 8 workers: shared -> 304.7s with 2 failures
-  // (icon-render-mechanism, module-tier); scoped -> 275.3s, all 35 pass.
-  // Shared state was both corrupting AND serializing the launches, which is
-  // why the failures looked like CPU contention and were not.
-  const appDataRoot = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-pw-appdata-"));
-  const roamingDir = path.join(appDataRoot, "Roaming");
-  const localDir = path.join(appDataRoot, "Local");
-  fs.mkdirSync(roamingDir, { recursive: true });
-  fs.mkdirSync(localDir, { recursive: true });
-  const app = await _electron.launch({
+  // Per-launch PLATFORM state isolation, on the shared seam so the walk
+  // stager gets the identical treatment (L-069-1 — the first cut of this
+  // lived here inline, and `npm run walk` kept launching against the
+  // operator's real machine-wide profile). The rationale, the measurements,
+  // and why HOME is scoped alongside the AppData pair all live with the
+  // definition in `scripts/vscode-launch.js`.
+  const state = _launch.makeLaunchStateDirs();
+  // Everything from here to the workbench being ready is wrapped, because
+  // all three directories now exist and the Electron app may be running.
+  // Without this, a launch timeout or a workbench that never paints leaks a
+  // whole VS Code state tree AND leaves the process alive — and the caller
+  // cannot clean up what it was never handed, since the throw happens before
+  // the LaunchedVSCode handle is returned.
+  let app: ElectronApplication | undefined;
+  try {
+    app = await _electron.launch({
     executablePath: code,
     args: [
       `--extensionDevelopmentPath=${EXTENSION_ROOT}`,
@@ -641,18 +652,42 @@ export async function launchVSCode(
       ...extraArgs,
       workspacePath,
     ],
+    // `state.env` is spread LAST, after `extraEnv`. The order is the
+    // guarantee: `extraEnv` exists so a test can hand the launched host a
+    // specific value (a dummy DABBLER_* key, say), and if it were applied
+    // afterwards a caller could silently un-scope APPDATA or HOME and get a
+    // launch that shares machine state while still looking isolated. A
+    // caller that genuinely needs to point one of these somewhere else
+    // should take it up with the factory, not defeat it from the outside.
     env: _electronEnv({
-      APPDATA: roamingDir,
-      LOCALAPPDATA: localDir,
       ...(extraEnv || {}),
+      ...state.env,
     }),
     timeout: 60_000,
-  });
-  const page = await app.firstWindow({ timeout: 60_000 });
-  // Wait for the workbench to settle. The most reliable signal is
-  // the activity bar element becoming visible.
-  await page.locator(".activitybar").waitFor({ state: "visible", timeout: 60_000 });
-  return { app, page, userDataDir, extensionsDir };
+    });
+    const page = await app.firstWindow({ timeout: 60_000 });
+    // Wait for the workbench to settle. The most reliable signal is
+    // the activity bar element becoming visible.
+    await page.locator(".activitybar").waitFor({ state: "visible", timeout: 60_000 });
+    return { app, page, userDataDir, extensionsDir, stateRoot: state.root };
+  } catch (err) {
+    if (app) {
+      try {
+        await app.close();
+      } catch {
+        // best effort — the launch is already failing; a close error here
+        // would mask the real cause.
+      }
+    }
+    for (const dir of [userDataDir, extensionsDir, state.root]) {
+      try {
+        fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+      } catch {
+        // opportunistic; tmpdirs live under TMPDIR
+      }
+    }
+    throw err;
+  }
 }
 
 /**
@@ -991,7 +1026,10 @@ export async function closeVSCode(launch: LaunchedVSCode): Promise<void> {
     // best effort — the Electron close handler can race the harness
     // teardown when a test asserts mid-launch.
   }
-  for (const dir of [launch.userDataDir, launch.extensionsDir]) {
+  // `stateRoot` is here because it is now a per-LAUNCH directory rather than
+  // the shared machine profile: a suite run creates one per test, and leaking
+  // it leaks a whole VS Code state tree each time.
+  for (const dir of [launch.userDataDir, launch.extensionsDir, launch.stateRoot]) {
     try {
       fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
     } catch {

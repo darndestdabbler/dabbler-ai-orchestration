@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "364e7a7a43f495c688edca11ec40e2cdb4d9067f",
+  "fixedTree": "312b9f36b2bd182913a70e912c3bc7386aaa9d53",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-10T20:09:09.775543+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "The race-vs-contention verdict is unsupported and contradicts the required treatment of failures persisting under isolation** - **Category:** Correctness - **Severity:** Major - **Failure scenario:** ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Does the revised evidence classify the two failure modes separately, record the full-isolation eight-worker Mode 1 failure as the required product-race candidate unless controlled repetitions substantiate another cause, and remove every causal exclusion not supported by the samples?",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "The original isolation hypothesis and the promised worker ceiling were not actually re-measured** - **Category:** Completeness - **Severity:** Major - **Failure scenario:** Session 2 must choose a wor ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Does the evidence contain a post-isolation rerun of the previously failing eight-worker setup on the same 14-core host, followed by an upward sweep sufficient to identify a measured stopping bound, with conclusions that distinguish host effects from isolation effects?",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "The experiment does not re-test the previously failing configuration under controlled conditions** - **Category:** Completeness - **Severity:** Major - **Failure scenario:** Sessions 2 and 3 use the D ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Evidence records a final-isolation rerun of the previously failing worker configuration on the same 14-core host, and every ceiling claim is bounded by the highest worker count actually demonstrated safe.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "The race-vs-contention verdict asserts causal conclusions the observations do not support** - **Category:** Correctness - **Severity:** Major - **Failure scenario:** Session 2 follows the explicit rec ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The report either supplies mode-specific controlled evidence and logs proving each causal exclusion and failure-rate estimate, or rewrites those conclusions as unresolved hypotheses without directing Session 2 to discount the failures.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

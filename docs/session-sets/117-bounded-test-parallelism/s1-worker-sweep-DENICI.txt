@@ -1,0 +1,242 @@
+==============================================================
+ Layer 3 (Playwright) worker sweep -- Set 117 Session 1
+==============================================================
+measured       : 2026-08-10
+machine        : DENICI
+logical CPUs   : 20
+RAM (GB)       : 63.8
+OS             : Windows 11 Pro 10.0.26200
+node           : v25.8.1
+playwright     : 1.62.1
+VS Code under test : 1.128.0 (.vscode-test/vscode-win32-x64-archive-1.128.0)
+tree measured  : working tree at ec4f0bdb + this session's isolation change
+                 (per-launch APPDATA/LOCALAPPDATA/HOME/USERPROFILE on the
+                 shared vscode-launch.js seam)
+
+                 PROVENANCE, stated because it is not exact: the sweep ran
+                 BEFORE round 1 remediation, which moved the Windows dirs
+                 from <root>/{Roaming,Local} to the true profile layout
+                 <root>/AppData/{Roaming,Local} and reordered the extraEnv
+                 merge. Both are one directory level and a spread order --
+                 no plausible effect on timing -- but these numbers were
+                 not produced by the exact final tree. The full Layer 3
+                 run recorded at close IS on the final tree, and is the
+                 run of record for correctness.
+
+THIS IS NOT THE MACHINE THE SPEC MEASURED ON. Every Layer 3 figure in
+spec.md (workers:1 at 10.1 min, workers:4 at 7.08 min, the 8-worker
+failures, real-host-baseline at 1.9 vs 4.2 min) came from the operator's
+WORK machine: 14 logical CPUs, 31.5 GB. Sessions run on both machines.
+These numbers stand BESIDE those, they do not replace them.
+
+method         : npx playwright test --workers=N
+                 --grep-invert "cold launch-to-first-row"
+                 35 of the suite's 36 tests. real-host-baseline is
+                 excluded exactly as the 14-core measurements excluded
+                 it: it is a performance test whose number parallelism
+                 corrupts, and Session 2 quarantines it. Runs were
+                 sequential on an otherwise-idle machine.
+
+--- [1/2] The sweep ---
+
+  workers   wall    speedup   sum of test    per-test    slowest   parallel
+                              durations      inflation   test      efficiency
+  -------   -----   -------   -----------    ---------   -------   ----------
+     1      548s     1.00x        546s         1.00x      23.6s       100%
+     4      231s     2.37x        711s         1.30x      31.4s        77%
+     8      206s     2.66x       1056s         1.93x      47.0s        64%
+    12      189s     2.90x       1344s         2.46x      84.0s        59%
+
+  All four counts: 35 passed, 0 failed, exit 0.
+
+  "sum of test durations" is what the machine actually did; "wall" is what
+  the developer waited. "per-test inflation" is that sum against the
+  serial sum -- i.e. how much slower each individual test becomes when it
+  runs alongside others. "parallel efficiency" is sum / (workers x wall).
+
+--- [2/2] What the numbers say ---
+
+1. NO CEILING WAS FOUND UP TO 12 WORKERS ON THIS HOST. That is an
+   observed LOWER BOUND, not the ceiling the session set out to find, and
+   the difference matters: counts above 12 were never run, so nothing here
+   says where the ceiling is. The 14-core host measured w=12 at 350.5s
+   with 8 FAILURES; DENICI ran w=12 green in 189s.
+
+   THE SESSION'S CENTRAL HYPOTHESIS REMAINS UNRESOLVED. It was that "the
+   failures and the poor speedup have one cause, and it is shared state,
+   not CPU." Testing it requires re-running the previously-failing
+   8-worker configuration ON THE HOST WHERE IT FAILED. That was not done,
+   and could not be: the 14-core work machine is a different physical
+   machine, not available from this session. Two variables therefore
+   differ between the failing runs and these -- the isolation change AND
+   the host -- so this sweep cannot attribute the difference to either
+   one. It is a host-specific observation of DENICI through 12 workers and
+   nothing more.
+
+   OWED RESIDUAL -- OWNER: SESSION 2, AS A PRECONDITION.
+   A post-isolation re-run of w=8 (and an upward sweep) on the 14-core
+   host. Verification raised this twice: once in round 1 and again in
+   round 2, where the fix was REJECTED on the correct ground that
+   documenting a missing measurement does not perform it. The operator
+   adjudicated on 2026-08-10 (see decisions.jsonl): the finding is
+   accepted as true and unmet, not waived as wrong, and its discharge
+   transfers to Session 2 -- the session where a worker count is actually
+   adopted, which is the decision the measurement protects.
+
+   SESSION 2 MUST NOT adopt a worker count for the 14-core host until it
+   has run this, and must not read DENICI's clean result through 12
+   workers as permission to raise the smaller host. If Session 2 also
+   runs on DENICI, the residual carries forward to Session 3 unchanged
+   and must be restated, not quietly dropped.
+
+2. SPEEDUP SATURATES AT ROUGHLY 4 WORKERS. Marginal wall clock bought by
+   each additional worker:
+
+     1 -> 4    -317s over 3 workers   = 105.7s per worker
+     4 -> 8     -25s over 4 workers   =   6.3s per worker
+     8 -> 12    -17s over 4 workers   =   4.3s per worker
+
+   Tripling the workers from 4 to 12 buys 1.22x. The knee is at 4 and it
+   is not close.
+
+3. THE COST IS PER-TEST INFLATION, AND IT IS LARGE. At 12 workers the
+   machine does 2.46x the total work of a serial run to deliver 2.90x the
+   wall-clock. Each Electron launch is competing with eleven others for
+   CPU, disk and memory, so every test gets slower -- the slowest test
+   goes 23.6s -> 84.0s, a 3.6x stretch, purely from load. This is the
+   quantified version of the operator's complaint about `-n auto`: past
+   the knee you spend the machine to buy seconds.
+
+4. THE FLOOR IS THE SLOWEST TEST, AND IT MOVES. vsix-first-run-walkthrough
+   (a real venv + pip install driven through the VS Code UI) is the
+   longest test at every count up to 8: 23.6s serial, 31.4s at w=4, 47.0s
+   at w=8, 66s at w=12. Above 8, icon-render-mechanism overtakes it at
+   84.0s. No worker count can finish faster than whichever test is
+   currently longest, which is why w=12's 189s is close to the practical
+   floor for this suite as written.
+
+--- [3/3] The race-vs-contention verdict (spec step 4) ---
+
+Spec step 4 asks for this either way: if failures persist under full
+isolation they are product races exposed by a schedule this suite has
+never run, and they must be written down rather than relabelled as
+flakiness. Failures did persist. Here is what they actually are.
+
+EVERY FAILURE OBSERVED THIS SESSION, IN 12 RUNS, IS ONE TEST:
+vsix-first-run-walkthrough. The other 34 tests did not fail once, at any
+worker count, in any run. (34, not 35: real-host-baseline was excluded
+from every run, so this session says nothing about it.)
+
+READ THE SAMPLE SIZES BEFORE THE PATTERN. Every cell below is 1 to 4
+runs. That is enough to establish that failures HAPPEN and where, and it
+is not enough to establish why, or to compare rates between rows.
+
+  condition                       runs   failures
+  -----------------------------   ----   --------
+  w=1  full suite                    1      0
+  w=4  full suite                    1      0
+  w=8  full suite                    4      2   <- both vsix-first-run
+  w=12 full suite                    3      0
+  vsix-first-run ALONE, serial       3      1   <- same test
+
+  (The four w=8 runs are: one before HOME/USERPROFILE scoping landed and
+  three after. Restricted to full isolation it is 3 runs, 1 failure.)
+
+TWO DISTINCT FAILURE MODES. They are recorded SEPARATELY and are not
+pooled, because they fail at different places for different reasons and
+neither one is evidence about the other.
+
+  Mode 1 -- spec line 208, 2 occurrences, BOTH at w=8:
+    F1 pressed, `.quick-input-widget input` never visible within 15s.
+    Occurred once before HOME/USERPROFILE scoping and once after, i.e.
+    ONCE IN THE THREE FULLY-ISOLATED w=8 RUNS. Never observed at w=1,
+    w=4 or w=12 -- but see the sample sizes below before reading anything
+    into that.
+
+  Mode 2 -- spec line 199, 1 occurrence, running ALONE at w=1:
+    the tree never reached "2 sets", stuck on "Default0 sets" for the
+    full 300s. That wait is gated on a REAL `pip install` completing
+    inside the launched window.
+
+CAUSE: UNRESOLVED FOR BOTH MODES. The samples are too small to support
+any causal claim, and an earlier draft of this file made three that the
+evidence does not carry. They are withdrawn:
+
+  - "NOT CPU contention" -- withdrawn. It rested on 0 failures in 3 runs
+    at w=12. At a per-run failure rate anywhere near the w=8 observation,
+    3 clean runs is an unremarkable outcome, not a refutation. A higher
+    worker count also does not guarantee that this particular test's F1
+    keypress met heavier instantaneous load.
+  - "NOT shared state" -- withdrawn. One failure in three fully-isolated
+    w=8 runs is consistent with the isolation having reduced the rate, or
+    not changed it, or the failure having another cause entirely.
+  - "Mode 2 is network-bound" -- withdrawn. Nothing was captured proving
+    PyPI was slow. Pip configuration (index URL, proxy, certificates,
+    credentials) normally lives under HOME or APPDATA, BOTH of which this
+    change now scopes to an empty directory -- so the isolation itself is
+    a live candidate cause of Mode 2, not an exonerated bystander. No pip
+    output was retained to distinguish them.
+
+WHAT THE SPEC REQUIRES OF MODE 1, and it is the operative reading: step 4
+says failures that persist under full isolation "are product races
+exposed by a schedule this suite has never run -- a real finding, out of
+scope to fix, and it must be written down rather than relabelled as
+flakiness." Mode 1 did persist under full isolation, at w=8. It is
+therefore recorded here as an OPEN PRODUCT-RACE CANDIDATE, not as
+flakiness. Calling it flakiness is precisely what the spec forbids, and
+an earlier draft of this file did it.
+
+Per the spec's non-goals ("No fixing of product races... Recording them
+precisely is in scope; repairing them is a later set"), neither mode is
+fixed here.
+
+CONSEQUENCE FOR SESSION 2, and it is blocking: Session 2's control is
+"three consecutive green runs at the chosen setting before it is
+trusted." This test failed in 2 of 9 full-suite runs across all worker
+counts, so three consecutive green runs is a materially weaker signal
+than it looks. Session 2 must decide explicitly how to handle it -- and
+should NOT simply discount the failures as unrelated flake, because Mode
+1's cause is open and may be exactly the schedule sensitivity the control
+exists to detect. Note also that spec decision 4's diagnostic ("a failure
+that passes in isolation is a race candidate") does not discriminate
+here: this test has failed BOTH in parallel and in isolation, in
+different places.
+
+CONSEQUENCE FOR THE CEILING: the other 34 tests were clean in every run
+at every count (1, 4, 8, 12) across 9 full-suite runs. No correctness
+bound was reached on this host up to 12 workers. What bounds the setting
+in practice is diminishing returns -- the knee at 4 -- and the operator's
+desktop, not observed failure.
+
+--- Not measured, and why ---
+
+  - Counts between 12 and 20 were not swept. The operator's standing
+    directive (2026-08-10) caps parallelism on this machine at 8 because
+    unbounded parallelism starves the desktop; 12 was probed only to
+    locate the ceiling and is recorded as ceiling data, NOT as an
+    adoptable setting. Sweeping to 20 would have cost machine time to
+    measure a configuration nobody may use.
+  - real-host-baseline was excluded from every run above. Its own
+    re-baselining is Session 2's job, and commit 5388c3d1's caveat
+    applies: a cold launch against a FRESH APPDATA is not the same
+    measurement as one against a warm shared profile, so its 1.9-min
+    figure must be re-measured after this isolation rather than compared
+    across it.
+  - PIP CONFIGURATION UNDER THE SCOPED DIRECTORIES was not validated, and
+    it is a real exposure rather than a theoretical one. A user's pip
+    index URL, proxy, certificate bundle and credentials normally live
+    under HOME or APPDATA (`%APPDATA%\pip\pip.ini`, `~/.config/pip`),
+    and both are now empty per launch -- so a machine that depends on a
+    corporate pip index would see the walkthrough's real `pip install`
+    behave differently under the harness than by hand. The APPDATA half of
+    that exposure shipped in 5388c3d1, before this session. It is named
+    here as an open risk and as a live candidate cause of the Mode 2
+    failure above; it is not resolved, and the pip environment the
+    walkthrough needs is not documented anywhere.
+  - The Python harness subprocess environment (electronLaunch.ts
+    `_filteredEnv`) was deliberately NOT given a scoped HOME. It creates
+    the git fixtures, and an empty HOME there risks losing git's global
+    identity during fixture setup -- a different risk from the launched
+    window, which the sample-project scaffold already handles with
+    `git config --local`. Named here as a deliberate non-change, not an
+    oversight.

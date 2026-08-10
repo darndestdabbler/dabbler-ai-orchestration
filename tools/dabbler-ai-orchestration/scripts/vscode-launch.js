@@ -30,6 +30,7 @@
 "use strict";
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..");
@@ -102,6 +103,66 @@ function electronEnv(extra, sourceEnv, platform) {
   }
   out.ELECTRON_ENABLE_LOGGING = "1";
   return { ...out, ...(extra || {}) };
+}
+
+/**
+ * Create a fresh set of per-launch state directories and return the
+ * environment overlay that points a VS Code launch at them.
+ *
+ * `--user-data-dir` and `--extensions-dir` scope VS Code's OWN profile. They
+ * do not scope the state directories the PLATFORM names, and those are shared
+ * machine-wide: APPDATA / LOCALAPPDATA on Windows, and everything reached
+ * through HOME elsewhere (`~/.config/Code` on Linux, `~/Library/Application
+ * Support/Code` on macOS). Before this, every concurrent launch shared them.
+ *
+ * Measured 2026-08-10, 35 Layer 3 tests at 8 workers on a 14-core host:
+ *
+ *   shared APPDATA   304.7s   2 failed (icon-render-mechanism, module-tier)
+ *   scoped APPDATA   275.3s   35 passed
+ *
+ * Shared state was both CORRUPTING and SERIALIZING the launches — the two
+ * failures had been assumed to be CPU starvation and were not. That is why
+ * this is a correctness fix independent of any worker count, and why the walk
+ * stager wants it as much as the test harness does: a walk launched against
+ * the operator's real machine-wide profile both pollutes it and shows the
+ * operator a window no test ever exercised.
+ *
+ * HOME / USERPROFILE are scoped too, deliberately. Scoping only the AppData
+ * pair would make this a Windows-only fix, leaving both Linux and macOS
+ * runners sharing state the moment either runs more than one worker. Nothing
+ * in this repo depends on the launched window reading a real home directory:
+ * the sample-project scaffold sets `git config --local` identity precisely
+ * because it targets a machine with no global identity.
+ *
+ * `baseDir` and `platform` are injected so the Layer 2 suite can drive the
+ * non-Windows branches from a Windows host, which is where this repo's
+ * platform bugs have historically hidden.
+ *
+ * Returns `{ root, env }`. `root` is the single directory a caller removes at
+ * teardown — every path in `env` lives under it, so one `rmSync` cleans up.
+ */
+function makeLaunchStateDirs(opts) {
+  const { baseDir, platform } = opts || {};
+  const plat = platform || process.platform;
+  const root = fs.mkdtempSync(
+    path.join(baseDir || os.tmpdir(), "dabbler-launch-state-")
+  );
+  const env = { HOME: root, USERPROFILE: root };
+  if (plat === "win32") {
+    // Mirror the real profile layout, which is `<USERPROFILE>/AppData/
+    // Roaming` and `<USERPROFILE>/AppData/Local` -- not `<root>/Roaming`.
+    // Since HOME and USERPROFILE are `root` here, anything that derives an
+    // AppData path from the profile instead of reading the environment
+    // variable lands in the same place the variable points, rather than in
+    // a sibling directory that only looks right.
+    const roaming = path.join(root, "AppData", "Roaming");
+    const local = path.join(root, "AppData", "Local");
+    fs.mkdirSync(roaming, { recursive: true });
+    fs.mkdirSync(local, { recursive: true });
+    env.APPDATA = roaming;
+    env.LOCALAPPDATA = local;
+  }
+  return { root, env };
 }
 
 function _parseCachedVersion(dirName) {
@@ -315,6 +376,7 @@ module.exports = {
   DARWIN_EXEC_PREFERENCE,
   WALK_COMPANION_PATH,
   electronEnv,
+  makeLaunchStateDirs,
   resolveCodeExecutable,
   describeVersionDir,
   realProbeIo,

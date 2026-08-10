@@ -47,6 +47,7 @@ const {
   findCodeBinary,
   launchArgs,
   electronEnv,
+  makeLaunchStateDirs,
 } = require("./vscode-launch.js");
 
 function log(msg) {
@@ -165,6 +166,13 @@ function main() {
 
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-walk-userdata-"));
   const extensionsDir = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-walk-ext-"));
+  // The same per-launch platform state the Playwright harness gets. Two
+  // reasons it belongs here and not only there: a walk that inherits the
+  // operator's real APPDATA writes into their actual VS Code profile, and a
+  // walk that launches differently from the suite shows the operator a window
+  // no test ever exercised — which is the whole reason `vscode-launch.js`
+  // exists.
+  const launchState = makeLaunchStateDirs();
 
   // The walk document rides along as a second editor tab so the operator
   // reads the item and looks at the UI without alt-tabbing to a browser.
@@ -205,7 +213,10 @@ function main() {
     // the child Code process into CLI-arg-parsing mode instead of opening the
     // isolated Extension Development Host. The Playwright harness has guarded
     // against this since Set 027 and shares the allowlist with this call.
-    env: electronEnv(args.marker ? { DABBLER_WALK_MARKER: args.marker } : {}),
+    env: electronEnv({
+      ...launchState.env,
+      ...(args.marker ? { DABBLER_WALK_MARKER: args.marker } : {}),
+    }),
     stdio: "ignore",
     detached: false,
   });
@@ -218,7 +229,7 @@ function main() {
         /* a leftover temp dir is not worth failing the walk over */
       }
     }
-    for (const dir of [userDataDir, extensionsDir]) {
+    for (const dir of [userDataDir, extensionsDir, launchState.root]) {
       try {
         fs.rmSync(dir, { recursive: true, force: true });
       } catch {

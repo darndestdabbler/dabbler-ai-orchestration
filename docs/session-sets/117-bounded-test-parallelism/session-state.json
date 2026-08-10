@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Isolate the launch, then re-test the ceiling",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-10T15:01:16.011927-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-10T16:50:12.304681-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "WAIVED"
     },
     {
       "number": 2,

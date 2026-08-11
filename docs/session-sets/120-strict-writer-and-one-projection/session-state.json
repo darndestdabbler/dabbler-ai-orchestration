@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "What to do about the history already on disk",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-11T04:32:50.798225-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-11T05:32:18.280412-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

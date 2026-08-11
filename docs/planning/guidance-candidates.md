@@ -80,3 +80,76 @@ that periodically confirms scoped selection would have caught what a full
 run caught. Without both, boundaries rot silently and the suite skips
 tests that would have found the break. Promote this entry only alongside
 that machinery, or the instruction is advice with no teeth.
+
+---
+
+## C-002 — What verification is for
+
+**Status:** queued 2026-08-11. Blocked on preload headroom.
+**Class:** one-line instruction.
+**Source:** GPT-5.6 Sol, in the consultation recorded at
+[`docs/proposals/2026-08-10-concurrent-monitoring-as-a-gate/verdict.md`](../proposals/2026-08-10-concurrent-monitoring-as-a-gate/verdict.md) §5.
+
+### The candidate instruction
+
+> *Tests give deterministic evidence for exercised behaviour;
+> verification owns requirements, **test adequacy**, residual risk and
+> plausible counterexamples. Correctness is never out of scope.*
+
+### Why it is worth a line
+
+The operator's instinct — verification's marginal value is *"where test
+coverage is lacking"* — was right and under-specified. Two reviewers
+independently rejected the sharper-sounding version of it (*"tests own
+correctness"*) because tests are **finite evidence about selected
+behaviour**, may be written by the same worker, and may encode the same
+misunderstanding. "Test adequacy" is the phrase that keeps the instinct
+without conceding the thing that matters.
+
+Measured support: across 572 historical findings, roughly a third are
+Completeness-class — *you did not cover X* — rather than correctness.
+The loop is already doing this job; the line names it so a verifier
+stops re-deriving the charter every round.
+
+### What it must not say
+
+- **Not** "verification does not review code." It reviews *whether the tests are sufficient*, which requires reading both.
+- **Not** a division that lets any finding be dismissed as "the other surface's job." The standing rule in C-003 governs dismissal.
+
+---
+
+## C-003 — Who may dismiss a blocking finding
+
+**Status:** queued 2026-08-11. Blocked on preload headroom.
+**Class:** one-line instruction — **the code half already exists.**
+
+### The candidate instruction
+
+> *A rejected blocking finding requires independent verifier acceptance,
+> deterministic falsifying evidence, or operator adjudication — never the
+> orchestrator's own reasoning.*
+
+### Why it is worth a line
+
+This corrects a factual error that reached a design proposal: the claim
+that `fix-accepted` / `fix-rejected` / `accepted-with-modification` let
+an orchestrator dismiss findings. They do the opposite — they are
+verdicts requested **from the verifier** about the orchestrator's
+*fixes* (`verify_session.py:2289-2313`), and a `fix-rejected` is
+**force-escalated to blocking** at `verify_session.py:3524-3535` under an
+explicit anti-laundering comment.
+
+**So the enforcement already exists in code; only the permitted exits
+need stating.** Set 116 S3 is the worked example of the legitimate path:
+a path-aware-critique Major was dismissed on *operator* adjudication,
+citing a passing test — deterministic evidence plus human authority, not
+an orchestrator's argument.
+
+Letting the worker dismiss its own auditor by stating a reason would make
+independence cosmetic, which is the whole value of `verification_integrity`.
+
+### Prerequisite before promotion
+
+None. Unlike C-001 and C-002 this needs no new machinery — it documents
+a boundary the code already enforces, and names the two exits that are
+legitimate.

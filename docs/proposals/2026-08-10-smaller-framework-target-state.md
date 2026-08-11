@@ -544,6 +544,8 @@ What it does deliver, in confidence order:
 | 2 | Collapse the preload to `AGENTS.md` (§5.1) | operator (deletes guidance) | ⬜ pending |
 | 3 | Encode the 5 lessons; adopt the §5.3 retention rules | self | ⬜ pending |
 | 7 | Transport detect → confirm → persist (R3) | self | ⬜ pending |
+| — | **Sealed audit plan** (§8a) | self | ⬜ unscheduled — needs a set |
+| — | **Random blind mutation / recall measurement** (§8a) | self | ⬜ unscheduled — needs a set |
 | 10 | Carve the extension to the tree (§6) | self | ⬜ pending — **and now larger in effect, see §6.5** |
 
 Steps 2–3 remain reversible and touch no contract. Step 10 should still
@@ -563,8 +565,13 @@ requires the concurrent monitor that was rejected.**
 
 - **Sealed audit plan.** Hash an audit plan derived from `spec.md` *before* implementation begins. Defeats verifier anchoring **structurally** rather than behaviourally, and catches what no diff can show: **absence** — missing implementation, missing tests.
 - **Random blind mutation.** Occasionally seed a defect in an isolated copy and measure whether verification catches it. Converts verifier quality from an article of faith into **a measured recall rate**, which this framework has never had. Reports; never blocks.
-- **The charter split.** Tests give *deterministic evidence for exercised behaviour*; verification owns *requirements, **test adequacy**, residual risk and counterexamples*. Correctness is never out of scope.
-- **Standing rule.** A rejected blocking finding requires independent verifier acceptance, deterministic falsifying evidence, or human adjudication — **never the worker's own reasoning.**
+- **The charter split.** Tests give *deterministic evidence for exercised behaviour*; verification owns *requirements, **test adequacy**, residual risk and counterexamples*. Correctness is never out of scope. → **queued as C-002** in [`guidance-candidates.md`](../planning/guidance-candidates.md); it is a line, not a build.
+- **Standing rule.** A rejected blocking finding requires independent verifier acceptance, deterministic falsifying evidence, or human adjudication — **never the worker's own reasoning.** → **queued as C-003.** Note the code half already exists: `verify_session.py:3524-3535` force-escalates a `fix-rejected` to blocking. Only the human-adjudication path needs stating.
+
+The first two are **builds and are now in the §8 table as unscheduled.**
+The second two are **instructions**, and go to the guidance queue rather
+than the roadmap — which is the §5 rule applied to this document's own
+output.
 
 ## 8b. One pattern, three instances — worth a lint, not a lesson
 

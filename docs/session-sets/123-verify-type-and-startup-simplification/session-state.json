@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "123-verify-type-and-startup-simplification",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "One entry point that resolves the type",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "The qualified verdict",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Delete the webview",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

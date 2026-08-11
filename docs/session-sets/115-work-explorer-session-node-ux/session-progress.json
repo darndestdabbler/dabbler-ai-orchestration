@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-11T11:20:17.287995-04:00",
+  "generatedAt": "2026-08-11T15:00:05.391711-04:00",
   "sessionSetDir": "115-work-explorer-session-node-ux",
   "inputs": {
-    "activity-log.json": "554b506bcd55f6cd2ecc59ce90a355c6389cdfd6fc9d216a041bde622d559859",
-    "session-state.json": "22e371f5f2f860ea28866d45c574d8f2fc6d390d05b0c23e89debe42cda5d2b2",
-    "spec.md": "8c6dd7047c01210d92c2ac77d1d7e4e809d28643183cefffd647f9380d28fb5f"
+    "activity-log.json": "087010038873467a5337c57d8449a3fb10406945d15208dc9c7aff27200eff5c",
+    "session-state.json": "e1762995903d49aa75a3ae19cf0eb88d5a8c8d11906240a952d5a22027716bd2",
+    "spec.md": "2745b488a26215ccca2edce7a7f51723ad441f7ec0a4303a92c4e8905a6176a9"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -226,16 +226,77 @@
     },
     {
       "number": 4,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 4 via start_session, read the preload (constitution, project-guidance, lessons-learned, AGENTS.md), the set spec, operator-notes.md and step-ledger-findings.md, posted the step checklist, and confirmed the copilot-cli transport carries no provider keys by design.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "obligation-projection",
+          "description": "Added close_preflight --write/--check: close-obligations.json under the set gitignored .dabbler/ dir, embedding the report verbatim, with per-file input digests plus a git fingerprint and per-row volatile marking. 16 new tests, all green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "obligations-rendered",
+          "description": "Rendered the obligations under the expanded session node: readCloseObligations in fileSystem.ts re-digests the set dir (content half only, no subprocess), a Close-out group row summarizes and carries the projection state, obligation rows carry blocking-ness, cost and an as-of qualifier. Layer 2 green at 1774.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "marker-removed-in-ts",
+          "description": "Finished the marker removal in TypeScript: HERE_MARKER, markHere, TERMINAL_STATUSES and isHere are gone, the shared corpus dropped the field, the two Python guards holding it were replaced, and the tests now assert the in-progress icon.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "uat-walk",
+          "description": "Operator walked the set and answered every item in place: all five looks passed, three decisions ratified (grouped, ignored, marker stays gone), one change ruled (artifact entry out). Full pytest 3933, mocha 1776, playwright 40 - all recorded fresh. Verification: discovery 1 Major, supplementary clean, remediation-review round 4 VERIFIED with both fixes accepted.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "artifact-entry-removed",
+          "description": "Operator ruling at the UAT walk: Open Session Artifacts is out of the session menu. Removed wholesale - command, package.json entries, SESSION_ACTIONS entry, discovery helpers, the Layer 2 suite and the two Layer 3 scenarios (the ones failing in CI) - replaced by absence assertions at both layers. Also fixed the CI race first (clickRowMenuItem), then removed that helper with its last caller.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
       "remaining": []

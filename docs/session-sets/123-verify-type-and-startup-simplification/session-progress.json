@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-11T18:31:20.046966-04:00",
+  "sessionSetDir": "123-verify-type-and-startup-simplification",
+  "inputs": {
+    "activity-log.json": "7b1e33747e58772be368b5c9b2889214d631a8bedc53c1a432ff9161065b171b",
+    "session-state.json": "a2b63b52bd749a76fc1f65c05e894da724d49dc0e0686a1f20f99ec56871f9c0",
+    "spec.md": "61a51e9f329e8358eb5ba88264eade65e6830fa19f7be9e2823d34f81f9d73ab"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 1 via start_session (github-copilot / anthropic / claude-opus-5 / high); preload read; transport profile is copilot-cli via the seat-local local-overrides.yaml, so no provider API keys are required or warned about.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "ship-the-three-branch-resolver-as",
+          "description": "Shipped ai_router/verify_type.py: resolve_verify_type() is the one entry point for all three branches (project file -> environment default awaiting one confirmation -> guided setup), with write_project_verify_type() as the confirm-once-and-remember step and a `python -m ai_router.verify_type` CLI (--confirm / --set / --json; exit 3 = guided setup required) for the terminal the agent is already in. The file wins silently over the environment (standing decision 5) and an invalid value in EITHER is reported, never guessed at -- a bad project file does not fall through to the environment.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "derive-transport-profile-from-the-resolved",
+          "description": "config.load_config no longer defaults transport.profile independently: it calls verify_type.derive_transport_profile after the local-overrides merge, so the project file outranks the tracked config AND the seat-local override, and the api default is now the last step of resolution rather than a parallel answer. Falsifiers (L-112-1) plant the disagreement in BOTH directions and assert the file wins, plus two look-alikes proving the derivation does not fire indiscriminately, plus a structural bijection assertion against config._VALID_TRANSPORT_PROFILES. 16 tests, all green; the neighbouring config / local-overrides / entry-point suites stay green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "audit-the-four-modules-above-before",
+          "description": "Audited the four named modules BEFORE writing detection code. config.py resolves and validates transport.profile (:504 default, :232 copilot-cli block); copilot_preflight.py owns seat readiness (binary / credential / live-probe); transport_diagnostics.py owns failed-dispatch diagnosis; orchestrator_identity.py owns the effective provider. Grep confirms NOTHING resolved a verify type anywhere: no project-verify-type, AI_ORCHESTRATION_VERIFY_TYPE or verify_type reference existed outside the design doc and this set's spec. Nothing was reimplemented: verify_type.py is stdlib-only (so config can import it without a cycle), adds the resolution ORDER the four never had, and delegates readiness to the existing preflight CLI by naming it in the guided-setup script rather than re-checking a seat itself.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-freeze",
+          "description": "Code frozen after the round-5 VERIFIED verdict, then the full suite ran once: 3952 passed, 9 skipped in 484s, recorded via run_of_record (digest 25178fd4cad8). Verification took five rounds -- two discovery, two remediation-review, and one the operator authorized past the bound -- ending VERIFIED with six fix verdicts accepted and no findings. Disposition authored, lessons cited (L-112-1, L-069-1, L-064-8), committed and pushed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 5,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 5
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

@@ -36,9 +36,9 @@
     {
       "number": 3,
       "title": "The menu \u2014 the prompt, and the evidence",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-11T10:20:26.763418-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-11T11:20:17.282169-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -46,7 +46,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 4,

@@ -281,6 +281,14 @@
       "dateTime": "2026-08-11T06:21:47.506232-04:00",
       "description": "Verification round 1: VERIFIED on both lenses (spec-conformance and failure-scenario, both gpt-5.5, anthropic excluded as the orchestrator effective provider), 0 blocking findings, 4 nits. Minor-only is effectively VERIFIED per the constitution, so the loop stops here. Two nits accepted and fixed (both stale-prose echoes in session_checklist.py: the collapse docstring still reasoned about the removed marker, and a pre-existing does-not-render-planned-rows claim that Set 114 S2 had contradicted below it -- L-065-1 and L-064-8 respectively). One accepted as a NAMED residual owned by the extension carve (the tools/ comments describing markHere as mirroring _mark_here; a tools/ edit is forbidden here by standing decision 3). One dismissed on measurement: the net test-function count across the staged diff is +6, not +7, confirmed per file. Full pytest still owed at close after the freeze.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T06:47:21.295733-04:00",
+      "description": "Complete. Full pytest on the frozen tree: 3,871 passed, 9 skipped, 0 failed in 538.06s, recorded in test-runs.jsonl (digest aa828265a873). Verification round 1 VERIFIED both lenses with 4 nits (2 accepted and fixed, 1 named residual owned by the extension carve, 1 dismissed on measurement); those docstring-only fixes plus the rebase onto origin moved the tree, so round 2 was run against the committed tree rather than being met inside the close as an unbounded backstop round -- VERIFIED again, 0 findings on both lenses, still inside the machine-enforced bound of 2 discovery passes. Set-terminal artifacts authored: change-log.md, docs/session-progress-schema.md, the full disposition, and the Step 9 guidance review (no changes recommended; preload at 11,856 of 12,000 tokens, and the one candidate lesson considered fails the Set 085 admission test on recurrence and miss cost). Committed and pushed as 2b66b65c.",
+      "status": "complete"
     }
   ]
 }

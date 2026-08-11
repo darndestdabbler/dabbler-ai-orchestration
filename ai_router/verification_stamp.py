@@ -202,14 +202,22 @@ GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 #   the routed response after evidence assembly), the disposition
 #   (verdict-patched), the lifecycle ledgers (events appended during
 #   close; steps logged at boundaries), and the state snapshot (flipped
-#   at close). Everything else in the set dir — spec.md,
-#   ai-assignment.md, change-log.md, UAT checklists — is session WORK
-#   and binds: a post-verification change makes the row stale.
+#   at close). Everything else in the set dir — spec.md and the UAT
+#   checklists — is session WORK and binds: a post-verification change
+#   makes the row stale.
+#
+#   NOTE (2026-08-11): this sentence read "spec.md, ai-assignment.md,
+#   change-log.md, UAT checklists" from Set 084 S2 until now, while the
+#   list below has exempted change-log.md since that same commit. The
+#   comment and the code contradicted each other for the whole life of
+#   the file, which is why the operator remembered ai-assignment.md as
+#   already exempt. Both are exempt now and the sentence says so.
 #
 # One definition, used by the producers, the consumer, and the test
 # fixtures alike (L-069-1).
 WORK_DIFF_BASE_EXCLUDES = (
-    # Set 123: these are git PATHSPECS, matched from the repository root,
+    # 2026-08-11 (ad-hoc fix, not a session set): these are git
+    # PATHSPECS, matched from the repository root,
     # so a bare "dist" excludes a root-level dist/ and nothing else. This
     # repo's generated bundles live at
     # tools/dabbler-ai-orchestration/dist/ (34 tracked files) and
@@ -310,6 +318,23 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # generates change-log.md") and policed by its own dedicated gate
     # (change_log_fresh) — close-out bookkeeping, not reviewed work.
     "change-log.md",
+    # 2026-08-11 (operator ruling): the per-session AI assignment record.
+    # It is finalized AFTER the round it describes -- it records WHO
+    # verified, which is not knowable until the verification has run --
+    # so leaving it binding meant a truthful record staled the very stamp
+    # it documented, and the close backstop answered with a fresh metered
+    # round. Measured live: it was the only file in Set 115's bound set
+    # that a session legitimately touches post-verification.
+    #
+    # Same class as decisions.jsonl and checklist-posts.jsonl: a RECORD
+    # about work whose substance -- the code and docs the session
+    # produced -- binds the diff normally. ADDED to
+    # EVIDENCE_VISIBLE_BOOKKEEPING below, so the verifier still READS it:
+    # freshness-exemption and evidence-exclusion are different questions
+    # (Set 111 S3), and suppressing an assignment record from the bundle
+    # would be a self-authorized reduction in verifier visibility that no
+    # orchestrator may make.
+    "ai-assignment.md",
     # The close lock exists exactly while the close (and therefore the
     # freshness recompute) runs — same tolerance the working-tree
     # gate's ignore patterns give it.
@@ -347,6 +372,12 @@ EVIDENCE_VISIBLE_BOOKKEEPING = (
     "decisions.jsonl",
     "checklist-posts.jsonl",
     "test-runs.jsonl",
+    # 2026-08-11: freshness-exempt (above) but the verifier still reads
+    # it. Who verified, and under what limitation, is exactly what a
+    # reviewer should see -- and Set 123 will add a qualified-verdict
+    # field for same-provider runs, which would be worth little if the
+    # assignment record were invisible to the round that must judge it.
+    "ai-assignment.md",
 )
 
 # What a --phase round's evidence bundle excludes: the loop's own
@@ -779,7 +810,8 @@ def work_diff_binding_paths(
 ) -> Optional[List[Tuple[str, float]]]:
     """The files that BIND the freshness digest, newest modification first.
 
-    Set 123: the digest is one SHA-256 over every bound file, so a
+    2026-08-11 (ad-hoc fix, not a session set): the digest is one
+    SHA-256 over every bound file, so a
     mismatch says *something* changed and never *what*. Every occurrence
     therefore cost an orchestrator a reasoning spiral and, often, a
     defensive extra verification round -- the loop this repo has spent

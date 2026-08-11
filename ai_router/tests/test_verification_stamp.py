@@ -215,3 +215,73 @@ class TestWorkDiffExcludesNestedBuildOutput:
         )
         mtimes = [mt for _, mt in rows]
         assert mtimes == sorted(mtimes, reverse=True), "newest-first ordering"
+
+class TestAiAssignmentIsFreshnessExemptButVisible:
+    """Operator ruling 2026-08-11. ai-assignment.md records WHO verified,
+    which is not knowable until the verification has run -- so it is
+    finalized AFTER the round it describes. Leaving it binding meant a
+    truthful record staled the very stamp it documented.
+    """
+
+    def _repo(self, tmp_path):
+        import subprocess
+
+        set_dir = tmp_path / "docs" / "session-sets" / "900-x"
+        set_dir.mkdir(parents=True)
+
+        def git(*a):
+            return subprocess.run(
+                ["git", "-C", str(tmp_path), *a], capture_output=True, check=False
+            )
+
+        git("init", "-b", "main")
+        git("config", "user.email", "f@example.invalid")
+        git("config", "user.name", "F")
+        git("config", "commit.gpgsign", "false")
+        (set_dir / "spec.md").write_text("work\n", encoding="utf-8")
+        (set_dir / "ai-assignment.md").write_text("assigned: pending\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-m", "baseline")
+        return set_dir
+
+    def test_recording_who_verified_does_not_stale_the_stamp(self, tmp_path):
+        set_dir = self._repo(tmp_path)
+        before = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+        assert before is not None
+
+        # What actually happens at close: the round has run, so the record
+        # can finally name the verifier.
+        (set_dir / "ai-assignment.md").write_text(
+            "assigned: gpt-5.6-sol (cross-provider)\n", encoding="utf-8"
+        )
+
+        after = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+        assert after == before, (
+            "finalizing ai-assignment.md staled the stamp it documents"
+        )
+
+    def test_real_work_still_stales_the_stamp(self, tmp_path):
+        """The exemption must not have widened into a verification
+        reduction: session WORK still binds."""
+        set_dir = self._repo(tmp_path)
+        before = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+
+        (set_dir / "spec.md").write_text("work -- edited\n", encoding="utf-8")
+
+        after = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+        assert after != before, "a real work edit no longer stales the stamp"
+
+    def test_it_stays_visible_to_the_verifier(self):
+        """Freshness-exemption and evidence-exclusion are DIFFERENT
+        questions (Set 111 S3). Suppressing the assignment record from a
+        round's bundle would be a self-authorized reduction in verifier
+        visibility."""
+        from verification_stamp import (
+            EVIDENCE_VISIBLE_BOOKKEEPING,
+            PHASED_EVIDENCE_SET_EXCLUDES,
+            WORK_DIFF_SET_BOOKKEEPING,
+        )
+
+        assert "ai-assignment.md" in WORK_DIFF_SET_BOOKKEEPING
+        assert "ai-assignment.md" in EVIDENCE_VISIBLE_BOOKKEEPING
+        assert "ai-assignment.md" not in PHASED_EVIDENCE_SET_EXCLUDES

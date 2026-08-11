@@ -355,6 +355,46 @@ one — so this needs a split rather than a blanket delete:
 **Deletable: 1,880 LOC and ~150 tests**, without touching the api cost
 guard.
 
+### 6.5 Keep the rendering, delete the derivation
+
+The largest extension saving is not a webview — it is a **duplicated
+computation**, found 2026-08-11:
+
+| | lines |
+| :--- | ---: |
+| Python — `progress.py` 814 + `session_checklist.py` 866 | **1,680** |
+| TypeScript mirror — `progress.ts` 668 + `sessionStepModel.ts` 525 + `workExplorerTreeModel.ts` 637 | **1,830** |
+| TS tests guarding the mirror — 44 + 19 + 47 | **110** |
+
+Plus `test_step_row_parity.py`, which exists **only** to check the two
+implementations agree. *A parity test is a tax on duplication.*
+
+It is not a hypothetical cost. The two implementations already disagree:
+Python renders an unknown step status as `[?]` — visibly wrong — while
+the tree maps it to `not-started` — **confidently wrong** — under a
+comment claiming the two match. That divergence is what made the live
+step-ledger defects look like rendering bugs when they were a data
+defect (§7.5's sibling; see
+[`docs/session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md`](../session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md)).
+
+**The operator's proposal, 2026-08-11: make the checklist data-driven so
+the orchestrator reads the data rather than the pixels.** That answers
+the strongest objection to a tree-centred design — an AI cannot see a
+TreeView, but it can read a file.
+
+- Compute the projection **once, in Python**; serialise it; both the tree and the orchestrator read the same bytes.
+- **JSON, not YAML** — the repo's convention is JSON for machine-written state (`session-state.json`, `activity-log.json`) and YAML for human-authored config (`router-config.yaml`, `modules.yaml`, `budget.yaml`). TypeScript parses JSON natively; YAML's type coercion is a poor target for a writer that must not silently corrupt state.
+- **Mark it derived and regenerable** — a cache, never a source.
+- **Carry explicit `unknown` / `stale` / `unreadable` states.** Today an unreadable ledger renders as an empty session row, so "no work" and "cannot read evidence" are indistinguishable.
+
+This deletes **~1,200–1,500 TypeScript lines and most of those 110
+tests** on top of the webview removals — and it removes a *defect class*
+rather than fixing an instance.
+
+**Prerequisite:** the status allowlist at the writer (§7.5's sibling
+finding). A projection computed from four spellings of "done" is a faster
+way to be wrong.
+
 **Rationale — this is the bus-factor fix.** The successor is not facing
 "complex"; they are facing *complex in two languages with two test stacks*,
 one of which is a VS Code extension with webviews, an Electron harness and
@@ -372,7 +412,7 @@ The distinction the first draft failed to make.
 | change | mechanism | effect |
 | :--- | :--- | :--- |
 | **Total round budget per session** | one number, enforced on *every* path including the backstop (`evaluate_phase_bound` already exists) | caps the worst case; today's observed backstop rounds ran **5–10, 5–12, 5–7** |
-| **Artifact cap per session** | refuse to create more than ~8 files per session | Set 116 carried **45 files** for 3 sessions; each is orchestrator work |
+| **Artifact cap per session** | ~~refuse to create more than ~8 files per session~~ | **DROPPED** — artifacts are *produced by* rounds, so bounding rounds bounds them; a second mechanism for one effect is a second thing to maintain (§8) |
 | **Preload collapse** (§5.1) | 11,849 → ~2,000 tokens; nothing left to evict | removes the mechanism that manufactured 2 of 3 prose Majors |
 | **Close-out is one command** | `close_session` already runs gate checks + state flip idempotently | the 57 min is what happens *around* it, not inside it — see §7.3 |
 | **Layer 3 shrink** | delete 9 webview scenarios of 35 | −~2.5 min |
@@ -416,12 +456,48 @@ exists for the session; that is knowable *before* close-out, and each firing
 spends a routed call at close time — roughly **$40–70 of routed spend across
 the dataset**, before counting the rounds that follow.
 
-**Recommendation: a close-out preflight**, runnable at any time, that names
-every unmet obligation in one shot. It would have pre-empted ~148 of 212
-failures, including all 78 of the expensive ones. Paired with:
+**Recommendation: a close-out preflight** — **shipped 2026-08-11**, Set 119
+Session 2, `ai_router/close_preflight.py` (1,047 lines). It evaluates the
+close predicates by calling them, takes no routed call, and ships a
+`--replay-history` instrument that measured its coverage against the
+recorded corpus: **150 still-blocking failures**, against this document's
+prediction of ~148.
 
-- **The backstop `discoveryBaselineTree` fix** — today a backstop-blocked close cannot reach `--phase remediation-review` (`verify_session.py:2945-2954` refuses with `EXIT_USAGE`), forcing a full ~$0.88 discovery round to re-enter the sanctioned path.
-- **A hard artifact cap** — Set 116 carried **45 files** across 3 sessions; each is orchestrator work and a chance to miss one.
+Early signal, small n: **both Set 119 sessions closed on the first
+attempt with zero failed closes**, against a historical baseline of 41%
+failing at least once and a mean of 1.6 attempts. Two sessions is not
+evidence; it is the right direction.
+
+Paired with:
+
+- **The backstop `discoveryBaselineTree` fix** — today a backstop-blocked close cannot reach `--phase remediation-review` (`verify_session.py:2945-2954` refuses with `EXIT_USAGE`), forcing a full ~$0.88 discovery round to re-enter the sanctioned path. Scheduled, Set 119 S3.
+- **The `cite_lessons` staleness fix** (new, found by Set 119 S2's own close). Scheduled, Set 119 S3 — see §7.5.
+
+### 7.5 The staleness category — found by the framework biting itself
+
+Set 119 Session 2 closed VERIFIED, then `cite_lessons` — **mandated at
+close** — bumped three `last-used-set` trailers *after* the round-5 stamp
+and staled it. Source, tests and documentation were byte-identical; only
+metadata moved. The close needed `--manual-verify` to complete.
+
+`WORK_DIFF_BASE_EXCLUDES` already carries `s*-rounds.jsonl`,
+`checklist-posts.jsonl` and `test-runs.jsonl` — **all three inside
+`docs/session-sets/<slug>/`.** The exclusion mechanism has an implicit
+**per-set scope** and no concept of a close-mandated write outside it,
+while `cite_lessons` writes `LESSONS_ACTIVE` *and* `LESSONS_ARCHIVE`,
+both repo-wide.
+
+This is the third instance of the same defect class (Set 116 S2 fixed the
+first two), which is why the fix must be a **category** — *the artifacts
+the close-out procedure is itself required to write* — and not a fourth
+list entry. It is also a plausible contributor to the 78–79 observed
+backstop firings, since a staled stamp is exactly what makes the backstop
+spend a round.
+
+**Second-order cost worth naming:** a rule that stales verification for
+writing metadata the framework itself mandates teaches orchestrators to
+skip `cite_lessons` — which would quietly kill the usage signal that
+drives every archival decision in §5.
 
 ### 7.4 The honest summary
 
@@ -437,32 +513,69 @@ What it does deliver, in confidence order:
 
 ## 8. Sequencing
 
-| # | step | authority | guaranteed? |
+| # | step | authority | status (2026-08-11) |
 | ---: | :--- | :--- | :--- |
-| 1 | **Close-out preflight** — name every unmet obligation in one shot (§7.3) | self | **yes** — attacks a 41% failure rate |
-| 2 | Collapse the preload to `AGENTS.md` (§5.1) | operator (deletes guidance) | **yes** |
-| 3 | Encode the 5 lessons; adopt the §5.3 retention rules | self | **yes** |
-| 4 | Total round budget + artifact cap | operator (verification) | **yes** |
-| 5 | Backstop `discoveryBaselineTree` fix | self | **yes** |
-| 6 | Delete the 5 unreachable gate modules | self | maintenance |
-| 6b | Delete `pricing_proposal.py` + `cost_report.py` (§6.4) | self | maintenance — −1,880 LOC, −150 tests |
-| 7 | Transport detect → confirm → persist (R3) | self | correctness |
-| 8 | Add `evidencePaths` to findings | self | prerequisite |
-| 9 | Cap doc-only findings at Minor | **operator** (reduces verification) | likely |
-| 10 | Carve the extension to the tree (§6) | self | bus factor only |
+| 1 | **Close-out preflight** — name every unmet obligation in one shot (§7.3) | self | ✅ **shipped** — Set 119 S2, `close_preflight.py`, 1,047 lines |
+| 8 | Add `evidencePaths` to findings | self | ✅ **shipped** — Set 119 S1, both surfaces |
+| 9 | Cap doc-only findings at Minor | **operator** (reduces verification) | ✅ **shipped** — Set 119 S1, operator attested in-session |
+| 4+5 | Round budget; backstop `discoveryBaselineTree`; **+ the `cite_lessons` staleness category fix** | operator / self | 🔜 **Set 119 S3** |
+| 6 | Delete the 5 unreachable gate modules **+ the 2 cost modules** (§6.4) | self | 🔜 **Set 119 S3** — −5,165 LOC, −370 tests |
+| — | **Status allowlist at the writer** (new, §7.5) | self | ⬜ unscheduled — **blocks Set 115** |
+| 2 | Collapse the preload to `AGENTS.md` (§5.1) | operator (deletes guidance) | ⬜ pending |
+| 3 | Encode the 5 lessons; adopt the §5.3 retention rules | self | ⬜ pending |
+| 7 | Transport detect → confirm → persist (R3) | self | ⬜ pending |
+| 10 | Carve the extension to the tree (§6) | self | ⬜ pending — **and now larger in effect, see §6.5** |
 
-Steps 1–3 are reversible and touch no contract. Step 10 is the largest and
-should come **last** — otherwise it is executed under the slow loop it
-exists to escape.
+Steps 2–3 remain reversible and touch no contract. Step 10 should still
+come **last** — otherwise it is executed under the slow loop it exists to
+escape.
+
+**The artifact cap was dropped** rather than deferred: artifacts are
+*produced by* rounds, so bounding rounds bounds them, and a second
+mechanism for one effect is a second thing to maintain.
+
+## 8a. Adopted from the concurrent-monitoring consultation
+
+Recorded in
+[`2026-08-10-concurrent-monitoring-as-a-gate/verdict.md`](2026-08-10-concurrent-monitoring-as-a-gate/verdict.md),
+and belonging in this roadmap rather than only in that record. **None
+requires the concurrent monitor that was rejected.**
+
+- **Sealed audit plan.** Hash an audit plan derived from `spec.md` *before* implementation begins. Defeats verifier anchoring **structurally** rather than behaviourally, and catches what no diff can show: **absence** — missing implementation, missing tests.
+- **Random blind mutation.** Occasionally seed a defect in an isolated copy and measure whether verification catches it. Converts verifier quality from an article of faith into **a measured recall rate**, which this framework has never had. Reports; never blocks.
+- **The charter split.** Tests give *deterministic evidence for exercised behaviour*; verification owns *requirements, **test adequacy**, residual risk and counterexamples*. Correctness is never out of scope.
+- **Standing rule.** A rejected blocking finding requires independent verifier acceptance, deterministic falsifying evidence, or human adjudication — **never the worker's own reasoning.**
+
+## 8b. One pattern, three instances — worth a lint, not a lesson
+
+Recorded because it recurred three times in a single evening:
+
+| defect | was fixed as | should have been |
+| :--- | :--- | :--- |
+| Verification staleness | a list that grows one entry per incident | a **category**: close-mandated writes |
+| `EvidenceTooLargeError` | a catch at the one site that bit (1 of 5) | the **type hierarchy** |
+| Step status | nothing at all | an **allowlist at the writer** (Set 086's pattern) |
+
+Each was patched at the instance rather than the class. What makes it
+decisive: **`L-069-1` — "fix every sibling site" — is already promoted
+into `project-guidance.md`, which is preload, which means it was in
+context every single time.** Prose guidance did not prevent the
+recurrence. That is the codebase making the argument for §5's
+executable-or-drop rule better than any reasoning could.
 
 ---
 
 ## 9. Open decisions
 
-1. **How small should Layer 3 get?** Deleting webviews takes it 35 → 26; migrating model-level scenarios to Layer 2 could reach ~8–12. It cannot reach zero — `L-064-12` records a VSIX manifest defect only Electron caught. Set 117 S2/S3 should be re-scoped against the answer.
-2. **Cap doc-only findings at Minor?** Operator-only; deferred until findings carry `evidencePaths`.
-3. **Is `modules.yaml` / `moduleAuthoring` (2,458 LOC) actually used?** If modules stay optional and parallel work is worktrees + manual merges (R1c), most of this may be deletable rather than portable.
-4. **Retention numbers** — 10 sets, 20 instruction lines, ~8 artifacts per session. Proposed, not measured. Adjust on evidence.
+**Resolved since drafting:** the doc-only cap (§8 step 9) was operator-attested
+and shipped in Set 119 S1.
+
+1. **How small should Layer 3 get?** Deleting webviews takes it 35 → 26; migrating model-level scenarios to Layer 2 could reach ~8–12. It cannot reach zero — `L-064-12` records a VSIX manifest defect only Electron caught. Set 117 is now **cancelled** (restorable), so this is unforced.
+2. **Is `modules.yaml` / `moduleAuthoring` (2,458 LOC) actually used?** Still the largest single deletion available after the webviews.
+3. **Retention numbers** — 10 sets, 20 instruction lines. Proposed, not measured.
+4. **NEW — where does the status allowlist land?** It is a router change that blocks Set 115, and it belongs to no current set. Set 119 S3 is full at 5 steps.
+5. **NEW — does Set 118 survive its own measurement correction?** Its coupling premise (47 files / 1,485 tests) appears to be a regex artifact; see [`docs/session-sets/118-test-retirement-and-coupling-budget/measurement-correction.md`](../session-sets/118-test-retirement-and-coupling-budget/measurement-correction.md). Its guard-accrual premise is untouched and is the stronger half.
+6. **NEW — is Set 115 Session 4 re-authored or dropped?** It carries three disqualifying findings; Sessions 1–3 are unaffected and confirmed valuable in daily use.
 
 ---
 
@@ -500,7 +613,7 @@ session plans drift; treat the high end as likely.
 
 | # | step | sessions | note |
 | ---: | :--- | :---: | :--- |
-| 4+5 | Round budget, artifact cap, backstop baseline fix | **1** | small and localized; step 5 is a few lines |
+| 4+5 | Round budget, backstop baseline fix, `cite_lessons` staleness category (§7.5) | **1** | small and localized; scheduled as Set 119 S3 |
 | 6 | Delete 5 unreachable gate modules + the two cost modules | **1** | mechanical: −5,165 LOC, −370 tests |
 | 9 | Cap doc-only findings at Minor | **1** | small code + operator attestation |
 | 1 | Close-out preflight | **1–2** | reuses existing gate predicates |
@@ -523,7 +636,27 @@ runs under a bounded loop with a preflight, instead of the loop it exists
 to escape. **Sequencing A before B is the highest-value scheduling
 decision in this document.**
 
-### 10.4 What would make this wrong
+### 10.4 Calibration against the first three sessions
+
+Set 119 delivered Phase A's steps 1, 8 and 9 in two sessions, with S3
+pending. Measured from `session-events.jsonl`:
+
+| | work phase | close | attempts | verdict |
+| :--- | ---: | ---: | ---: | :--- |
+| S1 — `evidencePaths` + doc-only cap | **1.31 h** | 3.5 min | 1 | VERIFIED |
+| S2 — `close_preflight` + historical replay | **5.14 h** | 0.0 min | 1 | VERIFIED |
+
+**S1 lands inside the 1.5–2.5h estimate; S2 is roughly double its top
+end** — though S2 shipped a 1,047-line CLI plus a replay instrument, and
+much of its span overlapped operator conversation, so it is not a clean
+effort measurement either. The base rate to trust remains the **48.1-min
+median work phase across 283 sessions**; these ran 1.6x and 6.4x it.
+
+Two sessions is not a calibration. It is enough to say the estimate is
+**not yet falsified for a scoped session, and optimistic for a session
+that ships a new subsystem.**
+
+### 10.5 What would make this wrong
 
 - **Step 10 is the least certain.** 25.6k LOC of TypeScript with ~1,587 tests. "Delete the webviews" is clean; rewiring `fileSystem.ts` (1,518 LOC) out of the deleted surfaces is not yet scoped (§9.3).
 - **Step 2 is judgment, not typing.** Converting `session-constitution.md` and `project-guidance.md` into code and one-liners is exactly the prose work Set 116 S3 showed does not converge cheaply — which is why it should follow the doc-only cap (step 9), never precede it.

@@ -139,3 +139,79 @@ class TestHelpers:
     def test_package_version_never_raises(self):
         assert isinstance(vstamp.package_version(), str)
         assert vstamp.package_version()
+
+class TestWorkDiffExcludesNestedBuildOutput:
+    """Set 123: the base excludes are git PATHSPECS, matched from the repo
+    root, so a bare ``dist`` never matched
+    ``tools/dabbler-ai-orchestration/dist/``. The bundle is TRACKED (34
+    files), so every extension rebuild staled a verification that had
+    already passed and sent the close backstop into a fresh metered round.
+    """
+
+    def _repo(self, tmp_path):
+        import subprocess
+
+        set_dir = tmp_path / "docs" / "session-sets" / "123-x"
+        set_dir.mkdir(parents=True)
+        root = tmp_path
+
+        def git(*a):
+            return subprocess.run(
+                ["git", "-C", str(root), *a], capture_output=True, check=False
+            )
+
+        git("init", "-b", "main")
+        git("config", "user.email", "f@example.invalid")
+        git("config", "user.name", "F")
+        git("config", "commit.gpgsign", "false")
+        (set_dir / "spec.md").write_text("work\n", encoding="utf-8")
+        nested = root / "tools" / "ext" / "dist"
+        nested.mkdir(parents=True)
+        (nested / "extension.js").write_text("bundle v1\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-m", "baseline")
+        return root, set_dir, git
+
+    def test_rebuilding_nested_dist_does_not_stale_the_stamp(self, tmp_path):
+        """The falsifier: plant the exact regression and assert it cannot
+        move the digest. Before the fix this assertion FAILS."""
+        root, set_dir, git = self._repo(tmp_path)
+        before = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+        assert before is not None
+
+        (root / "tools" / "ext" / "dist" / "extension.js").write_text(
+            "bundle v2 -- rebuilt\n", encoding="utf-8"
+        )
+
+        after = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+        assert after == before, (
+            "a rebuilt nested dist/ bundle staled the freshness digest"
+        )
+
+    def test_real_work_still_stales_the_stamp(self, tmp_path):
+        """The other half: the exclusion must not have widened. A source
+        change still binds, or the fix would be a verification reduction."""
+        root, set_dir, git = self._repo(tmp_path)
+        before = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+
+        (set_dir / "spec.md").write_text("work -- edited\n", encoding="utf-8")
+
+        after = vstamp.compute_work_diff_sha256(set_dir, "HEAD")
+        assert after != before, "a real work edit no longer stales the stamp"
+
+    def test_binding_paths_names_the_culprit(self, tmp_path):
+        """The diagnostic: a stale digest must be explainable. Without
+        this, every occurrence costs a reasoning spiral and often a
+        defensive extra round."""
+        root, set_dir, git = self._repo(tmp_path)
+        (set_dir / "spec.md").write_text("work -- edited\n", encoding="utf-8")
+
+        rows = vstamp.work_diff_binding_paths(set_dir, "HEAD")
+        assert rows is not None
+        names = [rel for rel, _ in rows]
+        assert any(n.endswith("123-x/spec.md") for n in names), names
+        assert not any("/dist/" in n for n in names), (
+            "build output must not appear in the bound set"
+        )
+        mtimes = [mt for _, mt in rows]
+        assert mtimes == sorted(mtimes, reverse=True), "newest-first ordering"

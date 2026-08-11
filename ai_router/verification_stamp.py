@@ -209,11 +209,27 @@ GIT_EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 # One definition, used by the producers, the consumer, and the test
 # fixtures alike (L-069-1).
 WORK_DIFF_BASE_EXCLUDES = (
+    # Set 123: these are git PATHSPECS, matched from the repository root,
+    # so a bare "dist" excludes a root-level dist/ and nothing else. This
+    # repo's generated bundles live at
+    # tools/dabbler-ai-orchestration/dist/ (34 tracked files) and
+    # .../out/ (4), so for as long as the patterns were bare names the
+    # committed bundle BOUND the freshness digest -- every extension
+    # rebuild staled the stamp of a verification that had already passed,
+    # and sent the close backstop into a fresh metered round. Both the
+    # bare name and the nested form are kept: "**/dist/**" covers any
+    # depth, and the bare entry is retained so a root-level dist/ stays
+    # excluded no matter how the pathspec magic is interpreted.
     "dist",
+    "**/dist/**",
     "out",
+    "**/out/**",
     "node_modules",
+    "**/node_modules/**",
     ".venv",
+    "**/.venv/**",
     "__pycache__",
+    "**/__pycache__/**",
     "*.vsix",
 )
 
@@ -758,24 +774,53 @@ def resolve_commitish(repo_root: Path, ref: str) -> Optional[str]:
     return sha or None
 
 
-def compute_work_diff_sha256(
+def work_diff_binding_paths(
     session_set_dir: Path, base: str
-) -> Optional[str]:
-    """The freshness digest: SHA-256 over the session's work state.
+) -> Optional[List[Tuple[str, float]]]:
+    """The files that BIND the freshness digest, newest modification first.
 
-    A canonical content digest — one ``path\\0blob-hash`` line per file
-    that differs from *base* (tracked changes AND untracked additions;
-    a deletion digests as a marker), under the work-diff exclusions —
-    rather than raw ``git diff`` bytes: an untracked deliverable is
-    invisible to ``git diff`` (L-064-9) but becomes diff-visible the
-    moment the sanctioned flow commits it, so a raw-diff hash would go
-    stale on every session that creates a new file. The content digest
-    is stable across the untracked→tracked transition and changes
-    exactly when any bound file's CONTENT changes — which is the
-    staleness the check exists to catch (I-084-S2-5).
+    Set 123: the digest is one SHA-256 over every bound file, so a
+    mismatch says *something* changed and never *what*. Every occurrence
+    therefore cost an orchestrator a reasoning spiral and, often, a
+    defensive extra verification round -- the loop this repo has spent
+    six sets narrowing (``WORK_DIFF_SET_BOOKKEEPING`` grew one entry per
+    incident in Sets 096, 111 S1/S2/S3, 114 S1 and 116 S1).
 
-    Returns ``None`` when the repo cannot be resolved or git fails —
-    the caller fails closed.
+    This returns the same file list :func:`compute_work_diff_sha256`
+    digests, paired with each file's modification time, so the caller can
+    name the likely culprit instead of guessing: the bound file touched
+    most recently is the one that staled the stamp.
+
+    **Diagnostic only.** It reports the same set the digest covers and
+    changes no exclusion, so it cannot widen or narrow what binds --
+    reading this can never make a stale stamp look fresh.
+
+    Returns ``None`` on the same conditions as the digest, so a caller
+    that cannot explain simply says so rather than inventing a culprit.
+    """
+    resolved = _resolve_work_diff_inputs(session_set_dir, base)
+    if resolved is None:
+        return None
+    repo_root, rels = resolved
+    out: List[Tuple[str, float]] = []
+    for rel in rels:
+        try:
+            mtime = (repo_root / rel).stat().st_mtime
+        except OSError:
+            mtime = 0.0  # deleted: it still binds, it just has no mtime
+        out.append((rel, mtime))
+    out.sort(key=lambda pair: pair[1], reverse=True)
+    return out
+
+
+def _resolve_work_diff_inputs(
+    session_set_dir: Path, base: str
+) -> Optional[Tuple[Path, List[str]]]:
+    """``(repo_root, bound_paths)`` for *session_set_dir* against *base*.
+
+    The path-selection half of :func:`compute_work_diff_sha256`, factored
+    out so the digest and its explanation cannot drift apart about what
+    binds (``L-069-1``: one definition, every consumer).
     """
     import subprocess
 
@@ -811,15 +856,6 @@ def compute_work_diff_sha256(
         out = proc.stdout.decode("utf-8", errors="replace")
         return [p for p in out.split("\0") if p]
 
-    def _base_bytes(rel: str) -> Optional[bytes]:
-        """*rel*'s content at *base*, or ``None`` when absent there."""
-        proc = subprocess.run(
-            ["git", "-C", str(repo_root), "show", f"{base}:{rel}"],
-            capture_output=True,
-            check=False,
-        )
-        return proc.stdout if proc.returncode == 0 else None
-
     changed = _git_z(
         "diff", "--name-only", "-z", "--no-ext-diff", base, "--", *pathspecs,
     )
@@ -829,9 +865,47 @@ def compute_work_diff_sha256(
     )
     if changed is None or untracked is None:
         return None
+    return repo_root, sorted(set(changed) | set(untracked))
+
+
+def compute_work_diff_sha256(
+    session_set_dir: Path, base: str
+) -> Optional[str]:
+    """The freshness digest: SHA-256 over the session's work state.
+
+    A canonical content digest — one ``path\\0blob-hash`` line per file
+    that differs from *base* (tracked changes AND untracked additions;
+    a deletion digests as a marker), under the work-diff exclusions —
+    rather than raw ``git diff`` bytes: an untracked deliverable is
+    invisible to ``git diff`` (L-064-9) but becomes diff-visible the
+    moment the sanctioned flow commits it, so a raw-diff hash would go
+    stale on every session that creates a new file. The content digest
+    is stable across the untracked→tracked transition and changes
+    exactly when any bound file's CONTENT changes — which is the
+    staleness the check exists to catch (I-084-S2-5).
+
+    Returns ``None`` when the repo cannot be resolved or git fails —
+    the caller fails closed.
+    """
+    import subprocess
+
+    resolved = _resolve_work_diff_inputs(session_set_dir, base)
+    if resolved is None:
+        return None
+    repo_root, rels = resolved
+    set_rel = repo_relative_posix(Path(session_set_dir).resolve(), repo_root)
+
+    def _base_bytes(rel: str) -> Optional[bytes]:
+        """*rel*'s content at *base*, or ``None`` when absent there."""
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "show", f"{base}:{rel}"],
+            capture_output=True,
+            check=False,
+        )
+        return proc.stdout if proc.returncode == 0 else None
 
     lines: List[str] = []
-    for rel in sorted(set(changed) | set(untracked)):
+    for rel in rels:
         target = repo_root / rel
         try:
             raw = target.read_bytes()

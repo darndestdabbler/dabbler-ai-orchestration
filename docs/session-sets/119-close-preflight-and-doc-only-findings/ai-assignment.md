@@ -159,6 +159,23 @@ surfaced as `unnumbered_events` rather than vanishing.
 5. **One Session 1 residual is closed here:** the whitespace-only
    `evidencePaths` schema/validator parity gap in
    `docs/path-aware-critique.schema.json`.
+6. **`cite_lessons` stales the verification stamp, and the backstop pays
+   for it.** This session's own preflight found it, before a close
+   attempt was spent. `WORK_DIFF_SET_BOOKKEEPING` excludes the per-set
+   files the sanctioned flow writes after verification but **not** the
+   repo-wide guidance files — and the constitution *mandates*
+   `cite_lessons` in the final commit, which bumps `last-used-set`
+   trailers in `lessons-learned.md` / `lessons-archive.md`. So every
+   citing session stales its own stamp between verifying and closing.
+   Nothing usually notices, because the backstop just runs a fresh round
+   and re-stamps — meaning citing sessions may be **buying a routed round
+   for a metadata trailer**, which is plausibly a real contributor to the
+   79 `verification_backstop` firings this session measured. It surfaced
+   here only because the round budget was spent, so the backstop refused
+   instead of quietly paying. Session 3 already touches `close_backstop.py`
+   and the stamp machinery; the fix is likely one entry in the exclusion
+   list, and the measurement (how many of the 79 are this) is a query
+   against `session-events.jsonl` and `router-metrics.jsonl`.
 
 **Recommended next orchestrator (Session 3):** recorded at close in
 `disposition.json`, not pre-committed here.

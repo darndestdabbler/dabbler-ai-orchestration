@@ -38,9 +38,9 @@ Small, and it unblocks *two* things: Set 115's step rendering, and the
 extension carve's deletion of the duplicated TypeScript derivation.
 Its defect is the one the operator sees daily.
 
-**3. Guidance becomes executable** *(not yet authored — see §4)*.
-Proposal steps 2+3: encode the five active lessons, collapse
-`session-constitution.md` and `project-guidance.md`, adopt the retention
+**3. Set 121 — guidance becomes executable** *(authored 2026-08-11)*.
+Proposal steps 2+3: encode the five active lessons, make
+`project-guidance.md` addressable and collapse it, adopt the retention
 rules, and promote C-001/C-002/C-003 out of
 [`guidance-candidates.md`](guidance-candidates.md).
 **Unblocked as of 119 S1**, which shipped the doc-only cap that was its
@@ -48,8 +48,12 @@ stated prerequisite.
 
 > **This set is the first real test of the doc-only cap.** It is exactly
 > the prose-heavy work that cost Set 116 S3 three blocking rounds and
-> ~$2.35. If the cap works, this set is dramatically cheaper than it
-> would have been — and either way you learn something worth knowing.
+> ~$2.35. Measured while authoring: path citation went from **0 of 581**
+> findings (sets 057–117) to **13 of 13** since Set 119 — so the cap is
+> live and structurally able to fire — but **it never has**, because all
+> 13 post-cap findings cite code (8 code-only, 5 mixed) and none is
+> doc-only. Session 4 measures it on this set's own traffic and returns
+> the verdict; a finding that it did not fire is a successful outcome.
 
 **Steps 2 and 3 are interchangeable.** 120 is smaller and fixes a
 visible defect; the guidance collapse compounds harder because every
@@ -113,15 +117,18 @@ unrelated commit.
 
 ## 4. What is authored and what is not
 
-**Authored and ready:** Set 120.
+**Authored and ready:** Set 120, and **Set 121** (authored 2026-08-11
+from measurements taken that day; §4b's preconditions were checked, and
+the one that could not be satisfied — whether the doc-only cap reduces
+rounds — is recorded inside the spec as a measurement rather than waved
+through).
 
-**Not authored, deliberately:** the guidance-executable set (§2 item 3)
-and the extension carve (item 5). Both should be authored from
-measurements taken at the time, per §3.
+**Not authored, deliberately:** the extension carve (item 5). It should
+be authored from measurements taken at the time, per §3.
 
-**Pointing an agent at this file is not sufficient for either.** Each has
-open questions that must be answered *before* a spec can be written, and
-they are scattered across the proposal where an authoring agent will not
+**Pointing an agent at this file is not sufficient for it.** It has open
+questions that must be answered *before* a spec can be written, and they
+are scattered across the proposal where an authoring agent will not
 reliably connect them. They are collected here.
 
 ### 4a. Before authoring the extension carve
@@ -211,9 +218,23 @@ without needing a target number.
 
 ### 4b. Before authoring the guidance-executable set
 
-- Confirm the **doc-only cap actually reduced rounds** — this set is its first real test, and if the cap is not working, prose-heavy work is still expensive and the set should be scoped smaller.
-- The five active lessons and their dispositions are already worked out in proposal §5.2; C-001/C-002/C-003 in [`guidance-candidates.md`](guidance-candidates.md) are drafted as lines and ready to promote.
-- **The retention numbers (10 sets, 20 instruction lines) are proposed, not measured.** Treat them as a starting point to be argued with, not a decision.
+**Set 121 was authored 2026-08-11; this section is retained as the
+record of what was checked.** Its findings are carried into the spec.
+
+- **Confirm the doc-only cap actually reduced rounds.** *Result: could
+  not be confirmed.* The cap is live and able to fire (path citation
+  0/581 → 13/13), but has never fired — all 13 post-cap findings cite
+  code. Set 121 remains its first real test, and Session 4 measures it.
+- The five active lessons and their dispositions are already worked out in proposal §5.2; C-001/C-002/C-003 in [`guidance-candidates.md`](guidance-candidates.md) are drafted as lines and ready to promote. *The list may become six — Set 120 S3 carries a Step 9 decision on `L-069-1`.*
+- **The retention numbers (10 sets, 20 instruction lines) are proposed, not measured.** Treat them as a starting point to be argued with, not a decision. *Set 121 S2 step 5 requires deriving them or stating plainly that the data supports nothing.*
+- *Added while authoring:* the usage ledger is an **operator design of
+  2026-08-11** — entries keyed `<set>-<session>` as dash-separated
+  strings, retention counted in **active sessions rather than elapsed
+  time**, and pruning **batched and operator-initiated** rather than
+  automatic at a set boundary. That supersedes proposal §5.3 where they
+  differ. `session-constitution.md` is deliberately **excluded** from
+  usage retention: it is a runbook, so citation-based tallies would
+  score its most-used content as unused.
 
 ## 5. Artifact index
 
@@ -228,6 +249,7 @@ Produced 2026-08-10/11; this is where the reasoning lives.
 | [`session-sets/115-.../step-ledger-findings.md`](../session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md) | the step-ledger root cause, the tree-vs-chat resolution, Session 4's contradiction |
 | [`session-sets/118-.../measurement-correction.md`](../session-sets/118-test-retirement-and-coupling-budget/measurement-correction.md) | why that set's coupling number is probably an artifact |
 | [`planning/guidance-candidates.md`](guidance-candidates.md) | guidance decided but not admissible while preload is at ceiling — C-001, C-002, C-003 |
+| [`session-sets/121-.../spec.md`](../session-sets/121-guidance-becomes-executable/spec.md) | the usage-ledger design, why the constitution is excluded from it, and **Future exploration: a shared guidance corpus across organizations** (operator idea, 2026-08-11 — the `scope="portable"` seam already exists) |
 | [`planning/terminology-sanctioned-writer.md`](terminology-sanctioned-writer.md) | the remaining "blessed" → "sanctioned" sweep across historical files |
 
 ## 6. The single open item with no owner

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "121-guidance-becomes-executable",
+  "status": "not-started",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "Encode what earns its keep; drop what does not",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 2,
+      "title": "The retention mechanism, so it cannot re-bloat",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "Make project-guidance.md addressable, and pay for it",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 4,
+      "title": "Admit the queue, and measure whether the cap fired",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

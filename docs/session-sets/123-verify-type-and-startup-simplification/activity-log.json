@@ -1,0 +1,84 @@
+{
+  "sessionSetName": "123-verify-type-and-startup-simplification",
+  "createdDate": "2026-08-11T16:46:21.161914-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T16:46:21.161764-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "ship-the-three-branch-resolver-as",
+      "dateTime": "2026-08-11T16:46:21.161764-04:00",
+      "description": "**Ship the three-branch resolver** as one function with one entry point: `project-verify-type.txt` if present and valid \u2192 else the environment default confirmed once and written to the file \u2192 else guided setup. **The file wins silently over the environment** (standing decision 5), and an invalid value in either is reported, never guessed at.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "derive-transport-profile-from-the-resolved",
+      "dateTime": "2026-08-11T16:46:21.161764-04:00",
+      "description": "**Derive `transport.profile` from the resolved type** (standing decision 2) so exactly one mechanism owns the fact. Where `config.py:504` currently defaults `transport.profile` to `api` independently, that default must become a consequence of resolution, not a parallel answer. **Ship a falsifier that sets the two to disagree and asserts the file wins** \u2014 `L-112-1`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "audit-the-four-modules-above-before",
+      "dateTime": "2026-08-11T16:46:21.161764-04:00",
+      "description": "**Audit the four modules above before writing detection code.** The readiness and identity checks already exist; this session gives them an order, not a replacement. Report anything reimplemented, and why.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T16:46:21.161764-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T16:57:56.028137-04:00",
+      "description": "Registered session 1 via start_session (github-copilot / anthropic / claude-opus-5 / high); preload read; transport profile is copilot-cli via the seat-local local-overrides.yaml, so no provider API keys are required or warned about.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "audit-the-four-modules-above-before",
+      "dateTime": "2026-08-11T16:57:56.029525-04:00",
+      "description": "Audited the four named modules BEFORE writing detection code. config.py resolves and validates transport.profile (:504 default, :232 copilot-cli block); copilot_preflight.py owns seat readiness (binary / credential / live-probe); transport_diagnostics.py owns failed-dispatch diagnosis; orchestrator_identity.py owns the effective provider. Grep confirms NOTHING resolved a verify type anywhere: no project-verify-type, AI_ORCHESTRATION_VERIFY_TYPE or verify_type reference existed outside the design doc and this set's spec. Nothing was reimplemented: verify_type.py is stdlib-only (so config can import it without a cycle), adds the resolution ORDER the four never had, and delegates readiness to the existing preflight CLI by naming it in the guided-setup script rather than re-checking a seat itself.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "ship-the-three-branch-resolver-as",
+      "dateTime": "2026-08-11T16:57:56.030390-04:00",
+      "description": "Shipped ai_router/verify_type.py: resolve_verify_type() is the one entry point for all three branches (project file -> environment default awaiting one confirmation -> guided setup), with write_project_verify_type() as the confirm-once-and-remember step and a `python -m ai_router.verify_type` CLI (--confirm / --set / --json; exit 3 = guided setup required) for the terminal the agent is already in. The file wins silently over the environment (standing decision 5) and an invalid value in EITHER is reported, never guessed at -- a bad project file does not fall through to the environment.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "derive-transport-profile-from-the-resolved",
+      "dateTime": "2026-08-11T16:57:56.031291-04:00",
+      "description": "config.load_config no longer defaults transport.profile independently: it calls verify_type.derive_transport_profile after the local-overrides merge, so the project file outranks the tracked config AND the seat-local override, and the api default is now the last step of resolution rather than a parallel answer. Falsifiers (L-112-1) plant the disagreement in BOTH directions and assert the file wins, plus two look-alikes proving the derivation does not fire indiscriminately, plus a structural bijection assertion against config._VALID_TRANSPORT_PROFILES. 16 tests, all green; the neighbouring config / local-overrides / entry-point suites stay green.",
+      "status": "complete"
+    }
+  ]
+}

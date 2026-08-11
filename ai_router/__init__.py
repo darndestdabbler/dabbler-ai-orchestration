@@ -162,6 +162,18 @@ from .orchestrator_identity import (
 # result-object-style (never raise) so route()/verify() compose them
 # directly rather than needing new plumbing in either module.
 from .cli_transport import CopilotCliTransport, resolve_transport_timeouts
+# Set 123 S1: the one entry point that answers "what verifies this project".
+# transport.profile is DERIVED from it (config.load_config calls
+# derive_transport_profile), so the two facts cannot disagree.
+from .verify_type import (
+    COPILOT_CLI as VERIFY_TYPE_COPILOT_CLI,
+    DIRECT_API as VERIFY_TYPE_DIRECT_API,
+    VerifyTypeError,
+    VerifyTypeResolution,
+    derive_transport_profile,
+    resolve_verify_type,
+    write_project_verify_type,
+)
 from .copilot_catalog import (
     Catalog as CopilotCatalog,
     load_lockfile as load_copilot_catalog,

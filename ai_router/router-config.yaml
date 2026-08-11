@@ -79,8 +79,15 @@ providers:
 # docs/session-sets/078-copilot-cli-hybrid-tier/spec.md for the full
 # seat-profile contract and its explicitly degraded guarantees (asserted
 # provider provenance, no billed-usage accounting).
+#
+# Set 123 S1: this value is now the FALLBACK, not the authority. When the
+# project holds a project-verify-type.txt (DIRECT_API | COPILOT_CLI),
+# ai_router/verify_type.py derives transport.profile from it and the file wins
+# — over this file and over local-overrides.yaml both. Two mechanisms for one
+# fact is a defect class this repo has hit three times; the file is the one.
+# `python -m ai_router.verify_type` prints which branch answered.
 transport:
-  profile: api   # api | copilot-cli
+  profile: api   # api | copilot-cli — derived from project-verify-type.txt when present
   # This is PACKAGE DATA (pyproject.toml ships this file), so it must carry the
   # profile that works for a fresh install with provider API keys. A machine
   # that runs on a Copilot seat sets its own profile in the gitignored

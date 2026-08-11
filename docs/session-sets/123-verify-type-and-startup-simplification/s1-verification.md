@@ -1,0 +1,21 @@
+**ISSUES FOUND**
+
+- **Issue 1:** `transport.profile` is not derived from the resolver for the environment branch, so the two can disagree.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/session-sets/123-verify-type-and-startup-simplification/spec.md:110`, `docs/session-sets/123-verify-type-and-startup-simplification/spec.md:116`, `docs/session-sets/123-verify-type-and-startup-simplification/spec.md:129`, `ai_router/verify_type.py:235`, `ai_router/verify_type.py:282`, `ai_router/verify_type.py:334`, `ai_router/config.py:205`, `ai_router/tests/test_verify_type_resolution.py:259`
+  - **Failure scenario:** A fresh Copilot-seat project has no `project-verify-type.txt` but does have `AI_ORCHESTRATION_VERIFY_TYPE=COPILOT_CLI`. `resolve_verify_type()` reports `COPILOT_CLI` with `transport_profile == "copilot-cli"`, while `load_config()` derives `"api"` and may fail on missing provider keys or dispatch through the wrong transport. This is probable because this no-file environment branch is one of the spec’s three intended startup paths, and keyless Copilot seats are a supported population.
+  - **Acceptance criterion:** `JUDGMENT - In the no-project-file environment-default branch, a reviewer must not be able to observe resolve_verify_type(...).transport_profile disagreeing with load_config(...)[\"transport\"][\"profile\"]; either config derives from that resolved branch or the resolver no longer reports the unconfirmed environment value as the resolved project verify type.`
+  - **Details:** **Violation:** the spec requires “Derive `transport.profile` from the resolved type” and ends with “`transport.profile` cannot disagree with it.” **Impact:** the merge would ship a second profile resolver beside `resolve_verify_type`, recreating the exact split-brain class the session is meant to remove. **Evidence:** `resolve_verify_type()` treats a valid environment value as resolved, but `derive_transport_profile()` deliberately ignores the environment and falls back to config/default; the test suite even codifies `AI_ORCHESTRATION_VERIFY_TYPE=COPILOT_CLI` plus no file as `transport.profile == "api"`.
+
+- **Issue 2:** The CLI confirmation path writes `project-verify-type.txt` to the invocation directory, not the project root.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/session-sets/123-verify-type-and-startup-simplification/spec.md:27`, `docs/planning/verify-type-resolution.md:116`, `ai_router/verify_type.py:147`, `ai_router/verify_type.py:196`, `ai_router/verify_type.py:460`
+  - **Failure scenario:** A user runs `python -m ai_router.verify_type --confirm` from a nested directory in a repo. The command exits successfully but writes `subdir/project-verify-type.txt`; resolving from the repo root still finds no project file, so future sessions can prompt again or derive a different profile depending on cwd. This is probable because the resolver explicitly supports walking up from nested working directories, and developers commonly run tooling below repo root.
+  - **Acceptance criterion:** `JUDGMENT - From a nested directory inside a repo with no existing project file and a valid environment default, --confirm and --set must write exactly <repo-root>/project-verify-type.txt, resolving from both the repo root and the nested directory must find that same file, and no nested project-verify-type.txt may be created.`
+  - **Details:** **Violation:** the settled location is “the project root,” and the file is the “SINGLE SOURCE OF TRUTH.” **Impact:** the setup command can falsely report success while leaving the project unconfigured from other directories, defeating the “case 1 forever” guarantee. **Evidence:** `find_project_file()` walks upward to a repo boundary, but `main()` passes raw `Path.cwd()` / `--project-root` into `write_project_verify_type()`, whose implementation writes directly to that path.
+
+**NITS**
+
+- **Nit:** `docs/planning/verify-type-resolution.md:36` still says an “absent or unparseable” project file falls through to the environment, while the implemented/session-set rule says invalid values are reported and never guessed at. That is documentation-only and recoverable, but it should be normalized.

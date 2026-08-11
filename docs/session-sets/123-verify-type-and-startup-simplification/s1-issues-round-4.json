@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 4,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The cwd fallback still outranks the explicitly loaded config’s own `transport.profile` when that config’s repository has no project file.\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `ai_router/config.py:214-217, ai_router/verify_type.py:397-412, ai_router/tests/test_verify_type_resolution.py:284-303`\n- **Failure scenario:** Automation runs from repo A, which has `project-verify-type.txt=COPILOT_CLI`, while explicitly loading repo B’s `router-config.yaml`. Repo B is in the normal pre-commit/setup state with no `project-verify-type.txt` yet but has `transport.profile: api`. `load_config()` always passes cwd as `extra_starts`, and `derive_transport_profile()` checks every project file before the config profile, so repo A’s file selects `copilot-cli` for repo B; if repo B lacks `transports.copilot-cli`, config load fails, otherwise repo B dispatches through the wrong transport. This is probable for the same explicit cross-repo automation path L7 covered, and the no-project-file state is a first-run/migration path the tests explicitly preserve.\n- **Acceptance criterion:** `python -c \"exec(__import__('base64').b64decode('CmltcG9ydCBvcwppbXBvcnQgcGF0aGxpYgppbXBvcnQgc2h1dGlsCmltcG9ydCBzeXMKaW1wb3J0IHRlbXBmaWxlCgpzeXMucGF0aC5pbnNlcnQoMCwgc3RyKHBhdGhsaWIuUGF0aCgnYWlfcm91dGVyJykucmVzb2x2ZSgpKSkKaW1wb3J0IGNvbmZpZwppbXBvcnQgdmVyaWZ5X3R5cGUgYXMgdnQKCm9yaWcgPSBwYXRobGliLlBhdGguY3dkKCkKYmFzZSA9IHBhdGhsaWIuUGF0aCh0ZW1wZmlsZS5ta2R0ZW1wKCkpCnRyeToKICAgIHJlcG9fYSA9IGJhc2UgLyAncmVwby1hJwogICAgcmVwb19iID0gYmFzZSAvICdyZXBvLWInCiAgICByZXBvX2EubWtkaXIoKQogICAgcmVwb19iLm1rZGlyKCkKICAgIChyZXBvX2EgLyAnLmdpdCcpLm1rZGlyKCkKICAgIChyZXBvX2IgLyAnLmdpdCcpLm1rZGlyKCkKICAgIHZ0LndyaXRlX3Byb2plY3RfdmVyaWZ5X3R5cGUocmVwb19hLCB2dC5DT1BJTE9UX0NMSSkKICAgIGNmZyA9IHJlcG9fYiAvICdyb3V0ZXItY29uZmlnLnlhbWwnCiAgICBjZmcud3JpdGVfdGV4dCgKICAgICAgICAncHJvdmlkZXJzOiB7fVxuJwogICAgICAgICdtb2RlbHM6IHt9XG4nCiAgICAgICAgJ3JvdXRpbmc6XG4nCiAgICAgICAgJyAgdGllcl9hc3NpZ25tZW50czoge31cbicKICAgICAgICAndHJhbnNwb3J0OlxuJwogICAgICAgICcgIHByb2ZpbGU6IGFwaVxuJywKICAgICAgICBlbmNvZGluZz0ndXRmLTgnLAogICAgKQogICAgb3MuY2hkaXIocmVwb19hKQogICAgbG9hZGVkID0gY29uZmlnLmxvYWRfY29uZmlnKHN0cihjZmcpKQogICAgcmFpc2UgU3lzdGVtRXhpdCgwIGlmIGxvYWRlZFsndHJhbnNwb3J0J11bJ3Byb2ZpbGUnXSA9PSAnYXBpJyBlbHNlIDEpCmZpbmFsbHk6CiAgICBvcy5jaGRpcihvcmlnKQogICAgc2h1dGlsLnJtdHJlZShiYXNlLCBpZ25vcmVfZXJyb3JzPVRydWUpCg=='))\"`\n- **Acceptance expectation:** exit 0\n- **Details:** Violation: the fix claims “the anchor FOLLOWS THE CONFIG, not the process” and that with no project file “the config stays in charge,” but the implementation searches cwd project files before reading the loaded config’s profile. Impact: a reasonable reviewer should not merge because an explicit repo-B config can still be dispatched according to repo A, preserving the L7 class for the common no-project-file state. Evidence: `config.py` always supplies `extra_starts=(None,)`; `verify_type.py` consumes all anchors before `transport.profile`; the no-project-file test only covers same-cwd, not cross-repo fallback.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Automation runs from repo A, which has `project-verify-type.txt=COPILOT_CLI`, while explicitly loading repo B’s `router-config.yaml`. Repo B is in the normal pre-commit/setup state with no `project-verify-type.txt` yet but has `transport.profile: api`. `load_config()` always passes cwd as `extra_starts`, and `derive_transport_profile()` checks every project file before the config profile, so repo A’s file selects `copilot-cli` for repo B; if repo B lacks `transports.copilot-cli`, config load fails, otherwise repo B dispatches through the wrong transport. This is probable for the same explicit cross-repo automation path L7 covered, and the no-project-file state is a first-run/migration path the tests explicitly preserve.",
+      "evidencePaths": [
+        "ai_router/config.py",
+        "ai_router/verify_type.py",
+        "ai_router/tests/test_verify_type_resolution.py"
+      ],
+      "acceptance": {
+        "kind": "executable",
+        "command": "python -c \"exec(__import__('base64').b64decode('CmltcG9ydCBvcwppbXBvcnQgcGF0aGxpYgppbXBvcnQgc2h1dGlsCmltcG9ydCBzeXMKaW1wb3J0IHRlbXBmaWxlCgpzeXMucGF0aC5pbnNlcnQoMCwgc3RyKHBhdGhsaWIuUGF0aCgnYWlfcm91dGVyJykucmVzb2x2ZSgpKSkKaW1wb3J0IGNvbmZpZwppbXBvcnQgdmVyaWZ5X3R5cGUgYXMgdnQKCm9yaWcgPSBwYXRobGliLlBhdGguY3dkKCkKYmFzZSA9IHBhdGhsaWIuUGF0aCh0ZW1wZmlsZS5ta2R0ZW1wKCkpCnRyeToKICAgIHJlcG9fYSA9IGJhc2UgLyAncmVwby1hJwogICAgcmVwb19iID0gYmFzZSAvICdyZXBvLWInCiAgICByZXBvX2EubWtkaXIoKQogICAgcmVwb19iLm1rZGlyKCkKICAgIChyZXBvX2EgLyAnLmdpdCcpLm1rZGlyKCkKICAgIChyZXBvX2IgLyAnLmdpdCcpLm1rZGlyKCkKICAgIHZ0LndyaXRlX3Byb2plY3RfdmVyaWZ5X3R5cGUocmVwb19hLCB2dC5DT1BJTE9UX0NMSSkKICAgIGNmZyA9IHJlcG9fYiAvICdyb3V0ZXItY29uZmlnLnlhbWwnCiAgICBjZmcud3JpdGVfdGV4dCgKICAgICAgICAncHJvdmlkZXJzOiB7fVxuJwogICAgICAgICdtb2RlbHM6IHt9XG4nCiAgICAgICAgJ3JvdXRpbmc6XG4nCiAgICAgICAgJyAgdGllcl9hc3NpZ25tZW50czoge31cbicKICAgICAgICAndHJhbnNwb3J0OlxuJwogICAgICAgICcgIHByb2ZpbGU6IGFwaVxuJywKICAgICAgICBlbmNvZGluZz0ndXRmLTgnLAogICAgKQogICAgb3MuY2hkaXIocmVwb19hKQogICAgbG9hZGVkID0gY29uZmlnLmxvYWRfY29uZmlnKHN0cihjZmcpKQogICAgcmFpc2UgU3lzdGVtRXhpdCgwIGlmIGxvYWRlZFsndHJhbnNwb3J0J11bJ3Byb2ZpbGUnXSA9PSAnYXBpJyBlbHNlIDEpCmZpbmFsbHk6CiAgICBvcy5jaGRpcihvcmlnKQogICAgc2h1dGlsLnJtdHJlZShiYXNlLCBpZ25vcmVfZXJyb3JzPVRydWUpCg=='))\"",
+        "expectedExitCode": 0
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 environment suggestion no longer claims dispatch profile",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 default CLI writes land at the project root",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 explicit config path finds the config-owned project file",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6 nested project files no longer override the root file",
+      "verdict": "fix-accepted",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 caller repository can still outrank an explicitly loaded config repository",
+      "verdict": "fix-rejected",
+      "ledgerId": "L7"
+    }
+  ]
+}

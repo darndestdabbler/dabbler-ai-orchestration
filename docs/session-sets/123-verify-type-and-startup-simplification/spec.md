@@ -187,7 +187,11 @@ be there.
    sibling reference** to the retired surface: docs, README, the
    consumer-bootstrap template, the cold-start fixture (`L-069-1`: a bug
    is a bug CLASS).
-5. `package.json` is the extension MANIFEST, so **`L-064-12` applies**:
+5. **Rename the Work Explorer caption** to `AI ORCH: WORK EXPLORER`
+   (operator, 2026-08-11) — the container `title`, its surviving
+   `contextualTitle`, and both `electronLaunch.ts` activity-bar selectors,
+   in one pass. Details and exact line numbers in the note below.
+6. `package.json` is the extension MANIFEST, so **`L-064-12` applies**:
    full `npm run test:playwright` after the last edit. Expect **31
    scenarios** if the walkthrough is rewritten in place, or 30 plus a
    rewritten one — the number is the *check*, not the goal. Then full
@@ -196,7 +200,36 @@ be there.
 **Creates:** the deletion, the bootstrap updates
 **Touches:** `tools/dabbler-ai-orchestration/src/`, `package.json`, Layer 3 specs, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `docs/`
 **Ends with:** 3,576 fewer lines of extension surface, 9 fewer Layer 3 scenarios, and a startup that infers rather than asks.
-**Progress keys:** `coldStartWalked`, `surfaceDeleted`, `bootstrapUpdated`, `layer3At31`, `walkthroughRewritten`
+**Progress keys:** `coldStartWalked`, `surfaceDeleted`, `bootstrapUpdated`, `layer3At31`, `walkthroughRewritten`, `captionRenamed`
+
+> **Operator note, 2026-08-11 (added during Session 1): rename the Work
+> Explorer caption.** VS Code renders a view's header as
+> `<viewsContainer title>: <view name>`, so today it reads
+> **`AI WORK EXPLORER: WORK EXPLORER`** — the same words twice. The
+> operator wants **`AI ORCH: WORK EXPLORER`**.
+>
+> The change is one field: `contributes.viewsContainers.activitybar[0].title`
+> in `tools/dabbler-ai-orchestration/package.json:48`, `"AI Work Explorer"`
+> -> `"AI Orch"`. The view's own `name` (`"Work Explorer"`, `:64`) does **not**
+> change. Fold it into this session because it is a `package.json` edit and
+> this session is already paying `L-064-12`'s full Layer 3 run for that file.
+>
+> Two siblings must move in the same pass (`L-069-1` — a bug is a bug CLASS,
+> and a rename is the same shape):
+>
+> - **`contextualTitle`** carries the same string twice in the same file
+>   (`:59` on the retired `dabblerSessionSets` view, `:65` on the surviving
+>   `dabblerWorkExplorerTree`). The `:59` one leaves with the webview; `:65`
+>   must be renamed with the container.
+> - **The Layer 3 harness selects the activity-bar icon by that exact
+>   string** — `electronLaunch.ts:724` and `:858`
+>   (`.activitybar .action-label[aria-label*="AI Work Explorer"]`). Both are
+>   `aria-label*=` substring matches, so leaving them would fail **every**
+>   tree scenario, not just one. Update both.
+>
+> This is a container **title**, not a command id, so it does not collide
+> with step 3's "do not change a surviving command id" rule — keybindings and
+> `when`-clauses key off ids, which are untouched.
 
 > **`vsix-first-run-walkthrough.spec.ts` is REWRITTEN, never deleted.**
 > It is counted above among the 9 retired scenarios only because it

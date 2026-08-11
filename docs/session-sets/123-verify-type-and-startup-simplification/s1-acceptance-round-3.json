@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "18a152c00f4bc866dbbdbc33425b78d843ad783c",
+  "fixedTree": "f01bbd893cc80f1e99a3eb237e0c9e80725e2bad",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T21:29:14.009289+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `load_config(path)` still lets the caller’s current repository outrank the explicitly loaded config’s repository. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/ ...",
+      "severity": "Major",
+      "outcome": "baseline-mismatch",
+      "criterion": "python -c \"exec('import os\\nimport sys\\nimport tempfile\\nfrom pathlib import Path\\nsys.path.insert(0, str(Path.cwd() / \\\"ai_router\\\"))\\nimport config\\nbase = Path(tempfile.mkdtemp())\\ncwd_repo = base / \\\"cwd-repo\\\"\\ntarget_repo = base / \\\"target-repo\\\"\\nfor repo in (cwd_repo, target_repo):\\n    repo.mkdir()\\n    (repo / \\\".git\\\").mkdir()\\n(cwd_repo / \\\"project-verify-type.txt\\\").write_text(\\\"DIRECT_API\\\\n\\\", encoding=\\\"utf-8\\\")\\n(target_repo / \\\"project-verify-type.txt\\\").write_text(\\\"COPILOT_CLI\\\\n\\\", encoding=\\\"utf-8\\\")\\n(target_repo / \\\"router-config.yaml\\\").write_text(\\\"providers: {}\\\\nmodels: {}\\\\nrouting:\\\\n  tier_assignments: {}\\\\ntransport:\\\\n  profile: api\\\\ntransports:\\\\n  copilot-cli:\\\\n    lockfile: ai_router/copilot-catalog.lock\\\\n    roles: {}\\\\n\\\", encoding=\\\"utf-8\\\")\\nos.chdir(cwd_repo)\\nprofile = config.load_config(str(target_repo / \\\"router-config.yaml\\\"))[\\\"transport\\\"][\\\"profile\\\"]\\nassert profile == \\\"copilot-cli\\\", profile')\"",
+      "reason": "the only pre-fix tree available belongs to an earlier round than the one that raised this finding, so a fails-before result would not be attributable to this fix. The finding stays judgment-based."
+    }
+  ]
+}

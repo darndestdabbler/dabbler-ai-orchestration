@@ -1,7 +1,13 @@
 # Verify-type resolution — operator design, 2026-08-11
 
-> **Status:** design decision, recorded for a future set. **Not built.**
-> This replaces the "detect → confirm → persist" placeholder that was R3
+> **Status:** operator design, **implemented by Set 123 Session 1** in
+> [`ai_router/verify_type.py`](../../ai_router/verify_type.py) (branches
+> 1-3, plus the `transport.profile` derivation) with falsifiers in
+> `ai_router/tests/test_verify_type_resolution.py`. Run
+> `python -m ai_router.verify_type` to see which branch answers for a
+> given project. The `DIRECT_API` precondition and the qualified verdict
+> below are **Session 2**; retiring the webview is **Session 3**.
+> This replaced the "detect → confirm → persist" placeholder that was R3
 > in [`the target-state proposal`](../proposals/2026-08-10-smaller-framework-target-state.md#3-3-both-transports-r3),
 > and it is the operator's design, not an inferred one.
 >
@@ -107,7 +113,34 @@ is not helpful*, rather than picking a target number.
 
 ## Open questions for the authoring set
 
-1. **Where does `project-verify-type.txt` live?** The bootstrap files must name it, and all three (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`) are kept in lockstep by policy. Repo root is the obvious candidate; it must be committed, since it is project configuration rather than machine state.
-2. **How does the qualified verdict surface?** A field on the verdict record is the cheap answer; whether `close_session` prints it, and whether the Work Explorer shows it, is a separate call.
-3. **What happens when the file and the environment disagree?** The rule above says the file wins silently. That is deliberate — a project's committed choice should not be overridden by whatever machine it is checked out on — but it should be *stated* in the implementation, not left implicit.
-4. **Does `router-config.yaml`'s `transport.profile` remain the source of truth, or become derived from this file?** Two mechanisms for one fact is the defect class this repo has hit three times. **Pick one.**
+1. **Where does `project-verify-type.txt` live?** **Settled (Set 123 S1):**
+   the project root, found by walking up from the working directory and
+   **stopping at the repository boundary** (the first ancestor holding
+   `.git`), so a project never inherits an unrelated parent directory's
+   answer. It is committed — project configuration, not machine state.
+   Session 3 names it in the three bootstrap files.
+2. **How does the qualified verdict surface?** Open — **Session 2** owns it.
+   A field on the verdict record is the cheap answer; whether
+   `close_session` prints it, and whether the Work Explorer shows it, is a
+   separate call.
+3. **What happens when the file and the environment disagree?**
+   **Settled (Set 123 S1):** the file wins, silently, and the
+   implementation says so rather than leaving it implicit —
+   `resolve_verify_type` returns on branch 1 without consulting the
+   environment for the answer, and
+   `test_project_file_wins_silently_over_the_environment` plants the
+   disagreement. One refinement the design did not anticipate: an
+   **invalid** project file does *not* fall through to the environment
+   either. Falling through would answer a question the project already
+   tried to answer, and answer it differently; both invalid branches are
+   reported, never guessed at.
+4. **Does `router-config.yaml`'s `transport.profile` remain the source of
+   truth, or become derived from this file?** **Settled (operator,
+   2026-08-11; implemented Set 123 S1):** derived. `config.load_config`
+   calls `verify_type.derive_transport_profile`, so where a project file
+   exists it *is* the profile — over the tracked config and over a
+   seat-local `local-overrides.yaml` both. The `api` default survives as
+   the last step of that resolution rather than as a parallel answer
+   beside it. The environment variable is deliberately **not** part of the
+   derivation: it feeds the confirm-once branch only, so an unconfirmed
+   machine default can never silently re-route dispatch.

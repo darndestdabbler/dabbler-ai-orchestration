@@ -17,6 +17,10 @@ try:
     from .pricing import unconfirmed_and_stale, validate_model_rates  # package context
     from .secret_resolver import resolve_secret
     from .cli_transport import validate_transport_timeouts
+    from .verify_type import (
+        PROFILE_SOURCE_PROJECT_FILE,
+        derive_transport_profile,
+    )
 except ImportError:  # test context — this module is also imported bare
     from pricing import (  # type: ignore[import-not-found]
         unconfirmed_and_stale,
@@ -25,6 +29,10 @@ except ImportError:  # test context — this module is also imported bare
     from secret_resolver import resolve_secret  # type: ignore[import-not-found]
     from cli_transport import (  # type: ignore[import-not-found]
         validate_transport_timeouts,
+    )
+    from verify_type import (  # type: ignore[import-not-found]
+        PROFILE_SOURCE_PROJECT_FILE,
+        derive_transport_profile,
     )
 
 # Default config location is router-config.yaml in the same directory as
@@ -173,10 +181,6 @@ def load_config(path: str | None = None, *,
     config.setdefault("routing", {})
     config["routing"].setdefault("outsourcing_mode", "whenever-helpful")
 
-    # Apply default for transport.profile (Set 078)
-    config.setdefault("transport", {})
-    config["transport"].setdefault("profile", "api")
-
     # Merge local-overrides.yaml if present (local > shared > default) BEFORE
     # any validation below runs. Session-verification finding (Set 078 S2):
     # validating against the pre-merge config meant a local override that
@@ -188,6 +192,31 @@ def load_config(path: str | None = None, *,
     local_overrides_path = config_path.parent / "local-overrides.yaml"
     if local_overrides_path.exists():
         _apply_local_overrides(config, local_overrides_path)
+
+    # Set 123 S1: transport.profile is DERIVED from the project's verify type,
+    # never decided beside it. The old unconditional `setdefault("profile",
+    # "api")` that used to sit here was a PARALLEL answer to the same question
+    # project-verify-type.txt answers; the default still exists, but it is now
+    # reached through resolution (verify_type.derive_transport_profile) rather
+    # than independently of it, so the two cannot disagree. Runs AFTER the
+    # local-overrides merge -- an explicitly configured seat profile is only
+    # visible once merged -- and BEFORE every consumer below, including
+    # validate_provider_api_keys, which branches on the profile.
+    #
+    # The anchor FOLLOWS THE CONFIG, not the process: the config file's own
+    # directory is tried first and the working directory second, and the FIRST
+    # anchor that lands in a project answers outright. A verify type describes
+    # how a PROJECT is verified, so the project that owns the config being
+    # loaded answers for it -- automation running from repo A while explicitly
+    # loading repo B's config must dispatch B's calls by B's answer, and by
+    # B's own configured default when B has not chosen yet. The cwd anchor is
+    # what keeps a pip-installed consumer (whose bundled config belongs to no
+    # repository) reading its own project file.
+    config.setdefault("transport", {})
+    profile_derivation = derive_transport_profile(
+        config, anchors=(config_path.parent, None)
+    )
+    config["transport"]["profile"] = profile_derivation.profile
 
     # Validate API keys exist in environment (only for enabled providers,
     # and only when the caller is about to DISPATCH -- Set 111 S2). The
@@ -233,7 +262,7 @@ def load_config(path: str | None = None, *,
     # Default profile "api" (absent block is fine); an unknown profile or a
     # copilot-cli profile missing its own config block fails loud rather
     # than silently falling back to the api path.
-    _validate_transport(config)
+    _validate_transport(config, derivation=profile_derivation)
 
     # Resolve prompt template file paths relative to config file location.
     # The integrated repo stores templates under ai_router/prompt-templates,
@@ -491,7 +520,7 @@ _VALID_TRANSPORT_PROFILES: frozenset[str] = frozenset({"api", "copilot-cli"})
 _COPILOT_CLI_REQUIRED_KEYS: frozenset[str] = frozenset({"lockfile", "roles"})
 
 
-def _validate_transport(config: dict) -> None:
+def _validate_transport(config: dict, *, derivation=None) -> None:
     """Validate transport.profile + its matching transports.<profile> block.
 
     Default profile "api" requires no extra block (the existing dispatch
@@ -500,12 +529,23 @@ def _validate_transport(config: dict) -> None:
     at load time rather than silently falling back to "api" — a shop that
     opted into the seat profile and got the plain API path instead (which
     it may have no keys for) is a worse failure than refusing to load.
+
+    Set 123 S1: *derivation* (a ``verify_type.ProfileDerivation``) says what
+    decided the profile. When a project file did, every error below names
+    that file — otherwise the operator is told to fix a ``transport.profile``
+    they never wrote, in a config that is no longer the authority for it.
     """
     profile = (config.get("transport") or {}).get("profile", "api")
+    origin = ""
+    if derivation is not None and derivation.source == PROFILE_SOURCE_PROJECT_FILE:
+        origin = (
+            f" (derived from {derivation.project_file}, which is the project's "
+            "verify type and outranks any configured transport.profile)"
+        )
     if profile not in _VALID_TRANSPORT_PROFILES:
         raise ValueError(
             f"transport.profile must be one of "
-            f"{sorted(_VALID_TRANSPORT_PROFILES)}, got {profile!r}"
+            f"{sorted(_VALID_TRANSPORT_PROFILES)}, got {profile!r}{origin}"
         )
     if profile == "api":
         return
@@ -514,8 +554,8 @@ def _validate_transport(config: dict) -> None:
     block = transports.get(profile)
     if not isinstance(block, dict):
         raise ValueError(
-            f"transport.profile is {profile!r} but transports.{profile} is "
-            "missing — add its config block (see router-config.yaml's "
+            f"transport.profile is {profile!r}{origin} but transports.{profile} "
+            "is missing — add its config block (see router-config.yaml's "
             "transports.copilot-cli example) before selecting this profile."
         )
     missing = sorted(_COPILOT_CLI_REQUIRED_KEYS - set(block))
@@ -645,6 +685,11 @@ _LOCAL_OVERRIDE_ALLOWED: frozenset[str] = frozenset({
     # `copilot-cli` ended up committed, where it would have made the router
     # unusable for every API-key-only consumer of the wheel. The seat choice
     # now has a supported local home instead.
+    #
+    # Set 123 S1: still the seat's home, and still the answer BEFORE a project
+    # commits one -- but a project-verify-type.txt outranks it. A project's
+    # committed choice is not overridden by whichever machine it happens to be
+    # checked out on (spec standing decision 5).
     "transport.profile",
     # Per-provider fields — expressed as "providers.<id>.<field>"
     # but validated dynamically by _apply_local_overrides.

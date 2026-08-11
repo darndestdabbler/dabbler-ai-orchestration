@@ -236,106 +236,111 @@ computes the title map it fails to use.
 
 ---
 
-### Session 4 of 4: The checklist tells the truth about what remains
+### Session 4 of 4: What still remains, in the surface you watch
 
-> **⚠ DO NOT RUN AS WRITTEN.** Three findings recorded 2026-08-11 in
-> [`step-ledger-findings.md`](step-ledger-findings.md), any one of which
-> is disqualifying on its own:
+> **Unblocked 2026-08-11.** This session previously carried a
+> **⚠ DO NOT RUN AS WRITTEN** notice over three findings in
+> [`step-ledger-findings.md`](step-ledger-findings.md). All three are now
+> resolved, and resolving them **shrank this session to a renderer** —
+> exactly as §6 of that document predicted.
 >
-> **1. It would render corrupt data.** The step-status field has no
-> validated vocabulary; ~10% of step entries carry an unrecognised token.
-> Nothing this session builds renders correctly until a status allowlist
-> lands at the writer — a **router** change, out of this set's scope.
+> | original blocker | resolution |
+> | :--- | :--- |
+> | **1. Would render corrupt data** — no validated step vocabulary, ~10% unrecognised tokens | **Set 120 S1** made the writer strict; **120 S2** migrated the 271 lossless tokens. The vocabulary is `pending / in-progress / complete / blocked`. |
+> | **2. The contradiction** — show outstanding lifecycle phases while rendering only what is recorded | **Dissolved, not argued away.** See below: `close_preflight` already *computes* the obligations, so the renderer renders a recorded computation rather than synthesising policy. |
+> | **3. Motivating measurement was a mean** | Rebaselined: close-out execution is **0.1 min median** across 104 sets / 295 sessions. The 57-minute figure bundled operator-away time. |
 >
-> **2. It contains a contradiction** (independent review, GPT-5.6 Sol):
-> it requires showing *outstanding lifecycle phases* while *rendering only
-> what is recorded, never what is planned.* Before verification,
-> disposition, remediation or close happens there is no record, and
-> absence cannot distinguish pending from not-applicable from
-> not-yet-knowable from corrupt. It therefore cannot deliver its own
-> "fully ticked means actually finished" promise without synthesising
-> expected obligations from policy — which it forbids itself.
->
-> **3. Its motivating measurement needs rebaselining.** The 57-minute
-> figure below is a **mean**, and wall-clock spans include operator-away
-> time — Set 116's spec had already ruled that *"the median is the honest
-> signal and the maxima are not effort,"* and the operator has since
-> confirmed the 402-minute outlier cited below was waiting on a human.
-> Measured from `session-events.jsonl` across 104 sets / 295 sessions,
-> **close-out execution is 0.1 min median.** The phenomenon the operator
-> observed is real — a ticked checklist can hide remaining work — but its
-> magnitude, and therefore this session's budget, is unestablished.
->
-> **Also unresolved:** Sol's sixth precondition asks for *evidence that
-> operators keep the session node expanded and act on it.* The tree is
-> lazy and its rows are collapsed by default, so "persistent" does not
-> establish "watched at the moment intervention matters."
->
-> **And the architecture may make this session smaller.** The same
-> derivation exists twice — 1,680 lines of Python against 1,830 of
-> TypeScript, guarded by 110 TS tests plus a parity harness that exists
-> only because there are two implementations. Computing the projection
-> once in Python and serialising it (the operator's 2026-08-11 proposal)
-> would reduce this session to a renderer.
->
-> **Re-author after the prerequisites in `step-ledger-findings.md` §7, or
-> drop this session and ship Sessions 1–3.**
+> **Sol's six preconditions, re-checked 2026-08-11:** (1) a canonical
+> applicability state machine — **already exists as `close_preflight`**;
+> (2) validated vocabulary — **shipped, 120 S1**; (3) explicit semantics
+> for absent / corrupt / stale — **shipped, 120 S3** (`unknown`, and
+> `evidence: absent | unreadable | read`); (4) no criterion satisfiable by
+> a false "complete" — **satisfied by construction**, because
+> `close_preflight` derives from the same predicates `close_session` runs;
+> (5) an audited prototype comparing files, Python and tree —
+> `test_step_row_parity.py` and its fixture; (6) evidence operators watch
+> the expanded session — **operator confirmed 2026-08-11: *"Often — I
+> watch the expanded session while work is in flight."***
 
-The operator's observation, 2026-08-10: *"you can have all tasks checked
-off and there is still a lot of outstanding work to be done (e.g., a final
-test run) and other close out steps."*
+**Why the contradiction is gone.** The objection was that showing
+outstanding lifecycle phases requires inventing obligations from policy,
+because nothing is recorded before verification or close happens. But
+`close_preflight` (Set 119 S2) *"reports every unmet close-out obligation
+for a session, in one pass, with no side effects and no routed call,
+runnable at any time."* Its JSON is already the render model:
 
-**Measured:** across sets 108-114, a mean of **57 minutes — 18% of a
-session — elapses after the last box ticks**, and in six sessions it was
-45% or more (402 min in 111 S4, 246 in 111 S2, 200 in 108 S4).
+```
+obligations: [{ check, met, blocking, detail, action }],  would_close: bool
+```
 
-**Cause:** Set 114 seeds the checklist from `spec.md`'s steps, and every
-spec compresses the lifecycle into one trailing step. Set 114 S3's own
-seeded plan ended `plan-step | verify-close` — a single box standing for
-the discovery round, the supplementary round, remediation,
-remediation-review, the final full suite, `disposition.json`,
-`change-log.md`, the Step 9 review, the path-aware critique, commit, push
-and `close_session`. The checklist therefore reads 5/5 at the moment
-verification *begins*.
+So this session renders **what a sanctioned Python component computed**,
+which is Set 114's discipline intact — *render what is recorded* — with
+the recording done by the component that owns the question.
+
+**The constraint that shapes the build.** Measured 2026-08-11:
+`close_preflight` takes **6.6 seconds** (git-backed predicates plus
+interpreter startup). That is far too slow to call from a tree that
+refreshes on file changes. It must therefore follow the pattern Set 120
+S3 established: **compute to a serialized projection with an input
+digest; the tree reads the file instantly and renders staleness
+honestly.** Do not call the CLI from the renderer.
+
+**A defect this session must fix, found while re-authoring.** Set 120 S3
+removed `<- here` **from Python only**. In the committed tree today:
+
+- `ai_router` — `HERE_MARKER` is gone, with a test asserting `not hasattr(sc, "HERE_MARKER")`
+- `workExplorerTreeModel.ts:352` — `export const HERE_MARKER = "<- here";` **still defined**
+- `workExplorerTreeModel.ts:660` — `description: row.isHere ? HERE_MARKER : undefined` **still rendered**
+
+The operator's ruling was *drop the marker, show the in-progress icon
+instead*. In the surface they actually watch, **neither half has
+happened**: the marker still renders and the icon still does not, because
+`stepDescriptor` derives its glyph from `row.status` alone
+(`:645`). This is `L-069-1` — *a bug is a bug CLASS; fix every sibling
+site* — with the Python site fixed and its TypeScript mirror missed.
 
 **Steps:**
 
 1. Register.
-2. **Render the lifecycle, not just the plan.** Extend the checklist model
-   so close-out phases are rows in their own right: verification rounds,
-   remediation, the final applicable suite, disposition, close. The spec's
-   steps remain what they are — the *implementation* plan — and stop being
-   mistaken for the whole session.
-3. **Derive them from ledgers that already exist** — `sN-rounds.jsonl`
-   (phase, verdict, `endedLoop`), `sN-remediation-round-*.md`,
-   `test-runs.jsonl`, `disposition.json`, `session-state.json`. **No new
-   writer and no new artifact**; the data is on disk and only the renderer
-   is wrong. Keep Set 114's discipline: render what is *recorded*, never
-   what is merely planned.
-4. **Ship it in `ai_router/session_checklist.py` first**, so consumers who
-   install from PyPI and have no extension get it, then render the same
-   model in the tree. Same reasoning as every other decision in this set:
-   the CLI is the portable surface. **While in the step rows, fix the
-   in-flight glyph**: `stepDescriptor` derives its icon from `row.status`
-   alone, so the row the session is actually on shows `<- here` in the
-   description and **no in-progress icon** — a logged step reads `complete`
-   (it is recorded after it happens) and the planned row ahead reads
-   `not-started`. Nothing is missing but the wiring: `glyphStatusOf`
-   already maps `in-progress`, and `ICON_FILES["in-progress"]` already
-   resolves `in-progress.svg`, which session rows use. Let `isHere` reach
-   the icon.
+2. **Serialize the close-out obligations.** Add a `--write` projection to
+   `ai_router/close_preflight.py` in the shape `session_projection.py`
+   already uses — same digest-based staleness, same explicit absence
+   states, no new vocabulary. **CLI first**, so consumers who install from
+   PyPI and never use the extension get it too; that has been this set's
+   rule throughout.
+3. **Render the obligations under the expanded session node**, reading the
+   projection file rather than shelling out. A stale projection renders as
+   **stale**, never as truth — an obligation list that silently lags is
+   worse than none, because it says "nothing remains" when something does.
+   Absent and unreadable stay distinguishable, per 120 S3's vocabulary.
+4. **Finish the marker removal in TypeScript.** Delete `HERE_MARKER` and
+   its render site, and let the in-progress state reach the icon:
+   `glyphStatusOf` already maps `in-progress` and
+   `ICON_FILES["in-progress"]` already resolves `in-progress.svg`, which
+   session rows use — only the wiring is missing. **Grep both languages
+   for every sibling site before declaring it done** (`L-069-1`); this
+   session exists partly because that step was skipped once already.
 5. **Walk it, then close.** This set's UAT is the guided look across all
-   four sessions — titles, left-click, both menu actions, the empty states,
-   and a checklist that still shows work outstanding when work is
-   outstanding. Full matrix once at the release boundary; verify, close;
-   `change-log.md`, Step 9 review, advisory path-aware critique. Coordinate
+   four sessions — titles, left-click, both menu actions, the empty
+   states, the in-progress icon on the current step, and an obligations
+   list that still shows work outstanding when work is outstanding.
+   `package.json` and the tree model are both in scope, so **`L-064-12`
+   applies**: full `npm run test:playwright` after the last edit. Then
+   full pytest, verify, close, `change-log.md`, Step 9 review. Coordinate
    the extension version bump with whatever is unpublished at that point.
 
-**Creates:** the lifecycle-aware checklist model, the CLI renderer, the tree rendering, this set's walk, `change-log.md`
-**Touches:** `ai_router/session_checklist.py`, `tools/dabbler-ai-orchestration/src/providers/`, Layer 3 specs
-**Ends with:** a fully-ticked checklist means the session is actually finished — and while close-out is running, the operator can see which phase it is in.
-**Progress keys:** `lifecycleRows`, `derivedFromLedgers`, `cliFirst`, `inFlightGlyph`, `uatWalk`, `changeLog`
+**Creates:** the close-out obligation projection, its tree rendering, the finished marker removal, this set's walk, `change-log.md`
+**Touches:** `ai_router/close_preflight.py`, `ai_router/tests/`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts`, Layer 3 specs
+**Ends with:** while a session is in flight the operator can see, in the row they already watch, which step is current and what still stands between here and close.
+**Progress keys:** `obligationProjection`, `obligationsRendered`, `stalenessHonest`, `markerRemovedInTs`, `inProgressGlyph`, `uatWalk`
 
+> **Scope note.** The original Session 4 proposed a lifecycle-aware
+> checklist model derived from six ledgers. That work is **not needed**:
+> `close_preflight` already reads those predicates, so building a second
+> derivation would recreate the duplication Set 120 spent a session
+> removing. If this session finds an obligation the preflight does not
+> cover, the fix belongs **in the preflight**, not in a parallel model in
+> the renderer.
 
 ---
 

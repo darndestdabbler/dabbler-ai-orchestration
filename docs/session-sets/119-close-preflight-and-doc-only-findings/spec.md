@@ -224,27 +224,66 @@ changes what is required — only when you can find out.
 
 ---
 
-### Session 3 of 3: Restore the backstop's recovery path, and delete what nothing reaches
+### Session 3 of 3: Stop the backstop misfiring, and delete what nothing reaches
 
 > **Deletion note.** `pricing.py` is **not** in the deletion list even
 > though the operator has ruled cost calculations unnecessary for Copilot.
 > It is load-bearing on the Direct API path. Only the rate-fetching CLI
 > and the cost report go.
 
+> **Residuals handed over by Session 2** (recorded in `ai-assignment.md`).
+> Two are taken here because they sit inside this session's existing touch
+> list and are small; two are **deferred on purpose** rather than absorbed,
+> because a sixth step doubles the median session length (Set 111 S4):
+>
+> | residual | disposition |
+> | :--- | :--- |
+> | `cite_lessons` stamp staleness | **taken — step 2** |
+> | `EvidenceTooLargeError` not caught on 4 of 5 sites | **taken — step 3** |
+> | preflight reports "would-refuse" for an already-closed session | **deferred** — low consequence, and it drags `close_preflight.py` into a session that otherwise does not touch it |
+> | doc-only cap's unmeasured blast radius | **deferred** — a measurement, not a fix, and it wants the `--replay-history` instrument Session 2 just shipped |
+
 **Steps:**
 
 1. Register.
-2. **Record a baseline the recovery path can use.** A backstop round writes
-   a `discoveryBaselineTree` alongside the ledger row Set 116 S2 already
-   appends, so `--phase remediation-review` is reachable after a
-   backstop-only blocking round instead of refusing with `EXIT_USAGE`.
-   Include the case the current behaviour ignores: a **clean** discovery
-   round writes no envelope at all, so it leaves no baseline either.
-3. **Make the refusal message true.** `close_backstop`'s blocking text
-   names `verify_session` as the sanctioned next step; after step 2 that
-   instruction must actually work, and the message should name the phase to
-   run. A test asserts the named command succeeds from the exact state the
-   message is printed in.
+2. **Stop the backstop firing when nothing changed.** Session 2's own
+   close proved this live: `cite_lessons` — *mandated at close* — bumped
+   three `last-used-set` trailers after a VERIFIED round-5 stamp, staling
+   it. Source, tests and docs were byte-identical; only metadata moved,
+   and the close needed `--manual-verify` to complete.
+   `WORK_DIFF_BASE_EXCLUDES` already carries `s*-rounds.jsonl`,
+   `checklist-posts.jsonl` and `test-runs.jsonl` — **all three inside
+   `docs/session-sets/<slug>/`.** The mechanism has an implicit
+   *per-set* scope and no concept of a close-mandated write outside it;
+   `cite_lessons` writes `LESSONS_ACTIVE` **and** `LESSONS_ARCHIVE`, both
+   repo-wide. Fix it as a **category — the artifacts the close-out
+   procedure is itself required to write — not as a fourth list entry.**
+   The acceptance test is not "does `lessons-learned.md` stop staling"; it
+   is *would a fifth close-mandated writer, in either scope, be excluded
+   without editing a list?* Ship the falsifier `L-112-1` requires: a
+   passed round plus a `cite_lessons` write must settle the close with
+   **zero** fresh metered rounds.
+3. **Make the recovery path reachable, and its failures survivable.**
+   Three parts, one surface.
+   **(a)** A backstop round writes a `discoveryBaselineTree` alongside the
+   ledger row Set 116 S2 appends, so `--phase remediation-review` is
+   reachable instead of refusing with `EXIT_USAGE`
+   (`verify_session.py:2945-2954`). Cover the case the current behaviour
+   ignores: a **clean** discovery round writes no envelope, so it leaves
+   no baseline either.
+   **(b)** `close_backstop`'s blocking text names `verify_session` as the
+   sanctioned next step; after (a) that instruction must actually work,
+   and the message should name the phase. A test asserts the named
+   command succeeds from the exact state the message is printed in.
+   **(c)** `EvidenceTooLargeError` and `VerifySessionError` are
+   **siblings** (`verify_session.py:449,453`), and `close_backstop`
+   catches the latter at four sites (311, 635, 808, 827) but the former at
+   **one** (779) — so an oversized bundle still crashes the close with an
+   unhandled traceback on four paths, taking the gate down with no
+   remediation line. One line fixes all four: make
+   `EvidenceTooLargeError` inherit from `VerifySessionError`. **Check the
+   catch ordering at 779 first** — a subclass caught after its parent is
+   unreachable.
 4. **Delete what nothing reaches.** Two groups, same proof obligation.
    **(a) The unreachable gate machinery:** `contract_gate.py`,
    `floor_ratchet.py`, `replacement_gate.py`, `spec_admission.py`,
@@ -262,10 +301,20 @@ changes what is required — only when you can find out.
    and is reported**, not forced.
 5. Full pytest at close after freeze; verify, close.
 
-**Creates:** the backstop baseline record, a truthful refusal message
-**Touches:** `ai_router/close_backstop.py`, `ai_router/verify_session.py`, the seven deleted modules and their tests, `ai_router/__init__.py` (drop the `cost_report` re-exports), `pyproject.toml` (if entry points reference them), `ai_router/tests/`
-**Ends with:** a backstop-blocked close can be remediated for ~$0.07 instead of ~$0.88, and 5,165 lines nothing reaches are gone.
-**Progress keys:** `backstopBaseline`, `truthfulRefusal`, `unreachableDeleted`, `costSurfaceDeleted`
+> **The pattern these residuals share, worth naming once.** Each was
+> previously patched at the instance rather than the class: the freshness
+> exclusion is a list that grows one entry per incident, and
+> `EvidenceTooLargeError` got a catch at the single site where it bit
+> rather than a fixed type hierarchy. `L-069-1` — *"fix every sibling
+> site"* — is already promoted into `project-guidance.md` and is therefore
+> in preload on every session, and the recurrence happened anyway. **Fix
+> the class here, not the instance**, or this set has taught the same
+> lesson a third time without learning it.
+
+**Creates:** the category-scoped freshness exclusion and its falsifier, the backstop baseline record, a truthful refusal message
+**Touches:** `ai_router/verification_stamp.py`, `ai_router/close_backstop.py`, `ai_router/verify_session.py`, the seven deleted modules and their tests, `ai_router/__init__.py` (drop the `cost_report` re-exports), `pyproject.toml` (if entry points reference them), `ai_router/tests/`
+**Ends with:** a close-mandated write no longer stales a good verdict, a backstop-blocked close can be remediated for ~$0.07 instead of ~$0.88, an oversized evidence bundle no longer takes the gate down, and 5,165 lines nothing reaches are gone.
+**Progress keys:** `stalenessCategoryFix`, `backstopBaseline`, `truthfulRefusal`, `evidenceErrorHierarchy`, `unreachableDeleted`, `costSurfaceDeleted`
 
 ---
 

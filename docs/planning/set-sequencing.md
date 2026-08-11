@@ -119,6 +119,41 @@ unrelated commit.
 and the extension carve (item 5). Both should be authored from
 measurements taken at the time, per §3.
 
+**Pointing an agent at this file is not sufficient for either.** Each has
+open questions that must be answered *before* a spec can be written, and
+they are scattered across the proposal where an authoring agent will not
+reliably connect them. They are collected here.
+
+### 4a. Before authoring the extension carve
+
+**Four things must be settled first. Three are operator calls.**
+
+| # | question | why it blocks | where |
+| ---: | :--- | :--- | :--- |
+| 1 | **Is `modules.yaml` / `moduleAuthoring.ts` actually used?** | **2,458 LOC** — the largest single deletion after the webviews. Nobody has confirmed the module system is exercised. | proposal §9.2 |
+| 2 | **How small should Layer 3 get?** | Deleting webviews takes it 35 → 26 scenarios. Migrating model-level tests to Layer 2 could reach ~8–12. It **cannot reach zero** — `L-064-12` records a VSIX manifest defect only Electron caught. | proposal §9.1 |
+| 3 | **How does `fileSystem.ts` (1,518 lines) unwire from the deleted surfaces?** | Explicitly **not scoped**. The proposal flags this as the least certain part of the whole plan. | proposal §10.5 |
+| 4 | **Has Set 120's projection landed?** | The §6.5 derivation deletion (~1,200–1,500 TS lines, ~110 tests, plus the parity harness) is only safe once one authoritative computed answer exists. | this file, §2 |
+
+**Then re-measure.** The LOC and test counts in proposal §6 were taken
+2026-08-10/11 and the extension will have moved. Per §3, the numbers in
+the spec must come from measurements taken at authoring time.
+
+**What is already decided and must not be relitigated** (proposal §6.2–6.5,
+settled with operator usage evidence on 2026-08-11):
+
+- **Both context submenus stay whole.** "Open File" *is* the four-artifact contract rendered as a menu; "Copy Prompt" keeps all five entries — `copyStartNextSessionPrompt` is the most-used and was called "hard won." An earlier plan to replace four with CLI output is **withdrawn**.
+- **Click-a-set-to-open-the-spec stays.** In daily use.
+- **The four status icons stay** — `media/{dark,light}/{not-started,in-progress,done,cancelled}.svg`.
+- **`pricing.py` stays** even though cost calculations are useless on a Copilot seat: `models.py`, `pull_verifier.py`, `config.py` and `__init__.py` import it, and it feeds the api-profile `max_cost_multiplier` guard. Only `pricing_proposal.py` and `cost_report.py` go.
+- **Keep the rendering, delete the derivation** (§6.5) — not "delete the tree."
+
+### 4b. Before authoring the guidance-executable set
+
+- Confirm the **doc-only cap actually reduced rounds** — this set is its first real test, and if the cap is not working, prose-heavy work is still expensive and the set should be scoped smaller.
+- The five active lessons and their dispositions are already worked out in proposal §5.2; C-001/C-002/C-003 in [`guidance-candidates.md`](guidance-candidates.md) are drafted as lines and ready to promote.
+- **The retention numbers (10 sets, 20 instruction lines) are proposed, not measured.** Treat them as a starting point to be argued with, not a decision.
+
 ## 5. Artifact index
 
 Produced 2026-08-10/11; this is where the reasoning lives.

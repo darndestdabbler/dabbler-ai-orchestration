@@ -3,6 +3,46 @@
 All notable changes to Dabbler AI Orchestration are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased] — to be folded into the next published version
+
+> **This section holds shipped-but-unversioned work.** The operator ruled
+> 2026-08-11 that the next Marketplace push happens **once**, after Set
+> 120 Session 3 and Set 115 Sessions 1–3 land, rather than publishing
+> `0.51.0` as it stands. Whoever cuts that release assigns the version
+> and folds these entries into it — the same "folded into" treatment
+> `0.43.0` and `0.44.0` received in `0.45.0`.
+>
+> **Why the wait.** `0.51.0` below headlines `<- here` on the step a
+> session is on. Set 120 Session 3 **removes** that marker (operator
+> ruling: the in-progress icon carries the same information without
+> claiming a single current step). Publishing first would show staff a
+> marker that appears in one release and disappears in the next.
+
+### Changed
+
+- **The Work Explorer context menu is smaller, and the Copy labels read
+  as prose.** Six commands were removed as unused: `Copy: spec-review
+  prompt`, `Copy: session accomplishments`, `Copy: set accomplishments`,
+  `Copy: start the next parallel session`, the parallel variant of the
+  start command, and `Open Orchestrator Writer Log`. The command surface
+  drops from 52 to 46. Every remaining `Copy: X` label is now `Copy X` —
+  the colon read as machine output rather than as an action.
+- **What was kept, and why.** `Copy start the next session`, `Copy slug
+  only`, `Cancel Session Set`, `Open Spec`, `Open Change Log`, `Open
+  Activity Log`, and `Open Session State` all stay — the operator
+  confirmed each is in real use, with `Open Spec` and `Open Change Log`
+  named the most valuable of the set.
+
+### Removed
+
+- **The parallel-session prompt builders** in
+  `commands/copyPromptCommands.ts` (366 → 114 lines). The multi-module
+  work rules on worktrees rather than parallel sessions in one tree, so
+  the parallel-only infrastructure had no remaining consumer. **No
+  command id that survives was renamed** — only titles changed, so
+  keybindings, `when`-clauses, and Layer 3 fixtures that reference ids
+  are unaffected.
+
 ## [0.51.0] — 2026-08-10 (staged; publish operator-gated)
 
 > **An in-flight session's steps now render in the Work Explorer.** Expand

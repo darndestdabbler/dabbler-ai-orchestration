@@ -1,0 +1,261 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-11T07:03:30.351086-04:00",
+  "sessionSetDir": "120-strict-writer-and-one-projection",
+  "inputs": {
+    "activity-log.json": "49ae36ebf11175d2af7c80324b67510a498641d28f8504be9036196c39df8cdf",
+    "session-state.json": "f83ae6d559c15c78db0aaee11e53306a8c33a7d83115aecbe888ff04aad91c2a",
+    "spec.md": "ebd3da23d251aa6a5efe91aa85e5accdb2f07c8bd2a1c56ebe467f833fd65f72"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered Set 120 Session 1 (copilot/anthropic/claude-opus-5/high); preload read; transport profile copilot-cli confirmed; decision-review-queue empty.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "define-the-vocabulary-and-enforce-it",
+          "description": "**Define the vocabulary and enforce it at the writer.** Draw the legal set from the canonical tokens already in use (`complete`, `pending`, `in-progress`, `blocked`, `skipped` \u2014 confirm against the counts above; do not invent). `SessionLog.log_step` fails closed on anything else, exactly as `session_state.validate_verification_verdict` does for verdicts (Set 086 S1). **Readers are not touched** \u2014 they stay lenient, per standing decision 1.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "audit-every-call-site-that-writes",
+          "description": "**Audit every call site that writes a step status.** An allowlist at one entry point is worthless if another path writes the file directly (`L-069-1`: *fix every sibling site* \u2014 the lesson that failed to prevent two recurrences this week). Report any writer that bypasses `log_step`, and route or refuse it.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "ship-the-falsifiers-l-112-1",
+          "description": "**Ship the falsifiers `L-112-1` requires:** one planting each drifted token (`completed`, `done`, `complete-with-known-failures`, a prose blob) and asserting the write is refused with a message naming the legal set; one asserting every canonical token is still accepted.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-freeze",
+          "description": "Full pytest at close after freeze; verify, close.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "define-vocabulary",
+          "description": "Confirmed the legal set against a fresh count of every activity-log.json (complete 2417, pending 55, in-progress 31, blocked 3, skipped 1); invented nothing. Added the vocabulary + validate_step_status/require_step_status/InvalidStepStatusError to session_log.py and made log_step and append_entry fail closed. Readers untouched (standing decision 1).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "audit-call-sites",
+          "description": "Audited every writer of a step status into activity-log.json. Four bypass SessionLog with their own read-modify-write: contract_gate, path_aware_critique, dual_surface_verify, suggestion_disposition. All four now route their status through require_step_status and the shared STEP_STATUS_COMPLETE constant. No other bypass found; the extension is read-only.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "ship-falsifiers",
+          "description": "Shipped ai_router/tests/test_step_status_vocabulary.py: 20 test functions / 50 cases. Plants every measured drifted token (completed, done, complete-with-known-failures, a prose blob, None, empty, near-miss casing) and asserts refusal with a message naming the legal set; asserts every canonical token still lands and the pending->in-progress->complete lifecycle survives. Structural assertions (L-112-1): the vocabulary constant is locked, an AST scan refuses any non-canonical status literal in an activity-log entry dict across all production modules, and that scan has its own planted-violation falsifier plus a session-state look-alike negative. Mutation-checked: with the two require_step_status guards removed, 34 of 50 cases fail.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-verify-close",
+          "description": "Full pytest on the frozen tree: 3835 passed, 9 skipped, 0 failed in 585.49s; recorded to test-runs.jsonl (digest 73c048d7a24b). pytest is the only expensive suite owed - run_of_record covers puts ai_router/ under pytest, and playwright covers tools/** plus session_state/start_session/close_session, none of which this session touched. Verification VERIFIED (round 3, 2 fix-accepted, 0 findings). Disposition authored; committing and closing.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 4,
+        "in-progress": 0,
+        "complete": 5,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 9
+      },
+      "current": [],
+      "remaining": [
+        "define-the-vocabulary-and-enforce-it",
+        "audit-every-call-site-that-writes",
+        "ship-the-falsifiers-l-112-1",
+        "full-pytest-at-close-after-freeze"
+      ]
+    },
+    {
+      "number": 2,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 via start_session (copilot / anthropic / claude-opus-5, effort high). Preload read: session-constitution.md, project-guidance.md, lessons-learned.md, AGENTS.md. decision-review-queue.jsonl absent - nothing to triage. Step checklist posted at session start.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "inventory-the-drift-precisely-per-file",
+          "description": "Shipped ai_router/step_status_drift.py: the inventory reproduces the spec's amendment exactly, from a command rather than a one-off query - 109 activity logs, 2805 entries, 286 drifted (10.2%) across 24 files, split 271 lossless (completed 229 + done 42) and 15 loaded (4 absent, 8 prose, 1 JSON list, 1 skipped, 1 complete-with-known-failures). VERDICT ON THE DISCREPANCY QUESTION: no discrepancy against the spec's amended figures; the one wrong number in this spec (the pre-amendment 'roughly a hundred session-set directories') was already corrected to 24 by S1, and 24 is what the command measures. Two facts the spec did not carry, both findings about the ORIGINAL query rather than about the spec's ruling: (1) a 110th activity log exists outside docs/session-sets - the pinned UAT fixture under tools/ - carrying 2 further 'completed' tokens, deliberately excluded and journaled; (2) the logs are CRLF with mixed trailing-newline conventions and Set 028's was written ensure_ascii=False, so a parse-mutate-dump migration would rewrite bytes in files it was asked not to touch and would make the ruling's own byte-identity acceptance check unevaluable. The migration is therefore byte-surgical.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-the-ruling-s-premise-before-acting",
+          "description": "Premise falsified against three independent signals rather than one: owning-session-not-complete (0 hits), same-step-re-logged-non-terminal (0 hits), and step-description-asserts-non-completion (1 hit). THE PREMISE STANDS - no evidence that any of the 271 completed/done steps failed to complete, so the ruling is executed as written and its scope is not widened. Method note, because the negative result is only worth what the net was: the description signal first ran with word-level markers (failed / failure / blocked / deferred) and produced 38 hits; all 38 were read in full and every one was incidental text - '0 failed' inside a suite count, test_failure_injection.py inside a file list, 'deferred to Set 062' as a scope note. Narrowing to phrase-level markers left one real hit: Set 061 S4 deferral-close, where 'cut short' describes the SET (the operator deferred Set 061's UAT and 0.30.0 release into Set 062) while the step's own job - record the deferral, write change-log.md - was done, and the session closed complete with a VERIFIED cross-provider verdict. That reading is recorded in-module as an adjudication, so --check-premise exits 0 today and still exits 2 the day a new counter-example appears; a check that stays permanently red is a check nobody reads.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "journal-the-ruling-then-execute-it",
+          "description": "Ruling journaled FIRST (decisions.jsonl, operator authority, 2026-08-11, citing spec.md Session 2), before any file was rewritten, so it survives a failed migration; a second entry journals the one scoping call this session made on its own authority - excluding the pinned UAT fixture under tools/ from the scan root, on goal-over-letter, because it is test data rather than a record of a real session and touching it would import an extension-test obligation the set's requiresE2E: false and standing decision 3 exclude. Then executed: dry run first (271 across 21 files), then --in-place. Result: 271 lossless tokens normalised to 'complete' across 21 files; 15 loaded entries preserved. Verified four ways rather than asserted - (1) the migrator's own two internal proofs, that no byte outside the replaced spans moved and that the reparsed document differs by exactly those statuses; (2) INDEPENDENTLY via git: across the 21 migrated files the entire diff is 271 removed status lines and 271 added, and nothing else; (3) re-running --in-place is a no-op (0 files changed), so the migration is idempotent and an interrupted run is recoverable by re-running it; (4) the post-migration inventory reports drift down from 286 (10.2%) to exactly the 15 preserved entries (0.5%). Shipped ai_router/tests/test_step_status_drift.py: 12 test functions / 15 cases, including planted violations for both directions of the raw scan (a stray status member the parser does not see is refused and NOT rewritten; an escaped status quoted inside a description is read as text, not structure) and for the premise check's two structural signals. Mutation-checked twice: swapping the surgical rewrite for a json.dump re-serialize fails 5 cases, and widening the ruled scope to swallow 'skipped' and 'complete-with-known-failures' fails 6. Docs updated where they would otherwise teach the retired state (L-064-8): ai_router/CHANGELOG.md and the module table in docs/repository-reference.md.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-freeze",
+          "description": "Verification: round 1 discovery (2 lenses, 1 blocking Major - the premise check was a companion command rather than an enforced precondition of the write path), round 2 supplementary BEFORE remediating (1 blocking Major - the same defect class one layer over: the UAT-fixture exclusion was journaled and documented but implemented as nothing, holding only because the DEFAULT scan root avoided it). Both ACCEPTED and fixed, both planted as falsifiers rather than merely fixed. Acceptance harness: round 1 judgment-based (settled at review), round 2 auto-closed with baseline discrimination proven - the unchanged executable criterion fails pre-fix and passes post-fix. Round 3 remediation-review: VERIFIED, 2 fix-accepted, 0 findings. Full pytest on the frozen tree: 3852 passed, 9 skipped, 0 failed in 552.58s; recorded to test-runs.jsonl (digest ce809631b056). pytest is the only expensive suite owed - run_of_record covers puts ai_router/ under pytest, and playwright covers tools/** plus session_state/start_session/close_session, none of which this session touched. Checklist-post honesty note: the advisory checklist_posted gate reports 3 transitions that left a record without a post (the operator-stop at journaling, verification-round 1, verification-round 3); posts were made at session start, before the migration, and after the rounds completed, but not one-per-transition. Recorded rather than quietly retried - a passed window cannot be re-entered. Disposition authored; committing and closing.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 5,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 5
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 with start_session (copilot / claude-opus-5 / high). Read the whole preload: session-constitution.md, project-guidance.md, lessons-learned.md, AGENTS.md. Confirmed the operator note that L-069-1 is already PROMOTED to project-guidance.md -> Conventions -> Code Style, so it needs no reactivation -- its rule is loaded at every session start already. decision-review-queue.jsonl is absent (no triage owed). Transport profile is copilot-cli via ai_router/local-overrides.yaml, so no provider API keys are required. Prerequisites confirmed: S1 shipped the vocabulary in session_log.py and S2 shipped step_status_drift.py plus the executed migration.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "ship-the-projection",
+          "description": "Shipped ai_router/session_projection.py: one computation of session progress serialized to session-progress.json beside the artifacts it derives from. It does NOT reimplement the row derivation -- it calls session_checklist.build_rows, so there is no second Python answer that could disagree (journaled decision, rubric line simpler-code). Marked derived and regenerable: every file carries derived: true, the regenerate command, and the SHA-256 of each input (activity-log.json / session-state.json / spec.md), so projection_state() can always say fresh/stale/absent/unreadable. close_session regenerates it after the state flip, declared via the Set 119 S3 CLOSE_MANDATED_WRITES mechanism (verified: verification_stamp.close_mandated_excludes discovers it) so a close-time write cannot stale the verification stamp. The read-side leniency is DERIVED from session_checklist.STATUS_BOXES by box glyph rather than re-spelled as a second alias table (L-069-1).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "carry-the-states-absence-hides",
+          "description": "Explicit unknown / stale / unreadable, plus a fourth absence found while measuring. unknown: a status token no reader can name -- 11 of the 15 entries Set 120 S2 preserved surface this way (Set 009 skipped, Set 014 complete-with-known-failures, Set 068 JSON array, 8 Set 110 prose blobs). unreadable: activity-log.json exists but does not parse, reported as evidence: unreadable beside absent and read, so no work and cannot read the evidence are no longer the same empty row. stale: the recorded input digests no longer match the live files. The fourth: orphanEntries counts ledger entries with no integer sessionNumber, which every reader silently drops -- that is where the other 4 preserved entries (Set 028 absent-status) went, and nothing had ever said so. Reported as a top-level count, not as rows, so the parity proof still holds.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "prove-parity-drop-the-here-marker",
+          "description": "Complete. Parity: test_session_projection.py asserts, over the SAME corpus the cross-language gate uses, that the projection carries every field session_checklist renders in the renderers order -- including the [?] posture for unknown tokens -- and that the boxes match the rendered text; a second test proves the SERIALIZED file round-trips to the same answer, which is the property a later set needs before deleting the TypeScript derivation. Marker removal shipped and echoed everywhere it was claimed: session_log.py docstring and the skipped refusal message, session_checklist.py rendering contract, and the target-state proposal at docs/proposals/2026-08-10 (L-065-1). Suite falsification confirmed by three mutations: healing unknown tokens to complete fails 1 test, disabling staleness detection fails 1, and reintroducing the <- here literal in render fails 1. Test budget: 7 new functions in test_session_projection.py plus 2 in test_step_row_parity.py, minus 3 removed marker tests in test_session_checklist.py = 6 net against the 7 remaining in the sets 40-function cap.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-freeze",
+          "description": "Complete, both governed suites. pytest: 3,871 passed, 9 skipped, 538s (digest aa828265a873). Playwright Layer 3: 36 passed, 713s (digest 6fb03ef1d341) -- owed because ai_router/close_session.py is on that suites covers list as a sanctioned state-file writer, which the projections close-time write touched; the specs requiresE2E: false governs the UAT/E2E procedure, not the covers-by-path run-of-record rule (Set 116 S3). Also found and fixed a real defect while closing: core.autocrlf=true with no .gitattributes let an ordinary rebase rewrite two already-stamped verification artifacts from LF to CRLF (775->780 and 491->495 bytes, no character changed), breaking their artifact_sha256 -- git editing a raw record the constitution says is never edited. A targeted .gitattributes marks the stamped artifacts binary and the two files were restored to their exact committed bytes from the git blob. A repo-wide git add --renormalize was attempted and immediately reverted: it would have stored the CRLF working-tree copies of ~100 historical sets artifacts, rewriting every prior verification record in the repo. Close proceeds under operator-authorized manual verification (2026-08-11), attested in s3-manual-verify-attestation.txt; both routed rounds had already returned VERIFIED.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 5,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 5
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

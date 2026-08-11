@@ -53,10 +53,41 @@ Measured 2026-08-11 across every `activity-log.json` in the repo.
 | **`done`** | **42** | drift |
 | `in-progress` | 31 | canonical |
 | `None` | 4 | drift |
-| `blocked` | 3 | |
-| `skipped` | 1 | |
+| `blocked` | 3 | canonical |
+| **`skipped`** | **1** | **drift — see the S1 amendment below** |
 | **`complete-with-known-failures`** | 1 | drift |
 | **multi-paragraph prose** | ~6 | one ~1,000 words; another a JSON array of routing costs |
+
+> **Amended after Session 1 shipped (2026-08-11).** Two corrections to
+> the figures above, both found by running the measurement rather than
+> trusting this spec — which is what Session 2 step 2 exists to do.
+>
+> **1. `skipped` is drift, not canonical.** This spec's Session 1 step 2
+> listed it in the legal set. S1 confirmed against the readers and
+> **correctly refused it**, under an operator ruling: no reader can name
+> it. It has no entry in `session_checklist.STATUS_BOXES` (so it renders
+> `[?]`, the corrupt-data glyph), and neither `_mark_here` nor the Work
+> Explorer's mirrored `markHere` counts it as terminal — **so a skipped
+> step steals the current-step marker from real work**, which is exactly
+> the defect that stranded `<- here` on step 1 in Set 119 S2. The shipped
+> vocabulary is therefore the **intersection** of what was measured and
+> what the readers understand: `pending`, `in-progress`, `complete`,
+> `blocked`.
+>
+> **2. The blast radius is 4x smaller than stated.** Measured against the
+> shipped vocabulary on 2026-08-11: **286 drifted entries of 2,798
+> (10.2%), across 24 files** — not "~281 across roughly a hundred
+> session-set directories." The entry count was close; the file count was
+> a guess and was wrong. Session 2 must still re-derive both from its own
+> command.
+>
+> **A note for Session 3.** `session_log.py`'s docstring records that
+> teaching the readers `skipped` "is a two-language change that belongs
+> with the extension carve." That was true when it was written. **Session
+> 3 collapses it:** once one Python computation is the single projection,
+> teaching a new token is a one-place change. Admitting `skipped` gets
+> substantially cheaper after S3 than the docstring assumes — but it is
+> still not this set's job.
 
 `SessionLog.log_step` accepts arbitrary strings
 (`ai_router/session_log.py:165`). **Roughly 10% of step entries carry a
@@ -88,6 +119,8 @@ duplication.
 2. **The tree is not the authority.** Both surfaces read the same files; a sanctioned writer proves provenance and shape, not semantic truth. This set produces *one computed answer*, which is a different claim.
 3. **No extension changes.** Deleting the TypeScript derivation belongs to the extension carve, not here. This set ships the projection; consumption follows.
 4. **No new blocking gate.** Set 116 reduced ten checks to three. The writer refuses bad input at the boundary — that is validation, not a gate.
+5. **The Session 2 migration scope is ruled, not open.** The operator ruled option (c) on 2026-08-11: normalise the 271 lossless synonyms (`completed`, `done`), leave the 15 semantically-loaded entries intact. Session 2 must still *falsify the premise* (step 3) and report if it fails — but it does not re-choose between (a), (b), and (c), and it does not widen the scope to the loaded entries.
+6. **`skipped` is not canonical, and that is settled.** Session 1 confirmed it against the readers and the operator ruled it out on 2026-08-11: no reader can name it, and admitting it would let a skipped step steal the current-step marker. Revisiting belongs after Session 3 collapses the two readers into one, not here.
 
 ## Non-goals
 
@@ -111,6 +144,14 @@ duplication.
    else, exactly as `session_state.validate_verification_verdict` does
    for verdicts (Set 086 S1). **Readers are not touched** — they stay
    lenient, per standing decision 1.
+
+   > **Outcome (S1, VERIFIED):** the instruction to *confirm* did its
+   > job — `skipped` failed the confirmation and was excluded by
+   > operator ruling. Shipped vocabulary: `pending`, `in-progress`,
+   > `complete`, `blocked`. Rationale in the amendment above and in
+   > `ai_router/session_log.py`'s module docstring. This step text is
+   > left as authored; the record of what the spec asked for is part of
+   > the history.
 3. **Audit every call site that writes a step status.** An allowlist at
    one entry point is worthless if another path writes the file directly
    (`L-069-1`: *fix every sibling site* — the lesson that failed to
@@ -131,36 +172,75 @@ duplication.
 
 ### Session 2 of 3: What to do about the history already on disk
 
-Making the writer strict does not fix the **~281 entries already
-written**. Those are records of real sessions, and rewriting records is
-not a decision an orchestrator may make alone.
+Making the writer strict does not fix the entries **already written**.
+Those are records of real sessions, and rewriting records is not a
+decision an orchestrator may make alone — so the ruling below was taken
+by the operator before this session opens.
+
+**The ruling: option (c), scoped to the lossless synonyms.** Measured on
+2026-08-11 against the vocabulary S1 shipped: **286 drifted entries of
+2,798 (10.2%), across 24 files.** They form two populations that deserve
+opposite treatment:
+
+| population | count | treatment |
+| :--- | ---: | :--- |
+| `completed` (229) + `done` (42) | **271** | **normalise to `complete`** |
+| `None` (4), `skipped` (1), `complete-with-known-failures` (1), prose/JSON (~9) | **15** | **leave untouched** |
+
+**Why normalising the 271 is not rewriting history.** `completed` →
+`complete` is a spelling correction inside a machine enum, not a change
+to what happened. Set 116 S1's precedent — which deliberately left
+historical specs and changelogs alone — protects *narrative records where
+a stale number is itself part of the history*. A misspelled enum token
+carries no such meaning: every reader that mis-renders it is mis-rendering
+a step that genuinely completed. This is 95% of the drift with provably
+zero information loss.
+
+**Why the 15 stay.** They are semantically loaded, and normalising them
+would launder meaning: `complete-with-known-failures` is *not* `complete`,
+and flattening it would erase a qualified outcome. `skipped` is refused by
+the writer for a documented reason (see the amendment above) and its one
+historical entry is a record of a real skip. These render as an explicit
+`unknown` under Session 3's projection — which is **true**, and is the
+honest outcome rather than a lossy guess.
+
+**Why not a permanent read-time synonym map.** With the writer strict as
+of S1, this population is **closed and finite**. A shim carried forever
+for 271 known entries costs more than fixing them once.
 
 **Steps:**
 
 1. Register.
 2. **Inventory the drift precisely** — per file, per token, with the
-   session and set each belongs to. The counts in this spec came from a
-   one-off query; reproduce them from a command so the ruling is made on
-   current data. **A discrepancy is a finding about the query *or* about
-   this spec, and the session must say which.**
-3. **Operator decision, journaled.** Three options, and the operator
-   picks: **(a)** normalise drifted tokens to their canonical equivalent
-   (`completed`→`complete`, `done`→`complete`) and move prose into a
-   `note` field; **(b)** leave history untouched and let readers show
-   `[?]`, treating the logs as records — the precedent Set 116 S1 set when
-   it *"deliberately left historical specs, changelogs, and the benchmark
-   script alone"*; **(c)** normalise only the mechanical spellings and
-   leave the prose entries. Record the ruling with `decision_journal`.
+   session and set each belongs to. The counts above came from a one-off
+   query; reproduce them from a command so the migration runs on current
+   data. **A discrepancy is a finding about the query *or* about this
+   spec, and the session must say which.** This spec has already been
+   wrong once here: it estimated the drift spanned "roughly a hundred
+   session-set directories" and the real figure is 24.
+3. **Falsify the ruling's premise before acting on it.** The ruling holds
+   only if `completed` and `done` are *pure* synonyms wherever they
+   appear. Check that no occurrence of either sits on a step that some
+   other evidence (a `blocked` note, a failure record, an unfinished
+   verification) shows did not actually complete. **If any does, stop and
+   report** — the operator ruled on a lossless rename, not on a judgement
+   call about outcomes. Absent such a case, the ruling stands and is not
+   reopened.
+4. **Journal the ruling, then execute it idempotently.** Record the
+   ruling first with `decision_journal`, as an operator decision taken
+   2026-08-11 citing this section, so it survives a failed migration.
    **This is not a verification reduction** — it changes no gate — but it
-   rewrites records, which is an operator call.
-4. **Execute the ruling idempotently**, with a dry-run mode and a
-   re-runnable result. If the ruling is (b), record that and skip.
+   rewrites records, which is why it is the operator's call and not this
+   session's. Then migrate with a dry-run mode and a re-runnable result:
+   rewrite only the 271 lossless tokens, touch nothing else, and assert
+   afterwards that the 15 loaded entries are byte-identical to what they
+   were before.
 5. Full pytest at close after freeze; verify, close.
 
-**Creates:** the drift inventory command, the journaled ruling, the migration (or the recorded decision not to migrate)
-**Touches:** `ai_router/`, `docs/session-sets/*/activity-log.json` (only under ruling (a) or (c)), `decisions.jsonl`, `ai_router/tests/`
-**Ends with:** the history on disk is either canonical or deliberately preserved, and which one is recorded.
-**Progress keys:** `driftInventory`, `operatorRuling`, `migrationExecuted`
+**Creates:** the drift inventory command, the journaled ruling, the scoped migration
+**Touches:** `ai_router/`, `docs/session-sets/*/activity-log.json` (the 271 lossless tokens only), `decisions.jsonl`, `ai_router/tests/`
+**Ends with:** every mechanically-drifted token is canonical, every semantically-loaded one is preserved intact, and the distinction is recorded.
+**Progress keys:** `driftInventory`, `premiseFalsified`, `operatorRuling`, `migrationExecuted`
 
 ---
 

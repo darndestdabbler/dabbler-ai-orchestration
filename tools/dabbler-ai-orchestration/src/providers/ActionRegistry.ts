@@ -98,17 +98,7 @@ export const ROW_ACTIONS: RowAction[] = [
   // submenu was renamed Set 049 S1 to better reflect its contents,
   // which include action prompts like "Start Next Session" not just
   // evaluation prompts).
-  { id: "dabbler.copySpecReviewPrompt",         label: "Evaluate Specification",       group: 301, category: "copyEval", when: () => true },
-  { id: "dabbler.copySessionAccomplishmentsPrompt", label: "Evaluate Most Recent Session", group: 302, category: "copyEval",
-    when: (s) => hasCompletedSession(s) },
-  { id: "dabbler.copySetAccomplishmentsPrompt", label: "Evaluate Session Set",         group: 303, category: "copyEval",
-    when: (s) => isCompleteState(s) },
   { id: "dabbler.copyStartNextSessionPrompt",   label: "Start Next Session",           group: 304, category: "copyEval",
-    when: (s) => inFlightLike(s) },
-  // Set 049 S1 hygiene: surface the parallel-session command in the
-  // submenu. Gated identically to "Start Next Session" — the parallel
-  // pattern is only meaningful on non-terminal rows.
-  { id: "dabbler.copyStartNextParallelSessionPrompt", label: "Start New Parallel Session", group: 305, category: "copyEval",
     when: (s) => inFlightLike(s) },
 
   // Flat actions — appear at the top level of the QuickPick. The
@@ -118,10 +108,8 @@ export const ROW_ACTIONS: RowAction[] = [
   //
   // Set 049 S4 (rip-out): `dabbler.checkOutOrchestrator` ("Set
   // Orchestrator…") retired alongside the check-out / check-in
-  // coordination layer. The writer-log opener stays as a diagnostic
-  // surface (the log itself is preserved provisionally per T5).
+  // coordination layer.
   { id: "dabblerSessionSets.copySlug",          label: "Copy Slug",                    group: 501, category: "flat", when: () => true },
-  { id: "dabbler.openOrchestratorWriterLog",    label: "Open Orchestrator Writer Log", group: 502, category: "flat", when: () => true },
   // Set 061 S2 (spec D3): companion to the blocked marker — jumps to
   // the spec of whichever unsatisfied prerequisite is blocking this
   // row (QuickPick when more than one). Reuses the openSpec plumbing

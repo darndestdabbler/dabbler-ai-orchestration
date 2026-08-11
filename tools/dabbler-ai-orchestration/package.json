@@ -115,17 +115,12 @@
       },
       {
         "command": "dabblerSessionSets.copyStartCommand.default",
-        "title": "Copy: Start next session",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.copyStartCommand.parallel",
-        "title": "Copy: Start next parallel session",
+        "title": "Copy Start next session",
         "category": "Dabbler"
       },
       {
         "command": "dabblerSessionSets.copySlug",
-        "title": "Copy: Slug only",
+        "title": "Copy Slug only",
         "category": "Dabbler"
       },
       {
@@ -154,28 +149,8 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabbler.copySpecReviewPrompt",
-        "title": "Copy: Spec-review prompt",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.copySessionAccomplishmentsPrompt",
-        "title": "Copy: Session-accomplishments review prompt",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.copySetAccomplishmentsPrompt",
-        "title": "Copy: Set-accomplishments review prompt",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabbler.copyStartNextSessionPrompt",
-        "title": "Copy: Start the next session",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.copyStartNextParallelSessionPrompt",
-        "title": "Copy: Start the next parallel session",
+        "title": "Copy Start the next session",
         "category": "Dabbler"
       },
       {
@@ -318,11 +293,6 @@
         "icon": "$(arrow-up)"
       },
       {
-        "command": "dabbler.openOrchestratorWriterLog",
-        "title": "Open Orchestrator Writer Log",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabbler.regenerateNarrationTemplates",
         "title": "Regenerate Narration Templates",
         "category": "Dabbler"
@@ -442,11 +412,6 @@
           "group": "5_actions@501"
         },
         {
-          "command": "dabbler.openOrchestratorWriterLog",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openOrchestratorWriterLog;/",
-          "group": "5_actions@502"
-        },
-        {
           "command": "dabblerSessionSets.openPrerequisiteSpec",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openPrerequisiteSpec;/",
           "group": "5_actions@503"
@@ -496,29 +461,9 @@
       ],
       "dabblerWorkExplorer.copyPrompt": [
         {
-          "command": "dabbler.copySpecReviewPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySpecReviewPrompt;/",
-          "group": "1@301"
-        },
-        {
-          "command": "dabbler.copySessionAccomplishmentsPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionAccomplishmentsPrompt;/",
-          "group": "1@302"
-        },
-        {
-          "command": "dabbler.copySetAccomplishmentsPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySetAccomplishmentsPrompt;/",
-          "group": "1@303"
-        },
-        {
           "command": "dabbler.copyStartNextSessionPrompt",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextSessionPrompt;/",
           "group": "1@304"
-        },
-        {
-          "command": "dabbler.copyStartNextParallelSessionPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copyStartNextParallelSessionPrompt;/",
-          "group": "1@305"
         }
       ]
     },

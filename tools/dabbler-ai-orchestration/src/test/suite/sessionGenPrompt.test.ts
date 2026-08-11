@@ -210,23 +210,40 @@ suite("parallel-sets shelving + escape hatch (Set 094 S2)", () => {
     assert.ok(/prerequisites:/.test(prompt), "still teaches explicit ordering");
   });
 
-  test("the parallel-SESSION worktree commands remain contributed (worktree tooling untouched)", () => {
-    // Amendment 7 keeps the worktree tooling: the per-existing-set "start next
-    // parallel session" commands are a different feature from parallel session
-    // SETS and must NOT be removed by the shelving. Pin their package.json
-    // contributions so a future cleanup cannot silently drop them.
+  test("the parallel session-SET generator remains contributed (worktree tooling untouched)", () => {
+    // Amendment 7 kept the worktree tooling: parallel session SETS are a
+    // different feature from the shelved UI guidance, and the generator
+    // must not be removed by that shelving. Pin its contribution so a
+    // future cleanup cannot silently drop it.
+    //
+    // 2026-08-11 operator menu trim: the two per-existing-set "start next
+    // parallel session" commands
+    // (`dabblerSessionSets.copyStartCommand.parallel` and
+    // `dabbler.copyStartNextParallelSessionPrompt`) were retired here by
+    // an explicit operator decision — a superseding ruling, not the
+    // silent drop this guard exists to catch. The worktree MODEL is
+    // unaffected and is in fact now the default: the multi-module verdict
+    // (docs/proposals/2026-08-11-multi-module-architecture/) puts every
+    // active session in its own worktree, so "start the next session"
+    // already implies one. `ai_router/worktree.py`, the canonical
+    // worktree CLI, is untouched.
     const pkgPath = path.resolve(__dirname, "../../..", "package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
     const ids = new Set(
       (pkg.contributes?.commands ?? []).map((c: { command: string }) => c.command),
     );
-    for (const id of [
+    assert.ok(
+      ids.has("dabbler.generateParallelSessionSetPrompt"),
+      "command dabbler.generateParallelSessionSetPrompt must stay contributed",
+    );
+    for (const retired of [
       "dabblerSessionSets.copyStartCommand.parallel",
       "dabbler.copyStartNextParallelSessionPrompt",
-      // The escape hatch itself is contributed.
-      "dabbler.generateParallelSessionSetPrompt",
     ]) {
-      assert.ok(ids.has(id), `command ${id} must stay contributed`);
+      assert.ok(
+        !ids.has(retired),
+        `${retired} was retired 2026-08-11 and must not be re-contributed`,
+      );
     }
   });
 });

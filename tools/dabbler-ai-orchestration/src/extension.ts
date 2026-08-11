@@ -36,7 +36,6 @@ import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
 import { registerConfigEditorCommand } from "./configEditor/ConfigEditorPanel";
 import { registerFlagDecisionForReview } from "./commands/flagDecisionForReview";
 import { registerScanAnnotationsForActiveSet } from "./commands/scanAnnotationsForActiveSet";
-import { registerOpenOrchestratorWriterLog } from "./commands/openOrchestratorWriterLog";
 import { registerRegenerateNarrationTemplatesCommand } from "./commands/regenerateNarrationTemplates";
 import { registerResolveSetNumberCommand } from "./commands/resolveSetNumber";
 import { registerUpgradeOlderSetsCommand } from "./commands/upgradeOlderSets";
@@ -479,11 +478,6 @@ export function activate(context: vscode.ExtensionContext): void {
   // all engines; there is no editor-hook installer to register.
   //
   // The writer-log opener stays as a Command-Palette / right-click
-  // diagnostic surface; the writer log itself is preserved
-  // provisionally per Set 049 T5.
-  safeRegister("registerOpenOrchestratorWriterLog", () =>
-    registerOpenOrchestratorWriterLog(context),
-  );
   safeRegister("registerRegenerateNarrationTemplates", () =>
     registerRegenerateNarrationTemplatesCommand(context),
   );

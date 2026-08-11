@@ -68,7 +68,7 @@ function ids(set: SessionSet, supports: ActionSupports): string[] {
 }
 
 suite("ActionRegistry", () => {
-  test("ROW_ACTIONS exposes the 16 menu-surface actions (Set 048 S3 reshape + Set 049 S1 hygiene + Set 049 S4 rip-out + Set 061 S2 prereq spec)", () => {
+  test("ROW_ACTIONS exposes the 11 menu-surface actions (Set 048 S3 reshape + Set 049 S4 rip-out + Set 061 S2 prereq spec + 2026-08-11 menu trim)", () => {
     // Set 048 S3 reshape:
     //   - L3 removed `dabblerSessionSets.openAiAssignment`.
     //   - L2 narrowed the Open File submenu to exactly 4 entries
@@ -76,39 +76,34 @@ suite("ActionRegistry", () => {
     //     pre-existing openUatChecklist / revealPlaywrightTests /
     //     openFolder commands remain registered (Command Palette
     //     accessible) but no longer surface on the right-click menu.
-    //   - copyStartCommand.default / .parallel and copySlug are kept
-    //     in copyCommand.ts (palette-accessible) but the right-click
+    //   - copyStartCommand.default and copySlug are kept in
+    //     copyCommand.ts (palette-accessible) but the right-click
     //     menu surfaces the new dabbler.copy*Prompt commands instead.
-    //   - Four new copyEval entries: copySpecReviewPrompt,
-    //     copySessionAccomplishmentsPrompt, copySetAccomplishmentsPrompt,
-    //     copyStartNextSessionPrompt.
-    //   - Two flat orchestrator entries promoted into the menu
-    //     surface: dabbler.checkOutOrchestrator (gated to in-progress)
-    //     and dabbler.openOrchestratorWriterLog.
-    // Set 049 S1 hygiene addition:
-    //   - dabbler.copyStartNextParallelSessionPrompt — the parallel-
-    //     session variant surfaces in the submenu under the same
-    //     non-terminal gating as "Start Next Session".
+    //   - copyEval entry: copyStartNextSessionPrompt.
     // Set 049 S4 rip-out:
     //   - `dabbler.checkOutOrchestrator` ("Set Orchestrator…") retired
-    //     alongside the check-out / check-in coordination layer. The
-    //     writer-log opener stays.
+    //     alongside the check-out / check-in coordination layer.
     // Set 061 S2 (spec D3):
     //   - dabblerSessionSets.openPrerequisiteSpec — flat companion to
     //     the blocked marker, gated to non-terminal rows with at least
     //     one unsatisfied prerequisite.
+    // 2026-08-11 operator decision (menu trim):
+    //   - The three "Evaluate" review prompts (spec / session- /
+    //     set-accomplishments) retired: they served manual verification
+    //     that the routed cross-provider round now owns.
+    //   - copyStartNextParallelSessionPrompt and
+    //     copyStartCommand.parallel retired: superseded by the
+    //     worktree-per-session model, where "the next session" is
+    //     started in its own worktree.
+    //   - openOrchestratorWriterLog retired as a troubleshooting-only
+    //     surface.
     const expected = new Set([
       "dabblerSessionSets.openSpec",
       "dabblerSessionSets.openActivityLog",
       "dabblerSessionSets.openChangeLog",
       "dabblerSessionSets.openSessionState",
-      "dabbler.copySpecReviewPrompt",
-      "dabbler.copySessionAccomplishmentsPrompt",
-      "dabbler.copySetAccomplishmentsPrompt",
       "dabbler.copyStartNextSessionPrompt",
-      "dabbler.copyStartNextParallelSessionPrompt",
       "dabblerSessionSets.copySlug",
-      "dabbler.openOrchestratorWriterLog",
       "dabblerSessionSets.openPrerequisiteSpec",
       "dabblerSessionSets.migrate",
       "dabblerSessionSets.migrateToV4",
@@ -117,7 +112,7 @@ suite("ActionRegistry", () => {
     ]);
     const got = new Set(ROW_ACTIONS.map((a) => a.id));
     assert.deepStrictEqual(got, expected);
-    assert.strictEqual(ROW_ACTIONS.length, 16);
+    assert.strictEqual(ROW_ACTIONS.length, 11);
   });
 
   test("openAiAssignment fully removed (L3)", () => {
@@ -165,47 +160,6 @@ suite("ActionRegistry", () => {
     }
   });
 
-  test("copyEval submenu — spec-review is always enabled", () => {
-    for (const st of ["in-progress", "not-started", "complete", "cancelled"] as SessionState[]) {
-      assert.ok(
-        ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copySpecReviewPrompt"),
-        `copySpecReviewPrompt missing for state=${st}`,
-      );
-    }
-  });
-
-  test("copyEval submenu — session-accomplishments gated on sessionsCompleted > 0", () => {
-    const zero = fakeSet("in-progress", { sessionsCompleted: 0 });
-    const one = fakeSet("in-progress", { sessionsCompleted: 1 });
-    const three = fakeSet("complete", { sessionsCompleted: 3 });
-    assert.ok(
-      !ids(zero, ALL_SUPPORTED).includes("dabbler.copySessionAccomplishmentsPrompt"),
-      "session-accomplishments should NOT surface before any session completes",
-    );
-    assert.ok(
-      ids(one, ALL_SUPPORTED).includes("dabbler.copySessionAccomplishmentsPrompt"),
-      "session-accomplishments should surface once one session is closed",
-    );
-    assert.ok(
-      ids(three, ALL_SUPPORTED).includes("dabbler.copySessionAccomplishmentsPrompt"),
-      "session-accomplishments should surface on a completed set too",
-    );
-  });
-
-  test("copyEval submenu — set-accomplishments gated on state === complete", () => {
-    for (const st of ["in-progress", "not-started", "cancelled"] as SessionState[]) {
-      assert.ok(
-        !ids(fakeSet(st, { sessionsCompleted: 5 }), ALL_SUPPORTED)
-          .includes("dabbler.copySetAccomplishmentsPrompt"),
-        `set-accomplishments leaked onto state=${st}`,
-      );
-    }
-    assert.ok(
-      ids(fakeSet("complete"), ALL_SUPPORTED).includes("dabbler.copySetAccomplishmentsPrompt"),
-      "set-accomplishments should surface only on complete state",
-    );
-  });
-
   test("copyEval submenu — start-next-session gated on non-terminal rows (L5)", () => {
     for (const st of ["in-progress", "not-started"] as SessionState[]) {
       assert.ok(
@@ -217,21 +171,6 @@ suite("ActionRegistry", () => {
       assert.ok(
         !ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copyStartNextSessionPrompt"),
         `start-next-session leaked onto terminal state=${st}`,
-      );
-    }
-  });
-
-  test("copyEval submenu — start-next-parallel-session gated on non-terminal rows (Set 049 S1)", () => {
-    for (const st of ["in-progress", "not-started"] as SessionState[]) {
-      assert.ok(
-        ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copyStartNextParallelSessionPrompt"),
-        `start-next-parallel-session missing for state=${st}`,
-      );
-    }
-    for (const st of ["complete", "cancelled"] as SessionState[]) {
-      assert.ok(
-        !ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.copyStartNextParallelSessionPrompt"),
-        `start-next-parallel-session leaked onto terminal state=${st}`,
       );
     }
   });
@@ -249,12 +188,30 @@ suite("ActionRegistry", () => {
     }
   });
 
-  test("openOrchestratorWriterLog stays for all states (writer log preserved per Set 049 T5)", () => {
-    for (const st of ["in-progress", "not-started", "complete", "cancelled"] as SessionState[]) {
-      assert.ok(
-        ids(fakeSet(st), ALL_SUPPORTED).includes("dabbler.openOrchestratorWriterLog"),
-        `openOrchestratorWriterLog missing for state=${st}`,
-      );
+  // 2026-08-11 operator menu trim. One guard for all five retirements,
+  // in the same shape as the checkOutOrchestrator guard above: a
+  // retired id must not reappear in ROW_ACTIONS OR surface in any
+  // state. Written as a loop so re-adding one costs one failure with
+  // the offending id named, not a hunt through five near-identical
+  // tests.
+  test("2026-08-11 menu trim — retired commands surface in no state", () => {
+    const retired = [
+      "dabbler.copySpecReviewPrompt",
+      "dabbler.copySessionAccomplishmentsPrompt",
+      "dabbler.copySetAccomplishmentsPrompt",
+      "dabbler.copyStartNextParallelSessionPrompt",
+      "dabbler.openOrchestratorWriterLog",
+    ];
+    for (const id of retired) {
+      for (const a of ROW_ACTIONS) {
+        assert.notStrictEqual(a.id, id, `${id} must not appear in ROW_ACTIONS — retired 2026-08-11`);
+      }
+      for (const st of ["in-progress", "not-started", "complete", "cancelled"] as SessionState[]) {
+        assert.ok(
+          !ids(fakeSet(st, { sessionsCompleted: 5 }), ALL_SUPPORTED).includes(id),
+          `${id} leaked onto state=${st} — retired 2026-08-11`,
+        );
+      }
     }
   });
 
@@ -383,17 +340,14 @@ suite("ActionRegistry", () => {
     }
   });
 
-  test("categorizedActions on a complete set surfaces set-accomplishments and NOT start-next", () => {
+  test("categorizedActions on a complete set surfaces no copyEval start actions", () => {
     const cats = categorizedActions(
       fakeSet("complete", { sessionsCompleted: 5 }),
       ALL_SUPPORTED,
     );
     const ids = cats.copyEval.map((a) => a.id);
-    assert.ok(ids.includes("dabbler.copySetAccomplishmentsPrompt"));
     assert.ok(!ids.includes("dabbler.copyStartNextSessionPrompt"),
       "start-next-session must not surface on complete (terminal) state");
-    assert.ok(!ids.includes("dabbler.copyStartNextParallelSessionPrompt"),
-      "start-next-parallel-session must not surface on complete (terminal) state");
   });
 
 });

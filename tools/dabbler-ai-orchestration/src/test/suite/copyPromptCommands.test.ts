@@ -1,24 +1,32 @@
 import * as assert from "assert";
+import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import {
-  buildSpecReviewPrompt,
-  buildSessionAccomplishmentsPrompt,
-  buildSetAccomplishmentsPrompt,
   buildStartNextSessionPrompt,
-  buildStartNextParallelSessionPrompt,
+  ensureCrossProviderVerificationDoc,
   sanitizeSlugForPrompt,
 } from "../../commands/copyPromptCommands";
+import {
+  CROSS_PROVIDER_VERIFICATION_REL_PATH,
+  resolveBundledTemplateDir,
+} from "../../utils/consumerBootstrap";
 import { SessionSet, SessionState } from "../../types";
 
-// Set 048 Session 3 — copyPromptCommands tests. The four prompt
-// builders are pure (no clipboard / no vscode API), so we exercise:
+// Set 048 Session 3 — copyPromptCommands tests.
 //
-//   - L1: prompts reference paths, never embed file contents.
-//   - §3.2 path-reference format: relative-to-repo-root paths, slash-
-//     separated regardless of OS path separator.
-//   - §3.9 review-criteria embedding when the per-repo override file
-//     exists; default hint copy when it does not.
-//   - "if present" change-log conditional inclusion.
+// The three "Evaluate" review-prompt builders (spec / session-
+// accomplishments / set-accomplishments) and the parallel-session
+// variant were RETIRED on 2026-08-11 by operator decision: the
+// review prompts were used for manual verification that the routed
+// cross-provider round now owns, and the parallel-session prompt was
+// superseded by the worktree-per-session model. Their suites went
+// with them, along with the review-criteria embedding machinery
+// (docs/review-criteria/<kind>.md) that only they consumed.
+//
+// What remains is the one-line start-next-session prompt (L5 mirror)
+// and the cross-provider-verification doc writer, which
+// consumerBootstrap and moduleAuthoring still call.
 
 function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
   const root = path.join("/repo");
@@ -53,98 +61,6 @@ function fakeSet(slug: string, over: Partial<SessionSet> = {}): SessionSet {
   };
 }
 
-const noCriteria = {
-  readReviewCriteria: () => null,
-  fileExists: (_p: string) => false,
-};
-
-const withCriteria = (text: string) => ({
-  readReviewCriteria: () => text,
-  fileExists: (_p: string) => true,
-});
-
-suite("copyPromptCommands — spec review prompt", () => {
-  test("references spec.md relative to repo root, never embeds contents", () => {
-    const out = buildSpecReviewPrompt(fakeSet("048-lightweight"), noCriteria);
-    assert.ok(out.includes("docs/session-sets/048-lightweight/spec.md"));
-    assert.ok(!out.includes("---\n"), "should not contain spec front-matter (which would imply embedded contents)");
-  });
-
-  test("uses forward slashes regardless of OS path separator (L1)", () => {
-    const out = buildSpecReviewPrompt(fakeSet("xy"), noCriteria);
-    assert.ok(!out.includes("\\"), `path should use forward slashes; got: ${out}`);
-  });
-
-  test("falls back to default hint when docs/review-criteria/spec.md absent (§3.9)", () => {
-    const out = buildSpecReviewPrompt(fakeSet("xy"), noCriteria);
-    assert.ok(out.includes("No `docs/review-criteria/spec.md` present"));
-  });
-
-  test("embeds review-criteria content when the per-repo file is present (§3.9)", () => {
-    const out = buildSpecReviewPrompt(
-      fakeSet("xy"),
-      withCriteria("Project-specific spec checks:\n- thing A\n- thing B"),
-    );
-    assert.ok(out.includes("Operator review criteria (from docs/review-criteria/spec.md)"));
-    assert.ok(out.includes("- thing A"));
-    assert.ok(out.includes("- thing B"));
-    assert.ok(!out.includes("No `docs/review-criteria/spec.md` present"));
-  });
-});
-
-suite("copyPromptCommands — session accomplishments prompt", () => {
-  test("always references spec.md and activity-log.json", () => {
-    const out = buildSessionAccomplishmentsPrompt(fakeSet("xy"), noCriteria);
-    assert.ok(out.includes("docs/session-sets/xy/spec.md"));
-    assert.ok(out.includes("docs/session-sets/xy/activity-log.json"));
-  });
-
-  test("includes change-log.md only when present", () => {
-    const without = buildSessionAccomplishmentsPrompt(fakeSet("xy"), noCriteria);
-    assert.ok(!without.includes("docs/session-sets/xy/change-log.md"));
-
-    const withChangeLog = buildSessionAccomplishmentsPrompt(
-      fakeSet("xy"),
-      withCriteria("session-specific criteria"),
-    );
-    assert.ok(withChangeLog.includes("docs/session-sets/xy/change-log.md"));
-  });
-
-  test("embeds git commands with prev-session-ref placeholder", () => {
-    const out = buildSessionAccomplishmentsPrompt(fakeSet("xy"), noCriteria);
-    assert.ok(out.includes("git log --oneline <prev-session-ref>..HEAD"));
-    assert.ok(out.includes("git diff <prev-session-ref>..HEAD"));
-  });
-});
-
-suite("copyPromptCommands — set accomplishments prompt", () => {
-  test("references spec.md and change-log.md when present", () => {
-    const out = buildSetAccomplishmentsPrompt(
-      fakeSet("xy", { state: "complete", sessionsCompleted: 5 }),
-      withCriteria("set-wide criteria"),
-    );
-    assert.ok(out.includes("docs/session-sets/xy/spec.md"));
-    assert.ok(out.includes("docs/session-sets/xy/change-log.md"));
-  });
-
-  test("omits change-log.md when the file is absent", () => {
-    const out = buildSetAccomplishmentsPrompt(
-      fakeSet("xy", { state: "complete", sessionsCompleted: 5 }),
-      noCriteria,
-    );
-    assert.ok(!out.includes("docs/session-sets/xy/change-log.md"));
-  });
-
-  test("embeds set-wide git commands with set-start-ref placeholder", () => {
-    const out = buildSetAccomplishmentsPrompt(
-      fakeSet("xy", { state: "complete" }),
-      noCriteria,
-    );
-    assert.ok(out.includes("git log --oneline <set-start-ref>..HEAD"));
-    assert.ok(out.includes("git diff <set-start-ref>..HEAD"));
-  });
-});
-
 suite("copyPromptCommands — start-next-session prompt (L5 + §3.3 mirror)", () => {
   test("returns the exact one-line text the L5 left-click writes", () => {
     const out = buildStartNextSessionPrompt(fakeSet("048-lightweight"));
@@ -165,145 +81,6 @@ suite("copyPromptCommands — start-next-session prompt (L5 + §3.3 mirror)", ()
     const out = buildStartNextSessionPrompt(fakeSet("evil`-name"));
     assert.strictEqual(out, "Start the next session of `evil'-name`.");
     assert.ok(!out.includes("``"), "double-backtick is unsafe in markdown");
-  });
-});
-
-suite("copyPromptCommands — start-next-parallel-session prompt (Set 049 S1 hygiene)", () => {
-  test("returns the parallel-variant text matching copyCommand.ts's parallel preset", () => {
-    const out = buildStartNextParallelSessionPrompt(fakeSet("049-orchestrator-coordination-removal"));
-    assert.strictEqual(
-      out,
-      "Start the next parallel session of `049-orchestrator-coordination-removal`.",
-    );
-  });
-
-  test("sanitizes backticks consistent with the non-parallel variant", () => {
-    const out = buildStartNextParallelSessionPrompt(fakeSet("evil`-name"));
-    assert.strictEqual(out, "Start the next parallel session of `evil'-name`.");
-    assert.ok(!out.includes("``"));
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Set 077 S4 — pointer-style Evaluate prompts (Feature 3, A2/A9)
-// ---------------------------------------------------------------------------
-// Adapted from routed test-generation (gemini-pro, S4): import paths,
-// TDD-ui setup/teardown, and the ensure-write sandbox (which must copy
-// the REAL bundle — loadTemplateBundle reads every bundle file, so a
-// one-file fake fails to load) were corrected during integration.
-
-import * as fs from "fs";
-import * as os from "os";
-import {
-  ensureCrossProviderVerificationDoc,
-  __forTests as copyPromptForTests,
-} from "../../commands/copyPromptCommands";
-import {
-  CROSS_PROVIDER_VERIFICATION_REL_PATH,
-  resolveBundledTemplateDir,
-} from "../../utils/consumerBootstrap";
-
-suite("copyPromptCommands — pointer-style Evaluate prompts (Set 077 S4)", () => {
-  type TrailerCtx = {
-    readReviewCriteria: (root: string, kind: "spec" | "session" | "set") => string | null;
-    fileExists: (p: string) => boolean;
-  };
-  const builders: Array<
-    [string, (s: SessionSet, c: TrailerCtx) => string]
-  > = [
-    ["spec", buildSpecReviewPrompt],
-    ["session", buildSessionAccomplishmentsPrompt],
-    ["set", buildSetAccomplishmentsPrompt],
-  ];
-
-  for (const [kind, build] of builders) {
-    test(`${kind} prompt OPENS with the canonical-doc pointer + missing-doc fallback`, () => {
-      const out = build(fakeSet("077-pointer"), noCriteria);
-      assert.ok(
-        out.startsWith("Cross-provider review request (advisory second opinion)."),
-        `${kind}: must open with the review-request line`,
-      );
-      assert.ok(
-        out.includes("docs/dabbler/cross-provider-verification.md"),
-        `${kind}: must point at the canonical instruction doc`,
-      );
-      assert.ok(
-        out.includes("If that file is missing"),
-        `${kind}: must carry the one-line missing-doc fallback`,
-      );
-      // The fallback names the full verdict grammar.
-      assert.ok(out.includes("VERIFIED"), kind);
-      assert.ok(out.includes("ISSUES_FOUND"), kind);
-      assert.ok(out.includes("WAIVED"), kind);
-    });
-
-    test(`${kind} prompt CLOSES with the advisory verdict instruction`, () => {
-      const out = build(fakeSet("077-pointer"), noCriteria);
-      assert.ok(
-        out
-          .trimEnd()
-          .endsWith("router's own cross-provider round, which the close-out gate corroborates independently."),
-        `${kind}: must close on the advisory verdict instruction`,
-      );
-      assert.ok(
-        out.includes("Final step: report your verdict in the grammar that doc defines"),
-        `${kind}: the final verdict instruction must be present`,
-      );
-      assert.ok(
-        !out.includes("external-verification.md"),
-        `${kind}: advisory prompts must not instruct writing the retired artifact`,
-      );
-    });
-
-    test(`${kind} prompt scope marker: only the spec review instructs Scope: specification`, () => {
-      const out = build(fakeSet("077-pointer"), noCriteria);
-      if (kind === "spec") {
-        assert.ok(
-          out.includes("Scope: specification"),
-          "spec review must instruct the parser-visible scope marker",
-        );
-      } else {
-        assert.ok(
-          !out.includes("Scope: specification"),
-          `${kind}: work reviews must not be spec-scoped`,
-        );
-      }
-    });
-
-    test(`${kind} prompt preserves the operator-criteria trailer between opener and close`, () => {
-      const out = build(
-        fakeSet("077-pointer"),
-        withCriteria("Repo-specific check: the frobnicator must frob."),
-      );
-      const criteriaIdx = out.indexOf("Repo-specific check");
-      const closeIdx = out.indexOf("Final step:");
-      assert.ok(criteriaIdx > 0, `${kind}: criteria embedded`);
-      assert.ok(closeIdx > criteriaIdx, `${kind}: close comes after the trailer`);
-    });
-  }
-});
-
-suite("copyPromptCommands — review-criteria size guard (Set 077 S4)", () => {
-  const trailerFn = copyPromptForTests.reviewCriteriaTrailer;
-
-  test("short criteria are embedded verbatim (no truncation note)", () => {
-    const trailer = trailerFn("/repo", "spec", withCriteria("short and sweet"));
-    assert.ok(trailer.includes("short and sweet"));
-    assert.ok(!trailer.includes("truncated at"));
-  });
-
-  test("criteria beyond 8000 chars are truncated with a pointer note", () => {
-    const long = "A".repeat(9000);
-    const trailer = trailerFn("/repo", "set", withCriteria(long));
-    assert.ok(trailer.includes("[... truncated at 8000 characters"));
-    assert.ok(
-      trailer.includes("read docs/review-criteria/set.md for the rest"),
-      "truncation note must point at the on-disk file",
-    );
-    assert.ok(
-      trailer.length < 8000 + 400,
-      `trailer should be bounded; got ${trailer.length}`,
-    );
   });
 });
 

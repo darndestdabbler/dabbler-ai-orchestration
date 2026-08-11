@@ -403,23 +403,16 @@ export function makeAdditionalSet(
   ]) as FixtureHandle;
 }
 
-export function makeAdditionalSets(
-  base: FixtureHandle,
-  count: number,
-  slugPrefix: string,
-  startIndex: number,
-  totalSessions: number,
-): FixtureHandle {
-  if (count <= 0) return base;
-  return runHarness([
-    "make-additional-sets",
-    ..._handleArgs(base),
-    "--slug-prefix", slugPrefix,
-    "--start-index", String(startIndex),
-    "--count", String(count),
-    "--new-total-sessions", String(totalSessions),
-  ]) as FixtureHandle;
-}
+// `makeAdditionalSets` (plural) lived here until 2026-08-11. Its only
+// consumer was real-host-baseline.spec.ts, which scaffolded 10/100/500
+// sets to measure cold launch-to-first-row. That benchmark was deleted
+// on the operator's rule that a test whose outcome has no actionable
+// consequence is not needed: the webview-vs-native comparison it existed
+// to make is finished, and the native tree's paint speed belongs to VS
+// Code. The singular `makeAdditionalSet` above is still used and stays.
+//
+// The harness subcommand `make-additional-sets` is left in place — it is
+// the fixture CLI's, not this file's, and costs nothing unused.
 
 // Derive the legacy v2/v3 top-level triple from a sessions[] ledger.
 // Fresh harness fixtures are all-not-started, but derive honestly so

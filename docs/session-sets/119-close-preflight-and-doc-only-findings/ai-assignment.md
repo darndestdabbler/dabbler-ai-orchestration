@@ -176,6 +176,20 @@ surfaced as `unnumbered_events` rather than vanishing.
    and the stamp machinery; the fix is likely one entry in the exclusion
    list, and the measurement (how many of the 79 are this) is a query
    against `session-events.jsonl` and `router-metrics.jsonl`.
+7. **The preflight does not model the already-closed short-circuit.**
+   Found by dogfooding it against this session *after* the close.
+   `close_session.run` checks `_is_already_closed` and returns
+   `noop_already_closed` (exit 0) **before** any gate runs; the preflight
+   walks the chain regardless and reports `would-refuse`. That is the
+   same "reports a refusal the close would not make" class the
+   verification loop caught three times here, so it should not be left
+   standing on principle — even though its consequence is small, because
+   preflighting an already-closed session is not the tool's use case.
+   Deliberately **not** fixed in this session: the tree was frozen, the
+   run of record taken, and the close already executed, so a code change
+   would have staled both to fix a low-consequence edge. The fix is a
+   few lines at the top of `evaluate` (report "already closed — nothing
+   owed" and return), plus the falsifier pair.
 
 **Recommended next orchestrator (Session 3):** recorded at close in
 `disposition.json`, not pre-committed here.

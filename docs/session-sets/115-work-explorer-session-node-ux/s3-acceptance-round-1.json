@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "437781ae31300eef16e67a5442f8990a895c5031",
+  "fixedTree": "8e30eeae379f02242510dad7d7da759de6f3ef3d",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T14:59:09.645097+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Unknown session statuses can be dropped before the run-prompt gate, so a later row can incorrectly offer `Copy Run Prompt`. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** ` ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Given a scanned session set whose raw sessions ledger contains session 1 complete, session 2 with an unrecognized status, and session 3 not-started, no rendered session row may contain ;act-copySessionRunPrompt;, and the regression must exercise the scan/descriptor path rather than only casting bogus SessionRecord values directly.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

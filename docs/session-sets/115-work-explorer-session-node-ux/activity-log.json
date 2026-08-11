@@ -190,6 +190,83 @@
       "dateTime": "2026-08-11T09:41:58.406020-04:00",
       "description": "Runs of record after the last code change: mocha 1721 passing / 1 pending (49s), playwright 38 passed (14.1m, includes the 2 new session-plan-reveal scenarios). pytest fresh from S1 - no ai_router source changed. Verification VERIFIED (gpt-5.5, both discovery lenses, 0 blocking findings, 1 nit).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T10:20:26.777734-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "add-session-scoped-context-menu-actions",
+      "dateTime": "2026-08-11T10:20:26.777734-04:00",
+      "description": "**Add session-scoped context-menu actions** through the existing `ActionRegistry` and the `contextValue` vocabulary the session node already carries (`workExplorerTreeModel` emits `session-<status>` tokens), so menu parity stays enforced by the existing parity test rather than by hand.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "copy-the-run-prompt-for-that",
+      "dateTime": "2026-08-11T10:20:26.777734-04:00",
+      "description": "**Copy the run prompt for that session.** Session-scoped sibling of the set-level L5 clipboard shortcut, and of the existing builders in `commands/copyPromptCommands.ts`. Gate on status the way `planLeftClickActivation` does \u2014 and **fail closed on an unrecognised status**, as that helper deliberately does.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "open-the-artifacts-for-that-session",
+      "dateTime": "2026-08-11T10:20:26.777734-04:00",
+      "description": "**Open the artifacts for that session** \u2014 QuickPick when there is more than one, reusing the `openSpec` plumbing the registry already notes for this case. **Discover them by convention (`s<N>-*`), never by a hardcoded list**, so the menu survives artifact churn; show an honest empty state when a session has produced nothing yet.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "full-layer-3-at-close-after",
+      "dateTime": "2026-08-11T10:20:26.777734-04:00",
+      "description": "Full Layer 3 at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T10:23:48.898135-04:00",
+      "description": "Registered session 3 via start_session (github-copilot / anthropic / claude-opus-5, effort high); preload read; Copilot CLI transport confirmed via ai_router/local-overrides.yaml, so no provider API keys are required; decision-review queue empty; prerequisites from S1 (title fix, parity test) and S2 (specSectionLocator, activateSession) confirmed on disk.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "add-session-scoped-context-menu-actions",
+      "dateTime": "2026-08-11T10:32:56.972970-04:00",
+      "description": "Added SESSION_ACTIONS to providers/ActionRegistry.ts (a separate list, because a session action reads the session and every existing RowAction reads only the set) and taught sessionDescriptor to emit their tokens through the same actionToken/tokenString seam the set row uses. package.json gains two commands, two commandPalette hides and two view/item/context entries in a new 6_session group. The Set 110 S2 assertion that no menu entry targets a session row is SUPERSEDED BY DECISION rather than deleted: it now covers bucket and step rows, and a new Set 115 S3 parity suite asserts the replacement rule (each session action appears exactly once as a top-level item, gates on its own delimited token, mints no token a set action owns, is hidden from the palette, and is never inline).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "copy-the-run-prompt-for-that",
+      "dateTime": "2026-08-11T10:32:56.976297-04:00",
+      "description": "Added dabbler.copySessionRunPrompt. The pure gate is rowMenuHelpers.nextRunnableSessionNumber + sessionOffersRunPrompt: the set-level half BORROWS planLeftClickActivation (so the set row and the session row cannot drift on what a runnable set is), and the session-level half walks the ledger in ascending order, skips complete/cancelled, and fails closed on the first unrecognised status - the ~10 percent mis-spelled status tokens step-ledger-findings.md measured are exactly the input that would otherwise nominate the wrong session. Only the row the trigger phrase resolves to carries the prompt, and the text is buildStartNextSessionPrompt verbatim, so no new trigger-phrase vocabulary is minted (decisions.jsonl D1). The command re-checks the gate on dispatch, because contextValue is computed at render time.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "open-the-artifacts-for-that-session",
+      "dateTime": "2026-08-11T10:32:56.979731-04:00",
+      "description": "Added dabblerSessionSets.openSessionArtifacts. Discovery is by convention (isSessionArtifact / listSessionArtifacts in commands/openFile.ts): case-insensitive ^s<N>-. on the top-level files of the set dir, sorted, so s3- cannot swallow s30- and a new artifact shape needs no code change. One match opens directly, several open a QuickPick (the openPrerequisiteSpec shape), none produces a message naming the session, the set and the s<N>-* convention. The entry is offered unconditionally and answered on the CLICK, because hiding it would need a readdir per session row on the tree scan (decisions.jsonl D2). Layer 2 coverage in sessionRowActions.test.ts (41 assertions green with the parity suite), Layer 3 in session-menu.spec.ts.",
+      "status": "complete"
     }
   ]
 }

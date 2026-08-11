@@ -429,6 +429,14 @@ export function normalizeLedgerSessions(raw: unknown): SessionRecord[] {
     if (typeof e.number !== "number" || !Number.isInteger(e.number)) continue;
     if (e.number < 1) continue;
     if (seen.has(e.number)) continue;
+    // Set 115 S3: every `continue` above DROPS a session rather than
+    // rendering it degraded, so the returned array can carry a HOLE in its
+    // numbering where a corrupt entry used to be. A consumer that reads
+    // past such a hole is reading a ledger the scan already refused to
+    // believe: `rowMenuHelpers.nextRunnableSessionNumber` therefore treats
+    // a number gap as "unknowable" rather than walking through it. Any
+    // future consumer that asks a sequential question of this array owes
+    // the same check.
     if (typeof e.status !== "string" || !_SESSION_STATUSES.has(e.status)) continue;
     const rawTitle = typeof e.title === "string" ? e.title.trim() : "";
     seen.add(e.number);

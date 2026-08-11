@@ -23,7 +23,8 @@
 // A set has at most one migration target at a time — the two
 // predicates are mutually exclusive by construction.
 
-import { SessionSet } from "../types";
+import { SessionRecord, SessionSet } from "../types";
+import { sessionOffersRunPrompt } from "./rowMenuHelpers";
 
 export interface ActionSupports {
   uat: boolean;
@@ -152,4 +153,68 @@ export function categorizedActions(
     copyEval: applicable.filter((a) => a.category === "copyEval"),
     flat: applicable.filter((a) => a.category === "flat"),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Set 115 Session 3 — the SESSION row's actions
+// ---------------------------------------------------------------------------
+
+// A separate list rather than a `kind` discriminator on `ROW_ACTIONS`,
+// for one reason: a session action's `when` needs the SESSION, and every
+// one of the twelve existing entries is a predicate over a set. Widening
+// `RowAction.when` to take an optional session would make every set
+// action's signature lie about what it reads.
+//
+// What is deliberately NOT separate is the `contextValue` seam. Both
+// lists produce tokens through the same `actionToken`, land in the same
+// `viewItem =~ /;act-…;/` menus, and are held to the same forward and
+// backward parity assertions in `workExplorerMenuParity.test.ts`. The
+// Set 110 S2 ruling that "no menu entry targets a session row" is
+// superseded HERE, by decision, and the parity test records the
+// replacement rule rather than dropping the assertion: session rows carry
+// exactly the entries below, and bucket and step rows still carry none.
+//
+// The numeric band continues the one at `ROW_ACTIONS`:
+//   6xx — session-row actions
+export interface SessionAction {
+  id: string;
+  label: string;
+  group: number;
+  detail?: string;
+  when: (set: SessionSet, session: SessionRecord) => boolean;
+}
+
+export const SESSION_ACTIONS: SessionAction[] = [
+  // Gated by `sessionOffersRunPrompt`, which reuses
+  // `planLeftClickActivation`'s set-level answer and adds "this row is the
+  // next runnable session". The prompt copied is the framework's own
+  // set-scoped trigger phrase, so the row that carries it must be the row
+  // that phrase resolves to.
+  {
+    id: "dabbler.copySessionRunPrompt",
+    label: "Copy Run Prompt",
+    group: 601,
+    when: (set, session) => sessionOffersRunPrompt(set, session),
+  },
+  // Unconditional ON PURPOSE. Knowing whether a session has artifacts
+  // means listing the set directory, and doing that per session row on the
+  // tree scan is the disk read Set 115's decision 4 forbids. The answer is
+  // computed on the click, and "none yet" is a sentence rather than a
+  // missing menu entry.
+  {
+    id: "dabblerSessionSets.openSessionArtifacts",
+    label: "Open Session Artifacts",
+    group: 602,
+    detail: "Files this session produced, discovered as s<N>-*",
+    when: () => true,
+  },
+];
+
+export function applicableSessionActions(
+  set: SessionSet,
+  session: SessionRecord,
+): SessionAction[] {
+  return SESSION_ACTIONS.filter((a) => a.when(set, session)).sort(
+    (a, b) => a.group - b.group,
+  );
 }

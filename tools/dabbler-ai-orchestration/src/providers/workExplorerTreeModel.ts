@@ -38,7 +38,13 @@ import {
   SessionState,
   SessionStatus,
 } from "../types";
-import { ActionSupports, ROW_ACTIONS, RowAction } from "./ActionRegistry";
+import {
+  ActionSupports,
+  ROW_ACTIONS,
+  RowAction,
+  SESSION_ACTIONS,
+  SessionAction,
+} from "./ActionRegistry";
 import {
   ICON_FILES,
   VisibleModule,
@@ -365,8 +371,12 @@ export const MODULE_TOKEN = {
  * The `contextValue` token for one registry action. Derived from the
  * command id so a new `ROW_ACTIONS` entry cannot be added without the
  * parity test noticing that no menu contribution matches it.
+ *
+ * Takes the command id alone (Set 115 S3) so set actions and session
+ * actions — two lists with different `when` signatures — mint tokens the
+ * same way and are held to the same parity assertions.
  */
-export function actionToken(action: RowAction): string {
+export function actionToken(action: RowAction | SessionAction): string {
   return `act-${action.id.replace(/^dabbler(SessionSets)?\./, "").replace(/\./g, "-")}`;
 }
 
@@ -583,6 +593,12 @@ export function setDescriptor(set: SessionSet, supports: ActionSupports): RowDes
  * Session rows (operator ask 1). The status glyph replaces the
  * `session N in flight` clause the webview carried in its description —
  * ask 2 is a REMOVAL, and this is where it is paid for.
+ *
+ * Set 115 S3: the row now also carries its applicable action tokens, the
+ * same way `setDescriptor` has since Set 110. This is a pure transform
+ * over data the scan already carried — `sessionOffersRunPrompt` reads the
+ * set's own `sessions[]` ledger — so the fourth level still costs no disk
+ * read.
  */
 export function sessionDescriptor(node: SessionNode): RowDescriptor {
   const { session } = node;
@@ -592,6 +608,10 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
   // alternative — reporting Collapsed unconditionally — is the dead
   // twisty the bucket and set rows both refuse.
   const steps = stepNodes(node);
+  const tokens: string[] = [NODE_TOKEN.session, `session-${session.status}`];
+  for (const action of SESSION_ACTIONS) {
+    if (action.when(node.set, session)) tokens.push(actionToken(action));
+  }
   return {
     id: `session:${node.set.name}/${session.number}`,
     label: session.title || `Session ${session.number}`,
@@ -600,7 +620,7 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     description: session.status === "in-progress" ? "in flight" : undefined,
     tooltip: sessionTooltip(node, steps.length),
     icon: sessionIcon(session.status),
-    contextValue: tokenString([NODE_TOKEN.session, `session-${session.status}`]),
+    contextValue: tokenString(tokens),
     // Collapsed only when there is something under it. A session with no
     // steps to show — every session that is not in flight, and an
     // in-flight one whose activity log is absent or unreadable — is a

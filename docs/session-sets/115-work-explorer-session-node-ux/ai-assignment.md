@@ -91,3 +91,33 @@ regardless.
 **Next set: unchanged.** Set 115 continues to Session 3.
 `step-ledger-findings.md` still disqualifies Session 4 as written, and
 nothing here touches that.
+
+---
+
+## Session 3 - The menu - the prompt, and the evidence
+
+**Orchestrator:** github-copilot / anthropic / claude-opus-5, effort high.
+
+**Why this session sat where it did.** Every one of its three work steps
+is implementation and design-decision work on the surface the previous
+two sessions built: the `contextValue` vocabulary Session 1's parity test
+guards, the `openSpec` plumbing Session 2 taught to take a session
+argument, and the tree node Session 2 made clickable. The temporary
+verification-only policy window assigns implementation, architecture and
+test authoring to the active orchestrator. Only `session-verification`
+is routed, on a different effective provider (`anthropic` excluded
+automatically by registry lookup on the orchestrator's model).
+
+Two decisions were journaled before any code was written, because both
+are the kind that a reviewer cannot reconstruct from the diff:
+
+- **The run prompt is gated to the session the phrase actually runs**,
+  not to every non-terminal session. The framework's only documented run
+  trigger is set-scoped, so a prompt copied from session 4 while session
+  3 is next would start a different session than the row it came from.
+- **The artifact entry is always shown and answered at click time.**
+  Hiding it on an empty session would mean a directory listing per
+  session row on the tree scan - the measured constraint Session 1 spent
+  its verification rounds protecting.
+
+**What routing bought.** _(recorded at close)_

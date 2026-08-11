@@ -24,7 +24,7 @@
 import * as assert from "assert";
 import * as fs from "fs";
 import * as path from "path";
-import { ROW_ACTIONS } from "../../providers/ActionRegistry";
+import { ROW_ACTIONS, SESSION_ACTIONS } from "../../providers/ActionRegistry";
 import { actionToken, tokenMatcher } from "../../providers/workExplorerTreeModel";
 
 const PKG_PATH = path.resolve(__dirname, "..", "..", "..", "package.json");
@@ -180,7 +180,11 @@ suite("Set 110 S2 — menu parity, backward: no menu entry is unreachable", () =
     // Backward direction: a stale entry left behind by a retired action
     // would otherwise sit in the menu forever, gated on a token nothing
     // can ever produce, and look like a feature nobody can reach.
-    const known = new Set(ROW_ACTIONS.map(actionToken));
+    //
+    // Both registries, one namespace (Set 115 S3): set actions and session
+    // actions mint tokens through the same `actionToken`, so a token that
+    // belongs to neither list is unreachable either way.
+    const known = new Set([...ROW_ACTIONS, ...SESSION_ACTIONS].map(actionToken));
     for (const entry of allNativeEntries) {
       const found = (entry.when ?? "").match(/;(act-[A-Za-z0-9-]+);/);
       if (!found) continue;
@@ -261,10 +265,12 @@ suite("Set 110 S2 — the two spike-proven constraints", () => {
     }
   });
 
-  test("no menu entry targets bucket, session or step rows — none has actions yet", () => {
-    // Stated so a future addition is a DECISION rather than a leak. The
-    // operator confirmed a mapping for module and set rows only; bucket,
-    // session and (Set 114 S3) step rows are display-only.
+  test("no menu entry targets bucket or step rows — neither has actions", () => {
+    // Set 110 S2 stated this for bucket, session AND step rows, so that a
+    // future addition would be a DECISION rather than a leak. Set 115 S3
+    // is that decision, for session rows only: see `SESSION_ACTIONS` and
+    // the suite below. Bucket and step rows remain display-only, and the
+    // assertion stays here for them rather than being dropped.
     for (const entry of allNativeEntries) {
       const when = entry.when ?? "";
       assert.ok(
@@ -272,12 +278,88 @@ suite("Set 110 S2 — the two spike-proven constraints", () => {
         `unexpected bucket-row action: ${entry.command}`,
       );
       assert.ok(
-        !when.includes(tokenMatcher("dabblerSession")),
-        `unexpected session-row action: ${entry.command}`,
-      );
-      assert.ok(
         !when.includes(tokenMatcher("dabblerStep")),
         `unexpected step-row action: ${entry.command}`,
+      );
+    }
+  });
+});
+
+suite("Set 115 S3 — menu parity for the session row's own actions", () => {
+  test("each SESSION_ACTION appears exactly once, as a top-level context item", () => {
+    // Forward direction, and the placement rule in one assertion: session
+    // actions are flat entries on `view/item/context`. They are NOT put
+    // under the `Open File ▸` / `Copy Prompt ▸` submenus, which are
+    // anchored on `;dabblerSet;` and would therefore never render on a
+    // session row at all.
+    for (const action of SESSION_ACTIONS) {
+      const hits = allNativeEntries.filter((e) => e.command === action.id);
+      assert.strictEqual(
+        hits.length,
+        1,
+        `${action.id} appears ${hits.length} time(s) in the native menus; expected exactly 1`,
+      );
+      assert.ok(
+        nativeItemContext.some((e) => e.command === action.id),
+        `${action.id} should be a top-level context item`,
+      );
+    }
+  });
+
+  test("each entry gates on its OWN action token, delimited", () => {
+    for (const action of SESSION_ACTIONS) {
+      const entry = allNativeEntries.find((e) => e.command === action.id);
+      assert.ok(entry, `${action.id} has no menu entry`);
+      const expected = tokenMatcher(actionToken(action));
+      assert.ok(
+        (entry.when ?? "").includes(expected),
+        `${action.id} gates on "${entry.when}" but should match ${expected}`,
+      );
+    }
+  });
+
+  test("session actions mint tokens that collide with no set action", () => {
+    // `actionToken` strips the `dabbler.` / `dabblerSessionSets.` prefix,
+    // so two commands in different namespaces can produce ONE token — and
+    // the collision would be invisible: both rows would light up for
+    // whichever menu entry matched first.
+    const setTokens = ROW_ACTIONS.map(actionToken);
+    for (const action of SESSION_ACTIONS) {
+      const token = actionToken(action);
+      assert.ok(
+        !setTokens.includes(token),
+        `${action.id} mints ${token}, which a set action already owns`,
+      );
+    }
+  });
+
+  test("no session action is offered from the Command Palette", () => {
+    // Every one of them needs a session node as its argument. Offered in
+    // the palette they would be commands that silently do nothing — the
+    // same rule `activateSession` follows, and the reason it follows it.
+    for (const action of SESSION_ACTIONS) {
+      assert.ok(
+        pkg.contributes.commands.some((c) => c.command === action.id),
+        `${action.id} is not declared in contributes.commands`,
+      );
+      const hidden = (menus.commandPalette ?? []).find((e) => e.command === action.id);
+      assert.ok(hidden, `${action.id} is not hidden from the Command Palette`);
+      assert.strictEqual(hidden.when, "false");
+    }
+  });
+
+  test("no session action is contributed inline", () => {
+    // The two-inline cap is a MODULE-row constraint (S1 spike evidence),
+    // and the assertion above enforces it by counting. This one keeps
+    // session rows out of that budget entirely: an icon-only action on a
+    // session row would crowd the very label Session 1 fought to show.
+    const inlineIds = nativeItemContext
+      .filter((e) => (e.group ?? "").startsWith("inline"))
+      .map((e) => e.command);
+    for (const action of SESSION_ACTIONS) {
+      assert.ok(
+        !inlineIds.includes(action.id),
+        `${action.id} is contributed inline; session actions belong in the context menu`,
       );
     }
   });

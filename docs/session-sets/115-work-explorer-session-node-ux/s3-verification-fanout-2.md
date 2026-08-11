@@ -1,0 +1,13 @@
+**ISSUES FOUND**
+
+- **Issue 1:** Unknown session statuses can be dropped before the run-prompt gate, so a later row can incorrectly offer `Copy Run Prompt`.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts:410-443`, `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts:1349-1382`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts:210-214`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts:603-623`, `tools/dabbler-ai-orchestration/src/providers/rowMenuHelpers.ts:75-112`, `tools/dabbler-ai-orchestration/src/test/suite/sessionRowActions.test.ts:127-143`
+  - **Failure scenario:** A real existing or hand-edited ledger has session 1 `complete`, session 2 with an unrecognized status such as `finished` or `COMPLETE`, and session 3 `not-started`. The scan path drops session 2 from `set.sessions`; session 3 is then rendered and `nextRunnableSessionNumber(set.sessions)` returns `3`, so the session 3 row offers the set-scoped run prompt even though the next runnable session is not safely knowable. This is probable for the intended surface because the task baseline explicitly says unrecognized status tokens are real input and the Work Explorer scans existing session-set history, not just freshly canonical fixtures.
+  - **Acceptance criterion:** `JUDGMENT - Given a scanned session set whose raw sessions ledger contains session 1 complete, session 2 with an unrecognized status, and session 3 not-started, no rendered session row may contain ;act-copySessionRunPrompt;, and the regression must exercise the scan/descriptor path rather than only casting bogus SessionRecord values directly.`
+  - **Details:** The broken requirement is: “An unrecognised session status offers the prompt nowhere in that set rather than guessing which session is next.” The implementation only fails closed if an unknown status reaches `nextRunnableSessionNumber`, but `normalizeLedgerSessions` skips entries whose status is not in `_SESSION_STATUSES`, and `readSessionSets` stores only that filtered array. The row model renders from the filtered `set.sessions`, then `sessionDescriptor` asks `sessionOffersRunPrompt`, which can nominate a later row. The correct behavior needs a scan-level unknown-status blocker or equivalent preserved sentinel so the prompt is suppressed for the whole set.
+
+**NITS**
+
+- **Nit:** `tools/dabbler-ai-orchestration/src/commands/openFile.ts:207` contains an embedded carriage return before `async function openPrerequisiteSpec`, which makes the comment/function render as one physical line in tools. It compiles, so this is cleanup only.

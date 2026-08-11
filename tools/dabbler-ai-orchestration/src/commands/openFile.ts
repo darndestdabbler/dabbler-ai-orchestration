@@ -112,13 +112,99 @@ export function specSectionTargetFor(
   return locateSessionSection(text, sessionNumber) ?? undefined;
 }
 
+/**
+ * Whether *name* is one of session *sessionNumber*'s artifacts (Set 115 S3).
+ *
+ * The convention is `s<N>-<anything>`, which is what every artifact in
+ * every set already obeys: `s1-issues.json`, `s2-verification-round-2.md`,
+ * `s1-remediation-round-1.md`. Discovery by convention rather than by a
+ * hardcoded list is step 4's explicit requirement — a set gains new
+ * artifact shapes whenever the workflow does, and a list would silently
+ * drop them.
+ *
+ * PURE, and exported, because the two ways this could quietly go wrong are
+ * both invisible in a running host: `s3-` must not match `s30-`'s files
+ * (the delimiter is what separates them, so a prefix test alone is not
+ * enough), and the match is case-insensitive because the convention is
+ * lowercase but the filesystem this runs on is not.
+ */
+export function isSessionArtifact(name: string, sessionNumber: number): boolean {
+  if (!Number.isInteger(sessionNumber) || sessionNumber <= 0) return false;
+  return new RegExp(`^s${sessionNumber}-.`, "i").test(name);
+}
+
+/**
+ * The absolute paths of session *sessionNumber*'s artifacts in *dir*,
+ * sorted by name, or `[]`.
+ *
+ * Files only, top level only, and every failure — an unreadable directory,
+ * a `stat` that throws on a vanished entry — degrades to fewer results
+ * rather than to an error. The empty array is a first-class answer: it is
+ * what a session that has produced nothing yet returns, and the caller
+ * says so plainly.
+ *
+ * The read happens on the CLICK, never on the tree scan. That is the same
+ * seam Session 2 established for the spec read and the same measured
+ * constraint (Set 115 decision 4) it protects.
+ */
+export function listSessionArtifacts(dir: string, sessionNumber: number): string[] {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries
+    .filter((e) => e.isFile() && isSessionArtifact(e.name, sessionNumber))
+    .map((e) => path.join(dir, e.name))
+    .sort((a, b) => path.basename(a).localeCompare(path.basename(b)));
+}
+
+/**
+ * Open one of a session's artifacts (Set 115 S3).
+ *
+ * The same three-way shape `openPrerequisiteSpec` already uses — open
+ * directly when there is one, QuickPick when there are several — with the
+ * empty case carrying the weight: it names the session, the set and the
+ * convention, so an operator who sees it learns why nothing appeared
+ * rather than suspecting the menu is broken.
+ */
+async function openSessionArtifacts(
+  set: SessionSet,
+  sessionNumber: number,
+): Promise<void> {
+  const artifacts = listSessionArtifacts(set.dir, sessionNumber);
+  if (artifacts.length === 0) {
+    vscode.window.showInformationMessage(
+      `Session ${sessionNumber} of "${set.name}" has no artifacts yet — ` +
+        `nothing matching s${sessionNumber}-* in ${path.basename(set.dir)}.`,
+    );
+    return;
+  }
+  if (artifacts.length === 1) {
+    openIfExists(artifacts[0], path.basename(artifacts[0]));
+    return;
+  }
+  const picked = await vscode.window.showQuickPick(
+    artifacts.map((p) => ({
+      label: path.basename(p),
+      description: path.relative(set.root, p),
+      absolute: p,
+    })),
+    { placeHolder: `Artifacts of session ${sessionNumber} — ${set.name}` },
+  );
+  if (picked) {
+    const { absolute } = picked as { absolute: string };
+    openIfExists(absolute, path.basename(absolute));
+  }
+}
+
 // Set 061 S2 (spec D3): companion to the blocked marker. Opens the
 // spec.md of the prerequisite set blocking `item.set` — directly when
 // one prerequisite is unsatisfied, via QuickPick when several are.
 // Unknown slugs (typos / missing sets) are listed but explained rather
 // than opened; resolution reuses the same merged cross-root scan the
-// blocked derivation itself runs on.
-async function openPrerequisiteSpec(set: SessionSet): Promise<void> {
+// blocked derivation itself runs on.async function openPrerequisiteSpec(set: SessionSet): Promise<void> {
   const unsatisfied: UnsatisfiedPrerequisite[] = set.unsatisfiedPrereqs ?? [];
   if (unsatisfied.length === 0) {
     vscode.window.showInformationMessage(
@@ -240,6 +326,21 @@ export function registerOpenFileCommands(context: vscode.ExtensionContext): void
       }
       void openPrerequisiteSpec(item.set);
     }),
+    // Set 115 S3: the session row's evidence half. Hidden from the
+    // Command Palette (`when: false` in package.json) because, unlike
+    // `openPrerequisiteSpec`, it cannot fall back to a set-level
+    // question — without a session node there is no session whose
+    // artifacts to list. `sessionNumberOf` is the SAME narrowing the
+    // spec reveal uses, so a non-session argument is a silent no-op
+    // rather than a guess at session 1.
+    vscode.commands.registerCommand(
+      "dabblerSessionSets.openSessionArtifacts",
+      (item: SetItem) => {
+        const sessionNumber = sessionNumberOf(item);
+        if (!item?.set || sessionNumber === undefined) return;
+        void openSessionArtifacts(item.set, sessionNumber);
+      }
+    ),
     vscode.commands.registerCommand("dabblerSessionSets.openFolder", (item: SetItem) => {
       if (!item?.set) return;
       vscode.commands.executeCommand("revealInExplorer", vscode.Uri.file(item.set.dir));

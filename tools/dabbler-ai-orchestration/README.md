@@ -238,30 +238,33 @@ Sign-up links and a full prerequisites checklist live in the
   not-started) the click also copies `Start the next session of
   \`<slug>\`.` to your clipboard with a one-line confirmation toast,
   so you can paste straight into the AI chat and resume work in two
-  keystrokes. Right-click opens a native VS Code QuickPick with
-  two-step submenus: **Open File ▸** (Spec / Activity Log / Change
-  Log / Session State), **Copy Eval ▸** (copyable prompts —
-  Evaluate Specification / Most Recent Session / Session Set /
-  Start Next Session / Start New Parallel Session), and flat
-  actions for Copy Slug, Open Orchestrator
-  Writer Log, Open Prerequisite Spec (on blocked rows),
-  Migrate to v4 schema, Cancel set, and Restore set. The
-  right-click menu honors light/dark theme natively and dismisses
-  on Escape or click-outside.
-- **Copyable review prompts for a second opinion.** The
-  `Dabbler: Copy …` Evaluate commands (also under Copy Eval ▸ in the
-  right-click menu) author review prompts that reference your
-  session-set artifacts by path rather than embedding their contents,
-  then write to the clipboard. Paste into any path-aware AI chat
+  keystrokes. Right-click opens a native VS Code context menu with
+  two-step submenus — **Open File ▸** (Spec / Activity Log / Change
+  Log / Session State) and **Copy Prompt ▸** (Start Next Session) —
+  plus flat actions for Copy Slug, Open Prerequisite Spec (on blocked
+  rows), Migrate to v3 / v4 schema, Cancel set, and Restore set. The
+  menu honors light/dark theme natively and dismisses on Escape or
+  click-outside.
+- **Session rows are clickable too.** Left-click a session under a set
+  and the same `spec.md` opens **positioned at that session's own
+  `### Session N of M:` block**, so you land on the plan you asked for
+  with the surrounding context still a scroll away. Right-click offers
+  **Copy Run Prompt** — on the one session the trigger phrase actually
+  runs, so a prompt copied from a row always starts that row's
+  session — and **Open Session Artifacts**, which lists the files that
+  session produced (discovered by the `s<N>-*` convention, so new
+  artifact shapes appear without an extension update) and says so
+  plainly when there are none yet.
+- **Copyable prompts for a second opinion.** The clipboard prompts above
+  reference your session-set artifacts by path rather than embedding
+  their contents. Paste into any path-aware AI chat
   (Claude Code, Codex, Cline, Cursor, etc.) on a *different* provider
-  than the one that did the work — the prompt points it at the
-  canonical `docs/dabbler/cross-provider-verification.md` instructions
-  (ensure-written into every workspace automatically), which fix the
-  review stance and the verdict grammar. These are **advisory**: a
+  than the one that did the work — the workspace's
+  `docs/dabbler/cross-provider-verification.md` (ensure-written
+  automatically at bootstrap) fixes the review stance and the verdict
+  grammar. These are **advisory**: a
   second opinion you read, separate from the routed verification round
-  the close-out gate corroborates. Optional per-repo files
-  at `docs/review-criteria/{spec,session,set}.md` override the
-  default review instructions if present.
+  the close-out gate corroborates.
 - **`--no-router` for CI and hermetic tests.** Run
   `python -m ai_router.start_session … --no-router`, or set
   `DABBLER_NO_ROUTER=1` in your environment, and the router makes no

@@ -1,23 +1,26 @@
 {
   "status": "completed",
-  "summary": "The Work Explorer's session rows stopped being labels you cannot click. Activating one now opens the set's own spec.md positioned at that session's `### Session N of M:` block — revealed at the top of the editor with an empty cursor on the heading, so the surrounding context and the configuration block stay a scroll away. It goes through the EXISTING `dabblerSessionSets.openSpec` rather than a parallel command: `openSpec` reads a session number off its argument, so there is still one answer to \"which file is the spec\" and one message when it is missing, and a set row through the same command still opens at the top exactly as before. The one new rule — which lines belong to session N — lives in a pure module (`providers/specSectionLocator.ts`) that borrows `sessionStepModel.scanSessionHeads` instead of carrying a second heading regex, so the step parser and the reveal cannot disagree about where a session begins; a heading inside a fenced sample is not a section, which is the falsifier that keeps a spec from opening at its own documentation template. Everything unanswerable degrades to the real file at the top: no session number, an unreadable spec, a ledger ahead of its spec, a malformed heading, or a throw inside the reveal. The spec read happens on the CLICK, never on the tree scan, so the measured no-extra-read constraint is untouched. Verification: both discovery lenses returned VERIFIED with zero Critical/Major findings; one nit recorded and deliberately not fixed (an already-open spec.md keeps its scroll position on the degradation path, matching the set row's long-standing behaviour).",
+  "summary": "The Work Explorer's session rows gained a context menu, and both entries reach it through the vocabulary the parity test already guards rather than through hand-written `when` clauses. `SESSION_ACTIONS` is a second registry beside `ROW_ACTIONS` — separate because a session action's `when` reads the SESSION and all twelve existing entries read only the set, so widening `RowAction.when` would have made every set action's signature lie about what it reads — but it mints tokens through the same `actionToken`, lands in the same `viewItem =~ /;act-...;/` menus, and is held to the same forward and backward parity assertions. **Copy Run Prompt** copies the framework's documented trigger phrase verbatim from the existing `buildStartNextSessionPrompt`, and appears on exactly ONE row per set: the session that phrase actually resolves to. That is narrower than the step's literal 'gate on status' reading, and deliberately so — the phrase is set-scoped, so an entry on session 4 while session 3 is next would start a different session than the row it was copied from. The gate borrows `planLeftClickActivation` for its set-level half (the two surfaces cannot drift on what a runnable set is) and adds `nextRunnableSessionNumber`. **Open Session Artifacts** discovers files by convention (`^s<N>-`, case-insensitive, files only, sorted) so `s3-` cannot swallow `s30-`'s evidence and a new artifact shape needs no code change; one match opens directly, several open a QuickPick, none produces a message naming the session, the set and the convention. The entry is unconditional and the folder is read on the CLICK, never on the tree scan — hiding it would have cost a readdir per session row on the path Set 115's decision 4 protects. The Set 110 S2 ruling that no menu entry targets a session row was written so a future addition would be a decision rather than a leak; this session is that decision, and the assertion was NARROWED to bucket and step rows rather than deleted. Round 1 found a real Major I had asserted against and did not have: my fail-closed rule on an unrecognised session status was UNREACHABLE, because `normalizeLedgerSessions` drops an unreadable entry instead of passing it through, leaving a hole in the numbering that my walk stepped straight over and nominating the wrong session. The fix fails closed on a number gap as well, which is strictly wider than the unknown-status flag the finding proposed — it also catches the sibling drop paths (a non-integer, numeric-string or non-positive `number`) that produce an identical hole. Verification: discovery ISSUES_FOUND (1 Major), supplementary clean, remediation-review VERIFIED with the fix accepted and zero findings.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/providers/specSectionLocator.ts",
-    "tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts",
-    "tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts",
+    "tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts",
+    "tools/dabbler-ai-orchestration/src/providers/rowMenuHelpers.ts",
+    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
     "tools/dabbler-ai-orchestration/src/commands/openFile.ts",
-    "tools/dabbler-ai-orchestration/src/commands/workExplorerTreeCommands.ts",
+    "tools/dabbler-ai-orchestration/src/commands/copyPromptCommands.ts",
+    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
     "tools/dabbler-ai-orchestration/package.json",
     "tools/dabbler-ai-orchestration/CHANGELOG.md",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionPlanReveal.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts",
+    "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionRowActions.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/session-plan-reveal.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/session-menu.spec.ts",
     "docs/session-sets/115-work-explorer-session-node-ux/ai-assignment.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/s2-verification-conventions.md"
+    "docs/session-sets/115-work-explorer-session-node-ux/s3-verification-conventions.md",
+    "docs/session-sets/115-work-explorer-session-node-ux/s3-remediation-round-1.md",
+    "docs/session-sets/115-work-explorer-session-node-ux/decisions.jsonl"
   ],
   "next_orchestrator": {
     "engine": "github-copilot",
@@ -26,12 +29,14 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 3 hangs a context menu on the very node this session made clickable and reuses the same openSpec plumbing for its artifact QuickPick. The live context that matters is this session's: the contextValue vocabulary, the menu-parity test's forward and backward assertions, and why session-row menu entries are deliberately absent rather than forgotten. No blocker, no cost pressure, no capability gap; verification stays cross-provider regardless."
+      "specifics": "Session 4 must NOT run as written — `step-ledger-findings.md` disqualifies it on three independent grounds and the spec's own heading says so. The next orchestrator's first job is therefore a decision, not an implementation: re-author session 4 after the findings' section 7 prerequisites, or drop it and ship sessions 1-3. That call needs the live context of what sessions 1-3 actually built and what the round-1 Major taught about corrupt ledgers reaching the row model, which is exactly this session's context. No blocker, no cost pressure, no capability gap; verification stays cross-provider regardless."
     }
   },
   "blockers": [],
   "lessons_cited": [
+    "L-112-1",
     "L-069-1",
-    "L-112-1"
+    "L-064-8",
+    "L-064-9"
   ]
 }

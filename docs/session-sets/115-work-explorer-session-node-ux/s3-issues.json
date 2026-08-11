@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Unknown session statuses can be dropped before the run-prompt gate, so a later row can incorrectly offer `Copy Run Prompt`.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts:410-443`, `tools/dabbler-ai-orchestration/src/utils/fileSystem.ts:1349-1382`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts:210-214`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts:603-623`, `tools/dabbler-ai-orchestration/src/providers/rowMenuHelpers.ts:75-112`, `tools/dabbler-ai-orchestration/src/test/suite/sessionRowActions.test.ts:127-143`\n  - **Failure scenario:** A real existing or hand-edited ledger has session 1 `complete`, session 2 with an unrecognized status such as `finished` or `COMPLETE`, and session 3 `not-started`. The scan path drops session 2 from `set.sessions`; session 3 is then rendered and `nextRunnableSessionNumber(set.sessions)` returns `3`, so the session 3 row offers the set-scoped run prompt even though the next runnable session is not safely knowable. This is probable for the intended surface because the task baseline explicitly says unrecognized status tokens are real input and the Work Explorer scans existing session-set history, not just freshly canonical fixtures.\n  - **Acceptance criterion:** `JUDGMENT - Given a scanned session set whose raw sessions ledger contains session 1 complete, session 2 with an unrecognized status, and session 3 not-started, no rendered session row may contain ;act-copySessionRunPrompt;, and the regression must exercise the scan/descriptor path rather than only casting bogus SessionRecord values directly.`\n  - **Details:** The broken requirement is: “An unrecognised session status offers the prompt nowhere in that set rather than guessing which session is next.” The implementation only fails closed if an unknown status reaches `nextRunnableSessionNumber`, but `normalizeLedgerSessions` skips entries whose status is not in `_SESSION_STATUSES`, and `readSessionSets` stores only that filtered array. The row model renders from the filtered `set.sessions`, then `sessionDescriptor` asks `sessionOffersRunPrompt`, which can nominate a later row. The correct behavior needs a scan-level unknown-status blocker or equivalent preserved sentinel so the prompt is suppressed for the whole set.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A real existing or hand-edited ledger has session 1 `complete`, session 2 with an unrecognized status such as `finished` or `COMPLETE`, and session 3 `not-started`. The scan path drops session 2 from `set.sessions`; session 3 is then rendered and `nextRunnableSessionNumber(set.sessions)` returns `3`, so the session 3 row offers the set-scoped run prompt even though the next runnable session is not safely knowable. This is probable for the intended surface because the task baseline explicitly says unrecognized status tokens are real input and the Work Explorer scans existing session-set history, not just freshly canonical fixtures.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+        "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
+        "tools/dabbler-ai-orchestration/src/providers/rowMenuHelpers.ts",
+        "tools/dabbler-ai-orchestration/src/test/suite/sessionRowActions.test.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Given a scanned session set whose raw sessions ledger contains session 1 complete, session 2 with an unrecognized status, and session 3 not-started, no rendered session row may contain ;act-copySessionRunPrompt;, and the regression must exercise the scan/descriptor path rather than only casting bogus SessionRecord values directly."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "437781ae31300eef16e67a5442f8990a895c5031"
+}

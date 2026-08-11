@@ -317,6 +317,16 @@
         "command": "dabblerWorkExplorer.activateSession",
         "title": "Open Session Plan",
         "category": "Dabbler"
+      },
+      {
+        "command": "dabbler.copySessionRunPrompt",
+        "title": "Copy Run Prompt",
+        "category": "Dabbler"
+      },
+      {
+        "command": "dabblerSessionSets.openSessionArtifacts",
+        "title": "Open Session Artifacts",
+        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -339,6 +349,14 @@
         },
         {
           "command": "dabblerWorkExplorer.activateSession",
+          "when": "false"
+        },
+        {
+          "command": "dabbler.copySessionRunPrompt",
+          "when": "false"
+        },
+        {
+          "command": "dabblerSessionSets.openSessionArtifacts",
           "when": "false"
         }
       ],
@@ -444,6 +462,16 @@
           "command": "dabblerSessionSets.restore",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-restore;/",
           "group": "9_lifecycle@902"
+        },
+        {
+          "command": "dabbler.copySessionRunPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionRunPrompt;/",
+          "group": "6_session@601"
+        },
+        {
+          "command": "dabblerSessionSets.openSessionArtifacts",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openSessionArtifacts;/",
+          "group": "6_session@602"
         }
       ],
       "dabblerWorkExplorer.openFile": [

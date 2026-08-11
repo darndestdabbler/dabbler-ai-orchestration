@@ -24,7 +24,9 @@
 import * as fs from "fs";
 import * as path from "path";
 import * as vscode from "vscode";
-import { SessionSet } from "../types";
+import { SessionRecord, SessionSet } from "../types";
+import { sessionOffersRunPrompt } from "../providers/rowMenuHelpers";
+import { asSessionNode } from "./workExplorerTreeCommands";
 import {
   CROSS_PROVIDER_VERIFICATION_REL_PATH,
   loadTemplateBundle,
@@ -94,6 +96,32 @@ export function buildStartNextSessionPrompt(set: SessionSet): string {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
 
+/**
+ * The run prompt for a SESSION row, or `null` when that row must not
+ * offer one (Set 115 S3).
+ *
+ * The text is `buildStartNextSessionPrompt` unchanged — deliberately the
+ * SAME string the set row's L5 shortcut copies, because it is the
+ * framework's documented trigger phrase and this session mints no new
+ * vocabulary. What is session-scoped is the GATE:
+ * `sessionOffersRunPrompt` allows exactly the row that phrase resolves
+ * to, so the prompt on a row always starts that row's session.
+ *
+ * The toast names the session number rather than echoing the phrase, so
+ * the operator can see at a glance that the row they clicked is the one
+ * that will run.
+ */
+export function planSessionRunPrompt(
+  set: SessionSet,
+  session: SessionRecord,
+): { text: string; toast: string } | null {
+  if (!sessionOffersRunPrompt(set, session)) return null;
+  return {
+    text: buildStartNextSessionPrompt(set),
+    toast: `Copied: Start session ${session.number} of ${set.name}`,
+  };
+}
+
 async function copyToClipboard(text: string, statusMessage: string): Promise<void> {
   try {
     await vscode.env.clipboard.writeText(text);
@@ -115,6 +143,22 @@ export function registerCopyPromptCommands(context: vscode.ExtensionContext): vo
           prompt,
           `Copied: Start the next session of ${item.set.name}`,
         );
+      },
+    ),
+    // Set 115 S3: the session row's sibling. It re-checks the gate on
+    // dispatch rather than trusting the menu — `contextValue` is computed
+    // at render time, so a row that has been on screen since before a
+    // session closed would otherwise still copy a prompt for a set that
+    // has moved on. A refused invocation is silent: the entry the
+    // operator clicked simply should not have been there.
+    vscode.commands.registerCommand(
+      "dabbler.copySessionRunPrompt",
+      async (arg: unknown) => {
+        const node = asSessionNode(arg);
+        if (!node) return;
+        const plan = planSessionRunPrompt(node.set, node.session);
+        if (!plan) return;
+        await copyToClipboard(plan.text, plan.toast);
       },
     ),
   );

@@ -20,6 +20,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 115 S3) A session row offers the prompt to run it and the files
+  it produced.** Right-clicking a session in the Work Explorer now shows
+  two entries:
+
+  - **Copy Run Prompt** — writes `Start the next session of \`<slug>\`.`
+    to the clipboard. It appears on **one row per set**: the session that
+    phrase actually runs (the in-flight one, else the first unstarted
+    one). A prompt copied from a later row would have started a different
+    session than the row it came from, so those rows do not offer one. An
+    unrecognised session status offers nothing anywhere in the set rather
+    than guessing which session is next.
+  - **Open Session Artifacts** — the files that session produced,
+    discovered **by convention** (`s<N>-*` in the set folder) rather than
+    from a hardcoded list, so new artifact shapes need no code change.
+    One match opens directly; several open a picker; none says so
+    plainly, naming the convention. The entry is always offered and the
+    folder is read on the **click**, never on the tree scan.
+
 - **(Set 115 S2) Click a session row and land on its plan.** The Work
   Explorer's session rows were labels you could not click. Activating one
   now opens the set's `spec.md` **positioned at that session's own

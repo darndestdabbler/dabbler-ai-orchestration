@@ -26627,6 +26627,45 @@ function specSectionTargetFor(specPath, sessionNumber) {
   }
   return locateSessionSection(text, sessionNumber) ?? void 0;
 }
+function isSessionArtifact(name, sessionNumber) {
+  if (!Number.isInteger(sessionNumber) || sessionNumber <= 0)
+    return false;
+  return new RegExp(`^s${sessionNumber}-.`, "i").test(name);
+}
+function listSessionArtifacts(dir, sessionNumber) {
+  let entries;
+  try {
+    entries = fs17.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  return entries.filter((e) => e.isFile() && isSessionArtifact(e.name, sessionNumber)).map((e) => path22.join(dir, e.name)).sort((a, b2) => path22.basename(a).localeCompare(path22.basename(b2)));
+}
+async function openSessionArtifacts(set, sessionNumber) {
+  const artifacts = listSessionArtifacts(set.dir, sessionNumber);
+  if (artifacts.length === 0) {
+    vscode15.window.showInformationMessage(
+      `Session ${sessionNumber} of "${set.name}" has no artifacts yet \u2014 nothing matching s${sessionNumber}-* in ${path22.basename(set.dir)}.`
+    );
+    return;
+  }
+  if (artifacts.length === 1) {
+    openIfExists(artifacts[0], path22.basename(artifacts[0]));
+    return;
+  }
+  const picked = await vscode15.window.showQuickPick(
+    artifacts.map((p2) => ({
+      label: path22.basename(p2),
+      description: path22.relative(set.root, p2),
+      absolute: p2
+    })),
+    { placeHolder: `Artifacts of session ${sessionNumber} \u2014 ${set.name}` }
+  );
+  if (picked) {
+    const { absolute } = picked;
+    openIfExists(absolute, path22.basename(absolute));
+  }
+}
 async function openPrerequisiteSpec(set) {
   const unsatisfied = set.unsatisfiedPrereqs ?? [];
   if (unsatisfied.length === 0) {
@@ -26759,6 +26798,22 @@ function registerOpenFileCommands(context) {
       }
       void openPrerequisiteSpec(item.set);
     }),
+    // Set 115 S3: the session row's evidence half. Hidden from the
+    // Command Palette (`when: false` in package.json) because, unlike
+    // `openPrerequisiteSpec`, it cannot fall back to a set-level
+    // question — without a session node there is no session whose
+    // artifacts to list. `sessionNumberOf` is the SAME narrowing the
+    // spec reveal uses, so a non-session argument is a silent no-op
+    // rather than a guess at session 1.
+    vscode15.commands.registerCommand(
+      "dabblerSessionSets.openSessionArtifacts",
+      (item) => {
+        const sessionNumber = sessionNumberOf(item);
+        if (!item?.set || sessionNumber === void 0)
+          return;
+        void openSessionArtifacts(item.set, sessionNumber);
+      }
+    ),
     vscode15.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;
@@ -26838,25 +26893,124 @@ function registerCopyCommands(context) {
 }
 
 // src/commands/copyPromptCommands.ts
+var vscode18 = __toESM(require("vscode"));
+
+// src/providers/rowMenuHelpers.ts
+function planLeftClickActivation(setName, state) {
+  const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
+  if (state !== "in-progress" && state !== "not-started") {
+    return { openCommand, clipboardWrite: null };
+  }
+  const sanitized = setName.replace(/`/g, "'");
+  return {
+    openCommand,
+    clipboardWrite: {
+      text: `Start the next session of \`${sanitized}\`.`,
+      toast: `Copied: Start the next session of ${setName}`
+    }
+  };
+}
+function nextRunnableSessionNumber(sessions) {
+  const ordered = [...sessions ?? []].sort((a, b2) => a.number - b2.number);
+  let expected = 1;
+  for (const session of ordered) {
+    if (session.number !== expected)
+      return null;
+    expected += 1;
+    if (session.status === "complete" || session.status === "cancelled")
+      continue;
+    if (session.status === "in-progress" || session.status === "not-started") {
+      return session.number;
+    }
+    return null;
+  }
+  return null;
+}
+function sessionOffersRunPrompt(set, session) {
+  if (planLeftClickActivation(set.name, set.state).clipboardWrite === null) {
+    return false;
+  }
+  return nextRunnableSessionNumber(set.sessions) === session.number;
+}
+
+// src/commands/workExplorerTreeCommands.ts
 var vscode17 = __toESM(require("vscode"));
+function asSetNode(arg) {
+  if (arg === null || typeof arg !== "object")
+    return void 0;
+  const node = arg;
+  return node.kind === "set" && node.set ? node : void 0;
+}
+function asSessionNode(arg) {
+  if (arg === null || typeof arg !== "object")
+    return void 0;
+  const node = arg;
+  return node.kind === "session" && node.set && node.session ? node : void 0;
+}
+async function activateSetRow(arg) {
+  const node = asSetNode(arg);
+  if (!node)
+    return;
+  const plan = planLeftClickActivation(node.set.name, node.set.state);
+  await vscode17.commands.executeCommand(plan.openCommand.commandId, node);
+  if (!plan.clipboardWrite)
+    return;
+  try {
+    await vscode17.env.clipboard.writeText(plan.clipboardWrite.text);
+    vscode17.window.showInformationMessage(plan.clipboardWrite.toast);
+  } catch (err) {
+    console.warn(
+      `[WorkExplorerTree] left-click clipboard write failed for "${node.set.name}"`,
+      err
+    );
+  }
+}
+async function activateSessionRow(arg) {
+  const node = asSessionNode(arg);
+  if (!node)
+    return;
+  await vscode17.commands.executeCommand("dabblerSessionSets.openSpec", node);
+}
+function registerWorkExplorerTreeCommands(context) {
+  context.subscriptions.push(
+    vscode17.commands.registerCommand(
+      "dabblerWorkExplorer.activateSet",
+      (arg) => activateSetRow(arg)
+    ),
+    vscode17.commands.registerCommand(
+      "dabblerWorkExplorer.activateSession",
+      (arg) => activateSessionRow(arg)
+    )
+  );
+}
+
+// src/commands/copyPromptCommands.ts
 function sanitizeSlugForPrompt(slug) {
   return slug.replace(/`/g, "'");
 }
 function buildStartNextSessionPrompt(set) {
   return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
 }
+function planSessionRunPrompt(set, session) {
+  if (!sessionOffersRunPrompt(set, session))
+    return null;
+  return {
+    text: buildStartNextSessionPrompt(set),
+    toast: `Copied: Start session ${session.number} of ${set.name}`
+  };
+}
 async function copyToClipboard(text, statusMessage) {
   try {
-    await vscode17.env.clipboard.writeText(text);
-    vscode17.window.setStatusBarMessage(statusMessage, 4e3);
+    await vscode18.env.clipboard.writeText(text);
+    vscode18.window.setStatusBarMessage(statusMessage, 4e3);
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
-    vscode17.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
+    vscode18.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
   }
 }
 function registerCopyPromptCommands(context) {
   context.subscriptions.push(
-    vscode17.commands.registerCommand(
+    vscode18.commands.registerCommand(
       "dabbler.copyStartNextSessionPrompt",
       async (item) => {
         if (!item?.set)
@@ -26867,6 +27021,24 @@ function registerCopyPromptCommands(context) {
           `Copied: Start the next session of ${item.set.name}`
         );
       }
+    ),
+    // Set 115 S3: the session row's sibling. It re-checks the gate on
+    // dispatch rather than trusting the menu — `contextValue` is computed
+    // at render time, so a row that has been on screen since before a
+    // session closed would otherwise still copy a prompt for a set that
+    // has moved on. A refused invocation is silent: the entry the
+    // operator clicked simply should not have been there.
+    vscode18.commands.registerCommand(
+      "dabbler.copySessionRunPrompt",
+      async (arg) => {
+        const node = asSessionNode(arg);
+        if (!node)
+          return;
+        const plan = planSessionRunPrompt(node.set, node.session);
+        if (!plan)
+          return;
+        await copyToClipboard(plan.text, plan.toast);
+      }
     )
   );
 }
@@ -26874,7 +27046,7 @@ function registerCopyPromptCommands(context) {
 // src/commands/trySampleProject.ts
 var fs18 = __toESM(require("fs"));
 var path24 = __toESM(require("path"));
-var vscode18 = __toESM(require("vscode"));
+var vscode19 = __toESM(require("vscode"));
 
 // src/utils/sampleProject.ts
 var path23 = __toESM(require("path"));
@@ -27252,23 +27424,23 @@ async function showPendingSampleLanding(context, io) {
 }
 function registerTrySampleProjectCommand(context) {
   context.subscriptions.push(
-    vscode18.commands.registerCommand("dabbler.trySampleProject", async () => {
+    vscode19.commands.registerCommand("dabbler.trySampleProject", async () => {
       await runTrySampleProject(context);
     })
   );
   void showPendingSampleLanding(context, {
-    openFolders: (vscode18.workspace.workspaceFolders ?? []).map(
+    openFolders: (vscode19.workspace.workspaceFolders ?? []).map(
       (f) => f.uri.fsPath
     ),
-    showInfo: (msg, ...actions) => Promise.resolve(vscode18.window.showInformationMessage(msg, ...actions)),
-    copyToClipboard: (text) => Promise.resolve(vscode18.env.clipboard.writeText(text)),
-    setStatus: (msg) => vscode18.window.setStatusBarMessage(msg, 5e3)
+    showInfo: (msg, ...actions) => Promise.resolve(vscode19.window.showInformationMessage(msg, ...actions)),
+    copyToClipboard: (text) => Promise.resolve(vscode19.env.clipboard.writeText(text)),
+    setStatus: (msg) => vscode19.window.setStatusBarMessage(msg, 5e3)
   });
 }
 var sampleChannel;
 function sampleOutputChannel() {
   if (!sampleChannel) {
-    sampleChannel = vscode18.window.createOutputChannel("Dabbler: Sample Project");
+    sampleChannel = vscode19.window.createOutputChannel("Dabbler: Sample Project");
   }
   return sampleChannel;
 }
@@ -27280,14 +27452,14 @@ async function runTrySampleProject(context) {
       listFilesRecursive: listFilesRecursiveSync
     });
   } catch (err) {
-    vscode18.window.showErrorMessage(
+    vscode19.window.showErrorMessage(
       `The sample project could not be loaded from the installed extension: ${describeError(err)}`
     );
     return;
   }
   const picked = await pickTargetFolder(bundle, {
     showOpenDialog: async () => {
-      const chosen = await vscode18.window.showOpenDialog({
+      const chosen = await vscode19.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -27296,7 +27468,7 @@ async function runTrySampleProject(context) {
       });
       return chosen?.[0]?.fsPath;
     },
-    showWarning: (msg, ...actions) => Promise.resolve(vscode18.window.showWarningMessage(msg, ...actions)),
+    showWarning: (msg, ...actions) => Promise.resolve(vscode19.window.showWarningMessage(msg, ...actions)),
     exists: (p2) => fs18.existsSync(p2),
     readFile: (p2) => fs18.readFileSync(p2, "utf8"),
     listDir: (p2) => fs18.readdirSync(p2),
@@ -27309,15 +27481,15 @@ async function runTrySampleProject(context) {
     return;
   const { folder, resumeFrom } = picked;
   if (!probePythonPresence(folder)) {
-    vscode18.window.showErrorMessage(
+    vscode19.window.showErrorMessage(
       describeMissingPython("Try a sample project")
     );
     return;
   }
   const bootstrapPython = resolveScaffoldBootstrapPython(folder) ?? resolveExplicitPythonPath(folder);
-  const result = await vscode18.window.withProgress(
+  const result = await vscode19.window.withProgress(
     {
-      location: vscode18.ProgressLocation.Notification,
+      location: vscode19.ProgressLocation.Notification,
       title: "Creating your sample project...",
       cancellable: false
     },
@@ -27358,31 +27530,31 @@ async function runTrySampleProject(context) {
     folder,
     slug: bundle.meta.sampleSetSlug
   });
-  const alreadyOpen = (vscode18.workspace.workspaceFolders ?? []).some(
+  const alreadyOpen = (vscode19.workspace.workspaceFolders ?? []).some(
     (f) => path24.resolve(f.uri.fsPath) === path24.resolve(folder)
   );
   if (alreadyOpen) {
     await showPendingSampleLanding(context, {
       openFolders: [folder],
-      showInfo: (msg, ...actions) => Promise.resolve(vscode18.window.showInformationMessage(msg, ...actions)),
-      copyToClipboard: (text) => Promise.resolve(vscode18.env.clipboard.writeText(text)),
-      setStatus: (msg) => vscode18.window.setStatusBarMessage(msg, 5e3)
+      showInfo: (msg, ...actions) => Promise.resolve(vscode19.window.showInformationMessage(msg, ...actions)),
+      copyToClipboard: (text) => Promise.resolve(vscode19.env.clipboard.writeText(text)),
+      setStatus: (msg) => vscode19.window.setStatusBarMessage(msg, 5e3)
     });
     return;
   }
-  await vscode18.commands.executeCommand(
+  await vscode19.commands.executeCommand(
     "vscode.openFolder",
-    vscode18.Uri.file(folder)
+    vscode19.Uri.file(folder)
   );
 }
 async function reportSampleFailure(folder, bootstrapPython, result) {
   const reason = result.failureReason ?? "no further detail available";
   if (result.failedStep === "git") {
-    vscode18.window.showErrorMessage(GIT_MISSING_MESSAGE);
+    vscode19.window.showErrorMessage(GIT_MISSING_MESSAGE);
     return;
   }
   if (result.failedStep !== "install") {
-    vscode18.window.showErrorMessage(
+    vscode19.window.showErrorMessage(
       `The sample project could not be created in '${folder}': ${reason}`
     );
     return;
@@ -27399,7 +27571,7 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
       )
     )
   );
-  const answer = await vscode18.window.showWarningMessage(
+  const answer = await vscode19.window.showWarningMessage(
     describeInstallFailure(folder, reason),
     INSTALL_FAILED_SHOW_LOG_ACTION,
     INSTALL_FAILED_RETRY_ACTION
@@ -27407,18 +27579,18 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
   if (answer === INSTALL_FAILED_SHOW_LOG_ACTION) {
     channel.show(true);
   } else if (answer === INSTALL_FAILED_RETRY_ACTION) {
-    await vscode18.commands.executeCommand("dabbler.trySampleProject");
+    await vscode19.commands.executeCommand("dabbler.trySampleProject");
   }
 }
 
 // src/commands/gitWorkflow.ts
-var vscode21 = __toESM(require("vscode"));
+var vscode22 = __toESM(require("vscode"));
 var cp4 = __toESM(require("child_process"));
 var fs20 = __toESM(require("fs"));
 var path26 = __toESM(require("path"));
 
 // src/utils/gitHost.ts
-var vscode19 = __toESM(require("vscode"));
+var vscode20 = __toESM(require("vscode"));
 var GIT_SUFFIX = /\.git$/i;
 function stripGitSuffix(s) {
   return s.replace(GIT_SUFFIX, "");
@@ -27540,7 +27712,7 @@ function resolveGitHostFromUrl(url, setting) {
   return auto.kind === "azure-devops" ? auto : { kind: "unknown", host: auto.host, owner: "", repo: "" };
 }
 function gitHostSetting() {
-  const v = vscode19.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
+  const v = vscode20.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
   return v === "github" || v === "azure-devops" ? v : "auto";
 }
 function createPrWebUrl(info, branch, targetBranch) {
@@ -27577,7 +27749,7 @@ function adoPrWebUrl(info, prId) {
 // src/utils/hostCli.ts
 var fs19 = __toESM(require("fs"));
 var path25 = __toESM(require("path"));
-var vscode20 = __toESM(require("vscode"));
+var vscode21 = __toESM(require("vscode"));
 var realExists3 = (p2) => {
   try {
     return fs19.statSync(p2).isFile();
@@ -27626,7 +27798,7 @@ function probeHostCliCore(command, explicitSetting, workspaceRoot2, env10 = proc
   return found ? { present: true, resolved: found } : { present: false, resolved: null };
 }
 function explicitCliPathSetting(key) {
-  const inspected = vscode20.workspace.getConfiguration("dabblerSessionSets").inspect(key);
+  const inspected = vscode21.workspace.getConfiguration("dabblerSessionSets").inspect(key);
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
@@ -27688,24 +27860,24 @@ function defaultRunner() {
 function defaultUi3() {
   return {
     confirm: async (message, detail, button) => {
-      const picked = await vscode21.window.showWarningMessage(
+      const picked = await vscode22.window.showWarningMessage(
         message,
         { modal: true, detail },
         button
       );
       return picked === button;
     },
-    showInputBox: vscode21.window.showInputBox,
+    showInputBox: vscode22.window.showInputBox,
     showQuickPickLabels: (labels, placeHolder) => Promise.resolve(
-      vscode21.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
+      vscode22.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
     ),
-    showInfo: (m) => void vscode21.window.showInformationMessage(m),
-    showWarning: (m) => void vscode21.window.showWarningMessage(m),
-    showError: (m) => void vscode21.window.showErrorMessage(m),
+    showInfo: (m) => void vscode22.window.showInformationMessage(m),
+    showWarning: (m) => void vscode22.window.showWarningMessage(m),
+    showError: (m) => void vscode22.window.showErrorMessage(m),
     openExternal: async (url) => {
-      await vscode21.env.openExternal(vscode21.Uri.parse(url));
+      await vscode22.env.openExternal(vscode22.Uri.parse(url));
     },
-    workspaceRoot: () => vscode21.workspace.workspaceFolders?.[0]?.uri.fsPath
+    workspaceRoot: () => vscode22.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 var SESSION_BRANCH_PREFIX = "session-set/";
@@ -28172,17 +28344,17 @@ ${notes.join("\n")}`);
 }
 function registerGitWorkflowCommands(context) {
   context.subscriptions.push(
-    vscode21.commands.registerCommand("dabbler.openPrForSet", async () => {
+    vscode22.commands.registerCommand("dabbler.openPrForSet", async () => {
       await runOpenPrFlow({ ui: defaultUi3(), run: defaultRunner() });
     }),
-    vscode21.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
+    vscode22.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
       await runFinalizeMergedSetFlow({ ui: defaultUi3(), run: defaultRunner() });
     })
   );
 }
 
 // src/commands/gitRelease.ts
-var vscode22 = __toESM(require("vscode"));
+var vscode23 = __toESM(require("vscode"));
 var HOTFIX_BRANCH_PREFIX = "hotfix/";
 var REF_VISIBLE_UNSAFE = /[ ~^:?*[\\]/;
 function refNameProblem(name, kind) {
@@ -28502,28 +28674,28 @@ ${(checkedOut.stderr || checkedOut.stdout).trim()}`);
 function registerGitReleaseCommands(context) {
   const deps = () => ({ ui: defaultUi3(), run: defaultRunner() });
   context.subscriptions.push(
-    vscode22.commands.registerCommand("dabbler.cutReleaseTag", async () => {
+    vscode23.commands.registerCommand("dabbler.cutReleaseTag", async () => {
       await runCutReleaseTagFlow(deps());
     }),
-    vscode22.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
+    vscode23.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
       await runStartHotfixFromTagFlow(deps());
     }),
-    vscode22.commands.registerCommand("dabbler.rollBackToTag", async () => {
+    vscode23.commands.registerCommand("dabbler.rollBackToTag", async () => {
       await runRollBackToTagFlow(deps());
     })
   );
 }
 
 // src/commands/troubleshoot.ts
-var vscode23 = __toESM(require("vscode"));
+var vscode24 = __toESM(require("vscode"));
 var fs21 = __toESM(require("fs"));
 var path27 = __toESM(require("path"));
 var cp5 = __toESM(require("child_process"));
 function workspaceRoot() {
-  return vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return vscode24.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 function outputChannel() {
-  return vscode23.window.createOutputChannel("Dabbler Diagnostics");
+  return vscode24.window.createOutputChannel("Dabbler Diagnostics");
 }
 function checkActivation() {
   const ch = outputChannel();
@@ -28637,7 +28809,7 @@ function checkLayout() {
 }
 function registerTroubleshootCommand(context) {
   context.subscriptions.push(
-    vscode23.commands.registerCommand("dabbler.troubleshoot", async () => {
+    vscode24.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items = [
         {
           label: "$(warning) Extension not activating",
@@ -28670,7 +28842,7 @@ function registerTroubleshootCommand(context) {
           run: checkLayout
         }
       ];
-      const picked = await vscode23.window.showQuickPick(
+      const picked = await vscode24.window.showQuickPick(
         items.map((i2) => ({ label: i2.label, detail: i2.detail, _run: i2.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
@@ -28681,16 +28853,16 @@ function registerTroubleshootCommand(context) {
 }
 
 // src/commands/cancelLifecycleCommands.ts
-var vscode24 = __toESM(require("vscode"));
+var vscode25 = __toESM(require("vscode"));
 function registerCancelLifecycleCommands(context, deps) {
   context.subscriptions.push(
-    vscode24.commands.registerCommand(
+    vscode25.commands.registerCommand(
       "dabblerSessionSets.cancel",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode24.window.showInformationMessage(
+        const choice = await vscode25.window.showInformationMessage(
           `Cancel session set "${set.name}"?`,
           { modal: true, detail: "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later." },
           "Cancel Session Set",
@@ -28698,7 +28870,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Cancel Session Set")
           return;
-        const reason = await vscode24.window.showInputBox({
+        const reason = await vscode25.window.showInputBox({
           prompt: `Reason for cancelling "${set.name}" (optional)`,
           placeHolder: "e.g. scope rolled into another set",
           ignoreFocusOut: true
@@ -28706,24 +28878,24 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await cancelSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode24.window.showErrorMessage(
+          vscode25.window.showErrorMessage(
             `Failed to cancel "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode24.window.showInformationMessage(
+        vscode25.window.showInformationMessage(
           `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`
         );
       }
     ),
-    vscode24.commands.registerCommand(
+    vscode25.commands.registerCommand(
       "dabblerSessionSets.restore",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode24.window.showInformationMessage(
+        const choice = await vscode25.window.showInformationMessage(
           `Restore session set "${set.name}"?`,
           { modal: true, detail: "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status." },
           "Restore",
@@ -28731,7 +28903,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Restore")
           return;
-        const reason = await vscode24.window.showInputBox({
+        const reason = await vscode25.window.showInputBox({
           prompt: `Reason for restoring "${set.name}" (optional)`,
           placeHolder: "e.g. scope is back in plan",
           ignoreFocusOut: true
@@ -28739,13 +28911,13 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await restoreSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode24.window.showErrorMessage(
+          vscode25.window.showErrorMessage(
             `Failed to restore "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode24.window.showInformationMessage(
+        vscode25.window.showInformationMessage(
           `Restored "${set.name}". RESTORED.md kept as audit trail.`
         );
       }
@@ -28756,26 +28928,26 @@ function registerCancelLifecycleCommands(context, deps) {
 // src/commands/copilotSeatSetupCommand.ts
 var fs22 = __toESM(require("fs"));
 var path28 = __toESM(require("path"));
-var vscode25 = __toESM(require("vscode"));
+var vscode26 = __toESM(require("vscode"));
 function registerCopilotSeatSetupCommand(context) {
   context.subscriptions.push(
-    vscode25.commands.registerCommand(
+    vscode26.commands.registerCommand(
       "dabblerSessionSets.setUpCopilotSeat",
       () => runSetUpCopilotSeat(context)
     )
   );
 }
 async function runSetUpCopilotSeat(context) {
-  const root = vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode25.window.showErrorMessage(
+    vscode26.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Set Up Copilot Seat."
     );
     return;
   }
   const venvPath = path28.join(root, ".venv");
   if (!fs22.existsSync(venvPath)) {
-    vscode25.window.showErrorMessage(
+    vscode26.window.showErrorMessage(
       'No .venv found in this workspace \u2014 run "Build project structure" (Getting Started form) or "Dabbler: Install ai-router" first, then re-run this command.'
     );
     return;
@@ -28785,15 +28957,15 @@ async function runSetUpCopilotSeat(context) {
 }
 
 // src/commands/newModule.ts
-var vscode26 = __toESM(require("vscode"));
+var vscode27 = __toESM(require("vscode"));
 var path29 = __toESM(require("path"));
 function defaultUi4() {
   return {
-    showInputBox: vscode26.window.showInputBox,
-    showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode26.window.showErrorMessage(m),
-    openFile: (absPath) => vscode26.commands.executeCommand("vscode.open", vscode26.Uri.file(absPath)),
-    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInputBox: vscode27.window.showInputBox,
+    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
+    openFile: (absPath) => vscode27.commands.executeCommand("vscode.open", vscode27.Uri.file(absPath)),
+    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 async function runNewModuleFlow(ui = defaultUi4()) {
@@ -28851,18 +29023,18 @@ async function runNewModuleFlow(ui = defaultUi4()) {
 }
 function registerNewModuleCommand(context) {
   context.subscriptions.push(
-    vscode26.commands.registerCommand("dabbler.newModule", async () => {
+    vscode27.commands.registerCommand("dabbler.newModule", async () => {
       await runNewModuleFlow();
     })
   );
 }
 
 // src/commands/assignLegacySets.ts
-var vscode27 = __toESM(require("vscode"));
+var vscode28 = __toESM(require("vscode"));
 function defaultUi5() {
   return {
     pickTargetModule: async (entries) => {
-      const picked = await vscode27.window.showQuickPick(
+      const picked = await vscode28.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -28876,7 +29048,7 @@ function defaultUi5() {
       return picked?.entry;
     },
     pickSets: async (candidates) => {
-      const picked = await vscode27.window.showQuickPick(
+      const picked = await vscode28.window.showQuickPick(
         candidates.map((s) => ({ label: s.name, set: s })),
         {
           placeHolder: "Select the legacy (unassigned) sets to assign",
@@ -28886,9 +29058,9 @@ function defaultUi5() {
       );
       return picked?.map((p2) => p2.set);
     },
-    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
-    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    showInformationMessage: (m) => vscode28.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode28.window.showErrorMessage(m),
+    workspaceRoot: () => vscode28.workspace.workspaceFolders?.[0]?.uri.fsPath,
     readSets: () => readAllSessionSets()
   };
 }
@@ -28960,7 +29132,7 @@ async function runAssignLegacySetsFlow(ui = defaultUi5()) {
 }
 function registerAssignLegacySetsCommand(context) {
   context.subscriptions.push(
-    vscode27.commands.registerCommand(
+    vscode28.commands.registerCommand(
       "dabbler.assignLegacySetsToModule",
       async () => {
         await runAssignLegacySetsFlow();
@@ -28970,7 +29142,7 @@ function registerAssignLegacySetsCommand(context) {
 }
 
 // src/commands/renameModule.ts
-var vscode28 = __toESM(require("vscode"));
+var vscode29 = __toESM(require("vscode"));
 
 // src/providers/ActionRegistry.ts
 var inFlightLike = (s) => s.state === "in-progress" || s.state === "not-started";
@@ -29029,6 +29201,31 @@ var ROW_ACTIONS = [
     group: 902,
     category: "flat",
     when: (s) => isCancelled2(s)
+  }
+];
+var SESSION_ACTIONS = [
+  // Gated by `sessionOffersRunPrompt`, which reuses
+  // `planLeftClickActivation`'s set-level answer and adds "this row is the
+  // next runnable session". The prompt copied is the framework's own
+  // set-scoped trigger phrase, so the row that carries it must be the row
+  // that phrase resolves to.
+  {
+    id: "dabbler.copySessionRunPrompt",
+    label: "Copy Run Prompt",
+    group: 601,
+    when: (set, session) => sessionOffersRunPrompt(set, session)
+  },
+  // Unconditional ON PURPOSE. Knowing whether a session has artifacts
+  // means listing the set directory, and doing that per session row on the
+  // tree scan is the disk read Set 115's decision 4 forbids. The answer is
+  // computed on the click, and "none yet" is a sentence rather than a
+  // missing menu entry.
+  {
+    id: "dabblerSessionSets.openSessionArtifacts",
+    label: "Open Session Artifacts",
+    group: 602,
+    detail: "Files this session produced, discovered as s<N>-*",
+    when: () => true
   }
 ];
 
@@ -29548,6 +29745,11 @@ function setDescriptor(set, supports) {
 function sessionDescriptor(node) {
   const { session } = node;
   const steps = stepNodes(node);
+  const tokens = [NODE_TOKEN.session, `session-${session.status}`];
+  for (const action of SESSION_ACTIONS) {
+    if (action.when(node.set, session))
+      tokens.push(actionToken(action));
+  }
   return {
     id: `session:${node.set.name}/${session.number}`,
     label: session.title || `Session ${session.number}`,
@@ -29556,7 +29758,7 @@ function sessionDescriptor(node) {
     description: session.status === "in-progress" ? "in flight" : void 0,
     tooltip: sessionTooltip(node, steps.length),
     icon: sessionIcon(session.status),
-    contextValue: tokenString([NODE_TOKEN.session, `session-${session.status}`]),
+    contextValue: tokenString(tokens),
     // Collapsed only when there is something under it. A session with no
     // steps to show — every session that is not in flight, and an
     // in-flight one whose activity log is absent or unreadable — is a
@@ -29620,7 +29822,7 @@ function descriptorFor(node, supports) {
 function defaultUi6() {
   return {
     pickModule: async (entries) => {
-      const picked = await vscode28.window.showQuickPick(
+      const picked = await vscode29.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -29630,28 +29832,28 @@ function defaultUi6() {
       );
       return picked?.entry;
     },
-    promptNewSlug: (currentSlug, validate) => vscode28.window.showInputBox({
+    promptNewSlug: (currentSlug, validate) => vscode29.window.showInputBox({
       prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
       value: currentSlug,
       ignoreFocusOut: true,
       validateInput: (v) => validate(v) ?? null
     }),
-    promptNewTitle: (currentTitle) => vscode28.window.showInputBox({
+    promptNewTitle: (currentTitle) => vscode29.window.showInputBox({
       prompt: "New module title (display name) \u2014 leave unchanged to keep it",
       value: currentTitle,
       ignoreFocusOut: true
     }),
     confirm: async (summary, detail) => {
-      const choice = await vscode28.window.showWarningMessage(
+      const choice = await vscode29.window.showWarningMessage(
         summary,
         { modal: true, detail },
         "Rename Module"
       );
       return choice === "Rename Module";
     },
-    showInformationMessage: (m) => vscode28.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode28.window.showErrorMessage(m),
-    workspaceRoot: () => vscode28.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    showInformationMessage: (m) => vscode29.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode29.window.showErrorMessage(m),
+    workspaceRoot: () => vscode29.workspace.workspaceFolders?.[0]?.uri.fsPath,
     readSets: () => readAllSessionSets()
   };
 }
@@ -29754,18 +29956,18 @@ Every file is rewritten transactionally; any failure rolls the whole change back
 }
 function registerRenameModuleCommand(context) {
   context.subscriptions.push(
-    vscode28.commands.registerCommand("dabbler.renameModule", async (arg) => {
+    vscode29.commands.registerCommand("dabbler.renameModule", async (arg) => {
       await runRenameModuleFlow(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
 // src/commands/deleteModule.ts
-var vscode29 = __toESM(require("vscode"));
+var vscode30 = __toESM(require("vscode"));
 function defaultUi7() {
   return {
     pickModule: async (entries) => {
-      const picked = await vscode29.window.showQuickPick(
+      const picked = await vscode30.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -29776,16 +29978,16 @@ function defaultUi7() {
       return picked?.entry;
     },
     confirm: async (summary, detail) => {
-      const choice = await vscode29.window.showWarningMessage(
+      const choice = await vscode30.window.showWarningMessage(
         summary,
         { modal: true, detail },
         "Delete Module"
       );
       return choice === "Delete Module";
     },
-    showInformationMessage: (m) => vscode29.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode29.window.showErrorMessage(m),
-    workspaceRoot: () => vscode29.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: (m) => vscode30.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode30.window.showErrorMessage(m),
+    workspaceRoot: () => vscode30.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 function summarizeGroup(label, names) {
@@ -29860,14 +30062,14 @@ Re-declaring "${target.slug}" later restores this grouping for any untouched his
 }
 function registerDeleteModuleCommand(context) {
   context.subscriptions.push(
-    vscode29.commands.registerCommand("dabbler.deleteModule", async (arg) => {
+    vscode30.commands.registerCommand("dabbler.deleteModule", async (arg) => {
       await runDeleteModuleFlow(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
 // src/wizard/planImport.ts
-var vscode30 = __toESM(require("vscode"));
+var vscode31 = __toESM(require("vscode"));
 var fs23 = __toESM(require("fs"));
 var path30 = __toESM(require("path"));
 var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
@@ -29895,14 +30097,14 @@ Format as a clean Markdown document I can save as ${destPosix}.`;
 }
 function defaultUi8() {
   return {
-    showOpenDialog: vscode30.window.showOpenDialog,
-    showWarningMessage: vscode30.window.showWarningMessage,
-    showInformationMessage: vscode30.window.showInformationMessage,
-    showErrorMessage: vscode30.window.showErrorMessage,
-    showQuickPick: (items, opts) => vscode30.window.showQuickPick(items, opts),
-    writeClipboard: (text) => vscode30.env.clipboard.writeText(text),
-    executeCommand: (command, ...args) => vscode30.commands.executeCommand(command, ...args),
-    workspaceRoot: () => vscode30.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showOpenDialog: vscode31.window.showOpenDialog,
+    showWarningMessage: vscode31.window.showWarningMessage,
+    showInformationMessage: vscode31.window.showInformationMessage,
+    showErrorMessage: vscode31.window.showErrorMessage,
+    showQuickPick: (items, opts) => vscode31.window.showQuickPick(items, opts),
+    writeClipboard: (text) => vscode31.env.clipboard.writeText(text),
+    executeCommand: (command, ...args) => vscode31.commands.executeCommand(command, ...args),
+    workspaceRoot: () => vscode31.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 async function resolvePlanTarget(root, ui, opts) {
@@ -29987,7 +30189,7 @@ async function importPlanFromFile(ui = defaultUi8(), opts) {
     );
     return false;
   }
-  void ui.executeCommand("vscode.open", vscode30.Uri.file(destPath));
+  void ui.executeCommand("vscode.open", vscode31.Uri.file(destPath));
   void ui.showInformationMessage(
     `Plan imported to ${target.destPosix}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
   );
@@ -30021,12 +30223,12 @@ async function openModulePlan(ui = defaultUi8(), opts) {
     }
     return;
   }
-  await ui.executeCommand("vscode.open", vscode30.Uri.file(destPath));
+  await ui.executeCommand("vscode.open", vscode31.Uri.file(destPath));
 }
 function registerPlanImportCommand(context) {
   context.subscriptions.push(
-    vscode30.commands.registerCommand("dabbler.importPlan", async () => {
-      const action = await vscode30.window.showQuickPick(
+    vscode31.commands.registerCommand("dabbler.importPlan", async () => {
+      const action = await vscode31.window.showQuickPick(
         [
           { label: "$(file) Import existing plan from file", value: "file" },
           { label: "$(clippy) Get a prompt to create a plan with AI", value: "prompt" }
@@ -30043,14 +30245,14 @@ function registerPlanImportCommand(context) {
     })
   );
   context.subscriptions.push(
-    vscode30.commands.registerCommand("dabbler.openModulePlan", async (arg) => {
+    vscode31.commands.registerCommand("dabbler.openModulePlan", async (arg) => {
       await openModulePlan(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
 // src/wizard/sessionGenPrompt.ts
-var vscode31 = __toESM(require("vscode"));
+var vscode32 = __toESM(require("vscode"));
 var fs24 = __toESM(require("fs"));
 var path31 = __toESM(require("path"));
 var PLAN_PATH = path31.join("docs", "planning", "project-plan.md");
@@ -30149,17 +30351,17 @@ intentionally NOT inlined here. Decompose the plan it describes into session
 sets per the rules above.`;
 }
 async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
-  const root = vscode31.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode32.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    void vscode31.window.showErrorMessage("No workspace folder is open.");
+    void vscode32.window.showErrorMessage("No workspace folder is open.");
     return false;
   }
   const modulePick = await pickModuleForAuthoring(
     root,
     {
-      showQuickPick: (items, opts) => vscode31.window.showQuickPick(items, opts),
-      showInformationMessage: (m) => vscode31.window.showInformationMessage(m),
-      showErrorMessage: (m) => vscode31.window.showErrorMessage(m)
+      showQuickPick: (items, opts) => vscode32.window.showQuickPick(items, opts),
+      showInformationMessage: (m) => vscode32.window.showInformationMessage(m),
+      showErrorMessage: (m) => vscode32.window.showErrorMessage(m)
     },
     pickOpts && pickOpts.preselectedSlug !== void 0 ? { preselectedSlug: pickOpts.preselectedSlug } : void 0
   );
@@ -30173,19 +30375,19 @@ async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
   const planRelPosix = moduleOpt?.planPath ?? PLAN_REL_POSIX;
   const planPath = path31.join(root, ...planRelPosix.split("/"));
   if (!fs24.existsSync(planPath)) {
-    const action = await vscode31.window.showWarningMessage(
+    const action = await vscode32.window.showWarningMessage(
       moduleOpt ? `No project plan found at ${planRelPosix} for module "${moduleOpt.slug}". Create it (the New Module command writes a stub) or import one first?` : `No project plan found at ${PLAN_PATH}. Import one first?`,
       "Import Plan"
     );
     if (action === "Import Plan")
-      void vscode31.commands.executeCommand("dabbler.importPlan");
+      void vscode32.commands.executeCommand("dabbler.importPlan");
     return false;
   }
   let bundle;
   try {
     bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
-    void vscode31.window.showErrorMessage(
+    void vscode32.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
     );
     return false;
@@ -30195,8 +30397,8 @@ async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
     module: moduleOpt
   };
   const prompt = buildSessionGenPrompt(bundle, resolved);
-  await vscode31.env.clipboard.writeText(prompt);
-  void vscode31.window.showInformationMessage(
+  await vscode32.env.clipboard.writeText(prompt);
+  void vscode32.window.showInformationMessage(
     "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
     { modal: false }
   );
@@ -30204,7 +30406,7 @@ async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
 }
 function registerSessionGenPromptCommand(context) {
   context.subscriptions.push(
-    vscode31.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
+    vscode32.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
       await copySessionSetGenPrompt(context);
     }),
     // Set 094 S2 (verdict amendment 7): the shelved parallel-sets UI's escape
@@ -30213,7 +30415,7 @@ function registerSessionGenPromptCommand(context) {
     // multiple-branches-in-one-module case (routed ruling 1a, chosen over a
     // sticky `parallelHint` setting). The `prerequisites:` machinery + worktree
     // tooling it references are untouched — this is UI shelving, reversible.
-    vscode31.commands.registerCommand(
+    vscode32.commands.registerCommand(
       "dabbler.generateParallelSessionSetPrompt",
       async () => {
         await copySessionSetGenPrompt(context, { parallel: true });
@@ -30223,7 +30425,7 @@ function registerSessionGenPromptCommand(context) {
 }
 
 // src/dashboard/CostDashboard.ts
-var vscode32 = __toESM(require("vscode"));
+var vscode33 = __toESM(require("vscode"));
 var fs27 = __toESM(require("fs"));
 var path33 = __toESM(require("path"));
 
@@ -30496,17 +30698,17 @@ function getNonce() {
 var CostDashboard = class _CostDashboard {
   static show(extensionUri) {
     if (_CostDashboard.currentPanel) {
-      _CostDashboard.currentPanel._panel.reveal(vscode32.ViewColumn.Two);
+      _CostDashboard.currentPanel._panel.reveal(vscode33.ViewColumn.Two);
       _CostDashboard.currentPanel._refresh();
       return;
     }
-    const panel = vscode32.window.createWebviewPanel(
+    const panel = vscode33.window.createWebviewPanel(
       "dabblerCostDashboard",
       "Dabbler \u2014 Cost Dashboard",
-      vscode32.ViewColumn.Two,
+      vscode33.ViewColumn.Two,
       {
         enableScripts: true,
-        localResourceRoots: [vscode32.Uri.joinPath(extensionUri, "webview")]
+        localResourceRoots: [vscode33.Uri.joinPath(extensionUri, "webview")]
       }
     );
     _CostDashboard.currentPanel = new _CostDashboard(panel, extensionUri);
@@ -30533,9 +30735,9 @@ var CostDashboard = class _CostDashboard {
     this._panel.webview.html = this._getHtml();
   }
   _exportCsv() {
-    const root = vscode32.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode33.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
-      vscode32.window.showErrorMessage("No workspace folder open.");
+      vscode33.window.showErrorMessage("No workspace folder open.");
       return;
     }
     const entries = readMetrics(root);
@@ -30543,37 +30745,37 @@ var CostDashboard = class _CostDashboard {
     const outPath = path33.join(root, "ai_router", "cost-export.csv");
     try {
       fs27.writeFileSync(outPath, csv, "utf8");
-      vscode32.commands.executeCommand("vscode.open", vscode32.Uri.file(outPath));
+      vscode33.commands.executeCommand("vscode.open", vscode33.Uri.file(outPath));
     } catch (err) {
-      vscode32.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
+      vscode33.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   async _openRouterConfig(anchor) {
-    const root = vscode32.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode33.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!root) {
-      vscode32.window.showErrorMessage("No workspace folder open.");
+      vscode33.window.showErrorMessage("No workspace folder open.");
       return;
     }
     const info = readRouterConfig(root);
     if (!info) {
-      vscode32.window.showErrorMessage("No ai_router/router-config.yaml found in this workspace.");
+      vscode33.window.showErrorMessage("No ai_router/router-config.yaml found in this workspace.");
       return;
     }
     try {
-      const doc = await vscode32.workspace.openTextDocument(info.configPath);
-      const editor = await vscode32.window.showTextDocument(doc, vscode32.ViewColumn.One);
+      const doc = await vscode33.workspace.openTextDocument(info.configPath);
+      const editor = await vscode33.window.showTextDocument(doc, vscode33.ViewColumn.One);
       const line = findConfigAnchorLine(doc.getText(), anchor);
       if (line >= 0) {
-        const pos = new vscode32.Position(line, 0);
-        editor.selection = new vscode32.Selection(pos, pos);
-        editor.revealRange(new vscode32.Range(pos, pos), vscode32.TextEditorRevealType.AtTop);
+        const pos = new vscode33.Position(line, 0);
+        editor.selection = new vscode33.Selection(pos, pos);
+        editor.revealRange(new vscode33.Range(pos, pos), vscode33.TextEditorRevealType.AtTop);
       }
     } catch (err) {
-      vscode32.window.showErrorMessage(`Could not open router-config.yaml: ${err instanceof Error ? err.message : String(err)}`);
+      vscode33.window.showErrorMessage(`Could not open router-config.yaml: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   _getHtml() {
-    const root = vscode32.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode33.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const nonce = getNonce();
     const cspSource = this._panel.webview.cspSource;
     if (!root) {
@@ -30599,7 +30801,7 @@ var CostDashboard = class _CostDashboard {
     const summary = summarizeMetrics(entries);
     const sparkline = buildSparkline(summary.dailyCosts);
     const banner = stalenessBannerHtml(computeStaleness(info));
-    const htmlPath = vscode32.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
+    const htmlPath = vscode33.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
     try {
       let html = fs27.readFileSync(htmlPath.fsPath, "utf8");
       const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
@@ -30621,7 +30823,7 @@ var CostDashboard = class _CostDashboard {
 };
 function registerCostDashboardCommand(context) {
   context.subscriptions.push(
-    vscode32.commands.registerCommand("dabbler.showCostDashboard", () => {
+    vscode33.commands.registerCommand("dabbler.showCostDashboard", () => {
       CostDashboard.show(context.extensionUri);
     })
   );
@@ -30629,7 +30831,7 @@ function registerCostDashboardCommand(context) {
 
 // src/configEditor/ConfigEditorPanel.ts
 var cp6 = __toESM(require("child_process"));
-var vscode33 = __toESM(require("vscode"));
+var vscode34 = __toESM(require("vscode"));
 var fs29 = __toESM(require("fs"));
 var path34 = __toESM(require("path"));
 
@@ -31695,23 +31897,23 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
   }
   static createOrShow(context) {
     if (_ConfigEditorPanel.currentPanel) {
-      _ConfigEditorPanel.currentPanel._panel.reveal(vscode33.ViewColumn.One);
+      _ConfigEditorPanel.currentPanel._panel.reveal(vscode34.ViewColumn.One);
       _ConfigEditorPanel.currentPanel._refresh();
       return;
     }
-    const panel = vscode33.window.createWebviewPanel(
+    const panel = vscode34.window.createWebviewPanel(
       "dabblerConfigEditor",
       "Dabbler Config Editor",
-      vscode33.ViewColumn.One,
+      vscode34.ViewColumn.One,
       {
         enableScripts: true,
-        localResourceRoots: [vscode33.Uri.joinPath(context.extensionUri, "webview")]
+        localResourceRoots: [vscode34.Uri.joinPath(context.extensionUri, "webview")]
       }
     );
     _ConfigEditorPanel.currentPanel = new _ConfigEditorPanel(panel, context.extensionUri);
   }
   _findAiRouterDir() {
-    const roots = vscode33.workspace.workspaceFolders;
+    const roots = vscode34.workspace.workspaceFolders;
     if (!roots?.length)
       return null;
     for (const folder of roots) {
@@ -31853,21 +32055,21 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
   }
   _handleSave(payload) {
     if (!this._loaded) {
-      vscode33.window.showErrorMessage("No config files loaded.");
+      vscode34.window.showErrorMessage("No config files loaded.");
       return;
     }
     if (this._parseIssues.length > 0) {
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Save aborted \u2014 ${this._parseIssues.length} YAML parse error(s). Fix the parse errors in the source files before saving.`
       );
       return;
     }
     if (!payload) {
-      vscode33.window.showErrorMessage("Save aborted \u2014 no payload from webview.");
+      vscode34.window.showErrorMessage("Save aborted \u2014 no payload from webview.");
       return;
     }
     if (!this._loaded.routerConfigDoc || !this._loaded.budgetDoc) {
-      vscode33.window.showErrorMessage("Save aborted \u2014 required config files are missing.");
+      vscode34.window.showErrorMessage("Save aborted \u2014 required config files are missing.");
       return;
     }
     const routerClone = parseDocumentFromText(this._loaded.routerConfigDoc.toString());
@@ -31877,7 +32079,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
     try {
       applyResult = applyPatch(routerClone, budgetClone, localClone, payload);
     } catch (err) {
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Save aborted \u2014 patch application failed: ${err instanceof Error ? err.message : String(err)}`
       );
       return;
@@ -31888,7 +32090,7 @@ var ConfigEditorPanel = class _ConfigEditorPanel {
     const validation = validateBatch({ routerConfig: routerObj, budget: budgetObj, localOverrides: localObj });
     if (!validation.valid) {
       const msgs = validation.errors.map((e) => `${e.file}${e.path}: ${e.message}`).join("\n");
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Save aborted \u2014 ${validation.errors.length} validation error(s):
 ${msgs}`,
         { modal: false }
@@ -31943,7 +32145,7 @@ ${msgs}`,
         workspaceRoot2
       );
       if (!ignored.ok) {
-        vscode33.window.showWarningMessage(
+        vscode34.window.showWarningMessage(
           `Saving ${LOCAL_OVERRIDES_REL}, but could not confirm it is git-ignored (${ignored.reason}). Add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing \u2014 these are per-machine settings.`
         );
       }
@@ -31958,26 +32160,26 @@ ${msgs}`,
       }
       this._recovery = { succeeded, failed, drifted: [], pendingContents };
       this._refresh();
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Partial save \u2014 ${succeeded.length} file(s) saved, ${failed.length} failed. See the recovery banner in the editor.`
       );
       return;
     }
     if (failed.length > 0) {
       this._refresh();
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Save failed: ${failed.map((f) => `${f.file}: ${f.reason}`).join("; ")}`
       );
       return;
     }
     this._lastSaveSnapshot = this._captureSnapshot(applyResult.routerConfigChanged, applyResult.budgetChanged, shouldWriteLocal);
     if (applyResult.warnings.length > 0) {
-      vscode33.window.showWarningMessage(applyResult.warnings.join(" "));
+      vscode34.window.showWarningMessage(applyResult.warnings.join(" "));
     }
     if (applyResult.routerConfigChanged || applyResult.budgetChanged || applyResult.localOverridesChanged) {
-      vscode33.window.showInformationMessage("Dabbler config saved.");
+      vscode34.window.showInformationMessage("Dabbler config saved.");
     } else {
-      vscode33.window.showInformationMessage("No changes to save.");
+      vscode34.window.showInformationMessage("No changes to save.");
     }
     this._refresh();
   }
@@ -32064,7 +32266,7 @@ ${msgs}`,
         }
       }
       this._recovery = null;
-      vscode33.window.showInformationMessage("Retry succeeded \u2014 all files saved.");
+      vscode34.window.showInformationMessage("Retry succeeded \u2014 all files saved.");
     } else {
       this._recovery = {
         succeeded: newSucceeded,
@@ -32072,7 +32274,7 @@ ${msgs}`,
         drifted: [],
         pendingContents: remainingPending
       };
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Retry partial \u2014 ${stillFailed.length} file(s) still failing.`
       );
     }
@@ -32089,11 +32291,11 @@ ${msgs}`,
       };
     }
     this._refresh();
-    vscode33.window.showInformationMessage("On-disk state accepted as new baseline.");
+    vscode34.window.showInformationMessage("On-disk state accepted as new baseline.");
   }
   _reapplyLastSave() {
     if (!this._lastSaveSnapshot || !this._loaded) {
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         "Re-apply unavailable \u2014 no last-saved snapshot exists in this session."
       );
       return;
@@ -32140,30 +32342,30 @@ ${msgs}`,
       }
       this._recovery = { succeeded, failed, drifted: [], pendingContents: failedPending };
       this._refresh();
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Re-apply partial \u2014 ${succeeded.length} file(s) restored, ${failed.length} failed. See the recovery banner.`
       );
       return;
     }
     if (failed.length > 0) {
       this._refresh();
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Re-apply failed: ${failed.map((f) => `${f.file}: ${f.reason}`).join("; ")}`
       );
       return;
     }
     this._recovery = null;
     this._lastSaveSnapshot = { ...this._lastSaveSnapshot, at: Date.now() };
-    vscode33.window.showInformationMessage("Last-saved state re-applied to disk.");
+    vscode34.window.showInformationMessage("Last-saved state re-applied to disk.");
     this._refresh();
   }
   async _runFlagDecisionCommand() {
-    await vscode33.commands.executeCommand("dabbler.flagDecisionForReview");
+    await vscode34.commands.executeCommand("dabbler.flagDecisionForReview");
   }
   _handleTestNotification() {
     const aiRouterDir = this._findAiRouterDir();
     if (!aiRouterDir) {
-      vscode33.window.showErrorMessage("No ai_router/ directory found in the workspace.");
+      vscode34.window.showErrorMessage("No ai_router/ directory found in the workspace.");
       return;
     }
     const localObj = this._loaded?.localOverridesDoc?.toJSON() ?? null;
@@ -32173,13 +32375,13 @@ ${msgs}`,
     const apiKeyValue = process.env[apiKeyEnv];
     const userKeyValue = process.env[userKeyEnv];
     if (!apiKeyValue) {
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Pushover API key env var $${apiKeyEnv} is not set. Export it in your shell before running VS Code.`
       );
       return;
     }
     if (!userKeyValue) {
-      vscode33.window.showErrorMessage(
+      vscode34.window.showErrorMessage(
         `Pushover user key env var $${userKeyEnv} is not set. Export it in your shell before running VS Code.`
       );
       return;
@@ -32213,7 +32415,7 @@ ${msgs}`,
     });
     child.on("error", (err) => {
       spawnErrored = true;
-      vscode33.window.showErrorMessage(`Test notification failed \u2014 could not spawn Python: ${err.message}`);
+      vscode34.window.showErrorMessage(`Test notification failed \u2014 could not spawn Python: ${err.message}`);
     });
     child.on("close", () => {
       if (spawnErrored)
@@ -32223,21 +32425,21 @@ ${msgs}`,
       try {
         const result = JSON.parse(stdout.trim());
         if (result.ok) {
-          vscode33.window.showInformationMessage(
+          vscode34.window.showInformationMessage(
             `Pushover test notification sent. Request ID: ${result.request_id ?? "(unknown)"}`
           );
         } else {
-          vscode33.window.showErrorMessage(`Test notification failed: ${result.error ?? "unknown error"}`);
+          vscode34.window.showErrorMessage(`Test notification failed: ${result.error ?? "unknown error"}`);
         }
       } catch {
         if (isAiRouterNotInstalled(stderr)) {
-          vscode33.window.showErrorMessage(
+          vscode34.window.showErrorMessage(
             `Test notification failed \u2014 ${describeAiRouterImportFailure(pythonPath)}`
           );
           return;
         }
         const detail = stderr.trim() || stdout.trim() || "no output";
-        vscode33.window.showErrorMessage(`Test notification failed \u2014 unexpected Python output: ${detail}`);
+        vscode34.window.showErrorMessage(`Test notification failed \u2014 unexpected Python output: ${detail}`);
       }
     });
   }
@@ -32246,13 +32448,13 @@ ${msgs}`,
       return;
     const target = this._loaded.localOverridesPath;
     if (!fs29.existsSync(target)) {
-      vscode33.window.showInformationMessage(
+      vscode34.window.showInformationMessage(
         "local-overrides.yaml does not exist yet. Save any per-operator override and the file is created automatically."
       );
       return;
     }
-    const doc = await vscode33.workspace.openTextDocument(target);
-    await vscode33.window.showTextDocument(doc);
+    const doc = await vscode34.workspace.openTextDocument(target);
+    await vscode34.window.showTextDocument(doc);
   }
   _refresh() {
     this._loadFiles();
@@ -32627,7 +32829,7 @@ ${msgs}`,
 };
 function registerConfigEditorCommand(context) {
   context.subscriptions.push(
-    vscode33.commands.registerCommand("dabbler.openConfigEditor", () => {
+    vscode34.commands.registerCommand("dabbler.openConfigEditor", () => {
       ConfigEditorPanel.createOrShow(context);
     })
   );
@@ -32637,7 +32839,7 @@ function escapeHtml3(str) {
 }
 
 // src/commands/flagDecisionForReview.ts
-var vscode34 = __toESM(require("vscode"));
+var vscode35 = __toESM(require("vscode"));
 var path36 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
@@ -32661,17 +32863,17 @@ function findActiveSessionSetDir(provider) {
 // src/commands/flagDecisionForReview.ts
 function registerFlagDecisionForReview(context) {
   context.subscriptions.push(
-    vscode34.commands.registerCommand(
+    vscode35.commands.registerCommand(
       "dabbler.flagDecisionForReview",
       async () => {
         const activeDir = findActiveSessionSetDir(readAllSessionSets);
         if (!activeDir) {
-          vscode34.window.showInformationMessage(
+          vscode35.window.showInformationMessage(
             "No active session set to flag against. Start a session set first (its state must be 'in-progress' for the flag to attach to it)."
           );
           return;
         }
-        const reason = await vscode34.window.showInputBox({
+        const reason = await vscode35.window.showInputBox({
           title: "Flag Decision for Cross-Provider Review",
           prompt: "One-line reason this decision should get a second-engine read at the next session start.",
           placeHolder: "e.g. budget-tier defaulting choice \u2014 confirm with Gemini before shipping",
@@ -32693,13 +32895,13 @@ function registerFlagDecisionForReview(context) {
           appendQueueEntry(activeDir, entry);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          vscode34.window.showErrorMessage(
+          vscode35.window.showErrorMessage(
             `Failed to append to decision-review queue: ${msg}`
           );
           return;
         }
         const slug = path36.basename(activeDir);
-        vscode34.window.showInformationMessage(
+        vscode35.window.showInformationMessage(
           `Flagged for cross-provider review in ${slug}/${QUEUE_FILENAME}. Will surface in the next session's planning checklist.`
         );
       }
@@ -32708,7 +32910,7 @@ function registerFlagDecisionForReview(context) {
 }
 
 // src/commands/scanAnnotationsForActiveSet.ts
-var vscode35 = __toESM(require("vscode"));
+var vscode36 = __toESM(require("vscode"));
 var fs32 = __toESM(require("fs"));
 var path38 = __toESM(require("path"));
 
@@ -32896,13 +33098,13 @@ function defaultReadYaml(absPath) {
 }
 function registerScanAnnotationsForActiveSet(context) {
   context.subscriptions.push(
-    vscode35.commands.registerCommand(
+    vscode36.commands.registerCommand(
       "dabbler.scanAnnotationsForActiveSet",
       async () => {
         const all = readAllSessionSets();
         const activeDir = findActiveSessionSetDir(() => all);
         if (!activeDir) {
-          vscode35.window.showInformationMessage(
+          vscode36.window.showInformationMessage(
             "No active session set to scan against. Start a session set first."
           );
           return;
@@ -32910,14 +33112,14 @@ function registerScanAnnotationsForActiveSet(context) {
         const activeSet = all.find((s) => s.dir === activeDir);
         const workspaceRoot2 = activeSet?.root ?? path38.dirname(path38.dirname(activeDir));
         if (!loadHonorAnnotationsToggle(workspaceRoot2, defaultReadYaml)) {
-          vscode35.window.showInformationMessage(
+          vscode36.window.showInformationMessage(
             "Annotation scanning is disabled for this project (local-overrides.yaml \u2192 decision_review.honor_annotations: false). No queue entries appended."
           );
           return;
         }
-        const uris = await vscode35.workspace.findFiles(
-          new vscode35.RelativePattern(workspaceRoot2, SCAN_GLOB),
-          new vscode35.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
+        const uris = await vscode36.workspace.findFiles(
+          new vscode36.RelativePattern(workspaceRoot2, SCAN_GLOB),
+          new vscode36.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
         );
         const filePaths = uris.map((u) => u.fsPath);
         const annotations = scanFilesForAnnotations(
@@ -32928,7 +33130,7 @@ function registerScanAnnotationsForActiveSet(context) {
         const fresh = deduplicateAnnotations(annotations, existing);
         if (fresh.length === 0) {
           const msg = annotations.length === 0 ? "No `@dabbler:outsource-review` annotations found in workspace." : `All ${annotations.length} annotation(s) already in the queue \u2014 nothing new appended.`;
-          vscode35.window.showInformationMessage(msg);
+          vscode36.window.showInformationMessage(msg);
           return;
         }
         try {
@@ -32937,13 +33139,13 @@ function registerScanAnnotationsForActiveSet(context) {
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          vscode35.window.showErrorMessage(
+          vscode36.window.showErrorMessage(
             `Failed to append annotation(s) to queue: ${msg}`
           );
           return;
         }
         const slug = path38.basename(activeDir);
-        vscode35.window.showInformationMessage(
+        vscode36.window.showInformationMessage(
           `Appended ${fresh.length} new annotation(s) to ${slug}/${QUEUE_FILENAME}.`
         );
       }
@@ -32955,18 +33157,18 @@ function registerScanAnnotationsForActiveSet(context) {
 var cp7 = __toESM(require("child_process"));
 var fs33 = __toESM(require("fs"));
 var path39 = __toESM(require("path"));
-var vscode36 = __toESM(require("vscode"));
+var vscode37 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
 function registerRegenerateNarrationTemplatesCommand(context) {
   context.subscriptions.push(
-    vscode36.commands.registerCommand(COMMAND_ID, async () => {
+    vscode37.commands.registerCommand(COMMAND_ID, async () => {
       await runRegenerate();
     })
   );
 }
 async function runRegenerate() {
-  if (!vscode36.workspace.workspaceFolders?.length) {
-    vscode36.window.showErrorMessage(
+  if (!vscode37.workspace.workspaceFolders?.length) {
+    vscode37.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Regenerate Narration Templates."
     );
     return;
@@ -32974,7 +33176,7 @@ async function runRegenerate() {
   const allSets = readAllSessionSets();
   const inProgress = allSets.filter((s) => s.state === "in-progress");
   if (inProgress.length === 0) {
-    vscode36.window.showInformationMessage(
+    vscode37.window.showInformationMessage(
       "No session set is in-progress. Start a session via `start_session` (or the orchestrator hook) before regenerating narration templates."
     );
     return;
@@ -32987,9 +33189,9 @@ async function runRegenerate() {
   fs33.mkdirSync(outDir, { recursive: true });
   const claudeOut = path39.join(outDir, "CLAUDE.md");
   const agentsOut = path39.join(outDir, "AGENTS.md");
-  const render7 = await vscode36.window.withProgress(
+  const render7 = await vscode37.window.withProgress(
     {
-      location: vscode36.ProgressLocation.Notification,
+      location: vscode37.ProgressLocation.Notification,
       title: `Regenerating narration templates for ${set.name}\u2026`,
       cancellable: false
     },
@@ -33014,7 +33216,7 @@ async function runRegenerate() {
     }
   );
   if (!render7.ok) {
-    vscode36.window.showErrorMessage(
+    vscode37.window.showErrorMessage(
       `Failed to render narration templates: ${render7.message}`
     );
     return;
@@ -33023,7 +33225,7 @@ async function runRegenerate() {
   const relAgents = path39.relative(set.root, agentsOut).replace(/\\/g, "/");
   const COPY_ACTION = "Copy to consumer workspace\u2026";
   const OPEN_ACTION = "Open Rendered CLAUDE.md";
-  const choice = await vscode36.window.showInformationMessage(
+  const choice = await vscode37.window.showInformationMessage(
     `Narration templates regenerated for ${set.name}: ${relClaude}, ${relAgents}.`,
     OPEN_ACTION,
     COPY_ACTION
@@ -33032,14 +33234,14 @@ async function runRegenerate() {
     await offerCopyToConsumerWorkspace(claudeOut, agentsOut);
   } else if (choice === OPEN_ACTION || choice === void 0) {
     try {
-      const doc = await vscode36.workspace.openTextDocument(claudeOut);
-      await vscode36.window.showTextDocument(doc, { preview: false });
+      const doc = await vscode37.workspace.openTextDocument(claudeOut);
+      await vscode37.window.showTextDocument(doc, { preview: false });
     } catch {
     }
   }
 }
 async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
-  const pick2 = await vscode36.window.showQuickPick(
+  const pick2 = await vscode37.window.showQuickPick(
     [
       { label: "Copy CLAUDE.md (for Claude Code consumers)", source: claudeOut, target: "CLAUDE.md" },
       { label: "Copy AGENTS.md (for Copilot CLI consumers)", source: agentsOut, target: "AGENTS.md" }
@@ -33048,7 +33250,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   );
   if (!pick2)
     return;
-  const dirUri = await vscode36.window.showOpenDialog({
+  const dirUri = await vscode37.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -33059,7 +33261,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   const destDir = dirUri[0].fsPath;
   const destPath = path39.join(destDir, pick2.target);
   if (fs33.existsSync(destPath)) {
-    const overwrite = await vscode36.window.showWarningMessage(
+    const overwrite = await vscode37.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
       "Overwrite"
@@ -33070,12 +33272,12 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   try {
     fs33.copyFileSync(pick2.source, destPath);
   } catch (err) {
-    vscode36.window.showErrorMessage(
+    vscode37.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
     );
     return;
   }
-  vscode36.window.showInformationMessage(
+  vscode37.window.showInformationMessage(
     `Copied ${pick2.target} to ${destDir}. The assistant will emit the session-start marker on its next launch in that workspace.`
   );
 }
@@ -33088,7 +33290,7 @@ async function pickSet(inProgress) {
     detail: path39.relative(s.root, s.dir).replace(/\\/g, "/"),
     set: s
   }));
-  const picked = await vscode36.window.showQuickPick(choices, {
+  const picked = await vscode37.window.showQuickPick(choices, {
     placeHolder: "Select the session set to regenerate narration templates for"
   });
   return picked?.set;
@@ -33142,14 +33344,14 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
 }
 
 // src/commands/resolveSetNumber.ts
-var vscode37 = __toESM(require("vscode"));
+var vscode38 = __toESM(require("vscode"));
 function registerResolveSetNumberCommand(context, deps = {}) {
   const readSets = deps.readSets ?? readAllSessionSets;
   context.subscriptions.push(
-    vscode37.commands.registerCommand(
+    vscode38.commands.registerCommand(
       "dabblerSessionSets.resolveSetNumber",
       async () => {
-        const raw = await vscode37.window.showInputBox({
+        const raw = await vscode38.window.showInputBox({
           title: "Resolve session set by number",
           prompt: "Enter a session-set number (e.g. 50 or 050)",
           placeHolder: "50",
@@ -33160,7 +33362,7 @@ function registerResolveSetNumberCommand(context, deps = {}) {
           return;
         const n = parseSetHandle(raw);
         if (n === null) {
-          vscode37.window.showErrorMessage(
+          vscode38.window.showErrorMessage(
             `"${raw}" is not a session-set number. Enter a bare integer like 50.`
           );
           return;
@@ -33170,13 +33372,13 @@ function registerResolveSetNumberCommand(context, deps = {}) {
         const result = resolveSetNumber(slugs, n);
         if (result.kind === "no-match") {
           const avail = result.available.length > 0 ? result.available.join(", ") : "(none)";
-          vscode37.window.showErrorMessage(
+          vscode38.window.showErrorMessage(
             `No session set numbered ${n}. Available numbers: ${avail}.`
           );
           return;
         }
         if (result.kind === "collision") {
-          vscode37.window.showErrorMessage(
+          vscode38.window.showErrorMessage(
             `Number ${n} is ambiguous \u2014 it matches ${result.matches.join(
               " and "
             )}. Two session sets must not share a numeric prefix; rename one.`
@@ -33196,18 +33398,18 @@ async function presentActions(slug, set) {
       label: "$(clippy) Copy slug",
       description: slug,
       run: async () => {
-        await vscode37.env.clipboard.writeText(slug);
-        vscode37.window.setStatusBarMessage(`Copied: ${slug}`, 4e3);
+        await vscode38.env.clipboard.writeText(slug);
+        vscode38.window.setStatusBarMessage(`Copied: ${slug}`, 4e3);
       }
     },
     {
       label: "$(clippy) Copy \u201CStart the next session\u201D prompt",
       description: `Start the next session of \`${slug}\`.`,
       run: async () => {
-        await vscode37.env.clipboard.writeText(
+        await vscode38.env.clipboard.writeText(
           `Start the next session of \`${slug}\`.`
         );
-        vscode37.window.setStatusBarMessage("Copied: start next session", 4e3);
+        vscode38.window.setStatusBarMessage("Copied: start next session", 4e3);
       }
     }
   ];
@@ -33215,12 +33417,12 @@ async function presentActions(slug, set) {
     actions.push({
       label: "$(go-to-file) Open spec",
       description: slug,
-      run: () => void vscode37.commands.executeCommand("dabblerSessionSets.openSpec", {
+      run: () => void vscode38.commands.executeCommand("dabblerSessionSets.openSpec", {
         set
       })
     });
   }
-  const pick2 = await vscode37.window.showQuickPick(actions, {
+  const pick2 = await vscode38.window.showQuickPick(actions, {
     title: `Set ${slug}`,
     placeHolder: "What would you like to do with this set?"
   });
@@ -33229,7 +33431,7 @@ async function presentActions(slug, set) {
 }
 
 // src/commands/upgradeOlderSets.ts
-var vscode38 = __toESM(require("vscode"));
+var vscode39 = __toESM(require("vscode"));
 var cp8 = __toESM(require("child_process"));
 var path40 = __toESM(require("path"));
 var fs34 = __toESM(require("fs"));
@@ -33301,28 +33503,28 @@ function summarizeJson(stdout) {
 }
 function registerUpgradeOlderSetsCommand(context, deps) {
   context.subscriptions.push(
-    vscode38.commands.registerCommand(
+    vscode39.commands.registerCommand(
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
           (r2) => fs34.existsSync(path40.join(r2, SESSION_SETS_REL2))
         );
         if (roots.length === 0) {
-          vscode38.window.showInformationMessage(
+          vscode39.window.showInformationMessage(
             "No docs/session-sets directory found in the workspace \u2014 nothing to upgrade."
           );
           return;
         }
-        const confirm = await vscode38.window.showInformationMessage(
+        const confirm = await vscode39.window.showInformationMessage(
           "Upgrade all older session sets to the current schema? This runs the three schema migrators in sequence, in-place, across every set. Each migrator writes a backup alongside any file it rewrites and is a no-op on already-current sets.",
           { modal: true },
           "Upgrade"
         );
         if (confirm !== "Upgrade")
           return;
-        await vscode38.window.withProgress(
+        await vscode39.window.withProgress(
           {
-            location: vscode38.ProgressLocation.Notification,
+            location: vscode39.ProgressLocation.Notification,
             title: "Upgrading older session sets\u2026",
             cancellable: false
           },
@@ -33343,11 +33545,11 @@ function registerUpgradeOlderSetsCommand(context, deps) {
             }
             deps.refreshView();
             if (failures.length === 0) {
-              vscode38.window.showInformationMessage(
+              vscode39.window.showInformationMessage(
                 `Session sets upgraded. ${summaries.join("; ")}. The tree refreshes shortly; the schema markers clear on the next read.`
               );
             } else {
-              vscode38.window.showErrorMessage(
+              vscode39.window.showErrorMessage(
                 `Bulk upgrade hit ${failures.length} error(s): ${failures.join(
                   " | "
                 )}. If Python / dabbler-ai-router isn't installed, set dabblerSessionSets.pythonPath to a venv with the router, or run the migrator chain manually from the repo root.`
@@ -33361,15 +33563,15 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 }
 
 // src/providers/WorkExplorerTreeProvider.ts
-var vscode40 = __toESM(require("vscode"));
+var vscode41 = __toESM(require("vscode"));
 
 // src/providers/moduleAssembly.ts
 var fs35 = __toESM(require("fs"));
 var path41 = __toESM(require("path"));
-var vscode39 = __toESM(require("vscode"));
+var vscode40 = __toESM(require("vscode"));
 function nodeModuleAssemblyIo() {
   return {
-    workspaceRoots: () => (vscode39.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
+    workspaceRoots: () => (vscode40.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
     classify: (root) => classifyModulesManifest(root),
     // Set 100 S1: the 093-era per-module plan-existence resolution retired
     // with the persistent `Plan` child node it fed. This probe stays — it
@@ -33415,7 +33617,7 @@ function assembleVisibleModules(allSets, io, lastKnownGood) {
 var WorkExplorerTreeProvider = class {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
-    this.onDidChangeEmitter = new vscode40.EventEmitter();
+    this.onDidChangeEmitter = new vscode41.EventEmitter();
     this.onDidChangeTreeData = this.onDidChangeEmitter.event;
     /** Memoised scan for the current refresh generation; cleared by `refresh()`. */
     this.scanCache = null;
@@ -33498,7 +33700,7 @@ var WorkExplorerTreeProvider = class {
   supports() {
     if (this.supportsCache)
       return this.supportsCache;
-    const cfg = vscode40.workspace.getConfiguration("dabblerSessionSets");
+    const cfg = vscode41.workspace.getConfiguration("dabblerSessionSets");
     const uatPref = cfg.get("uatSupport.enabled", "auto");
     const e2ePref = cfg.get("e2eSupport.enabled", "auto");
     const all = this.sets();
@@ -33509,15 +33711,15 @@ var WorkExplorerTreeProvider = class {
     return this.supportsCache;
   }
   toTreeItem(descriptor, node) {
-    const item = new vscode40.TreeItem(
+    const item = new vscode41.TreeItem(
       descriptor.label,
-      descriptor.collapsible === "collapsed" ? vscode40.TreeItemCollapsibleState.Collapsed : vscode40.TreeItemCollapsibleState.None
+      descriptor.collapsible === "collapsed" ? vscode41.TreeItemCollapsibleState.Collapsed : vscode41.TreeItemCollapsibleState.None
     );
     item.id = descriptor.id;
     item.description = descriptor.description;
     item.contextValue = descriptor.contextValue;
     if (descriptor.tooltip !== void 0) {
-      const md = new vscode40.MarkdownString(descriptor.tooltip, true);
+      const md = new vscode41.MarkdownString(descriptor.tooltip, true);
       item.tooltip = md;
     }
     if (descriptor.icon)
@@ -33540,11 +33742,11 @@ var WorkExplorerTreeProvider = class {
   }
   toIconPath(icon) {
     if (icon.kind === "theme") {
-      return icon.color ? new vscode40.ThemeIcon(icon.id, new vscode40.ThemeColor(icon.color)) : new vscode40.ThemeIcon(icon.id);
+      return icon.color ? new vscode41.ThemeIcon(icon.id, new vscode41.ThemeColor(icon.color)) : new vscode41.ThemeIcon(icon.id);
     }
     return {
-      light: vscode40.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
-      dark: vscode40.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
+      light: vscode41.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
+      dark: vscode41.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
     };
   }
 };
@@ -33555,75 +33757,6 @@ function describeManifestFaults(faults) {
     const shown = fault.retainedLastKnownGood ? "Showing the last-known-good module tree." : "No prior valid module tree is available; showing recoverable fallback groups.";
     return `${fault.rootLabel}: ${fault.message} ${shown}`;
   }).join("  ");
-}
-
-// src/commands/workExplorerTreeCommands.ts
-var vscode41 = __toESM(require("vscode"));
-
-// src/providers/rowMenuHelpers.ts
-function planLeftClickActivation(setName, state) {
-  const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
-  if (state !== "in-progress" && state !== "not-started") {
-    return { openCommand, clipboardWrite: null };
-  }
-  const sanitized = setName.replace(/`/g, "'");
-  return {
-    openCommand,
-    clipboardWrite: {
-      text: `Start the next session of \`${sanitized}\`.`,
-      toast: `Copied: Start the next session of ${setName}`
-    }
-  };
-}
-
-// src/commands/workExplorerTreeCommands.ts
-function asSetNode(arg) {
-  if (arg === null || typeof arg !== "object")
-    return void 0;
-  const node = arg;
-  return node.kind === "set" && node.set ? node : void 0;
-}
-function asSessionNode(arg) {
-  if (arg === null || typeof arg !== "object")
-    return void 0;
-  const node = arg;
-  return node.kind === "session" && node.set && node.session ? node : void 0;
-}
-async function activateSetRow(arg) {
-  const node = asSetNode(arg);
-  if (!node)
-    return;
-  const plan = planLeftClickActivation(node.set.name, node.set.state);
-  await vscode41.commands.executeCommand(plan.openCommand.commandId, node);
-  if (!plan.clipboardWrite)
-    return;
-  try {
-    await vscode41.env.clipboard.writeText(plan.clipboardWrite.text);
-    vscode41.window.showInformationMessage(plan.clipboardWrite.toast);
-  } catch (err) {
-    console.warn(
-      `[WorkExplorerTree] left-click clipboard write failed for "${node.set.name}"`,
-      err
-    );
-  }
-}
-async function activateSessionRow(arg) {
-  const node = asSessionNode(arg);
-  if (!node)
-    return;
-  await vscode41.commands.executeCommand("dabblerSessionSets.openSpec", node);
-}
-function registerWorkExplorerTreeCommands(context) {
-  context.subscriptions.push(
-    vscode41.commands.registerCommand(
-      "dabblerWorkExplorer.activateSet",
-      (arg) => activateSetRow(arg)
-    ),
-    vscode41.commands.registerCommand(
-      "dabblerWorkExplorer.activateSession",
-      (arg) => activateSessionRow(arg)
-    )
-  );
 }
 
 // src/extension.ts

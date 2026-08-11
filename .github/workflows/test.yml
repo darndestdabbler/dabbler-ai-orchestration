@@ -10,6 +10,10 @@ jobs:
   drift-guards:
     name: Drift guards
     runs-on: ubuntu-latest
+    # See the note on `playwright-tests`: no job here declared a timeout, so
+    # nothing could stop a hang before GitHub's six-hour ceiling. These
+    # dependency-light gates finish in well under a minute.
+    timeout-minutes: 10
     # Set 058 S3 (D6/D8): a fast gate that fails the build if more than one
     # session set is in-progress at once, if the committed dist/ template
     # bundle drifts from its canonical source, if the model registry names an
@@ -90,6 +94,7 @@ jobs:
   guidance-ceiling:
     name: Preload guidance ceiling gate
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Set 085 F1: the ratcheting preload-ceiling gate. `guidance_report
     # --check` fails the build if any required-reading file is over its
     # per-file ceiling or the corpus is over its total_ceiling_tokens, so
@@ -122,6 +127,7 @@ jobs:
   template-snapshot:
     name: Consumer-bootstrap template snapshot
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     # Set 058 S3 (D8): enforce the cold-start golden snapshot in CI. The full TS
     # unit suite is not run in CI (two pre-existing Set-026 specs fail under the
     # vscode-stub), so the snapshot guard would otherwise be local-only. This
@@ -160,6 +166,7 @@ jobs:
   sample-project-smoke:
     name: Sample-project smoke (Set 107)
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -212,6 +219,11 @@ jobs:
   python-tests:
     name: Python tests
     runs-on: ${{ matrix.os }}
+    # macOS stays HERE deliberately. It is green throughout the Layer 3
+    # outage and cheap, so the router keeps real macOS coverage even though
+    # the GUI suite no longer runs there. The suite is ~4 minutes with
+    # `-n auto`; 30 leaves room for a cold cache on a contended runner.
+    timeout-minutes: 30
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
@@ -241,6 +253,16 @@ jobs:
   playwright-tests:
     name: Playwright Layer 3
     runs-on: ${{ matrix.os }}
+    # 2026-08-11: no job in this file declared a timeout, so nothing could
+    # stop a hung suite before GitHub's SIX-HOUR ceiling. The macOS outage
+    # billed 149 minutes per run at the 10x macOS multiplier -- 1,491
+    # billable minutes each, ~65,600 across the 44 failed runs -- and 149
+    # minutes was luck, not a bound. A passing full Layer 3 run is ~11
+    # minutes (36 passed in 10.6m, measured 2026-08-11), so 30 is ~3x
+    # headroom for a slow or contended runner while capping a hang at 30
+    # minutes. If a legitimate run ever approaches this, raise it
+    # deliberately -- do not remove it.
+    timeout-minutes: 30
     strategy:
       # 2026-07-30: fail-fast was HIDING the real per-OS picture. When the
       # macOS leg failed on a stale binary-lookup path, GitHub cancelled the
@@ -252,32 +274,40 @@ jobs:
       # platform is red.
       fail-fast: false
       matrix:
-        # 2026-08-11: `macos-latest` pinned to `macos-13` to test the
-        # Apple-Silicon hypothesis for the week-long Layer 3 macOS outage.
+        # 2026-08-11: macOS REMOVED from Layer 3 on cost grounds (operator
+        # decision). GUI runs there billed 149 wall-clock minutes at the 10x
+        # macOS multiplier -- 1,491 billable minutes per run, ~65,600 across
+        # the 44 failed runs since 2026-08-04, against a plan that includes
+        # 3,000/month. The failure mode was maximally expensive: each of the
+        # 36 specs waited out a 30s click timeout plus 90s afterEach plus 90s
+        # worker teardown, single-worker, no early exit -- so a FAILING run
+        # cost more than a passing one.
         #
-        # Evidence: every completed Test run since 2026-08-04 21:22 has been
-        # red, and the ONLY red job is this one on macOS. All 36 of 36 specs
-        # fail, every one at the same line (`electronLaunch.ts:847`, the
-        # activity-bar click), hanging on Playwright's "visible, enabled and
-        # stable" precondition — the element RESOLVES and passes the
-        # `waitFor({state:"visible"})` on the line above, then never produces
-        # two consecutive stable frames, so the click times out at exactly
-        # 30s. A 100% failure rate at one shared choke point is an
-        # environment, not a regression; the break also landed on a
-        # DOCS-ONLY commit, and Python on macOS stayed green throughout.
+        # What was wrong: every spec failed at one shared choke point
+        # (`electronLaunch.ts:847`, the activity-bar click in
+        # openDabblerContainer), hanging on Playwright's "visible, enabled
+        # and stable" precondition. The element resolved and passed the
+        # `waitFor({state:"visible"})` on the line above, then never produced
+        # two consecutive stable frames. 100% failure at one choke point, a
+        # break that landed on a DOCS-ONLY commit, and Python-on-macOS green
+        # throughout all point at the environment: the job env reports
+        # `arm64`, so `macos-latest` had rotated to Apple Silicon.
+        # `downloadAndUnzipVSCode()` takes no arguments and auto-detects the
+        # platform, so the VS Code build fetched was correct -- this was
+        # about compositing Electron frames, not the wrong binary.
         #
-        # The runner is now `arm64` (`/Users/runner/hostedtoolcache/Python/
-        # 3.11.9/arm64` in the job env), so `macos-latest` has rotated to
-        # Apple Silicon. `downloadAndUnzipVSCode()` takes no arguments and
-        # auto-detects the platform, so the VS Code build is correct — this
-        # is about the image's ability to composite Electron frames, not
-        # about fetching the wrong binary.
-        #
-        # If `macos-13` is retired and this job errors with "no runner
-        # matching the labels", the next labels to try are `macos-15-intel`
-        # then `macos-14`. Revert this pin the moment the cause is known —
-        # a pinned image is a diagnosis aid, not a fix.
-        os: [ubuntu-latest, macos-13, windows-latest]
+        # THIS IS NOT DROPPING macOS SUPPORT. Two things still cover it:
+        #   1. `Python tests (macos-latest)` below stays, and stayed green
+        #      throughout -- the router keeps real macOS coverage, cheaply.
+        #   2. `electronBinaryLookup.test.ts` drives the Layer-3 macOS-only
+        #      binary-lookup branch through injected IO on EVERY push from a
+        #      Linux runner -- the macOS code path that historically broke is
+        #      still exercised on every commit.
+        # What is lost is macOS GUI verification: the extension still
+        # installs and runs there, it is no longer tested there. Reversible
+        # the moment a macOS user appears, ideally with the timeout above
+        # kept so a repeat cannot bill hours.
+        os: [ubuntu-latest, windows-latest]
     # Same dummy API-key envs the python-tests job uses. Several
     # Layer-3 specs shell out to `python -m ai_router.start_session`
     # / `ai_router.new_chat_id` / `ai_router.close_session` via

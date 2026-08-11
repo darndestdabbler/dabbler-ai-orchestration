@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The writer refuses what it cannot mean",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-11T03:12:33.817920-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-11T04:08:15.966743-04:00",
       "orchestrator": {
         "engine": "copilot",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

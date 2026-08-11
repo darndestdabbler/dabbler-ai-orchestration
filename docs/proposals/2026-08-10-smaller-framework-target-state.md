@@ -75,7 +75,7 @@ Operator-stated, and treated as constraints rather than options.
 | # | requirement |
 | ---: | :--- |
 | R1 | Break a plan into **optional modules** and **session sets** with a **uniform spec structure**. Modules implementable in parallel; manual merges acceptable. |
-| R2 | Tree displays **modules → session sets → sessions**, optionally task checklists, using the existing **not-started / in-progress / done** icons. If checklists are not in the tree, an instruction generates a **rolling checklist in chat**. |
+| R2 | Tree displays **modules → session sets → sessions**, optionally task checklists, using the existing **not-started / in-progress / done** icons. If checklists are not in the tree, an instruction generates a **rolling checklist in chat**. *(Resolved 2026-08-11 — not either/or: see §6.2. Both surfaces, one canonical model; the tree is the dashboard, chat carries a generated delta.)* |
 | R3 | Support **Copilot CLI (indirect)** *and* **Direct API** orchestrators. **The system must know which is in use** — detect, confirm with the user, record durably, proceed. |
 | R4 | **Cross-provider verification.** |
 | R5 | **Sufficient test coverage**, with full suites run **immediately prior to commit, push, and close**. |
@@ -312,13 +312,33 @@ operator reports these were used for troubleshooting, not routine work):
 `openOrchestratorWriterLog`, `openPrerequisiteSpec`, `revealPlaywrightTests`,
 `migrate`, `migrateToV4`, `troubleshoot`.
 
-**Task checklists: recommend keeping them OUT of the tree.** The step
-ledger is the highest-churn, lowest-value surface in the extension — Set
-115's operator notes record three defects observed live in a single day (a
-completed step rendering as not-done, `<- here` on the wrong row, an
-unplanned step ordered after a pending planned one). Replace with the
-operator's own option (b): **an instruction to emit a rolling checklist in
-chat.** Cost: one instruction line. Code: zero.
+**Task checklists — position revised twice, 2026-08-11.** An earlier draft
+of this document recommended keeping them **out** of the tree, on the
+grounds that the step ledger is high-churn and Set 115's operator notes
+record three defects observed live in a single day. **That reasoning was
+wrong, and so was the reversal that followed it.** The final position,
+after independent review by two providers:
+
+- **The three defects were not rendering bugs.** They share one cause — the step-status field has no validated vocabulary. "Done" is spelled four ways across the repo's activity logs, and ~10% of step entries carry an unrecognised token. `<- here` was behaving *correctly* on corrupt data: `session_checklist.py:393` picks the first non-terminal row, and with steps 1–4 unparseable, step 1 *is* first.
+- **Neither surface is more trustworthy than the other.** Both read the same two files. A sanctioned writer proves provenance and shape, **not semantic truth** — so "the tree is evidence, chat is self-report" is a category error. The tree is a *second parser over identical self-reported data*.
+- **And the tree currently hides what the CLI shows:** Python renders an unknown token as `[?]`; the tree maps it to `not-started`, under a comment claiming the two match.
+
+**The shape that survives review** (§6.5 is its architecture):
+
+| surface | job |
+| :--- | :--- |
+| **Tree** | the human dashboard — free, glanceable, *not* the authority |
+| **Chat** | a machine-generated **delta** at transitions (current / next / blockers / source timestamp), plus a **full snapshot** at session start and after any context reset — not 9 re-renders of 6 unchanged rows |
+| **Both** | projected from **one validated canonical state model**, with explicit `unknown` / `stale` / `unreadable` states |
+
+Two things the delta must carry that the current checklist does not:
+**close-preflight obligations**, not merely implementation steps — those
+are what closes actually fail on — and an honest name for the marker
+(*"next unresolved recorded step"*) unless explicit step-start /
+step-complete transitions are recorded.
+
+Full findings and the reviewers' reasoning:
+[`docs/session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md`](../session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md).
 
 ### 6.3 Removed, and what replaces it
 

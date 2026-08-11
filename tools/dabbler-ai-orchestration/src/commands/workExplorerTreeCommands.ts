@@ -29,13 +29,30 @@
 
 import * as vscode from "vscode";
 import { planLeftClickActivation } from "../providers/rowMenuHelpers";
-import { SetNode } from "../providers/workExplorerTreeModel";
+import { SessionNode, SetNode } from "../providers/workExplorerTreeModel";
 
 /** Narrow an untrusted command argument to a set-bearing tree node. */
 export function asSetNode(arg: unknown): SetNode | undefined {
   if (arg === null || typeof arg !== "object") return undefined;
   const node = arg as Partial<SetNode>;
   return node.kind === "set" && node.set ? (node as SetNode) : undefined;
+}
+
+/**
+ * Narrow an untrusted command argument to a session-bearing tree node
+ * (Set 115 S2).
+ *
+ * Requires BOTH `set` and `session`: a session node with no set cannot say
+ * which `spec.md` it belongs to, and one with no session record cannot say
+ * which section — either way the honest answer is to do nothing rather
+ * than open an arbitrary file.
+ */
+export function asSessionNode(arg: unknown): SessionNode | undefined {
+  if (arg === null || typeof arg !== "object") return undefined;
+  const node = arg as Partial<SessionNode>;
+  return node.kind === "session" && node.set && node.session
+    ? (node as SessionNode)
+    : undefined;
 }
 
 /**
@@ -60,6 +77,27 @@ export async function activateSetRow(arg: unknown): Promise<void> {
   }
 }
 
+/**
+ * Left-click on a SESSION row (Set 115 S2): open the set's `spec.md`
+ * positioned at that session's own plan.
+ *
+ * It dispatches the same `dabblerSessionSets.openSpec` the set row's
+ * activation already goes through — the session-level sibling of a
+ * behaviour that exists, sharing its "does the file exist" answer and its
+ * message wording rather than growing a parallel one. The node itself is
+ * the argument, which is what tells `openSpec` a section is wanted; a set
+ * node through the same command still opens at the top.
+ *
+ * No clipboard half. The set row's L5 shortcut copies "start the NEXT
+ * session", which is a set-level question; a per-session run prompt is
+ * Session 3's job, through the context menu.
+ */
+export async function activateSessionRow(arg: unknown): Promise<void> {
+  const node = asSessionNode(arg);
+  if (!node) return;
+  await vscode.commands.executeCommand("dabblerSessionSets.openSpec", node);
+}
+
 export function registerWorkExplorerTreeCommands(
   context: vscode.ExtensionContext,
 ): void {
@@ -67,6 +105,10 @@ export function registerWorkExplorerTreeCommands(
     vscode.commands.registerCommand(
       "dabblerWorkExplorer.activateSet",
       (arg: unknown) => activateSetRow(arg),
+    ),
+    vscode.commands.registerCommand(
+      "dabblerWorkExplorer.activateSession",
+      (arg: unknown) => activateSessionRow(arg),
     ),
   );
 }

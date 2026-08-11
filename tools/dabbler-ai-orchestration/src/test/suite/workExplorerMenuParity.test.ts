@@ -297,3 +297,35 @@ suite("Set 110 S2 — the row-activation command", () => {
     assert.strictEqual(hidden.when, "false");
   });
 });
+
+suite("Set 115 S2 — the session-activation command", () => {
+  test("is declared and hidden from the Command Palette", () => {
+    // Same rule as its set-row sibling, and the same reason: without a
+    // session node it has no spec to open and no section to open it at.
+    assert.ok(
+      pkg.contributes.commands.some(
+        (c) => c.command === "dabblerWorkExplorer.activateSession",
+      ),
+      "activateSession is not declared in contributes.commands",
+    );
+    const hidden = (menus.commandPalette ?? []).find(
+      (e) => e.command === "dabblerWorkExplorer.activateSession",
+    );
+    assert.ok(hidden, "activateSession is not hidden from the Command Palette");
+    assert.strictEqual(hidden.when, "false");
+  });
+
+  test("rides the row's `command`, not a session-row menu entry", () => {
+    // The Set 110 S2 ruling that no menu entry targets session rows still
+    // holds — a left-click activation is `TreeItem.command`, which is a
+    // different surface from `view/item/context`. Session 3 is where menu
+    // entries arrive, as a decision rather than as a side effect of this.
+    for (const entry of allNativeEntries) {
+      assert.notStrictEqual(
+        entry.command,
+        "dabblerWorkExplorer.activateSession",
+        "activateSession leaked into a context menu",
+      );
+    }
+  });
+});

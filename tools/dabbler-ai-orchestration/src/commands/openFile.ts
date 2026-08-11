@@ -3,19 +3,113 @@ import * as fs from "fs";
 import * as path from "path";
 import { SessionSet, UnsatisfiedPrerequisite } from "../types";
 import { PLAYWRIGHT_REL_DEFAULT, readAllSessionSets } from "../utils/fileSystem";
+import { locateSessionSection, SpecSectionRange } from "../providers/specSectionLocator";
 
 interface SetItem extends vscode.TreeItem {
   set: SessionSet;
 }
 
-function openIfExists(filePath: string | undefined, label: string): void {
+function openIfExists(
+  filePath: string | undefined,
+  label: string,
+  reveal?: SpecSectionRange,
+): void {
   if (!filePath || !fs.existsSync(filePath)) {
     vscode.window.showInformationMessage(
       `${label} does not exist yet: ${filePath ? path.basename(filePath) : "<unknown>"}`
     );
     return;
   }
-  vscode.commands.executeCommand("vscode.open", vscode.Uri.file(filePath));
+  const uri = vscode.Uri.file(filePath);
+  if (!reveal) {
+    vscode.commands.executeCommand("vscode.open", uri);
+    return;
+  }
+  void revealSection(uri, reveal);
+}
+
+/**
+ * Open *uri* positioned at *range* (Set 115 S2).
+ *
+ * `showTextDocument` rather than the `vscode.open` command because the
+ * landing has to be DELIBERATE: `vscode.open`'s selection reveal scrolls
+ * minimally, which can leave the heading on the last visible row with the
+ * plan itself below the fold — technically revealed, useless in practice.
+ * `AtTop` puts the session's own heading at the top of the viewport, which
+ * is what "land on its plan" means.
+ *
+ * The selection is EMPTY, anchored at the heading. Selecting the whole
+ * block would paint a 40-line highlight over a file the operator is about
+ * to read, and the first keystroke would replace it.
+ *
+ * Every failure degrades to the plain open: the operator ends up looking
+ * at the real file either way, which is the rule the whole feature is
+ * built on.
+ */
+async function revealSection(uri: vscode.Uri, range: SpecSectionRange): Promise<void> {
+  try {
+    const editor = await vscode.window.showTextDocument(uri);
+    // Clamp: the file is read to find the heading and opened separately,
+    // so a spec edited in between must never throw here.
+    const lastLine = Math.max(editor.document.lineCount - 1, 0);
+    const start = new vscode.Position(Math.min(range.startLine, lastLine), 0);
+    const end = new vscode.Position(Math.min(range.endLine, lastLine), 0);
+    editor.selection = new vscode.Selection(start, start);
+    editor.revealRange(new vscode.Range(start, end), vscode.TextEditorRevealType.AtTop);
+  } catch (err) {
+    console.warn(`[Dabbler] reveal failed for ${uri.fsPath}; opening at the top`, err);
+    vscode.commands.executeCommand("vscode.open", uri);
+  }
+}
+
+/**
+ * The session number a command argument asks for, or `undefined`.
+ *
+ * FAILS CLOSED, deliberately: anything that is not a session node
+ * carrying a positive integer number — a set row, a palette invocation
+ * with no argument, a hand-edited state file whose `number` is a string —
+ * yields `undefined` and therefore a plain open at the top of `spec.md`.
+ * The same posture `planLeftClickActivation` takes on an unrecognised
+ * state.
+ */
+export function sessionNumberOf(item: unknown): number | undefined {
+  if (item === null || typeof item !== "object") return undefined;
+  const node = item as { kind?: unknown; session?: { number?: unknown } };
+  if (node.kind !== "session") return undefined;
+  const number = node.session?.number;
+  if (typeof number !== "number" || !Number.isInteger(number) || number <= 0) {
+    return undefined;
+  }
+  return number;
+}
+
+/**
+ * Where `spec.md` should open for this command argument, or `undefined`
+ * for "at the top".
+ *
+ * The read happens HERE — on activation, once per click — and never on
+ * the tree scan. Set 115's decision 4 is explicit that title resolution
+ * and the tree's fourth level must add no disk read to a hot path; a click
+ * is not one of those paths, and reading the file the operator is about to
+ * see is the only way to know where its sections are.
+ *
+ * Exported for the Layer 2 suite: this is the seam where "which session"
+ * meets "which lines", and it degrades in three ways that all have to be
+ * proven — no session, an unreadable spec, and a spec with no matching
+ * heading.
+ */
+export function specSectionTargetFor(
+  specPath: string | undefined,
+  sessionNumber: number | undefined,
+): SpecSectionRange | undefined {
+  if (!specPath || sessionNumber === undefined) return undefined;
+  let text: string;
+  try {
+    text = fs.readFileSync(specPath, "utf-8");
+  } catch {
+    return undefined;
+  }
+  return locateSessionSection(text, sessionNumber) ?? undefined;
 }
 
 // Set 061 S2 (spec D3): companion to the blocked marker. Opens the
@@ -106,8 +200,17 @@ function findPlaywrightTests(set: SessionSet): string[] {
 
 export function registerOpenFileCommands(context: vscode.ExtensionContext): void {
   context.subscriptions.push(
+    // Set 115 S2: ONE `Open Spec`, two callers. A set row opens the file
+    // at the top exactly as before; a session row (`kind: "session"`)
+    // opens the same file positioned at its own `### Session N of M:`
+    // block. Adding a parallel command would have meant a second place
+    // for "which file is the spec" to be answered.
     vscode.commands.registerCommand("dabblerSessionSets.openSpec", (item: SetItem) =>
-      openIfExists(item?.set?.specPath, "Spec")
+      openIfExists(
+        item?.set?.specPath,
+        "Spec",
+        specSectionTargetFor(item?.set?.specPath, sessionNumberOf(item)),
+      )
     ),
     vscode.commands.registerCommand("dabblerSessionSets.openActivityLog", (item: SetItem) =>
       openIfExists(item?.set?.activityPath, "Activity log")

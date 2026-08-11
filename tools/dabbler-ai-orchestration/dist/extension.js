@@ -15719,8 +15719,7 @@ function parseStepTexts(segment) {
     return kept.join(" ").replace(/^\s*\d+\.\s*/, "").replace(/\s+/g, " ").trim();
   });
 }
-function parseSpecSteps(specText, sessionNumber) {
-  const body = stripFencedBlocks(specText);
+function scanSessionHeads(body) {
   const heads = [];
   SESSION_HEAD_RE.lastIndex = 0;
   let match;
@@ -15733,6 +15732,11 @@ function parseSpecSteps(specText, sessionNumber) {
     if (match[0].length === 0)
       SESSION_HEAD_RE.lastIndex += 1;
   }
+  return heads;
+}
+function parseSpecSteps(specText, sessionNumber) {
+  const body = stripFencedBlocks(specText);
+  const heads = scanSessionHeads(body);
   for (let i2 = 0; i2 < heads.length; i2 += 1) {
     if (heads[i2].number !== sessionNumber)
       continue;
@@ -26542,14 +26546,86 @@ function handleMigrationResultV4(set, result, deps) {
 var vscode15 = __toESM(require("vscode"));
 var fs17 = __toESM(require("fs"));
 var path22 = __toESM(require("path"));
-function openIfExists(filePath, label) {
+
+// src/providers/specSectionLocator.ts
+function lineAt(text, offset) {
+  let line = 0;
+  for (let i2 = 0; i2 < offset && i2 < text.length; i2 += 1) {
+    if (text[i2] === "\n")
+      line += 1;
+  }
+  return line;
+}
+function locateSessionSection(specText, sessionNumber) {
+  if (typeof specText !== "string" || specText === "")
+    return null;
+  if (!Number.isInteger(sessionNumber))
+    return null;
+  const body = stripFencedBlocks(specText);
+  const heads = scanSessionHeads(body);
+  const index = heads.findIndex((head2) => head2.number === sessionNumber);
+  if (index === -1)
+    return null;
+  const originalLines = specText.split("\n");
+  const lastLine = originalLines.length - 1;
+  const startLine = Math.min(lineAt(body, heads[index].headStart), lastLine);
+  let endLine = index + 1 < heads.length ? Math.max(lineAt(body, heads[index + 1].headStart) - 1, startLine) : lastLine;
+  while (endLine > startLine && (originalLines[endLine] ?? "").trim() === "") {
+    endLine -= 1;
+  }
+  return { startLine, endLine };
+}
+
+// src/commands/openFile.ts
+function openIfExists(filePath, label, reveal) {
   if (!filePath || !fs17.existsSync(filePath)) {
     vscode15.window.showInformationMessage(
       `${label} does not exist yet: ${filePath ? path22.basename(filePath) : "<unknown>"}`
     );
     return;
   }
-  vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(filePath));
+  const uri = vscode15.Uri.file(filePath);
+  if (!reveal) {
+    vscode15.commands.executeCommand("vscode.open", uri);
+    return;
+  }
+  void revealSection(uri, reveal);
+}
+async function revealSection(uri, range) {
+  try {
+    const editor = await vscode15.window.showTextDocument(uri);
+    const lastLine = Math.max(editor.document.lineCount - 1, 0);
+    const start = new vscode15.Position(Math.min(range.startLine, lastLine), 0);
+    const end = new vscode15.Position(Math.min(range.endLine, lastLine), 0);
+    editor.selection = new vscode15.Selection(start, start);
+    editor.revealRange(new vscode15.Range(start, end), vscode15.TextEditorRevealType.AtTop);
+  } catch (err) {
+    console.warn(`[Dabbler] reveal failed for ${uri.fsPath}; opening at the top`, err);
+    vscode15.commands.executeCommand("vscode.open", uri);
+  }
+}
+function sessionNumberOf(item) {
+  if (item === null || typeof item !== "object")
+    return void 0;
+  const node = item;
+  if (node.kind !== "session")
+    return void 0;
+  const number = node.session?.number;
+  if (typeof number !== "number" || !Number.isInteger(number) || number <= 0) {
+    return void 0;
+  }
+  return number;
+}
+function specSectionTargetFor(specPath, sessionNumber) {
+  if (!specPath || sessionNumber === void 0)
+    return void 0;
+  let text;
+  try {
+    text = fs17.readFileSync(specPath, "utf-8");
+  } catch {
+    return void 0;
+  }
+  return locateSessionSection(text, sessionNumber) ?? void 0;
 }
 async function openPrerequisiteSpec(set) {
   const unsatisfied = set.unsatisfiedPrereqs ?? [];
@@ -26638,9 +26714,18 @@ function findPlaywrightTests(set) {
 }
 function registerOpenFileCommands(context) {
   context.subscriptions.push(
+    // Set 115 S2: ONE `Open Spec`, two callers. A set row opens the file
+    // at the top exactly as before; a session row (`kind: "session"`)
+    // opens the same file positioned at its own `### Session N of M:`
+    // block. Adding a parallel command would have meant a second place
+    // for "which file is the spec" to be answered.
     vscode15.commands.registerCommand(
       "dabblerSessionSets.openSpec",
-      (item) => openIfExists(item?.set?.specPath, "Spec")
+      (item) => openIfExists(
+        item?.set?.specPath,
+        "Spec",
+        specSectionTargetFor(item?.set?.specPath, sessionNumberOf(item))
+      )
     ),
     vscode15.commands.registerCommand(
       "dabblerSessionSets.openActivityLog",
@@ -33444,6 +33529,13 @@ var WorkExplorerTreeProvider = class {
         arguments: [node]
       };
     }
+    if (node.kind === "session") {
+      item.command = {
+        command: "dabblerWorkExplorer.activateSession",
+        title: "Open Session Plan",
+        arguments: [node]
+      };
+    }
     return item;
   }
   toIconPath(icon) {
@@ -33491,6 +33583,12 @@ function asSetNode(arg) {
   const node = arg;
   return node.kind === "set" && node.set ? node : void 0;
 }
+function asSessionNode(arg) {
+  if (arg === null || typeof arg !== "object")
+    return void 0;
+  const node = arg;
+  return node.kind === "session" && node.set && node.session ? node : void 0;
+}
 async function activateSetRow(arg) {
   const node = asSetNode(arg);
   if (!node)
@@ -33509,11 +33607,21 @@ async function activateSetRow(arg) {
     );
   }
 }
+async function activateSessionRow(arg) {
+  const node = asSessionNode(arg);
+  if (!node)
+    return;
+  await vscode41.commands.executeCommand("dabblerSessionSets.openSpec", node);
+}
 function registerWorkExplorerTreeCommands(context) {
   context.subscriptions.push(
     vscode41.commands.registerCommand(
       "dabblerWorkExplorer.activateSet",
       (arg) => activateSetRow(arg)
+    ),
+    vscode41.commands.registerCommand(
+      "dabblerWorkExplorer.activateSession",
+      (arg) => activateSessionRow(arg)
     )
   );
 }

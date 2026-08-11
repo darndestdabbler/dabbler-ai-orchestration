@@ -212,6 +212,16 @@ export class WorkExplorerTreeProvider
         arguments: [node],
       };
     }
+    if (node.kind === "session") {
+      // Set 115 S2: the session-level sibling. The same spec.md, opened
+      // at this session's own `### Session N of M:` block — the fourth
+      // level stops being a label you cannot click.
+      item.command = {
+        command: "dabblerWorkExplorer.activateSession",
+        title: "Open Session Plan",
+        arguments: [node],
+      };
+    }
     return item;
   }
 

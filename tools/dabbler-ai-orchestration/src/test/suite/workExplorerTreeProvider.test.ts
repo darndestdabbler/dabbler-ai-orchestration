@@ -246,19 +246,41 @@ suite("Set 110 S2 — reveal support and command wiring", () => {
     });
   });
 
-  test("module, bucket and session rows carry NO activation command", () => {
-    // Only set rows have a meaningful primary action (open spec.md).
-    // Attaching one elsewhere would make a single click on a module row
-    // do something unexpected instead of just expanding it.
+  test("module and bucket rows carry NO activation command", () => {
+    // Attaching one would make a single click on a module row do
+    // something unexpected instead of just expanding it. Set and session
+    // rows are the two that have a meaningful primary action, and both
+    // resolve to the same file.
     withWorkspace(() => {
       const p = provider();
       const modules = p.getChildren();
       assert.strictEqual(p.getTreeItem(modules[0]).command, undefined);
       const buckets = p.getChildren(modules[0]);
       assert.strictEqual(p.getTreeItem(buckets[0]).command, undefined);
+    });
+  });
+
+  test("a session row carries the session activation command and its own node", () => {
+    // Set 115 S2. The fourth level was a label you could not click; now
+    // it opens the same `spec.md` the set row opens, positioned at this
+    // session's own plan. The ARGUMENT is the node, because that is what
+    // carries both the spec path (`set`) and the section (`session`).
+    withWorkspace(() => {
+      const p = provider();
+      const modules = p.getChildren();
+      const buckets = p.getChildren(modules[0]);
       const sets = p.getChildren(buckets[0]);
       const sessions = p.getChildren(sets[0]);
-      assert.strictEqual(p.getTreeItem(sessions[0]).command, undefined);
+      const item = p.getTreeItem(sessions[0]);
+      assert.strictEqual(item.command?.command, "dabblerWorkExplorer.activateSession");
+      const arg = item.command?.arguments?.[0] as {
+        kind?: string;
+        set?: { specPath?: string };
+        session?: { number?: number };
+      };
+      assert.strictEqual(arg.kind, "session");
+      assert.ok(arg.set?.specPath, "no spec path — the click would have no file to open");
+      assert.strictEqual(typeof arg.session?.number, "number");
     });
   });
 });

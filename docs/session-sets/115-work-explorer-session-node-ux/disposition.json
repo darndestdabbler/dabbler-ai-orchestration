@@ -1,30 +1,23 @@
 {
   "status": "completed",
-  "summary": "Session titles now come from spec.md on every surface, and one writer owns session-state.json. The extension's buildSessions hardcoded `Session ${n}` in a module that had already computed the spec's title map, and because title resolution puts the stored ledger first, whichever writer reached disk first made that label permanent — 130 rows across this repo carried it. One shared pure rule (progress.heal_title / healTitle) now resolves titles: a spec heading beats a generic-shaped stored title, an operator-authored title is never overwritten. It runs at the writer so the fix persists, and in the read view so closed sets — which get no further boundary write — display correctly without a migration script rewriting their records; the reader's spec read is conditional, so a healthy set costs no extra disk read. Ownership is settled by removal: the extension's readStatus no longer writes, ensureSessionStateFile is deleted, and readSessionSets consumes an in-memory derivation, so a scan can no longer race the router's writer or drop an untracked file into the operator's tree. A 14-case corpus, asserted by both languages, pins the rule shut. Verification (2 discovery lenses + supplementary) found 3 Major defects — 4 spec.md reads per spec-only set per scan, and an empty activity-log parity gap the extension had never mirrored from Set 077 S4 — both remediated with read-counting and per-shape falsifiers; remediation-review returned VERIFIED with 2 fix-accepted verdicts.",
+  "summary": "The Work Explorer's session rows stopped being labels you cannot click. Activating one now opens the set's own spec.md positioned at that session's `### Session N of M:` block — revealed at the top of the editor with an empty cursor on the heading, so the surrounding context and the configuration block stay a scroll away. It goes through the EXISTING `dabblerSessionSets.openSpec` rather than a parallel command: `openSpec` reads a session number off its argument, so there is still one answer to \"which file is the spec\" and one message when it is missing, and a set row through the same command still opens at the top exactly as before. The one new rule — which lines belong to session N — lives in a pure module (`providers/specSectionLocator.ts`) that borrows `sessionStepModel.scanSessionHeads` instead of carrying a second heading regex, so the step parser and the reveal cannot disagree about where a session begins; a heading inside a fenced sample is not a section, which is the falsifier that keeps a spec from opening at its own documentation template. Everything unanswerable degrades to the real file at the top: no session number, an unreadable spec, a ledger ahead of its spec, a malformed heading, or a throw inside the reveal. The spec read happens on the CLICK, never on the tree scan, so the measured no-extra-read constraint is untouched. Verification: both discovery lenses returned VERIFIED with zero Critical/Major findings; one nit recorded and deliberately not fixed (an already-open spec.md keeps its scroll position on the degradation path, matching the set row's long-standing behaviour).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/progress.py",
-    "ai_router/session_state.py",
-    "ai_router/tests/fixtures/session-title-parity.json",
-    "ai_router/tests/test_session_title_parity.py",
-    "ai_router/CHANGELOG.md",
-    "docs/session-state-schema.md",
+    "tools/dabbler-ai-orchestration/src/providers/specSectionLocator.ts",
+    "tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/WorkExplorerTreeProvider.ts",
+    "tools/dabbler-ai-orchestration/src/commands/openFile.ts",
+    "tools/dabbler-ai-orchestration/src/commands/workExplorerTreeCommands.ts",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionPlanReveal.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeProvider.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/session-plan-reveal.spec.ts",
     "docs/session-sets/115-work-explorer-session-node-ux/ai-assignment.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/s1-verification-conventions.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/s1-remediation-round-1.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/s1-remediation-round-2.md",
-    "tools/dabbler-ai-orchestration/src/utils/progress.ts",
-    "tools/dabbler-ai-orchestration/src/utils/sessionState.ts",
-    "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
-    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
-    "tools/dabbler-ai-orchestration/src/types.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionTitleParity.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionStateV4Writers.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionLedgerRows.test.ts",
-    "tools/dabbler-ai-orchestration/CHANGELOG.md"
+    "docs/session-sets/115-work-explorer-session-node-ux/s2-verification-conventions.md"
   ],
   "next_orchestrator": {
     "engine": "github-copilot",
@@ -33,13 +26,12 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 (left-click a session, land on its plan) works the same surface this session just restructured — readSessionSets' row model, the session ledger, and the new optional specTitles threading — so continuity of that context is worth more than a fresh perspective. No blocker, no cost pressure, no capability gap; verification stays cross-provider regardless."
+      "specifics": "Session 3 hangs a context menu on the very node this session made clickable and reuses the same openSpec plumbing for its artifact QuickPick. The live context that matters is this session's: the contextValue vocabulary, the menu-parity test's forward and backward assertions, and why session-row menu entries are deliberately absent rather than forgotten. No blocker, no cost pressure, no capability gap; verification stays cross-provider regardless."
     }
   },
   "blockers": [],
   "lessons_cited": [
     "L-069-1",
-    "L-112-1",
-    "L-064-8"
+    "L-112-1"
   ]
 }

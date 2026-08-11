@@ -312,6 +312,11 @@
         "command": "dabblerWorkExplorer.activateSet",
         "title": "Open Session Set",
         "category": "Dabbler"
+      },
+      {
+        "command": "dabblerWorkExplorer.activateSession",
+        "title": "Open Session Plan",
+        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -330,6 +335,10 @@
         },
         {
           "command": "dabblerWorkExplorer.activateSet",
+          "when": "false"
+        },
+        {
+          "command": "dabblerWorkExplorer.activateSession",
           "when": "false"
         }
       ],

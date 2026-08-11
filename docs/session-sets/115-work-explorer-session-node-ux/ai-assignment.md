@@ -45,3 +45,49 @@ inherits live context about the reader's read-count budget and the new
 session learned reorders the queue; the step-ledger findings that
 disqualify Session 4 are recorded and untouched by this work
 (`step-ledger-findings.md` §8 explicitly holds Sessions 1-3 independent).
+
+---
+
+## Session 2 — Left-click a session, land on its plan
+
+**Orchestrator:** github-copilot / anthropic / claude-opus-5, effort high.
+
+**Why this session sat where it did.** Three of its four work steps are
+implementation and design-decision work on a surface the previous session
+had just restructured: the tree's command wiring, the file-opening
+plumbing, and a parse rule that has to agree with a Python original. The
+temporary verification-only policy window assigns those to the active
+orchestrator. Only `session-verification` was routed, on a different
+effective provider (`gpt-5.5`; `anthropic` excluded automatically by
+registry lookup on the orchestrator's model).
+
+**What routing bought.** Both discovery lenses returned VERIFIED with no
+Critical/Major findings — the first zero-blocker round of this set. That
+is a weaker signal than Session 1's three Majors, and worth reading
+honestly: this session's change is small (one command, one pure module,
+one optional argument threaded through an existing command) and it shipped
+its falsifiers with it, including the fenced-sample case that would have
+made the locator open a spec at its documentation template. The
+failure-scenario lens explicitly reported trying to break the activation
+path and finding nothing material.
+
+The one nit is recorded and not fixed: when `spec.md` is **already open**
+and scrolled elsewhere, the degradation path (`vscode.open`, no selection)
+reveals the existing editor where it stands rather than forcing it to line
+1. That is the same behaviour a set row's left-click has always had, and
+matching the sibling surface is worth more than a literal reading of "at
+the top" — the operator still ends up looking at the real file, which is
+the rule the step is written to protect.
+
+**Next orchestrator: continue.** Session 3 adds the session context menu
+(run prompt + artifacts) on the node this session just made clickable, and
+it reuses the same `openSpec` plumbing for the artifact QuickPick. The
+live context that matters — the `contextValue` vocabulary, the menu-parity
+test's forward/backward assertions, and why session-row menu entries are
+*absent* rather than forgotten — is in this session's head. No blocker, no
+cost pressure, no capability gap; verification stays cross-provider
+regardless.
+
+**Next set: unchanged.** Set 115 continues to Session 3.
+`step-ledger-findings.md` still disqualifies Session 4 as written, and
+nothing here touches that.

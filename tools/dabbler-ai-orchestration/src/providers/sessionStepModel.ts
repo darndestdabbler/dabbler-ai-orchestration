@@ -354,11 +354,17 @@ const STEP_RE = /^(\s{0,3})(\d+)\.\s+\S/gm;
 const FENCE_RE = /^\s*(?:```|~~~)/;
 
 /**
- * Blank out fenced code blocks, preserving line count and offsets, so a
- * documentation sample full of numbered lines is not read as this spec's
- * steps. Mirrors `spec_admission._strip_fenced_blocks`.
+ * Blank out fenced code blocks, preserving LINE COUNT (not character
+ * offsets), so a documentation sample full of numbered lines is not read
+ * as this spec's steps. Mirrors `spec_admission._strip_fenced_blocks`.
+ *
+ * Exported for `specSectionLocator.ts` (Set 115 S2), which needs the same
+ * "a heading inside a fence is a sample, not a section" rule. Line count
+ * survives because every stripped line is replaced by an empty line, which
+ * is what makes an offset->line mapping computed on the stripped body valid
+ * for the ORIGINAL text.
  */
-function stripFencedBlocks(text: string): string {
+export function stripFencedBlocks(text: string): string {
   let inFence = false;
   return text
     .split("\n")
@@ -417,19 +423,29 @@ export function parseStepTexts(segment: string): string[] {
   });
 }
 
+/** One `### Session N of M:` heading, located in a fence-stripped body. */
+export interface SessionHead {
+  readonly number: number;
+  /** Offset of the `###` itself — mirrors Python's `m.start()`. */
+  readonly headStart: number;
+  /** Offset just past the heading line — mirrors Python's `m.end()`. */
+  readonly contentStart: number;
+}
+
 /**
- * The step texts `spec.md` currently declares for *sessionNumber*, or `[]`.
+ * Every session heading in *body*, in document order.
  *
- * Mirrors `spec_admission.parse_session_plans` narrowed to one session,
- * which is what `session_checklist.read_spec_steps` does.
+ * Split out of `parseSpecSteps` by Set 115 S2 so the section locator and
+ * the step parser scan with ONE regex. A second heading regex is the
+ * duplicate-parser defect this repo repeats most (L-069-1), and two
+ * consumers disagreeing about where session 3 begins is exactly the drift
+ * an operator would report as "it opened the wrong section".
+ *
+ * *body* must already be fence-stripped: a heading inside a fenced sample
+ * declares nothing.
  */
-export function parseSpecSteps(specText: string, sessionNumber: number): string[] {
-  const body = stripFencedBlocks(specText);
-  // `headStart` is the `###`'s own offset and `contentStart` is just past
-  // the heading line, mirroring Python's `m.start()` / `m.end()`. One
-  // session's segment runs from its own `contentStart` to the NEXT
-  // heading's `headStart`.
-  const heads: Array<{ number: number; headStart: number; contentStart: number }> = [];
+export function scanSessionHeads(body: string): SessionHead[] {
+  const heads: SessionHead[] = [];
   SESSION_HEAD_RE.lastIndex = 0;
   let match: RegExpExecArray | null;
   while ((match = SESSION_HEAD_RE.exec(body)) !== null) {
@@ -442,6 +458,22 @@ export function parseSpecSteps(specText: string, sessionNumber: number): string[
     // the guard costs nothing and the alternative is a hung extension host.
     if (match[0].length === 0) SESSION_HEAD_RE.lastIndex += 1;
   }
+  return heads;
+}
+
+/**
+ * The step texts `spec.md` currently declares for *sessionNumber*, or `[]`.
+ *
+ * Mirrors `spec_admission.parse_session_plans` narrowed to one session,
+ * which is what `session_checklist.read_spec_steps` does.
+ */
+export function parseSpecSteps(specText: string, sessionNumber: number): string[] {
+  const body = stripFencedBlocks(specText);
+  // `headStart` is the `###`'s own offset and `contentStart` is just past
+  // the heading line, mirroring Python's `m.start()` / `m.end()`. One
+  // session's segment runs from its own `contentStart` to the NEXT
+  // heading's `headStart`.
+  const heads = scanSessionHeads(body);
 
   for (let i = 0; i < heads.length; i += 1) {
     if (heads[i].number !== sessionNumber) continue;

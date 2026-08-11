@@ -18,6 +18,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > claiming a single current step). Publishing first would show staff a
 > marker that appears in one release and disappears in the next.
 
+### Added
+
+- **(Set 115 S2) Click a session row and land on its plan.** The Work
+  Explorer's session rows were labels you could not click. Activating one
+  now opens the set's `spec.md` **positioned at that session's own
+  `### Session N of M:` block** — the same file the framework itself
+  reads, revealed at the top of the editor with the cursor on the
+  heading, so the surrounding context and the Session Set Configuration
+  block are still a scroll away. No sidecar file is generated and nothing
+  is copied: the per-session view is a read-time slice of the one real
+  spec.
+
+  It goes through the **existing** `Open Spec` command rather than a
+  parallel one, so there is still exactly one answer to "which file is
+  the spec" and one message when it is missing. A spec that cannot answer
+  — no session headings at all (every older consumer-repo spec), a
+  malformed heading, or a ledger ahead of its spec — opens the real file
+  at the top rather than erroring or doing nothing.
+
 ### Fixed
 
 - **(Set 115 S1) Session rows say what the session is about.**

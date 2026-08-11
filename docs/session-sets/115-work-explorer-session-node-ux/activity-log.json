@@ -1,7 +1,7 @@
 {
   "sessionSetName": "115-work-explorer-session-node-ux",
   "createdDate": "2026-08-11T11:11:10.113634+00:00",
-  "totalSessions": 0,
+  "totalSessions": 4,
   "entries": [
     {
       "sessionNumber": 1,
@@ -96,6 +96,99 @@
       "stepKey": "verification",
       "dateTime": "2026-08-11T08:01:05.341676-04:00",
       "description": "Verification: discovery (2 lenses) + supplementary found 3 Major, all remediated; remediation-review returned VERIFIED with 2 fix-accepted verdicts",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T08:59:28.251912-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-a-session-scoped-reveal-activating",
+      "dateTime": "2026-08-11T08:59:28.251912-04:00",
+      "description": "**Add a session-scoped reveal**: activating a session node opens `spec.md` and reveals/selects that session's `### Session N of M:` block. Left-click on a **set** row already opens `spec.md` (`dabblerSessionSets.openSpec` via `planLeftClickActivation`) \u2014 this is the session-level sibling of a behaviour that exists, so reuse the plumbing rather than adding a parallel one.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "degrade-to-the-truth",
+      "dateTime": "2026-08-11T08:59:28.251912-04:00",
+      "description": "**Degrade to the truth.** A malformed or missing heading opens `spec.md` at the top rather than erroring or showing nothing. The operator always ends up looking at the real file.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "keep-the-decision-honest-about-scope",
+      "dateTime": "2026-08-11T08:59:28.251912-04:00",
+      "description": "**Keep the decision honest about scope**: if the plain reveal reads as too unfocused when actually used, record that finding \u2014 a read-only virtual document on a custom scheme is the sanctioned next step, and it is a *recorded* decision with a reason, not a default.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-layer-3-at-close-after",
+      "dateTime": "2026-08-11T08:59:28.251912-04:00",
+      "description": "Full Layer 3 at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T09:00:52.707638-04:00",
+      "description": "Registered session 2 via start_session; preload read (constitution, project-guidance, lessons-learned, AGENTS.md); transport profile copilot-cli confirmed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-a-session-scoped-reveal-activating",
+      "dateTime": "2026-08-11T09:09:01.052198-04:00",
+      "description": "Session rows now carry dabblerWorkExplorer.activateSession, which dispatches the EXISTING dabblerSessionSets.openSpec with the session node; openSpec reveals the section via the new pure providers/specSectionLocator.ts (borrowing sessionStepModel.scanSessionHeads so one regex decides what a session heading is). Layer 2 green: 13 new assertions.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "degrade-to-the-truth",
+      "dateTime": "2026-08-11T09:11:42.899026-04:00",
+      "description": "Every unanswerable case (no session number, unreadable spec, no matching heading, spec ahead of the ledger, EISDIR) returns undefined and opens spec.md at the top; the reveal itself falls back to vscode.open on any throw. Proven at Layer 2 (6 cases) and in a real host: a heading-less fixture opens at Ln 1 with no notification toast.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "keep-the-decision-honest-about-scope",
+      "dateTime": "2026-08-11T09:12:42.571534-04:00",
+      "description": "Journaled two decisions: (a) one command, two callers - openSpec takes an optional section, heading scan borrowed from sessionStepModel rather than re-derived; (b) the plain reveal ships as showTextDocument + revealRange(AtTop) with an empty selection, and whether it reads as focused enough is tagged uat_decide for the set walk - no custom scheme on this evidence, per the spec non-goal.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-layer-3-at-close-after",
+      "dateTime": "2026-08-11T09:15:53.944859-04:00",
+      "description": "Targeted runs recorded: Layer 2 full 1721 passing / 1 pending; new Layer 3 spec 2/2 in a real host. Full Layer 3 run of record is taken at close after the last code change.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-layer-3-at-close-after",
+      "dateTime": "2026-08-11T09:41:58.406020-04:00",
+      "description": "Runs of record after the last code change: mocha 1721 passing / 1 pending (49s), playwright 38 passed (14.1m, includes the 2 new session-plan-reveal scenarios). pytest fresh from S1 - no ai_router source changed. Verification VERIFIED (gpt-5.5, both discovery lenses, 0 blocking findings, 1 nit).",
       "status": "complete"
     }
   ]

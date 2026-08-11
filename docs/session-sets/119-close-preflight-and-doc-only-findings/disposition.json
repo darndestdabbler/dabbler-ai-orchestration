@@ -1,31 +1,41 @@
 {
   "status": "completed",
-  "summary": "Set 119 Session 1 gives every verification finding a provenance and stops documentation wording from buying a metered review round. `evidencePaths` is now contract on BOTH verification surfaces: the markdown parse in `ai_router/verification.py` reads a tolerant `Evidence paths:` line, and `ai_router/pull_verifier.py` offers an ungated `evidencePaths` array on the `submit_verdict` tool, parsing it into `Finding.evidence_paths` and serializing it as `evidencePaths`. `normalize_evidence_path` strips the decoration reviewers actually write (backticks, emphasis, `./`, backslashes, `:<line>`, `#anchor`) so the same file compares equal across rounds. Both reviewer templates ask for it and call it mandatory on a Critical/Major finding; both artifact schemas declare it optional, deliberately, because its absence must not launder a blocking finding. On top of that contract sits the doc-only severity cap, applied at the one shared chokepoint `is_blocking_issue`: a finding whose cited paths are ALL documentation prose is recorded at Minor and opens no round, and `classify_blocking` reports the demoted findings in a new `doc_capped_issues` list and names the count in its reason so the cap is auditable rather than silent. The cap is an operator-attested verification reduction, journaled BEFORE any cap code was written (authority=human, rubric_line=verification-reduction, verification_effect=reduces), with the narrower Major-only alternative recorded as considered and rejected. Three properties keep it from being the anti-laundering rule in reverse: doc-ness is derived from paths and never self-declared; absence is not doc-ness (an uncited blocking finding is never cheaper); and behaviour-bearing markdown (`ai_router/prompt-templates/**`) is code that happens to be spelled in markdown. Shipped with exactly 30 test functions -- the spec's irony budget to the digit -- including the L-112-1 falsifier pairs that plant each rule both ways. Two changes the spec did not enumerate were required for correctness, not scope: `TEMPLATE_ID` moved `session-verification-v7` -> `v8` with a freshly computed pin, because the reviewer template is hash-pinned and an unbumped edit fails closed by design (16 integrity-gate tests said so); and `docs/path-aware-critique.schema.json` plus its pure-Python validator both learned the field, because a producer emitting a key its own artifact schema does not declare is exactly the L-066-1 drift. Cross-provider verification returned VERIFIED on round 1 from both discovery lenses, with two Minor nits recorded below.",
+  "summary": "Set 119 Session 2 makes a close's obligations knowable before it runs. `python -m ai_router.close_preflight` reports every close-out obligation in one pass -- met and unmet, blocking and advisory -- at any point in a session, with NO side effects and NO routed call (no lock, no ledger event, no file written). It **reports; it never refuses**: this set's spec forbids a new gate, so blocking-ness is read from `gate_checks.is_blocking_check` rather than re-derived, and every verdict comes from CALLING the predicate `close_session` calls. The expensive case -- `verification_backstop`, 79 of 214 recorded check-failures, each firing a routed call at close time -- is answered for free by `close_backstop.decide_backstop`, EXTRACTED from `run_close_backstop` (which now consumes it) rather than copied, because a preflight carrying its own spelling of that seven-branch sequence would drift from the close it predicts. A close that would buy a round is reported as a COST WARNING, not a refusal: a backstop round returning VERIFIED closes fine. `--replay-history` ships the measurement as an instrument rather than a one-off query: 186 events, 214 recorded check-failures, 64 belonging to checks Set 116 S3 demoted, 150 still blocking, and the preflight covers 150 of 150. Filtering the ledger to before 2026-08-10T20:28Z reproduces the spec's prediction TO THE DIGIT (184 events, 212 failures, 148 still-blocking, 78 backstop, 122 sessions); the delta is exactly Set 117 Session 1's two close-out failures, recorded after the spec was authored. So the spec's prediction was RIGHT and history grew -- and the strong claim that the remainder is all knowable pre-close is confirmed, not asserted. Verification took five rounds and every one of the eight findings was accepted; none was disputed or dismissed. Four round-1 findings were ONE root cause: `close_session` runs the backstop BEFORE the gate chain and the first cut ran it after, so a no-evidence close was reported as a `verification_integrity` refusal (it is not one -- a VERIFIED backstop writes the very artifact that gate wants) and the backstop's mid-close bookkeeping was not tolerated on a rerun. `evaluate` now mirrors the close's order exactly. Round 2 found the two SET-TERMINAL gates outside `GATE_CHECKS` (path-aware critique, contract gate) were missing entirely. Round 3 found that fixing round 2 had introduced a new defect -- `required` was treated as unconditionally blocking while `close_session` soft-warns on the non-TTY path agents actually use -- and that the JSON surface still said `would_close: true` where the human surface said 'NOT yet decided'. Round 4 rejected the `--session-number` fix for deleting a promised input rather than making it coherent. The final shape satisfies both sides: the flag is an ASSERTION that is checked, never a partial override, so a mixed-session report is unrepresentable and a valid invocation is never refused. Round 5, on the operator's recorded authorization at the enforced bound, returned VERIFIED with 8/8 fix verdicts accepted and zero findings.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "ai_router/verification.py",
-    "ai_router/pull_verifier.py",
-    "ai_router/path_aware_critique.py",
-    "ai_router/verification_stamp.py",
-    "ai_router/prompt-templates/verification.md",
-    "ai_router/prompt-templates/path-aware-critique.md",
-    "ai_router/tests/test_doc_only_cap.py",
+    "ai_router/close_preflight.py",
+    "ai_router/close_backstop.py",
+    "ai_router/tests/test_close_preflight.py",
+    "ai_router/tests/test_path_aware_critique_schema.py",
+    "ai_router/docs/close-out.md",
     "ai_router/CHANGELOG.md",
-    "docs/session-issues.schema.json",
-    "docs/session-issues-schema.md",
     "docs/path-aware-critique.schema.json",
-    "docs/path-aware-critique-schema.md",
     "docs/ai-led-session-workflow.md",
-    "docs/planning/lessons-learned.md",
+    "docs/session-constitution.md",
+    "docs/repository-reference.md",
     "docs/session-sets/119-close-preflight-and-doc-only-findings/ai-assignment.md",
-    "docs/session-sets/119-close-preflight-and-doc-only-findings/s1-conventions.md",
     "docs/session-sets/119-close-preflight-and-doc-only-findings/decisions.jsonl",
-    "docs/session-sets/119-close-preflight-and-doc-only-findings/test-runs.jsonl",
     "docs/session-sets/119-close-preflight-and-doc-only-findings/activity-log.json",
     "docs/session-sets/119-close-preflight-and-doc-only-findings/checklist-posts.jsonl",
-    "docs/session-sets/117-bounded-test-parallelism/CANCELLED.md",
-    "docs/session-sets/117-bounded-test-parallelism/session-state.json"
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/test-runs.jsonl",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-remediation-round-1.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-remediation-round-3.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-verification.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-verification-fanout-2.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-verification-round-2.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-verification-round-3.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-verification-round-4.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-verification-round-5.md",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-issues.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-issues-round-2.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-issues-round-3.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-issues-round-4.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-acceptance-round-1.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-acceptance-round-2.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-acceptance-round-3.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-acceptance-round-4.json",
+    "docs/session-sets/119-close-preflight-and-doc-only-findings/s2-rounds.jsonl"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -35,34 +45,36 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 builds `ai_router.close_preflight` against the same gate predicates this session's orchestrator has just read end to end (`gate_checks.py`, `run_of_record`, `close_backstop`, the verification stamp), and its step 4 replays history over `session-events.jsonl` -- the same ledger this session's evidence came from. Continuity of that context is worth more than provider diversity here, and cross-provider independence is preserved where it matters: verification still routes to a different effective provider. Session 2 also inherits two owed residuals from this session, both named in `ai-assignment.md` and in the nits below."
+      "specifics": "Session 3 edits `close_backstop.py` -- the module this session just refactored -- to make a backstop round write a `discoveryBaselineTree` so `--phase remediation-review` stops refusing with EXIT_USAGE after a backstop-only blocking round. That change lands in the EXECUTION half of `run_close_backstop`, which this session deliberately separated from the DECISION half (`decide_backstop`) that `close_preflight` now depends on; an orchestrator who has just read that seam end to end is least likely to break the preflight while editing beside it. Session 3 also deletes seven modules on a proof-of-unreachability obligation, which is exactly the kind of work where knowing what the close path actually calls -- read directly this session, not inferred -- is worth more than provider diversity. Cross-provider independence is preserved where it matters: verification still routes to a different effective provider."
     }
   },
   "blockers": [],
   "lessons_cited": [
     "L-112-1",
-    "L-064-9",
-    "L-064-8"
+    "L-066-1",
+    "L-069-1",
+    "L-079-1"
   ],
   "notes": {
-    "adjudicated_minor_nits": [
-      {
-        "finding": "Doc-capped findings are classified and reported as Minor/nit, but the raw finding dict preserves its original `severity` value, so a durable artifact may still read `Major` for a capped finding. (Discovery call 1, spec-conformance lens.)",
-        "disposition": "working-as-intended, recorded",
-        "rationale": "Verification artifacts are RAW RECORDS and are never edited after they are written (session-constitution: `sN-issues*.json` is immutable). Rewriting a verifier's declared severity in the envelope would make the artifact say something the verifier did not say -- the same class of laundering the cap is guarded against, running through the writer instead of the classifier. The classification, not the stored label, is authoritative: every loop and gate consults `is_blocking_issue`, as the verifier itself observed. `classify_blocking.doc_capped_issues` exists precisely so a reader can see which findings were demoted without re-deriving it."
-      },
-      {
-        "finding": "`docs/path-aware-critique.schema.json` accepts a whitespace-only `evidencePaths` entry (a single space satisfies `minLength: 1`) while `ai_router/path_aware_critique.py` rejects it via `p.strip()`. A small schema/validator parity gap. (Discovery call 2, failure-scenario lens.)",
-        "disposition": "owed residual, owner: Set 119 Session 2",
-        "rationale": "Correct, and it is the L-066-1 class this repo names explicitly. It is Minor on consequence: the gap is FAIL-CLOSED (the Python validator is the stricter side, so nothing invalid is ever accepted at runtime), and the producer cannot emit the value -- `_coerce_evidence_paths` normalizes whitespace-only entries away before a `Finding` is built. The fix is one token: give the schema item the non-whitespace `pattern` that the sibling `description` property in the same file already carries. It is deliberately NOT applied in this session: the tree is frozen and stamped, and a post-verdict edit would stale `work_diff_sha256`, forcing a fresh routed backstop round to re-settle a one-character schema tightening. Session 2 already touches `ai_router/` and can fold it in before its own run of record."
-      }
-    ],
+    "measurement_step_4": {
+      "measured_today": "186 closeout_failed events; 214 recorded check-failures; 64 belonging to checks Set 116 S3 demoted to advisory; 150 still blocking; 150 covered by the preflight; 123 sessions with >=1 failure plus 1 unnumbered-event close.",
+      "spec_prediction": "184 events / 212 check-failures / 148 still-blocking / 78 verification_backstop / 122 sessions.",
+      "verdict": "The spec's prediction was CORRECT; the corpus grew. Filtering the ledger to before 2026-08-10T20:28Z reproduces the spec digit for digit. The delta is exactly Set 117 Session 1's two close-out failures (verification_backstop at 20:28:56Z, test_run_fresh at 20:29:47Z), recorded after the spec was authored and roughly two hours before this set's Session 1 began. The spec's strong claim -- that the remaining still-blocking failures are ALL knowable before close-out runs -- is confirmed rather than asserted: coverage is 150/150 today, 148/148 at the spec's cut.",
+      "instrument_defect_found_and_fixed": "Reconciling the session count (123 vs 122) found the one real defect in the instrument: a legacy Set 047 event carries \"session_number\": 0 and was being counted as a session. Session numbers are 1-based everywhere in this repo, so it is now excluded from the session tally -- while its check-failures still count, because a close really did fail and really did name them -- and discarded events are surfaced as `unnumbered_events` rather than vanishing. Pinned by a falsifier.",
+      "what_the_replay_does_not_claim": "It measures COVERAGE, not outcomes, and says so in its own output: the working trees that produced those failures are gone, so it answers 'would the preflight have named this obligation first?', which for a deterministic read-only predicate is the same question."
+    },
+    "verification_loop": "5 rounds: discovery (2 fan-out lenses, 4 blocking), supplementary (1 blocking), remediation-review x2 (2 then 1 blocking), and one operator-authorized remediation-review returning VERIFIED with 8/8 fix verdicts accepted and 0 findings. All 8 findings were ACCEPTED; none was disputed, dismissed, or waived, so there is no adjudicated-minor residual. Cost recorded as $0.00 on every round: this is a Copilot CLI seat, where billed usage is unavailable by design.",
     "operator_decisions_this_session": [
-      "Doc-only severity cap authorized (journaled in decisions.jsonl BEFORE any cap code was written, as spec step 3 requires).",
-      "Copilot catalog lockfile refreshed after the seat's CLI moved 1.0.78 -> 1.0.79: the fail-closed version-drift check was refusing every route() call, so the mandatory verification round was unrunnable. The refresh probes 18 model ids and spends premium requests, so it was the operator's call. Result: 11/18 confirmed across anthropic/google/openai. The lockfile is gitignored and seat-local -- no repo change.",
-      "Set 117 parked with the sanctioned, reversible `cancel_session_set` writer so the `one-active-set` drift check (and therefore the full suite, and therefore the blocking `test_run_fresh` gate) could pass. Sessions 2-3 of Set 117 are PENDING, NOT ABANDONED: `preCancelStatus: in-progress` is recorded and `restore_session_set` puts it back."
+      "Extraction over duplication (authority=ai, rubric_line=goal-over-letter): the spec's Touches list for this session does not name close_backstop.py, but its step 2 requires the preflight to evaluate the close's predicates 'by calling them rather than re-implementing them'. `decide_backstop` was extracted rather than copied; `run_close_backstop`'s behaviour is byte-identical and its 51 tests pass untouched.",
+      "One authorized verification round past the enforced bound (authority=human, rubric_line=accountability-sign-off, verification_effect=strengthens): at the bound, one Major from round 4 was fixed but unreviewed, its executable acceptance criterion passed verbatim, and the acceptance harness REFUSED to auto-close it on a baseline mismatch (its only pre-fix tree belonged to round 2). The operator authorized exactly one round to review the fix delta; it returned VERIFIED."
     ],
-    "test_run_of_record": "pytest: 3912 passed, 0 failed, 9 skipped in 899.54s (14:59), run on the frozen tree after the last code change and recorded in test-runs.jsonl. An earlier full run showed 2 failures; both were environmental (the Copilot CLI version drift and the two-in-progress-sets condition) and both are resolved above -- neither was in this session's changed code.",
-    "scope_notes": "Session 1 of 3. Sessions 2 (`close_preflight`) and 3 (the backstop baseline plus the unreachable-module deletion) are out of scope; `change-log.md` is authored at the set-terminal session. Nothing is published: `pyproject.toml` stays at 1.0.0 and the router changelog entry is filed under [Unreleased] on purpose."
+    "test_run_of_record": "pytest: 3975 passed, 9 skipped, 0 failed in 617.04s (10:17), run on the frozen tree after the last code change and recorded in test-runs.jsonl (digest e565fea2f7cf). No failures, environmental or otherwise.",
+    "session_1_residual_closed": "The whitespace-only `evidencePaths` schema/validator parity gap that Session 1 recorded as owed to Session 2 is fixed: `docs/path-aware-critique.schema.json` gives the array item the non-whitespace `pattern` its sibling `description` property already carried. Fail-closed is not the same as in-parity (L-066-1) -- nothing invalid was ever accepted at runtime, but a schema-only consumer would have accepted an artifact the runtime rejects. Both directions are now pinned by falsifier pairs in `test_path_aware_critique_schema.py`.",
+    "owed_residuals": [
+      "The doc-only cap's blast radius is still unmeasured. Session 1 named it; this session did not fold it in because the replay reads `session-events.jsonl` (close-out failures) while that question needs `sN-issues*.json` (findings) -- a different corpus and a different instrument. Still owed.",
+      "`EvidenceTooLargeError` is the one pre-metered backstop refusal the preflight does not predict. It is raised by the evidence assembly AFTER `decide_backstop` returns -- the single expensive read in the sequence, deliberately not performed, because assembling evidence on every run would make a run-it-on-a-whim tool no longer cheap. Session 3 touches `close_backstop.py` and could fold it in, but should weigh that cost.",
+      "The preflight is discoverable only by a pointer. The constitution sits at 3,984 of its 4,000-token ceiling and ceilings ratchet down only, so the Step 8 pointer row was reworded to name the preflight BEFORE close (evicting nothing) and the narrative lives in `close-out.md` Section 1 and the workflow doc. Anything more is an eviction decision and belongs to the later preload set."
+    ],
+    "scope_notes": "Session 2 of 3. Session 3 (the backstop baseline record, the truthful refusal message, and the unreachable-module deletion) is out of scope; `change-log.md` is authored at the set-terminal session. Nothing is published: `pyproject.toml` stays at 1.0.0 and the router changelog entry is filed under [Unreleased] on purpose. No extension change -- nothing here touches `tools/`."
   }
 }

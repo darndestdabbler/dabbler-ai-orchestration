@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** `close_preflight` reports the would-route backstop path as blocking because it evaluates `verification_integrity` before accounting for the close backstop.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_preflight.py:430`, `ai_router/gate_checks.py:1533`, `ai_router/close_session.py:1866`, `ai_router/close_session.py:2005`, `ai_router/close_backstop.py:953`, `ai_router/docs/close-out.md:185`\n  - **Failure scenario:** A typical completed API session has no stamped verification evidence yet. The preflight reports `verification_integrity` as an unmet blocking gate and exits `1`, even though default `close_session` runs the backstop before the gate chain; if that backstop returns `VERIFIED`, it writes the verification artifact/ledger/disposition patch and the later gate chain can pass. This is probable because the spec identifies the missing-settling-evidence backstop path as the central expensive case.\n  - **Acceptance criterion:** `JUDGMENT - With all non-verification gates satisfied and close_backstop.decide_backstop(...).would_route true, close_preflight.evaluate must report verification_backstop as a cost warning, must not include verification_integrity in unmet_blocking, and must exit 0 unless another deterministic pre-route blocking obligation is unmet.`\n  - **Details:** **Violation:** the delivered docs claim the preflight reports “closing now SPENDS a routed round” as a **cost warning** “not a refusal,” and that it “can never refuse something the close allows.” **Impact:** the central expensive-case deliverable gives a false blocking verdict and the rendered summary says `close_session would refuse`, changing the merge decision because the preflight does not predict the close path it claims to predict. **Evidence:** `close_preflight.evaluate` runs every `GATE_CHECKS` predicate before appending the backstop obligation; `check_verification_integrity` fails an API disposition with no `sN-verification*.md`; but `close_session.run` invokes `run_close_backstop` before `_run_gate_checks`, and a verified backstop writes the artifact/ledger/disposition patch before the gate chain runs. The correct behavior is to model the close’s backstop-before-gates ordering, not to gate on the pre-backstop filesystem state.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical completed API session has no stamped verification evidence yet. The preflight reports `verification_integrity` as an unmet blocking gate and exits `1`, even though default `close_session` runs the backstop before the gate chain; if that backstop returns `VERIFIED`, it writes the verification artifact/ledger/disposition patch and the later gate chain can pass. This is probable because the spec identifies the missing-settling-evidence backstop path as the central expensive case.",
+      "evidencePaths": [
+        "ai_router/close_preflight.py",
+        "ai_router/gate_checks.py",
+        "ai_router/close_session.py",
+        "ai_router/close_backstop.py",
+        "ai_router/docs/close-out.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "With all non-verification gates satisfied and close_backstop.decide_backstop(...).would_route true, close_preflight.evaluate must report verification_backstop as a cost warning, must not include verification_integrity in unmet_blocking, and must exit 0 unless another deterministic pre-route blocking obligation is unmet."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** Preflight reports the no-evidence backstop-spend path as a blocking `verification_integrity` refusal.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_preflight.py:430`, `ai_router/close_preflight.py:452`, `ai_router/close_session.py:1820`, `ai_router/close_session.py:2005`, `ai_router/gate_checks.py:1533`\n  - **Failure scenario:** A clean, pushed API session with no stamped verification evidence runs preflight before close. `close_session` would run the backstop before gate checks, and a VERIFIED backstop result can close; preflight instead runs `verification_integrity` first and exits non-zero. This is probable because this is the exact expensive case the feature exists to expose.\n  - **Acceptance criterion:** `JUDGMENT - A no-stamped-evidence, resolvable backstop case must not list verification_integrity as an unmet blocking row solely because sN-verification*.md is absent before the backstop would run.`\n  - **Details:** Violation: the tool claims a would-route backstop is a “cost warning, not a refusal” and should not “refuse something the close allows.” Impact: users get a false “close_session would refuse” result and may do unnecessary remediation instead of understanding the close would spend a routed round. Evidence: `close_session` runs `run_close_backstop` before `_run_gate_checks`, while `close_preflight.evaluate` runs all `GATE_CHECKS` before `_backstop_obligation`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A clean, pushed API session with no stamped verification evidence runs preflight before close. `close_session` would run the backstop before gate checks, and a VERIFIED backstop result can close; preflight instead runs `verification_integrity` first and exits non-zero. This is probable because this is the exact expensive case the feature exists to expose.",
+      "evidencePaths": [
+        "ai_router/close_preflight.py",
+        "ai_router/close_session.py",
+        "ai_router/gate_checks.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A no-stamped-evidence, resolvable backstop case must not list verification_integrity as an unmet blocking row solely because sN-verification*.md is absent before the backstop would run."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    },
+    {
+      "description": "** Preflight misses close_session’s backstop-written bookkeeping ignore path on reruns.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_session.py:1903`, `ai_router/close_session.py:2005`, `ai_router/close_session.py:839`, `ai_router/close_preflight.py:430`, `ai_router/close_backstop.py:453`, `ai_router/tests/test_close_backstop.py:788`\n  - **Failure scenario:** A close attempt runs a VERIFIED backstop, writes artifacts/disposition/round ledger, then fails a later gate. On rerun, `close_session` skips the backstop and ignores those exact bookkeeping paths for `working_tree_clean`; preflight will instead report `working_tree_clean` as blocking. This is probable because the repo has a dedicated regression test for this real rerun shape.\n  - **Acceptance criterion:** `JUDGMENT - In the rerun-after-backstop-bookkeeping scenario, close_preflight must tolerate the same backstop written_paths for working_tree_clean that close_session passes via extra_clean_ignore.`\n  - **Details:** Violation: preflight says it calls predicates “exactly the way close_session._run_gate_checks invokes” them. Impact: the preflight sends users to commit/clean paths that close_session intentionally tolerates, hiding the real later blocker. Evidence: `close_session` carries `backstop.written_paths` into `_run_gate_checks(... extra_clean_ignore=...)`; `close_preflight` never obtains or passes those paths.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A close attempt runs a VERIFIED backstop, writes artifacts/disposition/round ledger, then fails a later gate. On rerun, `close_session` skips the backstop and ignores those exact bookkeeping paths for `working_tree_clean`; preflight will instead report `working_tree_clean` as blocking. This is probable because the repo has a dedicated regression test for this real rerun shape.",
+      "evidencePaths": [
+        "ai_router/close_session.py",
+        "ai_router/close_preflight.py",
+        "ai_router/close_backstop.py",
+        "ai_router/tests/test_close_backstop.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "In the rerun-after-backstop-bookkeeping scenario, close_preflight must tolerate the same backstop written_paths for working_tree_clean that close_session passes via extra_clean_ignore."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    },
+    {
+      "description": "** `--session-number` only affects the backstop row, not the gate predicates.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_preflight.py:227`, `ai_router/close_preflight.py:406`, `ai_router/close_preflight.py:430`, `ai_router/close_preflight.py:717`, `ai_router/gate_checks.py:701`, `ai_router/gate_checks.py:1518`\n  - **Failure scenario:** In a multi-session set, a user or script passes `--session-number N` expecting to preflight session N. The report labels/backstops N, but activity, next-orchestrator, change-log, verification, UAT, checklist, and test freshness predicates still resolve the session from `session-state.json`. Multi-session sets are normal in this workflow, so a mislabeled mixed-session report is likely when the override is used.\n  - **Acceptance criterion:** `JUDGMENT - Passing an explicit session number must make every session-scoped obligation evaluate that same session, or the CLI must reject/remove the option instead of producing a mixed-session report.`\n  - **Details:** Violation: the task required preflight to run “against a session set and session number,” and the CLI help says “Session to preflight.” Impact: the command can falsely pass or fail obligations for the wrong session. Evidence: `evaluate()` resolves the explicit session but passes only `session_set_dir` and `disposition` to `GATE_CHECKS`; those predicates independently read the session in focus from state.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "In a multi-session set, a user or script passes `--session-number N` expecting to preflight session N. The report labels/backstops N, but activity, next-orchestrator, change-log, verification, UAT, checklist, and test freshness predicates still resolve the session from `session-state.json`. Multi-session sets are normal in this workflow, so a mislabeled mixed-session report is likely when the override is used.",
+      "evidencePaths": [
+        "ai_router/close_preflight.py",
+        "ai_router/gate_checks.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Passing an explicit session number must make every session-scoped obligation evaluate that same session, or the CLI must reject/remove the option instead of producing a mixed-session report."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "5da6924e318c96fb7a210600a9389303bf9df77b"
+}

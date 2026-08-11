@@ -149,6 +149,60 @@ session. The script is idempotent: running it twice on a session that
 is already `complete` exits 0 with `result: "noop_already_closed"` and
 no events emitted.
 
+### Finding out early — `close_preflight` (Set 119 S2)
+
+Two in five sessions fail close-out at least once (122 of 295 measured
+sessions, mean 1.6 attempts, max 9), and every one of those failures has
+the same shape: an obligation the orchestrator did not know it had until
+a gate refused. The preflight answers the same questions the close asks,
+at any time, with **no side effects and no routed call**:
+
+```bash
+.venv/Scripts/python.exe -m ai_router.close_preflight \
+    --session-set-dir docs/session-sets/<slug>
+```
+
+It prints every obligation in one pass — met and unmet, blocking and
+advisory — with the predicate's own remediation and the action that
+satisfies it. Exit `0` when nothing blocking is unmet, `1` when
+something is, `2` on an invalid invocation. `--json` emits the same
+report for a script.
+
+Three things it deliberately is **not**:
+
+- **Not a gate.** It reports; only the existing gates refuse. Its
+  blocking/advisory split comes straight from
+  `gate_checks.is_blocking_check`, so it can never refuse something the
+  close allows.
+- **Not a second implementation.** Every verdict comes from calling the
+  predicate `close_session` calls. A preflight that disagrees with the
+  gate is worse than no preflight.
+- **Not silent about money.** The expensive case is
+  `verification_backstop` — 79 of 214 recorded check-failures, each
+  firing a routed call *at close time*. `close_backstop.decide_backstop`
+  walks the backstop's whole pre-metered decision (method token,
+  `budget.yaml`, orchestrator identity, stamped evidence, round ledger,
+  diff base) using reads alone, so the preflight reports "closing now
+  SPENDS a routed round" as a **cost warning** — not a refusal, since a
+  backstop round that returns VERIFIED closes fine.
+
+Running it mid-session, `working_tree_clean` and `pushed_to_remote` are
+*supposed* to be unmet: they are the last two things a session does. A
+non-zero exit mid-session is the tool working. It is a to-do list, not
+an accusation.
+
+Its historical reach is measured rather than asserted:
+
+```bash
+.venv/Scripts/python.exe -m ai_router.close_preflight \
+    --session-set-dir <any> --replay-history
+```
+
+replays coverage over every `closeout_failed` event in the corpus. As of
+Set 119 S2: 214 recorded check-failures, 64 belonging to checks Set 116
+S3 demoted to advisory (worth nothing to pre-empt now), **150 still
+blocking, of which the preflight names 150**.
+
 The orchestration layer invokes close-out as a fresh routed turn after
 work verification terminates, so the close-out agent encounters
 `ai_router/docs/close-out.md` (this file) at the moment the instructions

@@ -414,3 +414,49 @@ class TestStructuralParity:
         env = _minimal()
         assert _schema_ok(validator, env) is True
         assert pac.validate_path_aware_critique_artifact(env).ok is True
+
+
+class TestEvidencePathsParity:
+    """Set 119 S1 shipped ``evidencePaths`` and S1's own verification found
+    the parity gap S2 closes here: the schema's item constraint was
+    ``minLength: 1``, which a single SPACE satisfies, while
+    ``path_aware_critique`` rejects it via ``p.strip()``. The sibling
+    ``description`` property in the same file already carried the
+    non-whitespace ``pattern``; the array item did not.
+
+    Fail-closed is not the same as in-parity (L-066-1): the Python side
+    being stricter means nothing invalid was ever accepted at runtime, but
+    a schema-only consumer would still accept an artifact the runtime
+    rejects. Both directions are pinned below.
+    """
+
+    def _with_paths(self, paths):
+        env = _minimal()
+        env["critiques"][0]["findings"] = [
+            {"description": "a finding", "evidencePaths": paths}
+        ]
+        return env
+
+    def test_whitespace_only_path_rejected_by_both(self, validator):
+        env = self._with_paths([" "])
+        assert _schema_ok(validator, env) is False
+        assert pac.validate_path_aware_critique_artifact(env).ok is False
+
+    def test_empty_path_rejected_by_both(self, validator):
+        env = self._with_paths([""])
+        assert _schema_ok(validator, env) is False
+        assert pac.validate_path_aware_critique_artifact(env).ok is False
+
+    def test_a_real_path_is_accepted_by_both(self, validator):
+        """The look-alike. Without it, 'reject every evidencePaths entry'
+        would pass the two tests above."""
+        env = self._with_paths(["ai_router/verification.py"])
+        assert _schema_ok(validator, env) is True
+        assert pac.validate_path_aware_critique_artifact(env).ok is True
+
+    def test_absent_evidence_paths_stays_valid(self, validator):
+        """Optional by design: its absence must not launder a blocking
+        finding, so it must also not invalidate an artifact."""
+        env = _minimal()
+        assert _schema_ok(validator, env) is True
+        assert pac.validate_path_aware_critique_artifact(env).ok is True

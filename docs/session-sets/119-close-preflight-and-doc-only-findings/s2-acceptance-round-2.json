@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "24f0ca2cd9eeeaa4c42e5f1138575d3d8e864697",
+  "fixedTree": "17e123d46f4ba822fcde356906e75a52208d5803",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T00:53:23.096643+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `close_preflight` omits the set-terminal path-aware critique and contract gates. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `ai_router/close_preflight.py:430`, `ai_rou ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "close_preflight reports path_aware_critique_gate and contract_gate when the same set-terminal conditions would make close_session evaluate them, preserving required/advisory/non-TTY blocking posture and remediation.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

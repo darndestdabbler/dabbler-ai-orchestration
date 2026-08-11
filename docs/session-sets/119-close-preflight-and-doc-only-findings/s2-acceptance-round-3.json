@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "24f0ca2cd9eeeaa4c42e5f1138575d3d8e864697",
+  "fixedTree": "33ce25cddace8823f844284fa357b3e3898f043c",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T01:02:13.844369+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `close_preflight` hard-blocks required terminal policy gates in headless mode even though `close_session` soft-warns and succeeds. - **Category:** Correctness - **Severity:** Major - **Evidence pat ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "For terminal required path-aware-critique and contract gates, close_preflight must classify blocking vs advisory according to the same TTY/headless or equivalent close_session invocation posture, not solely by policy level.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** JSON output still reports `\"would_close\": true` for the backstop-would-route state that the human renderer correctly says is “NOT yet decided.” - **Category:** Correctness - **Severity:** Major - * ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In the backstop_would_route state, JSON must not claim the close is decided/closeable; its boolean/status fields must match the human renderer’s “not yet decided” semantics.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

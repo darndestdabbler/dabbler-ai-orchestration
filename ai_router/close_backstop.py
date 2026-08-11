@@ -154,6 +154,40 @@ class BackstopOutcome:
         return self.status.startswith("skipped_")
 
 
+@dataclass
+class BackstopDecision:
+    """Whether the backstop will spend a routed call — decided before it does.
+
+    Set 119 S2. Every branch the backstop takes *before* its metered call
+    is a read of on-disk state: the method token, ``budget.yaml``, the
+    orchestrator identity, the stamped evidence, the round ledger and the
+    session's diff base. So the answer is knowable at any time, which is
+    what ``close_preflight`` asks on the orchestrator's behalf — 78 of the
+    212 recorded close-out check-failures are this one check, and each
+    firing spends a routed round at close time to say something that was
+    knowable minutes earlier.
+
+    This is an **extraction, not a copy**. A preflight carrying its own
+    spelling of the sequence would drift from the close it predicts, and a
+    preflight that disagrees with the gate is worse than no preflight —
+    it would teach orchestrators to distrust it, which is how a reporting
+    tool dies. :func:`run_close_backstop` consumes exactly this object, so
+    there is one sequence with two readers.
+
+    ``would_route`` True means the next thing the backstop does is spend
+    money; ``identity``, ``round_number`` and ``diff_base`` are then the
+    resolved inputs it would spend it with. ``would_route`` False means
+    the backstop has already decided, and ``outcome`` is the verbatim
+    :class:`BackstopOutcome` the close would see.
+    """
+
+    would_route: bool
+    outcome: Optional[BackstopOutcome] = None
+    identity: Optional[object] = None
+    round_number: Optional[int] = None
+    diff_base: Optional[str] = None
+
+
 def _default_route(prompt: str, session_set: str, session_number: int,
                    complexity_hint: int, max_tier: Optional[int],
                    exclude_providers: Optional[List[str]] = None,
@@ -505,31 +539,41 @@ def _round_bound_remediation(
     )
 
 
-def run_close_backstop(
+def decide_backstop(
     session_set_dir: str,
     session_number: Optional[int],
     disposition: Optional[Disposition],
-    *,
-    route_fn: Optional[Callable] = None,
-    complexity_hint: int = _DEFAULT_COMPLEXITY_HINT,
-) -> BackstopOutcome:
-    """Run the Set 084 close backstop for one close attempt.
+) -> BackstopDecision:
+    """Everything the backstop decides before it spends anything.
 
-    The caller (``close_session.run``) has already excluded the
-    ``--force`` / ``--manual-verify`` / ``--no-router`` paths and holds the
-    close lock. This function decides skip-vs-run, performs the
-    verification when owed, writes the artifacts + stamped row + the
-    disposition patch, and reports what happened; the caller maps the
-    outcome onto the close (proceed / ``gate_failed``).
+    Set 119 S2 extracted this from :func:`run_close_backstop`, which now
+    calls it — see :class:`BackstopDecision` for why it is one sequence
+    with two readers rather than two spellings of one sequence.
+
+    **Pure reads, no routed call, no writes.** Every branch below consults
+    on-disk state only: the disposition's method token, ``budget.yaml``,
+    the session's orchestrator identity, the stamped metrics rows and
+    their hash-bound artifacts, the round ledger, and ``git log`` for the
+    diff base. Safe to call at any time, including mid-session from
+    ``close_preflight``.
+
+    The one pre-metered refusal NOT decided here is
+    :class:`verify_session.EvidenceTooLargeError`, raised by the evidence
+    assembly that follows: assembly is the routing *preparation*, not the
+    decision, and it is the one expensive read in the sequence. A caller
+    predicting the close therefore predicts every branch up to assembly.
     """
     set_dir = Path(session_set_dir)
 
     if disposition is None or session_number is None:
         # Nothing to police here: the missing-disposition refusal (and
         # the no-session shape) belongs to the invocation layer.
-        return BackstopOutcome(
-            status=STATUS_SKIPPED_VOCABULARY,
-            messages=["backstop skipped: no disposition/session to close"],
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_SKIPPED_VOCABULARY,
+                messages=["backstop skipped: no disposition/session to close"],
+            ),
         )
 
     # An illegal verification_method token dooms this close regardless of
@@ -549,17 +593,20 @@ def run_close_backstop(
         str(set_dir), disposition,
     )
     if not vocab_ok:
-        return BackstopOutcome(
-            status=STATUS_SKIPPED_VOCABULARY,
-            messages=[
-                "backstop skipped: disposition.verification_method is "
-                "illegal, so no evidence this round could buy would let "
-                "the close pass. Fix the token. (A separate invocation, "
-                "close_session --manual-verify, does not reach this "
-                "backstop at all and would close with only an advisory "
-                "warning about the token -- that is a different, "
-                "attested path, not this one.)"
-            ],
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_SKIPPED_VOCABULARY,
+                messages=[
+                    "backstop skipped: disposition.verification_method is "
+                    "illegal, so no evidence this round could buy would let "
+                    "the close pass. Fix the token. (A separate invocation, "
+                    "close_session --manual-verify, does not reach this "
+                    "backstop at all and would close with only an advisory "
+                    "warning about the token -- that is a different, "
+                    "attested path, not this one.)"
+                ],
+            ),
         )
 
     # The operator-declared zero-budget tier keeps its existing manual /
@@ -567,13 +614,16 @@ def run_close_backstop(
     # counts; an absent or unreadable budget.yaml is the api default.
     budget, _err = _read_budget_yaml(_project_root_for(str(set_dir)))
     if budget is not None and budget.get("threshold_usd") == 0:
-        return BackstopOutcome(
-            status=STATUS_SKIPPED_ZERO_BUDGET,
-            messages=[
-                "backstop skipped: ai_router/budget.yaml declares the "
-                "zero-budget tier (threshold_usd: 0); the manual/attested "
-                "flow governs this close"
-            ],
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_SKIPPED_ZERO_BUDGET,
+                messages=[
+                    "backstop skipped: ai_router/budget.yaml declares the "
+                    "zero-budget tier (threshold_usd: 0); the manual/attested "
+                    "flow governs this close"
+                ],
+            ),
         )
 
     # F1: resolve the orchestrator identity through the one shared path.
@@ -583,11 +633,14 @@ def run_close_backstop(
             set_dir, session_number
         )
     except _vs.VerifySessionError as exc:
-        return BackstopOutcome(
-            status=STATUS_IDENTITY_UNRESOLVABLE,
-            remediation=(
-                f"{exc} Re-run start_session with --model, then close "
-                "again."
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_IDENTITY_UNRESOLVABLE,
+                remediation=(
+                    f"{exc} Re-run start_session with --model, then close "
+                    "again."
+                ),
             ),
         )
 
@@ -600,10 +653,13 @@ def run_close_backstop(
         set_dir, session_number, disposition, identity.effective_provider,
     )
     if settling_row is not None:
-        return BackstopOutcome(
-            status=STATUS_SKIPPED_EVIDENCE_PRESENT,
-            written_paths=_settling_bookkeeping_paths(
-                set_dir, settling_row
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_SKIPPED_EVIDENCE_PRESENT,
+                written_paths=_settling_bookkeeping_paths(
+                    set_dir, settling_row
+                ),
             ),
         )
 
@@ -634,34 +690,87 @@ def run_close_backstop(
         set_dir, session_number, round_number, None
     )
     if bound_status.exceeds:
-        return BackstopOutcome(
-            status=STATUS_ROUND_BOUND_REACHED,
-            remediation=_round_bound_remediation(
-                set_dir, session_number, bound_status
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_ROUND_BOUND_REACHED,
+                remediation=_round_bound_remediation(
+                    set_dir, session_number, bound_status
+                ),
             ),
         )
 
-    # --- The backstop runs. Same machinery as verify_session, end to
-    # --- end: evidence -> template -> exclusion -> stamped row ->
-    # --- raw artifacts -> disposition patch.
-    exclude_providers = [identity.effective_provider]
     diff_base = resolve_backstop_diff_base(set_dir, session_number)
     if diff_base is None:
         try:
             from .gate_checks import _verify_session_command
         except ImportError:
             from gate_checks import _verify_session_command  # type: ignore[no-redef]
-        return BackstopOutcome(
-            status=STATUS_ROUTE_FAILED,
-            remediation=(
-                "the backstop cannot determine the session's evidence "
-                "base (no recorded startedAt, or the repo is "
-                "unresolvable) and refuses to verify a degraded bundle "
-                "(fails closed — I-084-S2-6). Run the sanctioned Step 6 "
-                "command with an explicit --diff-base instead: "
-                f"{_verify_session_command(str(set_dir))}"
+        return BackstopDecision(
+            would_route=False,
+            outcome=BackstopOutcome(
+                status=STATUS_ROUTE_FAILED,
+                remediation=(
+                    "the backstop cannot determine the session's evidence "
+                    "base (no recorded startedAt, or the repo is "
+                    "unresolvable) and refuses to verify a degraded bundle "
+                    "(fails closed — I-084-S2-6). Run the sanctioned Step 6 "
+                    "command with an explicit --diff-base instead: "
+                    f"{_verify_session_command(str(set_dir))}"
+                ),
             ),
         )
+
+    return BackstopDecision(
+        would_route=True,
+        identity=identity,
+        round_number=round_number,
+        diff_base=diff_base,
+    )
+
+
+def run_close_backstop(
+    session_set_dir: str,
+    session_number: Optional[int],
+    disposition: Optional[Disposition],
+    *,
+    route_fn: Optional[Callable] = None,
+    complexity_hint: int = _DEFAULT_COMPLEXITY_HINT,
+) -> BackstopOutcome:
+    """Run the Set 084 close backstop for one close attempt.
+
+    The caller (``close_session.run``) has already excluded the
+    ``--force`` / ``--manual-verify`` / ``--no-router`` paths and holds the
+    close lock. This function decides skip-vs-run, performs the
+    verification when owed, writes the artifacts + stamped row + the
+    disposition patch, and reports what happened; the caller maps the
+    outcome onto the close (proceed / ``gate_failed``).
+
+    The skip-vs-run decision itself lives in :func:`decide_backstop`
+    (Set 119 S2), so ``close_preflight`` can ask the same question
+    without spending the round that answering it used to cost.
+    """
+    set_dir = Path(session_set_dir)
+
+    decision = decide_backstop(session_set_dir, session_number, disposition)
+    if not decision.would_route:
+        # decide_backstop always pairs would_route=False with an outcome;
+        # the fallback keeps a future edit from returning None here.
+        return decision.outcome or BackstopOutcome(
+            status=STATUS_ROUTE_FAILED,
+            remediation="the backstop reached no decision",
+        )
+
+    # Narrow for the type checker: a routing decision carries all three.
+    assert session_number is not None and disposition is not None
+    identity = decision.identity
+    round_number = decision.round_number
+    diff_base = decision.diff_base
+
+    # --- The backstop runs. Same machinery as verify_session, end to
+    # --- end: evidence -> template -> exclusion -> stamped row ->
+    # --- raw artifacts -> disposition patch.
+    exclude_providers = [identity.effective_provider]
     try:
         evidence = _vs.assemble_evidence(
             set_dir, session_number, diff_base,

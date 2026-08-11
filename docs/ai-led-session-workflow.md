@@ -2261,6 +2261,38 @@ close-out failure for orchestrators new to the workflow. The
 incident-recovery use only — do not reach for it as a shortcut
 around authoring the disposition.
 
+**Find out before you close — `close_preflight` (Set 119 S2).** Close-out
+is not slow (median 0.1 min); it **fails** — 122 of 295 measured sessions
+failed at least once, mean 1.6 attempts, max 9, every one of them an
+obligation nobody knew they had until a gate refused. Run
+
+```bash
+.venv/Scripts/python.exe -m ai_router.close_preflight \
+    --session-set-dir docs/session-sets/<slug>
+```
+
+at any point in a session to see every obligation in one pass — met and
+unmet, blocking and advisory — each with the predicate's own remediation
+and the action that satisfies it. It has **no side effects and makes no
+routed call**, so it is safe to run repeatedly, including while a close
+holds the lock.
+
+It **reports; it never refuses.** The blocking/advisory split is read
+from `gate_checks.is_blocking_check` and every verdict comes from calling
+the predicate `close_session` calls, so it can neither refuse something
+the close allows nor miss a demotion. It is not a gate and adds none.
+
+Its one addition beyond the gate chain is a **cost warning**: it answers
+"would the verification backstop fire?" — 79 of 214 recorded
+check-failures, each spending a routed call *at close time* — by walking
+`close_backstop.decide_backstop`, whose every branch is a read. A close
+that would buy a round is reported as expensive, not as blocked (a
+backstop round returning VERIFIED closes fine); the sanctioned response
+is to run `verify_session` yourself first, where the findings can be
+iterated on instead of met inside a close. Full contract:
+[`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md) →
+Section 1, *Finding out early*.
+
 **A deliberately remote-less repo is not an incident — use local-only,
 not `--force`.** When a repo has no git remote *by design* (and never
 will), the close-out push gate would otherwise fail every session. The

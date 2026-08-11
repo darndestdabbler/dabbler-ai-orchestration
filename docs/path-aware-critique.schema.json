@@ -111,7 +111,7 @@
         "evidencePaths": {
           "description": "Optional critic-emitted field (Set 119 S1): the repo-relative paths the critic actually read that prove the finding — the finding's provenance, taken from the submit_verdict tool's evidencePaths array and normalized (decoration and ':<line>' suffixes stripped). The tool description makes it MANDATORY on a Critical/Major finding, but it stays schema-optional because its ABSENCE must not launder a blocking finding: a finding with no paths keeps its declared severity. Doc-ness is derived from these paths, never self-declared — ai_router.verification.is_blocking_issue caps a finding whose paths are ALL documentation prose at Minor.",
           "type": "array",
-          "items": { "type": "string", "minLength": 1 }
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
         }
       },
       "allOf": [

@@ -60,19 +60,28 @@ honest accounting matters more than the headline:
 
 | | scenarios |
 | :--- | ---: |
-| **Webview — retired by this set** (`getting-started-surface` 4, `system-status` 3, `vsix-first-run-walkthrough` 1, `overlay-click-swallow` 1) | **9** |
+| **Webview — retired by this set** (`getting-started-surface` 4, `system-status` 3, `overlay-click-swallow` 1) | **8** |
+| `vsix-first-run-walkthrough` — **rewritten, not retired** (see Session 3) | 1 |
 | Tree — unaffected | 28 |
-| Harness baseline (`icon-render-mechanism`, `loading-state`, `real-host-baseline`) | 3 |
-| **Layer 3 total** | **40** |
+| Harness baseline (`icon-render-mechanism`, `loading-state`) | 2 |
+| **Layer 3 total** | **39** |
 
 Plus **3,576 lines** of surface: `configEditor/` 2,671, `wizard/` 583,
 `dashboard/` 322.
 
-**Why the other 31 must stay.** The tree renders in a real VS Code host
-and Layer 2 cannot prove that it does. Set 110 S4 shipped a staged VSIX
-with an icon shape **VS Code rejected outright** — the worked example of
-a defect only a real host catches. Retiring the harness would trade a
-known-cheap suite for an unknown-expensive release.
+> **Updated 2026-08-11 (ad-hoc PR).** `real-host-baseline.spec.ts` was
+> deleted separately — it burned 4.6 minutes on six cold launches to
+> assert only that six timings were greater than zero, and the
+> webview-vs-native comparison it existed for is finished. The suite is
+> now **39 scenarios in 6.7 minutes** (was 40 in 23.3), after `workers`
+> went 1 → 4 on isolation Set 117 S1 had already built. Re-derive these
+> counts when this set runs rather than trusting them.
+
+**Why the tree scenarios must stay.** The tree renders in a real VS Code
+host and Layer 2 cannot prove that it does. Set 110 S4 shipped a staged
+VSIX with an icon shape **VS Code rejected outright** — the worked
+example of a defect only a real host catches. Retiring the harness would
+trade a known-cheap suite for an unknown-expensive release.
 
 This is the operator's stated sizing principle applied literally:
 *eliminate on functionality that is not helpful*, rather than picking a
@@ -179,13 +188,45 @@ be there.
    consumer-bootstrap template, the cold-start fixture (`L-069-1`: a bug
    is a bug CLASS).
 5. `package.json` is the extension MANIFEST, so **`L-064-12` applies**:
-   full `npm run test:playwright` after the last edit — expect **31
-   scenarios, all passing**. Then full pytest, verify, close.
+   full `npm run test:playwright` after the last edit. Expect **31
+   scenarios** if the walkthrough is rewritten in place, or 30 plus a
+   rewritten one — the number is the *check*, not the goal. Then full
+   pytest, verify, close.
 
 **Creates:** the deletion, the bootstrap updates
 **Touches:** `tools/dabbler-ai-orchestration/src/`, `package.json`, Layer 3 specs, `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `docs/`
 **Ends with:** 3,576 fewer lines of extension surface, 9 fewer Layer 3 scenarios, and a startup that infers rather than asks.
-**Progress keys:** `coldStartWalked`, `surfaceDeleted`, `bootstrapUpdated`, `layer3At31`
+**Progress keys:** `coldStartWalked`, `surfaceDeleted`, `bootstrapUpdated`, `layer3At31`, `walkthroughRewritten`
+
+> **`vsix-first-run-walkthrough.spec.ts` is REWRITTEN, never deleted.**
+> It is counted above among the 9 retired scenarios only because it
+> drives the Getting Started webview form for its Build step; the journey
+> it proves — Build → rename → delete → re-add, through the real Command
+> Palette, QuickPick, InputBox and modal dialogs, with a real `git init`
+> — survives this set and must still be proven against the new
+> terminal-based flow. Two reasons it is not a candidate for deletion:
+>
+> - It is the **only** end-to-end proof of first run, and it exists
+>   because a round-5 verifier and a routed third-party opinion rejected
+>   stub-level evidence: *"a stub-level callback test proves wiring but
+>   not the real interactive journey."* Deleting it would re-open a
+>   question already adjudicated.
+> - First run is the path **new staff take**. Every other Layer 3 spec
+>   tests a surface an existing user navigates.
+>
+> **Decide one thing during the rewrite:** whether the real network `pip
+> install` still earns its cost. It is the bulk of the spec's ~1.7
+> minutes and its only network dependency, and at some point it is
+> testing pip rather than testing us. Keeping it is defensible — it is
+> the true cold start (`L-079-3`) and the same cost a human pays — but it
+> should be a decision, not an inheritance.
+>
+> *(Operator note, 2026-08-11: walkthrough VIDEOS are planned. Playwright
+> cannot record Electron — `ElectronLaunchOptions` has no `recordVideo` —
+> so this spec will not produce them directly. Its value there is as the
+> deterministic **script** for what a recording should show. Out of scope
+> for this set; recorded so the rewrite does not discard a journey that
+> is about to be filmed.)*
 
 > **Irony budget: 25 new test functions across all three sessions.**
 > Session 3 should be net NEGATIVE — it deletes 9 scenarios and adds

@@ -1,0 +1,140 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-11T08:49:26.878066-04:00",
+  "sessionSetDir": "115-work-explorer-session-node-ux",
+  "inputs": {
+    "activity-log.json": "5bc9fc94857ca55e7ac4e39ebf764dc1338963aed7a730d70a52b5a22e3fea1a",
+    "session-state.json": "d0f4a60563fa9dd5e237da22ea6d5b6f8129d2e5bbe631d8978789b6dade6cc3",
+    "spec.md": "8c6dd7047c01210d92c2ac77d1d7e4e809d28643183cefffd647f9380d28fb5f"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register: start_session recorded session 1 in flight",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "ts-titles-fixed",
+          "description": "Fix the TypeScript synthesizer: buildSessions threads the spec title map it already computed, through the shared healTitle rule",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "heal-rule",
+          "description": "Settle the sticky-generic problem: a spec heading beats a generic-shaped stored title, at the writer AND in the read view so closed sets heal without a migration script",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "writer-ownership",
+          "description": "Settle lazy-synthesis ownership: the router writes, the extension read derives in memory; parity corpus + both halves shipped",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "verification",
+          "description": "Verification: discovery (2 lenses) + supplementary found 3 Major, all remediated; remediation-review returned VERIFIED with 2 fix-accepted verdicts",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 1,
+          "stepKey": "session-001/path-aware-critique",
+          "description": "Operator set pathAwareCritique: advisory.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 6
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 4,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

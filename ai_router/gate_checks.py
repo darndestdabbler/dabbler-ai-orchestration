@@ -1027,16 +1027,28 @@ def _set_dir_display(session_set_dir: str) -> str:
     return display.replace(os.sep, "/")
 
 
-def _verify_session_command(session_set_dir: str) -> str:
+def _verify_session_command(
+    session_set_dir: str, phase: Optional[str] = None
+) -> str:
     """The exact sanctioned Step 6 invocation for this set.
 
     The refusal message teaches: the moment an engine hits the blocked
     path it must learn the one command that produces real evidence.
+
+    Set 119 S3: *phase* appends ``--phase <phase>`` so a refusal can name
+    the step it actually means. The backstop's blocking message said
+    "re-verify with verify_session" and meant the remediation-review
+    cycle, but that phase failed closed with ``EXIT_USAGE`` from exactly
+    the state the message was printed in — the message named a command
+    that did not work. Naming the phase is only honest now that it does.
     """
-    return (
+    command = (
         f"{_venv_python()} -m ai_router.verify_session "
         f"--session-set-dir {_set_dir_display(session_set_dir)}"
     )
+    if phase:
+        command += f" --phase {phase}"
+    return command
 
 
 def _claimed_close_verdict(disposition: Disposition) -> Optional[str]:

@@ -236,12 +236,15 @@ transports:
 # `confirmed_on: "YYYY-MM-DD"` records the day a HUMAN last confirmed that
 # entry's rates against the provider's published page. Its ABSENCE is honest
 # and is the state of every entry below: nothing here has been confirmed under
-# this regime yet, and Set 109 S4 is the session that confirms them. To see
-# what the providers publish today:
+# this regime yet, and Set 109 S4 is the session that confirms them.
 #
-#     python -m ai_router.pricing_proposal --fetch    # proposes, never writes
-#     # ...mark each change accept/reject in pricing-proposal.json...
-#     python -m ai_router.pricing_proposal --apply    # writes only what you accepted
+# Set 119 S3 deleted `pricing_proposal`, the CLI that used to propose rates
+# from the providers' published pages and apply the ones a human accepted:
+# nothing in the package imported it, and on a Copilot seat every routed call
+# records `billed_usage_unavailable: true` with `cost_usd: 0.0`, so the cost
+# surface it fed could not be populated at all. Confirming a rate is now the
+# manual step it always ended in -- read the provider's published page, edit
+# the entry, and stamp `confirmed_on` with the date you read it.
 #
 # No rate below was edited by Session 3, deliberately. This set's own rule is
 # that a human confirms every rate change, and the flow that makes that
@@ -429,8 +432,9 @@ models:
   # alias is RETIRED rather than corrected: three explicit entries mean the
   # variant is a deliberate choice at every call site, and `model_inventory
   # --check` now fails loud on any id a provider does not offer, so the class
-  # cannot silently reopen. Rates below were written by
-  # `pricing_proposal --apply` from OpenAI's published page, never hand-typed.
+  # cannot silently reopen. Rates below were taken from OpenAI's published
+  # page under the Set 109 confirmation flow (`pricing_proposal --apply`,
+  # since deleted in Set 119 S3), never hand-typed.
     input_cost_per_1m: 5.0
     output_cost_per_1m: 30.0
     confirmed_on: '2026-08-04'
@@ -988,13 +992,11 @@ verification:
                                      #   family when one exists (degrades loudly to the base
                                      #   orchestrator-only exclusion when none survives).
 
-  # --- Per-session routed-verification gate (Set 068 S6) — RETIRED (Set 083)
-  # The routed_gate CLI is kept only so pre-083 scaffolds keep working; it now
-  # always answers REQUIRED (exit 0) and its predicate is informational. The
-  # knobs below document the historical defaults; they no longer gate anything.
-  routed_gate:
-    enabled: true
-    breadth_threshold: 4        # informational only since the Set 083 retirement
+  # --- Per-session routed-verification gate (Set 068 S6) — RETIRED (Set 083),
+  # DELETED (Set 119 S3). The predicate always answered REQUIRED after the
+  # retirement and nothing in the package called it, so the module and this
+  # block's knobs are gone. Per-session cross-provider verification is
+  # mandatory on every Full-tier session; there is no gate to configure.
 
   # Verifier selection is RULE-BASED, not map-based. A candidate
   # verifier must be:
@@ -1187,8 +1189,8 @@ pull_verifier:
 # run`; the floor's execution bounds are the pull_verifier.run_test.caps block
 # above (the gate's producer drives the same cage). This gate is the replacement
 # floor the Set 068 S4 routed-demotion transition guard waited on; S6 wired the
-# blast-radius gating predicate (routed_gate.py) that flipped per-session routed
-# verification to gated (cut-over now LIVE -- see the verification: anchor). Doc:
+# blast-radius gating predicate (routed_gate.py, retired in Set 083 and deleted
+# in Set 119 S3) that flipped per-session routed verification to gated. Doc:
 # docs/contract-gate.md; design:
 # docs/session-sets/068-cadence-study-and-contract-gate/contract-gate-design.md.
 
@@ -1208,7 +1210,8 @@ state:
 
 # --- Output ---
 output:
-  cost_report_on_exit: true    # print cost summary when session ends
+  # `cost_report_on_exit` lived here with no reader in the package; Set 119 S3
+  # deleted it with the cost_report module it named.
   verbose: false               # detailed logging of each API call
 
 # --- Authoring-time admission tests (Set 111 S4) ---

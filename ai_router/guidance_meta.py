@@ -269,6 +269,38 @@ def update_last_used(
 _KNOWN_KEYS = set(SINGLE_FIELDS) | set(MULTI_FIELDS)
 
 
+# The one field ``cite_lessons`` is mandated to move at close.
+_LAST_USED_RE = re.compile(r'last-used-set="[^"]*"')
+_CLOSE_MANDATED_PLACEHOLDER = 'last-used-set="<close-mandated>"'
+
+
+def normalize_close_mandated_metadata(data: bytes) -> bytes:
+    """Blank the ``last-used-set`` value in every lesson trailer.
+
+    The freshness normalizer for the guidance files (Set 119 S3; the
+    contract is in :mod:`ai_router.verification_stamp`). The constitution
+    mandates ``cite_lessons`` in the final commit, so a citing session
+    rewrites this field AFTER the round that will settle its close —
+    staling its own stamp and sending the backstop off to buy a metered
+    round for a metadata trailer.
+
+    Only the trailer's own value is replaced, and only on lines that
+    parse as a lesson trailer, so **the lesson prose keeps binding
+    normally**: exempting the whole file would let a post-verification
+    rewrite of a preload document ride a passed round. Byte-preserving
+    otherwise — line endings, indentation and every other field survive,
+    because this output is hashed, never written back.
+    """
+    text = data.decode("utf-8", errors="surrogateescape")
+    out: List[str] = []
+    for line in text.split("\n"):
+        stripped = line[:-1] if line.endswith("\r") else line
+        if _TRAILER_RE.match(stripped):
+            line = _LAST_USED_RE.sub(_CLOSE_MANDATED_PLACEHOLDER, line)
+        out.append(line)
+    return "\n".join(out).encode("utf-8", errors="surrogateescape")
+
+
 def validate_meta(meta: LessonMeta) -> List[str]:
     """Return a list of error strings for one :class:`LessonMeta` (empty = ok).
 
@@ -378,6 +410,7 @@ __all__ = [
     "parse_document",
     "find_entry",
     "update_last_used",
+    "normalize_close_mandated_metadata",
     "validate_meta",
     "meta_warnings",
     "validate_documents",

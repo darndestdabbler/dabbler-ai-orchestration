@@ -54,9 +54,9 @@ tools/dabbler-ai-orchestration/out/
 # --refresh) and never shared truth across seats — same rationale as the
 # local-overrides.yaml entry above.
 ai_router/copilot-catalog.lock
-# Set 109 S3 (scrape-to-propose price flow). The proposal is a transient
-# review artifact: a human marks each change accept/reject, runs
-# `python -m ai_router.pricing_proposal --apply`, and the durable record is
-# the resulting router-config.yaml diff plus its confirmed_on stamps. A
-# committed proposal would be a stale second opinion about live prices.
+# Set 109 S3's scrape-to-propose price flow wrote this transient review
+# artifact. Set 119 S3 deleted `pricing_proposal`, so nothing produces it
+# any more; the entry stays so a stale file left over from that era is
+# never committed. A committed proposal would be a stale second opinion
+# about live prices.
 ai_router/pricing-proposal.json

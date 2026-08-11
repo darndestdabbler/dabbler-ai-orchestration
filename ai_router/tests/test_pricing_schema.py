@@ -420,12 +420,20 @@ def test_an_identity_only_entry_still_needs_no_rates():
 
 def test_the_error_names_both_ways_out():
     """An operator hitting this at load needs to know it is either a missing
-    price or a missing is_enabled: false, and which command fills it in."""
+    price or a missing is_enabled: false, and how to fill it in.
+
+    Set 119 S3 deleted ``pricing_proposal``, the CLI this message used to
+    name. A refusal that names a command which no longer exists is worse
+    than one that names none, so the message now points at the manual
+    action -- and this assertion is what keeps the two in step.
+    """
     with pytest.raises(PricingError) as exc:
         validate_model_rates("x", {"provider": "openai", "is_enabled": True})
     message = str(exc.value)
     assert "is_enabled: false" in message
-    assert "pricing_proposal --fetch" in message
+    assert "published pricing page" in message
+    assert "confirmed_on" in message
+    assert "pricing_proposal" not in message
 
 
 def test_a_routable_entry_with_a_pricing_list_passes():

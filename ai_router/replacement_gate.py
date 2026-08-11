@@ -3,7 +3,8 @@
 Set 068's DEMOTE decision kept the routed per-session check GATED and kept the
 **manual whole-set critique** as the backstop, explicitly saying RETIRE reopens
 **on telemetry**, not on faith. Set 069 built an executable automated ceiling
-(S2-S4) and a quality-gated ratchet (S5 :mod:`ai_router.floor_ratchet`). The open
+(S2-S4) and a quality-gated ratchet (S5 ``floor_ratchet``, deleted as
+unreachable in Set 119 S3). The open
 question - *is the automated process good enough to drop the manual run's
 cadence?* - is exactly the kind of design argument the proposal panel said should
 "lose to scoreboards" (Sec.1.6). This module is that scoreboard.

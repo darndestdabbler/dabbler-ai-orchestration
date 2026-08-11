@@ -209,9 +209,14 @@ does **not** ship automated pre-call enforcement (warnings,
 block-on-exceed). Operators monitor spend manually with:
 
 - `python -m ai_router.report --since YYYY-MM-DD` — governance summary.
-- `python -m ai_router.cost_report` — per-session detail.
 - The `Dabbler: Show cost dashboard` extension command — live spend
   view.
+
+> **`python -m ai_router.cost_report` no longer exists** (deleted in Set 119 S3 as unreachable). Nothing in
+> the package called it, and on the Copilot CLI transport every routed
+> call records `billed_usage_unavailable: true` with `cost_usd: 0.0`, so
+> the per-session detail it printed was zeros. `report.py` and the
+> extension dashboard remain.
 
 Automated threshold-aware pre-call warnings + block-on-exceed
 enforcement are planned for a follow-up set.
@@ -331,7 +336,8 @@ The **target state**:
   deterministically in `ai_router/routed_gate.py`
   (`evaluate_routed_gate` / `python -m ai_router.routed_gate`), building on the
   Set 066 blast-radius core predicate (`blast_radius.classify_paths`) plus the
-  session-level triggers above. The S4 consensus required it to be a
+  session-level triggers above (the module was deleted in Set 119 S3 as unreachable — see the transition
+  guard below). The S4 consensus required it to be a
   **deterministic diff heuristic, not a per-session feeling** — so the only
   operator inputs are the three honestly-declared facts the diff cannot show
   (`--contract-uncovered`, `--high-blast`, `--post-failed-loop`), each of which
@@ -341,9 +347,11 @@ The **target state**:
 > (Set 083).** The S6 cut-over ran as described above from Set 068 until
 > Set 083, when the operator restored mandatory per-session verification
 > after a live incident demonstrated the gate's input-honesty flaw (see the
-> current-policy note at the top of this section). `routed_gate.py` remains
-> importable and its CLI runnable for pre-083 scaffolds, but it always
-> answers REQUIRED; the predicate's verdict is informational only.
+> current-policy note at the top of this section). `routed_gate.py` stayed
+> importable for pre-083 scaffolds while always answering REQUIRED, and
+> Set 119 S3 deleted it: nothing in the package called it, and a module
+> whose only behaviour is to answer REQUIRED unconditionally is not a
+> gate. There is nothing to configure and nothing to run.
 
 ### Significance flagging
 
@@ -1535,9 +1543,9 @@ dispatches to a different AI provider for independent review.
 > incident: the gating predicate's verdict was only as honest as the path
 > list the policed actor fed it (an empty argument list evaluated as a
 > zero-file diff and printed SKIP), and a skip affordance presented to an
-> engine will eventually be taken. `python -m ai_router.routed_gate` still
-> exists so pre-083 scaffolds keep working, but it now always answers
-> REQUIRED; its predicate output is informational only. The end-of-set
+> engine will eventually be taken. `python -m ai_router.routed_gate`
+> answered REQUIRED unconditionally after that decision and was deleted in Set 119 S3 as unreachable; there
+> is no skip path and no gate to run. The end-of-set
 > path-aware critique + the contract-test gate remain **additional**
 > surfaces, not substitutes. The only exception is operator-declared, never
 > per-session: the zero-budget tier in `ai_router/budget.yaml`

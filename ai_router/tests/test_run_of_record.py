@@ -369,7 +369,7 @@ class TestDefaultSuiteCoverage:
         "changed",
         [
             "docs/planning/project-guidance.md",
-            "ai_router/pricing_proposal.py",
+            "ai_router/notifications.py",
             "README.md",
         ],
     )

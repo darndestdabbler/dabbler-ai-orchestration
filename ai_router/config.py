@@ -542,9 +542,10 @@ def _check_pricing_staleness(config: dict) -> None:
     The VS Code extension's Cost Dashboard renders its own staleness banner
     from that field, and extension work is an explicit non-goal of this set;
     deleting the field here would have broken a shipped surface this session
-    is not allowed to touch. The sanctioned writer
-    (``ai_router.pricing_proposal --apply``) maintains both, so the rollup
-    cannot drift away from the stamps it summarises.
+    is not allowed to touch. Set 119 S3 deleted ``pricing_proposal``, the
+    CLI that used to maintain both fields, so both are now maintained by
+    hand in ``router-config.yaml`` -- keep them in step when you edit a
+    rate, or the rollup drifts away from the stamps it summarises.
 
     Controlled by, under the top-level ``metadata`` block:
         review_frequency_days: integer, default 30
@@ -567,8 +568,8 @@ def _check_pricing_staleness(config: dict) -> None:
         print(
             f"WARNING: {len(never)} model(s) have no confirmed_on stamp and "
             f"{len(stale)} are older than {threshold_days} days: {shown}. "
-            "Run `python -m ai_router.pricing_proposal --fetch` to see what "
-            "the providers publish today.",
+            "Check the provider's published pricing page and update the "
+            "model's rate and confirmed_on stamp in router-config.yaml.",
             file=sys.stderr,
         )
         return

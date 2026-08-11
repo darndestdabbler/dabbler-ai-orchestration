@@ -52,11 +52,15 @@ multi-artifact forgery". Never document it as tamper-proof.
 
 from __future__ import annotations
 
+import ast
+import fnmatch
+import functools
 import hashlib
 import os
 import re
+from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 
 # The sanctioned producer surfaces. Anything else (including absence)
@@ -340,6 +344,255 @@ PHASED_EVIDENCE_SET_EXCLUDES = tuple(
     if name not in EVIDENCE_VISIBLE_BOOKKEEPING
 )
 
+# ---------------------------------------------------------------------------
+# Set 119 S3 — close-mandated writes, as a CATEGORY rather than a list
+# ---------------------------------------------------------------------------
+#
+# The two tuples above are per-SET by construction: every pattern is
+# joined to ``docs/session-sets/<slug>/`` before it reaches the pathspec.
+# That scope was never stated, only assumed, and the assumption broke the
+# moment a close-mandated write landed outside it. ``cite_lessons`` is
+# exactly that write: the constitution MANDATES it in the final commit,
+# and it bumps ``last-used-set`` trailers in ``docs/planning/``. So every
+# citing session staled its own verification stamp between verifying and
+# closing, and the backstop quietly bought a fresh metered round to
+# re-stamp a tree whose source, tests and docs were byte-identical.
+#
+# Adding two more filenames to a tuple would fix this instance and leave
+# the class alive — the same instance-not-class patch L-069-1 exists to
+# stop, and the third time this repo has grown one list entry per
+# incident. Instead the WRITER declares its own close-mandated output,
+# in its own module, and this module DISCOVERS those declarations. A
+# fifth close-mandated writer is therefore exempt the moment it says so,
+# in either scope, with nothing here to edit.
+#
+# A declaration is a module-level ``CLOSE_MANDATED_WRITES`` tuple of
+# dicts, read WITHOUT importing the module (``ast.literal_eval`` on the
+# assignment) so discovery is hermetic, side-effect-free and safe to run
+# on the close path:
+#
+#     CLOSE_MANDATED_WRITES = (
+#         {
+#             "path": "docs/planning/lessons-learned.md",
+#             "scope": "repo",
+#             "bound": "guidance_meta:normalize_close_mandated_metadata",
+#             "reason": "...",
+#         },
+#     )
+#
+# ``bound`` is the honest half. A per-set ledger is close output END TO
+# END, so the whole file is exempt (``bound: "whole-file"``). A guidance
+# file is NOT: the close mandates one metadata field in it, while the
+# lesson prose around that field is session WORK and must keep binding —
+# exempting the file wholesale would let a post-verification rewrite of a
+# PRELOAD document ride a passed round, which is a verification reduction
+# no orchestrator may self-authorize. So a partially-mandated artifact
+# names a normalizer, and only the bytes the close is entitled to move
+# are removed from the digest.
+CLOSE_MANDATED_DECLARATION = "CLOSE_MANDATED_WRITES"
+
+# ``bound`` sentinel: the artifact is close output in its entirety.
+BOUND_WHOLE_FILE = "whole-file"
+
+CLOSE_MANDATED_SCOPES = ("set", "repo")
+
+
+@dataclass(frozen=True)
+class CloseMandatedWrite:
+    """One artifact the close-out procedure is itself required to write.
+
+    ``path`` is a filename glob when ``scope == "set"`` (joined to the
+    session-set dir by the consumer, exactly like
+    :data:`WORK_DIFF_SET_BOOKKEEPING`) and a repo-relative glob when
+    ``scope == "repo"``. ``bound`` is :data:`BOUND_WHOLE_FILE` or a
+    ``"module:function"`` reference to a normalizer
+    ``(bytes) -> bytes`` that strips the close's own mutation.
+    ``module`` is resolved inside this package under both the
+    package-qualified and the bare-module import context the test
+    harness uses.
+    """
+
+    path: str
+    scope: str
+    bound: str
+    reason: str
+    declared_by: str = ""
+
+    @property
+    def whole_file(self) -> bool:
+        return self.bound == BOUND_WHOLE_FILE
+
+
+def _parse_declaration(
+    module_name: str, source: str
+) -> List[CloseMandatedWrite]:
+    """The module's :data:`CLOSE_MANDATED_DECLARATION`, or ``[]``.
+
+    Fails CLOSED on a malformed declaration (``ValueError``): a writer
+    that declares an exemption it does not get is the silent-no-op
+    failure mode this mechanism exists to replace, and a typo that
+    quietly exempts nothing would be discovered the same way the
+    original bug was — by paying for a round.
+    """
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    found: List[CloseMandatedWrite] = []
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        names = [
+            t.id for t in node.targets if isinstance(t, ast.Name)
+        ]
+        if CLOSE_MANDATED_DECLARATION not in names:
+            continue
+        try:
+            value = ast.literal_eval(node.value)
+        except (ValueError, SyntaxError) as exc:
+            raise ValueError(
+                f"{module_name}.{CLOSE_MANDATED_DECLARATION} is not a "
+                f"literal and cannot be read without importing: {exc}"
+            ) from exc
+        if not isinstance(value, (list, tuple)):
+            raise ValueError(
+                f"{module_name}.{CLOSE_MANDATED_DECLARATION} must be a "
+                f"tuple of dicts, got {type(value).__name__}"
+            )
+        for entry in value:
+            found.append(_coerce_declaration(module_name, entry))
+    return found
+
+
+def _coerce_declaration(module_name: str, entry: object) -> CloseMandatedWrite:
+    where = f"{module_name}.{CLOSE_MANDATED_DECLARATION}"
+    if not isinstance(entry, dict):
+        raise ValueError(
+            f"{where}: each entry must be a dict, got "
+            f"{type(entry).__name__}"
+        )
+    missing = [k for k in ("path", "scope", "bound", "reason")
+               if not entry.get(k)]
+    if missing:
+        raise ValueError(
+            f"{where}: entry is missing non-empty {', '.join(missing)}"
+        )
+    scope = entry["scope"]
+    if scope not in CLOSE_MANDATED_SCOPES:
+        raise ValueError(
+            f"{where}: scope must be one of "
+            f"{', '.join(CLOSE_MANDATED_SCOPES)}, got {scope!r}"
+        )
+    bound = entry["bound"]
+    if bound != BOUND_WHOLE_FILE and ":" not in bound:
+        raise ValueError(
+            f"{where}: bound must be {BOUND_WHOLE_FILE!r} or "
+            f"'module:function', got {bound!r}"
+        )
+    return CloseMandatedWrite(
+        path=str(entry["path"]).replace("\\", "/"),
+        scope=str(scope),
+        bound=str(bound),
+        reason=str(entry["reason"]),
+        declared_by=module_name,
+    )
+
+
+@functools.lru_cache(maxsize=8)
+def _discover_cached(package_dir: str) -> Tuple[CloseMandatedWrite, ...]:
+    found: List[CloseMandatedWrite] = []
+    root = Path(package_dir)
+    for path in sorted(root.glob("*.py")):
+        try:
+            source = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if CLOSE_MANDATED_DECLARATION not in source:
+            continue  # cheap pre-filter; the parse is the authority
+        found.extend(_parse_declaration(path.stem, source))
+    return tuple(found)
+
+
+def discover_close_mandated_writes(
+    package_dir: Optional[str] = None,
+) -> Tuple[CloseMandatedWrite, ...]:
+    """Every close-mandated write declared by a module in this package.
+
+    Source-level discovery (no imports, no side effects), cached per
+    directory. *package_dir* defaults to this package; tests point it at
+    a synthetic tree to prove a NEW writer is exempt without editing
+    anything here.
+    """
+    return _discover_cached(str(package_dir or _THIS_DIR))
+
+
+def close_mandated_excludes(
+    set_rel: Optional[str] = None,
+    package_dir: Optional[str] = None,
+) -> List[str]:
+    """Pathspec exclusions for the wholly-close-mandated declarations.
+
+    Set-scoped patterns are joined to *set_rel*; when no session set is
+    in play they are dropped rather than applied repo-wide.
+    """
+    out: List[str] = []
+    for decl in discover_close_mandated_writes(package_dir):
+        if not decl.whole_file:
+            continue
+        if decl.scope == "repo":
+            out.append(decl.path)
+        elif set_rel:
+            out.append(f"{set_rel}/{decl.path}")
+    return out
+
+
+def _load_normalizer(bound: str) -> Callable[[bytes], bytes]:
+    module_name, _, func_name = bound.partition(":")
+    import importlib
+
+    module = None
+    for candidate in (f"{__package__}.{module_name}" if __package__
+                      else module_name, module_name):
+        try:
+            module = importlib.import_module(candidate)
+            break
+        except ImportError:
+            continue
+    if module is None:
+        raise ValueError(f"cannot import normalizer module {module_name!r}")
+    func = getattr(module, func_name, None)
+    if not callable(func):
+        raise ValueError(
+            f"{module_name}.{func_name} is not a callable normalizer"
+        )
+    return func
+
+
+def close_mandated_normalizer(
+    rel_path: str,
+    set_rel: Optional[str] = None,
+    package_dir: Optional[str] = None,
+) -> Optional[Callable[[bytes], bytes]]:
+    """The normalizer for *rel_path* (repo-relative POSIX), or ``None``.
+
+    ``None`` means the path carries no partial close-mandated write and
+    its bytes bind the freshness digest exactly as before.
+    """
+    normalized = rel_path.replace("\\", "/")
+    for decl in discover_close_mandated_writes(package_dir):
+        if decl.whole_file:
+            continue
+        if decl.scope == "repo":
+            pattern = decl.path
+        elif set_rel:
+            pattern = f"{set_rel}/{decl.path}"
+        else:
+            continue
+        if fnmatch.fnmatch(normalized, pattern):
+            return _load_normalizer(decl.bound)
+    return None
+
+
 _HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -537,6 +790,10 @@ def compute_work_diff_sha256(
     set_rel = repo_relative_posix(cur, repo_root)
     excludes = [
         *(f"{set_rel}/{name}" for name in WORK_DIFF_SET_BOOKKEEPING),
+        # Set 119 S3: the same question asked of the writers themselves,
+        # so a close-mandated artifact outside the set dir is exempt
+        # without an edit here.
+        *close_mandated_excludes(set_rel),
         "*router-metrics.jsonl",
         *WORK_DIFF_BASE_EXCLUDES,
     ]
@@ -554,6 +811,15 @@ def compute_work_diff_sha256(
         out = proc.stdout.decode("utf-8", errors="replace")
         return [p for p in out.split("\0") if p]
 
+    def _base_bytes(rel: str) -> Optional[bytes]:
+        """*rel*'s content at *base*, or ``None`` when absent there."""
+        proc = subprocess.run(
+            ["git", "-C", str(repo_root), "show", f"{base}:{rel}"],
+            capture_output=True,
+            check=False,
+        )
+        return proc.stdout if proc.returncode == 0 else None
+
     changed = _git_z(
         "diff", "--name-only", "-z", "--no-ext-diff", base, "--", *pathspecs,
     )
@@ -568,10 +834,26 @@ def compute_work_diff_sha256(
     for rel in sorted(set(changed) | set(untracked)):
         target = repo_root / rel
         try:
-            file_hash = sha256_hex(target.read_bytes())
+            raw = target.read_bytes()
         except OSError:
-            file_hash = "deleted"
-        lines.append(f"{rel}\0{file_hash}")
+            lines.append(f"{rel}\0deleted")
+            continue
+        normalizer = close_mandated_normalizer(rel, set_rel)
+        if normalizer is None:
+            lines.append(f"{rel}\0{sha256_hex(raw)}")
+            continue
+        # A partially close-mandated artifact. Compare NORMALIZED against
+        # normalized-at-base: when the close's own field is all that
+        # moved the file leaves the digest entirely (its mere presence in
+        # the file list would otherwise be the staleness signal), and any
+        # other edit binds normally on the normalized bytes — so a
+        # substantive change to the same file still stales the stamp, and
+        # a later mandated write cannot un-stale it.
+        current = normalizer(raw)
+        at_base = _base_bytes(rel)
+        if at_base is not None and normalizer(at_base) == current:
+            continue
+        lines.append(f"{rel}\0{sha256_hex(current)}")
     return sha256_hex("\n".join(lines).encode("utf-8"))
 
 

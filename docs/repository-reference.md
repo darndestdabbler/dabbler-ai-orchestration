@@ -749,9 +749,6 @@ A few things worth noticing in this real example:
 
 Three other artifacts are produced alongside this stop message:
 
-- **Console cost-report banner** from `print_cost_report()`
-  ([ai_router/__init__.py:767](../ai_router/__init__.py#L767)) — sessions
-  completed/remaining, total calls, total cost, per-model breakdown.
 - **Pushover notification** (if configured) — title
   `Session complete: <slug>`, body containing the session number,
   verdict, and one-line summary. Sent *before* the optional Step 9
@@ -795,7 +792,7 @@ covered elsewhere in this doc.
 
 | Path | Purpose |
 |---|---|
-| [ai_router/__init__.py](../ai_router/__init__.py) | Public surface of the router. Exports `route()`, `register_session_start()`, `mark_session_complete()`, `print_cost_report()`, `print_metrics_report()`, `record_adjudication()`, `send_session_complete_notification()`, and the `find_active_session_set()` discovery helper. |
+| [ai_router/__init__.py](../ai_router/__init__.py) | Public surface of the router. Exports `route()`, `register_session_start()`, `mark_session_complete()`, `print_metrics_report()`, `record_adjudication()`, `send_session_complete_notification()`, and the `find_active_session_set()` discovery helper. Set 119 S3 dropped the `get_costs()` / `print_cost_report()` re-exports along with the `cost_report` module they published. |
 | [ai_router/config.py](../ai_router/config.py) | Loads and validates `router-config.yaml`, parses the prompt-template markdown files, and resolves effective generation parameters for any `(model, task_type)` pair. Walks up from `cwd` to find a workspace-relative `ai_router/router-config.yaml` before falling back to the package-bundled default (Set 012 Session 1 — no env-var setup needed for the common case). |
 | [ai_router/models.py](../ai_router/models.py) | Complexity estimation (the 1-100 score) and the per-tier model-selection logic that drives routing decisions. |
 | [ai_router/providers.py](../ai_router/providers.py) | HTTP callers for Anthropic, Google, and OpenAI. Accepts a per-call `generation_params` dict so each provider's reasoning knobs (effort, thinking, thinking_budget, thinking_level) can be tuned per task type. |

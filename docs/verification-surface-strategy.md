@@ -8,6 +8,17 @@
 > decided, built, and measured, and the live policy that resulted.
 > **Created:** 2026-06-16 (Set 068 S6). **Owners:** the four Set 065 questions
 > (a)–(d) + the open author-independence question.
+>
+> **Set 119 S3 deletion note.** Two modules this document names were
+> deleted as unreachable: `ai_router/routed_gate.py` (retired as a skip
+> authority by Set 083, after which it answered REQUIRED unconditionally)
+> and `ai_router/floor_ratchet.py` (no module imported it, no console
+> script named it, `router-config.yaml` never referenced it). The
+> *policy* below is unchanged — per-session cross-provider verification
+> is mandatory on every Full-tier session — only the dead code that used
+> to sit beside it is gone. `contract_gate.py` and `replacement_gate.py`
+> both STAY: the first is a live close gate, the second is called by
+> `dual_surface_verify`. References below are historical record.
 
 ---
 
@@ -34,8 +45,8 @@ The framework verifies AI-led work on **three layers**, chosen by a single
    review runs on every Full-tier session with no skip: the 2026-07-06 UAT
    incident showed the gating predicate's verdict was only as honest as the
    path list the policed actor fed it. The predicate
-   (`ai_router/routed_gate.py`) survives as an informational trigger report
-   only. The layer's demonstrated value remains **early interception of
+   (`ai_router/routed_gate.py`) survived as an informational trigger report
+   until Set 119 S3 deleted it. The layer's demonstrated value remains **early interception of
    migrating cross-file coupling defects at their introduction**.
 
 All three layers, plus the `pathAwareCritique` set-level gate, are governed by
@@ -153,7 +164,8 @@ executed in S6. The verification surface is now:
   every Full-tier session at Step 6 of
   [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) — no skip;
   the verification-integrity close gate refuses an unverified close, and the
-  old gating predicate (`ai_router/routed_gate.py`) is informational only.
+  old gating predicate (`ai_router/routed_gate.py`) was informational only,
+  and Set 119 S3 deleted it.
   As of Set 070 the
   push template it uses (`prompt-templates/verification.md`) runs at **strong
   adversarial framing** (§5.2), and as of Set 071 that strong framing ships with a
@@ -400,7 +412,8 @@ loop):
 
 ### 6.3 The ceiling → floor ratchet + the measured replacement gate (S5)
 
-- **The quality-gated ratchet** (`ai_router/floor_ratchet.py`). A reproduced
+- **The quality-gated ratchet** (`ai_router/floor_ratchet.py`, deleted in Set
+  119 S3 — historical record). A reproduced
   probeable defect yields a **candidate falsifier artifact** that is **never
   auto-merged**. Admission requires five mechanical gates (fails-on-old,
   passes-on-fixed on a *different* ref, drives a **public contract**, an N-run

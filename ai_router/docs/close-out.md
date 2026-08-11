@@ -626,10 +626,12 @@ Notification failure is non-fatal: the work is preserved in git
 regardless and the human can re-fire the notification by hand if
 needed.
 
-The cost report (`print_cost_report(SESSION_SET)`) prints during
-the close-out turn before step 9. It reads `router-metrics.jsonl` for
-this session set and is dual-sourced (Set 4 Session 1) — both per-call
-metrics and provider-side aggregation cross-check each other.
+The close-out turn prints no cost report. `cost_report` was deleted in Set 119 S3 as unreachable: nothing
+in the package called it, and on the Copilot CLI transport every routed
+call records `billed_usage_unavailable: true` with `cost_usd: 0.0`, so
+the report it produced was zeros. `python -m ai_router.report` still
+reads `router-metrics.jsonl` for a governance summary, and the
+extension's cost dashboard is unchanged.
 
 ---
 

@@ -772,6 +772,20 @@ def run_close_backstop(
     # --- raw artifacts -> disposition patch.
     exclude_providers = [identity.effective_provider]
     try:
+        repo_root = _vs.repo_root_for(set_dir)
+    except _vs.VerifySessionError:
+        repo_root = set_dir
+    # Set 119 S3: snapshot the tree BEFORE anything is written, so the
+    # ledger row below records the state this round actually reviewed and
+    # `--phase remediation-review` is reachable afterwards. Until now a
+    # backstop round left no baseline at all -- it is unphased, and only
+    # findings-bearing discovery-family rounds wrote one into an envelope
+    # -- so the remediation loop this run's own blocking message names
+    # refused with EXIT_USAGE, and the orchestrator had to buy a full
+    # discovery round to get back in. Fails OPEN like verify_session's:
+    # the round is still sound evidence without it.
+    baseline_tree = _vs.snapshot_worktree_tree(repo_root)
+    try:
         evidence = _vs.assemble_evidence(
             set_dir, session_number, diff_base,
             list(_vs.DEFAULT_DIFF_EXCLUDES),
@@ -822,10 +836,6 @@ def run_close_backstop(
     issues_path = _vs.issues_artifact_path(
         set_dir, session_number, round_number
     )
-    try:
-        repo_root = _vs.repo_root_for(set_dir)
-    except _vs.VerifySessionError:
-        repo_root = set_dir
     # I-084-S2-5: bind the stamp to the repo state under close. The
     # base is already resolved (rev-list sha or the empty tree);
     # resolve_commitish normalizes it and the freshness hash is what
@@ -984,6 +994,7 @@ def run_close_backstop(
         blocking=classification.blocking,
         ended_loop=not classification.blocking,
         source=_vs.ROUND_SOURCE_CLOSE_BACKSTOP,
+        discovery_baseline_tree=baseline_tree,
     )
     written.append(str(ledger_path))
 
@@ -1009,6 +1020,22 @@ def run_close_backstop(
             str(i.get("description", i))[:160]
             for i in classification.blocking_issues[:3]
         )
+        # Set 119 S3: name the phase, and name it only because it now
+        # works. The old text said "re-verify with verify_session (the
+        # sanctioned remediation loop)" while --phase remediation-review
+        # refused with EXIT_USAGE from this exact state -- no prior round
+        # had recorded a discoveryBaselineTree, because this round is
+        # unphased and only findings-bearing discovery-family rounds
+        # wrote one. The ledger row above now carries the baseline, so
+        # the named command runs; test_close_backstop asserts it succeeds
+        # from the state this message is printed in.
+        try:
+            from .gate_checks import _verify_session_command
+        except ImportError:
+            from gate_checks import _verify_session_command  # type: ignore[no-redef]
+        next_command = _verify_session_command(
+            str(set_dir), phase=_vs.PHASE_REMEDIATION_REVIEW
+        )
         return BackstopOutcome(
             status=STATUS_BLOCKING,
             messages=messages,
@@ -1019,9 +1046,10 @@ def run_close_backstop(
             remediation=(
                 f"the backstop verification found BLOCKING issues "
                 f"({len(classification.blocking_issues)} Critical/Major): "
-                f"{findings}. Remediate, then re-verify with "
-                "verify_session (the sanctioned remediation loop) and "
-                "close again."
+                f"{findings}. Remediate the blockers once, then review the "
+                f"fix delta: {next_command} -- this round recorded the "
+                "baseline it diffs from, so the phase is reachable without "
+                "buying a fresh discovery round. Then close again."
             ),
         )
 

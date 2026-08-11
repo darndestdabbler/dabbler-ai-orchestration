@@ -195,3 +195,91 @@ surfaced as `unnumbered_events` rather than vanishing.
 `disposition.json`, not pre-committed here.
 
 ---
+
+## Session 3 — Restore the backstop's recovery path, and delete what nothing reaches
+
+**Orchestrator:** `copilot` / `anthropic` / `claude-opus-5`, effort `high`
+(Copilot CLI transport — this seat carries no provider API keys by design,
+and their absence is not an error).
+
+**Verification:** routes to a non-anthropic effective provider, as the
+cross-provider rule requires.
+
+**Set-terminal session.** It owes `change-log.md`, the Step 9 guidance
+reorganization review, and the set-terminal close. `pathAwareCritique` is
+deliberately absent from this set's configuration, so no critique artifact
+is owed.
+
+**Inherited residuals, and their disposition here.** Session 2 handed over
+seven items. The spec's own residual table already took two
+(`cite_lessons` stamp staleness → step 2; `EvidenceTooLargeError` sibling
+sites → step 3c) and deferred two (the preflight's already-closed
+short-circuit; the doc-only cap's blast radius). The remaining three are
+observations rather than owed work: `decide_backstop` is the seam step 3a
+lands in, the preflight's `EvidenceTooLargeError` blind spot is a
+consequence of not assembling evidence (and step 3c makes the resulting
+crash survivable rather than making the preflight predict it), and the
+constitution's 3,984-of-4,000-token ceiling is a later set's eviction
+decision.
+
+**Recommended next session set:** recorded at close in `disposition.json`,
+not pre-committed here.
+
+**What actually happened, recorded at close.**
+
+*The spec's deletion list was wrong about three of seven modules, and
+saying so is the deliverable.* Step 4's proof obligation — no import from
+a close path, no console-script entry point, no reference in
+`router-config.yaml` — was discharged with a static import graph over all
+78 `ai_router` modules before anything was deleted, and it overturned the
+prediction. `contract_gate` is called by `close_session.run` as a live
+close gate; `spec_admission` is called by `session_checklist` to seed the
+plan the `checklist_posted` gate reads; `replacement_gate` is imported at
+module scope and called by `dual_surface_verify`. All three stayed. The
+spec's own rule made that the correct outcome rather than a shortfall —
+*"a module that turns out to be reachable stays and is reported, not
+forced"* — but it means the **`Ends with` figure of 5,165 lines is
+wrong**. Measured: 3,483 module LOC + 3,012 test LOC (235 tests) across
+four modules. The criterion that separates the two groups is journaled:
+a module is reachable when a **surviving module calls it**, and an
+`__init__` re-export is publication, not use.
+
+*One design choice went beyond the spec's letter, and it went the
+conservative way.* Step 2 asked for the freshness fix as a category, and
+the obvious category is a path exclusion. Applied to
+`docs/planning/lessons-learned.md` that would have been a **verification
+reduction**: a post-verification rewrite of an always-loaded preload
+document could then ride a passed round, and reductions are never
+self-authorized. So the category carries two `bound` values — whole-file
+for artifacts the close owns end to end, and a **normalizer** for
+artifacts it owns only partly. `cite_lessons` declares a normalizer, the
+digest compares normalized-current against normalized-at-base, and lesson
+prose keeps binding exactly as before. The mechanism costs about thirty
+lines more than the exclusion and reduces nothing.
+
+*The full suite earned its place in the ordering.* The first full run
+failed one test — `test_no_phase_envelope_carries_no_phase_fields` — and
+it was a real finding, not a flake: the first cut of the baseline change
+had widened the **Set 096 envelope contract** when only the round
+**ledger** needed widening. The narrower fix landed and the suite was
+re-run in full so the run of record postdates the last code change. A
+targeted-only pass would have shipped a silent contract change.
+
+*Two spec surfaces that are worth naming for whoever revises them.* The
+step-2 prose says `WORK_DIFF_BASE_EXCLUDES` "already carries
+`s*-rounds.jsonl`, `checklist-posts.jsonl` and `test-runs.jsonl`" — those
+three live in `WORK_DIFF_SET_BOOKKEEPING`; `WORK_DIFF_BASE_EXCLUDES` holds
+the repo-wide generated-bundle patterns. And the session-state title for
+Session 3 ("Restore the backstop's recovery path…") differs from the
+spec's heading ("Stop the backstop misfiring…"). Neither changed any
+behaviour; both would mislead a reader.
+
+*Verification.* One `--phase discovery` round, 2-call fan-out
+(spec-conformance and failure-scenario lenses), both answered by
+`gpt-5.5` with `anthropic` excluded by registry lookup on the
+orchestrator's model. **VERIFIED, zero findings.** An up-front conventions
+block (`s3-conventions.md`) declared the suite baseline, the release
+contract, the five by-design exclusions and the consequence rubric
+(L-064-10), which is the cheapest thing in the loop.
+
+---

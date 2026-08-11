@@ -1437,3 +1437,252 @@ class TestRunningTestsLastDoesNotReopenTheLoop:
 
         assert outcome.result == "succeeded", outcome.messages
         assert len(fake_route.calls) == 1  # stale -> the backstop re-verified
+
+
+# ---------------------------------------------------------------------------
+# Set 119 S3 - the backstop's own recovery path, and its survivable failures
+# ---------------------------------------------------------------------------
+
+class TestTheBackstopLeavesARecoveryPath:
+    """A backstop-blocked close told the orchestrator to "re-verify with
+    verify_session (the sanctioned remediation loop)". That instruction did
+    not work: ``--phase remediation-review`` fails closed unless a prior
+    round recorded a ``discoveryBaselineTree``, and NO round in this state
+    ever had -- the envelope is written only on findings-bearing
+    discovery-family rounds, and a backstop round is unphased. So the one
+    documented way out cost a full discovery round (~$0.88) to reach a
+    remediation review (~$0.07).
+    """
+
+    def _blocking_route(self):
+        return FakeBackstopRoute(
+            response=(
+                "ISSUES_FOUND\n\n"
+                "Issue 1: The deliverable is missing entirely.\n"
+                "Severity: Major\n"
+                "Evidence paths: ai_router/close_backstop.py\n"
+            ),
+        )
+
+    def test_a_backstop_round_records_the_baseline_it_reviewed(
+        self, closeable, monkeypatch,
+    ):
+        """PLANTED: the exact state the refusal is printed in."""
+        import verify_session as _vs
+
+        root, set_dir = closeable
+        monkeypatch.setattr(
+            close_backstop, "_default_route", self._blocking_route()
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "gate_failed"
+
+        completed = [
+            r for r in _vs.read_round_ledger(set_dir, 1)
+            if r.get("event") == _vs.ROUND_EVENT_COMPLETED
+        ]
+        tree = completed[-1].get("discoveryBaselineTree")
+        assert tree, "the backstop round left no baseline to remediate from"
+        assert _vs.find_discovery_baseline_tree(set_dir, 1, 2) == (1, tree)
+
+    def test_the_refusal_names_a_command_that_works_from_this_state(
+        self, closeable, monkeypatch,
+    ):
+        """The spec's falsifier: the named command must SUCCEED from the
+        exact state the message is printed in.
+
+        The message is parsed, not paraphrased -- a test that hand-builds
+        the args would keep passing after the message drifted, which is how
+        an instruction goes stale without anyone noticing.
+        """
+        import verify_session as _vs
+
+        root, set_dir = closeable
+        monkeypatch.setattr(
+            close_backstop, "_default_route", self._blocking_route()
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+        assert outcome.status == close_backstop.STATUS_BLOCKING
+        remediation = outcome.remediation
+        assert "--phase remediation-review" in remediation, remediation
+
+        # Run exactly what it named.
+        tokens = remediation.split()
+        phase = tokens[tokens.index("--phase") + 1]
+        assert phase == "remediation-review"
+
+        args = _vs._build_arg_parser().parse_args(
+            ["--session-set-dir", str(set_dir), "--phase", phase]
+        )
+        exit_code = _vs.run(
+            args,
+            route_fn=FakeBackstopRoute(
+                response=(
+                    "VERIFIED\n\n"
+                    "Fix verdict: L1-1 The deliverable is missing entirely "
+                    "-- fix-accepted\n"
+                )
+            ),
+        )
+        assert exit_code != _vs.EXIT_USAGE, (
+            "the backstop told the orchestrator to run a command that "
+            "refuses from the state it was printed in"
+        )
+        assert exit_code == _vs.EXIT_OK
+        # And it really reviewed the fix delta, from the baseline the
+        # backstop round left behind.
+        assert (set_dir / "s1-verification-round-2.md").exists()
+
+    def test_a_clean_round_also_leaves_a_baseline(self, closeable, fake_route):
+        """The case the old behaviour ignored: a CLEAN round writes no
+        findings envelope, so under the envelope-only rule it left no
+        baseline either -- even though it is a perfectly good one."""
+        import verify_session as _vs
+
+        root, set_dir = closeable
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+        assert outcome.result == "succeeded", outcome.messages
+
+        assert not (set_dir / "s1-issues.json").exists()
+        assert _vs.find_discovery_baseline_tree(set_dir, 1, 2) is not None
+
+    def test_a_remediation_review_round_never_becomes_a_baseline(
+        self, closeable,
+    ):
+        """The look-alike. A remediation-review reviews the fix delta FROM a
+        baseline; recording one would make a second cycle diff from the
+        first fix instead of from the original discovery baseline."""
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+        _vs.record_round_completed(
+            _vs.round_ledger_path(set_dir, 1),
+            session_number=1,
+            round_number=1,
+            phase=_vs.PHASE_REMEDIATION_REVIEW,
+            verdict="VERIFIED",
+            blocking=False,
+            ended_loop=True,
+            discovery_baseline_tree=None,
+        )
+        assert _vs.find_discovery_baseline_tree(set_dir, 1, 2) is None
+
+    def test_the_envelope_still_wins_within_one_round(self, closeable):
+        """Two records can carry the baseline. The immutable artifact is the
+        authority; they agree by construction when both exist."""
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+        _vs.write_issues_artifact(
+            _vs.issues_artifact_path(set_dir, 1, 1),
+            1, 1, "ISSUES_FOUND",
+            [{"description": "x", "severity": "Major"}],
+            phase=_vs.PHASE_DISCOVERY,
+            discovery_baseline_tree="a" * 40,
+        )
+        _vs.record_round_completed(
+            _vs.round_ledger_path(set_dir, 1),
+            session_number=1,
+            round_number=1,
+            phase=_vs.PHASE_DISCOVERY,
+            verdict="ISSUES_FOUND",
+            blocking=True,
+            ended_loop=False,
+            discovery_baseline_tree="b" * 40,
+        )
+        assert _vs.find_discovery_baseline_tree(set_dir, 1, 2) == (1, "a" * 40)
+
+    def test_a_ledger_without_a_baseline_is_tolerated(self, closeable):
+        """Ledgers written before this set carry no key at all."""
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+        _vs.record_round_completed(
+            _vs.round_ledger_path(set_dir, 1),
+            session_number=1,
+            round_number=1,
+            phase=None,
+            verdict="ISSUES_FOUND",
+            blocking=True,
+            ended_loop=False,
+        )
+        record = _vs.read_round_ledger(set_dir, 1)[-1]
+        assert "discoveryBaselineTree" not in record
+        assert _vs.find_discovery_baseline_tree(set_dir, 1, 2) is None
+
+
+class TestAnOversizedBundleCannotTakeTheGateDown:
+    """``EvidenceTooLargeError`` was a SIBLING of ``VerifySessionError``.
+    ``close_backstop`` catches the parent at four sites and caught this one
+    at exactly one, so an oversized bundle crashed the close with an
+    unhandled traceback on the other four -- the gate gone, no remediation
+    line, on the most expensive path there is. Set 119 S3 fixed the TYPE,
+    which fixes all four (L-069-1: the class, not the instance).
+    """
+
+    def test_it_is_a_subclass_now(self):
+        import verify_session as _vs
+
+        assert issubclass(_vs.EvidenceTooLargeError, _vs.VerifySessionError)
+
+    def test_a_parent_only_handler_now_catches_it(self):
+        """The structural assertion beside the textual one (L-112-1): the
+        four bare ``except VerifySessionError`` sites are covered by the
+        type relationship, however they are spelled."""
+        import verify_session as _vs
+
+        try:
+            raise _vs.EvidenceTooLargeError(968_227, 614_400)
+        except _vs.VerifySessionError as exc:
+            assert exc.assembled_chars == 968_227
+        else:  # pragma: no cover - the raise above always fires
+            pytest.fail("a parent-only handler still misses the subclass")
+
+    def test_the_cli_still_maps_it_to_verification_unavailable(
+        self, closeable, monkeypatch,
+    ):
+        """PLANTED LOOK-ALIKE, and the trap the spec warned about: a
+        subclass caught AFTER its parent is unreachable code. The CLI
+        caught ``VerifySessionError`` first, so making the type a subclass
+        would have silently downgraded the fail-closed
+        verification-unavailable exit into a plain usage error.
+        """
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+
+        def _too_large(*_a, **_kw):
+            raise _vs.EvidenceTooLargeError(968_227, 614_400)
+
+        monkeypatch.setattr(_vs, "assemble_evidence", _too_large)
+        args = _vs._build_arg_parser().parse_args(
+            ["--session-set-dir", str(set_dir)]
+        )
+        assert _vs.run(args) == _vs.EXIT_VERIFICATION_UNAVAILABLE
+
+    def test_the_backstop_still_reports_it_as_unavailable(
+        self, closeable, monkeypatch,
+    ):
+        """The one site that DID catch it keeps its specific message; the
+        subclass must not be swallowed by the generic handler below it."""
+        import verify_session as _vs
+
+        _root, set_dir = closeable
+
+        def _too_large(*_a, **_kw):
+            raise _vs.EvidenceTooLargeError(968_227, 614_400)
+
+        monkeypatch.setattr(_vs, "assemble_evidence", _too_large)
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+        assert outcome.status == close_backstop.STATUS_UNAVAILABLE
+        assert "968227" in outcome.remediation

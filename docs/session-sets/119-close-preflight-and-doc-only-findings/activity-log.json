@@ -196,6 +196,91 @@
       "dateTime": "2026-08-11T00:37:55.114554-04:00",
       "description": "Verification: 5 rounds (2 discovery + 2 remediation-review + 1 operator-authorized). 8 findings, all accepted, none disputed. Round 5 returned VERIFIED with 8/8 fix verdicts accepted and zero findings. Root causes fixed: (1) evaluate() now mirrors close_session ordering -- backstop decision FIRST, then the gate chain with extra_clean_ignore from the settling row, and verification_integrity reported as not-yet-decidable when the backstop would route; (2) --session-number is an assertion that is checked, not a partial override; (3) the two set-terminal policy gates are reported, mirroring the close TTY posture; (4) the verdict is a tri-state so the JSON and human surfaces cannot disagree. Full pytest on the frozen tree: 3975 passed, 9 skipped, 0 failed in 617.04s (10:17), recorded as the pytest run of record (digest e565fea2f7cf).",
       "status": "completed"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T01:32:19.363560-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "stop-the-backstop-firing-when-nothing",
+      "dateTime": "2026-08-11T01:32:19.363560-04:00",
+      "description": "**Stop the backstop firing when nothing changed.** Session 2's own close proved this live: `cite_lessons` \u2014 *mandated at close* \u2014 bumped three `last-used-set` trailers after a VERIFIED round-5 stamp, staling it. Source, tests and docs were byte-identical; only metadata moved, and the close needed `--manual-verify` to complete. `WORK_DIFF_BASE_EXCLUDES` already carries `s*-rounds.jsonl`, `checklist-posts.jsonl` and `test-runs.jsonl` \u2014 **all three inside `docs/session-sets/<slug>/`.** The mechanism has an implicit *per-set* scope and no concept of a close-mandated write outside it; `cite_lessons` writes `LESSONS_ACTIVE` **and** `LESSONS_ARCHIVE`, both repo-wide. Fix it as a **category \u2014 the artifacts the close-out procedure is itself required to write \u2014 not as a fourth list entry.** The acceptance test is not \"does `lessons-learned.md` stop staling\"; it is *would a fifth close-mandated writer, in either scope, be excluded without editing a list?* Ship the falsifier `L-112-1` requires: a passed round plus a `cite_lessons` write must settle the close with **zero** fresh metered rounds.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "make-the-recovery-path-reachable-and",
+      "dateTime": "2026-08-11T01:32:19.363560-04:00",
+      "description": "**Make the recovery path reachable, and its failures survivable.** Three parts, one surface. **(a)** A backstop round writes a `discoveryBaselineTree` alongside the ledger row Set 116 S2 appends, so `--phase remediation-review` is reachable instead of refusing with `EXIT_USAGE` (`verify_session.py:2945-2954`). Cover the case the current behaviour ignores: a **clean** discovery round writes no envelope, so it leaves no baseline either. **(b)** `close_backstop`'s blocking text names `verify_session` as the sanctioned next step; after (a) that instruction must actually work, and the message should name the phase. A test asserts the named command succeeds from the exact state the message is printed in. **(c)** `EvidenceTooLargeError` and `VerifySessionError` are **siblings** (`verify_session.py:449,453`), and `close_backstop` catches the latter at four sites (311, 635, 808, 827) but the former at **one** (779) \u2014 so an oversized bundle still crashes the close with an unhandled traceback on four paths, taking the gate down with no remediation line. One line fixes all four: make `EvidenceTooLargeError` inherit from `VerifySessionError`. **Check the catch ordering at 779 first** \u2014 a subclass caught after its parent is unreachable.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "delete-what-nothing-reaches",
+      "dateTime": "2026-08-11T01:32:19.363560-04:00",
+      "description": "**Delete what nothing reaches.** Two groups, same proof obligation. **(a) The unreachable gate machinery:** `contract_gate.py`, `floor_ratchet.py`, `replacement_gate.py`, `spec_admission.py`, `routed_gate.py` and their tests (**3,285 LOC, ~220 tests**). **(b) The cost surface that a Copilot seat cannot populate:** `pricing_proposal.py` and `cost_report.py` and their tests (**1,880 LOC, ~150 tests**) \u2014 across 83 routed calls every metrics row carries `billed_usage_unavailable: true` and `cost_usd: 0.0`. **`pricing.py` STAYS** \u2014 `models.py`, `pull_verifier.py`, `config.py` and `__init__.py` import it, and it feeds the api-profile verifier's `max_cost_multiplier` guard; deleting it breaks the Direct API path. Prove unreachability first for every module: no import from any close path, no console-script entry point, no reference in `router-config.yaml`. A module that turns out to be reachable **stays and is reported**, not forced.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T01:32:19.363560-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T01:33:29.243442-04:00",
+      "description": "Register. Preload read (constitution, project-guidance, lessons-learned, AGENTS.md); transport profile copilot-cli confirmed via local-overrides.yaml (no provider keys by design); start_session registered session 3/3; session-start checklist posted; decision-review-queue.jsonl absent (nothing to triage).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "stop-the-backstop-firing-when-nothing",
+      "dateTime": "2026-08-11T01:50:38.204947-04:00",
+      "description": "Fixed the close-mandated-write staleness as a CATEGORY: writers declare a module-level CLOSE_MANDATED_WRITES literal and verification_stamp DISCOVERS them by ast (no import, no side effects, safe on the close path), so a fifth writer in either scope is exempt with nothing here to edit. Two bounds, because the honesty matters: a per-set ledger is close output end-to-end (whole-file), while a guidance file is only PARTLY mandated -- cite_lessons owns one trailer field and the lesson prose around it is session work. So cite_lessons declares a normalizer (guidance_meta.normalize_close_mandated_metadata) and the digest compares normalized-current against normalized-at-base, dropping the file entirely when only the mandated field moved. A wholesale exemption would have let a post-verification rewrite of a PRELOAD document ride a passed round -- a verification reduction, and not one this set is authorized to make. Falsifiers (L-112-1), 32 in ai_router/tests/test_close_mandated_writes.py: planted cite_lessons bump -> digest unchanged AND validate_stamped_row still ok (zero fresh metered rounds); planted look-alike prose edit -> digest moves AND the row goes stale with the work-changed reason; synthetic fifth writer in a throwaway package tree, both scopes and both bounds; malformed/non-literal declarations fail closed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "make-the-recovery-path-reachable-and",
+      "dateTime": "2026-08-11T02:04:21.636320-04:00",
+      "description": "Three parts, one surface. (a) The baseline record moved to where every round writes: record_round_completed gains discovery_baseline_tree (omit-null) and find_discovery_baseline_tree reads the ledger as well as the envelopes. The envelope is written only on findings-bearing rounds, so the two states that most need a baseline left none -- a CLEAN discovery round and every close-backstop round (unphased) -- and --phase remediation-review refused with EXIT_USAGE. verify_session now snapshots for every round except remediation-review itself (which must never become a baseline, or a second cycle would diff from the first fix), and close_backstop snapshots before it writes anything. (b) _verify_session_command takes an optional phase; the backstop's blocking remediation now names --phase remediation-review, which is honest only because (a) made it work. (c) EvidenceTooLargeError now INHERITS VerifySessionError. It was a sibling caught at one of five sites, so an oversized bundle crashed the close with a traceback on four paths; fixing the type fixes all four (L-069-1, the class not the instance). The exit-code split never lived in the class relationship, only in handler ORDER -- and the CLI caught the parent FIRST, so the reorder at verify_session.py was mandatory: a subclass caught after its parent is unreachable code. 10 falsifiers appended to test_close_backstop.py, including the spec's: the refusal message is PARSED, not paraphrased, and the command it names is executed from the exact state it was printed in (round 2 resolves the baseline and returns EXIT_OK).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "delete-what-nothing-reaches",
+      "dateTime": "2026-08-11T02:11:10.400655-04:00",
+      "description": "Proved reachability FIRST with a static import graph over all 78 ai_router modules (ast, no execution), then applied the spec's own escape clause. THE SPEC'S LIST WAS WRONG ABOUT THREE OF SEVEN, and they stay and are reported: contract_gate (close_session.run calls validate_contract_gate as a live close gate; close_preflight and start_session call it too -- it is ON the close path the spec says it is off), spec_admission (session_checklist.read_spec_steps calls parse_session_plans to seed the plan the checklist_posted gate reads), replacement_gate (dual_surface_verify imports validate_benchmark_registration at module scope and calls it -- deleting it would break that module outright, and editing a survivor to manufacture unreachability is exactly the forcing the spec forbids). DELETED, all four proven unreachable: floor_ratchet (914), routed_gate (437), pricing_proposal (1581), cost_report (551) = 3,483 LOC plus 3,012 lines of tests (235 tests). The line drawn and journaled: a module is reachable when a SURVIVING module CALLS it; an __init__ re-export is publication, not use. pricing.py STAYS as the spec requires. Every echo fixed in one pass (L-065-1): __init__ re-exports and docstring, config.py and pricing.py operator messages that named a deleted command, the routed_gate config block and the dead cost_report_on_exit key, four test modules, and the doc instructions in ai-led-session-workflow.md, close-out.md, pull-verifier.md, repository-reference.md and verification-surface-strategy.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T02:48:40.615166-04:00",
+      "description": "Full pytest on the frozen tree: 3,780 passed, 9 skipped, 0 failed in 513.23s, recorded as the run of record (digest 859283c79f4f). The FIRST full run failed one test and it was a real finding, not a flake: the first cut of the baseline change widened the Set 096 ENVELOPE contract when only the round LEDGER needed it. Narrowed the change, re-ran the suite in full so the run of record postdates the last code change. Dogfooded close_preflight before verifying (it named working_tree_clean and the backstop cost correctly). Verification: one --phase discovery round, 2-call fan-out (spec-conformance + failure-scenario), both gpt-5.5 with anthropic excluded by registry lookup on claude-opus-5 -- VERIFIED, zero findings, zero nits. Authored s3-conventions.md up front per L-064-10, plus change-log.md (set-terminal), the disposition and the ai-assignment close-out block.",
+      "status": "complete"
     }
   ]
 }

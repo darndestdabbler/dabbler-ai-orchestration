@@ -177,7 +177,8 @@ Set 067 left these to Set 068; they are now built:
 - **Experiment B** (the cadence study) ran, and the routed **keep / demote /
   retire** decision was made: **DEMOTE** — later **reversed by Set 083**, which
   made per-session cross-provider verification mandatory again on every
-  Full-tier session (the gating predicate in `ai_router/routed_gate.py` is now
+  Full-tier session (the gating predicate in `ai_router/routed_gate.py`, since
+  deleted in Set 119 S3, was
   informational only). The end-of-set path-aware critique (this adapter) + the
   contract-test gate are additional surfaces. Full strategy:
   [`../../docs/verification-surface-strategy.md`](../../docs/verification-surface-strategy.md).
@@ -369,7 +370,8 @@ S1–S4 let a critic produce **execution-backed evidence**; S5 is how that evide
 are net-new pure-Python libraries imported by no existing runtime path — zero
 behavioral change to any existing flow.
 
-- **The quality-gated ratchet** (`ai_router/floor_ratchet.py`). A reproduced
+- **The quality-gated ratchet** (`ai_router/floor_ratchet.py`, deleted in Set
+  119 S3 — historical record). A reproduced
   probeable defect (a `REPRODUCED` finding from the S1 protocol) yields a
   **candidate falsifier artifact** (`candidate-falsifiers.json`) that is **NEVER
   auto-merged**: `build_candidate_from_finding` always emits
@@ -413,9 +415,12 @@ behavioral change to any existing flow.
 Schemas: `docs/candidate-falsifier.schema.json`,
 `docs/benchmark-registration.schema.json`,
 `docs/replacement-scoreboard.schema.json` (+ example fixtures + pure-Python
-validators with L-066-1 parity). CLIs:
-`python -m ai_router.floor_ratchet --session-set-dir <dir>` and
+validators with L-066-1 parity). CLI:
 `python -m ai_router.replacement_gate --session-set-dir <dir>`.
+`floor_ratchet` was deleted in Set 119 S3 as unreachable — no module imported it, no console script named
+it and `router-config.yaml` never referenced it; `replacement_gate`
+stays because `dual_surface_verify` calls
+`validate_benchmark_registration`.
 
 > **Strategy context.** How these layers fit the settled verification surface —
 > floor / ceiling / gated-routed, and how Set 069 made the ceiling *executable* —

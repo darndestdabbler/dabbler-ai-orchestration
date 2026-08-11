@@ -11,7 +11,7 @@ of the Set 083 fix (Session 2 ships the **enforcement** half: the
 verification-integrity close gate).
 
 One command performs Step 6 the way every other boundary step already
-works (``start_session``, ``routed_gate``, ``close_session``,
+works (``start_session``, ``close_session``,
 ``pull_critique``)::
 
     python -m ai_router.verify_session --session-set-dir <set> \
@@ -450,13 +450,30 @@ class VerifySessionError(Exception):
     """Raised for deterministic pre-route failures (usage / state)."""
 
 
-class EvidenceTooLargeError(Exception):
+class EvidenceTooLargeError(VerifySessionError):
     """Raised by ``assemble_evidence`` when the assembled evidence exceeds the
-    oversized-input cap (Set 089). Distinct from :class:`VerifySessionError` so
-    the CLI maps it to ``EXIT_VERIFICATION_UNAVAILABLE`` (fail-closed evidence),
-    not ``EXIT_USAGE``. Raising it at assembly time -- not only in the CLI --
-    means EVERY caller of ``assemble_evidence`` fails closed rather than routing
-    a diff the verifier would silently truncate."""
+    oversized-input cap (Set 089). The CLI maps it to
+    ``EXIT_VERIFICATION_UNAVAILABLE`` (fail-closed evidence), not ``EXIT_USAGE``.
+    Raising it at assembly time -- not only in the CLI -- means EVERY caller of
+    ``assemble_evidence`` fails closed rather than routing a diff the verifier
+    would silently truncate.
+
+    Set 119 S3 made it a SUBCLASS of :class:`VerifySessionError`. It used to be
+    a sibling, which read as the right way to keep the two exit codes apart and
+    was in fact a standing crash: ``close_backstop`` catches the parent at four
+    sites and caught this one at exactly one, so an oversized bundle took the
+    close down with an unhandled traceback on the other four paths -- the gate
+    gone, no remediation line, on the most expensive path there is. Fixing the
+    TYPE fixes all four at once, which is the class-level fix L-069-1 asks for;
+    catching it at three more sites would have been the fourth instance-patch
+    in a row.
+
+    The exit-code distinction survives because it was never carried by the
+    class relationship, only by handler ORDER: every site that wants the
+    unavailable exit catches this subclass FIRST and the parent second. A site
+    that catches only the parent now handles both, which is the point -- it
+    fails closed with a message instead of unwinding.
+    """
 
     def __init__(self, assembled_chars: int, cap: int) -> None:
         self.assembled_chars = assembled_chars
@@ -1507,28 +1524,56 @@ def find_discovery_baseline_tree(
 ) -> Optional[tuple]:
     """The most recent prior round's recorded ``discoveryBaselineTree``.
 
-    Scans the immutable ``sN-issues*.json`` envelopes from
-    ``current_round - 1`` down to 1 and returns ``(round, tree_sha)`` for
-    the first (i.e. latest) envelope carrying the field, or ``None``.
-    Only discovery-family rounds write the field, so a second
-    remediation-review cycle diffs from the ORIGINAL discovery baseline —
-    the cumulative fix delta — by construction.
+    Two records carry it, and both are consulted (Set 119 S3):
+
+    * the immutable ``sN-issues*.json`` envelopes — the original Set 096
+      home, written only on a **findings-bearing** round;
+    * the ``sN-rounds.jsonl`` ledger row, written for **every** completed
+      round.
+
+    The envelope-only rule left the sanctioned recovery path unreachable
+    from exactly the states that need it. A CLEAN discovery round writes
+    no envelope, so it recorded no baseline; a close-backstop round wrote
+    none either. ``--phase remediation-review`` then refused with
+    EXIT_USAGE — "no prior round recorded a discoveryBaselineTree" — and
+    the orchestrator had to buy a full discovery round to re-enter the
+    loop the backstop's own refusal message told it to use.
+
+    Scans from ``current_round - 1`` down to 1 and returns
+    ``(round, tree_sha)`` for the first (latest) round that recorded one,
+    so a second remediation-review cycle still diffs from the ORIGINAL
+    baseline — the cumulative fix delta — by construction. Within one
+    round the envelope wins: it is the immutable artifact, and the two
+    agree by construction when both exist.
     """
+    ledger_trees: dict = {}
+    for record in read_round_ledger(session_set_dir, session_number):
+        if record.get("event") != ROUND_EVENT_COMPLETED:
+            continue
+        tree = record.get("discoveryBaselineTree")
+        round_no = record.get("verificationRound")
+        if (
+            isinstance(tree, str)
+            and tree.strip()
+            and isinstance(round_no, int)
+        ):
+            ledger_trees[round_no] = tree.strip()
+
     for prior_round in range(current_round - 1, 0, -1):
         path = issues_artifact_path(
             session_set_dir, session_number, prior_round
         )
-        if not path.exists():
-            continue
-        try:
-            envelope = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(envelope, dict):
-            continue
-        tree = envelope.get("discoveryBaselineTree")
-        if isinstance(tree, str) and tree.strip():
-            return prior_round, tree.strip()
+        if path.exists():
+            try:
+                envelope = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                envelope = None
+            if isinstance(envelope, dict):
+                tree = envelope.get("discoveryBaselineTree")
+                if isinstance(tree, str) and tree.strip():
+                    return prior_round, tree.strip()
+        if prior_round in ledger_trees:
+            return prior_round, ledger_trees[prior_round]
     return None
 
 
@@ -1773,6 +1818,7 @@ def record_round_completed(
     blocking: bool,
     ended_loop: bool,
     source: str = ROUND_SOURCE_VERIFY_SESSION,
+    discovery_baseline_tree: Optional[str] = None,
 ) -> dict:
     """Append the completed round's record — the bounded-totals input.
 
@@ -1791,8 +1837,21 @@ def record_round_completed(
     backstop round is an unphased round and consumes the same budget as
     any other, which is the point of unifying them. Readers must tolerate
     its absence -- ledgers written before this set carry no ``source``.
+
+    ``discovery_baseline_tree`` (Set 119 S3) is the working-tree snapshot
+    taken before the round's evidence was assembled -- the same value
+    :func:`write_issues_artifact` records, written HERE as well because
+    the envelope is not a reliable place to keep it. The envelope is
+    written only on a findings-bearing round (the locked Set 055
+    invariant), so the two rounds that most need a baseline leave none:
+    a CLEAN discovery round, and every close-backstop round (which wrote
+    no baseline at all). ``--phase remediation-review`` then refused with
+    EXIT_USAGE and the only way back into the sanctioned loop was to buy
+    a whole discovery round. The ledger has no findings precondition, so
+    recording it here covers every round that ran. Omit-null: a round
+    that could not snapshot writes no key, and readers tolerate absence.
     """
-    return _append_round_ledger(path, {
+    record = {
         "event": ROUND_EVENT_COMPLETED,
         "sessionNumber": session_number,
         "verificationRound": round_number,
@@ -1802,7 +1861,10 @@ def record_round_completed(
         "blocking": blocking,
         "endedLoop": ended_loop,
         "recordedAt": datetime.now().astimezone().isoformat(),
-    })
+    }
+    if discovery_baseline_tree:
+        record["discoveryBaselineTree"] = discovery_baseline_tree
+    return _append_round_ledger(path, record)
 
 
 
@@ -2962,9 +3024,6 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             evidence = assemble_evidence(
                 session_set_dir, session_number, args.diff_base, excludes
             )
-    except VerifySessionError as exc:
-        print(f"verify_session: {exc}", file=sys.stderr)
-        return EXIT_USAGE
     except EvidenceTooLargeError as exc:
         # -- Set 089: oversized-INPUT guard (enforced in assemble_evidence so
         #    every caller fails closed). A larger input would be truncated at
@@ -2972,6 +3031,12 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         #    with no signal it is partial (the mirror of the SS3 output-
         #    truncation guard). Fail closed: nothing routed, nothing written,
         #    the close stays BLOCKED.
+        #
+        #    Set 119 S3: this clause MUST precede the VerifySessionError one
+        #    below -- EvidenceTooLargeError is now a subclass, and a subclass
+        #    caught after its parent is unreachable code. Before the reorder
+        #    this site would have silently degraded the fail-closed
+        #    "verification unavailable" exit into a plain usage error.
         print(
             "verify_session: VERIFICATION UNAVAILABLE -- the assembled evidence "
             f"({exc.assembled_chars:,} chars) exceeds the cap ({exc.cap:,} "
@@ -2987,6 +3052,9 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             file=sys.stderr,
         )
         return EXIT_VERIFICATION_UNAVAILABLE
+    except VerifySessionError as exc:
+        print(f"verify_session: {exc}", file=sys.stderr)
+        return EXIT_USAGE
 
     conventions = ""
     if args.conventions_file:
@@ -3042,11 +3110,23 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             if acceptance_block:
                 framing = framing + "\n\n" + acceptance_block
 
-    # -- Discovery-family rounds snapshot the working tree so a later
-    #    remediation-review can diff the fix delta from it. Fails OPEN
-    #    with a loud note: the round itself is still sound evidence.
+    # -- Rounds that could later be a remediation baseline snapshot the
+    #    working tree, so a later remediation-review can diff the fix
+    #    delta from it. Fails OPEN with a loud note: the round itself is
+    #    still sound evidence.
+    #
+    #    Set 119 S3 widens this from the discovery family to every round
+    #    that is not itself a remediation-review. The narrower rule made
+    #    the sanctioned recovery path unreachable from the states that
+    #    need it most -- an unphased (classic) round recorded nothing, and
+    #    the close backstop runs unphased, so a backstop-blocked close had
+    #    to buy a full discovery round to re-enter the loop its own
+    #    refusal message named. A remediation-review round is excluded on
+    #    purpose: it reviews the fix delta FROM a baseline and must never
+    #    become one, or the second cycle would diff from the first fix
+    #    instead of from the original discovery baseline.
     snapshot_tree: Optional[str] = None
-    if phase in (PHASE_DISCOVERY, PHASE_SUPPLEMENTARY):
+    if phase != PHASE_REMEDIATION_REVIEW:
         snapshot_tree = snapshot_worktree_tree(
             repo_root_for(session_set_dir)
         )
@@ -3055,7 +3135,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                 "verify_session: WARNING -- could not snapshot the working "
                 "tree; this round will not record a discoveryBaselineTree, "
                 "so a later --phase remediation-review needs a baseline "
-                "from another discovery-family round.",
+                "from another round.",
                 file=sys.stderr,
             )
 
@@ -3640,7 +3720,18 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             verdict,
             merged_issues,
             phase=phase,
-            discovery_baseline_tree=snapshot_tree,
+            # Set 119 S3: the ENVELOPE field keeps its Set 096 meaning
+            # exactly -- written by discovery-family rounds only, as
+            # docs/session-issues.schema.json documents. The widened
+            # snapshot goes to the round LEDGER instead (below), which
+            # has no findings precondition and no prior contract; that
+            # is what makes a clean or unphased round a usable baseline
+            # without changing what an envelope means.
+            discovery_baseline_tree=(
+                snapshot_tree
+                if phase in (PHASE_DISCOVERY, PHASE_SUPPLEMENTARY)
+                else None
+            ),
             fix_verdicts=fix_verdicts or None,
         )
 
@@ -3689,6 +3780,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         verdict=session_verdict,
         blocking=classification.blocking,
         ended_loop=ended_loop,
+        discovery_baseline_tree=snapshot_tree,
     )
 
     disposition_path = patch_disposition(session_set_dir, session_verdict)

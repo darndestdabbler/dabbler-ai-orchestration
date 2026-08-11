@@ -69,6 +69,49 @@ NOT_FOUND = "not-found"         # id present in no guidance file
 NO_TRAILER = "no-trailer"       # heading exists but carries no metadata
 
 
+# Set 119 S3 — this module's close-mandated writes, declared here rather
+# than listed in verification_stamp.
+#
+# The constitution MANDATES this CLI in the final commit, which lands a
+# ``last-used-set`` bump AFTER the verification round that will settle
+# the close. Nothing noticed for a long time because the close backstop
+# simply bought a fresh metered round and re-stamped a tree whose source,
+# tests and docs were byte-identical — so citing sessions were plausibly
+# paying for a routed round to record a metadata trailer, and it only
+# surfaced in Set 119 S2 when the round budget was already spent and the
+# backstop refused instead of quietly paying.
+#
+# ``bound`` names a normalizer, not ``whole-file``, on purpose: the close
+# is entitled to move the trailer field and nothing else. Lesson prose in
+# these files is session WORK and keeps binding the freshness digest, so
+# a post-verification rewrite of a preload document still stales the
+# stamp. The paths are ``guidance_config.GUIDANCE_RELDIR`` +
+# ``LESSONS_ACTIVE`` / ``LESSONS_ARCHIVE``, spelled literally because the
+# declaration is read with ``ast.literal_eval`` (no import, no side
+# effects, safe on the close path); ``test_close_mandated_writes.py``
+# asserts the two spellings agree.
+CLOSE_MANDATED_WRITES = (
+    {
+        "path": "docs/planning/lessons-learned.md",
+        "scope": "repo",
+        "bound": "guidance_meta:normalize_close_mandated_metadata",
+        "reason": (
+            "cite_lessons bumps last-used-set in the active tier during "
+            "the close-mandated final commit"
+        ),
+    },
+    {
+        "path": "docs/planning/lessons-archive.md",
+        "scope": "repo",
+        "bound": "guidance_meta:normalize_close_mandated_metadata",
+        "reason": (
+            "citing an archived id is legal and updates the archive's "
+            "trailer the same way"
+        ),
+    },
+)
+
+
 def cite_one(
     files: List[Tuple[str, str]], lesson_id: str, set_label: str
 ) -> Tuple[str, Optional[str]]:
@@ -180,6 +223,7 @@ __all__ = [
     "CITED_ARCHIVED",
     "NOT_FOUND",
     "NO_TRAILER",
+    "CLOSE_MANDATED_WRITES",
     "normalize_set_label",
     "cite_one",
     "main",

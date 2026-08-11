@@ -156,9 +156,9 @@ def validate_model_rates(alias: str, entry: dict) -> None:
             "would make this the cheapest candidate in every selection "
             "tiebreak while billing an unknown amount. If nothing should "
             "route here, set is_enabled: false and it becomes an "
-            "identity-only record, which needs no rates. To fill it in from "
-            "the provider's published page: python -m "
-            "ai_router.pricing_proposal --fetch"
+            "identity-only record, which needs no rates. To fill it in, "
+            "copy the rates from the provider's published pricing page into "
+            "this entry and stamp confirmed_on."
         )
 
     if rows is not None and has_flat:

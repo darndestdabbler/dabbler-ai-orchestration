@@ -13,7 +13,7 @@ Module map (for new contributors):
 
 Usage:
     from ai_router import (
-        route, verify, query, get_costs, print_cost_report,
+        route, verify, query,
         print_session_set_status,
         send_pushover_notification, send_session_complete_notification
     )
@@ -45,10 +45,6 @@ Usage:
         content="Reformat this JSON:\n...",
         task_type="formatting"
     )
-
-    # Get cost report (includes verification costs)
-    costs = get_costs()
-    print_cost_report()
 
 Session logging is handled externally by the caller (Claude Code) via
 the SessionLog class:
@@ -1899,8 +1895,6 @@ def _tiebreaker_reroute(
     return route_result
 
 
-from .cost_report import get_costs, print_cost_report
-
 # Set 067: the first-party tool-loop "pull" verifier adapter. A route()-PARALLEL
 # agentic seam (the verifier drives a read-only tool loop; the orchestrator is a
 # deterministic servant), NOT a branch inside route(). See pull_verifier.py and
@@ -1988,27 +1982,17 @@ from .contract_gate import (
     CONTRACT_FLOOR_RESULT_FILENAME,
 )
 
-# Set 068 S6: the per-session routed-verification gating predicate — RETIRED
-# as a skip authority by Set 083 (operator decision after the 2026-07-06 UAT
-# incident: the predicate's verdict is only as honest as the path list the
-# policed actor feeds it). Per-session cross-provider verification is now
-# MANDATORY on every Full-tier session; the CLI always answers REQUIRED. The
-# exports stay for import back-compat and the informational trigger report.
-# See routed_gate.py + docs/ai-led-session-workflow.md ->
-# "Verification-surface policy".
-from .routed_gate import (
-    evaluate_routed_gate,
-    RoutedGateDecision,
-    ROUTED_GATE_TRIGGERS,
-    BREADTH_THRESHOLD,
-    TRIGGER_BLAST_RADIUS,
-    TRIGGER_MULTI_MODULE,
-    TRIGGER_BREADTH,
-    TRIGGER_BUILD_CI_CONFIG,
-    TRIGGER_CONTRACT_UNCOVERED,
-    TRIGGER_HIGH_BLAST,
-    TRIGGER_POST_FAILED_LOOP,
-)
+# Set 068 S6's per-session routed-verification gating predicate
+# (``routed_gate``) was RETIRED as a skip authority by Set 083 -- the
+# operator's decision after the 2026-07-06 UAT incident: the predicate's
+# verdict is only as honest as the path list the policed actor feeds it.
+# Per-session cross-provider verification has been MANDATORY on every
+# Full-tier session ever since, and the module answered REQUIRED
+# unconditionally. Set 119 S3 deleted it along with the cost surface
+# (``cost_report`` / ``pricing_proposal``) and ``floor_ratchet``: nothing
+# in the package called any of them. ``pricing`` STAYS -- ``models``,
+# ``pull_verifier``, ``config`` and this module import it, and it feeds
+# the api-profile verifier's max_cost_multiplier guard.
 
 
 def print_session_set_status(base_dir: str = "docs/session-sets") -> None:

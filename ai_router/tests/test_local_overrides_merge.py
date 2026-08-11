@@ -92,7 +92,6 @@ _MINIMAL_RC = textwrap.dedent("""\
       log_prompts: false
       log_responses: false
     output:
-      cost_report_on_exit: false
       verbose: false
 """)
 

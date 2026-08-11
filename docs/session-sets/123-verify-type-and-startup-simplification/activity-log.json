@@ -79,6 +79,14 @@
       "dateTime": "2026-08-11T16:57:56.031291-04:00",
       "description": "config.load_config no longer defaults transport.profile independently: it calls verify_type.derive_transport_profile after the local-overrides merge, so the project file outranks the tracked config AND the seat-local override, and the api default is now the last step of resolution rather than a parallel answer. Falsifiers (L-112-1) plant the disagreement in BOTH directions and assert the file wins, plus two look-alikes proving the derivation does not fire indiscriminately, plus a structural bijection assertion against config._VALID_TRANSPORT_PROFILES. 16 tests, all green; the neighbouring config / local-overrides / entry-point suites stay green.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T18:31:01.207959-04:00",
+      "description": "Code frozen after the round-5 VERIFIED verdict, then the full suite ran once: 3952 passed, 9 skipped in 484s, recorded via run_of_record (digest 25178fd4cad8). Verification took five rounds -- two discovery, two remediation-review, and one the operator authorized past the bound -- ending VERIFIED with six fix verdicts accepted and no findings. Disposition authored, lessons cited (L-112-1, L-069-1, L-064-8), committed and pushed.",
+      "status": "complete"
     }
   ]
 }

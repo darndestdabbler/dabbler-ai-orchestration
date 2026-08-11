@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "Left-click a session, land on its plan",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-11T08:59:28.236746-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-11T09:52:17.111634-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

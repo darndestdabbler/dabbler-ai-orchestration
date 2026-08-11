@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-11T08:49:26.878066-04:00",
+  "generatedAt": "2026-08-11T09:52:17.115127-04:00",
   "sessionSetDir": "115-work-explorer-session-node-ux",
   "inputs": {
-    "activity-log.json": "5bc9fc94857ca55e7ac4e39ebf764dc1338963aed7a730d70a52b5a22e3fea1a",
-    "session-state.json": "d0f4a60563fa9dd5e237da22ea6d5b6f8129d2e5bbe631d8978789b6dade6cc3",
+    "activity-log.json": "e94aea08ff4e727a0f0c9eed793f92a6c52d74e80a029a5292be0d8bbcb582a3",
+    "session-state.json": "cc8b50dc0346c87bd096acd8f4de96b819c8e573c72fb13aad2766cd14a5b602",
     "spec.md": "8c6dd7047c01210d92c2ac77d1d7e4e809d28643183cefffd647f9380d28fb5f"
   },
   "orphanEntries": 0,
@@ -90,16 +90,67 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 via start_session; preload read (constitution, project-guidance, lessons-learned, AGENTS.md); transport profile copilot-cli confirmed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "add-a-session-scoped-reveal-activating",
+          "description": "Session rows now carry dabblerWorkExplorer.activateSession, which dispatches the EXISTING dabblerSessionSets.openSpec with the session node; openSpec reveals the section via the new pure providers/specSectionLocator.ts (borrowing sessionStepModel.scanSessionHeads so one regex decides what a session heading is). Layer 2 green: 13 new assertions.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "degrade-to-the-truth",
+          "description": "Every unanswerable case (no session number, unreadable spec, no matching heading, spec ahead of the ledger, EISDIR) returns undefined and opens spec.md at the top; the reveal itself falls back to vscode.open on any throw. Proven at Layer 2 (6 cases) and in a real host: a heading-less fixture opens at Ln 1 with no notification toast.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "keep-the-decision-honest-about-scope",
+          "description": "Journaled two decisions: (a) one command, two callers - openSpec takes an optional section, heading scan borrowed from sessionStepModel rather than re-derived; (b) the plain reveal ships as showTextDocument + revealRange(AtTop) with an empty selection, and whether it reads as focused enough is tagged uat_decide for the set walk - no custom scheme on this evidence, per the spec non-goal.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-layer-3-at-close-after",
+          "description": "Runs of record after the last code change: mocha 1721 passing / 1 pending (49s), playwright 38 passed (14.1m, includes the 2 new session-plan-reveal scenarios). pytest fresh from S1 - no ai_router source changed. Verification VERIFIED (gpt-5.5, both discovery lenses, 0 blocking findings, 1 nit).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 5
       },
       "current": [],
       "remaining": []

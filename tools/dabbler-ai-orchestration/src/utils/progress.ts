@@ -103,13 +103,7 @@ export class SessionStateInvariantError extends Error {
 // optional to tolerate older specs that omit it).
 const SESSION_HEADING_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+\d+)?\s*:\s*(.+?)\s*$/gm;
 
-export function extractSessionTitlesFromSpec(specMdPath: string): Array<{ number: number; title: string }> {
-  let text: string;
-  try {
-    text = fs.readFileSync(specMdPath, "utf-8");
-  } catch {
-    return [];
-  }
+export function extractSessionTitlesFromText(text: string): Array<{ number: number; title: string }> {
   const out: Array<{ number: number; title: string }> = [];
   let m: RegExpExecArray | null;
   // Reset state because the regex is /g.
@@ -118,6 +112,114 @@ export function extractSessionTitlesFromSpec(specMdPath: string): Array<{ number
     out.push({ number: parseInt(m[1], 10), title: m[2].trim() });
   }
   out.sort((a, b) => a.number - b.number);
+  return out;
+}
+
+export function extractSessionTitlesFromSpec(specMdPath: string): Array<{ number: number; title: string }> {
+  let text: string;
+  try {
+    text = fs.readFileSync(specMdPath, "utf-8");
+  } catch {
+    return [];
+  }
+  return extractSessionTitlesFromText(text);
+}
+
+// ---------------------------------------------------------------------------
+// Generic-title heal (Set 115 S1) — mirror of progress.py
+// ---------------------------------------------------------------------------
+
+// A title is *generic-shaped* when it is exactly the fallback label a
+// writer emits when it knows nothing: `Session <this entry's number>`.
+// Anchored to the entry's OWN number — `Session 5` stored on session 3
+// is drift or an operator's words, not the fallback.
+const GENERIC_TITLE_RE = /^Session\s+(\d+)$/;
+
+export function isGenericTitle(title: unknown, num: number): boolean {
+  if (typeof title !== "string") return true;
+  const stripped = title.trim();
+  if (stripped.length === 0) return true;
+  const m = GENERIC_TITLE_RE.exec(stripped);
+  return m !== null && parseInt(m[1], 10) === num;
+}
+
+/**
+ * The title `num` should carry, or `null` when unresolved.
+ *
+ * Resolution order (Set 115 S1): a non-generic stored title (never
+ * overwritten) → the `spec.md` heading → the stored title as-is → null,
+ * leaving the caller's own `Session N` fallback.
+ *
+ * Pure mirror of `progress.heal_title`; the parity corpus
+ * `ai_router/tests/fixtures/session-title-parity.json` pins the two
+ * implementations together.
+ */
+export function healTitle(
+  storedTitle: unknown,
+  num: number,
+  specTitles: Map<number, string> | null,
+): string | null {
+  if (!isGenericTitle(storedTitle, num)) return storedTitle as string;
+  const specTitle = specTitles?.get(num);
+  if (typeof specTitle === "string" && specTitle.trim().length > 0) {
+    return specTitle.trim();
+  }
+  if (typeof storedTitle === "string" && storedTitle.trim().length > 0) {
+    return storedTitle;
+  }
+  return null;
+}
+
+/** Apply {@link healTitle} in place across a `sessions[]` array; returns the change count. */
+export function healGenericTitles(
+  sessions: any[],
+  specTitles: Map<number, string>,
+): number {
+  let healed = 0;
+  for (const entry of sessions) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const num = entry.number;
+    if (!isStrictPositiveInt(num)) continue;
+    const current = entry.title;
+    const resolved = healTitle(current, num, specTitles);
+    if (resolved !== null && resolved !== current) {
+      entry.title = resolved;
+      healed += 1;
+    }
+  }
+  return healed;
+}
+
+/**
+ * True when any entry carries a generic-shaped title.
+ *
+ * Readers call this BEFORE touching `spec.md` so a healthy set costs no
+ * additional disk read on the tree scan — the constraint Set 110 S1
+ * measured when the tree grew its fourth level.
+ */
+export function needsTitleHeal(sessions: any[]): boolean {
+  for (const entry of sessions) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const num = entry.number;
+    if (!isStrictPositiveInt(num)) continue;
+    if (isGenericTitle(entry.title, num)) return true;
+  }
+  return false;
+}
+
+/** `{number → title}` from spec text already in hand — no I/O. */
+export function specTitleMapFromText(text: string): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const t of extractSessionTitlesFromText(text)) out.set(t.number, t.title);
+  return out;
+}
+
+/** `{number → title}` for `specMdPath`, for the heal helpers above. */
+export function specTitleMap(specMdPath: string): Map<number, string> {
+  const out = new Map<number, string>();
+  for (const t of extractSessionTitlesFromSpec(specMdPath)) {
+    out.set(t.number, t.title);
+  }
   return out;
 }
 
@@ -269,7 +371,11 @@ const V4_PER_SESSION_KEYS = [
 // Per the Session-1 audit verdict (Group A1): the shim is the
 // reader-first phase; the migrator (Session 3) and the writer flip
 // (Sessions 4-5) both depend on this contract.
-export function normalizeToV4Shape(state: any, specMdPath: string): any {
+export function normalizeToV4Shape(
+  state: any,
+  specMdPath: string,
+  specTitles?: Map<number, string>,
+): any {
   if (state === null || state === undefined) {
     throw new TypeError("normalizeToV4Shape: state is null");
   }
@@ -317,6 +423,26 @@ export function normalizeToV4Shape(state: any, specMdPath: string): any {
       if (sv4[k] === undefined) sv4[k] = null;
     }
     sessionsV4.push(sv4);
+  }
+
+  // Step 2b (Set 115 S1): heal generic-shaped titles from spec.md.
+  //
+  // A `Session N` label on disk is sticky — title resolution puts the
+  // stored ledger first, so once any writer put the fallback there every
+  // later boundary write copied it forward and nothing self-healed. The
+  // write-path heal in `session_state._build_sessions_array` fixes that
+  // going forward, but a CLOSED set gets no further boundary write, so
+  // the read view heals too and every row says what its session is about
+  // without a migration script rewriting closed history.
+  //
+  // The spec read is CONDITIONAL on a generic title actually being
+  // present: a healthy set costs no additional disk read on the scan.
+  // A caller that already read the spec passes its title map in, so the
+  // tree scan reads each `spec.md` at most once per set (Set 115 S1
+  // round-1 finding).
+  if (needsTitleHeal(sessionsV4)) {
+    const titles = specTitles ?? specTitleMap(specMdPath);
+    if (titles.size > 0) healGenericTitles(sessionsV4, titles);
   }
 
   const schemaVersionIn = state.schemaVersion;
@@ -477,11 +603,15 @@ export function normalizeToV4Shape(state: any, specMdPath: string): any {
 // to a v3 file. The normalize shim is invoked even for v3 inputs so
 // the v4 per-session enrichment is available to any consumer that
 // fetches the normalized object directly.
-export function readProgress(state: any, specMdPath: string): ProgressView {
+export function readProgress(
+  state: any,
+  specMdPath: string,
+  specTitles?: Map<number, string>,
+): ProgressView {
   if (state === null || state === undefined) {
     throw new TypeError("readProgress: state is null");
   }
-  const normalized = normalizeToV4Shape(state, specMdPath);
+  const normalized = normalizeToV4Shape(state, specMdPath, specTitles);
   return getProgress(normalized);
 }
 

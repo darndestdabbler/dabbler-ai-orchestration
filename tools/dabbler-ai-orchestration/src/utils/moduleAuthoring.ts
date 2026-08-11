@@ -1939,12 +1939,13 @@ export function renameModule(
 
 /** Session-set artifact filenames that prove REAL execution happened (as
  * opposed to a bare `kind: plan|decomposition` scaffold that only has a
- * spec.md). Deliberately does NOT include `session-state.json`: the
- * Session Set Explorer's own reader (`readStatus` -> `ensureSessionStateFile`)
- * lazily SYNTHESIZES a `not-started` session-state.json onto any spec-only
- * folder the moment it is scanned, so the file's mere presence is not a
- * "this was touched" signal — only these real artifacts (or a non-
- * `not-started` status inside the state file, checked separately) are. */
+ * spec.md). Deliberately does NOT include `session-state.json`: the file
+ * is created by the router's writers (`start_session` /
+ * `ensure_session_state_file`) and, before Set 115 S1, was also
+ * lazily synthesized onto any spec-only folder the Explorer scanned — so
+ * the file's mere presence is not a "this was touched" signal. Only these
+ * real artifacts (or a non-`not-started` status inside the state file,
+ * checked separately) are. */
 const EXECUTION_ARTIFACT_FILENAMES = [
   "activity-log.json",
   "session-events.jsonl",
@@ -1960,13 +1961,11 @@ function hasExecutionArtifacts(dir: string): boolean {
 }
 
 /** Non-mutating raw-status read (mirrors {@link hasRunningSessionAt}): never
- * calls the Explorer's `readStatus` (which would synthesize a state file as
- * a side effect). Absent/unparseable/no-string-status all fall back to
- * {@link inferLegacyStatus} — the SAME file-presence inference
- * `readStatus`'s own synthesizer would apply, just without writing it,
- * so a legacy set with no `session-state.json` at all (but a real
- * `change-log.md` or `activity-log.json`) still classifies correctly
- * instead of reading as an untouched not-started set. */
+ * calls the Explorer's `readStatus` on the pre-Set-115 path (which would
+ * synthesize a state file as a side effect). Absent/unparseable/no-string-status
+ * all fall back to {@link inferLegacyStatus} — the SAME file-presence inference
+ * `readStatus` applies, kept here so this module's classification does not
+ * depend on the reader's shape work. */
 function rawSessionSetStatus(dir: string): "not-started" | "in-progress" | "complete" {
   let raw: string;
   try {

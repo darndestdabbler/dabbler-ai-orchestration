@@ -1,15 +1,21 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "115-work-explorer-session-node-ux",
-  "status": "not-started",
+  "status": "in-progress",
   "sessions": [
     {
       "number": 1,
       "title": "The titles both writers already know",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-11T07:11:10.106546-04:00",
       "completedAt": null,
-      "orchestrator": null,
+      "orchestrator": {
+        "engine": "github-copilot",
+        "provider": "anthropic",
+        "model": "claude-opus-5",
+        "effort": "high",
+        "identityProvenance": "asserted"
+      },
       "verificationVerdict": null
     },
     {

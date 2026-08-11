@@ -4,9 +4,9 @@ import * as fs from "fs";
 import * as path from "path";
 import * as YAML from "yaml";
 import { listGitWorktrees } from "./git";
-import { readStatus } from "./sessionState";
+import { inferStateInMemory, readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
-import { readProgress, SessionStateInvariantError, normalizeToV4Shape } from "./progress";
+import { readProgress, SessionStateInvariantError, normalizeToV4Shape, canonicalizeStatus } from "./progress";
 import { parseSpecSteps } from "../providers/sessionStepModel";
 import {
   DuplicateNameCollision,
@@ -933,6 +933,10 @@ export function readSessionSets(root: string): SessionSet[] {
     // at every cancel/restore boundary, so the state file's `status`
     // is the authoritative read.
     let state: SessionState;
+    // Set 115 S1: the in-memory synthesis for a folder with no state
+    // file, computed at most once per set (see the absent-file branch
+    // below) and reused as the ledger input further down.
+    let inferredState: Record<string, unknown> | null = null;
     const cancellation = readCancellationState(dir);
     if (cancellation === "cancelled") {
       state = "cancelled";
@@ -950,19 +954,35 @@ export function readSessionSets(root: string): SessionSet[] {
       );
       state = "cancelled";
     } else {
-      const status = readStatus(dir);
-      if (status === "complete") {
-        // Defensive: a snapshot with status: "complete" that doesn't
-        // actually satisfy the v3 invariants (e.g., sessions[] still
-        // contains a not-started entry) is a stale mid-set close-out —
-        // either a manual edit or a snapshot a consumer repo hasn't
-        // refreshed yet. Downgrade so the set doesn't briefly show
-        // Complete in the window between sessions.
-        state = isMidSetComplete(statePath) ? "in-progress" : "complete";
-      } else if (status === "in-progress") {
-        state = "in-progress";
+      // Set 115 S1 (round-1 finding): infer ONCE per set. `readStatus`
+      // would re-derive the same shape a second time for a spec-only
+      // folder, so the absent-file branch computes it here and both the
+      // bucketing status and the ledger below read that one object.
+      if (!fs.existsSync(statePath)) {
+        inferredState = inferStateInMemory(dir);
+        const raw = inferredState.status;
+        state =
+          typeof raw === "string"
+            ? (canonicalizeStatus(raw) as SessionState)
+            : "not-started";
+        if (state === "complete" && isMidSetComplete(statePath)) {
+          state = "in-progress";
+        }
       } else {
-        state = "not-started";
+        const status = readStatus(dir);
+        if (status === "complete") {
+          // Defensive: a snapshot with status: "complete" that doesn't
+          // actually satisfy the v3 invariants (e.g., sessions[] still
+          // contains a not-started entry) is a stale mid-set close-out —
+          // either a manual edit or a snapshot a consumer repo hasn't
+          // refreshed yet. Downgrade so the set doesn't briefly show
+          // Complete in the window between sessions.
+          state = isMidSetComplete(statePath) ? "in-progress" : "complete";
+        } else if (status === "in-progress") {
+          state = "in-progress";
+        } else {
+          state = "not-started";
+        }
       }
     }
 
@@ -1038,7 +1058,14 @@ export function readSessionSets(root: string): SessionSet[] {
       } catch { /* ignore */ }
     }
 
-    if (fs.existsSync(statePath)) {
+    // Set 115 S1: the state file is no longer created as a side effect of
+    // this read (`readStatus` used to write one), so the absent-file case
+    // is now real and is answered in memory. `inferStateInMemory` applies
+    // the same inference the router's backfill does, which keeps a
+    // spec-only set showing its PLANNED session rows — and its real
+    // titles — without the Explorer putting an untracked file in the
+    // operator's tree.
+    {
       try {
         // Set 047 Session 2 (reader-first phase): pipe the raw parsed
         // state through `normalizeToV4Shape` so a v4-shaped file (whose
@@ -1050,7 +1077,9 @@ export function readSessionSets(root: string): SessionSet[] {
         // them. `needsMigration` detection below reads the RAW parsed
         // object (`rawSd`) because the v3/v4 distinction is precisely
         // the signal we're checking for there.
-        const rawSd = JSON.parse(fs.readFileSync(statePath, "utf8")) as {
+        const rawSd = (fs.existsSync(statePath)
+          ? JSON.parse(fs.readFileSync(statePath, "utf8"))
+          : (inferredState ?? inferStateInMemory(dir))) as {
           schemaVersion?: number;
           sessions?: unknown;
           completedSessions?: unknown;
@@ -1130,7 +1159,14 @@ export function readSessionSets(root: string): SessionSet[] {
           }
         }
 
-        const sd = normalizeToV4Shape(preNormalizeSd, specPath) as {
+        const sd = normalizeToV4Shape(
+          preNormalizeSd,
+          specPath,
+          // Set 115 S1: an in-memory synthesis already resolved its
+          // titles from the one `spec.md` read it performed, so forbid a
+          // second read here.
+          inferredState !== null ? new Map<number, string>() : undefined,
+        ) as {
           completedAt?: string;
           startedAt?: string;
           status?: string;
@@ -1170,7 +1206,9 @@ export function readSessionSets(root: string): SessionSet[] {
         let progressCompleted: number[] | null = null;
         let progressCurrent: number | null = null;
         try {
-          const view = readProgress(sd, specPath);
+          // `sd` is already normalized and healed above, so this
+          // re-normalization must never re-read `spec.md` (Set 115 S1).
+          const view = readProgress(sd, specPath, new Map<number, string>());
           progressTotal = view.totalSessions;
           progressCompleted = [...view.completedSessions];
           progressCurrent = view.currentSession;

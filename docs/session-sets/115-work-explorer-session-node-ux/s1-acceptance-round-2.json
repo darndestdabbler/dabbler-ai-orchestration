@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "0130e178b4361a90462c9b502025a78182e9540e",
+  "fixedTree": "9e5506f1ead5f6c723fdd7078f263dcf8630b73c",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T11:56:39.644643+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The TypeScript absent-state reader still treats an empty `activity-log.json` as in-progress, diverging from the router-owned synthesis it claims to mirror. - **Category:** Correctness - **Severity: ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "For a set with spec.md, no session-state.json, and activity-log.json containing an empty entries list or empty bare list, the TypeScript absent-state path classifies the set and derived sessions as not-started, matching the router backfill rule.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

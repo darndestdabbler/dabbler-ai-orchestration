@@ -157,8 +157,8 @@ suite("fileSystem — readSessionSets", () => {
   // not derived from file presence. Each fixture writes the canonical
   // not-started / in-progress / complete status string and asserts the
   // tree-view label maps it correctly. The "spec.md only" fixture
-  // exercises the lazy-synth fallback (readStatus writes the
-  // not-started shape on the fly when the file is absent).
+  // exercises the lazy-synth fallback (Set 115 S1: inferred in memory —
+  // the read no longer writes the file).
 
   test("reads a not-started set via lazy-synth (spec.md only)", () => {
     const dir = makeTmpDir();
@@ -170,8 +170,12 @@ suite("fileSystem — readSessionSets", () => {
     assert.strictEqual(sets.length, 1);
     assert.strictEqual(sets[0].name, slug);
     assert.strictEqual(sets[0].state, "not-started");
-    // Lazy-synth wrote the file as a side effect of readStatus.
-    assert.ok(fs.existsSync(path.join(setDir, "session-state.json")));
+    // Set 115 S1: the inference is in memory. Creating the file belongs
+    // to the router's writers, so scanning a folder leaves it untouched.
+    assert.ok(
+      !fs.existsSync(path.join(setDir, "session-state.json")),
+      "a read must not create the state file",
+    );
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -476,14 +480,17 @@ suite("fileSystem — readSessionSets", () => {
   // Verifier round 2 regression: lazy-synth on a legacy folder with
   // change-log.md or activity-log.json but no session-state.json must
   // infer the right initial state from those files (not regress to
-  // not-started). readStatus now routes the file-absent path through
-  // ensureSessionStateFile, mirroring the Python helper.
+  // not-started).
+  //
+  // Set 115 S1: that inference is now IN MEMORY. `readStatus` no longer
+  // creates the file — the router's sanctioned writers own creation, so
+  // scanning a folder in the Explorer cannot race them onto disk with a
+  // generic `Session N` ledger. Each test below therefore asserts the
+  // rendered set AND that nothing was written.
 
   test("lazy-synth infers 'complete' from legacy change-log.md presence (with spec totalSessions)", () => {
-    // Set 030 Session 3: lazy-synth writes sessions[] when the spec
-    // declares totalSessions. Set 047 Session 5 flipped the writer
-    // to v4 emission: top-level lifecycleState is dropped (the shim
-    // re-derives it on read from status); schemaVersion is 4.
+    // Set 030 Session 3: lazy-synth derives sessions[] when the spec
+    // declares totalSessions.
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "legacy-done");
     fs.mkdirSync(setDir, { recursive: true });
@@ -495,16 +502,13 @@ suite("fileSystem — readSessionSets", () => {
     // Deliberately no session-state.json — exercises the lazy-synth path.
     const sets = readSessionSets(dir);
     assert.strictEqual(sets[0].state, "complete");
-    // Side effect: a state file was written with the inferred shape.
-    const written = JSON.parse(
-      fs.readFileSync(path.join(setDir, "session-state.json"), "utf8")
+    assert.ok(
+      !fs.existsSync(path.join(setDir, "session-state.json")),
+      "Set 115 S1: a read must not create the state file",
     );
-    assert.strictEqual(written.status, "complete");
-    assert.strictEqual(written.schemaVersion, 4);
-    assert.ok(!("lifecycleState" in written), "v4 drops top-level lifecycleState");
-    assert.ok(Array.isArray(written.sessions));
-    assert.strictEqual(written.sessions.length, 2);
-    for (const entry of written.sessions) {
+    const sessions = sets[0].sessions ?? [];
+    assert.strictEqual(sessions.length, 2);
+    for (const entry of sessions) {
       assert.strictEqual(entry.status, "complete");
     }
     fs.rmSync(dir, { recursive: true });
@@ -512,9 +516,8 @@ suite("fileSystem — readSessionSets", () => {
 
   test("lazy-synth with change-log.md but NO spec totalSessions stays not-started (Round A fix)", () => {
     // Round-A regression (Set 030 Session 3 verifier): without a
-    // known plan, the writer cannot emit a reader-valid complete
-    // snapshot. The backfill falls through to not-started. Set 047
-    // Session 5: shape is v4 (no top-level lifecycleState).
+    // known plan, the reader cannot claim a complete snapshot. The
+    // inference falls through to not-started.
     const dir = makeTmpDir();
     const setDir = path.join(dir, "docs", "session-sets", "plan-less");
     fs.mkdirSync(setDir, { recursive: true });
@@ -524,13 +527,7 @@ suite("fileSystem — readSessionSets", () => {
     // Without a plan, the snapshot can't claim complete — bucket as
     // not-started.
     assert.strictEqual(sets[0].state, "not-started");
-    const written = JSON.parse(
-      fs.readFileSync(path.join(setDir, "session-state.json"), "utf8")
-    );
-    assert.strictEqual(written.status, "not-started");
-    assert.strictEqual(written.schemaVersion, 4);
-    assert.ok(!("lifecycleState" in written));
-    assert.strictEqual(written.sessions, undefined);
+    assert.ok(!fs.existsSync(path.join(setDir, "session-state.json")));
     fs.rmSync(dir, { recursive: true });
   });
 
@@ -550,17 +547,10 @@ suite("fileSystem — readSessionSets", () => {
     );
     const sets = readSessionSets(dir);
     assert.strictEqual(sets[0].state, "in-progress");
-    const written = JSON.parse(
-      fs.readFileSync(path.join(setDir, "session-state.json"), "utf8")
-    );
-    assert.strictEqual(written.status, "in-progress");
-    // Set 047 S5: top-level startedAt dropped; per-session startedAt
-    // carries the earliest activity-log timestamp.
-    assert.ok(!("startedAt" in written), "v4 drops top-level startedAt");
-    assert.strictEqual(written.schemaVersion, 4);
-    assert.ok(Array.isArray(written.sessions));
-    assert.strictEqual(written.sessions[0].status, "in-progress");
-    assert.strictEqual(written.sessions[0].startedAt, "2026-01-01T00:00:00-04:00");
+    assert.ok(!fs.existsSync(path.join(setDir, "session-state.json")));
+    const sessions = sets[0].sessions ?? [];
+    assert.strictEqual(sessions.length, 3);
+    assert.strictEqual(sessions[0].status, "in-progress");
     fs.rmSync(dir, { recursive: true });
   });
 

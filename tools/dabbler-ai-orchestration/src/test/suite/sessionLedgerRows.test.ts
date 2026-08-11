@@ -173,12 +173,13 @@ suite("Set 110 S2 — the scan carries the ledger onto SessionSet", () => {
   });
 
   test("a spec-only set shows its PLANNED sessions, via the existing lazy synthesis", () => {
-    // A folder with `spec.md` and no `session-state.json` is lazily
-    // synthesized to a not-started state file by `ensureSessionStateFile`
-    // — pre-existing behaviour this session did not add. The consequence
-    // for the fourth level is a good one and worth pinning: a set that
-    // has never been started still lists the sessions its spec plans,
-    // all `not-started`, rather than rendering as a bare leaf.
+    // A folder with `spec.md` and no `session-state.json` is derived as
+    // a not-started view by `inferStateInMemory` (Set 115 S1 — in
+    // memory; nothing is written) — pre-existing behaviour this session
+    // did not add. The consequence for the fourth level is a good one
+    // and worth pinning: a set that has never been started still lists
+    // the sessions its spec plans, all `not-started`, rather than
+    // rendering as a bare leaf.
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-ledger-"));
     try {
       const dir = path.join(root, "docs", "session-sets", "043-planned");

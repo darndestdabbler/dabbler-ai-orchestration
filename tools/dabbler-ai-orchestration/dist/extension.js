@@ -14765,13 +14765,7 @@ var SessionStateInvariantError = class extends Error {
   }
 };
 var SESSION_HEADING_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+\d+)?\s*:\s*(.+?)\s*$/gm;
-function extractSessionTitlesFromSpec(specMdPath) {
-  let text;
-  try {
-    text = fs.readFileSync(specMdPath, "utf-8");
-  } catch {
-    return [];
-  }
+function extractSessionTitlesFromText(text) {
   const out = [];
   let m;
   SESSION_HEADING_RE.lastIndex = 0;
@@ -14779,6 +14773,79 @@ function extractSessionTitlesFromSpec(specMdPath) {
     out.push({ number: parseInt(m[1], 10), title: m[2].trim() });
   }
   out.sort((a, b2) => a.number - b2.number);
+  return out;
+}
+function extractSessionTitlesFromSpec(specMdPath) {
+  let text;
+  try {
+    text = fs.readFileSync(specMdPath, "utf-8");
+  } catch {
+    return [];
+  }
+  return extractSessionTitlesFromText(text);
+}
+var GENERIC_TITLE_RE = /^Session\s+(\d+)$/;
+function isGenericTitle(title, num) {
+  if (typeof title !== "string")
+    return true;
+  const stripped = title.trim();
+  if (stripped.length === 0)
+    return true;
+  const m = GENERIC_TITLE_RE.exec(stripped);
+  return m !== null && parseInt(m[1], 10) === num;
+}
+function healTitle(storedTitle, num, specTitles) {
+  if (!isGenericTitle(storedTitle, num))
+    return storedTitle;
+  const specTitle = specTitles?.get(num);
+  if (typeof specTitle === "string" && specTitle.trim().length > 0) {
+    return specTitle.trim();
+  }
+  if (typeof storedTitle === "string" && storedTitle.trim().length > 0) {
+    return storedTitle;
+  }
+  return null;
+}
+function healGenericTitles(sessions, specTitles) {
+  let healed = 0;
+  for (const entry of sessions) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry))
+      continue;
+    const num = entry.number;
+    if (!isStrictPositiveInt(num))
+      continue;
+    const current = entry.title;
+    const resolved = healTitle(current, num, specTitles);
+    if (resolved !== null && resolved !== current) {
+      entry.title = resolved;
+      healed += 1;
+    }
+  }
+  return healed;
+}
+function needsTitleHeal(sessions) {
+  for (const entry of sessions) {
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry))
+      continue;
+    const num = entry.number;
+    if (!isStrictPositiveInt(num))
+      continue;
+    if (isGenericTitle(entry.title, num))
+      return true;
+  }
+  return false;
+}
+function specTitleMapFromText(text) {
+  const out = /* @__PURE__ */ new Map();
+  for (const t2 of extractSessionTitlesFromText(text))
+    out.set(t2.number, t2.title);
+  return out;
+}
+function specTitleMap(specMdPath) {
+  const out = /* @__PURE__ */ new Map();
+  for (const t2 of extractSessionTitlesFromSpec(specMdPath)) {
+    out.set(t2.number, t2.title);
+  }
   return out;
 }
 function isStrictPositiveInt(v) {
@@ -14835,7 +14902,7 @@ var V4_PER_SESSION_KEYS = [
   "orchestrator",
   "verificationVerdict"
 ];
-function normalizeToV4Shape(state, specMdPath) {
+function normalizeToV4Shape(state, specMdPath, specTitles) {
   if (state === null || state === void 0) {
     throw new TypeError("normalizeToV4Shape: state is null");
   }
@@ -14865,6 +14932,11 @@ function normalizeToV4Shape(state, specMdPath) {
         sv4[k2] = null;
     }
     sessionsV4.push(sv4);
+  }
+  if (needsTitleHeal(sessionsV4)) {
+    const titles = specTitles ?? specTitleMap(specMdPath);
+    if (titles.size > 0)
+      healGenericTitles(sessionsV4, titles);
   }
   const schemaVersionIn = state.schemaVersion;
   const isV4Input = typeof schemaVersionIn === "number" && schemaVersionIn >= SCHEMA_VERSION_V4;
@@ -14955,11 +15027,11 @@ function normalizeToV4Shape(state, specMdPath) {
   }
   return out;
 }
-function readProgress(state, specMdPath) {
+function readProgress(state, specMdPath, specTitles) {
   if (state === null || state === void 0) {
     throw new TypeError("readProgress: state is null");
   }
-  const normalized = normalizeToV4Shape(state, specMdPath);
+  const normalized = normalizeToV4Shape(state, specMdPath, specTitles);
   return getProgress(normalized);
 }
 function getProgress(state) {
@@ -15146,7 +15218,7 @@ function parseSessions(raw) {
 // src/utils/sessionState.ts
 var SCHEMA_VERSION = SCHEMA_VERSION_V4;
 var SESSION_STATE_FILENAME = "session-state.json";
-function buildSessions(totalSessions, topStatus) {
+function buildSessions(totalSessions, topStatus, specTitles) {
   if (totalSessions === null || totalSessions <= 0)
     return void 0;
   const out = [];
@@ -15159,7 +15231,7 @@ function buildSessions(totalSessions, topStatus) {
     }
     out.push({
       number: n,
-      title: `Session ${n}`,
+      title: healTitle(null, n, specTitles) ?? `Session ${n}`,
       status,
       startedAt: null,
       completedAt: null,
@@ -15176,16 +15248,7 @@ var STATUS_ALIASES2 = {
 function canonicalizeStatus2(raw) {
   return STATUS_ALIASES2[raw] ?? raw;
 }
-function readTotalSessionsFromSpec(sessionSetDir) {
-  const specPath = path2.join(sessionSetDir, "spec.md");
-  if (!fs2.existsSync(specPath))
-    return null;
-  let text;
-  try {
-    text = fs2.readFileSync(specPath, "utf8");
-  } catch {
-    return null;
-  }
+function totalSessionsFromSpecText(text, specTitles) {
   const headingMatch = text.match(
     /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i
   );
@@ -15196,15 +15259,25 @@ function readTotalSessionsFromSpec(sessionSetDir) {
     if (Number.isFinite(value) && value > 0)
       return value;
   }
-  const titles = extractSessionTitlesFromSpec(specPath);
-  if (titles.length === 0)
+  if (specTitles.size === 0)
     return null;
-  const maxN = titles.reduce((m, t2) => t2.number > m ? t2.number : m, 0);
+  const maxN = Math.max(...specTitles.keys());
   return maxN > 0 ? maxN : null;
 }
+function readSpecOnce(sessionSetDir) {
+  const specPath = path2.join(sessionSetDir, "spec.md");
+  let text;
+  try {
+    text = fs2.readFileSync(specPath, "utf8");
+  } catch {
+    return { titles: /* @__PURE__ */ new Map(), total: null };
+  }
+  const titles = specTitleMapFromText(text);
+  return { titles, total: totalSessionsFromSpecText(text, titles) };
+}
 function notStartedPayload(sessionSetDir) {
-  const totalSessions = readTotalSessionsFromSpec(sessionSetDir);
-  const sessions = buildSessions(totalSessions, "not-started");
+  const { titles, total } = readSpecOnce(sessionSetDir);
+  const sessions = buildSessions(total, "not-started", titles);
   const base = {
     schemaVersion: SCHEMA_VERSION,
     sessionSetName: path2.basename(sessionSetDir.replace(/[\\/]+$/, "")),
@@ -15215,7 +15288,7 @@ function notStartedPayload(sessionSetDir) {
   }
   return base;
 }
-function backfillPayload(sessionSetDir) {
+function inferStateInMemory(sessionSetDir) {
   const changelogPath = path2.join(sessionSetDir, "change-log.md");
   if (fs2.existsSync(changelogPath)) {
     const base = notStartedPayload(sessionSetDir);
@@ -15231,6 +15304,23 @@ function backfillPayload(sessionSetDir) {
   }
   const activityPath = path2.join(sessionSetDir, "activity-log.json");
   if (fs2.existsSync(activityPath)) {
+    let entries = null;
+    let readable = true;
+    try {
+      const data = JSON.parse(fs2.readFileSync(activityPath, "utf8"));
+      if (Array.isArray(data)) {
+        entries = data;
+      } else if (data && typeof data === "object" && Array.isArray(data.entries)) {
+        entries = data.entries;
+      } else {
+        readable = false;
+      }
+    } catch {
+      readable = false;
+    }
+    if (readable && entries !== null && entries.length === 0) {
+      return notStartedPayload(sessionSetDir);
+    }
     const base = notStartedPayload(sessionSetDir);
     if (!Array.isArray(base.sessions) || base.sessions.length === 0) {
       return base;
@@ -15238,54 +15328,19 @@ function backfillPayload(sessionSetDir) {
     base.status = "in-progress";
     const sessions = base.sessions;
     sessions[0].status = "in-progress";
-    try {
-      const data = JSON.parse(fs2.readFileSync(activityPath, "utf8"));
-      const timestamps = [];
-      for (const e of data.entries ?? []) {
-        if (typeof e.dateTime === "string")
-          timestamps.push(e.dateTime);
-      }
-      timestamps.sort();
-      const earliest = timestamps[0];
-      if (earliest !== void 0) {
-        sessions[0].startedAt = earliest;
-      }
-    } catch {
+    const timestamps = [];
+    for (const e of entries ?? []) {
+      if (typeof e.dateTime === "string")
+        timestamps.push(e.dateTime);
+    }
+    timestamps.sort();
+    const earliest = timestamps[0];
+    if (earliest !== void 0) {
+      sessions[0].startedAt = earliest;
     }
     return base;
   }
   return notStartedPayload(sessionSetDir);
-}
-function atomicWriteJson(filePath, payload) {
-  const directory = path2.dirname(filePath);
-  const base = path2.basename(filePath);
-  const tmpPath = path2.join(
-    directory,
-    `.${base}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`
-  );
-  try {
-    fs2.writeFileSync(
-      tmpPath,
-      JSON.stringify(payload, null, 2) + "\n",
-      { encoding: "utf8" }
-    );
-    fs2.renameSync(tmpPath, filePath);
-  } catch (err) {
-    if (fs2.existsSync(tmpPath)) {
-      try {
-        fs2.unlinkSync(tmpPath);
-      } catch {
-      }
-    }
-    throw err;
-  }
-}
-function ensureSessionStateFile(sessionSetDir) {
-  const filePath = path2.join(sessionSetDir, SESSION_STATE_FILENAME);
-  if (fs2.existsSync(filePath))
-    return filePath;
-  atomicWriteJson(filePath, backfillPayload(sessionSetDir));
-  return filePath;
 }
 function loadCanonicalStatus(filePath) {
   const raw = fs2.readFileSync(filePath, "utf8");
@@ -15308,8 +15363,8 @@ function readStatus(sessionSetDir) {
   if (fs2.existsSync(filePath)) {
     return loadCanonicalStatus(filePath);
   }
-  ensureSessionStateFile(sessionSetDir);
-  return loadCanonicalStatus(filePath);
+  const inferred = inferStateInMemory(sessionSetDir).status;
+  return typeof inferred === "string" ? canonicalizeStatus2(inferred) : "not-started";
 }
 
 // src/utils/cancelLifecycle.ts
@@ -16219,6 +16274,7 @@ function readSessionSets(root) {
     const aiAssignmentPath = path4.join(dir, "ai-assignment.md");
     const uatChecklistPath = path4.join(dir, `${entry.name}-uat-checklist.json`);
     let state;
+    let inferredState = null;
     const cancellation = readCancellationState(dir);
     if (cancellation === "cancelled") {
       state = "cancelled";
@@ -16228,13 +16284,22 @@ function readSessionSets(root) {
       );
       state = "cancelled";
     } else {
-      const status = readStatus(dir);
-      if (status === "complete") {
-        state = isMidSetComplete(statePath) ? "in-progress" : "complete";
-      } else if (status === "in-progress") {
-        state = "in-progress";
+      if (!fs4.existsSync(statePath)) {
+        inferredState = inferStateInMemory(dir);
+        const raw = inferredState.status;
+        state = typeof raw === "string" ? canonicalizeStatus(raw) : "not-started";
+        if (state === "complete" && isMidSetComplete(statePath)) {
+          state = "in-progress";
+        }
       } else {
-        state = "not-started";
+        const status = readStatus(dir);
+        if (status === "complete") {
+          state = isMidSetComplete(statePath) ? "in-progress" : "complete";
+        } else if (status === "in-progress") {
+          state = "in-progress";
+        } else {
+          state = "not-started";
+        }
       }
     }
     let totalSessions = null;
@@ -16262,9 +16327,9 @@ function readSessionSets(root) {
       } catch {
       }
     }
-    if (fs4.existsSync(statePath)) {
+    {
       try {
-        const rawSd = JSON.parse(fs4.readFileSync(statePath, "utf8"));
+        const rawSd = fs4.existsSync(statePath) ? JSON.parse(fs4.readFileSync(statePath, "utf8")) : inferredState ?? inferStateInMemory(dir);
         if (rawSd && typeof rawSd === "object" && !Array.isArray(rawSd)) {
           const sv = rawSd.schemaVersion;
           schemaVersionOnDisk = typeof sv === "number" ? sv : null;
@@ -16292,13 +16357,20 @@ function readSessionSets(root) {
             preNormalizeSd = { ...rawSd, completedSessions: closedLedgerSessions };
           }
         }
-        const sd = normalizeToV4Shape(preNormalizeSd, specPath);
+        const sd = normalizeToV4Shape(
+          preNormalizeSd,
+          specPath,
+          // Set 115 S1: an in-memory synthesis already resolved its
+          // titles from the one `spec.md` read it performed, so forbid a
+          // second read here.
+          inferredState !== null ? /* @__PURE__ */ new Map() : void 0
+        );
         ledgerSessions = sd.sessions ?? null;
         let progressTotal = null;
         let progressCompleted = null;
         let progressCurrent = null;
         try {
-          const view = readProgress(sd, specPath);
+          const view = readProgress(sd, specPath, /* @__PURE__ */ new Map());
           progressTotal = view.totalSessions;
           progressCompleted = [...view.completedSessions];
           progressCurrent = view.currentSession;
@@ -25779,7 +25851,7 @@ function deriveLegacyTriple(sessions) {
   completed.sort((a, b2) => a - b2);
   return { current, total: sessions.length, completed };
 }
-function atomicWriteJson2(filePath, data) {
+function atomicWriteJson(filePath, data) {
   const dir = path20.dirname(filePath);
   const base = path20.basename(filePath);
   const tmp = path20.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
@@ -25907,7 +25979,7 @@ function migrateOneSet(setDir, options = {}) {
   out.totalSessions = derivedTotal;
   out.completedSessions = completed;
   if (!dryRun) {
-    atomicWriteJson2(statePath, out);
+    atomicWriteJson(statePath, out);
   }
   return {
     setDir,
@@ -26127,7 +26199,7 @@ function buildV4OnDiskShape(normalized, original) {
   }
   return out;
 }
-function atomicWriteJson3(filePath, data) {
+function atomicWriteJson2(filePath, data) {
   const dir = path21.dirname(filePath);
   const base = path21.basename(filePath);
   const tmp = path21.join(
@@ -26153,7 +26225,7 @@ function atomicWriteJson3(filePath, data) {
 }
 function atomicCopyJson(src, dst) {
   const raw = JSON.parse(fs16.readFileSync(src, "utf-8"));
-  atomicWriteJson3(dst, raw);
+  atomicWriteJson2(dst, raw);
 }
 function migrateOneSetV4(setDir, options = {}) {
   const dryRun = options.dryRun ?? false;
@@ -26242,7 +26314,7 @@ function migrateOneSetV4(setDir, options = {}) {
       };
     }
     try {
-      atomicWriteJson3(statePath, sweptState);
+      atomicWriteJson2(statePath, sweptState);
     } catch (exc) {
       const msg = exc instanceof Error ? exc.message : String(exc);
       return {
@@ -26341,7 +26413,7 @@ function migrateOneSetV4(setDir, options = {}) {
     };
   }
   try {
-    atomicWriteJson3(statePath, newState);
+    atomicWriteJson2(statePath, newState);
   } catch (exc) {
     const msg = exc instanceof Error ? exc.message : String(exc);
     return {

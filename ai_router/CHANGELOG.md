@@ -11,6 +11,33 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — one computed projection, and the marker goes (Set 120 S3)
 
+### Fixed
+
+- **(Set 115 S1) A generic `Session N` title no longer sticks.** Title
+  resolution puts the stored `sessions[]` ledger first so titles survive
+  boundary writes — which also meant one `Session N` on disk was copied
+  forward by every later write, and nothing self-healed. 130 rows across
+  this repo were in that state. `progress.heal_title` adds the missing
+  carve-out: a `spec.md` heading beats a **generic-shaped** stored title
+  (exactly `Session <that entry's own number>`, or empty), while a
+  genuinely operator-authored title is still never overwritten —
+  `Session 5` stored on session 3 is authored, not the fallback.
+
+  The rule runs in two places for one reason. `_build_sessions_array`
+  applies it at every boundary write, so the fix persists; and
+  `normalize_to_v4_shape` applies it in the read view, because a
+  **closed set gets no further boundary write** — the read view is the
+  only place its labels can heal, and healing there rewrites no closed
+  history (the spec asked for healing *without* a migration script). The
+  reader's `spec.md` read is conditional on `needs_title_heal`, so a
+  healthy set costs no additional disk read on the tree scan.
+
+  New public helpers in `ai_router.progress`: `is_generic_title`,
+  `heal_title`, `heal_generic_titles`, `needs_title_heal`. The extension
+  mirrors them in `utils/progress.ts`, and
+  `ai_router/tests/fixtures/session-title-parity.json` pins the two
+  implementations to one corpus that neither language owns.
+
 ### Added
 
 - **(Set 120 S3) `ai_router.session_projection` — the session progress

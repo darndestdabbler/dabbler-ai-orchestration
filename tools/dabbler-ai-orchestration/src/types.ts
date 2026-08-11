@@ -336,9 +336,9 @@ export interface SessionSet {
   // disk read**, which is what keeps the fourth level off the startup
   // path S1 measured. Empty array when the state file is unreadable or
   // carries no usable ledger. A set with NO state file is not one of
-  // those cases: `ensureSessionStateFile` lazily synthesizes a
-  // not-started state from the spec, so such a set lists its PLANNED
-  // sessions, all `not-started`. Entries are narrowed to
+  // those cases: `inferStateInMemory` derives a not-started view from the
+  // spec (Set 115 S1 — in memory; no file is written), so such a set
+  // lists its PLANNED sessions, all `not-started`. Entries are narrowed to
   // the three display fields; per-session extras the ledger carries
   // (`type`, `verificationVerdict`, …) are deliberately NOT lifted here
   // — their consumers read the ledger through `tierLegibility`.

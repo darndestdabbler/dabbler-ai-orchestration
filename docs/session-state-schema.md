@@ -48,10 +48,10 @@ migrated; removal does NOT land in Set 047.
 Every directory under `docs/session-sets/<slug>/` that contains a
 `spec.md`. The state file sits next to `spec.md`, `activity-log.json`,
 and `change-log.md`. A directory with a spec but no state file is
-lazy-synthesized on first read (`ensureSessionStateFile` in the
-extension; `ensure_session_state_file` in the router), which infers
-the initial status from current file presence and writes a v4
-skeleton.
+lazy-synthesized by `ensure_session_state_file` in the router, which
+infers the initial status from current file presence and writes a v4
+skeleton. The extension **derives that same shape in memory and writes
+nothing** (Set 115 S1 — see *Lazy synthesis* below).
 
 The schema applies to all four Dabbler consumer repos and to any new
 repo adopted through the bootstrap prompt.
@@ -977,9 +977,8 @@ and the blocked marker" section for the user-facing description.
 
 ## Lazy synthesis (file-absent branch)
 
-A folder with `spec.md` but no `session-state.json` triggers
-`ensureSessionStateFile` (extension) / `ensure_state_file` (router),
-which infers a starting shape from current file presence:
+A folder with `spec.md` but no `session-state.json` is answered by
+inferring a starting shape from current file presence:
 
 | Files present | Inferred `status` | `sessions[]` shape |
 |---|---|---|
@@ -987,11 +986,77 @@ which infers a starting shape from current file presence:
 | `activity-log.json` (no change-log) | `"in-progress"` | session 1 promoted to `"in-progress"`; `sessions[0].startedAt` set from the earliest activity-log timestamp |
 | Neither | `"not-started"` | every session `"not-started"` |
 
-Both writers also seed `sessions[]` by parsing `spec.md` headings
+Both sides seed `sessions[]` by parsing `spec.md` headings
 (`### Session K of N: <title>`) or its Session Set Configuration
-block's `totalSessions:` value; when the spec has neither, they
-write the plan-less carve-out shape (no `sessions[]` key, top-level
+block's `totalSessions:` value; when the spec has neither, the
+plan-less carve-out shape applies (no `sessions[]` key, top-level
 `status: "in-progress"` + `startedAt` + `orchestrator` passthroughs).
+
+### Who writes it — one owner (Set 115 S1)
+
+**The router's writers create this file. The extension writes it only
+on an explicit operator action (cancel / restore), never on a read.**
+
+Before Set 115 S1 there were two `ensureSessionStateFile`
+implementations, and the extension's was reached from
+`readStatus` — a *read* that wrote. Because the extension watches
+`spec.md` and `session-state.json`, its synthesizer routinely won the
+race and put its own payload on disk first; since title resolution puts
+the stored ledger first (see below), whatever it wrote became permanent.
+Its `buildSessions` hardcoded ``title: `Session ${n}` `` in a module that
+had already computed the spec's real titles, which is how every set in
+the Explorer came to show generic labels.
+
+What the extension does now:
+
+| Path | Before | Now |
+|---|---|---|
+| `readStatus` on a folder with no state file | wrote a v4 skeleton, then re-read it | `inferStateInMemory` returns the same shape; nothing is written |
+| `readSessionSets` (the tree scan) | relied on that side effect having created the file | uses the in-memory derivation directly, so a spec-only set still lists its PLANNED sessions with their real titles |
+| `synthesizeNotStartedState` | bootstrap writer | unchanged, but explicit-action only — not reachable from a read |
+| cancel / restore | own sanctioned writer | unchanged |
+
+Two consequences worth naming: scanning a folder no longer drops an
+untracked file into the operator's tree (Set 099 S2 had already grown
+`rawSessionSetStatus` specifically to dodge that side effect), and there
+is no second writer left to lose a race to.
+
+### Title resolution and the generic-title heal (Set 115 S1)
+
+Per record, a title resolves as:
+
+1. The stored `sessions[]` title — **unless it is generic-shaped**,
+   meaning exactly `Session <that entry's own number>`, or empty.
+2. The `spec.md` heading for that number.
+3. The stored generic title, when the spec offers nothing.
+4. The `Session N` fallback.
+
+Rule 1's carve-out is the fix for stickiness: the stored ledger comes
+first so titles survive boundary writes, which also meant a single
+`Session N` on disk was copied forward forever and nothing self-healed
+(130 rows across this repo were in that state when the rule shipped). A
+genuinely operator-authored title is still never overwritten — `Session
+5` stored on session 3 is authored, not the fallback.
+
+The rule is one pure function, `progress.heal_title` (mirrored by
+`healTitle` in the extension's `utils/progress.ts`), and it runs in two
+places:
+
+- **At the writer** (`session_state._build_sessions_array`), so the fix
+  persists at the next boundary write.
+- **In the read view** (`normalize_to_v4_shape` / `normalizeToV4Shape`),
+  because a **closed set gets no further boundary write** — the read
+  view is the only place its labels can heal, and healing there rewrites
+  no closed history. The spec read is conditional on
+  `needs_title_heal`, so a healthy set costs no additional disk read on
+  the tree scan.
+
+Both implementations are pinned to one corpus,
+`ai_router/tests/fixtures/session-title-parity.json`, asserted by
+`ai_router/tests/test_session_title_parity.py` and
+`tools/dabbler-ai-orchestration/src/test/suite/sessionTitleParity.test.ts`.
+Neither language owns it: change one side alone and its own suite fails;
+change the corpus alone and both fail.
 
 ---
 

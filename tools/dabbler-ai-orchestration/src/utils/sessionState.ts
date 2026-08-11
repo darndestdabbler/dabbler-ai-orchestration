@@ -3,7 +3,8 @@ import * as path from "path";
 
 import {
   SCHEMA_VERSION_V4,
-  extractSessionTitlesFromSpec,
+  healTitle,
+  specTitleMapFromText,
 } from "./progress";
 
 // Canonical status strings carried by session-state.json under the Set 7
@@ -44,6 +45,7 @@ type LazySessionRecord = {
 function buildSessions(
   totalSessions: number | null,
   topStatus: "not-started" | "in-progress" | "complete",
+  specTitles: Map<number, string>,
 ): LazySessionRecord[] | undefined {
   // Mirror of _not_started_payload / _backfill_payload in Python
   // session_state.py. Per rule 1, sessions[] is omitted when
@@ -61,9 +63,14 @@ function buildSessions(
       // session 1 to in-progress so the snapshot satisfies rule 6.
       status = "in-progress";
     }
+    // Set 115 S1: the spec heading, resolved through the SAME rule the
+    // Python writer uses. This module already computed the title map and
+    // then threw it away, hardcoding `Session ${n}` — which is how the
+    // generic label reached disk in the first place, and (because title
+    // resolution puts the stored ledger first) why it then stuck.
     out.push({
       number: n,
-      title: `Session ${n}`,
+      title: healTitle(null, n, specTitles) ?? `Session ${n}`,
       status,
       startedAt: null,
       completedAt: null,
@@ -97,19 +104,16 @@ function canonicalizeStatus(raw: string): string {
 //
 // Set 047 Session 5 (mirrors Python S4 verifier Critical 2): when the
 // Session Set Configuration block has no numeric totalSessions, fall
-// back to the highest ``### Session N`` heading in the spec body. A
-// headings-only spec is a legitimate plan signal (the audit
-// proposals + recurring-session specs are authored this way before
-// the configuration block lands).
-function readTotalSessionsFromSpec(sessionSetDir: string): number | null {
-  const specPath = path.join(sessionSetDir, "spec.md");
-  if (!fs.existsSync(specPath)) return null;
-  let text: string;
-  try {
-    text = fs.readFileSync(specPath, "utf8");
-  } catch {
-    return null;
-  }
+// back to the highest ``### Session N`` heading in the spec.
+//
+// Set 115 S1: takes spec TEXT, not a path. The caller reads `spec.md`
+// once and derives both the title map and the total from it — the
+// round-1 finding was that this path read the same file twice per set,
+// on the tree scan.
+function totalSessionsFromSpecText(
+  text: string,
+  specTitles: Map<number, string>,
+): number | null {
   const headingMatch = text.match(
     /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i
   );
@@ -120,10 +124,25 @@ function readTotalSessionsFromSpec(sessionSetDir: string): number | null {
     if (Number.isFinite(value) && value > 0) return value;
   }
   // Headings fallback: max(N) over `### Session N — ...` headings.
-  const titles = extractSessionTitlesFromSpec(specPath);
-  if (titles.length === 0) return null;
-  const maxN = titles.reduce((m, t) => (t.number > m ? t.number : m), 0);
+  if (specTitles.size === 0) return null;
+  const maxN = Math.max(...specTitles.keys());
   return maxN > 0 ? maxN : null;
+}
+
+/** The one `spec.md` read this module performs per synthesis. */
+function readSpecOnce(sessionSetDir: string): {
+  titles: Map<number, string>;
+  total: number | null;
+} {
+  const specPath = path.join(sessionSetDir, "spec.md");
+  let text: string;
+  try {
+    text = fs.readFileSync(specPath, "utf8");
+  } catch {
+    return { titles: new Map(), total: null };
+  }
+  const titles = specTitleMapFromText(text);
+  return { titles, total: totalSessionsFromSpecText(text, titles) };
 }
 
 // Mirror of _not_started_payload in Python. Must produce structurally
@@ -144,8 +163,8 @@ function readTotalSessionsFromSpec(sessionSetDir: string): number | null {
 // The next legitimate write (register_session_start) materializes
 // ``sessions[]`` when the total is known.
 function notStartedPayload(sessionSetDir: string): Record<string, unknown> {
-  const totalSessions = readTotalSessionsFromSpec(sessionSetDir);
-  const sessions = buildSessions(totalSessions, "not-started");
+  const { titles, total } = readSpecOnce(sessionSetDir);
+  const sessions = buildSessions(total, "not-started", titles);
   const base: Record<string, unknown> = {
     schemaVersion: SCHEMA_VERSION,
     sessionSetName: path.basename(sessionSetDir.replace(/[\\/]+$/, "")),
@@ -175,38 +194,40 @@ function notStartedPayload(sessionSetDir: string): Record<string, unknown> {
 // correctness — `completedAt` and `startedAt` are observability fields,
 // not lifecycle drivers — but we keep them aligned so a folder
 // synthesized by either side reads the same way.
-function backfillPayload(sessionSetDir: string): Record<string, unknown> {
-  // Set 030 Session 3 (mirroring Python Session 2): re-derive
-  // sessions[] from the inferred top-status so the snapshot satisfies
-  // the invariants. change-log present -> all complete;
-  // activity-log only -> session 1 in-progress; neither -> all
-  // not-started (the notStartedPayload default).
-  //
-  // Set 047 Session 5 (mirrors Python S4): v4 emission. Top-level
-  // status drives bucketing; per-session metadata carries the
-  // boundary timestamps. The change-log branch leaves per-session
-  // completedAt at null — the change-log mtime is a set-level
-  // "when did this finish" heuristic, not a per-session boundary;
-  // the shim's read-time derivation surfaces it for the explorer if
-  // needed. The activity-log branch writes the earliest log
-  // timestamp onto sessions[0].startedAt so the v4 read-view derives
-  // a non-null top-level startedAt for the in-flight session.
-  //
-  // When totalSessions is unknown (no spec config + no headings),
-  // buildSessions returns undefined and we CANNOT escalate to
-  // complete/in-progress without violating rule 1 (sessions[]
-  // required for any set with a known plan). In that case the
-  // backfill stays at the not-started shape — the operator's intent
-  // (signaled by file presence) is preserved via the file presence
-  // itself; the next boundary write with a known plan will re-promote.
-
+/**
+ * The state a spec-only folder *would* have, computed in memory.
+ *
+ * **Set 115 S1 — writer ownership.** Two `ensureSessionStateFile`
+ * implementations used to create this file: `ai_router/session_state.py`
+ * and this module, the latter reached from `readStatus` — i.e. a *read*
+ * that wrote. Because the extension watches `spec.md` and
+ * `session-state.json`, its synthesizer routinely won the race and put
+ * its own payload on disk first; every later boundary write then carried
+ * that payload's titles forward, because title resolution puts the
+ * stored ledger first. That is how `Session N` became sticky across the
+ * whole Explorer.
+ *
+ * The ownership rule now: **the router's sanctioned writers own creation
+ * of `session-state.json`; the extension writes it only on an explicit
+ * operator action (cancel / restore), never on a read.** This function is
+ * the read-side replacement — the same inference the Python backfill
+ * applies (`change-log.md` → complete; `activity-log.json` →
+ * in-progress; neither → not-started), returned rather than written.
+ *
+ * Consequences that make this a removal rather than a trade: a folder no
+ * longer gains an untracked file merely because the Explorer scanned it
+ * (Set 099 S2 had already grown a non-mutating mirror,
+ * `rawSessionSetStatus`, specifically to dodge that side effect), and
+ * there is no longer a second writer to lose a race to.
+ */
+export function inferStateInMemory(sessionSetDir: string): Record<string, unknown> {
   const changelogPath = path.join(sessionSetDir, "change-log.md");
   if (fs.existsSync(changelogPath)) {
     const base = notStartedPayload(sessionSetDir);
     if (!Array.isArray(base.sessions)) {
-      // No spec plan — cannot emit a reader-valid `complete` snapshot.
-      // Fall through to the not-started shape; preserves operator
-      // intent without producing an invariant-violating file.
+      // No spec plan — cannot produce a reader-valid `complete`
+      // snapshot. Fall through to the not-started shape; preserves
+      // operator intent without an invariant-violating view.
       return base;
     }
     base.status = "complete";
@@ -219,30 +240,50 @@ function backfillPayload(sessionSetDir: string): Record<string, unknown> {
 
   const activityPath = path.join(sessionSetDir, "activity-log.json");
   if (fs.existsSync(activityPath)) {
+    let entries: Array<{ dateTime?: unknown }> | null = null;
+    let readable = true;
+    try {
+      const data = JSON.parse(fs.readFileSync(activityPath, "utf8"));
+      if (Array.isArray(data)) {
+        entries = data as Array<{ dateTime?: unknown }>;
+      } else if (data && typeof data === "object" && Array.isArray(data.entries)) {
+        entries = data.entries as Array<{ dateTime?: unknown }>;
+      } else {
+        // Unexpected shape: file presence stays the conservative
+        // in-progress signal, exactly as the router does.
+        readable = false;
+      }
+    } catch {
+      readable = false;
+    }
+    // Mirror of `_activity_log_has_entries` (Set 077 S4 / A12): an
+    // activity log whose entries list is EMPTY is not evidence of
+    // progress — the modern authoring flow creates `{"entries": []}` up
+    // front, so treating mere file presence as in-progress showed a set
+    // in flight nobody started. Unreadable / malformed / unexpected
+    // shapes keep the conservative legacy inference. Set 115 S1 round-2
+    // finding: the TypeScript side had never mirrored this, so the two
+    // sides disagreed about every freshly-authored set.
+    if (readable && entries !== null && entries.length === 0) {
+      return notStartedPayload(sessionSetDir);
+    }
     const base = notStartedPayload(sessionSetDir);
     if (!Array.isArray(base.sessions) || base.sessions.length === 0) {
-      // No spec plan — cannot emit a reader-valid `in-progress`
-      // snapshot. Fall through to not-started.
+      // No spec plan — cannot produce a reader-valid `in-progress`
+      // view. Fall through to not-started.
       return base;
     }
     base.status = "in-progress";
     const sessions = base.sessions as LazySessionRecord[];
     sessions[0].status = "in-progress";
-    try {
-      const data = JSON.parse(fs.readFileSync(activityPath, "utf8")) as {
-        entries?: Array<{ dateTime?: unknown }>;
-      };
-      const timestamps: string[] = [];
-      for (const e of data.entries ?? []) {
-        if (typeof e.dateTime === "string") timestamps.push(e.dateTime);
-      }
-      timestamps.sort();
-      const earliest = timestamps[0];
-      if (earliest !== undefined) {
-        sessions[0].startedAt = earliest;
-      }
-    } catch {
-      /* leave per-session startedAt at null */
+    const timestamps: string[] = [];
+    for (const e of entries ?? []) {
+      if (typeof e.dateTime === "string") timestamps.push(e.dateTime);
+    }
+    timestamps.sort();
+    const earliest = timestamps[0];
+    if (earliest !== undefined) {
+      sessions[0].startedAt = earliest;
     }
     return base;
   }
@@ -254,9 +295,11 @@ function backfillPayload(sessionSetDir: string): Record<string, unknown> {
 // in Python: a fixed `path + ".tmp"` would let two concurrent writers
 // (the Python backfill, this TS path, two extension instances on the
 // same workspace) collide on the temp filename. Per-call uniqueness via
-// PID + random suffix avoids that without a cross-process lock; both
-// writers produce the same not-started shape so last-rename-wins is
-// benign.
+// PID + random suffix avoids that without a cross-process lock.
+//
+// Set 115 S1: no longer reachable from a READ. The only remaining
+// state-file writers in the extension are the explicit operator actions
+// in `cancelLifecycle.ts`; see `inferStateInMemory` for why.
 function atomicWriteJson(filePath: string, payload: unknown): void {
   const directory = path.dirname(filePath);
   const base = path.basename(filePath);
@@ -292,41 +335,17 @@ function atomicWriteJson(filePath: string, payload: unknown): void {
  * vs the canonical ``"complete"``) is preserved as-is; canonicalization
  * happens at the read boundary in :func:`readStatus`.
  *
- * Mirrors :func:`synthesize_not_started_state` in Python — both writers
- * must produce structurally identical content so a folder can be
- * synthesized by either side without confusing the other.
- *
- * Used at session-set bootstrap time when the caller knows the set
- * truly has not started. Lazy-synth fallback uses
- * :func:`ensureSessionStateFile` instead so a legacy folder is
- * inferred from current file presence rather than regressed to
- * not-started.
+ * **Set 115 S1:** this is now an EXPLICIT-ACTION writer only. It is not
+ * reachable from any read; `readStatus` derives in memory via
+ * {@link inferStateInMemory} instead. Titles come from `spec.md`
+ * through the same `healTitle` rule the router's writer applies, so a
+ * file created here is byte-compatible with one created by
+ * `ai_router/session_state.py`.
  */
 export function synthesizeNotStartedState(sessionSetDir: string): string {
   const filePath = path.join(sessionSetDir, SESSION_STATE_FILENAME);
   if (fs.existsSync(filePath)) return filePath;
   atomicWriteJson(filePath, notStartedPayload(sessionSetDir));
-  return filePath;
-}
-
-/**
- * Idempotently write the inferred ``session-state.json`` for a folder.
- *
- * Differs from :func:`synthesizeNotStartedState` in that the file-absent
- * path uses :func:`backfillPayload` to infer the right shape from
- * current file presence (change-log → complete; activity-log →
- * in-progress; neither → not-started), matching the Python one-shot
- * backfill's behavior. Verifier round 2 (Set 7 / Session 2) flagged
- * the regression: a legacy folder with change-log.md but no
- * session-state.json was being misclassified as "not-started" on
- * first read.
- *
- * Mirrors :func:`ensure_session_state_file` in Python.
- */
-export function ensureSessionStateFile(sessionSetDir: string): string {
-  const filePath = path.join(sessionSetDir, SESSION_STATE_FILENAME);
-  if (fs.existsSync(filePath)) return filePath;
-  atomicWriteJson(filePath, backfillPayload(sessionSetDir));
   return filePath;
 }
 
@@ -338,26 +357,22 @@ export function ensureSessionStateFile(sessionSetDir: string): string {
  * "cancelled"``; pre-Set-7 drift (``"completed"``, ``"done"``) is
  * canonicalized via :data:`STATUS_ALIASES`.
  *
- * Lazy-synthesis fallback: a folder with ``spec.md`` but no
- * ``session-state.json`` triggers :func:`ensureSessionStateFile`,
- * which infers the right initial status from current file presence
- * (``change-log.md`` → ``"complete"``; ``activity-log.json`` →
- * ``"in-progress"``; neither → ``"not-started"``) — same rules as
- * the Python one-shot backfill. The atomic-write pattern keeps
- * concurrent fallback synthesis benign — both Python and TS writers
- * produce the same shape and the last rename wins.
+ * **Set 115 S1 — this read no longer writes.** A folder with `spec.md`
+ * but no `session-state.json` is inferred in memory by
+ * {@link inferStateInMemory} (same rules as the router's backfill:
+ * ``change-log.md`` → ``"complete"``; ``activity-log.json`` →
+ * ``"in-progress"``; neither → ``"not-started"``). Creating the file is
+ * the router's job — `ensure_session_state_file` / `start_session` —
+ * and leaving it to one writer is what stops a generic `Session N`
+ * ledger from being raced onto disk ahead of the real titles.
  *
  * Parse errors propagate (consistent with the Python side and the
  * spec's risk section: "the fallback only triggers on file-absent,
  * never on parse-error"). A folder without ``spec.md`` is not a
  * session set; callers must filter those out.
  */
-// Shared loader for the file-present branch and the post-synthesis
-// re-read in readStatus. Without this, a race where another process
-// creates the file between the existence check and the re-read could
-// return a raw aliased value or skip the dict / string-status
-// validations applied above. Mirrors `_load_canonical_status` in
-// Python.
+// Shared loader for the file-present branch. Mirrors
+// `_load_canonical_status` in Python.
 function loadCanonicalStatus(filePath: string): string {
   const raw = fs.readFileSync(filePath, "utf8");
   const parsed = JSON.parse(raw); // intentional: throws on malformed
@@ -380,14 +395,6 @@ export function readStatus(sessionSetDir: string): CanonicalStatus | string {
   if (fs.existsSync(filePath)) {
     return loadCanonicalStatus(filePath);
   }
-
-  // File absent. Use ensureSessionStateFile (not synthesizeNotStarted)
-  // so a legacy folder that slipped through Set 7 Session 1's backfill
-  // is inferred from current file presence — change-log.md →
-  // "complete", activity-log.json → "in-progress" — rather than being
-  // regressed to "not-started". Then re-read through the same loader
-  // so validation and alias canonicalization apply uniformly under
-  // races.
-  ensureSessionStateFile(sessionSetDir);
-  return loadCanonicalStatus(filePath);
+  const inferred = inferStateInMemory(sessionSetDir).status;
+  return typeof inferred === "string" ? canonicalizeStatus(inferred) : "not-started";
 }

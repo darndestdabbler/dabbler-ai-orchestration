@@ -76,6 +76,7 @@ try:
         SessionStateInvariantError,
         canonicalize_status,
         extract_session_titles_from_spec,
+        heal_title,
         normalize_to_v4_shape,
         synthesize_v3_from_v2,
         validate_invariants,
@@ -94,6 +95,7 @@ except ImportError:
         SessionStateInvariantError,
         canonicalize_status,
         extract_session_titles_from_spec,
+        heal_title,
         normalize_to_v4_shape,
         synthesize_v3_from_v2,
         validate_invariants,
@@ -533,7 +535,12 @@ def _build_sessions_array(
     Title resolution order, per record:
 
     1. The existing v3 ``sessions[]`` on disk (carries forward across
-       boundary writes).
+       boundary writes) — **unless it is generic-shaped**, i.e. exactly
+       ``Session <this number>``. Set 115 S1: a stored generic label is
+       the fallback a writer emits when it knows nothing, and putting it
+       first made it sticky forever (once on disk, every later boundary
+       write copied it and nothing self-healed). A ``spec.md`` heading
+       beats it; a genuinely operator-authored title never loses.
     2. ``spec.md`` regex extraction (the canonical authoring source).
     3. ``Session N`` fallback (always available).
 
@@ -595,11 +602,12 @@ def _build_sessions_array(
 
     out: List[dict] = []
     for k in range(1, total + 1):
-        if existing.get(k) is not None:
-            title = existing[k].title
-        elif k in spec_titles:
-            title = spec_titles[k]
-        else:
+        # Set 115 S1: the stored title wins only when it says something
+        # the fallback does not. ``heal_title`` owns that rule for every
+        # writer and reader in both languages.
+        stored = existing[k].title if existing.get(k) is not None else None
+        title = heal_title(stored, k, spec_titles)
+        if title is None:
             title = f"Session {k}"
 
         if in_progress_number is not None and k == in_progress_number:

@@ -5,7 +5,8 @@ import * as path from "path";
 
 import { cancelSessionSet, restoreSessionSet } from "../../utils/cancelLifecycle";
 import {
-  ensureSessionStateFile,
+  inferStateInMemory,
+  readStatus,
   synthesizeNotStartedState,
 } from "../../utils/sessionState";
 
@@ -19,6 +20,10 @@ import {
 // carve-out (no spec totalSessions, no headings) preserves
 // absent-sessions[] across cancel/restore. This file pins those
 // invariants shut and mirrors test_session_state_v4_writers.py.
+//
+// Set 115 S1: `ensureSessionStateFile` is gone — the read path no
+// longer writes. Its shape assertions live on against
+// `inferStateInMemory`, which returns exactly what it used to write.
 
 const V4_TOP_LEVEL_DROPPED_KEYS = [
   "lifecycleState",
@@ -177,14 +182,18 @@ suite("Set 047 / S5 — synthesizeNotStartedState emits v4", () => {
   });
 });
 
-suite("Set 047 / S5 — ensureSessionStateFile emits v4", () => {
+suite("Set 047 / S5 — the file-absent inference emits v4", () => {
+  // Set 115 S1: the lazy-synth path no longer WRITES — `readStatus`
+  // derives the same shape in memory via `inferStateInMemory`, and
+  // creating the file belongs to the router's sanctioned writers. The
+  // shape assertions below are unchanged; the file-write assertion is
+  // replaced by its opposite (see "writes nothing" at the end).
   test("change-log branch → status=complete with all sessions complete", () => {
     const dir = makeTmpDir();
     try {
       writeSpec(dir, specWithTotal(2));
       fs.writeFileSync(path.join(dir, "change-log.md"), "# Set close-out\n");
-      ensureSessionStateFile(dir);
-      const state = readState(dir);
+      const state = inferStateInMemory(dir);
       assert.strictEqual(state.schemaVersion, 4);
       assert.strictEqual(state.status, "complete");
       const sessions = state.sessions as Array<Record<string, unknown>>;
@@ -225,8 +234,7 @@ suite("Set 047 / S5 — ensureSessionStateFile emits v4", () => {
         ),
         "utf8",
       );
-      ensureSessionStateFile(dir);
-      const state = readState(dir);
+      const state = inferStateInMemory(dir);
       assert.strictEqual(state.schemaVersion, 4);
       assert.strictEqual(state.status, "in-progress");
       const sessions = state.sessions as Array<Record<string, unknown>>;
@@ -247,8 +255,7 @@ suite("Set 047 / S5 — ensureSessionStateFile emits v4", () => {
     try {
       writeSpec(dir, "# Stub\n\nTo be authored.\n");
       fs.writeFileSync(path.join(dir, "change-log.md"), "# Set close-out\n");
-      ensureSessionStateFile(dir);
-      const state = readState(dir);
+      const state = inferStateInMemory(dir);
       assert.strictEqual(state.status, "not-started");
       assert.ok(!("sessions" in state));
     } finally {
@@ -260,12 +267,89 @@ suite("Set 047 / S5 — ensureSessionStateFile emits v4", () => {
     const dir = makeTmpDir();
     try {
       writeSpec(dir, specWithTotal(1));
-      ensureSessionStateFile(dir);
-      const state = readState(dir);
+      const state = inferStateInMemory(dir);
       assert.strictEqual(state.status, "not-started");
       const sessions = state.sessions as Array<Record<string, unknown>>;
       assert.strictEqual(sessions.length, 1);
       assert.strictEqual(sessions[0].status, "not-started");
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+
+  test("Set 115 S1: inference writes nothing — the read path is not a writer", () => {
+    // The whole ownership decision in one assertion. The extension used
+    // to create `session-state.json` from `readStatus`, which raced the
+    // router's writer and put a generic `Session N` ledger on disk first.
+    const dir = makeTmpDir();
+    try {
+      writeSpec(dir, specWithTotal(2));
+      fs.writeFileSync(path.join(dir, "change-log.md"), "# Set close-out\n");
+      inferStateInMemory(dir);
+      readStatus(dir);
+      assert.ok(
+        !fs.existsSync(path.join(dir, "session-state.json")),
+        "no state file may be created by a read",
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+
+  test("Set 115 S1: readStatus still infers status from file presence", () => {
+    const dir = makeTmpDir();
+    try {
+      writeSpec(dir, specWithTotal(2));
+      fs.writeFileSync(path.join(dir, "change-log.md"), "# Set close-out\n");
+      assert.strictEqual(readStatus(dir), "complete");
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+});
+
+suite("Set 115 S1 — session titles come from spec.md, not `Session N`", () => {
+  test("synthesized sessions[] carries the spec's heading titles", () => {
+    const dir = makeTmpDir();
+    try {
+      writeSpec(
+        dir,
+        [
+          "# Titled set",
+          "",
+          "### Session 1 of 2: The titles both writers already know",
+          "Body...",
+          "",
+          "### Session 2 of 2: Left-click a session, land on its plan",
+          "Body...",
+          "",
+        ].join("\n"),
+      );
+      synthesizeNotStartedState(dir);
+      const state = readState(dir);
+      const sessions = state.sessions as Array<Record<string, unknown>>;
+      assert.deepStrictEqual(
+        sessions.map((s) => s.title),
+        [
+          "The titles both writers already know",
+          "Left-click a session, land on its plan",
+        ],
+      );
+    } finally {
+      fs.rmSync(dir, { recursive: true });
+    }
+  });
+
+  test("a spec with no headings still falls back to `Session N`", () => {
+    const dir = makeTmpDir();
+    try {
+      writeSpec(dir, specWithTotal(2));
+      const state = inferStateInMemory(dir);
+      const sessions = state.sessions as Array<Record<string, unknown>>;
+      assert.deepStrictEqual(
+        sessions.map((s) => s.title),
+        ["Session 1", "Session 2"],
+      );
     } finally {
       fs.rmSync(dir, { recursive: true });
     }

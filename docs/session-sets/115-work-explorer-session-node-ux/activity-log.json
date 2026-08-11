@@ -1,0 +1,102 @@
+{
+  "sessionSetName": "115-work-explorer-session-node-ux",
+  "createdDate": "2026-08-11T11:11:10.113634+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-11T11:11:10.116960+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T07:11:10.133531-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "fix-the-typescript-synthesizer",
+      "dateTime": "2026-08-11T07:11:10.133531-04:00",
+      "description": "**Fix the TypeScript synthesizer.** `utils/sessionState.ts::buildSessions` hardcodes ``title: `Session ${n}` `` while the same module already imports and calls `extractSessionTitlesFromSpec`. Thread the map it already computes into the loop, applying the same resolution order the Python writer documents. **No new file read** \u2014 if the change adds one, it is the wrong change.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "settle-the-sticky-generic-problem-which",
+      "dateTime": "2026-08-11T07:11:10.133531-04:00",
+      "description": "**Settle the sticky-generic problem, which is the actual bug.** Because resolution puts the existing ledger first, a `\"Session N\"` already on disk is carried forward by every boundary write and never heals. Decide and test the rule: a spec heading beats a **generic-shaped** stored title (`Session <own number>`), while a genuinely operator-authored title is still never overwritten. Every existing set must end up healed without a migration script.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "settle-which-ensuresessionstatefile-owns-lazy-sy",
+      "dateTime": "2026-08-11T07:11:10.133531-04:00",
+      "description": "**Settle which `ensureSessionStateFile` owns lazy synthesis.** Two writers \u2014 `ai_router/session_state.py` and `utils/sessionState.ts` \u2014 currently create the same file, and the extension's watcher makes the race real and observable. Record the ownership decision where writer discipline is documented; a Python\u2194TypeScript parity test for title resolution is the enforcement (precedent: the menu-parity test, and `sessionStepModel`'s regex, which is explicitly maintained as a mirror).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-and-the-layer-2",
+      "dateTime": "2026-08-11T07:11:10.133531-04:00",
+      "description": "Full pytest and the Layer 2 tree-provider harness at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T07:29:10.397728-04:00",
+      "description": "Register: start_session recorded session 1 in flight",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "ts-titles-fixed",
+      "dateTime": "2026-08-11T07:29:10.399003-04:00",
+      "description": "Fix the TypeScript synthesizer: buildSessions threads the spec title map it already computed, through the shared healTitle rule",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "heal-rule",
+      "dateTime": "2026-08-11T07:29:10.399991-04:00",
+      "description": "Settle the sticky-generic problem: a spec heading beats a generic-shaped stored title, at the writer AND in the read view so closed sets heal without a migration script",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "writer-ownership",
+      "dateTime": "2026-08-11T07:29:10.400783-04:00",
+      "description": "Settle lazy-synthesis ownership: the router writes, the extension read derives in memory; parity corpus + both halves shipped",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "verification",
+      "dateTime": "2026-08-11T08:01:05.341676-04:00",
+      "description": "Verification: discovery (2 lenses) + supplementary found 3 Major, all remediated; remediation-review returned VERIFIED with 2 fix-accepted verdicts",
+      "status": "complete"
+    }
+  ]
+}

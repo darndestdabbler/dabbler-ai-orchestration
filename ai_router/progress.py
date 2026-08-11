@@ -217,6 +217,112 @@ def extract_session_titles_from_spec(spec_md_path: Path) -> List[Tuple[int, str]
 
 
 # ---------------------------------------------------------------------------
+# Generic-title heal (Set 115 S1)
+# ---------------------------------------------------------------------------
+
+
+# A title is *generic-shaped* when it is exactly the fallback label a
+# writer emits when it knows nothing: ``Session <this entry's number>``.
+# Deliberately anchored to the entry's OWN number — ``Session 5`` stored
+# on session 3 is drift or an operator's words, not the fallback, and
+# healing it would be the renderer inventing content.
+_GENERIC_TITLE_RE = re.compile(r"^Session\s+(?P<number>\d+)$")
+
+
+def is_generic_title(title: object, number: int) -> bool:
+    """True when *title* is the ``Session N`` fallback for *number*.
+
+    Empty / whitespace-only / non-string titles count as generic: they
+    carry no more meaning than the fallback and a spec heading is
+    strictly better than either.
+
+    The rule this predicate exists for (Set 115 S1): **a spec heading
+    beats a generic-shaped stored title; an operator-authored title is
+    never overwritten.** Title resolution puts the stored ledger first
+    (it carries forward across boundary writes), which is what made
+    ``Session N`` sticky once any writer put it on disk — every later
+    write copied it and nothing self-healed.
+    """
+    if not isinstance(title, str):
+        return True
+    stripped = title.strip()
+    if not stripped:
+        return True
+    match = _GENERIC_TITLE_RE.match(stripped)
+    return match is not None and int(match.group("number")) == number
+
+
+def heal_title(
+    stored_title: object,
+    number: int,
+    spec_titles: Optional[dict] = None,
+) -> Optional[str]:
+    """Return the title *number* should carry, or ``None`` if unresolved.
+
+    Resolution order, per Set 115 S1:
+
+    1. A stored title that is **not** generic-shaped (operator-authored;
+       never overwritten).
+    2. The ``spec.md`` heading for that number.
+    3. The stored title as-is (generic, but no spec heading exists).
+    4. ``None`` — the caller supplies its own ``Session N`` fallback.
+
+    Pure: no I/O. Both writers and both readers route through this so
+    Python and TypeScript cannot disagree about a title (the parity
+    corpus in ``ai_router/tests/fixtures/session-title-parity.json``
+    pins the agreement shut).
+    """
+    if not is_generic_title(stored_title, number):
+        return stored_title  # type: ignore[return-value]
+    spec_title = (spec_titles or {}).get(number)
+    if isinstance(spec_title, str) and spec_title.strip():
+        return spec_title.strip()
+    if isinstance(stored_title, str) and stored_title.strip():
+        return stored_title
+    return None
+
+
+def heal_generic_titles(sessions: Iterable[dict], spec_titles: dict) -> int:
+    """Apply :func:`heal_title` in place across a ``sessions[]`` array.
+
+    Returns the number of entries whose title changed. Entries without a
+    usable integer ``number`` are skipped — the invariant validators own
+    that complaint, not this helper.
+    """
+    healed = 0
+    for entry in sessions:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("number")
+        if type(number) is not int or number <= 0:
+            continue
+        current = entry.get("title")
+        resolved = heal_title(current, number, spec_titles)
+        if resolved is not None and resolved != current:
+            entry["title"] = resolved
+            healed += 1
+    return healed
+
+
+def needs_title_heal(sessions: Iterable[dict]) -> bool:
+    """True when any entry carries a generic-shaped title.
+
+    Readers call this BEFORE touching ``spec.md`` so a healthy set costs
+    no extra disk read on the scan — the constraint Set 110 S1 measured
+    when the tree grew its fourth level.
+    """
+    for entry in sessions:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("number")
+        if type(number) is not int or number <= 0:
+            continue
+        if is_generic_title(entry.get("title"), number):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
 # v2 -> v3 read-time synthesis
 # ---------------------------------------------------------------------------
 
@@ -326,7 +432,11 @@ _V4_PER_SESSION_KEYS = (
 )
 
 
-def normalize_to_v4_shape(state: dict, spec_md_path: Path) -> dict:
+def normalize_to_v4_shape(
+    state: dict,
+    spec_md_path: Path,
+    spec_titles: Optional[dict] = None,
+) -> dict:
     """Return *state* in canonical v4 read-view shape.
 
     Accepts v1/v2/v3/v4 input. Returns a NEW dict; does NOT mutate the
@@ -421,6 +531,30 @@ def normalize_to_v4_shape(state: dict, spec_md_path: Path) -> dict:
         for k in _V4_PER_SESSION_KEYS:
             sv4.setdefault(k, None)
         sessions_v4.append(sv4)
+
+    # Step 2b (Set 115 S1): heal generic-shaped titles from spec.md.
+    #
+    # A ``Session N`` label on disk is sticky: title resolution puts the
+    # stored ledger first, so once any writer put the fallback there every
+    # later boundary write copied it forward and nothing self-healed. The
+    # write-path heal in ``session_state._build_sessions_array`` fixes that
+    # going forward, but a CLOSED set gets no further boundary write — so
+    # the read view heals too, and every set displays what it is about
+    # without a migration script rewriting closed history.
+    #
+    # The spec read is CONDITIONAL on a generic title actually being
+    # present, so a healthy set costs no additional disk read (the
+    # constraint recorded in the Set 115 spec, decision 4). A caller that
+    # already read the spec passes ``spec_titles`` in, so no path reads
+    # the same file twice.
+    if needs_title_heal(sessions_v4):
+        titles = (
+            spec_titles
+            if spec_titles is not None
+            else {n: t for n, t in extract_session_titles_from_spec(spec_md_path)}
+        )
+        if titles:
+            heal_generic_titles(sessions_v4, titles)
 
     schema_version_in = state.get("schemaVersion")
     is_v4_input = (

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "ed44152ead5b675a1a9eb24ce1385028182db934",
+  "fixedTree": "7a5969b38ff161542db938a2e71ca8ce94d67f57",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T11:56:31.563454+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The TypeScript lazy-synthesis path adds and repeats `spec.md` reads instead of threading one already-read title map. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/s ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "For a spec-only set, the TypeScript scan/synthesis path computes the absent-file state once and reuses one parsed/read spec result for both total-session and title resolution, without separate spec-title and total-session file reads or a second inferStateInMemory pass.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The TypeScript absent-state path adds and duplicates synchronous `spec.md` reads despite the explicit “No new file read” constraint. - **Category:** Correctness - **Severity:** Major - **Evidence p ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The absent-state TypeScript path derives titles and `totalSessions` from one `spec.md` read per inferred state, and `readSessionSets` reuses that inferred state instead of invoking `inferStateInMemory` twice for the same missing file.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

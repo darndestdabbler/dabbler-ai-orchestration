@@ -188,6 +188,99 @@
       "dateTime": "2026-08-11T05:27:06.121992-04:00",
       "description": "Verification: round 1 discovery (2 lenses, 1 blocking Major - the premise check was a companion command rather than an enforced precondition of the write path), round 2 supplementary BEFORE remediating (1 blocking Major - the same defect class one layer over: the UAT-fixture exclusion was journaled and documented but implemented as nothing, holding only because the DEFAULT scan root avoided it). Both ACCEPTED and fixed, both planted as falsifiers rather than merely fixed. Acceptance harness: round 1 judgment-based (settled at review), round 2 auto-closed with baseline discrimination proven - the unchanged executable criterion fails pre-fix and passes post-fix. Round 3 remediation-review: VERIFIED, 2 fix-accepted, 0 findings. Full pytest on the frozen tree: 3852 passed, 9 skipped, 0 failed in 552.58s; recorded to test-runs.jsonl (digest ce809631b056). pytest is the only expensive suite owed - run_of_record covers puts ai_router/ under pytest, and playwright covers tools/** plus session_state/start_session/close_session, none of which this session touched. Checklist-post honesty note: the advisory checklist_posted gate reports 3 transitions that left a record without a post (the operator-stop at journaling, verification-round 1, verification-round 3); posts were made at session start, before the migration, and after the rounds completed, but not one-per-transition. Recorded rather than quietly retried - a passed window cannot be re-entered. Disposition authored; committing and closing.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T05:44:36.668248-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "ship-the-projection",
+      "dateTime": "2026-08-11T05:44:36.668248-04:00",
+      "description": "**Ship the projection.** One Python computation of session progress \u2014 steps, their statuses, the current step, what remains \u2014 serialised to **JSON** beside the artifacts it derives from. The repo's convention is JSON for machine-written state and YAML for human-authored config; this is state. **Mark it derived and regenerable**: a cache, never a source, so it can never go stale against its own inputs.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "carry-the-states-absence-currently-hides",
+      "dateTime": "2026-08-11T05:44:36.668248-04:00",
+      "description": "**Carry the states absence currently hides.** Explicit `unknown`, `stale` and `unreadable`. Today an unreadable ledger renders as an empty session row, so *\"no work\"* and *\"cannot read evidence\"* are indistinguishable \u2014 a defect both reviewers named independently.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "prove-parity-against-the-python-renderer",
+      "dateTime": "2026-08-11T05:44:36.668248-04:00",
+      "description": "**Prove parity against the Python renderer.** The projection must reproduce what `session_checklist` renders for the same inputs, including the `[?]` posture for unknown tokens. This is the check that makes it safe for a later set to delete the TypeScript derivation \u2014 **do not delete it here** (standing decision 3). **Drop the `<- here` marker in the same pass** (operator ruling, 2026-08-11): `HERE_MARKER` (`session_checklist.py:158`), its rendering (`:555`, `:575`) and `markHere` (`:394`) go. The `in-progress` status token carries the fact directly, so nothing needs to be inferred \u2014 and the marker's single-valued design is what made it point confidently at the wrong row when the data was bad. Removing it also permits two steps in flight without requiring it, which `markHere` cannot represent.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T05:44:36.668248-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T05:48:34.294790-04:00",
+      "description": "Registered session 3 with start_session (copilot / claude-opus-5 / high). Read the whole preload: session-constitution.md, project-guidance.md, lessons-learned.md, AGENTS.md. Confirmed the operator note that L-069-1 is already PROMOTED to project-guidance.md -> Conventions -> Code Style, so it needs no reactivation -- its rule is loaded at every session start already. decision-review-queue.jsonl is absent (no triage owed). Transport profile is copilot-cli via ai_router/local-overrides.yaml, so no provider API keys are required. Prerequisites confirmed: S1 shipped the vocabulary in session_log.py and S2 shipped step_status_drift.py plus the executed migration.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "ship-the-projection",
+      "dateTime": "2026-08-11T06:01:03.931746-04:00",
+      "description": "Shipped ai_router/session_projection.py: one computation of session progress serialized to session-progress.json beside the artifacts it derives from. It does NOT reimplement the row derivation -- it calls session_checklist.build_rows, so there is no second Python answer that could disagree (journaled decision, rubric line simpler-code). Marked derived and regenerable: every file carries derived: true, the regenerate command, and the SHA-256 of each input (activity-log.json / session-state.json / spec.md), so projection_state() can always say fresh/stale/absent/unreadable. close_session regenerates it after the state flip, declared via the Set 119 S3 CLOSE_MANDATED_WRITES mechanism (verified: verification_stamp.close_mandated_excludes discovers it) so a close-time write cannot stale the verification stamp. The read-side leniency is DERIVED from session_checklist.STATUS_BOXES by box glyph rather than re-spelled as a second alias table (L-069-1).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "carry-the-states-absence-hides",
+      "dateTime": "2026-08-11T06:01:03.933759-04:00",
+      "description": "Explicit unknown / stale / unreadable, plus a fourth absence found while measuring. unknown: a status token no reader can name -- 11 of the 15 entries Set 120 S2 preserved surface this way (Set 009 skipped, Set 014 complete-with-known-failures, Set 068 JSON array, 8 Set 110 prose blobs). unreadable: activity-log.json exists but does not parse, reported as evidence: unreadable beside absent and read, so no work and cannot read the evidence are no longer the same empty row. stale: the recorded input digests no longer match the live files. The fourth: orphanEntries counts ledger entries with no integer sessionNumber, which every reader silently drops -- that is where the other 4 preserved entries (Set 028 absent-status) went, and nothing had ever said so. Reported as a top-level count, not as rows, so the parity proof still holds.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "prove-parity-drop-the-here-marker",
+      "dateTime": "2026-08-11T06:01:13.460017-04:00",
+      "description": "In progress. Removed the <- here marker per the operator ruling of 2026-08-11: HERE_MARKER, both rendering sites, _mark_here and ChecklistRow.is_here are gone from session_checklist.py, and record_post now writes inProgressStepKeys (a list, since two steps can be in flight and zero is a real answer) instead of the hereStepKey/hereStepNumber/hereStatus triple the marker produced. The shared Python/TypeScript parity corpus keeps its cases byte-identical -- the Python half now compares the five fields both implementations still produce and the divergence is declared in the corpus _readme, so nothing under tools/ is touched (journaled decision, rubric line goal-over-letter; standing decision 3). Parity proof and the projection falsifiers still to write.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "prove-parity-drop-the-here-marker",
+      "dateTime": "2026-08-11T06:06:06.116194-04:00",
+      "description": "Complete. Parity: test_session_projection.py asserts, over the SAME corpus the cross-language gate uses, that the projection carries every field session_checklist renders in the renderers order -- including the [?] posture for unknown tokens -- and that the boxes match the rendered text; a second test proves the SERIALIZED file round-trips to the same answer, which is the property a later set needs before deleting the TypeScript derivation. Marker removal shipped and echoed everywhere it was claimed: session_log.py docstring and the skipped refusal message, session_checklist.py rendering contract, and the target-state proposal at docs/proposals/2026-08-10 (L-065-1). Suite falsification confirmed by three mutations: healing unknown tokens to complete fails 1 test, disabling staleness detection fails 1, and reintroducing the <- here literal in render fails 1. Test budget: 7 new functions in test_session_projection.py plus 2 in test_step_row_parity.py, minus 3 removed marker tests in test_session_checklist.py = 6 net against the 7 remaining in the sets 40-function cap.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T06:21:47.506232-04:00",
+      "description": "Verification round 1: VERIFIED on both lenses (spec-conformance and failure-scenario, both gpt-5.5, anthropic excluded as the orchestrator effective provider), 0 blocking findings, 4 nits. Minor-only is effectively VERIFIED per the constitution, so the loop stops here. Two nits accepted and fixed (both stale-prose echoes in session_checklist.py: the collapse docstring still reasoned about the removed marker, and a pre-existing does-not-render-planned-rows claim that Set 114 S2 had contradicted below it -- L-065-1 and L-064-8 respectively). One accepted as a NAMED residual owned by the extension carve (the tools/ comments describing markHere as mirroring _mark_here; a tools/ edit is forbidden here by standing decision 3). One dismissed on measurement: the net test-function count across the staged diff is +6, not +7, confirmed per file. Full pytest still owed at close after the freeze.",
+      "status": "in-progress"
     }
   ]
 }

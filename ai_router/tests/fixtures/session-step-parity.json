@@ -25,7 +25,26 @@
     "",
     "expectedRows is the RENDERED row list in order. expectedSpecSteps is",
     "what spec.md declares for that session, which decides only whether",
-    "ordinal reconciliation is trustworthy — it never contributes a row."
+    "ordinal reconciliation is trustworthy — it never contributes a row.",
+    "",
+    "ONE DECLARED DIVERGENCE (Set 120 Session 3, operator ruling",
+    "2026-08-11). The '<- here' marker was removed from Python:",
+    "session_checklist.HERE_MARKER, its two rendering sites, _mark_here",
+    "and ChecklistRow.is_here are all gone, because the in-progress status",
+    "token now carries that fact directly and the marker's single-valued",
+    "design is what made it point confidently at the wrong row when the",
+    "data was bad. The EXTENSION keeps its markHere until the extension",
+    "carve deletes that derivation wholesale (Set 120 standing decision 3:",
+    "no extension changes in this set).",
+    "",
+    "So 'isHere' below is now pinned for the TYPESCRIPT half only.",
+    "test_step_row_parity.py compares on the five fields both",
+    "implementations still produce (stepNumber, stepKey, description,",
+    "status, isPlanned) and projects isHere out of the expectation;",
+    "sessionStepModel.test.ts is unchanged and still asserts it. Do NOT",
+    "strip isHere from these cases as a cleanup — it is the only coverage",
+    "the extension's marker has, and test_the_corpus_still_pins_the",
+    "_extensions_here_marker fails if it goes."
   ],
   "cases": [
     {

@@ -23,10 +23,32 @@ a hand-fed list — against the corpus's expectations.
 Neither language owns the corpus. Change Python alone and this fails;
 change TypeScript alone and its test fails; change the corpus alone and
 both fail.
+
+One declared divergence (Set 120 S3)
+------------------------------------
+The corpus's ``expectedRows`` still carry ``isHere``, and Python no
+longer has that field: the operator ruled the ``<- here`` marker out on
+2026-08-11 and ``session_checklist._mark_here`` went with it, while the
+extension keeps its ``markHere`` until the carve deletes that derivation
+wholesale (Set 120 standing decision 3 — no extension changes here).
+
+So this half compares on :data:`SHARED_ROW_FIELDS` — everything the two
+implementations still both produce — and projects ``isHere`` out of the
+expectation before asserting. The corpus's ``cases`` are untouched, so
+the TypeScript suite keeps proving its own marker behaviour against
+them; the divergence is recorded in the corpus's ``_readme``, which is
+the one file both languages read.
+
+The gate loses nothing it could still prove. What it exists to pin is
+"the rule that decides which rows exist" — order, identity, status,
+planned-ness — and every one of those fields is still asserted on both
+sides. ``isHere`` is not a field the two now disagree about; it is a
+field one of them no longer has.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import os
 from typing import Dict, List
@@ -51,6 +73,19 @@ def _load_corpus() -> List[dict]:
 CASES = _load_corpus()
 CASE_IDS = [c["name"] for c in CASES]
 
+#: The row fields both implementations still produce. ``isHere`` is
+#: deliberately absent — see the module docstring's "One declared
+#: divergence". A field added to ``ChecklistRow`` and not to this tuple
+#: silently stops being compared, so :func:`test_the_shared_fields_are_the
+#: _whole_python_row` pins the tuple against the dataclass itself.
+SHARED_ROW_FIELDS = (
+    "stepNumber",
+    "stepKey",
+    "description",
+    "status",
+    "isPlanned",
+)
+
 
 def _materialize(case: dict, tmp_path) -> str:
     """Write *case* to a session-set directory and return its path."""
@@ -74,9 +109,13 @@ def _as_dict(row: session_checklist.ChecklistRow) -> Dict[str, object]:
         "stepKey": row.step_key,
         "description": row.description,
         "status": row.status,
-        "isHere": row.is_here,
         "isPlanned": row.is_planned,
     }
+
+
+def _shared(expected: dict) -> Dict[str, object]:
+    """*expected* restricted to the fields both implementations produce."""
+    return {k: expected[k] for k in SHARED_ROW_FIELDS}
 
 
 @pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
@@ -103,7 +142,49 @@ def test_rows_match_the_corpus(case, tmp_path):
         _as_dict(r)
         for r in session_checklist.build_rows(set_dir, case["sessionNumber"])
     ]
-    assert rows == case["expectedRows"], case["why"]
+    assert rows == [_shared(e) for e in case["expectedRows"]], case["why"]
+
+
+def test_the_shared_fields_are_the_whole_python_row():
+    """A new row field must be added to the parity comparison, not just the row.
+
+    Without this, adding a field to ``ChecklistRow`` would leave it
+    uncompared and the two implementations free to disagree about it
+    forever — the silent divergence the corpus exists to make impossible.
+    Asserted against the dataclass rather than a hand-written list, so
+    the check cannot go stale.
+    """
+    fields = [f.name for f in dataclasses.fields(session_checklist.ChecklistRow)]
+    camel = [
+        "".join(w if i == 0 else w.capitalize() for i, w in enumerate(f.split("_")))
+        for f in fields
+    ]
+    assert sorted(camel) == sorted(SHARED_ROW_FIELDS), (
+        "ChecklistRow gained or lost a field; add it to SHARED_ROW_FIELDS "
+        "(and to the corpus + the TypeScript half) or the parity gate "
+        "stops proving it"
+    )
+
+
+def test_the_corpus_still_pins_the_extensions_here_marker():
+    """The one declared divergence stays declared, and stays covered.
+
+    Python dropped ``isHere`` (Set 120 S3, operator ruling); the
+    extension keeps it until the carve. The corpus must therefore STILL
+    carry the field for the TypeScript half to assert against — a
+    well-meaning cleanup that stripped it from ``expectedRows`` would
+    leave ``markHere`` untested in the only place that tests it, and this
+    Python suite would never notice.
+    """
+    assert all(
+        "isHere" in row for case in CASES for row in case["expectedRows"]
+    ), (
+        "expectedRows lost isHere: the TypeScript half asserts on it and "
+        "nothing else does"
+    )
+    assert any(
+        row["isHere"] for case in CASES for row in case["expectedRows"]
+    ), "no case pins a TRUE isHere, so the marker's behaviour is unproven"
 
 
 def test_the_corpus_covers_the_cases_the_tree_depends_on():

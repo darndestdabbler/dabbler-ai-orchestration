@@ -2339,6 +2339,44 @@ def run(
                 "warning: no session-state.json found to flip; "
                 "events ledger remains the canonical record"
             )
+
+        # Set 120 S3: regenerate the derived progress projection LAST, so
+        # it reflects the state flip above rather than the pre-close
+        # snapshot. Close-mandated and declared as such in
+        # session_projection.CLOSE_MANDATED_WRITES, so it cannot stale
+        # the verification stamp it is written after. Never fatal: a
+        # cache that cannot be written must not fail a close that has
+        # already passed every gate — but the skip is NAMED rather than
+        # silent (L-079-1).
+        try:
+            try:
+                from session_projection import (  # type: ignore[import-not-found]
+                    PROJECTION_FILENAME,
+                    REGENERATE_COMMAND,
+                    write_projection,
+                )
+            except ImportError:
+                from .session_projection import (  # type: ignore[no-redef]
+                    PROJECTION_FILENAME,
+                    REGENERATE_COMMAND,
+                    write_projection,
+                )
+            if write_projection(session_set_dir) is None:
+                outcome.messages.append(
+                    f"warning: could not write {PROJECTION_FILENAME}; the "
+                    f"progress projection is NOT current. Regenerate with: "
+                    f"{REGENERATE_COMMAND}"
+                )
+            else:
+                outcome.messages.append(
+                    f"regenerated the derived progress projection "
+                    f"({PROJECTION_FILENAME})"
+                )
+        except Exception as exc:  # pragma: no cover - defensive
+            outcome.messages.append(
+                f"warning: the progress projection could not be "
+                f"regenerated ({type(exc).__name__}); it is NOT current"
+            )
         return outcome
     finally:
         release_lock(lock_handle)

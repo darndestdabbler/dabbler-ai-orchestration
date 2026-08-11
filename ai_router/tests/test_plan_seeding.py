@@ -97,8 +97,19 @@ def _keys(rows):
     return [r.step_key for r in rows]
 
 
-def _here(rows):
-    return next(r.step_key for r in rows if r.is_here)
+def _in_flight(rows):
+    """Step keys the checklist shows as in flight.
+
+    Set 120 S3 removed the ``<- here`` marker: what is current is no
+    longer a rule's single answer but the ``in-progress`` status the
+    strict writer guarantees, read straight off the row. This returns a
+    LIST because zero and two are both real answers now.
+    """
+    return [
+        r.step_key
+        for r in rows
+        if sc.STATUS_BOXES.get(str(r.status).lower()) == sc.IN_PROGRESS_BOX
+    ]
 
 
 class TestStepTextParsing:
@@ -297,7 +308,10 @@ class TestReconciliation:
         rows = sc.build_rows(self._seeded(tmp_path), 1)
         assert [r.box for r in rows] == ["[ ]", "[ ]", "[ ]"]
         assert all(r.is_planned for r in rows)
-        assert _here(rows) == "register"
+        assert _keys(rows) == ["register", "build-the-thing", "verify-it"]
+        # Nothing is in flight: the plan is a forecast, not a claim of
+        # work started. The removed marker asserted "register" here.
+        assert _in_flight(rows) == []
 
     def test_a_logged_step_claims_its_planned_row_by_step_number(
         self, tmp_path
@@ -562,56 +576,75 @@ class TestOrdinalClaimingIsGatedOnTheSpec:
         assert rows[1].status == "complete"
 
 
-class TestHereMarker:
+class TestWhatIsInFlight:
+    """What replaced the ``<- here`` marker (Set 120 S3).
+
+    The marker inferred a single current row; these assert the fact the
+    ledger carries instead. The cases are the same ones the marker's
+    tests covered, because they are the cases that were getting the
+    wrong answer — an in-flight step below an unstarted planned row, a
+    caught-up session, and an all-complete one.
+    """
+
     def _seeded(self, tmp_path):
         set_dir = _make_set(tmp_path)
         sc.seed_session_plan(set_dir, 1)
         return set_dir
 
-    def test_here_is_the_step_in_flight_not_an_earlier_pending_plan_row(
+    def test_in_flight_is_the_step_in_flight_not_an_earlier_pending_plan_row(
         self, tmp_path
     ):
-        """The whole point of the marker: where IS this session.
+        """The defect the marker used to produce, now impossible.
 
         With a plan seeded, an unstarted step 2 sits above an in-flight
-        step 3. Pointing the operator at step 2 answers the question
-        wrongly.
+        step 3. The old rule had to be TOLD to prefer the logged row;
+        reading ``in-progress`` cannot get this wrong.
         """
         set_dir = self._seeded(tmp_path)
         log = SessionLog(set_dir)
         log.log_step(1, 1, "register", "Registered.", "complete")
         log.log_step(1, 3, "verify-it", "Working on it.", "in-progress")
         rows = sc.build_rows(set_dir, 1)
-        assert _here(rows) == "verify-it"
+        assert _in_flight(rows) == ["verify-it"]
 
-    def test_here_falls_to_the_next_planned_step_when_work_is_caught_up(
-        self, tmp_path
-    ):
+    def test_nothing_is_in_flight_when_work_is_caught_up(self, tmp_path):
+        """Zero is a real answer, and the marker could not give it.
+
+        With step 1 complete and nothing started, the marker pointed at
+        the next planned row and called it "here" — an inference that
+        read as a claim the session was working on it. Nothing is.
+        """
         set_dir = self._seeded(tmp_path)
         SessionLog(set_dir).log_step(
             1, 1, "register", "Registered.", "complete"
         )
         rows = sc.build_rows(set_dir, 1)
-        assert _here(rows) == "build-the-thing"
+        assert _in_flight(rows) == []
 
-    def test_exactly_one_row_is_here(self, tmp_path):
+    def test_two_steps_can_be_in_flight_at_once(self, tmp_path):
+        """The representational limit the operator ruling named.
+
+        ``markHere`` selects exactly one row, so a session genuinely
+        working two steps in parallel had to be misreported. It no
+        longer has to be.
+        """
         set_dir = self._seeded(tmp_path)
-        SessionLog(set_dir).log_step(
-            1, 2, "build-the-thing", "Going.", "in-progress"
-        )
+        log = SessionLog(set_dir)
+        log.log_step(1, 2, "build-the-thing", "Going.", "in-progress")
+        log.log_step(1, 3, "verify-it", "Also going.", "in-progress")
         rows = sc.build_rows(set_dir, 1)
-        assert sum(1 for r in rows if r.is_here) == 1
+        assert _in_flight(rows) == ["build-the-thing", "verify-it"]
 
-    def test_everything_complete_marks_the_last_row(self, tmp_path):
+    def test_everything_complete_leaves_nothing_in_flight(self, tmp_path):
         set_dir = self._seeded(tmp_path)
         log = SessionLog(set_dir)
         for number, key in ((1, "register"), (2, "build-the-thing"), (3, "verify-it")):
             log.log_step(1, number, key, "Done.", "complete")
         rows = sc.build_rows(set_dir, 1)
-        assert _here(rows) == "verify-it"
+        assert _in_flight(rows) == []
 
     def test_a_set_with_no_plan_keeps_the_set_111_behaviour(self, tmp_path):
-        """No seeded plan: first-logged order, first non-terminal is here."""
+        """No seeded plan: first-logged order, statuses as written."""
         set_dir = _make_set(tmp_path, spec=None)
         log = SessionLog(set_dir)
         log.log_step(1, 1, "register", "Registered.", "complete")
@@ -619,7 +652,7 @@ class TestHereMarker:
         log.log_step(1, 3, "verify", "Going.", "in-progress")
         rows = sc.build_rows(set_dir, 1)
         assert _keys(rows) == ["register", "execute", "verify"]
-        assert _here(rows) == "execute"
+        assert _in_flight(rows) == ["verify"]
         assert not any(r.is_planned for r in rows)
 
 
@@ -788,14 +821,20 @@ class TestRenderingASeededPlan:
         out = sc.render(sc.build_rows(set_dir, 1), 1, verbose=True, width=200)
         assert "A longer sentence that wraps" in out
 
-    def test_a_post_records_a_planned_here_step(self, tmp_path):
+    def test_a_post_records_what_is_in_flight(self, tmp_path):
+        """A plan-only session has nothing in flight, and says so.
+
+        The old record claimed ``hereStepKey: "register"`` here — the
+        marker's inference, not a fact. An empty list is the true
+        answer, and the key is present rather than omitted so "nothing
+        in flight" cannot be confused with "not recorded".
+        """
         set_dir = _make_set(tmp_path)
         sc.seed_session_plan(set_dir, 1)
         rows = sc.build_rows(set_dir, 1)
         record = sc.record_post(set_dir, 1, rows)
         assert record["stepCount"] == 3
-        assert record["hereStepKey"] == "register"
-        assert record["hereStatus"] == "pending"
+        assert record["inProgressStepKeys"] == []
 
 
 class TestStartSessionWiring:

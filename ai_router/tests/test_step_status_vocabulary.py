@@ -280,10 +280,12 @@ def test_a_skipped_step_can_no_longer_reach_disk(tmp_path):
     """The round-1 finding, closed and pinned.
 
     `skipped` reached disk once (Set 009 S4, an operator-decided session
-    skip logged as a step). Both readers render it `[?]`, and neither
-    `_mark_here` nor the Explorer's mirrored `markHere` counts it as
-    terminal --- so it steals the current-step marker from real work.
-    Operator ruling 2026-08-11: refuse it until both readers learn it.
+    skip logged as a step). Both readers render it `[?]`, and at the time
+    of the ruling neither counted it as terminal --- so it stole the
+    current-step marker from real work. (Set 120 S3 has since removed
+    that marker from the Python reader; the `[?]` half stands and the
+    ruling was not reopened.) Operator ruling 2026-08-11: refuse it until
+    both readers learn it.
     """
     log = SessionLog(str(tmp_path))
     with pytest.raises(InvalidStepStatusError) as excinfo:
@@ -298,24 +300,30 @@ def test_a_skipped_step_can_no_longer_reach_disk(tmp_path):
     assert suggest_step_status("skipped") is None
 
 
-def test_a_skipped_step_does_not_take_the_here_marker(tmp_path):
+def test_a_skipped_step_cannot_hide_what_is_in_flight(tmp_path):
     """The second half of the round-1 acceptance criterion.
 
-    With `skipped` unwritable, the marker lands on real unfinished work
-    rather than on a step nobody will do. Asserted through the real
-    renderer, not by reasoning about `_mark_here`.
+    With ``skipped`` unwritable, the step the checklist shows as in
+    flight is real work rather than a step nobody will do. The original
+    form of this test asserted it through the ``<- here`` marker; Set
+    120 S3 removed the marker, so it now asserts the fact that replaced
+    it — the ``in-progress`` box, read off the real renderer's rows.
     """
-    from ai_router.session_checklist import build_rows
+    from ai_router.session_checklist import (
+        IN_PROGRESS_BOX,
+        UNKNOWN_BOX,
+        build_rows,
+    )
 
     log = SessionLog(str(tmp_path))
     log.log_step(1, 1, "session-001/register", "Registered.", "complete")
     log.log_step(1, 2, "session-001/build", "Building.", "in-progress")
 
     rows = build_rows(str(tmp_path), 1)
-    here = [r for r in rows if r.is_here]
-    assert len(here) == 1
-    assert here[0].step_key == "session-001/build"
-    assert here[0].box != "[?]"
+    in_flight = [r for r in rows if r.box == IN_PROGRESS_BOX]
+    assert len(in_flight) == 1
+    assert in_flight[0].step_key == "session-001/build"
+    assert in_flight[0].box != UNKNOWN_BOX
 
 
 def _non_canonical_status_writes(py_file: Path) -> list:
@@ -458,7 +466,6 @@ def test_readers_stay_lenient_about_history():
             step_key="session-001/historical",
             description="Logged before the vocabulary existed.",
             status=token,
-            is_here=False,
         )
         assert row.box in set(STATUS_BOXES.values()) | {UNKNOWN_BOX}
 
@@ -473,7 +480,6 @@ def test_readers_stay_lenient_about_history():
             step_key="k",
             description="d",
             status="completed",
-            is_here=False,
         ).box
         == UNKNOWN_BOX
     )

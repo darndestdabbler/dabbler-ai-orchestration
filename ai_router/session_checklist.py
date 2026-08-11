@@ -26,9 +26,18 @@ operator asks most, and before this the honest answer was "scroll up".
 The rendering contract
 ----------------------
 One row per step, in the order the steps were logged, each with a status
-box and the step's description. The row for the step currently in flight
-is marked ``<- here``. That marker is the whole point: a checklist that
-shows only what is done answers half the question.
+box and the step's description.
+
+**There is no ``<- here`` marker** (removed by operator ruling,
+2026-08-11, Set 120 S3). It was a single-valued *inference* — "the first
+unfinished row is where we are" — and Set 119 S2 showed what that costs
+when the data is bad: four unparseable statuses made step 1 the first
+non-terminal row, so the marker pointed confidently at a step that had
+finished hours earlier. Since Set 120 S1 the writer is strict and the
+``in-progress`` token carries the fact directly, so nothing needs to be
+inferred; and because the fact is per-row rather than per-session, two
+steps may be in flight at once, which a single marker could not
+represent. What is in flight is now read from the boxes: ``[~]``.
 
 Status boxes are ASCII (``[x]`` / ``[~]`` / ``[ ]`` / ``[!]``) because
 this prints to a console whose text layer is ``cp1252`` on Windows —
@@ -37,11 +46,13 @@ lesson class L-079-1 covers what happens when it is ignored.
 
 What it does NOT do
 -------------------
-It renders **logged** steps, not planned ones. A step the orchestrator
-never logged does not appear, because inventing rows from the spec would
-produce a checklist that disagrees with the record — and the record is
-what close-out gates on. If the checklist looks short, the fix is to
-call ``log_step``, not to change this renderer.
+It renders **the ledger**, and only the ledger. It never invents a row
+from ``spec.md`` at render time, because a checklist that disagrees with
+``activity-log.json`` undermines the file close-out gates on. Planned
+rows do appear — but only because ``start_session`` wrote them *into the
+ledger* as ``pending`` entries, so the renderer still has exactly one
+rule (see "The forward half" below). If the checklist looks short, the
+fix is to call ``log_step``, not to change this renderer.
 
 The renderer is the recorder (Set 114 S1)
 -----------------------------------------
@@ -155,7 +166,10 @@ STATUS_BOXES = {
 }
 UNKNOWN_BOX = "[?]"
 
-HERE_MARKER = "<- here"
+# The one spelling of "this step is in flight", used by the post ledger
+# so that question is answered from the same table the rows are boxed
+# from rather than by a second list of tokens (L-069-1).
+IN_PROGRESS_BOX = "[~]"
 
 
 @dataclass(frozen=True)
@@ -164,7 +178,6 @@ class ChecklistRow:
     step_key: str
     description: str
     status: str
-    is_here: bool
     # Set 114 S2: True when this row is still only a PLAN — a step the
     # spec promised that nothing has logged yet. Defaults to False so
     # every existing construction (and consumer-repo caller) is
@@ -231,12 +244,13 @@ def _collapse_by_step_key(entries: Sequence[dict]) -> List[dict]:
 
     ``activity-log.json`` is an append-only audit trail, so a step that is
     logged ``in-progress`` and later logged ``complete`` appears twice.
-    Rendering both would duplicate the row AND strand the ``<- here``
-    marker on the stale entry, which is exactly the wrong answer to "where
-    is this session". So entries are collapsed by ``stepKey``, keeping the
-    latest, at the position the step first appeared — the ledger stays
-    append-only (nothing is rewritten), and the checklist shows the
-    current truth.
+    Rendering both would duplicate the row AND show the stale status
+    beside the current one — with the ``[~]`` box still claiming the step
+    is in flight after it finished, which is exactly the wrong answer to
+    "where is this session". So entries are collapsed by ``stepKey``,
+    keeping the latest, at the position the step first appeared — the
+    ledger stays append-only (nothing is rewritten), and the checklist
+    shows the current truth.
 
     Steps logged with no ``stepKey`` cannot be collapsed and are kept
     individually; two anonymous steps are two steps.
@@ -292,7 +306,6 @@ def _row_from_entry(entry: dict, *, is_planned: bool) -> ChecklistRow:
         step_key=str(entry.get("stepKey") or ""),
         description=str(entry.get("description") or ""),
         status=str(entry.get("status") or ""),
-        is_here=False,
         is_planned=is_planned,
     )
 
@@ -390,46 +403,14 @@ def _reconcile(
     return plan_rows + extra
 
 
-def _mark_here(rows: List[ChecklistRow]) -> List[ChecklistRow]:
-    """Return *rows* with exactly one row carrying the ``<- here`` marker.
-
-    The first unfinished **logged** step is "here". Only if no logged step
-    is unfinished does a still-pending planned row take the marker — that
-    is the honest reading of "the plan promised this next, and nothing has
-    started it". Without that ordering a session on step 3 with step 2
-    still ``[ ]`` in the plan would point the operator at step 2, which is
-    precisely the "where is this session" question answered wrongly.
-
-    With no plan seeded, every row is a logged one and this reduces to the
-    Set 111 S4 rule: the first non-terminal row, or the last row when
-    everything is finished.
-    """
-    if not rows:
-        return rows
-    terminal = {"complete", "done"}
-
-    def unfinished(row: ChecklistRow) -> bool:
-        return str(row.status).lower() not in terminal
-
-    here = next(
-        (i for i, row in enumerate(rows) if not row.is_planned and unfinished(row)),
-        None,
-    )
-    if here is None:
-        here = next(
-            (i for i, row in enumerate(rows) if unfinished(row)), len(rows) - 1
-        )
-    return [
-        ChecklistRow(
-            step_number=row.step_number,
-            step_key=row.step_key,
-            description=row.description,
-            status=row.status,
-            is_here=(i == here),
-            is_planned=row.is_planned,
-        )
-        for i, row in enumerate(rows)
-    ]
+# Set 120 S3 removed ``_mark_here`` here (operator ruling, 2026-08-11).
+# It computed the single ``<- here`` row by rule -- first unfinished
+# logged step, else first unfinished planned row, else the last row --
+# and every one of those branches is an inference the ledger no longer
+# needs anyone to make. See this module's docstring, "The rendering
+# contract", for why. Nothing replaced it: what is in flight is the
+# ``in-progress`` status the strict writer guarantees, read straight off
+# the row.
 
 
 def build_rows(
@@ -440,8 +421,12 @@ def build_rows(
     Two sources, one record. Entries seeded by ``start_session``
     (``kind: "plan-step"``) supply the forward view — what this session
     said it would do — and ordinary ``log_step`` entries supply what it
-    has actually done. :func:`_reconcile` merges them; :func:`_mark_here`
-    picks the ``<- here`` row.
+    has actually done. :func:`_reconcile` merges them.
+
+    **This is the one Python derivation of a session's step rows** (Set
+    120 S3). ``ai_router.session_projection`` serializes what this
+    returns rather than recomputing it, so the projection cannot disagree
+    with the checklist: there is no second implementation to drift.
 
     The spec is consulted for exactly one thing (:func:`plan_matches_spec`):
     whether the plan still says what it said at registration. It never
@@ -480,15 +465,11 @@ def build_rows(
         [e for e in mine if e.get("kind") != PLAN_STEP_KIND]
     )
     if not plan:
-        return _mark_here([_row_from_entry(e, is_planned=False) for e in real])
-    return _mark_here(
-        _reconcile(
-            plan,
-            real,
-            allow_ordinal=plan_matches_spec(
-                session_set_dir, session_number, plan
-            ),
-        )
+        return [_row_from_entry(e, is_planned=False) for e in real]
+    return _reconcile(
+        plan,
+        real,
+        allow_ordinal=plan_matches_spec(session_set_dir, session_number, plan),
     )
 
 
@@ -552,8 +533,7 @@ def render(
     lines = [heading, "-" * (len(heading) + 2)]
     for row in rows:
         text = _summarize(row.description, row.step_key, width, verbose=verbose)
-        suffix = f"  {HERE_MARKER}" if row.is_here else ""
-        lines.append(f" {row.box} {text}{suffix}")
+        lines.append(f" {row.box} {text}")
     return "\n".join(lines)
 
 
@@ -571,8 +551,6 @@ def render_markdown(
     lines = [f"| | {heading} |", "| :--- | :--- |"]
     for row in rows:
         text = _summarize(row.description, row.step_key, width, verbose=verbose)
-        if row.is_here:
-            text = f"**{text}** {HERE_MARKER}"
         lines.append(f"| {row.box} | {text} |")
     return "\n".join(lines)
 
@@ -632,9 +610,18 @@ def record_post(
     """Append one post record for a render that just happened.
 
     Records what the spec asks a post to prove: **when**, for which
-    session, how many steps were shown, and which step carried the
-    ``<- here`` marker — the three facts that distinguish "the operator
-    was shown where this session is" from "a file was touched".
+    session, how many steps were shown, and which steps were in
+    flight — the facts that distinguish "the operator was shown where
+    this session is" from "a file was touched".
+
+    Set 120 S3 replaced the single ``hereStepKey`` / ``hereStepNumber`` /
+    ``hereStatus`` triple with ``inProgressStepKeys``, a LIST, when the
+    ``<- here`` marker was removed by operator ruling. The old fields
+    recorded a rule's output; this records a fact the ledger already
+    carries. Empty is a real and common answer — at the start-of-session
+    post nothing has been marked ``in-progress`` yet — so the key is
+    always present rather than omitted, and an empty list means "nothing
+    in flight", not "not recorded".
 
     Returns the record written, or ``None`` when the append failed. The
     failure is deliberately non-fatal: a locked or read-only ledger must
@@ -643,18 +630,17 @@ def record_post(
     the skip in operator-facing output) — silence here would be the
     invisible omission this whole mechanism exists to end.
     """
-    here = next((r for r in rows if r.is_here), None)
     record = {
         "sessionNumber": session_number,
         "postedAt": datetime.now().astimezone().isoformat(),
         "stepCount": len(rows),
         "surface": surface,
+        "inProgressStepKeys": [
+            r.step_key
+            for r in rows
+            if STATUS_BOXES.get(str(r.status).lower()) == IN_PROGRESS_BOX
+        ],
     }
-    if here is not None:
-        record["hereStepKey"] = here.step_key
-        if here.step_number is not None:
-            record["hereStepNumber"] = here.step_number
-        record["hereStatus"] = here.status
     try:
         with open(
             posts_path(session_set_dir), "a", encoding="utf-8", newline="\n"
@@ -979,7 +965,8 @@ if __name__ == "__main__":  # pragma: no cover
 
 __all__ = [
     "STATUS_BOXES",
-    "HERE_MARKER",
+    "IN_PROGRESS_BOX",
+    "UNKNOWN_BOX",
     "PLAN_STEP_KIND",
     "PLAN_STEP_STATUS",
     "POSTS_FILENAME",

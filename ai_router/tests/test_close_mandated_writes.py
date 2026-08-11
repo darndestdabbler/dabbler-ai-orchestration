@@ -210,8 +210,24 @@ class TestCiteLessonsDeclaresItsOwnWrites:
         of the always-loaded lessons file ride a passed round — a
         verification reduction, and not one this set is authorized to
         make.
+
+        Asserted against the GUIDANCE paths specifically rather than
+        against an empty list. The original form ("nothing is wholly
+        exempt anywhere") was a proxy that happened to hold while
+        cite_lessons was the only declaring module, and it failed the
+        moment Set 120 S3 declared a legitimately whole-file artifact
+        (``session-progress.json``, which is derived from inputs that
+        each bind on their own). A proxy that fails on a correct change
+        is testing the wrong thing; the claim in the docstring is about
+        these two files.
         """
-        assert close_mandated_excludes("docs/session-sets/x") == []
+        exempt = close_mandated_excludes("docs/session-sets/x")
+        for path in (
+            "docs/planning/lessons-learned.md",
+            "docs/planning/lessons-archive.md",
+        ):
+            assert path not in exempt
+            assert f"docs/session-sets/x/{path}" not in exempt
 
     def test_a_guidance_path_resolves_to_the_normalizer(self):
         fn = close_mandated_normalizer("docs/planning/lessons-learned.md")

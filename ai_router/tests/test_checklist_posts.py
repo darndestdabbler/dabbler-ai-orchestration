@@ -199,24 +199,23 @@ def _test_run(set_dir: str, at: str, *, suite="playwright", session=1) -> None:
 
 
 class TestRecordPost:
-    def test_records_the_here_step_and_the_count(self, tmp_path):
+    def test_records_what_is_in_flight_and_the_count(self, tmp_path):
         set_dir = _make_set(tmp_path)
         rows = [
-            sc.ChecklistRow(1, "register", "", "complete", False),
-            sc.ChecklistRow(2, "execute", "", "in-progress", True),
-            sc.ChecklistRow(3, "close", "", "pending", False),
+            sc.ChecklistRow(1, "register", "", "complete"),
+            sc.ChecklistRow(2, "execute", "", "in-progress", is_planned=True),
+            sc.ChecklistRow(3, "close", "", "pending"),
         ]
         written = sc.record_post(set_dir, 1, rows, surface=sc.SURFACE_MARKDOWN)
         assert written is not None
         assert written["stepCount"] == 3
-        assert written["hereStepKey"] == "execute"
-        assert written["hereStepNumber"] == 2
+        assert written["inProgressStepKeys"] == ["execute"]
         assert written["surface"] == sc.SURFACE_MARKDOWN
         assert sc.read_posts(set_dir, 1) == [written]
 
     def test_appends_never_rewrites(self, tmp_path):
         set_dir = _make_set(tmp_path)
-        rows = [sc.ChecklistRow(1, "a", "", "complete", True)]
+        rows = [sc.ChecklistRow(1, "a", "", "complete", is_planned=True)]
         sc.record_post(set_dir, 1, rows)
         sc.record_post(set_dir, 1, rows)
         assert len(sc.read_posts(set_dir, 1)) == 2
@@ -227,7 +226,7 @@ class TestRecordPost:
         written = sc.record_post(set_dir, 1, [])
         assert written is not None
         assert written["stepCount"] == 0
-        assert "hereStepKey" not in written
+        assert written["inProgressStepKeys"] == []
 
     def test_write_failure_is_reported_not_raised(self, tmp_path, monkeypatch):
         set_dir = _make_set(tmp_path)

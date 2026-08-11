@@ -72,39 +72,6 @@ class TestBuildRows:
         )
         assert [r.step_key for r in sc.build_rows(set_dir, 2)] == ["s2-work"]
 
-    def test_here_marks_the_first_unfinished_step(self, tmp_path):
-        set_dir = _write_set(
-            tmp_path,
-            [
-                _entry(1, "a", "complete"),
-                _entry(2, "b", "in-progress"),
-                _entry(3, "c", "pending"),
-            ],
-        )
-        rows = sc.build_rows(set_dir, 2)
-        assert [r.is_here for r in rows] == [False, True, False]
-
-    def test_here_marks_the_last_row_when_everything_is_done(self, tmp_path):
-        """A session whose steps are all complete sits at its final step."""
-        set_dir = _write_set(
-            tmp_path,
-            [_entry(1, "a", "complete"), _entry(2, "b", "complete")],
-        )
-        rows = sc.build_rows(set_dir, 2)
-        assert [r.is_here for r in rows] == [False, True]
-
-    def test_exactly_one_row_is_here(self, tmp_path):
-        set_dir = _write_set(
-            tmp_path,
-            [
-                _entry(1, "a", "pending"),
-                _entry(2, "b", "pending"),
-                _entry(3, "c", "pending"),
-            ],
-        )
-        rows = sc.build_rows(set_dir, 2)
-        assert sum(1 for r in rows if r.is_here) == 1
-
     def test_missing_log_yields_no_rows_rather_than_raising(self, tmp_path):
         set_dir = tmp_path / "empty"
         set_dir.mkdir()
@@ -123,7 +90,7 @@ class TestBuildRows:
     def test_a_relogged_step_collapses_to_its_latest_entry(self, tmp_path):
         """The activity log is append-only, so a step logged in-progress
         and later complete appears twice. Rendering both would duplicate
-        the row and strand the marker on the stale entry."""
+        the row and show a stale status beside the current one."""
         set_dir = _write_set(
             tmp_path,
             [
@@ -147,10 +114,16 @@ class TestBuildRows:
         )
         assert [r.step_key for r in sc.build_rows(set_dir, 2)] == ["a", "b"]
 
-    def test_here_follows_the_collapsed_status_not_the_stale_one(
+    def test_a_collapsed_row_carries_the_latest_status_not_the_stale_one(
         self, tmp_path
     ):
-        """The dogfood defect: re-logging left `here` on a stale row."""
+        """The dogfood defect, restated without the removed marker.
+
+        Re-logging used to leave ``<- here`` on a stale row; Set 120 S3
+        removed the marker, but the underlying rule it depended on — the
+        collapsed row shows the LATEST status — is still what makes the
+        checklist current, so it keeps its own test.
+        """
         set_dir = _write_set(
             tmp_path,
             [
@@ -161,9 +134,9 @@ class TestBuildRows:
             ],
         )
         rows = sc.build_rows(set_dir, 2)
-        assert [(r.step_key, r.is_here) for r in rows] == [
-            ("a", False),
-            ("b", True),
+        assert [(r.step_key, r.status) for r in rows] == [
+            ("a", "complete"),
+            ("b", "in-progress"),
         ]
 
     def test_steps_without_a_key_are_not_collapsed_together(self, tmp_path):
@@ -195,15 +168,15 @@ class TestStatusBoxes:
         ],
     )
     def test_known_statuses_map_to_boxes(self, status, expected):
-        row = sc.ChecklistRow(1, "k", "d", status, False)
+        row = sc.ChecklistRow(1, "k", "d", status)
         assert row.box == expected
 
     def test_status_is_case_insensitive(self):
-        assert sc.ChecklistRow(1, "k", "d", "COMPLETE", False).box == "[x]"
+        assert sc.ChecklistRow(1, "k", "d", "COMPLETE").box == "[x]"
 
     def test_an_unknown_status_is_visibly_unknown(self):
         """Never silently render an unrecognised status as done."""
-        assert sc.ChecklistRow(1, "k", "d", "weird", False).box == "[?]"
+        assert sc.ChecklistRow(1, "k", "d", "weird").box == "[?]"
 
 
 class TestCurrentSessionNumber:
@@ -253,13 +226,26 @@ class TestRender:
         out = sc.render(sc.build_rows(set_dir, 2), 2, verbose=True)
         assert "Shipped the thing" in out
 
-    def test_the_here_marker_appears_exactly_once(self, tmp_path):
+    def test_no_rendered_surface_carries_a_here_marker(self, tmp_path):
+        """The falsifier for the removal (Set 120 S3, operator ruling).
+
+        Deleting a constant is invisible if something reintroduces the
+        literal, so this asserts on the RENDERED text of both surfaces
+        rather than on the absence of a name. The in-flight row is still
+        identifiable — by its ``[~]`` box, which is the fact the ledger
+        carries rather than a marker inferred from it.
+        """
         set_dir = _write_set(
             tmp_path,
             [_entry(1, "a", "complete"), _entry(2, "b", "in-progress")],
         )
-        out = sc.render(sc.build_rows(set_dir, 2), 2)
-        assert out.count(sc.HERE_MARKER) == 1
+        rows = sc.build_rows(set_dir, 2)
+        for out in (sc.render(rows, 2), sc.render_markdown(rows, 2)):
+            assert "<- here" not in out
+            assert "here" not in out.lower().replace("where", "")
+        assert not hasattr(sc, "HERE_MARKER")
+        assert not hasattr(sc, "_mark_here")
+        assert sc.render(rows, 2).count(sc.IN_PROGRESS_BOX) == 1
 
     def test_output_is_cp1252_safe(self, tmp_path):
         """L-079-1: this prints to a Windows console."""
@@ -283,7 +269,7 @@ class TestRender:
         out = sc.render([], 3)
         assert "no steps logged yet" in out
 
-    def test_markdown_is_a_table_with_a_bolded_here_row(self, tmp_path):
+    def test_markdown_is_a_table_with_a_box_per_row(self, tmp_path):
         set_dir = _write_set(
             tmp_path,
             [_entry(1, "a", "complete"), _entry(2, "b", "in-progress")],
@@ -291,7 +277,8 @@ class TestRender:
         out = sc.render_markdown(sc.build_rows(set_dir, 2), 2)
         assert out.startswith("| | Session 2 step |")
         assert "| :--- | :--- |" in out
-        assert "**B**" in out and sc.HERE_MARKER in out
+        assert "| [x] | A |" in out
+        assert "| [~] | B |" in out
 
     def test_markdown_empty_state_is_still_a_table(self):
         out = sc.render_markdown([], 1)

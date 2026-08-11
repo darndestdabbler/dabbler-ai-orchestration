@@ -22,15 +22,17 @@ in use --- it invents nothing:
 
 **Why ``skipped`` is NOT in that set**, despite appearing once on disk
 and being named in the Set 120 spec: no reader can name it. It has no
-entry in ``session_checklist.STATUS_BOXES`` (so it renders ``[?]``, the
-corrupt-data glyph) and neither ``session_checklist._mark_here`` nor the
-Work Explorer's mirrored ``markHere`` counts it as terminal (so a skipped
-step steals the current-step marker from real work). Admitting a token
-the readers cannot name is precisely the defect this module exists to
-prevent, so the vocabulary is the INTERSECTION of what was measured and
-what the readers understand. Teaching both readers is a two-language
-change that belongs with the extension carve; until then ``skipped`` is
-refused with a message that says so (operator ruling, 2026-08-11).
+entry in ``session_checklist.STATUS_BOXES``, so it renders ``[?]`` ---
+the corrupt-data glyph --- and neither reader counted it as terminal, so
+at the time of the ruling a skipped step stole the current-step marker
+from real work. (Set 120 S3 has since removed that marker from the
+Python reader; the ``[?]`` half stands, and the ruling was not
+reopened --- see below.) Admitting a token the readers cannot name is
+precisely the defect this module exists to prevent, so the vocabulary is
+the INTERSECTION of what was measured and what the readers understand.
+Teaching both readers is a two-language change that belongs with the
+extension carve; until then ``skipped`` is refused with a message that
+says so (operator ruling, 2026-08-11).
 
 Use :func:`require_step_status` at any writer that puts a ``status``
 into an ``activity-log.json`` entry. The four sibling writers that do
@@ -97,11 +99,10 @@ _STEP_STATUS_REFUSAL_REASONS = {
         "'skipped' was considered and deliberately excluded (Set 120 S1, "
         "operator ruling 2026-08-11): no reader can name it. It has no "
         "box in session_checklist.STATUS_BOXES, so it renders as '[?]' "
-        "-- the corrupt-data glyph -- and neither _mark_here nor the Work "
-        "Explorer's mirrored markHere counts it as terminal, so a skipped "
-        "step steals the current-step marker from real work. Record the "
-        "skip in the step's DESCRIPTION until both readers learn the "
-        "token."
+        "-- the corrupt-data glyph -- and no reader counts it as "
+        "terminal, so it cannot be told apart from unfinished work. "
+        "Record the skip in the step's DESCRIPTION until both readers "
+        "learn the token."
     ),
 }
 

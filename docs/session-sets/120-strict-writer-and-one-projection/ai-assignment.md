@@ -194,3 +194,126 @@ are planted as a look-alike pair, and two mutation checks confirm the
 suite falsifies: a `json.dump` re-serialize fails 5 cases, and widening
 the ruled scope to swallow `skipped` and `complete-with-known-failures`
 fails 6.
+
+---
+
+## Session 3 — Compute the projection once
+
+**Orchestrator:** `copilot` / `anthropic` / `claude-opus-5`, effort `high`
+(Copilot CLI transport — this seat carries no provider API keys by design,
+and their absence is not an error).
+
+**Verification:** routes to a non-anthropic effective provider, as the
+cross-provider rule requires.
+
+**The projection reuses the derivation rather than shipping a third one.**
+The spec's Touches line named `ai_router/progress.py`, but that module is
+the set-level `session-state.json` normalizer and knows nothing about
+steps. The projection went to a new `ai_router/session_projection.py`
+which calls `session_checklist.build_rows` instead of reimplementing it —
+because a set whose entire premise is *"the derivation exists twice"*
+answering it with a third implementation would have been the joke writing
+itself. That makes "computed once" **structural**: there is no second
+Python answer that could drift, and it makes the parity proof
+non-tautological, since the real check is that the *serialized file*
+reproduces the renderer, which is the property a later set needs before
+it can delete the TypeScript half.
+
+**Two decisions were journaled before any code was written**, both
+orchestrator-authority scoping calls: where the projection lives, and how
+to remove the `<- here` marker without touching `tools/`. The second was
+the session's only real design tension. The operator ruled the marker out;
+removing `ChecklistRow.is_here` removes a field the **shared** Python/
+TypeScript parity corpus pins in all 34 of its expected rows, and
+`sessionStepModel.test.ts` `deepStrictEqual`s against it. Editing the
+corpus would have broken the extension suite — a `tools/` change standing
+decision 3 forbids and `requiresE2E: false` does not carry. So the
+corpus's `cases` stay byte-identical, the Python half compares the five
+fields both implementations still produce, and the divergence is declared
+in the corpus's `_readme`. Two new guards keep that honest:
+`SHARED_ROW_FIELDS` is asserted against `ChecklistRow`'s own dataclass
+fields, and a second test refuses a cleanup that strips `isHere` from the
+corpus — because that field is now the *only* coverage the extension's
+marker has.
+
+**A fourth absence turned up that the spec did not name.** Steps 3's list
+was `unknown` / `stale` / `unreadable`. Measuring found that Set 028's
+four absent-`status` entries — the population Set 2 preserved and flagged
+as S3's headline case — never reach any reader at all: they carry no
+`sessionNumber`, so `build_rows` drops them in both languages and nothing
+has ever said so. That is the same defect class the spec named, so the
+projection reports `orphanEntries` as a top-level **count**. A count and
+not rows, deliberately: inventing rows for entries that name no session
+would put the projection at odds with the renderer it must reproduce, and
+the parity proof would have been the thing that broke.
+
+**The suite was checked for vacuity, not just for green.** Three mutations,
+one per property: healing an unknown token to `complete` fails
+`test_an_unnameable_token_projects_as_unknown_without_being_healed`;
+disabling staleness detection fails
+`test_a_touched_input_makes_the_projection_stale`; re-inserting the literal
+`<- here` into `render` fails
+`test_no_rendered_surface_carries_a_here_marker`. The last one matters
+most: deleting a constant is invisible if something writes the string back,
+so the falsifier asserts on rendered TEXT rather than on the absence of a
+name.
+
+**One pre-existing test was tightened rather than deleted.**
+`test_the_guidance_files_are_never_wholly_exempt` asserted
+`close_mandated_excludes(...) == []` — a proxy that held only while
+`cite_lessons` was the sole declaring module, and that failed the moment a
+legitimately whole-file artifact was declared. Its docstring is about the
+two guidance files, so it now asserts that, which is both stricter about
+what it claims and correct under the change.
+
+**Test budget: 6 net** against the 7 the set had left (7 new functions in
+`test_session_projection.py`, 2 in `test_step_row_parity.py`, minus 3
+marker tests removed from `test_session_checklist.py`). Set total: 39 of
+the 40-function cap.
+
+**What the next set inherits:**
+
+1. **The extension carve is now unblocked** and is the natural next set.
+   `session-progress.json` is the one computed answer §6.5 was waiting on;
+   `sessionStepModel.ts` (~1,830 lines), its 110 tests, `test_step_row_parity.py`
+   and the shared corpus can all go in the same pass that teaches the
+   Explorer to read the projection.
+2. **`skipped` gets substantially cheaper the moment that carve lands.**
+   The spec predicted this: teaching a new token was a two-language change,
+   and after the carve it is a one-place change. It is still a decision, not
+   an automatic consequence.
+3. **The absent-`status` four are still an open writer decision.** Whether
+   absence should be refused at the writer was named by S1, inherited by S2,
+   and is not answered here — S3 made the four *visible* (`orphanEntries`)
+   rather than deciding their fate, which is the honest split.
+4. **Nothing consumes the projection yet.** It is written at close and
+   checkable with `--check`; the Work Explorer still derives its own rows.
+   That is standing decision 3 working as intended, not an omission.
+
+**Verification: round 1 VERIFIED on both lenses, 0 blocking findings, 4
+nits — adjudicated as follows.**
+
+- *`_collapse_by_step_key`'s docstring still explains itself in terms of
+  the removed marker* — **accepted and fixed.** A stale echo of exactly
+  the class L-065-1 names; the reason for collapsing is now stated as the
+  stale `[~]` box, which is the fact that survived the marker.
+- *"It renders logged steps, not planned ones" contradicts the seeded-plan
+  behaviour* — **accepted and fixed.** Pre-existing (Set 114 S2 added the
+  forward half below it without amending the claim above it), and exactly
+  L-064-8: prose that was true in the old context reads authoritative in
+  the new one. The section now says it renders the ledger and only the
+  ledger, which is the rule that is actually true in both halves.
+- *The extension's comments still say `markHere` mirrors
+  `session_checklist._mark_here`* — **accepted as a named residual, not
+  fixed.** Correcting it is a `tools/` edit, which standing decision 3
+  forbids in this set and `requiresE2E: false` does not carry. Owner: the
+  extension carve, which deletes both the comment and the code it
+  describes. The divergence is already declared in the shared corpus's
+  `_readme` and in the target-state proposal, so the residual is a
+  decision rather than an oversight (L-069-1).
+- *"the staged diff is net +7 test functions, not +6"* — **dismissed,
+  measured.** Counting `def test_*` across the staged diff per file:
+  `test_session_projection.py` +7, `test_step_row_parity.py` +2,
+  `test_session_checklist.py` −3, everything else ±0. Net **+6**. The
+  lens most likely counted the additions and not the three marker tests
+  removed from `test_session_checklist.py`.

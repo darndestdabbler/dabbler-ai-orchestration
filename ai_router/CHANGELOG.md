@@ -9,6 +9,95 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
+## [Unreleased] — one computed projection, and the marker goes (Set 120 S3)
+
+### Added
+
+- **(Set 120 S3) `ai_router.session_projection` — the session progress
+  projection, computed once and serialized.** One Python answer for a
+  session set's steps, their states, what is in flight and what remains,
+  written to `session-progress.json` beside the artifacts it derives
+  from. Canonical shape: `docs/session-progress-schema.md`.
+
+  It does **not** re-implement the row derivation.
+  `session_checklist.build_rows` stays the one Python computation and
+  this module serializes what it returns, so "computed once" is
+  structural rather than asserted — there is no second Python derivation
+  that could drift. The read-side leniency is likewise *derived* from
+  `session_checklist.STATUS_BOXES` by box glyph rather than re-spelled as
+  a second alias table, so the projection cannot recognise a token the
+  renderer does not (L-069-1).
+
+  **Derived and regenerable — a cache, never a source.** Every file
+  carries `derived: true`, the exact regenerate command, and the SHA-256
+  of each input (`activity-log.json`, `session-state.json`, `spec.md`),
+  so `projection_state()` can always answer `fresh` / `stale` / `absent`
+  / `unreadable` and `--check` exits `3` on anything but fresh. A
+  `schemaVersion` newer than the reading code reads as `unreadable`
+  rather than being guessed at.
+
+  `close_session` regenerates it after flipping the state snapshot. That
+  write is declared through the Set 119 S3 `CLOSE_MANDATED_WRITES`
+  mechanism rather than by adding a filename to a list in
+  `verification_stamp`, so a close-time write cannot stale the
+  verification stamp it is written after — the failure Sets 111 S2, 112
+  S3 and 114 S1 each paid a metered round for.
+
+- **(Set 120 S3) The states absence used to hide.** `unknown` for a
+  status token no reader can name — which is where 11 of the 15 entries
+  Set 120 S2 deliberately preserved now surface, with their raw token
+  intact rather than laundered. `unreadable` beside `absent` and `read`
+  for the ledger itself, so "no work" and "cannot read the evidence" stop
+  being the same empty session row (a defect both Set 115 reviewers named
+  independently). `stale` for the projection against its own inputs. And
+  `orphanEntries`, a top-level count of ledger entries with no integer
+  `sessionNumber` — every reader in both languages silently drops them,
+  which is where the other 4 preserved entries (Set 028's absent-status
+  population) had gone. Reported as a count rather than as rows, because
+  inventing rows for entries that name no session would break the parity
+  the projection has to hold.
+
+### Removed
+
+- **(Set 120 S3, operator ruling 2026-08-11) The `<- here` marker.**
+  `session_checklist.HERE_MARKER`, both of its rendering sites,
+  `_mark_here`, and **`ChecklistRow.is_here`** are gone. The marker
+  inferred a single current row (first non-terminal logged step, falling
+  back to the first pending planned row, falling back to the last row) —
+  and that inference is what pointed confidently at step 1 of Set 119 S2
+  while the real work was four steps further on. Since Set 120 S1 the
+  `in-progress` token carries the fact directly, so nothing needs to be
+  derived; and because the fact is per-row, two steps may now be in
+  flight at once, which a single-valued marker could not represent.
+
+  **Breaking for callers that construct `ChecklistRow` positionally with
+  five arguments, or read `row.is_here`.** `is_planned` is now the fifth
+  field. Read what is in flight from the row's `box`
+  (`session_checklist.IN_PROGRESS_BOX`) or from the projection's
+  `current`.
+
+- **(Set 120 S3) The post ledger's `hereStepKey` / `hereStepNumber` /
+  `hereStatus` triple**, replaced by `inProgressStepKeys` — a list,
+  always present, possibly empty. The old fields recorded a rule's
+  output; this records a fact the ledger already carries. Empty is a real
+  answer (nothing started yet), which the marker had to fake.
+
+### Changed
+
+- **(Set 120 S3) The cross-language step-row parity corpus carries one
+  declared divergence.** `ai_router/tests/fixtures/session-step-parity.json`
+  keeps its `cases` byte-identical — the extension still computes
+  `isHere` until the carve deletes that derivation wholesale (Set 120
+  standing decision 3: no extension changes here), and the corpus is the
+  only coverage that behaviour has. The Python half now compares the five
+  fields both implementations still produce and projects `isHere` out of
+  the expectation; the divergence is recorded in the corpus's `_readme`,
+  which is the one file both languages read. Two new guards keep it
+  honest: `SHARED_ROW_FIELDS` is asserted against `ChecklistRow`'s own
+  dataclass fields, so a field added to the row cannot silently stop
+  being compared, and a second test refuses a "cleanup" that strips
+  `isHere` from the corpus.
+
 ## [Unreleased] — the drift inventory and the scoped history migration (Set 120 S2)
 
 ### Added

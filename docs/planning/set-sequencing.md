@@ -173,12 +173,31 @@ The shape, as stated:
 > individual repos and then merge them later. So, if that is a better
 > approach, let me know."*
 
-**This is worth a cross-provider consultation before it is designed.** The
-two candidate shapes — one repo with modules and worktrees, versus
-separate repos merged later — differ in exactly the places this framework
-has already been bitten: shared git index, whole-tree test runs, and
-shared append-only files. Neither the operator nor the orchestrator that
-recorded this has a confident answer.
+**✅ ANSWERED 2026-08-11 — one repo, one worktree per active session.**
+Both providers reached it independently from an identical prompt:
+[`proposals/2026-08-11-multi-module-architecture/verdict.md`](../proposals/2026-08-11-multi-module-architecture/verdict.md).
+
+The decisive point: *"one repo" does not mean one shared working
+directory* — worktrees already isolate the index, HEAD, edited files and
+test trees, so separate repos buy nothing Option A lacks while costing
+session-set ID collisions, framework version skew, and guidance
+divergence ("Developer B's AI remains blind to what Developer A just
+learned"). "Semi-independent now, merge later" is monorepo territory;
+separate repos are for **permanently** separate deployables.
+
+**Module authoring: Python CLI for lifecycle, prompts for content.**
+`python -m ai_router.modules create|rename|delete|assign-sets` handles
+transactional mutation; the extension keeps the copy-prompt menu items
+the operator asked for plus thin launchers. This is not cleanup —
+`cancelLifecycle.ts:296` **writes `session-state.json` from TypeScript
+today**, so moving lifecycle to Python restores an invariant the project
+believes it already has.
+
+**The next-week protocol** (verdict §6) is process, not tooling: one
+worktree per set, reserve set numbers in chat before scaffolding, freeze
+shared config, small PRs daily, and one merge captain who tests the
+**prospective merge commit** — because two individually verified branches
+can still fail together, which no architecture here prevents.
 
 ### 4d. The setup webview and verify-type resolution
 
@@ -205,6 +224,7 @@ Produced 2026-08-10/11; this is where the reasoning lives.
 | [`proposals/2026-08-10-smaller-framework-target-state.md`](../proposals/2026-08-10-smaller-framework-target-state.md) | the canonical roadmap: requirements, gates, guidance model, Work Explorer, what is guaranteed to improve vs not, sequencing, estimate |
 | [`proposals/2026-08-10-verifying-prose-is-where-the-time-went.md`](../proposals/2026-08-10-verifying-prose-is-where-the-time-went.md) | Set 116 S3's own instrumentation: where the loop's money went |
 | [`proposals/2026-08-10-concurrent-monitoring-as-a-gate/`](../proposals/2026-08-10-concurrent-monitoring-as-a-gate/) | a rejected design, two provider reviews, and the three ideas worth keeping |
+| [`proposals/2026-08-11-multi-module-architecture/`](../proposals/2026-08-11-multi-module-architecture/) | **the module ruling** — one repo + worktrees, why separate repos lose, the Python-CLI lifecycle decision, and the next-week protocol |
 | [`session-sets/115-.../step-ledger-findings.md`](../session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md) | the step-ledger root cause, the tree-vs-chat resolution, Session 4's contradiction |
 | [`session-sets/118-.../measurement-correction.md`](../session-sets/118-test-retirement-and-coupling-budget/measurement-correction.md) | why that set's coupling number is probably an artifact |
 | [`planning/guidance-candidates.md`](guidance-candidates.md) | guidance decided but not admissible while preload is at ceiling — C-001, C-002, C-003 |

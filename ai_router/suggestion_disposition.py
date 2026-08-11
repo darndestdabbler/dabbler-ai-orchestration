@@ -53,6 +53,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal, Optional
 
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .session_log import STEP_STATUS_COMPLETE, require_step_status
+except ImportError:  # pragma: no cover - test/bare context
+    from session_log import (  # type: ignore[no-redef]
+        STEP_STATUS_COMPLETE,
+        require_step_status,
+    )
+
 SuggestionChoice = Literal["e2e", "uat", "both", "neither"]
 
 VALID_CHOICES = ("e2e", "uat", "both", "neither")
@@ -125,7 +133,7 @@ def record_suggestion_disposition(
             f"Operator answered the UAT/E2E suggested-state prompt: "
             f"{choice}."
         ),
-        "status": "complete",
+        "status": require_step_status(STEP_STATUS_COMPLETE),
         "kind": ENTRY_KIND,
         "choice": choice,
     }

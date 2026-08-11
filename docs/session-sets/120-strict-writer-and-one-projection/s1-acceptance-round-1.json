@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "439b22c3727a1e88853507f53d3d7e5768029631",
+  "fixedTree": "75b8506514616e5f4e6fc26301c3520a1cfb7330",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T07:47:49.983329+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The writer accepts `skipped`, but the checklist reader still treats it as unknown/unfinished. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/session_log.py:43-61 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Every token accepted by require_step_status(), including \"skipped\", is recognized by the checklist reader with a non-UNKNOWN box, and a skipped row does not become the active \"<- here\" row when followed by pending/in-progress work.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `skipped` is accepted by the new writer vocabulary but the checklist reader still treats it as unknown and unfinished. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_ro ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The checklist reader recognizes every token accepted by require_step_status(), including \"skipped\", with a non-UNKNOWN box and terminal/current-row semantics that do not treat a skipped logged step as unfinished solely because the reader cannot name it.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

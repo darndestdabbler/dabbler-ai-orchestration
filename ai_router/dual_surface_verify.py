@@ -63,6 +63,7 @@ try:  # package + bare-filename import shim (matches the test convention)
     from .pull_critique import _default_sandbox_for, build_instruction, prompt_body_of
     from .verification import build_verification_prompt, parse_verification_response
     from .replacement_gate import validate_benchmark_registration
+    from .session_log import STEP_STATUS_COMPLETE, require_step_status
 except ImportError:  # pragma: no cover - test/bare context
     from providers import APIResult, call_model  # type: ignore
     from pull_verifier import (  # type: ignore
@@ -88,6 +89,10 @@ except ImportError:  # pragma: no cover - test/bare context
         parse_verification_response,
     )
     from replacement_gate import validate_benchmark_registration  # type: ignore
+    from session_log import (  # type: ignore
+        STEP_STATUS_COMPLETE,
+        require_step_status,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1910,7 +1915,7 @@ def record_dual_surface_mode(
         "stepKey": f"session-{session_number:03d}/dual-surface-mode",
         "dateTime": _now_iso_utc(),
         "description": f"Operator set dualSurfaceMode: {value}.",
-        "status": "complete",
+        "status": require_step_status(STEP_STATUS_COMPLETE),
         "kind": DUAL_SURFACE_MODE_ENTRY_KIND,
         "choice": value,
     }

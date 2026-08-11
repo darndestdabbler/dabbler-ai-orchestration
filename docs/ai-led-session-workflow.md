@@ -1492,6 +1492,21 @@ log.log_step(
 )
 ```
 
+> **`status` is a closed vocabulary (Set 120 S1).** Exactly one of
+> `complete`, `in-progress`, `pending`, `blocked` — and exactly that
+> spelling. `log_step` raises `InvalidStepStatusError` on anything else,
+> including the near-misses readers happen to tolerate (`completed`,
+> `done`, `Complete`) and prose written into the status field. Narrative
+> belongs in `description`. Readers stay lenient about the history
+> already on disk; the writer does not, because a token no reader can
+> name renders the whole session as not-started (Set 119 S2).
+>
+> **`skipped` is deliberately not legal.** It has no box in the checklist
+> reader and is not terminal in either the CLI or the Work Explorer, so a
+> skipped step renders `[?]` and steals the `<- here` marker from real
+> work. Record a skip in the step's `description` until both readers
+> learn the token (operator ruling, 2026-08-11).
+
 **Reasoning tasks** — delegate to the router:
 ```python
 from ai_router import route

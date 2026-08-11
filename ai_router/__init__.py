@@ -64,7 +64,16 @@ from .call_trace import HttpCall, trace_provider_calls, record_http_request
 from .pricing import resolve_rates, worst_case_output_cost_per_1m
 from .secret_resolver import resolve_secret, register_backend
 from .prompting import build_prompt
-from .session_log import SessionLog
+from .session_log import (
+    SessionLog,
+    ALLOWED_STEP_STATUSES,
+    CANONICAL_STEP_STATUSES,
+    InvalidStepStatusError,
+    is_valid_step_status,
+    require_step_status,
+    suggest_step_status,
+    validate_step_status,
+)
 from .session_state import (
     SESSION_STATE_FILENAME,
     SCHEMA_VERSION as SESSION_STATE_SCHEMA_VERSION,

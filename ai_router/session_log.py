@@ -1,9 +1,212 @@
-"""JSON-based session logging for session sets."""
+"""JSON-based session logging for session sets.
+
+**The step-status vocabulary (Set 120 S1).** Until this set,
+:meth:`SessionLog.log_step` accepted any string, and roughly 10% of the
+step entries on disk carried a token no reader recognises: "done" was
+spelled four ways (``complete`` / ``completed`` / ``done`` /
+``complete-with-known-failures``), and prose up to ~1,500 characters had
+been written into the status field. The consequence was visible --- Set
+119 S2 wrote ``completed``, and the whole session rendered as
+not-started with the ``<- here`` marker stranded on step 1, because
+:mod:`ai_router.session_checklist` selects the first *non-terminal* row
+and an unparseable row is never terminal.
+
+The fix follows the Set 086 S1 pattern established for verification
+verdicts: **readers stay lenient, the writer is strict.** Every reader
+keeps tolerating whatever it finds on disk (history is a record, not a
+bug to be crashed on); nothing that a reader cannot name may be written
+from here on. The legal set is drawn from the canonical tokens already
+in use --- it invents nothing:
+
+    complete, in-progress, pending, blocked
+
+**Why ``skipped`` is NOT in that set**, despite appearing once on disk
+and being named in the Set 120 spec: no reader can name it. It has no
+entry in ``session_checklist.STATUS_BOXES`` (so it renders ``[?]``, the
+corrupt-data glyph) and neither ``session_checklist._mark_here`` nor the
+Work Explorer's mirrored ``markHere`` counts it as terminal (so a skipped
+step steals the current-step marker from real work). Admitting a token
+the readers cannot name is precisely the defect this module exists to
+prevent, so the vocabulary is the INTERSECTION of what was measured and
+what the readers understand. Teaching both readers is a two-language
+change that belongs with the extension carve; until then ``skipped`` is
+refused with a message that says so (operator ruling, 2026-08-11).
+
+Use :func:`require_step_status` at any writer that puts a ``status``
+into an ``activity-log.json`` entry. The four sibling writers that do
+their own read-modify-write of that file
+(:mod:`ai_router.contract_gate`, :mod:`ai_router.path_aware_critique`,
+:mod:`ai_router.dual_surface_verify`,
+:mod:`ai_router.suggestion_disposition`) all route through it, so an
+allowlist at one entry point is not silently bypassed at another
+(L-069-1).
+"""
 
 import json
 import os
 from datetime import datetime
 from typing import Optional
+
+
+# ---------------------------------------------------------------------------
+# The step-status vocabulary (Set 120 S1)
+# ---------------------------------------------------------------------------
+
+STEP_STATUS_COMPLETE = "complete"
+STEP_STATUS_IN_PROGRESS = "in-progress"
+STEP_STATUS_PENDING = "pending"
+STEP_STATUS_BLOCKED = "blocked"
+
+#: The legal set, in the order a step normally travels through it. Every
+#: token here was measured in use across this repo's activity logs on
+#: 2026-08-11 (2,417 / 31 / 55 / 3 occurrences respectively) **and** is
+#: named by every reader --- see the module docstring for why ``skipped``,
+#: which satisfies only the first half, is deliberately absent.
+CANONICAL_STEP_STATUSES = (
+    STEP_STATUS_PENDING,
+    STEP_STATUS_IN_PROGRESS,
+    STEP_STATUS_COMPLETE,
+    STEP_STATUS_BLOCKED,
+)
+
+ALLOWED_STEP_STATUSES = frozenset(CANONICAL_STEP_STATUSES)
+
+# Spellings a caller might reasonably reach for, mapped to what they
+# meant. This is *only* used to make a refusal actionable --- nothing
+# here is ever written to disk. Two sources, deliberately no third:
+# the drift measured in the activity logs (``completed``, ``done``,
+# ``complete-with-known-failures``), and the alias keys
+# ``session_checklist.STATUS_BOXES`` already renders, since a reader
+# tolerating a spelling is exactly why a writer would try it.
+_STEP_STATUS_DRIFT_HINTS = {
+    "completed": STEP_STATUS_COMPLETE,
+    "done": STEP_STATUS_COMPLETE,
+    "complete-with-known-failures": STEP_STATUS_COMPLETE,
+    "in_progress": STEP_STATUS_IN_PROGRESS,
+    "started": STEP_STATUS_IN_PROGRESS,
+    "not-started": STEP_STATUS_PENDING,
+    "failed": STEP_STATUS_BLOCKED,
+}
+
+# Tokens refused for a reason worth stating, rather than by falling
+# through to "not in the legal set". A caller reaching for one of these
+# is not making a typo, so the message explains the decision instead of
+# suggesting a near-miss it did not mean.
+_STEP_STATUS_REFUSAL_REASONS = {
+    "skipped": (
+        "'skipped' was considered and deliberately excluded (Set 120 S1, "
+        "operator ruling 2026-08-11): no reader can name it. It has no "
+        "box in session_checklist.STATUS_BOXES, so it renders as '[?]' "
+        "-- the corrupt-data glyph -- and neither _mark_here nor the Work "
+        "Explorer's mirrored markHere counts it as terminal, so a skipped "
+        "step steals the current-step marker from real work. Record the "
+        "skip in the step's DESCRIPTION until both readers learn the "
+        "token."
+    ),
+}
+
+# A status is a token. Anything longer than this is prose that belongs in
+# the description, and echoing it whole would bury the remediation.
+_STATUS_ECHO_LIMIT = 60
+
+
+class InvalidStepStatusError(ValueError):
+    """Raised by a sanctioned writer asked to persist a step status outside
+    the vocabulary. A ``ValueError`` subclass so existing ``except
+    ValueError`` callers still catch it (mirrors
+    :class:`ai_router.session_state.InvalidVerificationVerdictError`)."""
+
+
+def _echo_status(status: object) -> str:
+    """``repr`` of *status*, truncated so a prose blob stays readable."""
+    text = repr(status)
+    if len(text) <= _STATUS_ECHO_LIMIT:
+        return text
+    return f"{text[:_STATUS_ECHO_LIMIT]}... ({len(str(status))} chars)"
+
+
+def is_valid_step_status(status: object) -> bool:
+    """True iff *status* is EXACTLY one of :data:`CANONICAL_STEP_STATUSES`.
+
+    Exact means exact: no case folding, no whitespace tolerance, no
+    prefix match. The point of the vocabulary is that the field carries
+    one spelling per meaning, so ``"Complete"`` and ``" complete"`` are
+    refused at the writer even though every reader would render them ---
+    a near-miss admitted here is a near-miss on disk forever.
+    """
+    return isinstance(status, str) and status in ALLOWED_STEP_STATUSES
+
+
+def suggest_step_status(status: object) -> Optional[str]:
+    """The canonical token *status* most likely meant, or ``None``.
+
+    Advisory only: used to make a refusal message actionable. Never call
+    this to normalize a value on the way to disk --- the writer refuses,
+    it does not silently rewrite what the caller said.
+    """
+    if not isinstance(status, str):
+        return None
+    normalized = status.strip().lower()
+    if normalized in ALLOWED_STEP_STATUSES:
+        return normalized
+    return _STEP_STATUS_DRIFT_HINTS.get(normalized)
+
+
+def validate_step_status(status: object, *, field: str = "status") -> Optional[str]:
+    """Return a remediation message when *status* is outside the
+    vocabulary; ``None`` when it is exactly canonical.
+
+    The message always names the legal set, so a caller that hits it
+    learns the vocabulary from the failure itself.
+    """
+    if is_valid_step_status(status):
+        return None
+
+    allowed = ", ".join(f"'{t}'" for t in CANONICAL_STEP_STATUSES)
+    echo = _echo_status(status)
+    hint = suggest_step_status(status)
+    hint_text = f" Did you mean '{hint}'?" if hint else ""
+
+    if not isinstance(status, str):
+        return (
+            f"{field} {echo} is not a step status: it must be a string, "
+            f"and EXACTLY one of the legal set ({allowed})."
+        )
+    if not status.strip():
+        return (
+            f"{field} {echo} is not a step status: an empty value renders "
+            f"as '[?]', indistinguishable from corrupt data. Write EXACTLY "
+            f"one of the legal set ({allowed})."
+        )
+    reason = _STEP_STATUS_REFUSAL_REASONS.get(status.strip().lower())
+    if reason is not None:
+        return (
+            f"{field} {echo} is not a step status. The legal set is "
+            f"({allowed}). {reason}"
+        )
+    if "\n" in status or len(status) > _STATUS_ECHO_LIMIT:
+        return (
+            f"{field} {echo} is prose, not a step status. The status field "
+            f"carries EXACTLY one of the legal set ({allowed}); the "
+            f"narrative belongs in the step's description."
+        )
+    return (
+        f"{field} {echo} is not a step status. It must be EXACTLY one of "
+        f"the legal set ({allowed}) --- a near-miss spelling is refused "
+        f"too, because every reader of the activity log recognises only "
+        f"these.{hint_text}"
+    )
+
+
+def require_step_status(status: object, *, field: str = "status") -> str:
+    """Return *status* unchanged, or raise :class:`InvalidStepStatusError`.
+
+    The single chokepoint every sanctioned activity-log writer calls.
+    """
+    message = validate_step_status(status, field=field)
+    if message is not None:
+        raise InvalidStepStatusError(message)
+    return status  # type: ignore[return-value]
 
 
 def find_active_session_set(base_dir: str = "docs/session-sets") -> str:
@@ -165,7 +368,14 @@ class SessionLog:
     def log_step(self, session_number: int, step_number: int,
                  step_key: str, description: str, status: str,
                  api_calls: list[dict] | None = None):
-        """Append a step entry to the activity log."""
+        """Append a step entry to the activity log.
+
+        Raises :class:`InvalidStepStatusError` when *status* is outside
+        the vocabulary (Set 120 S1). This is the strict half of "readers
+        lenient, writer strict": nothing a reader cannot name reaches
+        disk from here on.
+        """
+        require_step_status(status)
         entry = {
             "sessionNumber": session_number,
             "stepNumber": step_number,
@@ -199,11 +409,19 @@ class SessionLog:
         Raises ``ValueError`` on anything that is not a dict carrying a
         ``sessionNumber`` — a malformed entry poisons every reader of the
         log, so it is refused at the writer rather than discovered later.
+
+        Set 120 S1: a ``status``, **when present**, must be in the step
+        vocabulary. Absence is not refused here — this method also
+        carries bookkeeping entries, and "no status recorded" is a
+        different problem from "a status no reader can name" (Session 3
+        gives absence its own explicit state).
         """
         if not isinstance(entry, dict):
             raise ValueError(f"activity-log entry must be a dict, got {type(entry)}")
         if "sessionNumber" not in entry:
             raise ValueError("activity-log entry must carry a sessionNumber")
+        if "status" in entry:
+            require_step_status(entry["status"], field="entry['status']")
         self._data["entries"].append(dict(entry))
         self._save()
 

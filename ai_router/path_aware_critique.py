@@ -57,6 +57,14 @@ try:  # package vs bare-import (mirrors the rest of ai_router)
 except ImportError:  # pragma: no cover - test/bare context
     from evidence_protocol import validate_finding_evidence  # type: ignore
 
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .session_log import STEP_STATUS_COMPLETE, require_step_status
+except ImportError:  # pragma: no cover - test/bare context
+    from session_log import (  # type: ignore[no-redef]
+        STEP_STATUS_COMPLETE,
+        require_step_status,
+    )
+
 
 # ---------------------------------------------------------------------------
 # The pathAwareCritique policy attribute (Set 066 S1)
@@ -372,7 +380,7 @@ def record_path_aware_critique(
         "stepKey": f"session-{session_number:03d}/path-aware-critique",
         "dateTime": _now_iso_utc(),
         "description": f"Operator set pathAwareCritique: {value}.",
-        "status": "complete",
+        "status": require_step_status(STEP_STATUS_COMPLETE),
         "kind": PATH_AWARE_CRITIQUE_ENTRY_KIND,
         "choice": value,
     }

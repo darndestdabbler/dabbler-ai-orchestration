@@ -1,0 +1,100 @@
+{
+  "sessionSetName": "120-strict-writer-and-one-projection",
+  "createdDate": "2026-08-11T03:12:33.830277-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T03:12:33.829927-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "define-the-vocabulary-and-enforce-it",
+      "dateTime": "2026-08-11T03:12:33.829927-04:00",
+      "description": "**Define the vocabulary and enforce it at the writer.** Draw the legal set from the canonical tokens already in use (`complete`, `pending`, `in-progress`, `blocked`, `skipped` \u2014 confirm against the counts above; do not invent). `SessionLog.log_step` fails closed on anything else, exactly as `session_state.validate_verification_verdict` does for verdicts (Set 086 S1). **Readers are not touched** \u2014 they stay lenient, per standing decision 1.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "audit-every-call-site-that-writes",
+      "dateTime": "2026-08-11T03:12:33.829927-04:00",
+      "description": "**Audit every call site that writes a step status.** An allowlist at one entry point is worthless if another path writes the file directly (`L-069-1`: *fix every sibling site* \u2014 the lesson that failed to prevent two recurrences this week). Report any writer that bypasses `log_step`, and route or refuse it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "ship-the-falsifiers-l-112-1",
+      "dateTime": "2026-08-11T03:12:33.829927-04:00",
+      "description": "**Ship the falsifiers `L-112-1` requires:** one planting each drifted token (`completed`, `done`, `complete-with-known-failures`, a prose blob) and asserting the write is refused with a message naming the legal set; one asserting every canonical token is still accepted.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-freeze",
+      "dateTime": "2026-08-11T03:12:33.829927-04:00",
+      "description": "Full pytest at close after freeze; verify, close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T03:15:01.517204-04:00",
+      "description": "Registered Set 120 Session 1 (copilot/anthropic/claude-opus-5/high); preload read; transport profile copilot-cli confirmed; decision-review-queue empty.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "define-vocabulary",
+      "dateTime": "2026-08-11T03:19:19.904984-04:00",
+      "description": "Confirmed the legal set against a fresh count of every activity-log.json (complete 2417, pending 55, in-progress 31, blocked 3, skipped 1); invented nothing. Added the vocabulary + validate_step_status/require_step_status/InvalidStepStatusError to session_log.py and made log_step and append_entry fail closed. Readers untouched (standing decision 1).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "audit-call-sites",
+      "dateTime": "2026-08-11T03:19:19.906655-04:00",
+      "description": "Audited every writer of a step status into activity-log.json. Four bypass SessionLog with their own read-modify-write: contract_gate, path_aware_critique, dual_surface_verify, suggestion_disposition. All four now route their status through require_step_status and the shared STEP_STATUS_COMPLETE constant. No other bypass found; the extension is read-only.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "ship-falsifiers",
+      "dateTime": "2026-08-11T03:23:32.807862-04:00",
+      "description": "Shipped ai_router/tests/test_step_status_vocabulary.py: 20 test functions / 50 cases. Plants every measured drifted token (completed, done, complete-with-known-failures, a prose blob, None, empty, near-miss casing) and asserts refusal with a message naming the legal set; asserts every canonical token still lands and the pending->in-progress->complete lifecycle survives. Structural assertions (L-112-1): the vocabulary constant is locked, an AST scan refuses any non-canonical status literal in an activity-log entry dict across all production modules, and that scan has its own planted-violation falsifier plus a session-state look-alike negative. Mutation-checked: with the two require_step_status guards removed, 34 of 50 cases fail.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-verify-close",
+      "dateTime": "2026-08-11T03:56:33.497449-04:00",
+      "description": "Verification complete: round 1 discovery (2 blocking, both lenses found the same real defect), round 2 supplementary (1 blocking, dismissed as out-of-scope concurrent extension work), round 3 remediation-review VERIFIED with 2 fix-accepted and 0 findings. Starting the close-out full pytest after code freeze.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-verify-close",
+      "dateTime": "2026-08-11T04:07:17.287165-04:00",
+      "description": "Full pytest on the frozen tree: 3835 passed, 9 skipped, 0 failed in 585.49s; recorded to test-runs.jsonl (digest 73c048d7a24b). pytest is the only expensive suite owed - run_of_record covers puts ai_router/ under pytest, and playwright covers tools/** plus session_state/start_session/close_session, none of which this session touched. Verification VERIFIED (round 3, 2 fix-accepted, 0 findings). Disposition authored; committing and closing.",
+      "status": "complete"
+    }
+  ]
+}

@@ -55,6 +55,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Sequence, Tuple, Union
 
+try:  # package vs bare-import (mirrors the rest of ai_router)
+    from .session_log import STEP_STATUS_COMPLETE, require_step_status
+except ImportError:  # pragma: no cover - test/bare context
+    from session_log import (  # type: ignore[no-redef]
+        STEP_STATUS_COMPLETE,
+        require_step_status,
+    )
+
 
 # ---------------------------------------------------------------------------
 # The contractGate policy attribute (mirrors path_aware_critique)
@@ -322,7 +330,7 @@ def record_contract_gate(
         "stepKey": f"session-{session_number:03d}/contract-gate",
         "dateTime": _now_iso_utc(),
         "description": f"Operator set contractGate: {value}.",
-        "status": "complete",
+        "status": require_step_status(STEP_STATUS_COMPLETE),
         "kind": CONTRACT_GATE_ENTRY_KIND,
         "choice": value,
     }

@@ -126,18 +126,25 @@ reliably connect them. They are collected here.
 
 ### 4a. Before authoring the extension carve
 
-**Four things must be settled first. Three are operator calls.**
+**Operator decisions taken 2026-08-11 — three of the four are now
+settled.**
 
-| # | question | why it blocks | where |
-| ---: | :--- | :--- | :--- |
-| 1 | **Is `modules.yaml` / `moduleAuthoring.ts` actually used?** | **2,458 LOC** — the largest single deletion after the webviews. Nobody has confirmed the module system is exercised. | proposal §9.2 |
-| 2 | **How small should Layer 3 get?** | Deleting webviews takes it 35 → 26 scenarios. Migrating model-level tests to Layer 2 could reach ~8–12. It **cannot reach zero** — `L-064-12` records a VSIX manifest defect only Electron caught. | proposal §9.1 |
-| 3 | **How does `fileSystem.ts` (1,518 lines) unwire from the deleted surfaces?** | Explicitly **not scoped**. The proposal flags this as the least certain part of the whole plan. | proposal §10.5 |
-| 4 | **Has Set 120's projection landed?** | The §6.5 derivation deletion (~1,200–1,500 TS lines, ~110 tests, plus the parity harness) is only safe once one authoritative computed answer exists. | this file, §2 |
+| # | question | status |
+| ---: | :--- | :--- |
+| 1 | Is `modules.yaml` / `moduleAuthoring.ts` used? | ✅ **KEEP AND EXTEND.** Developers are waiting on multi-module support; the requirement is that it be **SIMPLE**. See §4c. |
+| 2 | How small should Layer 3 get? | ✅ **No target number.** Eliminate on functionality that is not helpful, and let the count fall out. First candidate: the setup webview (§4d) — worth 9 of the suite's 35 scenarios. |
+| 3 | How does `fileSystem.ts` (1,518 lines) unwire? | ✅ **DEFERRED.** *"There may be some legacy code there that isn't used. Maybe we can defer pruning this."* Do not scope it into the carve. |
+| 4 | Has Set 120's projection landed? | ⬜ still a prerequisite |
+
+**Operator's overall judgement on trimming, recorded so a later agent does
+not over-reach:**
+
+> *"Other than the above, I don't know that we need to trim any more for
+> right now. With the improvements to the testing, perhaps this will be
+> enough to make it maintainable."*
 
 **Then re-measure.** The LOC and test counts in proposal §6 were taken
-2026-08-10/11 and the extension will have moved. Per §3, the numbers in
-the spec must come from measurements taken at authoring time.
+2026-08-10/11 and the extension will have moved.
 
 **What is already decided and must not be relitigated** (proposal §6.2–6.5,
 settled with operator usage evidence on 2026-08-11):
@@ -145,8 +152,43 @@ settled with operator usage evidence on 2026-08-11):
 - **Both context submenus stay whole.** "Open File" *is* the four-artifact contract rendered as a menu; "Copy Prompt" keeps all five entries — `copyStartNextSessionPrompt` is the most-used and was called "hard won." An earlier plan to replace four with CLI output is **withdrawn**.
 - **Click-a-set-to-open-the-spec stays.** In daily use.
 - **The four status icons stay** — `media/{dark,light}/{not-started,in-progress,done,cancelled}.svg`.
-- **`pricing.py` stays** even though cost calculations are useless on a Copilot seat: `models.py`, `pull_verifier.py`, `config.py` and `__init__.py` import it, and it feeds the api-profile `max_cost_multiplier` guard. Only `pricing_proposal.py` and `cost_report.py` go.
+- **`pricing.py` stays**; `pricing_proposal.py` and `cost_report.py` are archived — see [`archived-cost-reporting.md`](archived-cost-reporting.md).
 - **Keep the rendering, delete the derivation** (§6.5) — not "delete the tree."
+
+### 4c. Multi-module support — the developer-facing requirement
+
+**This is now a live requirement, not a hypothetical.** Developers are
+waiting on it, and the operator's constraint is one word: **SIMPLE.**
+
+The shape, as stated:
+
+- Two or more developers work on **semi-independent modules** concurrently, integrating later.
+- **Manual git is acceptable** — they are willing to run the commands themselves.
+- **Copy-prompt context menu items for modules** would help.
+- **Module authoring via context menu** — either copy-prompts for an AI engine to act on, or executing Python scripts.
+
+**An open architectural question the operator raised and wants input on:**
+
+> *"I am mindful that AI is so powerful that we could start with
+> individual repos and then merge them later. So, if that is a better
+> approach, let me know."*
+
+**This is worth a cross-provider consultation before it is designed.** The
+two candidate shapes — one repo with modules and worktrees, versus
+separate repos merged later — differ in exactly the places this framework
+has already been bitten: shared git index, whole-tree test runs, and
+shared append-only files. Neither the operator nor the orchestrator that
+recorded this has a confident answer.
+
+### 4d. The setup webview and verify-type resolution
+
+The operator designed a replacement for the setup webview: a three-branch
+verify-type resolution rule, recorded in full at
+[`verify-type-resolution.md`](verify-type-resolution.md).
+
+Retiring `configEditor/` (2,671), `wizard/` (583) and `dashboard/` (322)
+removes **9 of Layer 3's 35 scenarios** and answers question 2 above
+without needing a target number.
 
 ### 4b. Before authoring the guidance-executable set
 

@@ -331,11 +331,31 @@ after independent review by two providers:
 | **Chat** | a machine-generated **delta** at transitions (current / next / blockers / source timestamp), plus a **full snapshot** at session start and after any context reset — not 9 re-renders of 6 unchanged rows |
 | **Both** | projected from **one validated canonical state model**, with explicit `unknown` / `stale` / `unreadable` states |
 
-Two things the delta must carry that the current checklist does not:
-**close-preflight obligations**, not merely implementation steps — those
-are what closes actually fail on — and an honest name for the marker
-(*"next unresolved recorded step"*) unless explicit step-start /
-step-complete transitions are recorded.
+**Two requirements the current checklist does not meet** are named: the
+delta must carry close-preflight obligations rather than only
+implementation steps, since those are what closes actually fail on; and
+the marker needs an honest name unless explicit step-start/step-complete
+transitions are recorded.
+
+**Operator ruling, 2026-08-11 — the marker is dropped entirely.**
+
+> *"I don't need the `<- here` tag. I just need the In Progress icon. The
+> In Progress icon would provide the flexibility to allow two items to be
+> in flight at the same time, but not require it."*
+
+This is a better answer than either the rename or the explicit-transition
+fix, and it removes machinery rather than adding it:
+
+- **`markHere` becomes unnecessary.** `session_checklist.py:394` exists to guarantee *exactly one* row carries the marker — an inference (first non-terminal row, falling back to the last) that this repo has already seen point confidently at the wrong row. Delete the inference and the class of bug goes with it.
+- **The status field already carries the fact.** `in-progress` is a canonical token in the vocabulary Set 120 defines. If a step is in flight, it says so; nothing needs to be derived.
+- **It permits concurrent steps without requiring them.** The current design *cannot* represent two in-flight steps, because the marker is single-valued by construction. Icon-driven rendering is naturally multi-valued.
+- **It aligns both surfaces for free.** The tree already renders per-row icons from status. Dropping the marker means the chat delta and the tree derive from the same field, with no second rule.
+
+`HERE_MARKER` (`session_checklist.py:158`), its rendering
+(`:555`, `:575`) and `markHere` (`:394`) are the surface to remove.
+**This is a Set 120 concern** — it depends on `in-progress` being
+reliably written, which is exactly what that set's writer validation
+delivers.
 
 Full findings and the reviewers' reasoning:
 [`docs/session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md`](../session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md).

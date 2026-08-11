@@ -184,12 +184,20 @@ not a decision an orchestrator may make alone.
    including the `[?]` posture for unknown tokens. This is the check that
    makes it safe for a later set to delete the TypeScript derivation —
    **do not delete it here** (standing decision 3).
+   **Drop the `<- here` marker in the same pass** (operator ruling,
+   2026-08-11): `HERE_MARKER` (`session_checklist.py:158`), its rendering
+   (`:555`, `:575`) and `markHere` (`:394`) go. The `in-progress` status
+   token carries the fact directly, so nothing needs to be inferred —
+   and the marker's single-valued design is what made it point
+   confidently at the wrong row when the data was bad. Removing it also
+   permits two steps in flight without requiring it, which `markHere`
+   cannot represent.
 5. Full pytest at close after freeze; verify, close.
 
 **Creates:** the serialized progress projection, its schema, the parity proof
 **Touches:** `ai_router/progress.py`, `ai_router/session_checklist.py`, `ai_router/tests/`, `docs/`
-**Ends with:** one computation, one answer, and a file the Work Explorer *and* an orchestrator can both read — the operator's 2026-08-11 proposal, executed.
-**Progress keys:** `projection`, `absenceStates`, `pythonParity`
+**Ends with:** one computation, one answer, a file the Work Explorer *and* an orchestrator can both read — and one fewer inferred value to be wrong about.
+**Progress keys:** `projection`, `absenceStates`, `pythonParity`, `hereMarkerRemoved`
 
 > **Irony budget.** This set adds tests to a framework already carrying
 > ~3,900. **Cap: 40 new test functions across all three sessions.** If the

@@ -287,9 +287,18 @@ export function activate(context: vscode.ExtensionContext): void {
       // tree-state (Set 8 spec § Detection rules); the cancelled
       // commands write it directly, so the watcher must see it to
       // refresh the bucket the moment a set is cancelled / restored.
+      //
+      // Set 115 S4 added `close-obligations.json` — the close-out
+      // projection, which lives one level down in each set's `.dabbler/`
+      // directory (hence the leading `**/`, which already covers it).
+      // Without it the panel would not move until the 30-second poll
+      // after an operator ran `close_preflight --write`, which is the
+      // one moment they are watching that row on purpose. The path is
+      // git-ignored, not unwatched: an ignored file still raises
+      // filesystem events.
       const pattern = new vscode.RelativePattern(
         sessionSetsAbs,
-        "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
+        "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json,close-obligations.json}"
       );
       const watcher = vscode.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {

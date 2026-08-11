@@ -203,6 +203,51 @@ Set 119 S2: 214 recorded check-failures, 64 belonging to checks Set 116
 S3 demoted to advisory (worth nothing to pre-empt now), **150 still
 blocking, of which the preflight names 150**.
 
+#### Putting the answer where the operator is looking (Set 115 S4)
+
+The preflight costs 2–7 seconds — git-backed predicates plus interpreter
+startup — so nothing that redraws may call it. `--write` serializes the
+report instead, and the Work Explorer reads the file:
+
+```bash
+.venv/Scripts/python.exe -m ai_router.close_preflight \
+    --session-set-dir docs/session-sets/<slug> --write
+```
+
+`--write` is a **superset of a normal run**: the report still prints and
+the exit code still answers "would this close". The extra effect is
+`<set>/.dabbler/close-obligations.json`, which the Work Explorer renders
+as a **Close-out** row under the in-flight session, expanding to one row
+per obligation.
+
+- **It is a cache, never a source.** The file records a SHA-256 of every
+  top-level file in the session-set directory. `--check` compares them
+  and exits `0` fresh / `3` stale, absent or unreadable, without
+  evaluating anything. The tree does the same comparison itself and
+  renders `stale` as stale — an obligation list that silently lags is
+  worse than none, because it says "nothing remains" when something does.
+- **Two of the rows cannot be digested at all.** Five checks read state
+  from outside the session-set directory — `working_tree_clean` and
+  `pushed_to_remote` call git; `verification_integrity` validates an
+  evidence stamp that binds the repo-wide work diff; `test_run_fresh`
+  digests the source surfaces a suite covers; the backstop reads both.
+  Committing, or editing a module anywhere in the repo, changes those
+  answers while every file in the set directory stays byte-identical.
+  Those rows are marked `volatile`, the file records a git fingerprint
+  beside the content digests, and any reader that cannot re-run git (the
+  tree, deliberately) labels them "as of" the projection's timestamp
+  rather than as current truth. Everything **not** named in
+  `close_preflight.SET_LOCAL_CHECKS` is volatile, so a check added later
+  is over-labelled rather than silently over-claimed.
+- **It is never committed.** `.dabbler/` is git-ignored, and the writer
+  drops a self-protecting `.gitignore` inside the directory it creates so
+  a consumer repo is covered without editing its root ignore file. That
+  is what keeps a mid-session write from landing in the verification
+  stamp's work diff and buying a metered backstop round at close.
+
+Regenerate it whenever you want the panel current — it is cheap to
+re-run and it never routes.
+
 The orchestration layer invokes close-out as a fresh routed turn after
 work verification terminates, so the close-out agent encounters
 `ai_router/docs/close-out.md` (this file) at the moment the instructions

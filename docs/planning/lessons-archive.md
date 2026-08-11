@@ -759,7 +759,7 @@ each id is in the active tier (D2: one id, one trailer).
   at that trigger moment.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="111" status="archived" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" last-used-set="115" status="archived" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each
@@ -797,7 +797,7 @@ instruction is still live: the rubric has not shipped in
 `project-guidance.md`.
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="110" status="archived" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="115" status="archived" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

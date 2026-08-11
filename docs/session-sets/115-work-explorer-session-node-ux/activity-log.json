@@ -267,6 +267,123 @@
       "dateTime": "2026-08-11T10:32:56.979731-04:00",
       "description": "Added dabblerSessionSets.openSessionArtifacts. Discovery is by convention (isSessionArtifact / listSessionArtifacts in commands/openFile.ts): case-insensitive ^s<N>-. on the top-level files of the set dir, sorted, so s3- cannot swallow s30- and a new artifact shape needs no code change. One match opens directly, several open a QuickPick (the openPrerequisiteSpec shape), none produces a message naming the session, the set and the s<N>-* convention. The entry is offered unconditionally and answered on the CLICK, because hiding it would need a readdir per session row on the tree scan (decisions.jsonl D2). Layer 2 coverage in sessionRowActions.test.ts (41 assertions green with the parity suite), Layer 3 in session-menu.spec.ts.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T11:41:06.550665-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "serialize-the-close-out-obligations",
+      "dateTime": "2026-08-11T11:41:06.550665-04:00",
+      "description": "**Serialize the close-out obligations.** Add a `--write` projection to `ai_router/close_preflight.py` in the shape `session_projection.py` already uses \u2014 same digest-based staleness, same explicit absence states, no new vocabulary. **CLI first**, so consumers who install from PyPI and never use the extension get it too; that has been this set's rule throughout.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "render-the-obligations-under-the-expanded",
+      "dateTime": "2026-08-11T11:41:06.550665-04:00",
+      "description": "**Render the obligations under the expanded session node**, reading the projection file rather than shelling out. A stale projection renders as **stale**, never as truth \u2014 an obligation list that silently lags is worse than none, because it says \"nothing remains\" when something does. Absent and unreadable stay distinguishable, per 120 S3's vocabulary.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "finish-the-marker-removal-in-typescript",
+      "dateTime": "2026-08-11T11:41:06.550665-04:00",
+      "description": "**Finish the marker removal in TypeScript.** Delete `HERE_MARKER` and its render site, and let the in-progress state reach the icon: `glyphStatusOf` already maps `in-progress` and `ICON_FILES[\"in-progress\"]` already resolves `in-progress.svg`, which session rows use \u2014 only the wiring is missing. **Grep both languages for every sibling site before declaring it done** (`L-069-1`); this session exists partly because that step was skipped once already.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "walk-it-then-close",
+      "dateTime": "2026-08-11T11:41:06.550665-04:00",
+      "description": "**Walk it, then close.** This set's UAT is the guided look across all four sessions \u2014 titles, left-click, both menu actions, the empty states, the in-progress icon on the current step, and an obligations list that still shows work outstanding when work is outstanding. `package.json` and the tree model are both in scope, so **`L-064-12` applies**: full `npm run test:playwright` after the last edit. Then full pytest, verify, close, `change-log.md`, Step 9 review. Coordinate the extension version bump with whatever is unpublished at that point.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-11T11:49:19.736993-04:00",
+      "description": "Registered session 4 via start_session, read the preload (constitution, project-guidance, lessons-learned, AGENTS.md), the set spec, operator-notes.md and step-ledger-findings.md, posted the step checklist, and confirmed the copilot-cli transport carries no provider keys by design.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "obligation-projection",
+      "dateTime": "2026-08-11T11:51:39.351943-04:00",
+      "description": "Journaled the four pre-code decisions (projection location and git treatment, volatile git-backed rows, the Close-out group row, wholesale marker removal) and started the close_preflight --write projection.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "obligation-projection",
+      "dateTime": "2026-08-11T12:01:02.164498-04:00",
+      "description": "Added close_preflight --write/--check: close-obligations.json under the set gitignored .dabbler/ dir, embedding the report verbatim, with per-file input digests plus a git fingerprint and per-row volatile marking. 16 new tests, all green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "obligations-rendered",
+      "dateTime": "2026-08-11T12:01:02.169278-04:00",
+      "description": "Rendering the obligations under the expanded session node from the projection file.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "obligations-rendered",
+      "dateTime": "2026-08-11T12:25:35.421603-04:00",
+      "description": "Rendered the obligations under the expanded session node: readCloseObligations in fileSystem.ts re-digests the set dir (content half only, no subprocess), a Close-out group row summarizes and carries the projection state, obligation rows carry blocking-ness, cost and an as-of qualifier. Layer 2 green at 1774.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "marker-removed-in-ts",
+      "dateTime": "2026-08-11T12:25:35.429283-04:00",
+      "description": "Finished the marker removal in TypeScript: HERE_MARKER, markHere, TERMINAL_STATUSES and isHere are gone, the shared corpus dropped the field, the two Python guards holding it were replaced, and the tests now assert the in-progress icon.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "uat-walk",
+      "dateTime": "2026-08-11T13:12:28.306517-04:00",
+      "description": "Ran the end-of-set multi-provider path-aware critique (gpt-5.6-sol + gemini-3.1-pro, both path-aware over the repo): 5 Major findings, all remediated in one pass - volatility default inverted to fail safe, damaged payloads read unreadable, the glyph requires a settled verdict, the watcher covers the projection, symlink digest parity. Authored the UAT walk and change-log.md; running the full suites.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "artifact-entry-removed",
+      "dateTime": "2026-08-11T14:12:04.385386-04:00",
+      "description": "Operator ruling at the UAT walk: Open Session Artifacts is out of the session menu. Removed wholesale - command, package.json entries, SESSION_ACTIONS entry, discovery helpers, the Layer 2 suite and the two Layer 3 scenarios (the ones failing in CI) - replaced by absence assertions at both layers. Also fixed the CI race first (clickRowMenuItem), then removed that helper with its last caller.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "uat-walk",
+      "dateTime": "2026-08-11T14:58:48.456551-04:00",
+      "description": "Operator walked the set and answered every item in place: all five looks passed, three decisions ratified (grouped, ignored, marker stays gone), one change ruled (artifact entry out). Full pytest 3933, mocha 1776, playwright 40 - all recorded fresh. Verification: discovery 1 Major, supplementary clean, remediation-review round 4 VERIFIED with both fixes accepted.",
+      "status": "complete"
     }
   ]
 }

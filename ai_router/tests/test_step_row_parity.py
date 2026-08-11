@@ -24,26 +24,20 @@ Neither language owns the corpus. Change Python alone and this fails;
 change TypeScript alone and its test fails; change the corpus alone and
 both fail.
 
-One declared divergence (Set 120 S3)
-------------------------------------
-The corpus's ``expectedRows`` still carry ``isHere``, and Python no
-longer has that field: the operator ruled the ``<- here`` marker out on
-2026-08-11 and ``session_checklist._mark_here`` went with it, while the
-extension keeps its ``markHere`` until the carve deletes that derivation
-wholesale (Set 120 standing decision 3 — no extension changes here).
+One removal, finished (Sets 120 S3 + 115 S4)
+--------------------------------------------
+The corpus used to carry an ``isHere`` field that only one language
+produced. The operator ruled the ``<- here`` marker out on 2026-08-11;
+Set 120 S3 removed ``session_checklist._mark_here`` and
+``ChecklistRow.is_here`` but could not touch the extension (its standing
+decision 3), so the corpus kept the field for the TypeScript half alone
+and this docstring declared the divergence.
 
-So this half compares on :data:`SHARED_ROW_FIELDS` — everything the two
-implementations still both produce — and projects ``isHere`` out of the
-expectation before asserting. The corpus's ``cases`` are untouched, so
-the TypeScript suite keeps proving its own marker behaviour against
-them; the divergence is recorded in the corpus's ``_readme``, which is
-the one file both languages read.
-
-The gate loses nothing it could still prove. What it exists to pin is
-"the rule that decides which rows exist" — order, identity, status,
-planned-ness — and every one of those fields is still asserted on both
-sides. ``isHere`` is not a field the two now disagree about; it is a
-field one of them no longer has.
+Set 115 S4 finished it: ``markHere``, the ``isHere`` field and the tree's
+``HERE_MARKER`` are gone, the corpus no longer carries the field, and
+both halves compare the same five fields again. :data:`SHARED_ROW_FIELDS`
+is therefore the WHOLE row on both sides, which is the state a parity
+gate should be in — nothing declared, nothing projected out.
 """
 
 from __future__ import annotations
@@ -73,11 +67,11 @@ def _load_corpus() -> List[dict]:
 CASES = _load_corpus()
 CASE_IDS = [c["name"] for c in CASES]
 
-#: The row fields both implementations still produce. ``isHere`` is
-#: deliberately absent — see the module docstring's "One declared
-#: divergence". A field added to ``ChecklistRow`` and not to this tuple
-#: silently stops being compared, so :func:`test_the_shared_fields_are_the
-#: _whole_python_row` pins the tuple against the dataclass itself.
+#: The row fields, which are now the WHOLE row on both sides (Set 115 S4
+#: removed ``isHere``, the last field only one language produced). A field
+#: added to ``ChecklistRow`` and not to this tuple silently stops being
+#: compared, so :func:`test_the_shared_fields_are_the_whole_python_row`
+#: pins the tuple against the dataclass itself.
 SHARED_ROW_FIELDS = (
     "stepNumber",
     "stepKey",
@@ -166,25 +160,63 @@ def test_the_shared_fields_are_the_whole_python_row():
     )
 
 
-def test_the_corpus_still_pins_the_extensions_here_marker():
-    """The one declared divergence stays declared, and stays covered.
+def test_the_corpus_carries_no_field_only_one_language_produces():
+    """The anti-resurrection guard for the marker (L-112-1, planted).
 
-    Python dropped ``isHere`` (Set 120 S3, operator ruling); the
-    extension keeps it until the carve. The corpus must therefore STILL
-    carry the field for the TypeScript half to assert against — a
-    well-meaning cleanup that stripped it from ``expectedRows`` would
-    leave ``markHere`` untested in the only place that tests it, and this
-    Python suite would never notice.
+    ``isHere`` was the one field the corpus pinned that only the
+    extension produced, and carrying it is what let the two languages
+    drift for a whole set. Re-adding any such field — this one or a
+    successor — puts the gate back into a state where one half asserts
+    something the other cannot, so the corpus is asserted to contain
+    exactly the fields both halves compare.
     """
-    assert all(
-        "isHere" in row for case in CASES for row in case["expectedRows"]
-    ), (
-        "expectedRows lost isHere: the TypeScript half asserts on it and "
-        "nothing else does"
+    extra = {
+        key
+        for case in CASES
+        for row in case["expectedRows"]
+        for key in row
+        if key not in SHARED_ROW_FIELDS
+    }
+    assert not extra, (
+        f"expectedRows carries {sorted(extra)}, which SHARED_ROW_FIELDS does "
+        "not compare. Either both implementations produce it (add it to "
+        "SHARED_ROW_FIELDS and to the TypeScript half) or only one does, "
+        "which is the divergence the corpus exists to prevent"
     )
+    missing = {
+        field
+        for case in CASES
+        for row in case["expectedRows"]
+        for field in SHARED_ROW_FIELDS
+        if field not in row
+    }
+    assert not missing, f"expectedRows lost {sorted(missing)}"
+
+
+def test_the_corpus_still_pins_a_step_in_flight():
+    """What replaced the marker has to be covered by something.
+
+    The tree draws its in-progress glyph from a row whose recorded status
+    is ``in-progress``. If no case produced one, the corpus would prove
+    the rows exist and say nothing about the signal an operator actually
+    reads — the same "a gate that only ever passes" failure L-112-1
+    names, one level up.
+    """
+    in_flight = [
+        (case["name"], row["stepKey"])
+        for case in CASES
+        for row in case["expectedRows"]
+        if row["status"] == "in-progress"
+    ]
+    assert in_flight, "no case renders a step in flight"
     assert any(
-        row["isHere"] for case in CASES for row in case["expectedRows"]
-    ), "no case pins a TRUE isHere, so the marker's behaviour is unproven"
+        name == "in-flight-is-the-logged-step-not-an-earlier-pending-plan-row"
+        for name, _key in in_flight
+    ), (
+        "the case that pins an in-flight LOGGED row below an unstarted "
+        "planned one is gone; that is the exact defect the removed marker "
+        "produced, and the glyph's correctness on it is unproven without it"
+    )
 
 
 def test_the_corpus_covers_the_cases_the_tree_depends_on():
@@ -204,8 +236,8 @@ def test_the_corpus_covers_the_cases_the_tree_depends_on():
         "legacy-set-with-no-seeded-plan",
         "repeated-key-collapses-to-the-latest-at-the-first-position",
         "anonymous-steps-are-not-collapsed",
-        "everything-finished-marks-the-last-row",
-        "planned-row-takes-the-marker-only-when-no-logged-step-is-unfinished",
+        "everything-finished-has-nothing-in-flight",
+        "in-flight-is-the-logged-step-not-an-earlier-pending-plan-row",
         "steps-in-a-fenced-block-are-not-this-specs-steps",
         "a-falsy-non-string-kind-is-no-kind-at-all",
         "falsy-non-string-fields-read-as-empty",

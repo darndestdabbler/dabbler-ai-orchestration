@@ -1,6 +1,13 @@
-// Set 115 Session 3 — the session row's menu: the prompt, and the evidence.
+// Set 115 Session 3 — the session row's menu: the prompt.
 //
-// Three suites for the three things that can be wrong independently:
+// Narrowed by Set 115 Session 4: the operator walked the finished row and
+// ruled "Open Session Artifacts" out of the menu, so its command and its
+// discovery helpers are gone and the suite that drove them went with them.
+// What replaced that coverage is an ABSENCE assertion — no session row
+// carries the token — because a re-added registry entry is otherwise
+// invisible until someone right-clicks in a UAT walk.
+//
+// Two suites for the two things that can be wrong independently:
 //
 //   1. `nextRunnableSessionNumber` / `sessionOffersRunPrompt` — WHICH row
 //      may offer the run prompt. This is the session's one genuinely new
@@ -8,11 +15,7 @@
 //      session": the copied text is the framework's SET-scoped trigger
 //      phrase, so a prompt offered on the wrong row would start a different
 //      session than the row it came from.
-//   2. `isSessionArtifact` / `listSessionArtifacts` — WHICH files belong to
-//      session N, driven from a real directory because the two ways this
-//      goes wrong (an `s3-` prefix swallowing `s30-`'s files, a directory
-//      that cannot be read) are both invisible in a running host.
-//   3. `sessionDescriptor` — whether the row actually CARRIES the tokens
+//   2. `sessionDescriptor` — whether the row actually CARRIES the tokens
 //      the menus gate on. `workExplorerMenuParity.test.ts` proves the menus
 //      and the registry agree; nothing there proves a rendered row emits
 //      the token, which is the other half of the same contract.
@@ -36,11 +39,9 @@ import {
 } from "../../providers/rowMenuHelpers";
 import { sessionDescriptor } from "../../providers/workExplorerTreeModel";
 import { readSessionSets } from "../../utils/fileSystem";
-import { isSessionArtifact, listSessionArtifacts } from "../../commands/openFile";
 import { planSessionRunPrompt } from "../../commands/copyPromptCommands";
 
 const RUN_PROMPT = "dabbler.copySessionRunPrompt";
-const ARTIFACTS = "dabblerSessionSets.openSessionArtifacts";
 
 function session(number: number, status: string, title = ""): SessionRecord {
   return { number, title, status: status as SessionStatus };
@@ -234,78 +235,12 @@ suite("Set 115 S3 — which session may be run", () => {
   });
 });
 
-suite("Set 115 S3 — which files are a session's artifacts", () => {
-  test("the convention is s<N>- and nothing looser", () => {
-    assert.ok(isSessionArtifact("s3-verification.md", 3));
-    assert.ok(isSessionArtifact("s3-issues-round-2.json", 3));
-    // The collision that a bare prefix test would miss: session 3's menu
-    // must not list session 30's evidence.
-    assert.strictEqual(isSessionArtifact("s30-verification.md", 3), false);
-    assert.strictEqual(isSessionArtifact("s3.md", 3), false);
-    assert.strictEqual(isSessionArtifact("s3-", 3), false);
-    assert.strictEqual(isSessionArtifact("spec.md", 3), false);
-    assert.strictEqual(isSessionArtifact("s2-verification.md", 3), false);
-    assert.strictEqual(isSessionArtifact("xs3-verification.md", 3), false);
-    // Case: the convention is lowercase, the filesystem is not.
-    assert.ok(isSessionArtifact("S3-Verification.md", 3));
-  });
-
-  test("a non-positive or non-integer session number matches nothing", () => {
-    assert.strictEqual(isSessionArtifact("s0-x.md", 0), false);
-    assert.strictEqual(isSessionArtifact("s3-x.md", 3.5), false);
-    assert.strictEqual(isSessionArtifact("s3-x.md", -3), false);
-  });
-
-  test("listing returns this session's files, sorted, from a real directory", () => {
-    withTmpDir((dir) => {
-      for (const name of [
-        "s3-verification.md",
-        "s3-acceptance-round-1.json",
-        "s30-verification.md",
-        "s2-issues.json",
-        "spec.md",
-        "session-state.json",
-      ]) {
-        fs.writeFileSync(path.join(dir, name), "x", "utf-8");
-      }
-      fs.mkdirSync(path.join(dir, "s3-a-directory"));
-
-      assert.deepStrictEqual(
-        listSessionArtifacts(dir, 3).map((p) => path.basename(p)),
-        ["s3-acceptance-round-1.json", "s3-verification.md"],
-      );
-      assert.deepStrictEqual(
-        listSessionArtifacts(dir, 30).map((p) => path.basename(p)),
-        ["s30-verification.md"],
-      );
-      // Absolute paths, because the caller opens them.
-      assert.ok(path.isAbsolute(listSessionArtifacts(dir, 3)[0]));
-    });
-  });
-
-  test("a session that has produced nothing yields an empty list", () => {
-    withTmpDir((dir) => {
-      fs.writeFileSync(path.join(dir, "spec.md"), "x", "utf-8");
-      assert.deepStrictEqual(listSessionArtifacts(dir, 4), []);
-    });
-  });
-
-  test("an unreadable directory degrades to empty rather than throwing", () => {
-    // The menu entry is offered unconditionally, so this path is reachable
-    // whenever a set directory is deleted while its row is on screen.
-    assert.deepStrictEqual(
-      listSessionArtifacts(path.join(os.tmpdir(), "dabbler-no-such-dir-115s3"), 1),
-      [],
-    );
-  });
-});
-
 suite("Set 115 S3 — the session row carries its own action tokens", () => {
   function tokensFor(set: SessionSet, record: SessionRecord): string {
     return sessionDescriptor({ kind: "session", set, session: record }).contextValue;
   }
 
-  test("the runnable row carries both tokens; its siblings carry only the artifact one", () => {
+  test("only the runnable row carries the run-prompt token", () => {
     const sessions = [
       session(1, "complete", "The first one"),
       session(2, "not-started", "The next one"),
@@ -315,7 +250,6 @@ suite("Set 115 S3 — the session row carries its own action tokens", () => {
 
     const next = tokensFor(set, sessions[1]);
     assert.ok(next.includes(";act-copySessionRunPrompt;"), next);
-    assert.ok(next.includes(";act-openSessionArtifacts;"), next);
 
     for (const record of [sessions[0], sessions[2]]) {
       const other = tokensFor(set, record);
@@ -323,9 +257,24 @@ suite("Set 115 S3 — the session row carries its own action tokens", () => {
         !other.includes(";act-copySessionRunPrompt;"),
         `session ${record.number} should not offer the run prompt: ${other}`,
       );
-      // Evidence is offered on every session — including one that has
-      // produced none, which answers honestly on click.
-      assert.ok(other.includes(";act-openSessionArtifacts;"), other);
+    }
+  });
+
+  test("no session row carries the removed artifact token", () => {
+    // Set 115 S4, operator ruling at the walk. Asserted as an ABSENCE
+    // across every session status because a re-added registry entry
+    // would otherwise reappear on screen with nothing failing.
+    const sessions = [
+      session(1, "complete"),
+      session(2, "in-progress"),
+      session(3, "not-started"),
+    ];
+    const set = makeSet("115-x", "in-progress", sessions);
+    for (const record of sessions) {
+      assert.ok(
+        !tokensFor(set, record).includes("act-openSessionArtifacts"),
+        `session ${record.number} still offers the removed entry`,
+      );
     }
   });
 
@@ -344,24 +293,24 @@ suite("Set 115 S3 — the session row carries its own action tokens", () => {
     const set = makeSet("115-x", "in-progress", sessions);
     assert.deepStrictEqual(
       applicableSessionActions(set, sessions[0]).map((a) => a.id),
-      [RUN_PROMPT, ARTIFACTS],
+      [RUN_PROMPT],
     );
+    // A session the phrase does not resolve to offers NOTHING now that
+    // the artifact entry is gone — an empty menu is the honest result,
+    // not a bug.
     const complete = [session(1, "complete"), session(2, "complete")];
     assert.deepStrictEqual(
       applicableSessionActions(makeSet("115-y", "complete", complete), complete[0]).map(
         (a) => a.id,
       ),
-      [ARTIFACTS],
+      [],
     );
   });
 
   test("every registered session action is one this suite pins", () => {
     // A new entry added to `SESSION_ACTIONS` without a test lands here
     // rather than in a UAT walk.
-    assert.deepStrictEqual(
-      SESSION_ACTIONS.map((a) => a.id).sort(),
-      [RUN_PROMPT, ARTIFACTS].sort(),
-    );
+    assert.deepStrictEqual(SESSION_ACTIONS.map((a) => a.id), [RUN_PROMPT]);
   });
 });
 
@@ -426,9 +375,6 @@ suite("Set 115 S3 round 1 — a corrupt ledger, through the real scan", () => {
         `a rendered row offers the run prompt on a ledger with a hole: ${value}`,
       );
     }
-    // The evidence half is unaffected: every session can still be asked
-    // what it produced.
-    assert.ok(renderedTokens(set).every((v) => v.includes(";act-openSessionArtifacts;")));
   });
 
   test("a corrupt session NUMBER is the same class and fails the same way", () => {

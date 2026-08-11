@@ -1251,4 +1251,276 @@ suite("fileSystem — readSessionSets stepLedger (Set 114 S3)", () => {
     assert.strictEqual(set.stepLedger.entries.length, 3);
     fs.rmSync(root, { recursive: true });
   });
+
+  // -------------------------------------------------------------------
+  // Set 115 S4 — the close-out obligation projection, on the scan side
+  // -------------------------------------------------------------------
+  //
+  // The reader's whole job is to answer "can this recorded answer still
+  // be trusted", so the tests are the four ways it cannot be, plus the
+  // one way it can. The CROSS-LANGUAGE half — that this reader's digest
+  // map is the same one `close_preflight.input_digests` writes — is
+  // proven in the Layer 3 spec, which drives the real Python writer over
+  // a real repository; here the writer is simulated so the failure modes
+  // can be planted cheaply.
+
+  function projection(over: Record<string, unknown> = {}): string {
+    return JSON.stringify({
+      schemaVersion: 1,
+      derived: true,
+      regenerateWith: "python -m ai_router.close_preflight ... --write",
+      generatedAt: "2026-08-11T13:42:00-04:00",
+      sessionSetDir: "live-set",
+      inputs: {},
+      volatileInputs: { git: "deadbeef" },
+      report: {
+        session_set_dir: "docs/session-sets/live-set",
+        session_number: 1,
+        verdict: "would-refuse",
+        would_close: false,
+        obligations: [
+          {
+            check: "working_tree_clean",
+            met: false,
+            blocking: true,
+            detail: "uncommitted changes",
+            action: "commit them",
+            cost_warning: "",
+            volatile: true,
+          },
+        ],
+      },
+      ...over,
+    });
+  }
+
+  /** Digest the set dir exactly as the writer would, then land the file. */
+  function landProjection(setDir: string, over: Record<string, unknown> = {}) {
+    const crypto = require("crypto") as typeof import("crypto");
+    const inputs: Record<string, string> = {};
+    for (const entry of fs.readdirSync(setDir, { withFileTypes: true })) {
+      if (!entry.isFile()) continue;
+      inputs[entry.name] = crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(path.join(setDir, entry.name)))
+        .digest("hex");
+    }
+    const dir = path.join(setDir, ".dabbler");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(
+      path.join(dir, "close-obligations.json"),
+      projection({ inputs, ...over }),
+    );
+  }
+
+  test("a fresh projection is read, with its rows and its verdict", () => {
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir);
+    const [set] = readSessionSets(root);
+    assert.ok(set.closeObligations);
+    assert.strictEqual(set.closeObligations.state, "fresh");
+    assert.strictEqual(set.closeObligations.sessionNumber, 1);
+    assert.strictEqual(set.closeObligations.verdict, "would-refuse");
+    assert.strictEqual(set.closeObligations.obligations.length, 1);
+    assert.strictEqual(set.closeObligations.obligations[0].volatile, true);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("ANY change to the set directory makes it stale", () => {
+    // The digest map is the whole directory, so an artifact nobody named
+    // — here a verification envelope — still counts. Every obligation
+    // this projection reports is derived from files like it.
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir);
+    fs.writeFileSync(path.join(setDir, "s1-issues.json"), "[]");
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.closeObligations?.state, "stale");
+    // Stale still carries its rows: the operator is told the answer is
+    // old, not left with nothing.
+    assert.strictEqual(set.closeObligations?.obligations.length, 1);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("an edited input makes it stale even when the file count is identical", () => {
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir);
+    fs.writeFileSync(path.join(setDir, "session-state.json"), STATE + "\n");
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.closeObligations?.state, "stale");
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("absent and unreadable are different answers", () => {
+    // "Nobody computed this" and "the record is damaged" are opposite
+    // facts, and collapsing either into an empty row is how a close-out
+    // list ends up implying nothing remains.
+    const { root, setDir } = stage({ activity: LOG });
+    assert.strictEqual(readSessionSets(root)[0].closeObligations?.state, "absent");
+
+    const dir = path.join(setDir, ".dabbler");
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, "close-obligations.json"), "{not json");
+    assert.strictEqual(
+      readSessionSets(root)[0].closeObligations?.state,
+      "unreadable",
+    );
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a projection from a newer schema is unreadable, never guessed at", () => {
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir, { schemaVersion: 99 });
+    const set = readSessionSets(root)[0];
+    assert.strictEqual(set.closeObligations?.state, "unreadable");
+    assert.deepStrictEqual(set.closeObligations?.obligations, []);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a row missing its fields makes the whole projection unreadable", () => {
+    // Found by an end-of-set path-aware critic. The first cut filtered
+    // malformed rows out and rendered the rest, which turns a damaged
+    // record into a shorter CONFIDENT one — and when every row is
+    // malformed, into "nothing outstanding" with a tick. Damage is
+    // damage: the operator is told to regenerate.
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir, {
+      report: {
+        session_number: 1,
+        verdict: "would-refuse",
+        obligations: [{ check: "mystery_check" }, { notACheck: true }],
+      },
+    });
+    const read = readSessionSets(root)[0].closeObligations;
+    assert.strictEqual(read?.state, "unreadable");
+    assert.deepStrictEqual(read?.obligations, []);
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a parseable row with fields missing degrades towards the safe claim", () => {
+    // The rows that ARE parseable still degrade rather than assume:
+    // unknown blocking-ness reads as blocking and unknown volatility as
+    // volatile, because both answer a missing field with the claim that
+    // costs the operator least if it is wrong.
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir, {
+      report: {
+        session_number: 1,
+        verdict: "would-refuse",
+        obligations: [{ check: "mystery_check" }],
+      },
+    });
+    const rows = readSessionSets(root)[0].closeObligations?.obligations ?? [];
+    assert.strictEqual(rows.length, 1);
+    assert.deepStrictEqual(
+      { met: rows[0].met, blocking: rows[0].blocking, volatile: rows[0].volatile },
+      { met: false, blocking: true, volatile: true },
+    );
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a report with no obligations ARRAY is unreadable, not an empty list", () => {
+    const { root, setDir } = stage({ activity: LOG });
+    landProjection(setDir, {
+      report: { session_number: 1, verdict: "would-close" },
+    });
+    assert.strictEqual(
+      readSessionSets(root)[0].closeObligations?.state,
+      "unreadable",
+    );
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a read failure that is not ENOENT is unreadable, not absent", () => {
+    // "Nobody computed this" and "this machine cannot read it" are
+    // different things to tell an operator and different things to fix.
+    // A directory standing where the file belongs is the portable way to
+    // make the read fail with something other than ENOENT.
+    const { root, setDir } = stage({ activity: LOG });
+    fs.mkdirSync(path.join(setDir, ".dabbler", "close-obligations.json"), {
+      recursive: true,
+    });
+    assert.strictEqual(
+      readSessionSets(root)[0].closeObligations?.state,
+      "unreadable",
+    );
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a symlinked artifact is digested, exactly as the Python writer does", function () {
+    // Found by both end-of-set path-aware critics. Python's
+    // `os.path.isfile` FOLLOWS a symlink to a regular file; Node's
+    // `Dirent.isFile()` reports false for it. With the first cut's
+    // dirent check, one symlinked artifact in a session set meant the
+    // writer digested a file the reader never saw, the key sets could
+    // never match, and the panel read `stale` forever with nothing the
+    // operator could do about it.
+    const { root, setDir } = stage({ activity: LOG });
+    const target = path.join(root, "linked-artifact.json");
+    fs.writeFileSync(target, '{"real": true}');
+    try {
+      fs.symlinkSync(target, path.join(setDir, "s1-linked.json"), "file");
+    } catch {
+      // Unprivileged Windows cannot create symlinks; the assertion is
+      // about parity, and there is nothing to compare when the OS
+      // refuses to make one.
+      fs.rmSync(root, { recursive: true });
+      this.skip();
+      return;
+    }
+    landProjection(setDir);
+    assert.strictEqual(readSessionSets(root)[0].closeObligations?.state, "fresh");
+    // And it is genuinely IN the digest, not merely skipped by both
+    // sides — otherwise this would pass vacuously (L-112-1).
+    fs.writeFileSync(target, '{"real": false}');
+    assert.strictEqual(readSessionSets(root)[0].closeObligations?.state, "stale");
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("the digest walker resolves through statSync, not dirent types", () => {
+    // The structural half of the symlink guard (L-112-1). The runtime
+    // test above needs the OS to create a symlink — unprivileged Windows
+    // refuses, and Layer 2 as a whole is skipped in CI, so on many
+    // machines it never executes. This one always does, and it pins the
+    // exact regression: `readdirSync(dir, { withFileTypes: true })` plus
+    // `entry.isFile()` reports FALSE for a symlink to a regular file,
+    // while the Python writer's `os.path.isfile` follows it. The two
+    // digest maps would then never match and the panel would read stale
+    // forever.
+    const source = fs.readFileSync(
+      path.join(__dirname, "..", "..", "utils", "fileSystem.ts"),
+      "utf8",
+    );
+    const walker = source.slice(
+      source.indexOf("function digestSetDirectory"),
+      source.indexOf("function projectionIsFresh"),
+    );
+    assert.ok(walker.length > 0, "digestSetDirectory moved; update this guard");
+    assert.ok(
+      walker.includes("statSync"),
+      "the digest walker must stat (and so follow symlinks) to match the writer",
+    );
+    assert.ok(
+      !walker.includes("withFileTypes"),
+      "dirent types do not follow symlinks; Python's os.path.isfile does",
+    );
+  });
+
+  test("a set that is not in flight gets no projection read at all", () => {
+    // The read costs a file plus a digest pass over the directory. Every
+    // set that cannot close pays nothing, which is the same rule the
+    // step ledger follows.
+    const closed = JSON.stringify({
+      schemaVersion: 4,
+      sessionSetName: "live-set",
+      status: "complete",
+      sessions: [
+        { number: 1, title: "Session 1", status: "complete", startedAt: "2026-08-10T00:00:00-04:00", completedAt: "2026-08-10T05:00:00-04:00", orchestrator: null, verificationVerdict: "VERIFIED" },
+        { number: 2, title: "Session 2", status: "complete", startedAt: "2026-08-10T06:00:00-04:00", completedAt: "2026-08-10T09:00:00-04:00", orchestrator: null, verificationVerdict: "VERIFIED" },
+      ],
+    });
+    const { root, setDir } = stage({ activity: LOG, state: closed });
+    landProjection(setDir);
+    assert.strictEqual(readSessionSets(root)[0].closeObligations ?? null, null);
+    fs.rmSync(root, { recursive: true });
+  });
 });

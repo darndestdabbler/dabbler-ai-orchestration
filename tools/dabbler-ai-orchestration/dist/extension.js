@@ -15578,7 +15578,6 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
 
 // src/providers/sessionStepModel.ts
 var PLAN_STEP_KIND = "plan-step";
-var TERMINAL_STATUSES = /* @__PURE__ */ new Set(["complete", "done"]);
 var STATUS_GLYPHS = {
   complete: "complete",
   done: "complete",
@@ -15630,7 +15629,6 @@ function rowFromEntry(entry, isPlanned) {
     stepKey: pyStr(entry.stepKey),
     description: pyStr(entry.description),
     status: pyStr(entry.status),
-    isHere: false,
     isPlanned
   };
 }
@@ -15674,17 +15672,6 @@ function reconcile(plan, real, allowOrdinal) {
   }
   const extra = real.filter((_entry, position) => !claims.has(position)).map((entry) => rowFromEntry(entry, false));
   return [...planRows, ...extra];
-}
-function markHere(rows) {
-  if (rows.length === 0)
-    return [];
-  const unfinished = (row) => !TERMINAL_STATUSES.has(String(row.status).toLowerCase());
-  let here = rows.findIndex((row) => !row.isPlanned && unfinished(row));
-  if (here === -1) {
-    const planned = rows.findIndex(unfinished);
-    here = planned === -1 ? rows.length - 1 : planned;
-  }
-  return rows.map((row, index) => ({ ...row, isHere: index === here }));
 }
 var SESSION_HEAD_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+(\d+))?\s*:\s*(.*)$/gm;
 var STEP_RE = /^(\s{0,3})(\d+)\.\s+\S/gm;
@@ -15762,9 +15749,9 @@ function buildStepRows(entries, sessionNumber, specSteps) {
   const plan = collapseByStepKey(mine.filter((e) => e.kind === PLAN_STEP_KIND));
   const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
   if (plan.length === 0) {
-    return markHere(real.map((entry) => rowFromEntry(entry, false)));
+    return real.map((entry) => rowFromEntry(entry, false));
   }
-  return markHere(reconcile(plan, real, planMatchesSpec(plan, specSteps)));
+  return reconcile(plan, real, planMatchesSpec(plan, specSteps));
 }
 function humanizeStepKey(stepKey) {
   const text = pyStr(stepKey).replace(/[_-]/g, " ").trim();
@@ -16258,6 +16245,127 @@ function buildStepLedger(state, currentSession, entries, specPath) {
     specSteps
   };
 }
+var CLOSE_OBLIGATIONS_REL = path4.join(
+  ".dabbler",
+  "close-obligations.json"
+);
+var CLOSE_OBLIGATIONS_SCHEMA_VERSION = 1;
+function digestSetDirectory(dir) {
+  const digests = {};
+  let names;
+  try {
+    names = fs4.readdirSync(dir);
+  } catch {
+    return digests;
+  }
+  for (const name of names) {
+    const full = path4.join(dir, name);
+    try {
+      if (!fs4.statSync(full).isFile())
+        continue;
+    } catch {
+      continue;
+    }
+    try {
+      digests[name] = crypto.createHash("sha256").update(fs4.readFileSync(full)).digest("hex");
+    } catch {
+      digests[name] = null;
+    }
+  }
+  return digests;
+}
+function projectionIsFresh(recorded, live) {
+  if (!recorded || typeof recorded !== "object" || Array.isArray(recorded)) {
+    return false;
+  }
+  const was = recorded;
+  const wasKeys = Object.keys(was);
+  const liveKeys = Object.keys(live);
+  if (wasKeys.length !== liveKeys.length)
+    return false;
+  for (const key of liveKeys) {
+    if (!(key in was))
+      return false;
+    const before = was[key] === null ? null : String(was[key]);
+    if (before !== live[key])
+      return false;
+  }
+  return true;
+}
+function narrowObligation(raw) {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw))
+    return null;
+  const row = raw;
+  if (typeof row.check !== "string" || !row.check)
+    return null;
+  return {
+    check: row.check,
+    met: row.met === true,
+    // Unknown reads as BLOCKING, and unknown volatility reads as
+    // volatile: both defaults answer a missing field with the claim that
+    // costs the operator least if it is wrong. A row that silently
+    // demoted itself to advisory is how a close-out list starts lying.
+    blocking: row.blocking !== false,
+    detail: typeof row.detail === "string" ? row.detail : "",
+    action: typeof row.action === "string" ? row.action : "",
+    cost_warning: typeof row.cost_warning === "string" ? row.cost_warning : "",
+    volatile: row.volatile !== false
+  };
+}
+function readCloseObligations(dir, state) {
+  if (state !== "in-progress")
+    return null;
+  const empty = (s) => ({
+    state: s,
+    sessionNumber: null,
+    verdict: null,
+    generatedAt: null,
+    obligations: []
+  });
+  const file = path4.join(dir, CLOSE_OBLIGATIONS_REL);
+  let raw;
+  try {
+    raw = fs4.readFileSync(file, "utf8");
+  } catch (err) {
+    const code = err?.code;
+    return empty(code === "ENOENT" ? "absent" : "unreadable");
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return empty("unreadable");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return empty("unreadable");
+  }
+  const payload = parsed;
+  const version = payload.schemaVersion;
+  if (typeof version !== "number" || version > CLOSE_OBLIGATIONS_SCHEMA_VERSION) {
+    return empty("unreadable");
+  }
+  const report = payload.report;
+  if (!report || typeof report !== "object" || Array.isArray(report)) {
+    return empty("unreadable");
+  }
+  const reportRecord = report;
+  if (!Array.isArray(reportRecord.obligations))
+    return empty("unreadable");
+  const obligations = [];
+  for (const row of reportRecord.obligations) {
+    const narrowed = narrowObligation(row);
+    if (narrowed === null)
+      return empty("unreadable");
+    obligations.push(narrowed);
+  }
+  return {
+    state: projectionIsFresh(payload.inputs, digestSetDirectory(dir)) ? "fresh" : "stale",
+    sessionNumber: typeof reportRecord.session_number === "number" ? reportRecord.session_number : null,
+    verdict: typeof reportRecord.verdict === "string" ? reportRecord.verdict : null,
+    generatedAt: typeof payload.generatedAt === "string" ? payload.generatedAt : null,
+    obligations
+  };
+}
 function readSessionSets(root) {
   const sessionSetsDir = path4.join(root, SESSION_SETS_REL);
   if (!fs4.existsSync(sessionSetsDir))
@@ -16487,7 +16595,11 @@ function readSessionSets(root) {
       // Set 114 S3: the fifth level's data. Null on every set that is not
       // in flight, and on an in-flight set whose activity log is absent,
       // unreadable, or silent about the current session.
-      stepLedger
+      stepLedger,
+      // Set 115 S4: the close-out obligations for the in-flight session.
+      // Null on every set that is not in flight; a real state (including
+      // `absent`) on the one that is.
+      closeObligations: readCloseObligations(dir, state)
     });
   }
   deriveBlockedByPrereqs(sets);
@@ -26627,45 +26739,6 @@ function specSectionTargetFor(specPath, sessionNumber) {
   }
   return locateSessionSection(text, sessionNumber) ?? void 0;
 }
-function isSessionArtifact(name, sessionNumber) {
-  if (!Number.isInteger(sessionNumber) || sessionNumber <= 0)
-    return false;
-  return new RegExp(`^s${sessionNumber}-.`, "i").test(name);
-}
-function listSessionArtifacts(dir, sessionNumber) {
-  let entries;
-  try {
-    entries = fs17.readdirSync(dir, { withFileTypes: true });
-  } catch {
-    return [];
-  }
-  return entries.filter((e) => e.isFile() && isSessionArtifact(e.name, sessionNumber)).map((e) => path22.join(dir, e.name)).sort((a, b2) => path22.basename(a).localeCompare(path22.basename(b2)));
-}
-async function openSessionArtifacts(set, sessionNumber) {
-  const artifacts = listSessionArtifacts(set.dir, sessionNumber);
-  if (artifacts.length === 0) {
-    vscode15.window.showInformationMessage(
-      `Session ${sessionNumber} of "${set.name}" has no artifacts yet \u2014 nothing matching s${sessionNumber}-* in ${path22.basename(set.dir)}.`
-    );
-    return;
-  }
-  if (artifacts.length === 1) {
-    openIfExists(artifacts[0], path22.basename(artifacts[0]));
-    return;
-  }
-  const picked = await vscode15.window.showQuickPick(
-    artifacts.map((p2) => ({
-      label: path22.basename(p2),
-      description: path22.relative(set.root, p2),
-      absolute: p2
-    })),
-    { placeHolder: `Artifacts of session ${sessionNumber} \u2014 ${set.name}` }
-  );
-  if (picked) {
-    const { absolute } = picked;
-    openIfExists(absolute, path22.basename(absolute));
-  }
-}
 async function openPrerequisiteSpec(set) {
   const unsatisfied = set.unsatisfiedPrereqs ?? [];
   if (unsatisfied.length === 0) {
@@ -26798,22 +26871,6 @@ function registerOpenFileCommands(context) {
       }
       void openPrerequisiteSpec(item.set);
     }),
-    // Set 115 S3: the session row's evidence half. Hidden from the
-    // Command Palette (`when: false` in package.json) because, unlike
-    // `openPrerequisiteSpec`, it cannot fall back to a set-level
-    // question — without a session node there is no session whose
-    // artifacts to list. `sessionNumberOf` is the SAME narrowing the
-    // spec reveal uses, so a non-session argument is a silent no-op
-    // rather than a guess at session 1.
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.openSessionArtifacts",
-      (item) => {
-        const sessionNumber = sessionNumberOf(item);
-        if (!item?.set || sessionNumber === void 0)
-          return;
-        void openSessionArtifacts(item.set, sessionNumber);
-      }
-    ),
     vscode15.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
       if (!item?.set)
         return;
@@ -29214,19 +29271,14 @@ var SESSION_ACTIONS = [
     label: "Copy Run Prompt",
     group: 601,
     when: (set, session) => sessionOffersRunPrompt(set, session)
-  },
-  // Unconditional ON PURPOSE. Knowing whether a session has artifacts
-  // means listing the set directory, and doing that per session row on the
-  // tree scan is the disk read Set 115's decision 4 forbids. The answer is
-  // computed on the click, and "none yet" is a sentence rather than a
-  // missing menu entry.
-  {
-    id: "dabblerSessionSets.openSessionArtifacts",
-    label: "Open Session Artifacts",
-    group: 602,
-    detail: "Files this session produced, discovered as s<N>-*",
-    when: () => true
   }
+  // Set 115 S4 (operator ruling at the set's UAT walk, 2026-08-11):
+  // "Open Session Artifacts" is REMOVED. S3 shipped it beside the run
+  // prompt; walking the finished row, the operator judged one entry
+  // enough — the artifacts are a folder away and the menu is worth more
+  // when it offers exactly what a session row is for. The command, its
+  // manifest entries and its discovery helpers went with it rather than
+  // being left registered and unreachable.
 ];
 
 // src/providers/inProgressSetsService.ts
@@ -29559,6 +29611,42 @@ function stepNodes(node) {
     position
   }));
 }
+function closeOutNodes(node) {
+  if (node.session.status !== "in-progress")
+    return [];
+  const obligations = node.set.closeObligations;
+  if (!obligations)
+    return [];
+  if (obligations.sessionNumber !== null && obligations.sessionNumber !== node.session.number) {
+    return [
+      {
+        kind: "closeout",
+        set: node.set,
+        session: node.session,
+        obligations: {
+          state: "absent",
+          sessionNumber: null,
+          verdict: null,
+          generatedAt: null,
+          obligations: []
+        }
+      }
+    ];
+  }
+  return [
+    { kind: "closeout", set: node.set, session: node.session, obligations }
+  ];
+}
+function obligationNodes(node) {
+  return node.obligations.obligations.map((obligation, position) => ({
+    kind: "obligation",
+    set: node.set,
+    session: node.session,
+    obligation,
+    projection: node.obligations,
+    position
+  }));
+}
 function childrenOf(node) {
   switch (node.kind) {
     case "module":
@@ -29568,8 +29656,11 @@ function childrenOf(node) {
     case "set":
       return sessionNodes(node);
     case "session":
-      return stepNodes(node);
+      return [...stepNodes(node), ...closeOutNodes(node)];
+    case "closeout":
+      return obligationNodes(node);
     case "step":
+    case "obligation":
       return [];
   }
 }
@@ -29582,9 +29673,10 @@ var NODE_TOKEN = {
   bucket: "dabblerBucket",
   set: "dabblerSet",
   session: "dabblerSession",
-  step: "dabblerStep"
+  step: "dabblerStep",
+  closeout: "dabblerCloseOut",
+  obligation: "dabblerObligation"
 };
-var HERE_MARKER = "<- here";
 var MODULE_TOKEN = {
   declared: "module-declared",
   fallback: "module-fallback",
@@ -29745,6 +29837,7 @@ function setDescriptor(set, supports) {
 function sessionDescriptor(node) {
   const { session } = node;
   const steps = stepNodes(node);
+  const closeOut = closeOutNodes(node);
   const tokens = [NODE_TOKEN.session, `session-${session.status}`];
   for (const action of SESSION_ACTIONS) {
     if (action.when(node.set, session))
@@ -29764,7 +29857,7 @@ function sessionDescriptor(node) {
     // in-flight one whose activity log is absent or unreadable — is a
     // leaf, which is the same rule an empty bucket and a ledger-less set
     // already follow.
-    collapsible: steps.length > 0 ? "collapsed" : "none"
+    collapsible: steps.length + closeOut.length > 0 ? "collapsed" : "none"
   };
 }
 function sessionTooltip(node, stepCount) {
@@ -29782,8 +29875,6 @@ function stepDescriptor(node) {
   const tooltipLines = [`**${stepRowLabel(row)}**`];
   const state = row.isPlanned ? "planned \u2014 not started" : String(row.status || "unknown").replace(/[-_]/g, " ");
   tooltipLines.push("", state);
-  if (row.isHere)
-    tooltipLines.push("", "_the session is here_");
   const description = String(row.description || "").trim();
   if (description)
     tooltipLines.push("", description);
@@ -29792,13 +29883,168 @@ function stepDescriptor(node) {
     // alongside a planned row that carries the same key.
     id: `step:${node.set.name}/${node.session.number}/${node.position}`,
     label: stepRowLabel(row),
-    description: row.isHere ? HERE_MARKER : void 0,
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[glyph] },
     contextValue: tokenString([
       NODE_TOKEN.step,
       `step-${glyph}`,
       row.isPlanned ? "step-planned" : "step-logged"
+    ]),
+    collapsible: "none"
+  };
+}
+var CLOSE_PREFLIGHT_COMMAND = "python -m ai_router.close_preflight --session-set-dir <set> --write";
+function asOfLabel(generatedAt) {
+  if (!generatedAt)
+    return "as of an unrecorded time";
+  const when = new Date(generatedAt);
+  if (Number.isNaN(when.getTime()))
+    return `as of ${generatedAt}`;
+  const hh = String(when.getHours()).padStart(2, "0");
+  const mm = String(when.getMinutes()).padStart(2, "0");
+  return `as of ${hh}:${mm}`;
+}
+function obligationCounts(projection) {
+  const unmet = projection.obligations.filter((o2) => !o2.met);
+  return {
+    blocking: unmet.filter((o2) => o2.blocking).length,
+    advisory: unmet.filter((o2) => !o2.blocking).length,
+    total: projection.obligations.length
+  };
+}
+var VERDICT_WOULD_CLOSE = "would-close";
+var VERDICT_UNDECIDED = "undecided-backstop-would-route";
+function closeOutSummary(projection) {
+  const { state } = projection;
+  if (state === "absent")
+    return "not computed";
+  if (state === "unreadable")
+    return "unreadable \u2014 regenerate";
+  const { blocking, advisory } = obligationCounts(projection);
+  const parts = [];
+  if (blocking > 0)
+    parts.push(`${blocking} blocking`);
+  if (advisory > 0)
+    parts.push(`${advisory} advisory`);
+  if (parts.length === 0) {
+    parts.push(
+      projection.verdict === VERDICT_UNDECIDED ? "not decided \u2014 the backstop would route" : "nothing outstanding"
+    );
+    parts.push(asOfLabel(projection.generatedAt));
+  }
+  const outstanding = parts.join(", ");
+  return state === "stale" ? `stale \u2014 ${outstanding}` : outstanding;
+}
+function closeOutGlyph(projection) {
+  if (projection.state === "unreadable")
+    return "cancelled";
+  if (projection.state !== "fresh")
+    return "not-started";
+  const { blocking, advisory } = obligationCounts(projection);
+  if (blocking + advisory > 0)
+    return "not-started";
+  return projection.verdict === VERDICT_WOULD_CLOSE ? "complete" : "not-started";
+}
+function closeOutTooltip(node) {
+  const p2 = node.obligations;
+  const lines = ["**Close-out obligations**"];
+  switch (p2.state) {
+    case "absent":
+      lines.push(
+        "",
+        "Nothing has been computed for this session yet. This row is not a claim that nothing remains \u2014 it is the absence of an answer.",
+        "",
+        `Run: \`${CLOSE_PREFLIGHT_COMMAND}\``
+      );
+      return lines.join("\n");
+    case "unreadable":
+      lines.push(
+        "",
+        "The recorded projection could not be read \u2014 damaged, or written by a newer schema than this extension knows.",
+        "",
+        `Regenerate: \`${CLOSE_PREFLIGHT_COMMAND}\``
+      );
+      return lines.join("\n");
+    case "stale":
+      lines.push(
+        "",
+        `**Stale** \u2014 the session-set directory has changed since this was computed (${asOfLabel(p2.generatedAt)}). Rows below were true then.`,
+        "",
+        `Regenerate: \`${CLOSE_PREFLIGHT_COMMAND}\``
+      );
+      break;
+    default:
+      lines.push("", `Computed ${asOfLabel(p2.generatedAt)}.`);
+      break;
+  }
+  const { blocking, advisory, total } = obligationCounts(p2);
+  lines.push(
+    "",
+    `${total} obligation${total === 1 ? "" : "s"} \u2014 ${blocking} blocking unmet, ${advisory} advisory unmet.`
+  );
+  if (p2.verdict) {
+    lines.push("", `close_session would report: \`${p2.verdict}\``);
+  }
+  lines.push(
+    "",
+    "_These are the same predicates `close_session` runs; nothing here refuses a close._"
+  );
+  return lines.join("\n");
+}
+function closeOutDescriptor(node) {
+  const p2 = node.obligations;
+  return {
+    id: `closeout:${node.set.name}/${node.session.number}`,
+    label: "Close-out",
+    description: closeOutSummary(p2),
+    tooltip: closeOutTooltip(node),
+    icon: { kind: "file", slug: ICON_FILES[closeOutGlyph(p2)] },
+    contextValue: tokenString([NODE_TOKEN.closeout, `closeout-${p2.state}`]),
+    collapsible: p2.obligations.length > 0 ? "collapsed" : "none"
+  };
+}
+function obligationDescriptor(node) {
+  const { obligation: o2, projection } = node;
+  const stale = projection.state !== "fresh";
+  const asOf = stale || o2.volatile;
+  const parts = [];
+  if (!o2.met)
+    parts.push(o2.blocking ? "blocking" : "advisory");
+  if (o2.cost_warning)
+    parts.push("$");
+  if (asOf)
+    parts.push(asOfLabel(projection.generatedAt));
+  const tooltip = [`**${humanizeStepKey(o2.check)}**`, "", o2.met ? "met" : "unmet"];
+  if (o2.detail)
+    tooltip.push("", o2.detail);
+  if (o2.action)
+    tooltip.push("", `\u2192 ${o2.action}`);
+  if (o2.cost_warning)
+    tooltip.push("", `$ ${o2.cost_warning}`);
+  if (o2.volatile) {
+    tooltip.push(
+      "",
+      "_Read from git, not from a file \u2014 no digest can tell whether it is still true, so this row is only ever as current as the projection's timestamp._"
+    );
+  }
+  if (stale) {
+    tooltip.push("", `_The projection is ${projection.state}; regenerate it._`);
+  }
+  return {
+    id: `obligation:${node.set.name}/${node.session.number}/${node.position}`,
+    label: humanizeStepKey(o2.check),
+    description: parts.length > 0 ? parts.join(" \xB7 ") : void 0,
+    tooltip: tooltip.join("\n"),
+    // A met row may still read as done: the parent row carries the
+    // staleness verdict for the list as a whole, and the description
+    // above repeats it per row, so the glyph is not the only thing
+    // saying how old the answer is.
+    icon: { kind: "file", slug: ICON_FILES[o2.met ? "complete" : "not-started"] },
+    contextValue: tokenString([
+      NODE_TOKEN.obligation,
+      o2.met ? "obligation-met" : "obligation-unmet",
+      o2.blocking ? "obligation-blocking" : "obligation-advisory",
+      ...o2.volatile ? ["obligation-volatile"] : []
     ]),
     collapsible: "none"
   };
@@ -29815,6 +30061,10 @@ function descriptorFor(node, supports) {
       return sessionDescriptor(node);
     case "step":
       return stepDescriptor(node);
+    case "closeout":
+      return closeOutDescriptor(node);
+    case "obligation":
+      return obligationDescriptor(node);
   }
 }
 
@@ -33862,7 +34112,7 @@ function activate(context) {
       const sessionSetsAbs = path42.join(root, SESSION_SETS_REL3);
       const pattern = new vscode42.RelativePattern(
         sessionSetsAbs,
-        "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json}"
+        "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json,close-obligations.json}"
       );
       const watcher = vscode42.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {

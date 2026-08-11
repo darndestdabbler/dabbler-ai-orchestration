@@ -322,11 +322,6 @@
         "command": "dabbler.copySessionRunPrompt",
         "title": "Copy Run Prompt",
         "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.openSessionArtifacts",
-        "title": "Open Session Artifacts",
-        "category": "Dabbler"
       }
     ],
     "menus": {
@@ -353,10 +348,6 @@
         },
         {
           "command": "dabbler.copySessionRunPrompt",
-          "when": "false"
-        },
-        {
-          "command": "dabblerSessionSets.openSessionArtifacts",
           "when": "false"
         }
       ],
@@ -467,11 +458,6 @@
           "command": "dabbler.copySessionRunPrompt",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionRunPrompt;/",
           "group": "6_session@601"
-        },
-        {
-          "command": "dabblerSessionSets.openSessionArtifacts",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openSessionArtifacts;/",
-          "group": "6_session@602"
         }
       ],
       "dabblerWorkExplorer.openFile": [

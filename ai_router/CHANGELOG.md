@@ -11,6 +11,70 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — one computed projection, and the marker goes (Set 120 S3)
 
+### Added
+
+- **(Set 115 S4) `close_preflight --write` / `--check` — the close-out
+  obligations, serialized where a renderer can read them.** The preflight
+  costs 2-7 seconds (git-backed predicates plus interpreter startup), so
+  nothing that redraws may call it. `--write` runs the report as usual —
+  same output, same exit code — and additionally serializes it to
+  `<set>/.dabbler/close-obligations.json`, which the Work Explorer renders
+  as a **Close-out** row under the in-flight session. `--check` compares
+  the file against its inputs without evaluating anything: exit `0` fresh,
+  `3` stale, absent or unreadable.
+
+  **The report is embedded verbatim.** The file carries
+  `PreflightReport.to_dict()` unchanged rather than a shape a renderer
+  might prefer, because this module has already shipped two surfaces of
+  one report that disagreed (`would_close` said `true` while the human
+  report said "NOT yet decided"), and one spelling is the fix that holds.
+
+  **The digest map is the whole session-set directory**, not a curated
+  filename list. Obligations derive from `disposition.json`,
+  `session-state.json`, `activity-log.json`, `spec.md`, `change-log.md`,
+  the run-of-record and checklist-post ledgers, and every
+  `s<N>-verification*.md` / `s<N>-issues*.json` artifact the backstop and
+  the integrity gate look for. A set that grows an artifact grows an
+  input, with nothing to remember to add (L-069-1).
+
+  **Two obligations cannot be digested at all**, and the file says so
+  rather than averaging over it. Five checks read state that lives
+  outside the session-set directory — `working_tree_clean` and
+  `pushed_to_remote` call git directly; `verification_integrity`
+  validates an evidence stamp that binds the repo-wide work diff;
+  `test_run_fresh` compares a `run_of_record` freshness digest over the
+  source files a suite covers; and the backstop reads both. Committing,
+  or editing a module anywhere in the repo, changes those answers while
+  every file in the session-set directory stays byte-identical. Those
+  rows carry `volatile: true` and the file records a git fingerprint
+  under `volatileInputs`, so `projection_state(..., include_volatile=False)`
+  is the honest answer for a reader that will not spawn git. The Work
+  Explorer uses exactly that, and labels those rows "as of" the
+  projection's timestamp.
+
+  **The classification fails safe.** `SET_LOCAL_CHECKS` names the checks
+  that are a pure function of files inside the set directory and
+  *everything else is volatile*, so a check added later is over-labelled
+  "as of" (noise) rather than silently rendered as current truth (a lie).
+  Both end-of-set path-aware critics independently found the first cut
+  the other way round: it listed the two checks that call git directly
+  and rendered the two stamp/digest-backed ones as re-checkable. Two
+  tests hold the line — an AST walk (through function-local imports,
+  which is how these predicates actually reach outside) that refuses a
+  set-local check reaching a repo-wide helper, and its falsifier proving
+  the walk can see one.
+
+  **It is never committed.** `.dabbler/` is git-ignored and the writer
+  drops a self-protecting `.gitignore` inside the directory it creates, so
+  a consumer repo is covered without editing its root ignore file. That is
+  what keeps a mid-session write out of the verification stamp's work diff
+  — structurally, rather than by adding one more filename to an exemption
+  list — and off `working_tree_clean`. The cost is that the projection is
+  per-machine: a fresh clone reads `absent`, which is a designed state.
+
+  `Obligation.volatile` also appears in `--json`. Consumers that pin the
+  exact key set of an obligation row will see one new key.
+
 ### Fixed
 
 - **(Set 115 S1) A generic `Session N` title no longer sticks.** Title
@@ -97,6 +161,13 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   derived; and because the fact is per-row, two steps may now be in
   flight at once, which a single-valued marker could not represent.
 
+  **(Set 115 S4) The TypeScript half went with it**, finishing a removal
+  that stood half-done for one set: `workExplorerTreeModel.HERE_MARKER`
+  and its render site, `sessionStepModel.markHere`, its `TERMINAL_STATUSES`
+  table and the `StepRow.isHere` field. `grep`ping both languages before
+  declaring the class closed is the rule that was skipped the first time
+  (L-069-1).
+
   **Breaking for callers that construct `ChecklistRow` positionally with
   five arguments, or read `row.is_here`.** `is_planned` is now the fifth
   field. Read what is in flight from the row's `box`
@@ -111,19 +182,22 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **(Set 120 S3) The cross-language step-row parity corpus carries one
-  declared divergence.** `ai_router/tests/fixtures/session-step-parity.json`
-  keeps its `cases` byte-identical — the extension still computes
-  `isHere` until the carve deletes that derivation wholesale (Set 120
-  standing decision 3: no extension changes here), and the corpus is the
-  only coverage that behaviour has. The Python half now compares the five
-  fields both implementations still produce and projects `isHere` out of
-  the expectation; the divergence is recorded in the corpus's `_readme`,
-  which is the one file both languages read. Two new guards keep it
-  honest: `SHARED_ROW_FIELDS` is asserted against `ChecklistRow`'s own
-  dataclass fields, so a field added to the row cannot silently stop
-  being compared, and a second test refuses a "cleanup" that strips
-  `isHere` from the corpus.
+- **(Set 120 S3, closed by Set 115 S4) The cross-language step-row parity
+  corpus's declared divergence is over.**
+  `ai_router/tests/fixtures/session-step-parity.json` kept its `cases`
+  byte-identical through Set 120 S3 — the extension still computed
+  `isHere`, that set could not touch it (standing decision 3), and the
+  corpus was the only coverage the behaviour had — so the Python half
+  compared the five shared fields and projected `isHere` out of the
+  expectation. **Set 115 S4 deleted the extension's derivation**, so the
+  field is gone from the corpus, both halves compare the same whole row
+  again, and the `_readme`'s divergence note is replaced by the history
+  of its removal. `SHARED_ROW_FIELDS` is still asserted against
+  `ChecklistRow`'s own dataclass fields; the guard that *required*
+  `isHere` in the corpus is replaced by its inverse — a test that refuses
+  any expectation field the two halves do not both compare — plus one
+  that pins a real in-progress row, which is what the icon that replaced
+  the marker is drawn from.
 
 ## [Unreleased] — the drift inventory and the scoped history migration (Set 120 S2)
 

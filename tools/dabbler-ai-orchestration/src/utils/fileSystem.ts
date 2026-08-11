@@ -9,6 +9,9 @@ import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError, normalizeToV4Shape, canonicalizeStatus } from "./progress";
 import { parseSpecSteps } from "../providers/sessionStepModel";
 import {
+  CloseObligation,
+  CloseObligations,
+  CloseObligationsState,
   DuplicateNameCollision,
   ModuleManifestEntry,
   SessionRecord,
@@ -907,6 +910,215 @@ export function buildStepLedger(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Set 115 Session 4 — the close-out obligation projection
+// ---------------------------------------------------------------------------
+
+/**
+ * Where `ai_router.close_preflight --write` puts its projection. The
+ * directory is git-ignored on purpose (see that module's header): the
+ * file is a per-machine cache written mid-session, and a tracked one
+ * would land inside the verification stamp's work diff every time it was
+ * refreshed.
+ */
+export const CLOSE_OBLIGATIONS_REL = path.join(
+  ".dabbler",
+  "close-obligations.json",
+);
+
+/**
+ * The highest projection shape this reader understands. A file claiming a
+ * newer one reads as `unreadable` rather than being guessed at — the same
+ * posture `session_projection.read_projection` takes, and the reason a
+ * schema bump on the Python side cannot make the tree render a shape it
+ * does not know.
+ */
+export const CLOSE_OBLIGATIONS_SCHEMA_VERSION = 1;
+
+/**
+ * Digest every top-level file of a session-set directory, mirroring
+ * `close_preflight.input_digests`.
+ *
+ * Byte-for-byte the same question the writer asked, so the comparison is
+ * meaningful: sha256 over raw bytes, files only (which is also what keeps
+ * the projection — one level down in `.dabbler/`) out of its own digest.
+ * A file that cannot be read records `null`, exactly as the writer does,
+ * so "unreadable then" and "unreadable now" compare equal instead of
+ * flapping the state.
+ *
+ * `statSync` rather than `Dirent.isFile()` **deliberately**, and this is
+ * not a style choice: Python's `os.path.isfile` FOLLOWS a symlink to a
+ * regular file while `Dirent.isFile()` reports `false` for it. A set
+ * holding one symlinked artifact would then be digested by the writer and
+ * skipped by this reader, the key sets would never match, and the panel
+ * would read `stale` forever with no way for the operator to fix it.
+ * Both end-of-set path-aware critics found this independently. A broken
+ * symlink throws here and is skipped, which is what `os.path.isfile`
+ * answers for it too.
+ */
+function digestSetDirectory(dir: string): Record<string, string | null> {
+  const digests: Record<string, string | null> = {};
+  let names: string[];
+  try {
+    names = fs.readdirSync(dir);
+  } catch {
+    return digests;
+  }
+  for (const name of names) {
+    const full = path.join(dir, name);
+    try {
+      if (!fs.statSync(full).isFile()) continue;
+    } catch {
+      continue;
+    }
+    try {
+      digests[name] = crypto
+        .createHash("sha256")
+        .update(fs.readFileSync(full))
+        .digest("hex");
+    } catch {
+      digests[name] = null;
+    }
+  }
+  return digests;
+}
+
+/** Content-digest comparison only. See `CloseObligations.state`. */
+function projectionIsFresh(
+  recorded: unknown,
+  live: Record<string, string | null>,
+): boolean {
+  if (!recorded || typeof recorded !== "object" || Array.isArray(recorded)) {
+    return false;
+  }
+  const was = recorded as Record<string, unknown>;
+  const wasKeys = Object.keys(was);
+  const liveKeys = Object.keys(live);
+  if (wasKeys.length !== liveKeys.length) return false;
+  for (const key of liveKeys) {
+    if (!(key in was)) return false;
+    const before = was[key] === null ? null : String(was[key]);
+    if (before !== live[key]) return false;
+  }
+  return true;
+}
+
+function narrowObligation(raw: unknown): CloseObligation | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const row = raw as Record<string, unknown>;
+  if (typeof row.check !== "string" || !row.check) return null;
+  return {
+    check: row.check,
+    met: row.met === true,
+    // Unknown reads as BLOCKING, and unknown volatility reads as
+    // volatile: both defaults answer a missing field with the claim that
+    // costs the operator least if it is wrong. A row that silently
+    // demoted itself to advisory is how a close-out list starts lying.
+    blocking: row.blocking !== false,
+    detail: typeof row.detail === "string" ? row.detail : "",
+    action: typeof row.action === "string" ? row.action : "",
+    cost_warning:
+      typeof row.cost_warning === "string" ? row.cost_warning : "",
+    volatile: row.volatile !== false,
+  };
+}
+
+/**
+ * Read the close-out obligation projection for one session set.
+ *
+ * Never computes and never spawns anything: `close_preflight` takes 2-7
+ * seconds and this runs on every watcher tick. The four states are the
+ * ones Set 120 S3 established, and the distinctions are the point —
+ * "nobody has computed this" (`absent`), "the file is damaged or from a
+ * newer schema" (`unreadable`) and "computed against inputs that have
+ * since changed" (`stale`) are three different things to tell an
+ * operator, and collapsing any of them into "nothing to show" is how a
+ * checklist ends up claiming nothing remains while something does.
+ *
+ * **Damage is `unreadable`, never an empty list.** Only a genuine
+ * `ENOENT` reads as `absent`; a permissions error, a directory in the
+ * file's place, a payload whose `report.obligations` is missing or not an
+ * array, and a single malformed row all read as `unreadable`. Filtering a
+ * bad row out and rendering the rest would turn a damaged record into a
+ * shorter, confident one — and an empty result would render "nothing
+ * outstanding", which is the exact false all-clear this feature exists to
+ * prevent (found by an end-of-set path-aware critic on the first cut,
+ * which defaulted a non-array to `[]`).
+ *
+ * Returns `null` only for a set that is not in flight — the one case
+ * where there is no close to preflight.
+ */
+export function readCloseObligations(
+  dir: string,
+  state: SessionState,
+): CloseObligations | null {
+  if (state !== "in-progress") return null;
+
+  const empty = (s: CloseObligationsState): CloseObligations => ({
+    state: s,
+    sessionNumber: null,
+    verdict: null,
+    generatedAt: null,
+    obligations: [],
+  });
+
+  const file = path.join(dir, CLOSE_OBLIGATIONS_REL);
+  let raw: string;
+  try {
+    raw = fs.readFileSync(file, "utf8");
+  } catch (err) {
+    // "Not there" is the only read failure that means nobody computed
+    // it. Anything else — a permissions error, a directory in its place,
+    // an I/O fault — is a file we cannot read, which is a different
+    // thing to tell the operator and a different thing to fix.
+    const code = (err as NodeJS.ErrnoException)?.code;
+    return empty(code === "ENOENT" ? "absent" : "unreadable");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return empty("unreadable");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return empty("unreadable");
+  }
+  const payload = parsed as Record<string, unknown>;
+  const version = payload.schemaVersion;
+  if (typeof version !== "number" || version > CLOSE_OBLIGATIONS_SCHEMA_VERSION) {
+    return empty("unreadable");
+  }
+  const report = payload.report;
+  if (!report || typeof report !== "object" || Array.isArray(report)) {
+    return empty("unreadable");
+  }
+  const reportRecord = report as Record<string, unknown>;
+  if (!Array.isArray(reportRecord.obligations)) return empty("unreadable");
+
+  const obligations: CloseObligation[] = [];
+  for (const row of reportRecord.obligations) {
+    const narrowed = narrowObligation(row);
+    if (narrowed === null) return empty("unreadable");
+    obligations.push(narrowed);
+  }
+
+  return {
+    state: projectionIsFresh(payload.inputs, digestSetDirectory(dir))
+      ? "fresh"
+      : "stale",
+    sessionNumber:
+      typeof reportRecord.session_number === "number"
+        ? reportRecord.session_number
+        : null,
+    verdict:
+      typeof reportRecord.verdict === "string" ? reportRecord.verdict : null,
+    generatedAt:
+      typeof payload.generatedAt === "string" ? payload.generatedAt : null,
+    obligations,
+  };
+}
+
 export function readSessionSets(root: string): SessionSet[] {
   const sessionSetsDir = path.join(root, SESSION_SETS_REL);
   if (!fs.existsSync(sessionSetsDir)) return [];
@@ -1392,6 +1604,10 @@ export function readSessionSets(root: string): SessionSet[] {
       // in flight, and on an in-flight set whose activity log is absent,
       // unreadable, or silent about the current session.
       stepLedger,
+      // Set 115 S4: the close-out obligations for the in-flight session.
+      // Null on every set that is not in flight; a real state (including
+      // `absent`) on the one that is.
+      closeObligations: readCloseObligations(dir, state),
     });
   }
 

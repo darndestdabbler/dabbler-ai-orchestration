@@ -250,11 +250,17 @@ Sign-up links and a full prerequisites checklist live in the
   `### Session N of M:` block**, so you land on the plan you asked for
   with the surrounding context still a scroll away. Right-click offers
   **Copy Run Prompt** — on the one session the trigger phrase actually
-  runs, so a prompt copied from a row always starts that row's
-  session — and **Open Session Artifacts**, which lists the files that
-  session produced (discovered by the `s<N>-*` convention, so new
-  artifact shapes appear without an extension update) and says so
-  plainly when there are none yet.
+  runs, so a prompt copied from a row always starts that row's session.
+- **The in-flight session shows what still stands between it and close.**
+  Expand it and, under its steps, a **Close-out** row summarises the
+  obligations `close_session` will check (`1 blocking, 3 advisory`, or
+  `nothing outstanding`) and expands to one row each, with the
+  predicate's own remediation on hover. The panel reads a file rather
+  than computing anything: run
+  `python -m ai_router.close_preflight --session-set-dir <set> --write`
+  and the row follows. It says how old its answer is — `not computed`,
+  `stale`, or `as of HH:MM` on the rows that read git — and only ever
+  reads as done when the recorded verdict says the close would proceed.
 - **Copyable prompts for a second opinion.** The clipboard prompts above
   reference your session-set artifacts by path rather than embedding
   their contents. Paste into any path-aware AI chat

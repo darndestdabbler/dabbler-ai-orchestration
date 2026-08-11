@@ -234,6 +234,67 @@ export interface SessionStepEntry {
   kind?: string;
 }
 
+/**
+ * Set 115 Session 4 — one close-out obligation, exactly as
+ * `ai_router.close_preflight` recorded it. The snake_case keys are the
+ * Python report's own: the projection embeds `PreflightReport.to_dict()`
+ * verbatim so the CLI's `--json` and the file the tree reads cannot
+ * disagree, and re-spelling them here would reintroduce the divergence
+ * that embedding avoids.
+ */
+export interface CloseObligation {
+  check: string;
+  met: boolean;
+  blocking: boolean;
+  detail: string;
+  action: string;
+  cost_warning: string;
+  /**
+   * True when the obligation's predicate reads git rather than files, so
+   * NO content digest can tell whether it is still true — committing
+   * changes no byte this projection hashed. The tree renders these rows
+   * "as of" the projection's timestamp rather than as current truth.
+   */
+  volatile: boolean;
+}
+
+/**
+ * How a serialized projection stands against the inputs it derived from.
+ * The vocabulary is `ai_router.session_projection`'s, unchanged: one
+ * framework, one answer to "is this file still true".
+ */
+export type CloseObligationsState =
+  | "fresh"
+  | "stale"
+  | "absent"
+  | "unreadable";
+
+/**
+ * Set 115 Session 4 — the in-flight session's close-out obligations, read
+ * from `.dabbler/close-obligations.json` at scan time.
+ *
+ * The projection is READ, never computed here: `close_preflight` costs
+ * 2-7 seconds (git-backed predicates plus interpreter startup) and this
+ * runs on every watcher tick and 30-second poll.
+ *
+ * `state` is computed by re-digesting the set directory and comparing
+ * against what the file recorded — the CONTENT half of the freshness
+ * question only. The git half is deliberately not checked (that would be
+ * a subprocess on a redraw path); the rows that depend on it carry
+ * `volatile` and are labelled instead.
+ */
+export interface CloseObligations {
+  state: CloseObligationsState;
+  /** The session the recorded report is about; null when it never resolved. */
+  sessionNumber: number | null;
+  /** `would-close` / `would-refuse` / `undecided-backstop-would-route`. */
+  verdict: string | null;
+  /** ISO timestamp the projection was computed at, for the "as of" label. */
+  generatedAt: string | null;
+  /** Empty whenever the state is `absent` or `unreadable`. */
+  obligations: CloseObligation[];
+}
+
 export interface SessionSet {
   name: string;
   // Set 087 Session 1: the VALIDATED module attribution — the spec's
@@ -363,6 +424,20 @@ export interface SessionSet {
   // degradation an absent or unreadable activity log must produce: no
   // children, never a stale or invented list.
   stepLedger?: SessionStepLedger | null;
+  // Set 115 Session 4: the in-flight session's close-out obligations, read
+  // from the set's git-ignored `.dabbler/close-obligations.json`.
+  //
+  // Same shape of contract as `stepLedger` above — populated ONLY for a
+  // set whose state is `in-progress`, so every other set pays nothing —
+  // but the cost here is a genuinely new read (the projection plus a
+  // digest pass over the set directory), which is why it is gated on the
+  // one set at most that can use it.
+  //
+  // `undefined` / `null` means the tree shows no close-out row at all.
+  // An ABSENT projection is not that: it is a real state the operator is
+  // told about, because "nobody has computed this yet" and "there is
+  // nothing to compute" are opposite facts.
+  closeObligations?: CloseObligations | null;
   // Set 087 Session 1: the fail-loud duplicate-set-name flag, set by
   // `readAllSessionSetsWithDiagnostics` on the ONE merged row shown for
   // a collided name. Undefined everywhere else (and always on the

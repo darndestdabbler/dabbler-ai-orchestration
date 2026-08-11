@@ -121,3 +121,42 @@ are the kind that a reviewer cannot reconstruct from the diff:
   its verification rounds protecting.
 
 **What routing bought.** _(recorded at close)_
+
+---
+
+## Session 4 - The checklist tells the truth about what remains
+
+**Orchestrator:** github-copilot / anthropic / claude-opus-5, effort high.
+
+**Why this session sat where it did.** Four of its five steps are
+implementation and architecture on surfaces this set and Set 120 have
+been building all week: a new CLI mode on `close_preflight`, a sixth
+tree level, and the second half of a bug-class removal whose first half
+Set 120 S3 authored. The temporary verification-only policy window
+assigns implementation, architecture and test authoring to the active
+orchestrator. Only `session-verification` is routed, on a different
+effective provider.
+
+Four decisions were journaled before any code was written, and three of
+them are the kind a reviewer cannot reconstruct from the diff:
+
+- **The projection is an ignored cache, not a tracked record.** Written
+  mid-session by definition — which is *after* a verification round is
+  stamped, every time — so a tracked file in the set directory would
+  stale its own round and buy a metered backstop round at close, the
+  failure Sets 111 S2, 112 S3 and 114 S1 each paid for. Putting it under
+  the already-ignored `.dabbler/` makes the exemption structural rather
+  than one more filename in a list.
+- **Freshness is two questions, not one.** Two of the fourteen
+  obligations read git, and committing changes no byte any content digest
+  covers. A single freshness verdict would have to pick a lie: badge
+  itself stale on every unrelated commit, or badge itself fresh while
+  telling the operator to commit work they already committed.
+- **The marker removal is the whole derivation, not the two lines the
+  spec names.** The spec's letter named `HERE_MARKER` and its render
+  site; its stated goal was L-069-1, in the same step. Deleting only the
+  named sites would have left `markHere` computing a field nothing
+  renders, still pinned by a corpus and by two Python guards protecting
+  nothing.
+
+**What routing bought.** _(recorded at close)_

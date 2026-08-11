@@ -33,6 +33,8 @@
 //      `workExplorerMenuParity.test.ts`, not by memory.
 
 import {
+  CloseObligation,
+  CloseObligations,
   SessionRecord,
   SessionSet,
   SessionState,
@@ -62,6 +64,7 @@ import {
   StepRow,
   buildStepRows,
   glyphStatusOf,
+  humanizeStepKey,
   stepRowLabel,
 } from "./sessionStepModel";
 
@@ -87,7 +90,9 @@ export type WorkExplorerNode =
   | BucketNode
   | SetNode
   | SessionNode
-  | StepNode;
+  | StepNode
+  | CloseOutNode
+  | ObligationNode;
 
 export interface ModuleNode {
   readonly kind: "module";
@@ -137,6 +142,38 @@ export interface StepNode {
   readonly set: SessionSet;
   readonly session: SessionRecord;
   readonly row: StepRow;
+  readonly position: number;
+}
+
+/**
+ * Set 115 Session 4 — the close-out group row under an in-flight session.
+ *
+ * ONE row, not fourteen. The obligations are what a close actually fails
+ * on (122 of 295 sessions failed at least once, mean 1.6 attempts), and
+ * the operator watches the expanded session while work is in flight — so
+ * the summary belongs where they are already looking and the detail
+ * belongs one twisty further in. It is also the only sensible home for
+ * the projection's own state: `stale` is a fact about the whole recorded
+ * answer, not about any single row.
+ */
+export interface CloseOutNode {
+  readonly kind: "closeout";
+  readonly set: SessionSet;
+  readonly session: SessionRecord;
+  readonly obligations: CloseObligations;
+}
+
+/**
+ * One recorded close-out obligation. `position` disambiguates the row id
+ * for the same reason `StepNode.position` does.
+ */
+export interface ObligationNode {
+  readonly kind: "obligation";
+  readonly set: SessionSet;
+  readonly session: SessionRecord;
+  readonly obligation: CloseObligation;
+  /** Carried so a row can label itself "as of" when the answer is old. */
+  readonly projection: CloseObligations;
   readonly position: number;
 }
 
@@ -250,6 +287,61 @@ export function stepNodes(node: SessionNode): StepNode[] {
   }));
 }
 
+/**
+ * The close-out group row (Set 115 S4) — at most one, under the in-flight
+ * session and after its steps.
+ *
+ * Present whenever the session is in flight, INCLUDING when no projection
+ * has been written: "nobody has computed this yet" is a state the operator
+ * is told about, with the command to fix it in the tooltip, because the
+ * alternative is a feature that is invisible until it happens to be
+ * populated. Every other session gets nothing — a closed session's
+ * obligations are answered by the fact that it closed.
+ */
+export function closeOutNodes(node: SessionNode): CloseOutNode[] {
+  if (node.session.status !== "in-progress") return [];
+  const obligations = node.set.closeObligations;
+  if (!obligations) return [];
+  // A projection about a DIFFERENT session says nothing about this one.
+  // Rendering it here would attach one session's obligations to another's
+  // row, which is worse than showing nothing: it is showing something
+  // false. It reads as `absent` because that is what it is for this row.
+  if (
+    obligations.sessionNumber !== null &&
+    obligations.sessionNumber !== node.session.number
+  ) {
+    return [
+      {
+        kind: "closeout",
+        set: node.set,
+        session: node.session,
+        obligations: {
+          state: "absent",
+          sessionNumber: null,
+          verdict: null,
+          generatedAt: null,
+          obligations: [],
+        },
+      },
+    ];
+  }
+  return [
+    { kind: "closeout", set: node.set, session: node.session, obligations },
+  ];
+}
+
+/** The obligation rows, in the order the preflight reported them. */
+export function obligationNodes(node: CloseOutNode): ObligationNode[] {
+  return node.obligations.obligations.map((obligation, position) => ({
+    kind: "obligation",
+    set: node.set,
+    session: node.session,
+    obligation,
+    projection: node.obligations,
+    position,
+  }));
+}
+
 export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
   switch (node.kind) {
     case "module":
@@ -259,8 +351,11 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
     case "set":
       return sessionNodes(node);
     case "session":
-      return stepNodes(node);
+      return [...stepNodes(node), ...closeOutNodes(node)];
+    case "closeout":
+      return obligationNodes(node);
     case "step":
+    case "obligation":
       return [];
   }
 }
@@ -348,14 +443,22 @@ export const NODE_TOKEN = {
   set: "dabblerSet",
   session: "dabblerSession",
   step: "dabblerStep",
+  closeout: "dabblerCloseOut",
+  obligation: "dabblerObligation",
 } as const;
 
 /**
- * The current-step marker, in the vocabulary
- * `python -m ai_router.session_checklist` already prints. Shared so the
- * panel and the terminal cannot name the same signal two ways.
+ * Set 115 S4: the `<- here` marker is GONE, in both languages.
+ *
+ * `session_checklist.HERE_MARKER`, its rendering and `_mark_here` went in
+ * Set 120 S3 under an operator ruling; this file's mirror went with the
+ * derivation it mirrored (`markHere`, `isHere`) in the same pass that
+ * removed the marker's last rendering site. What the operator reads
+ * instead is the in-progress GLYPH on the step whose recorded status is
+ * `in-progress` — a fact the ledger carries since Set 120 S1 made the
+ * writer strict, rather than an inference that pointed confidently at
+ * step 1 of Set 119 S2 when the data was bad.
  */
-export const HERE_MARKER = "<- here";
 
 /** Module-row capability tokens. */
 export const MODULE_TOKEN = {
@@ -608,6 +711,10 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
   // alternative — reporting Collapsed unconditionally — is the dead
   // twisty the bucket and set rows both refuse.
   const steps = stepNodes(node);
+  // Set 115 S4: the close-out row is the other thing that can live under
+  // a session, so it counts towards the same question. A session with no
+  // steps but a close-out projection is still expandable.
+  const closeOut = closeOutNodes(node);
   const tokens: string[] = [NODE_TOKEN.session, `session-${session.status}`];
   for (const action of SESSION_ACTIONS) {
     if (action.when(node.set, session)) tokens.push(actionToken(action));
@@ -626,7 +733,7 @@ export function sessionDescriptor(node: SessionNode): RowDescriptor {
     // in-flight one whose activity log is absent or unreadable — is a
     // leaf, which is the same rule an empty bucket and a ledger-less set
     // already follow.
-    collapsible: steps.length > 0 ? "collapsed" : "none",
+    collapsible: steps.length + closeOut.length > 0 ? "collapsed" : "none",
   };
 }
 
@@ -649,11 +756,13 @@ function sessionTooltip(node: SessionNode, stepCount: number): string {
  * text is in the tooltip. This is the same trade
  * `session_checklist._summarize` makes for the terminal.
  *
- * The DESCRIPTION slot carries the current-step marker and nothing else.
- * `<- here` is the vocabulary the CLI already uses for this exact signal,
- * so the two surfaces name the same thing the same way; and keeping every
- * other row's description empty is what makes the marked one findable at a
- * glance, which is the whole point of the surface.
+ * The DESCRIPTION slot is empty on every step row. It carried the
+ * `<- here` marker until Set 115 S4; the operator ruled the marker out
+ * (Set 120 S3) and what replaces it is the ICON: the step whose recorded
+ * status is `in-progress` gets the in-progress glyph, which is a fact the
+ * ledger states rather than a row the renderer picked. Two steps can be
+ * in flight at once, which a single-valued marker could not represent,
+ * and zero can — a real answer the marker had to fake.
  *
  * The ICON is the same authored lifecycle glyph the session and set rows
  * use, mapped from the step's status by `glyphStatusOf` — "the same status
@@ -668,7 +777,6 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
     ? "planned — not started"
     : String(row.status || "unknown").replace(/[-_]/g, " ");
   tooltipLines.push("", state);
-  if (row.isHere) tooltipLines.push("", "_the session is here_");
   const description = String(row.description || "").trim();
   if (description) tooltipLines.push("", description);
 
@@ -677,13 +785,254 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
     // alongside a planned row that carries the same key.
     id: `step:${node.set.name}/${node.session.number}/${node.position}`,
     label: stepRowLabel(row),
-    description: row.isHere ? HERE_MARKER : undefined,
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[glyph] },
     contextValue: tokenString([
       NODE_TOKEN.step,
       `step-${glyph}`,
       row.isPlanned ? "step-planned" : "step-logged",
+    ]),
+    collapsible: "none",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The close-out obligations (Set 115 S4)
+// ---------------------------------------------------------------------------
+
+/**
+ * The command that produces (or refreshes) the projection. Named in every
+ * tooltip that reports a state other than `fresh`, because a surface that
+ * says "stale" without saying how to fix it is a complaint, not a tool.
+ */
+export const CLOSE_PREFLIGHT_COMMAND =
+  "python -m ai_router.close_preflight --session-set-dir <set> --write";
+
+/** Local clock time, for the "as of" qualifier. Falls back to the raw
+ * string when the recorded timestamp is not parseable — showing what was
+ * written beats showing "Invalid Date". */
+export function asOfLabel(generatedAt: string | null): string {
+  if (!generatedAt) return "as of an unrecorded time";
+  const when = new Date(generatedAt);
+  if (Number.isNaN(when.getTime())) return `as of ${generatedAt}`;
+  const hh = String(when.getHours()).padStart(2, "0");
+  const mm = String(when.getMinutes()).padStart(2, "0");
+  return `as of ${hh}:${mm}`;
+}
+
+/** Unmet rows, split the way the close splits them. */
+export function obligationCounts(projection: CloseObligations): {
+  blocking: number;
+  advisory: number;
+  total: number;
+} {
+  const unmet = projection.obligations.filter((o) => !o.met);
+  return {
+    blocking: unmet.filter((o) => o.blocking).length,
+    advisory: unmet.filter((o) => !o.blocking).length,
+    total: projection.obligations.length,
+  };
+}
+
+/**
+ * The verdict `close_preflight` recorded, when it is one this renderer
+ * knows. `would-close` is the ONLY one that means the close is settled:
+ * `undecided-backstop-would-route` means every hand-fixable row is done
+ * and the close is decided by a routed round that has not happened yet.
+ * Collapsing that into an all-clear is the same overclaim the Python
+ * report's tri-state `would_close` exists to avoid.
+ */
+export const VERDICT_WOULD_CLOSE = "would-close";
+export const VERDICT_UNDECIDED = "undecided-backstop-would-route";
+
+/**
+ * The group row's one line of text.
+ *
+ * A state other than `fresh` is said FIRST and is never omitted, because
+ * the counts behind it are a claim about a moment that has passed. The
+ * spec's rule is exact: a stale projection renders as stale, never as
+ * truth — an obligation list that silently lags says "nothing remains"
+ * when something does.
+ *
+ * An all-clear is always DATED and never unqualified. Two of the rows
+ * behind it read git, which no digest here can re-check (`volatile`), and
+ * a recorded verdict of `undecided` means the close turns on a routed
+ * round that has not run — so "nothing outstanding" alone would be an
+ * all-clear the projection cannot support.
+ */
+export function closeOutSummary(projection: CloseObligations): string {
+  const { state } = projection;
+  if (state === "absent") return "not computed";
+  if (state === "unreadable") return "unreadable — regenerate";
+  const { blocking, advisory } = obligationCounts(projection);
+  const parts: string[] = [];
+  if (blocking > 0) parts.push(`${blocking} blocking`);
+  if (advisory > 0) parts.push(`${advisory} advisory`);
+  if (parts.length === 0) {
+    parts.push(
+      projection.verdict === VERDICT_UNDECIDED
+        ? "not decided — the backstop would route"
+        : "nothing outstanding",
+    );
+    // Dated, because everything recorded is met and two of those answers
+    // came from git: this is exactly the case where an undated row would
+    // be read as "go ahead and close".
+    parts.push(asOfLabel(projection.generatedAt));
+  }
+  const outstanding = parts.join(", ");
+  return state === "stale" ? `stale — ${outstanding}` : outstanding;
+}
+
+/**
+ * The group row's glyph, which may only read as DONE when the projection
+ * is fresh, nothing at all is outstanding, **and** the recorded verdict
+ * says the close would actually proceed.
+ *
+ * That last condition is the one an end-of-set critic caught missing: a
+ * report whose rows are all met but whose verdict is
+ * `undecided-backstop-would-route` describes a close that is not settled,
+ * and painting the tick there tells an operator they are done when a
+ * routed round still stands between them and closing.
+ *
+ * `unreadable` takes the cancelled glyph rather than the not-started one
+ * on purpose: it is a data-quality fault, and the Python renderer's `[?]`
+ * posture is to surface those rather than conceal them
+ * (`step-ledger-findings.md` §4 records the tree doing the opposite for
+ * step statuses, and this row does not repeat it).
+ */
+export function closeOutGlyph(projection: CloseObligations): SessionStatus {
+  if (projection.state === "unreadable") return "cancelled";
+  if (projection.state !== "fresh") return "not-started";
+  const { blocking, advisory } = obligationCounts(projection);
+  if (blocking + advisory > 0) return "not-started";
+  return projection.verdict === VERDICT_WOULD_CLOSE
+    ? "complete"
+    : "not-started";
+}
+
+function closeOutTooltip(node: CloseOutNode): string {
+  const p = node.obligations;
+  const lines = ["**Close-out obligations**"];
+  switch (p.state) {
+    case "absent":
+      lines.push(
+        "",
+        "Nothing has been computed for this session yet. This row is not a "
+          + "claim that nothing remains — it is the absence of an answer.",
+        "",
+        `Run: \`${CLOSE_PREFLIGHT_COMMAND}\``,
+      );
+      return lines.join("\n");
+    case "unreadable":
+      lines.push(
+        "",
+        "The recorded projection could not be read — damaged, or written by "
+          + "a newer schema than this extension knows.",
+        "",
+        `Regenerate: \`${CLOSE_PREFLIGHT_COMMAND}\``,
+      );
+      return lines.join("\n");
+    case "stale":
+      lines.push(
+        "",
+        `**Stale** — the session-set directory has changed since this was `
+          + `computed (${asOfLabel(p.generatedAt)}). Rows below were true then.`,
+        "",
+        `Regenerate: \`${CLOSE_PREFLIGHT_COMMAND}\``,
+      );
+      break;
+    default:
+      lines.push("", `Computed ${asOfLabel(p.generatedAt)}.`);
+      break;
+  }
+  const { blocking, advisory, total } = obligationCounts(p);
+  lines.push(
+    "",
+    `${total} obligation${total === 1 ? "" : "s"} — ${blocking} blocking `
+      + `unmet, ${advisory} advisory unmet.`,
+  );
+  if (p.verdict) {
+    lines.push("", `close_session would report: \`${p.verdict}\``);
+  }
+  lines.push(
+    "",
+    "_These are the same predicates `close_session` runs; nothing here "
+      + "refuses a close._",
+  );
+  return lines.join("\n");
+}
+
+/**
+ * The close-out group row.
+ *
+ * A LEAF when there is nothing under it — an absent or unreadable
+ * projection has no obligation rows, and a twisty that opens onto nothing
+ * is the dead affordance every other level in this tree refuses.
+ */
+export function closeOutDescriptor(node: CloseOutNode): RowDescriptor {
+  const p = node.obligations;
+  return {
+    id: `closeout:${node.set.name}/${node.session.number}`,
+    label: "Close-out",
+    description: closeOutSummary(p),
+    tooltip: closeOutTooltip(node),
+    icon: { kind: "file", slug: ICON_FILES[closeOutGlyph(p)] },
+    contextValue: tokenString([NODE_TOKEN.closeout, `closeout-${p.state}`]),
+    collapsible: p.obligations.length > 0 ? "collapsed" : "none",
+  };
+}
+
+/**
+ * One obligation row.
+ *
+ * The description carries an "as of" qualifier whenever the row's answer
+ * cannot be shown to be current — either because the projection as a
+ * whole is not fresh, or because this particular predicate reads git and
+ * NO content digest can speak for it (`volatile`). One rule, two reasons,
+ * the same four words: what the operator needs to know in both cases is
+ * that this was true at a moment, not that it is true now.
+ */
+export function obligationDescriptor(node: ObligationNode): RowDescriptor {
+  const { obligation: o, projection } = node;
+  const stale = projection.state !== "fresh";
+  const asOf = stale || o.volatile;
+
+  const parts: string[] = [];
+  if (!o.met) parts.push(o.blocking ? "blocking" : "advisory");
+  if (o.cost_warning) parts.push("$");
+  if (asOf) parts.push(asOfLabel(projection.generatedAt));
+
+  const tooltip = [`**${humanizeStepKey(o.check)}**`, "", o.met ? "met" : "unmet"];
+  if (o.detail) tooltip.push("", o.detail);
+  if (o.action) tooltip.push("", `→ ${o.action}`);
+  if (o.cost_warning) tooltip.push("", `$ ${o.cost_warning}`);
+  if (o.volatile) {
+    tooltip.push(
+      "",
+      "_Read from git, not from a file — no digest can tell whether it is "
+        + "still true, so this row is only ever as current as the "
+        + "projection's timestamp._",
+    );
+  }
+  if (stale) {
+    tooltip.push("", `_The projection is ${projection.state}; regenerate it._`);
+  }
+
+  return {
+    id: `obligation:${node.set.name}/${node.session.number}/${node.position}`,
+    label: humanizeStepKey(o.check),
+    description: parts.length > 0 ? parts.join(" · ") : undefined,
+    tooltip: tooltip.join("\n"),
+    // A met row may still read as done: the parent row carries the
+    // staleness verdict for the list as a whole, and the description
+    // above repeats it per row, so the glyph is not the only thing
+    // saying how old the answer is.
+    icon: { kind: "file", slug: ICON_FILES[o.met ? "complete" : "not-started"] },
+    contextValue: tokenString([
+      NODE_TOKEN.obligation,
+      o.met ? "obligation-met" : "obligation-unmet",
+      o.blocking ? "obligation-blocking" : "obligation-advisory",
+      ...(o.volatile ? ["obligation-volatile"] : []),
     ]),
     collapsible: "none",
   };
@@ -704,5 +1053,9 @@ export function descriptorFor(
       return sessionDescriptor(node);
     case "step":
       return stepDescriptor(node);
+    case "closeout":
+      return closeOutDescriptor(node);
+    case "obligation":
+      return obligationDescriptor(node);
   }
 }

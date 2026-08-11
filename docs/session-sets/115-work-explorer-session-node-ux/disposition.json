@@ -1,42 +1,57 @@
 {
   "status": "completed",
-  "summary": "The Work Explorer's session rows gained a context menu, and both entries reach it through the vocabulary the parity test already guards rather than through hand-written `when` clauses. `SESSION_ACTIONS` is a second registry beside `ROW_ACTIONS` — separate because a session action's `when` reads the SESSION and all twelve existing entries read only the set, so widening `RowAction.when` would have made every set action's signature lie about what it reads — but it mints tokens through the same `actionToken`, lands in the same `viewItem =~ /;act-...;/` menus, and is held to the same forward and backward parity assertions. **Copy Run Prompt** copies the framework's documented trigger phrase verbatim from the existing `buildStartNextSessionPrompt`, and appears on exactly ONE row per set: the session that phrase actually resolves to. That is narrower than the step's literal 'gate on status' reading, and deliberately so — the phrase is set-scoped, so an entry on session 4 while session 3 is next would start a different session than the row it was copied from. The gate borrows `planLeftClickActivation` for its set-level half (the two surfaces cannot drift on what a runnable set is) and adds `nextRunnableSessionNumber`. **Open Session Artifacts** discovers files by convention (`^s<N>-`, case-insensitive, files only, sorted) so `s3-` cannot swallow `s30-`'s evidence and a new artifact shape needs no code change; one match opens directly, several open a QuickPick, none produces a message naming the session, the set and the convention. The entry is unconditional and the folder is read on the CLICK, never on the tree scan — hiding it would have cost a readdir per session row on the path Set 115's decision 4 protects. The Set 110 S2 ruling that no menu entry targets a session row was written so a future addition would be a decision rather than a leak; this session is that decision, and the assertion was NARROWED to bucket and step rows rather than deleted. Round 1 found a real Major I had asserted against and did not have: my fail-closed rule on an unrecognised session status was UNREACHABLE, because `normalizeLedgerSessions` drops an unreadable entry instead of passing it through, leaving a hole in the numbering that my walk stepped straight over and nominating the wrong session. The fix fails closed on a number gap as well, which is strictly wider than the unknown-status flag the finding proposed — it also catches the sibling drop paths (a non-integer, numeric-string or non-positive `number`) that produce an identical hole. Verification: discovery ISSUES_FOUND (1 Major), supplementary clean, remediation-review VERIFIED with the fix accepted and zero findings.",
+  "summary": "Session 4 shipped the close-out obligations as a serialized projection and finished the `<- here` removal in TypeScript. `close_preflight --write` runs the report exactly as before (same stdout, same exit code) and additionally serializes `PreflightReport.to_dict()` VERBATIM to `<set>/.dabbler/close-obligations.json`, with a SHA-256 per top-level file of the session-set directory and a git fingerprint beside it; `--check` compares without evaluating (exit 0 fresh, 3 otherwise). The Work Explorer reads that file and renders a Close-out row under the in-flight session, expanding to one row per obligation. The preflight costs 2-7 seconds, so the renderer never calls it -- the file is the whole interface, which is the pattern Set 120 S3 established. Four decisions were journaled before any code: the projection is an ignored per-machine cache under the already-ignored `.dabbler/` (a tracked file written mid-session would stale its own verification round and buy a metered backstop round at close -- the failure Sets 111 S2, 112 S3 and 114 S1 each paid for); freshness is TWO questions, because no content digest can speak for a predicate that reads git; the obligations are one grouped row rather than fourteen flat ones; and the marker removal is the whole derivation rather than the two sites the spec names. The marker half deleted `HERE_MARKER` and its render site, `markHere`, `TERMINAL_STATUSES` and `StepRow.isHere`, stripped `isHere` from the shared parity corpus, and replaced the two Python guards Set 120 S3 left behind to hold that field alive -- so both halves compare the same whole row again and the corpus's declared divergence is over. What an operator reads instead is the in-progress glyph on the step whose RECORDED status is in-progress. The end-of-set multi-provider path-aware critique (gpt-5.6-sol + gemini-3.1-pro, each reading the repo) returned five Major findings and every one was real: the volatility rule was derived from a source-text scan for a direct `_run_git` call and so missed `verification_integrity` (an evidence stamp binding the repo-wide work diff) and `test_run_fresh` (a run-of-record digest over covered source) -- fixed by INVERTING the default so `SET_LOCAL_CHECKS` names the set-local checks and everything else is volatile, guarded by an AST walk that follows function-local imports; a damaged payload degraded into a short confident list -- now any structural damage reads `unreadable` and only ENOENT reads `absent`; the group row could paint the done glyph on an `undecided-backstop-would-route` verdict -- now done requires fresh AND nothing outstanding AND a settled verdict; the file watcher did not cover the projection, so the row would not move after the very command the UAT walk prescribes; and the reader's dirent check diverged from the writer's `os.path.isfile` on symlinks, which would have pinned the panel at stale forever. At the UAT walk the operator ruled `Open Session Artifacts` out of the session menu; it was removed WHOLESALE (command, manifest entries, registry entry, discovery helpers, its Layer 2 suite and its two Layer 3 scenarios) because the command was palette-hidden by design and the menu was its only door -- replaced by absence assertions at both layers. That removal made an empty context menu reachable for the first time, which the full Layer 3 run caught as a real defect in `rowContextMenuText`; the helper now treats 'no menu' as an answer and the spec asserts the menu is empty rather than merely lacking two labels. Verification: discovery ISSUES_FOUND (1 Major -- Playwright-scoped changes after the last recorded full run), supplementary clean, remediation-review round 3 ISSUES_FOUND (1 Major -- the same class one suite over: mocha run but not recorded), remediation-review round 4 VERIFIED with both fixes accepted and zero findings. Both blocking findings were the gap between running a suite and recording it, and neither was a defect in shipped code.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts",
-    "tools/dabbler-ai-orchestration/src/providers/rowMenuHelpers.ts",
-    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
-    "tools/dabbler-ai-orchestration/src/commands/openFile.ts",
-    "tools/dabbler-ai-orchestration/src/commands/copyPromptCommands.ts",
+    "ai_router/close_preflight.py",
+    "ai_router/tests/test_close_preflight.py",
+    "ai_router/tests/test_step_row_parity.py",
+    "ai_router/tests/fixtures/session-step-parity.json",
+    "ai_router/tests/e2e/harness_cli.py",
+    "ai_router/docs/close-out.md",
+    "ai_router/CHANGELOG.md",
+    "docs/ai-led-session-workflow.md",
+    "docs/proposals/2026-08-10-smaller-framework-target-state.md",
+    "tools/dabbler-ai-orchestration/src/types.ts",
+    "tools/dabbler-ai-orchestration/src/extension.ts",
     "tools/dabbler-ai-orchestration/src/utils/fileSystem.ts",
+    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/ActionRegistry.ts",
+    "tools/dabbler-ai-orchestration/src/commands/openFile.ts",
     "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/CHANGELOG.md",
     "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/src/test/suite/fileSystem.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionStepModel.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/sessionRowActions.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/watcherInventory.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
     "tools/dabbler-ai-orchestration/src/test/playwright/session-menu.spec.ts",
+    "docs/session-sets/115-work-explorer-session-node-ux/change-log.md",
     "docs/session-sets/115-work-explorer-session-node-ux/ai-assignment.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/s3-verification-conventions.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/s3-remediation-round-1.md",
-    "docs/session-sets/115-work-explorer-session-node-ux/decisions.jsonl"
+    "docs/session-sets/115-work-explorer-session-node-ux/decisions.jsonl",
+    "docs/session-sets/115-work-explorer-session-node-ux/path-aware-critique.json",
+    "docs/session-sets/115-work-explorer-session-node-ux/s4-uat-walk.md",
+    "docs/session-sets/115-work-explorer-session-node-ux/s4-verification-conventions.md",
+    "docs/session-sets/115-work-explorer-session-node-ux/s4-remediation-round-1.md"
   ],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 4 must NOT run as written — `step-ledger-findings.md` disqualifies it on three independent grounds and the spec's own heading says so. The next orchestrator's first job is therefore a decision, not an implementation: re-author session 4 after the findings' section 7 prerequisites, or drop it and ship sessions 1-3. That call needs the live context of what sessions 1-3 actually built and what the round-1 Major taught about corrupt ledgers reaching the row model, which is exactly this session's context. No blocker, no cost pressure, no capability gap; verification stays cross-provider regardless."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": [],
+  "uat": {
+    "status": "walked",
+    "walkArtifact": "s4-uat-walk.md",
+    "attestation": "Operator walked the whole set on 2026-08-11 and answered every item in s4-uat-walk.md in place. All five looks passed: session rows read as 'titles someone wrote'; left-click lands on the right session's block without scrolling; the run prompt is offered on the row they would have picked; the step in flight is identifiable by icon alone; the close-out row and its regeneration are 'fine'. Three decisions ratified: keep the obligations grouped, keep the projection git-ignored, and agreed that the in-progress icon is enough now that the marker is gone. One change ruled at the walk -- 'we no longer need Open Session Artifacts' -- and it was removed from the session menu in this session, wholesale."
+  },
   "lessons_cited": [
-    "L-112-1",
     "L-069-1",
-    "L-064-8",
-    "L-064-9"
+    "L-112-1",
+    "L-064-12",
+    "L-065-1",
+    "L-064-8"
   ]
 }

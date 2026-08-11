@@ -34,11 +34,11 @@
 // WHAT IS DELIBERATELY NOT MIRRORED
 // ---------------------------------
 // The CLI's text/markdown rendering (`render`, `render_markdown`,
-// `_summarize`, the `<- here` column widths) and the post ledger. Those
+// `_summarize`) and the post ledger. Those
 // are terminal concerns. This file mirrors the part that decides WHICH
-// rows exist, in WHAT order, with WHAT status, and WHICH one is current —
-// `_collapse_by_step_key`, `is_logged_step`, `_reconcile`, `_mark_here`,
-// `build_rows`, `plan_matches_spec`, `_humanize` — plus the spec-step
+// rows exist, in WHAT order, with WHAT status —
+// `_collapse_by_step_key`, `is_logged_step`, `_reconcile`,
+// `build_rows`, `plan_matches_spec` and `_humanize` — plus the spec-step
 // parse those last two need (`spec_admission.parse_session_plans` /
 // `parse_step_texts`).
 
@@ -71,7 +71,6 @@ export interface StepRow {
   stepKey: string;
   description: string;
   status: string;
-  isHere: boolean;
   /**
    * True when this row is still only a PLAN — a step the spec promised
    * that nothing has logged yet. It is carried rather than re-derived
@@ -81,8 +80,9 @@ export interface StepRow {
   isPlanned: boolean;
 }
 
-/** Statuses that mean the step is finished. Mirrors `_mark_here`'s `terminal`. */
-const TERMINAL_STATUSES = new Set(["complete", "done"]);
+// Set 115 S4: `TERMINAL_STATUSES` is gone with `markHere`, the only thing
+// that read it. What is in flight is now READ (`status === "in-progress"`)
+// rather than derived from which statuses count as finished.
 
 /**
  * Status token -> the four-state lifecycle status the Explorer's authored
@@ -225,7 +225,6 @@ function rowFromEntry(entry: StepEntry, isPlanned: boolean): StepRow {
     stepKey: pyStr(entry.stepKey),
     description: pyStr(entry.description),
     status: pyStr(entry.status),
-    isHere: false,
     isPlanned,
   };
 }
@@ -305,28 +304,19 @@ export function reconcile(
 }
 
 /**
- * Return *rows* with exactly one row carrying the current-step marker.
+ * Set 115 S4 — `markHere` is GONE, and so is `TERMINAL_STATUSES`, which
+ * existed only to serve it.
  *
- * The first unfinished **logged** step is "here". Only if no logged step is
- * unfinished does a still-pending PLANNED row take the marker — that is
- * the honest reading of "the plan promised this next, and nothing has
- * started it". Without that ordering, a session on step 3 whose step 2 is
- * still an untouched plan row would point the operator at step 2.
- *
- * Mirrors `session_checklist._mark_here`.
+ * `session_checklist._mark_here` was removed by operator ruling in Set 120
+ * S3; that set's standing decision 3 ("no extension changes") left this
+ * mirror computing a field nothing would render, and its CHANGELOG said
+ * so — the derivation stood "until the carve deletes it wholesale". This
+ * is that deletion. The rule it implemented (first unfinished logged row,
+ * else the first pending planned row, else the last row) is exactly what
+ * pointed confidently at step 1 of Set 119 S2 when four statuses were
+ * unreadable; the `in-progress` token now carries the fact directly, so
+ * the renderer reads it instead of inferring it.
  */
-export function markHere(rows: readonly StepRow[]): StepRow[] {
-  if (rows.length === 0) return [];
-  const unfinished = (row: StepRow): boolean =>
-    !TERMINAL_STATUSES.has(String(row.status).toLowerCase());
-
-  let here = rows.findIndex((row) => !row.isPlanned && unfinished(row));
-  if (here === -1) {
-    const planned = rows.findIndex(unfinished);
-    here = planned === -1 ? rows.length - 1 : planned;
-  }
-  return rows.map((row, index) => ({ ...row, isHere: index === here }));
-}
 
 // ---------------------------------------------------------------------------
 // The spec's step texts — mirror of `ai_router/spec_admission.py`
@@ -549,9 +539,9 @@ export function buildStepRows(
   const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
 
   if (plan.length === 0) {
-    return markHere(real.map((entry) => rowFromEntry(entry, false)));
+    return real.map((entry) => rowFromEntry(entry, false));
   }
-  return markHere(reconcile(plan, real, planMatchesSpec(plan, specSteps)));
+  return reconcile(plan, real, planMatchesSpec(plan, specSteps));
 }
 
 /**

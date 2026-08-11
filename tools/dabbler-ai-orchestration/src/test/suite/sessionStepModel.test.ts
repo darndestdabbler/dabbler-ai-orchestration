@@ -26,7 +26,6 @@ import {
   glyphStatusOf,
   humanizeStepKey,
   isLoggedStep,
-  markHere,
   parseSpecSteps,
   parseStepTexts,
   planMatchesSpec,
@@ -58,7 +57,6 @@ interface ParityCase {
     stepKey: string;
     description: string;
     status: string;
-    isHere: boolean;
     isPlanned: boolean;
   }>;
 }
@@ -72,7 +70,6 @@ const asPlain = (row: StepRow) => ({
   stepKey: row.stepKey,
   description: row.description,
   status: row.status,
-  isHere: row.isHere,
   isPlanned: row.isPlanned,
 });
 
@@ -163,10 +160,6 @@ suite("Set 114 S3 — the row-builder primitives", () => {
     );
   });
 
-  test("markHere on an empty list is empty, not a crash", () => {
-    assert.deepStrictEqual(markHere([]), []);
-  });
-
   test("planMatchesSpec is false whenever the spec yields nothing", () => {
     // Conservative in every failure direction: a missing, unreadable or
     // unparseable spec costs only the ordinal convenience.
@@ -232,7 +225,6 @@ suite("Set 114 S3 — how a row renders", () => {
       stepKey: "",
       description: "Wired the tree. Then ran the suite, which took a while.",
       status: "complete",
-      isHere: false,
       isPlanned: false,
     };
     assert.strictEqual(stepRowLabel(row), "Wired the tree.");
@@ -245,7 +237,6 @@ suite("Set 114 S3 — how a row renders", () => {
       stepKey: "",
       description: "",
       status: "pending",
-      isHere: false,
       isPlanned: true,
     };
     assert.strictEqual(stepRowLabel(row), "(unnamed step)");

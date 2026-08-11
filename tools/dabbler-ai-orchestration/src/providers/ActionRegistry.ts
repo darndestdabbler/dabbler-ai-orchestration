@@ -196,18 +196,13 @@ export const SESSION_ACTIONS: SessionAction[] = [
     group: 601,
     when: (set, session) => sessionOffersRunPrompt(set, session),
   },
-  // Unconditional ON PURPOSE. Knowing whether a session has artifacts
-  // means listing the set directory, and doing that per session row on the
-  // tree scan is the disk read Set 115's decision 4 forbids. The answer is
-  // computed on the click, and "none yet" is a sentence rather than a
-  // missing menu entry.
-  {
-    id: "dabblerSessionSets.openSessionArtifacts",
-    label: "Open Session Artifacts",
-    group: 602,
-    detail: "Files this session produced, discovered as s<N>-*",
-    when: () => true,
-  },
+  // Set 115 S4 (operator ruling at the set's UAT walk, 2026-08-11):
+  // "Open Session Artifacts" is REMOVED. S3 shipped it beside the run
+  // prompt; walking the finished row, the operator judged one entry
+  // enough — the artifacts are a folder away and the menu is worth more
+  // when it offers exactly what a session row is for. The command, its
+  // manifest entries and its discovery helpers went with it rather than
+  // being left registered and unreachable.
 ];
 
 export function applicableSessionActions(

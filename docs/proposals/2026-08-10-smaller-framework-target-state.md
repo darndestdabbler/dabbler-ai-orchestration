@@ -357,17 +357,24 @@ fix, and it removes machinery rather than adding it:
 reliably written, which is exactly what that set's writer validation
 delivers.
 
-> **Done (Set 120 Session 3, 2026-08-11).** The Python half is removed:
-> `HERE_MARKER`, both rendering sites, `_mark_here` and
-> `ChecklistRow.is_here` are gone, and `record_post` now records
-> `inProgressStepKeys` (a list) instead of the single `hereStepKey` the
-> marker produced. What is in flight is read off the `in-progress`
-> status, and `ai_router/session_projection.py` serializes it as
-> `current`. The **extension** half (`sessionStepModel.ts`'s `markHere`,
-> `workExplorerTreeModel.ts`'s `HERE_MARKER`) deliberately stands until
-> the §6.5 carve deletes that derivation wholesale — Set 120's standing
-> decision 3 forbids extension changes, and the shared parity corpus
-> still pins the TypeScript behaviour for exactly that reason.
+> **Done (Set 120 Session 3, 2026-08-11; finished Set 115 Session 4).**
+> The Python half was removed first: `HERE_MARKER`, both rendering sites,
+> `_mark_here` and `ChecklistRow.is_here` are gone, and `record_post` now
+> records `inProgressStepKeys` (a list) instead of the single
+> `hereStepKey` the marker produced. What is in flight is read off the
+> `in-progress` status, and `ai_router/session_projection.py` serializes
+> it as `current`.
+>
+> The **extension** half stood for one set — Set 120's standing decision 3
+> forbade extension changes, and the shared parity corpus pinned the
+> TypeScript behaviour for exactly that reason. **Set 115 S4 removed it**:
+> `sessionStepModel.ts`'s `markHere`, its `TERMINAL_STATUSES` table and
+> the `StepRow.isHere` field, plus `workExplorerTreeModel.ts`'s
+> `HERE_MARKER` and its render site. The corpus dropped `isHere` with
+> them, so both halves compare the same whole row again. Note that this
+> did **not** wait for the §6.5 carve: the marker's removal is a bug-class
+> fix (L-069-1) and holding it for a larger refactor is what left one
+> language rendering a signal the other had ruled out.
 
 Full findings and the reviewers' reasoning:
 [`docs/session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md`](../session-sets/115-work-explorer-session-node-ux/step-ledger-findings.md).

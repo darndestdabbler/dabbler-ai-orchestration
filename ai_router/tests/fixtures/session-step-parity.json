@@ -27,29 +27,28 @@
     "what spec.md declares for that session, which decides only whether",
     "ordinal reconciliation is trustworthy — it never contributes a row.",
     "",
-    "ONE DECLARED DIVERGENCE (Set 120 Session 3, operator ruling",
-    "2026-08-11). The '<- here' marker was removed from Python:",
-    "session_checklist.HERE_MARKER, its two rendering sites, _mark_here",
-    "and ChecklistRow.is_here are all gone, because the in-progress status",
-    "token now carries that fact directly and the marker's single-valued",
-    "design is what made it point confidently at the wrong row when the",
-    "data was bad. The EXTENSION keeps its markHere until the extension",
-    "carve deletes that derivation wholesale (Set 120 standing decision 3:",
-    "no extension changes in this set).",
+    "NO '<- here' MARKER, in either language (operator ruling 2026-08-11).",
+    "Set 120 Session 3 removed it from Python — session_checklist.",
+    "HERE_MARKER, its two rendering sites, _mark_here and",
+    "ChecklistRow.is_here — because the in-progress status token carries",
+    "that fact directly and the marker's single-valued design is what made",
+    "it point confidently at the wrong row when the data was bad. That set",
+    "could not touch the extension (its standing decision 3), so the",
+    "corpus carried an 'isHere' field for the TypeScript half alone and",
+    "this _readme declared the divergence.",
     "",
-    "So 'isHere' below is now pinned for the TYPESCRIPT half only.",
-    "test_step_row_parity.py compares on the five fields both",
-    "implementations still produce (stepNumber, stepKey, description,",
-    "status, isPlanned) and projects isHere out of the expectation;",
-    "sessionStepModel.test.ts is unchanged and still asserts it. Do NOT",
-    "strip isHere from these cases as a cleanup — it is the only coverage",
-    "the extension's marker has, and test_the_corpus_still_pins_the",
-    "_extensions_here_marker fails if it goes."
+    "Set 115 Session 4 finished the removal: markHere, the isHere field",
+    "and the tree's HERE_MARKER are gone too, so the field is gone from",
+    "these cases and BOTH suites compare the same five fields again. What",
+    "an operator reads instead of the marker is the in-progress GLYPH on",
+    "the step whose recorded status is in-progress — which is why the",
+    "'logged-step-in-flight' case matters: it is the one that pins a real",
+    "in-progress row for the icon to come from."
   ],
   "cases": [
     {
       "name": "plan-only",
-      "why": "Session start: start_session seeded the plan and nothing has been logged. This is the forward view Set 114 S2 exists for — every row pending, the marker on the first, and no logged step anywhere.",
+      "why": "Session start: start_session seeded the plan and nothing has been logged. This is the forward view Set 114 S2 exists for — every row pending, nothing in flight, and no logged step anywhere.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
       "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
@@ -59,14 +58,14 @@
         {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isHere": false, "isPlanned": true}
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isPlanned": true}
       ]
     },
     {
       "name": "plan-partly-executed-ordinal",
-      "why": "The common case. The orchestrator's own step keys are prose-free handles that do NOT equal the slugs the seeder derived from the spec's sentences, so every claim here is made by the ordinal pass. Steps 1-2 are logged and own their rows' content; step 3 is still the spec's own words, and the marker sits on the first unfinished LOGGED row.",
+      "why": "The common case. The orchestrator's own step keys are prose-free handles that do NOT equal the slugs the seeder derived from the spec's sentences, so every claim here is made by the ordinal pass. Steps 1-2 are logged and own their rows' content; step 3 is still the spec's own words, and the step logged in-progress is the one the tree draws its in-progress glyph from.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
       "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
@@ -78,9 +77,9 @@
         {"sessionNumber": 1, "stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "registration", "description": "Registered and read the preload.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress", "isHere": true, "isPlanned": false},
-        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isHere": false, "isPlanned": true}
+        {"stepNumber": 1, "stepKey": "registration", "description": "Registered and read the preload.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress", "isPlanned": false},
+        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isPlanned": true}
       ]
     },
     {
@@ -96,9 +95,9 @@
         {"sessionNumber": 1, "stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete", "isHere": false, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete", "isPlanned": false}
       ]
     },
     {
@@ -114,10 +113,10 @@
         {"sessionNumber": 1, "stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete", "isHere": false, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete", "isPlanned": false}
       ]
     },
     {
@@ -132,14 +131,14 @@
         {"sessionNumber": 1, "stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "kind": "path_aware_critique"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": true, "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "isHere": false, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "isPlanned": false}
       ]
     },
     {
       "name": "legacy-set-with-no-seeded-plan",
-      "why": "Every set that started before Set 114 S2, and any spec whose steps do not parse. The renderer falls back to exactly its Set 111 S4 behaviour: the logged steps, collapsed by stepKey, in first-logged order, marker on the first unfinished one.",
+      "why": "Every set that started before Set 114 S2, and any spec whose steps do not parse. The renderer falls back to exactly its Set 111 S4 behaviour: the logged steps, collapsed by stepKey, in first-logged order.",
       "sessionNumber": 2,
       "specMarkdown": "# Fixture spec\n\nNo session headings at all, so nothing parses.\n",
       "expectedSpecSteps": [],
@@ -149,14 +148,14 @@
         {"sessionNumber": 2, "stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "the-work", "description": "Doing the work.", "status": "in-progress", "isHere": true, "isPlanned": false},
-        {"stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending", "isHere": false, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "the-work", "description": "Doing the work.", "status": "in-progress", "isPlanned": false},
+        {"stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending", "isPlanned": false}
       ]
     },
     {
       "name": "repeated-key-collapses-to-the-latest-at-the-first-position",
-      "why": "activity-log.json is append-only, so a step logged in-progress and later complete appears twice. Rendering both duplicates the row AND strands the marker on the stale entry. The collapse keeps the LATEST entry at the position the step FIRST appeared.",
+      "why": "activity-log.json is append-only, so a step logged in-progress and later complete appears twice. Rendering both duplicates the row and leaves the stale entry on screen beside its own successor. The collapse keeps the LATEST entry at the position the step FIRST appeared.",
       "sessionNumber": 2,
       "specMarkdown": "# Fixture spec\n",
       "expectedSpecSteps": [],
@@ -166,8 +165,8 @@
         {"sessionNumber": 2, "stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "second-thing", "description": "Second thing.", "status": "pending", "isHere": true, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "second-thing", "description": "Second thing.", "status": "pending", "isPlanned": false}
       ]
     },
     {
@@ -181,13 +180,13 @@
         {"sessionNumber": 2, "stepNumber": 2, "description": "Second anonymous step.", "status": "complete"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "", "description": "First anonymous step.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "", "description": "Second anonymous step.", "status": "complete", "isHere": true, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "", "description": "First anonymous step.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "", "description": "Second anonymous step.", "status": "complete", "isPlanned": false}
       ]
     },
     {
-      "name": "everything-finished-marks-the-last-row",
-      "why": "With no unfinished row anywhere the marker falls to the last one, so the checklist never renders without a 'here'.",
+      "name": "everything-finished-has-nothing-in-flight",
+      "why": "Zero rows in flight is a real answer, and the removed marker could not give it: it fell to the last row and read as a claim that the session was working on it. With the marker gone the operator sees two complete glyphs and no in-progress one, which is the truth.",
       "sessionNumber": 2,
       "specMarkdown": "# Fixture spec\n",
       "expectedSpecSteps": [],
@@ -196,13 +195,13 @@
         {"sessionNumber": 2, "stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "a", "description": "A.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done", "isHere": true, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "a", "description": "A.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done", "isPlanned": false}
       ]
     },
     {
-      "name": "planned-row-takes-the-marker-only-when-no-logged-step-is-unfinished",
-      "why": "The marker prefers the first unfinished LOGGED step over an earlier still-pending PLANNED one. Without that ordering, a session on step 3 whose planned step 2 was never claimed would point the operator at step 2 — the 'where is this session' question answered wrongly.",
+      "name": "in-flight-is-the-logged-step-not-an-earlier-pending-plan-row",
+      "why": "The case the removed marker used to get wrong, and the one the in-progress GLYPH now gets right for free. An unstarted planned step 2 sits above a logged step in flight; the old rule had to be TOLD to prefer the logged row, while reading the recorded in-progress status cannot point anywhere else. This is also the corpus's proof that a real in-progress row survives reconciliation, which is what the tree's icon is drawn from.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
       "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
@@ -213,9 +212,9 @@
         {"sessionNumber": 1, "stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": false, "isPlanned": true},
-        {"stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress", "isHere": true, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
+        {"stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress", "isPlanned": false}
       ]
     },
     {
@@ -230,8 +229,8 @@
         {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete"}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isHere": true, "isPlanned": true}
+        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true}
       ]
     },
     {
@@ -247,8 +246,8 @@
         {"sessionNumber": 1, "stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "kind": false}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "isHere": true, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "isPlanned": false}
       ]
     },
     {
@@ -262,8 +261,8 @@
         {"sessionNumber": 2, "stepNumber": 2, "stepKey": 0, "description": "Second one.", "status": 0}
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "", "description": "", "status": "complete", "isHere": false, "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "", "description": "Second one.", "status": "", "isHere": true, "isPlanned": false}
+        {"stepNumber": 1, "stepKey": "", "description": "", "status": "complete", "isPlanned": false},
+        {"stepNumber": 2, "stepKey": "", "description": "Second one.", "status": "", "isPlanned": false}
       ]
     },
     {

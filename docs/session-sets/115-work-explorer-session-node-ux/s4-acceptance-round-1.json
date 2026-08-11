@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "435dd7ccd8eda87cf570ddaa6b50d71c7f74ba4d",
+  "fixedTree": "97ae6ef7745087ec98c61e7d8da513ce81c0e70f",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T18:50:12.829858+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The current tree has Playwright-scoped code changes after the last recorded full Playwright run. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/session-sets/115-work ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "test-runs.jsonl records a passing full npm run test:playwright run after the artifact-entry-removal/package-menu changes, or those post-run Playwright-scope changes are reverted.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

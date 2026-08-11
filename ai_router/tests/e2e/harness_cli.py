@@ -231,6 +231,30 @@ def cmd_make_sibling_worktree(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_close_preflight(args: argparse.Namespace) -> int:
+    """Set 115 S4 — write the real close-out obligation projection.
+
+    Calls the SHIPPING writer (``close_preflight.write_projection``), not
+    a hand-rolled JSON blob, so the Layer 3 scenario renders whatever the
+    production preflight actually computed. That is the only place the
+    Python writer's digest map and the extension's reader can be proven
+    to agree in a real repository — a fixture that faked the file would
+    prove the renderer and nothing else.
+    """
+    handle = _load_handle(args)
+    import close_preflight  # noqa: PLC0415 - heavy; only this command needs it
+
+    set_dir = str(handle.set_dir)
+    written = close_preflight.write_projection(set_dir)
+    _emit({
+        "path": written,
+        "state": close_preflight.projection_state(
+            set_dir, include_volatile=False
+        ),
+    })
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="harness_cli")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -258,6 +282,10 @@ def _build_parser() -> argparse.ArgumentParser:
     _add_handle_args(p)
     p.add_argument("--session-number", type=int, required=True)
     p.set_defaults(func=cmd_start)
+
+    p = sub.add_parser("close-preflight")
+    _add_handle_args(p)
+    p.set_defaults(func=cmd_close_preflight)
 
     p = sub.add_parser("make-activity")
     _add_handle_args(p)

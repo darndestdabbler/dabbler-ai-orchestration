@@ -23,8 +23,10 @@ agreement, not the prediction, is the assertion.
 
 from __future__ import annotations
 
+import ast
 import json
 import os
+import re
 import subprocess
 from pathlib import Path
 
@@ -849,6 +851,426 @@ class TestOutput:
             ["--session-set-dir", str(set_dir)]
         ) == EXIT_BLOCKING_UNMET
         assert evaluate(str(set_dir)).session_number == 1
+
+
+# ---------------------------------------------------------------------------
+# The serialized projection (Set 115 S4)
+# ---------------------------------------------------------------------------
+
+def _gate_check_bodies():
+    """Top-level function defs in ``gate_checks``, by name."""
+    tree = ast.parse(Path(gate_checks.__file__).read_text(encoding="utf-8"))
+    return {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+
+
+def _referenced_names(
+    name: str, bodies: dict, *, opaque=frozenset(), seen=None, depth: int = 0
+) -> set:
+    """Every name a predicate reaches, transitively, from the AST.
+
+    From the AST rather than from the source text, because a text scan
+    reads docstrings: the first cut of this guard "found" a git call in
+    `check_change_log_fresh` because its docstring names another
+    function. It also follows **function-local imports**
+    (``from .run_of_record import evaluate_freshness``), which is exactly
+    how these predicates reach outside the session-set directory and what
+    a call-name walk alone would miss.
+
+    ``opaque`` names helpers that are not descended into.
+    """
+    seen = set() if seen is None else seen
+    if name in seen or depth > 4 or name not in bodies:
+        return set()
+    seen.add(name)
+    out: set = set()
+    for node in ast.walk(bodies[name]):
+        if isinstance(node, ast.Name):
+            out.add(node.id)
+        elif isinstance(node, ast.Attribute):
+            out.add(node.attr)
+            if isinstance(node.value, ast.Name):
+                out.add(node.value.id)
+        elif isinstance(node, ast.ImportFrom):
+            out.add((node.module or "").lstrip("."))
+            out.update(a.name for a in node.names)
+        elif isinstance(node, ast.Import):
+            out.update(a.name.split(".")[-1] for a in node.names)
+    for callee in set(out):
+        if callee in bodies and callee not in opaque:
+            out |= _referenced_names(
+                callee, bodies, opaque=opaque, seen=seen, depth=depth + 1
+            )
+    return out
+
+
+#: Reaching one of these means the answer depends on state outside the
+#: session-set directory, so a reader that re-digested only that
+#: directory has not re-checked it. Named at FUNCTION granularity, not
+#: module: ``_checklist_transitions`` imports ``run_of_record.read_records``
+#: to read ``test-runs.jsonl`` — a file inside the set directory — while
+#: ``check_test_run_fresh`` imports ``evaluate_freshness``, which digests
+#: the source surfaces a suite covers anywhere in the repo. Same module,
+#: opposite answers.
+_REPO_WIDE_HELPERS = frozenset({
+    "surface_digest",
+    "evaluate_freshness",
+    "compute_work_diff_sha256",
+    "find_valid_stamped_rows",
+    "validate_stamped_row",
+})
+
+#: Helpers that run git to answer "WHERE is the repository", not "what is
+#: in it". Their result is a path; it does not vary with the content of
+#: any file, so a check that calls one has not thereby become
+#: repo-state-dependent. Named here rather than silently tolerated,
+#: because the exception is a judgment.
+_PATH_RESOLVERS = frozenset({"_repo_root_for", "_project_root_for", "_run_git"})
+
+
+class TestTheSerializedProjection:
+    """The renderer must never pay for this run, and must never overclaim.
+
+    Two properties carry these tests, and both are planted rather than
+    inspected (L-112-1):
+
+    1. **The file is invisible to git.** Not "we added an ignore rule" —
+       the assertion runs ``git status`` in a real repo after a real
+       write and requires the path to be absent from it. That is what
+       makes the placement decision hold rather than merely be stated.
+    2. **A commit stales it for a reader that checks git and NOT for one
+       that checks only files.** This is the whole reason ``volatile``
+       exists: committing changes no digested byte, so a content-only
+       reader is provably fresh while some of its rows have just become
+       wrong.
+    """
+
+    def _write(self, set_dir: Path) -> str:
+        written = close_preflight.write_projection(str(set_dir))
+        assert written is not None
+        return written
+
+    def test_write_lands_in_the_ignored_marker_dir_with_a_self_ignore(
+        self, workable,
+    ):
+        _root, set_dir = workable
+        written = self._write(set_dir)
+        assert Path(written) == set_dir / ".dabbler" / "close-obligations.json"
+        ignore = set_dir / ".dabbler" / ".gitignore"
+        assert ignore.is_file(), (
+            "a consumer repo whose root .gitignore predates the marker "
+            "directory has nothing else protecting it"
+        )
+        assert ignore.read_text(encoding="utf-8").strip().endswith("*")
+
+    def test_git_does_not_see_the_projection(self, workable):
+        """The planted proof of the placement decision.
+
+        If this file were tracked, every mid-session ``--write`` would
+        land inside the verification stamp's work diff and stale a round
+        that had already passed -- and would fail ``working_tree_clean``
+        on top of it. Both consequences are prevented by the same fact,
+        so the fact is what gets asserted.
+        """
+        root, set_dir = workable
+        written = self._write(set_dir)
+        proc = subprocess.run(
+            ["git", "status", "--porcelain", "--ignored=no"],
+            cwd=str(root), check=True, capture_output=True, text=True,
+        )
+        assert "close-obligations" not in proc.stdout, proc.stdout
+        assert ".dabbler" not in proc.stdout, proc.stdout
+        assert Path(written).is_file(), "and yet it really is on disk"
+
+    def test_the_projection_carries_the_report_verbatim(self, workable, capsys):
+        """One spelling. This module has already shipped two surfaces of
+        one report that disagreed (``would_close`` said true while the
+        human report said "NOT yet decided"); embedding ``to_dict()``
+        unchanged is what stops that from being possible again."""
+        _root, set_dir = workable
+        close_preflight.main(["--session-set-dir", str(set_dir), "--json"])
+        from_cli = json.loads(capsys.readouterr().out)
+        self._write(set_dir)
+        embedded = close_preflight.read_projection(str(set_dir))["report"]
+        assert embedded == from_cli
+
+    def test_absent_then_fresh_then_stale_when_an_input_changes(
+        self, workable,
+    ):
+        _root, set_dir = workable
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_ABSENT
+        )
+        self._write(set_dir)
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_FRESH
+        )
+        (set_dir / "activity-log.json").write_text("{}", encoding="utf-8")
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_STALE
+        )
+
+    def test_a_new_artifact_stales_it_without_being_named_anywhere(
+        self, workable,
+    ):
+        """The reason the digest map is the DIRECTORY and not a list.
+
+        ``s1-issues.json`` is an input to the verification-integrity and
+        backstop rows, and no filename list in this module mentions it.
+        A set that grows an artifact grows an input.
+        """
+        _root, set_dir = workable
+        self._write(set_dir)
+        (set_dir / "s1-issues.json").write_text("[]", encoding="utf-8")
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_STALE
+        )
+
+    def test_a_commit_stales_it_for_git_readers_only(self, workable):
+        """The property ``volatile`` exists for.
+
+        Committing an unrelated file changes not one byte the projection
+        digested, so a content-only reader is correctly fresh -- and the
+        git-backed rows it is carrying have just gone out of date. A
+        projection with one freshness verdict would have to pick a lie:
+        either badge itself stale on every unrelated commit, or badge
+        itself fresh while telling the operator to commit work they
+        already committed.
+        """
+        root, set_dir = workable
+        self._write(set_dir)
+        (root / "README.md").write_text("moved on\n", encoding="utf-8")
+        _git(root, "add", "README.md")
+        _git(root, "commit", "-m", "unrelated")
+
+        assert close_preflight.projection_state(
+            str(set_dir), include_volatile=False
+        ) == close_preflight.PROJECTION_FRESH
+        assert close_preflight.projection_state(
+            str(set_dir), include_volatile=True
+        ) == close_preflight.PROJECTION_STALE
+
+    def test_unreadable_is_distinguishable_from_absent(self, workable):
+        _root, set_dir = workable
+        self._write(set_dir)
+        path = Path(close_preflight.projection_path(str(set_dir)))
+        path.write_text("{not json", encoding="utf-8")
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_UNREADABLE
+        )
+        path.unlink()
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_ABSENT
+        )
+
+    def test_a_future_schema_version_reads_as_unreadable(self, workable):
+        """Guessing at an unknown shape is how a cache becomes a source."""
+        _root, set_dir = workable
+        self._write(set_dir)
+        path = Path(close_preflight.projection_path(str(set_dir)))
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        payload["schemaVersion"] = close_preflight.PROJECTION_SCHEMA_VERSION + 1
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        assert close_preflight.read_projection(str(set_dir)) is None
+        assert close_preflight.projection_state(str(set_dir)) == (
+            close_preflight.PROJECTION_UNREADABLE
+        )
+
+    def test_git_backed_checks_are_derived_from_gate_checks_not_declared(self):
+        """The narrow half: every check that calls git is volatile.
+
+        Mechanically derivable, so it is derived rather than trusted. It
+        is NOT the definition of volatility -- see the test below, which
+        covers the class this one is blind to.
+        """
+        source = Path(gate_checks.__file__).read_text(encoding="utf-8")
+        derived = {
+            block.split("(")[0]
+            for block in source.split("\ndef ")
+            if block.startswith("check_") and "_run_git" in block
+        }
+        names = {
+            name for name, fn in gate_checks.GATE_CHECKS
+            if fn.__name__ in derived
+        }
+        assert names == close_preflight.GIT_BACKED_CHECKS
+        assert not (names & close_preflight.SET_LOCAL_CHECKS), (
+            "a check that calls git cannot be set-local"
+        )
+
+    def test_no_set_local_check_reaches_repo_wide_state(self):
+        """The finding both end-of-set path-aware critics found.
+
+        A source-text scan for a *direct* ``_run_git`` call is blind to
+        how ``verification_integrity`` and ``test_run_fresh`` actually
+        depend on the repository: through an evidence stamp that binds
+        the git work diff, and through a ``run_of_record.surface_digest``
+        over source files anywhere in the tree. Both were rendered as
+        re-checkable truth by the first cut of this feature, so a module
+        edited outside the session-set directory left the panel
+        confidently claiming an answer that had already changed.
+
+        This fails CLOSED: a predicate that grows such a dependency stops
+        being set-local, and the row it produces starts saying "as of".
+        """
+        bodies = _gate_check_bodies()
+        offenders = {}
+        for name, fn in gate_checks.GATE_CHECKS:
+            if name not in close_preflight.SET_LOCAL_CHECKS:
+                continue
+            reached = _referenced_names(
+                fn.__name__, bodies, opaque=_PATH_RESOLVERS
+            )
+            hits = sorted(reached & _REPO_WIDE_HELPERS)
+            if hits:
+                offenders[name] = hits
+        assert not offenders, (
+            f"these are declared set-local but reach repo-wide state: "
+            f"{offenders}. A reader that re-digested only the session-set "
+            f"directory has not re-checked them; remove them from "
+            f"SET_LOCAL_CHECKS so their rows say 'as of'."
+        )
+
+    def test_the_scan_can_actually_see_a_repo_wide_dependency(self):
+        """The falsifier for the scan itself (L-112-1).
+
+        A transitive walk that reached nothing would satisfy the test
+        above no matter what was declared set-local. These are the two
+        checks the first cut got wrong, and both reach their repo-wide
+        helper through a FUNCTION-LOCAL import rather than a call the
+        walk could see by name -- which is precisely why the scan reads
+        imports.
+        """
+        bodies = _gate_check_bodies()
+        assert "find_valid_stamped_rows" in _referenced_names(
+            "check_verification_integrity", bodies
+        )
+        assert "evaluate_freshness" in _referenced_names(
+            "check_test_run_fresh", bodies
+        )
+
+    def test_the_repo_wide_checks_really_are_volatile(self):
+        """The other falsifier: emptying ``SET_LOCAL_CHECKS`` would
+        satisfy every guard above while making every row say "as of".
+        These five are the checks whose answer provably lives outside the
+        session-set directory, named so a future demotion is a visible
+        decision."""
+        for name in (
+            "working_tree_clean",
+            "pushed_to_remote",
+            "verification_integrity",
+            "test_run_fresh",
+            BACKSTOP_CHECK_NAME,
+        ):
+            assert name not in close_preflight.SET_LOCAL_CHECKS, name
+            assert close_preflight.Obligation(
+                check=name, met=True, blocking=True
+            ).volatile, name
+
+    def test_every_reported_check_is_classified(self, workable):
+        """No third state. A check the preflight reports is either
+        set-local or volatile; a name matching neither list takes the
+        default -- which is why the default is the safe one, and why this
+        asserts the union is total."""
+        _root, set_dir = workable
+        reported = {o.check for o in evaluate(str(set_dir)).obligations}
+        assert reported, "no obligations to classify"
+        for check in reported:
+            local = check in close_preflight.SET_LOCAL_CHECKS
+            volatile = close_preflight.Obligation(
+                check=check, met=True, blocking=True
+            ).volatile
+            assert local != volatile, check
+
+    def test_only_the_repo_dependent_rows_are_marked_volatile(self, workable):
+        _root, set_dir = workable
+        report = evaluate(str(set_dir))
+        marked = {o.check for o in report.obligations if o.volatile}
+        assert close_preflight.GIT_BACKED_CHECKS <= marked
+        assert marked, "a volatility flag nothing ever sets proves nothing"
+        unmarked = {o.check for o in report.obligations if not o.volatile}
+        assert unmarked, (
+            "a volatility flag that is always true proves nothing either: "
+            "every row would say 'as of' and the distinction would be dead"
+        )
+        assert all(
+            "volatile" in o for o in report.to_dict()["obligations"]
+        ), "every row must answer the question, not only the volatile ones"
+
+    def test_cli_check_reports_the_state_without_evaluating(
+        self, workable, capsys, monkeypatch,
+    ):
+        _root, set_dir = workable
+        monkeypatch.setattr(
+            close_preflight, "evaluate",
+            lambda *a, **k: pytest.fail("--check must not run the predicates"),
+        )
+        code = close_preflight.main(
+            ["--session-set-dir", str(set_dir), "--check"]
+        )
+        assert code == close_preflight.EXIT_PROJECTION_NOT_FRESH
+        out = capsys.readouterr()
+        assert "absent" in out.out
+        assert "--write" in out.err
+
+    def test_cli_check_exits_zero_when_fresh(self, workable, capsys):
+        _root, set_dir = workable
+        close_preflight.main(["--session-set-dir", str(set_dir), "--write"])
+        capsys.readouterr()
+        assert close_preflight.main(
+            ["--session-set-dir", str(set_dir), "--check"]
+        ) == EXIT_OK
+
+    def test_cli_write_still_reports_the_verdict(self, workable, capsys):
+        """``--write`` is a superset of a normal run, not a mode that
+        swallows it: the exit code still answers "would this close"."""
+        _root, set_dir = workable
+        code = close_preflight.main(
+            ["--session-set-dir", str(set_dir), "--write"]
+        )
+        captured = capsys.readouterr()
+        assert code == EXIT_BLOCKING_UNMET
+        assert "BLOCKING:" in captured.out
+        assert "wrote " in captured.err
+
+    def test_write_keeps_json_stdout_parseable(self, workable, capsys):
+        """The side-effect notice goes to stderr for exactly this reason."""
+        _root, set_dir = workable
+        close_preflight.main(
+            ["--session-set-dir", str(set_dir), "--write", "--json"]
+        )
+        captured = capsys.readouterr()
+        assert json.loads(captured.out)["verdict"]
+        assert "wrote " in captured.err
+
+    def test_a_failed_write_names_the_skip(self, workable, capsys, monkeypatch):
+        """L-079-1: a fail-open branch around I/O must NAME the skip.
+
+        Silently continuing would leave the Explorer rendering a stale
+        projection while the operator believed they had just refreshed it.
+        """
+        _root, set_dir = workable
+        monkeypatch.setattr(
+            close_preflight, "_ensure_projection_dir",
+            lambda *_a, **_k: (_ for _ in ()).throw(OSError("read-only")),
+        )
+        code = close_preflight.main(
+            ["--session-set-dir", str(set_dir), "--write"]
+        )
+        err = capsys.readouterr().err
+        assert code == EXIT_BLOCKING_UNMET, "the report still stands"
+        assert "NOT serialized" in err
+
+    def test_the_projection_names_how_to_rebuild_itself(self, workable):
+        _root, set_dir = workable
+        self._write(set_dir)
+        payload = close_preflight.read_projection(str(set_dir))
+        assert payload["derived"] is True
+        assert "--write" in payload["regenerateWith"]
+        assert payload["sessionSetDir"] == set_dir.name
 
 
 class TestItMirrorsTheClosesOrdering:

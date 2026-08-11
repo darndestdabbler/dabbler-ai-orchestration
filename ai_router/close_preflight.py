@@ -57,10 +57,12 @@ from __future__ import annotations
 
 import argparse
 import glob
+import hashlib
 import json
 import os
 import sys
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Dict, List, Optional
 
 try:
@@ -68,6 +70,7 @@ try:
     from .gate_checks import (  # type: ignore[import-not-found]
         GATE_CHECKS,
         VERIFICATION_INTEGRITY_CHECK_NAME,
+        _run_git,
         _verify_session_command,
         is_blocking_check,
     )
@@ -85,6 +88,7 @@ except ImportError:  # pragma: no cover - direct-script fallback
     from gate_checks import (  # type: ignore[no-redef]
         GATE_CHECKS,
         VERIFICATION_INTEGRITY_CHECK_NAME,
+        _run_git,
         _verify_session_command,
         is_blocking_check,
     )
@@ -129,6 +133,49 @@ VERDICT_UNDECIDED = "undecided-backstop-would-route"
 # whim. The import happens inside _backstop_obligation. A parity test
 # pins this constant to close_backstop.BACKSTOP_CHECK_NAME.
 BACKSTOP_CHECK_NAME = "verification_backstop"
+
+# The checks whose answer is a pure function of files INSIDE the
+# session-set directory. Everything else is VOLATILE: its answer depends
+# on state the projection's content digests cannot cover — git, the
+# repo-wide work diff, or a run-of-record surface digest over source
+# files anywhere in the tree — so a reader that re-digested only the set
+# directory has not re-checked it and must not claim to have.
+#
+# **The default is volatile, and that is the whole point.** The first cut
+# of this listed the two checks that call git directly and treated every
+# other row as re-checkable. Both end-of-set path-aware critics found the
+# same hole independently: `verification_integrity` validates an evidence
+# stamp that binds the git work diff, and `test_run_fresh` compares a
+# `run_of_record.surface_digest` over the source files a suite covers —
+# so editing a module anywhere in the repo changes both answers while
+# every file in the session-set directory stays byte-identical. Listing
+# the exceptions the other way round means a check added later is
+# over-labelled "as of" (noise) rather than silently rendered as current
+# truth (a lie), and that is the direction this list must fail in.
+#
+# Membership is a CLAIM about each predicate's inputs, so
+# ``TestTheSerializedProjection`` checks it two ways: no member may reach
+# git or the repo-wide digest helpers (scanned transitively through
+# ``gate_checks``'s own module-level functions), and the union of members
+# and volatile rows must be every check the preflight reports.
+SET_LOCAL_CHECKS = frozenset({
+    DISPOSITION_PRESENT_CHECK_NAME,
+    "activity_log_entry",
+    "next_orchestrator_present",
+    "change_log_fresh",
+    "uat_walk_recorded",
+    "checklist_posted",
+    "verification_method_vocabulary",
+    PATH_AWARE_CRITIQUE_CHECK_NAME,
+    CONTRACT_GATE_CHECK_NAME,
+})
+
+# The subset that reaches git *directly*. Kept as its own constant only
+# because it is mechanically derivable from ``gate_checks``'s source, and
+# a test asserts the derivation lands entirely outside SET_LOCAL_CHECKS —
+# a narrow guard on the widest-known class, not the definition of
+# volatility.
+GIT_BACKED_CHECKS = frozenset({"working_tree_clean", "pushed_to_remote"})
 
 
 # The action for checks whose remediation states a CONDITION rather than a
@@ -193,6 +240,17 @@ class Obligation:
     right now would *succeed* but would spend a routed verification round
     doing it. That is not a refusal, so it never affects the exit code —
     it is the 78-of-212 line item this tool exists to surface early.
+
+    ``volatile`` marks a row whose answer depends on state a content
+    digest of the session-set directory cannot cover — git, the repo-wide
+    work diff, or a source-surface digest (:data:`SET_LOCAL_CHECKS` names
+    the complement). It changes nothing about the live report — the
+    predicate just ran — and everything about a *recorded* one: a
+    projection can be provably fresh against every file it digested and
+    still be wrong about these rows, because the thing they read is not
+    one of those files. It is DERIVED from the check name rather than
+    assigned at each construction site, so no row can be built with the
+    wrong answer and a check added later is volatile by default.
     """
 
     check: str
@@ -202,6 +260,10 @@ class Obligation:
     action: str = ""
     cost_warning: str = ""
 
+    @property
+    def volatile(self) -> bool:
+        return self.check not in SET_LOCAL_CHECKS
+
     def to_dict(self) -> dict:
         return {
             "check": self.check,
@@ -210,6 +272,7 @@ class Obligation:
             "detail": self.detail,
             "action": self.action,
             "cost_warning": self.cost_warning,
+            "volatile": self.volatile,
         }
 
 
@@ -870,6 +933,283 @@ def render(report: PreflightReport) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The serialized projection (Set 115 S4)
+# ---------------------------------------------------------------------------
+#
+# Why a file and not a call. This preflight costs 2-7 seconds — git-backed
+# predicates plus interpreter startup — measured at 6.6s on the run that
+# motivated this session. The Work Explorer refreshes on every watcher
+# tick and on a 30-second poll, so calling it from the renderer would put
+# a multi-second subprocess on a redraw path and make a DISPLAY feature
+# fail whenever the interpreter is unresolvable. Set 120 S3 settled the
+# pattern for exactly this shape of problem: compute once in Python,
+# serialize with an input digest, and let the tree read the file.
+#
+# Why it is NOT beside session-progress.json. That projection is close
+# OUTPUT, written once by close_session and declared through
+# CLOSE_MANDATED_WRITES. This one is written MID-SESSION, whenever an
+# orchestrator or operator wants the current answer — which is after a
+# verification round has been stamped, every time. A tracked file there
+# would stale its own round's stamp and buy a metered backstop round at
+# close, the failure Sets 111 S2, 112 S3 and 114 S1 each paid for. So it
+# lives in the set's ``.dabbler/`` directory, which is already ignored
+# (the Set 029 gitignore entry), and the writer drops a self-protecting
+# ``.gitignore`` there so a consumer repo that never patched its root
+# ignore file is covered too. An ignored path is invisible to `git diff`
+# and to `git status`, so the exemption is structural rather than a
+# filename in a list somewhere (L-069-1).
+
+#: The projection, under the session set's ignored marker directory.
+PROJECTION_DIRNAME = ".dabbler"
+PROJECTION_FILENAME = "close-obligations.json"
+
+#: Bumped when the shape changes incompatibly. A reader that finds a
+#: higher version treats the file as unreadable rather than guessing —
+#: the same posture the projection takes towards its own inputs.
+PROJECTION_SCHEMA_VERSION = 1
+
+PROJECTION_REGENERATE_COMMAND = (
+    "python -m ai_router.close_preflight --session-set-dir <dir> --write"
+)
+
+# The projection's own states, spelled exactly as session_projection
+# spells them. Two projections in one framework answering "is this file
+# still true" with two vocabularies would be a second thing to learn for
+# no gain.
+PROJECTION_FRESH = "fresh"
+PROJECTION_STALE = "stale"
+PROJECTION_ABSENT = "absent"
+PROJECTION_UNREADABLE = "unreadable"
+
+#: The key under which the git fingerprint is recorded. One key, not a
+#: map: the fingerprint already folds HEAD and the porcelain status into
+#: a single hash, and naming its parts separately would invite a reader
+#: to compare one of them alone.
+VOLATILE_INPUT_GIT = "git"
+
+EXIT_PROJECTION_NOT_FRESH = 3
+
+
+def projection_dir(session_set_dir: str) -> str:
+    return os.path.join(session_set_dir, PROJECTION_DIRNAME)
+
+
+def projection_path(session_set_dir: str) -> str:
+    return os.path.join(projection_dir(session_set_dir), PROJECTION_FILENAME)
+
+
+def _digest_bytes(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def _digest_file(path: str) -> Optional[str]:
+    """SHA-256 of *path*'s bytes, or ``None`` when it cannot be read.
+
+    Bytes, not parsed content: the question is "did this input change",
+    and a reformat that changes no values still changes what a consumer
+    reading the raw file sees.
+    """
+    try:
+        with open(path, "rb") as fh:
+            return _digest_bytes(fh.read())
+    except OSError:
+        return None
+
+
+def input_digests(session_set_dir: str) -> Dict[str, Optional[str]]:
+    """Digest every top-level file in the session-set directory.
+
+    Deliberately the whole directory rather than a curated filename list.
+    The obligations derive from `disposition.json`, `session-state.json`,
+    `activity-log.json`, `spec.md`, `change-log.md`, the run-of-record
+    and checklist-post ledgers, the round ledger, and every
+    ``s<N>-verification*.md`` / ``s<N>-issues*.json`` artifact the
+    backstop and the integrity gate look for — a set that grows a new
+    artifact grows a new input, and a curated list would be one more
+    place to forget (L-069-1). Digesting the directory means the answer
+    is exhaustive by construction and errs only towards STALE, which is
+    the safe direction for a cache to be wrong in.
+
+    Directories are skipped, which is also what keeps the projection out
+    of its own digest: it lives one level down in ``.dabbler/``.
+    """
+    digests: Dict[str, Optional[str]] = {}
+    try:
+        names = sorted(os.listdir(session_set_dir))
+    except OSError:
+        return digests
+    for name in names:
+        path = os.path.join(session_set_dir, name)
+        if not os.path.isfile(path):
+            continue
+        digests[name] = _digest_file(path)
+    return digests
+
+
+def git_fingerprint(session_set_dir: str) -> Optional[str]:
+    """One hash over everything the two git-backed predicates read.
+
+    ``git status --porcelain --branch`` carries both halves in one call:
+    the dirty-path lines ``working_tree_clean`` reads, and the
+    ``## branch...upstream [ahead N]`` header ``pushed_to_remote`` reads.
+    ``HEAD`` is folded in so a commit that leaves the tree equally clean
+    still moves the fingerprint.
+
+    ``None`` when git is unavailable or the directory is not in a work
+    tree — recorded as a positive "there was no git answer here" rather
+    than omitted, so a projection built outside a repo and one built
+    inside it are distinguishable.
+    """
+    rc_head, head, _ = _run_git(["rev-parse", "HEAD"], cwd=session_set_dir)
+    rc_status, status, _ = _run_git(
+        ["status", "--porcelain", "--branch"], cwd=session_set_dir
+    )
+    if rc_head != 0 and rc_status != 0:
+        return None
+    payload = f"{head if rc_head == 0 else ''}\n{status if rc_status == 0 else ''}"
+    return _digest_bytes(payload.encode("utf-8"))
+
+
+def build_projection(
+    session_set_dir: str, report: Optional[PreflightReport] = None
+) -> dict:
+    """The whole projection for a session set, as a plain dict.
+
+    The report is embedded **verbatim** — ``PreflightReport.to_dict()``,
+    the same payload ``--json`` prints — rather than re-serialized into a
+    shape a renderer might prefer. This module has already been bitten
+    once by two surfaces of one report disagreeing (the ``would_close``
+    boolean that said ``true`` while the human report said "NOT yet
+    decided"), and one spelling is the fix that holds.
+
+    Pure apart from the predicates it runs: nothing here writes, so a
+    consumer that only wants the answer can ask for it.
+    """
+    report = evaluate(session_set_dir) if report is None else report
+    return {
+        "schemaVersion": PROJECTION_SCHEMA_VERSION,
+        "derived": True,
+        "regenerateWith": PROJECTION_REGENERATE_COMMAND,
+        "generatedAt": datetime.now().astimezone().isoformat(),
+        "sessionSetDir": os.path.basename(os.path.normpath(session_set_dir)),
+        "inputs": input_digests(session_set_dir),
+        "volatileInputs": {VOLATILE_INPUT_GIT: git_fingerprint(session_set_dir)},
+        "report": report.to_dict(),
+    }
+
+
+_PROJECTION_DIR_GITIGNORE = (
+    "# Written by ai_router.close_preflight --write. Everything in this\n"
+    "# directory is a derived per-machine cache: regenerate it, never\n"
+    "# commit it. This file exists so a consumer repo whose root\n"
+    "# .gitignore predates the marker directory is still covered.\n"
+    "*\n"
+)
+
+
+def _ensure_projection_dir(session_set_dir: str) -> str:
+    """Create ``.dabbler/`` and its self-protecting ignore file.
+
+    The ignore file is written only when absent, so an operator who
+    edits it keeps their edit. Set 029 shipped exactly this
+    belt-and-suspenders for the per-set marker files; the reasoning is
+    unchanged, and it is what makes the "never commit this" property
+    hold in a consumer repo that this repo's root ``.gitignore`` cannot
+    reach.
+    """
+    directory = projection_dir(session_set_dir)
+    os.makedirs(directory, exist_ok=True)
+    ignore = os.path.join(directory, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(_PROJECTION_DIR_GITIGNORE)
+    return directory
+
+
+def write_projection(
+    session_set_dir: str, report: Optional[PreflightReport] = None
+) -> Optional[str]:
+    """Serialize the projection; return the path written, or ``None``.
+
+    Never raises. A derived cache that cannot be written must not take
+    down the report it accompanies — but the caller NAMES the skip in
+    operator-facing output rather than swallowing it (L-079-1).
+    """
+    payload = build_projection(session_set_dir, report)
+    try:
+        _ensure_projection_dir(session_set_dir)
+        with open(
+            projection_path(session_set_dir), "w", encoding="utf-8", newline="\n"
+        ) as fh:
+            json.dump(payload, fh, indent=2, ensure_ascii=True)
+            fh.write("\n")
+    except OSError:
+        return None
+    return projection_path(session_set_dir)
+
+
+def read_projection(session_set_dir: str) -> Optional[dict]:
+    """The serialized projection, or ``None`` when absent or unreadable.
+
+    A projection whose ``schemaVersion`` this code does not know reads as
+    ``None`` too: guessing at an unknown shape is how a cache becomes a
+    source.
+    """
+    try:
+        with open(projection_path(session_set_dir), "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    version = data.get("schemaVersion")
+    if not isinstance(version, int) or version > PROJECTION_SCHEMA_VERSION:
+        return None
+    return data
+
+
+def projection_state(
+    session_set_dir: str, *, include_volatile: bool = True
+) -> str:
+    """Is the serialized projection ``fresh``, ``stale``, absent or unreadable?
+
+    ``include_volatile`` is the honest half. Every reader can recompute
+    the content digests; only a reader willing to run git can recompute
+    the fingerprint. The CLI checks both — it is already paying for git.
+    The Work Explorer checks the content digests alone, deliberately, and
+    labels the two volatile ROWS "as of" the projection's timestamp
+    instead of pretending to have re-checked them. A renderer that
+    claimed freshness it could not establish would be the failure this
+    whole file exists to avoid, and one that spawned git on every redraw
+    would be the failure the file replaces.
+    """
+    data = read_projection(session_set_dir)
+    if data is None:
+        return (
+            PROJECTION_UNREADABLE
+            if os.path.isfile(projection_path(session_set_dir))
+            else PROJECTION_ABSENT
+        )
+    recorded = data.get("inputs")
+    if not isinstance(recorded, dict):
+        return PROJECTION_STALE
+    live = input_digests(session_set_dir)
+    if set(recorded) != set(live):
+        return PROJECTION_STALE
+    if any(recorded.get(name) != live[name] for name in live):
+        return PROJECTION_STALE
+    if include_volatile:
+        recorded_git = data.get("volatileInputs")
+        if not isinstance(recorded_git, dict):
+            return PROJECTION_STALE
+        if recorded_git.get(VOLATILE_INPUT_GIT) != git_fingerprint(
+            session_set_dir
+        ):
+            return PROJECTION_STALE
+    return PROJECTION_FRESH
+
+
+# ---------------------------------------------------------------------------
 # Step 4 — prove it against history
 # ---------------------------------------------------------------------------
 
@@ -1110,6 +1450,27 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Emit the report as JSON on stdout.",
     )
     parser.add_argument(
+        "--write",
+        action="store_true",
+        help=(
+            "Also serialize the report to "
+            f"{PROJECTION_DIRNAME}/{PROJECTION_FILENAME} beside the session "
+            "set, with a digest of every input, so the Work Explorer can "
+            "render the obligations without paying for this run. The "
+            "directory is git-ignored: the projection is a per-machine "
+            "cache, never a record."
+        ),
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "Report whether the serialized projection still matches its "
+            "inputs, without evaluating anything. Exit 0 fresh, "
+            f"{EXIT_PROJECTION_NOT_FRESH} stale/absent/unreadable."
+        ),
+    )
+    parser.add_argument(
         "--replay-history",
         action="store_true",
         help=(
@@ -1157,11 +1518,41 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"close_preflight: {mismatch}", file=sys.stderr)
         return EXIT_INVALID_INVOCATION
 
+    if args.check:
+        # Deliberately BEFORE evaluate(): the whole point of --check is to
+        # ask whether the recorded answer still holds without paying the
+        # seconds that producing a new one costs.
+        state = projection_state(session_set_dir)
+        _emit(f"{PROJECTION_DIRNAME}/{PROJECTION_FILENAME}: {state}")
+        if state != PROJECTION_FRESH:
+            print(
+                f"regenerate with: {PROJECTION_REGENERATE_COMMAND}",
+                file=sys.stderr,
+            )
+            return EXIT_PROJECTION_NOT_FRESH
+        return EXIT_OK
+
     report = evaluate(session_set_dir)
     if args.json:
         _emit(json.dumps(report.to_dict(), indent=2))
     else:
         _emit(render(report))
+
+    if args.write:
+        # stderr, always: --json's stdout must stay parseable, and a
+        # write is a side-effect notice rather than report data.
+        written = write_projection(session_set_dir, report)
+        if written is None:
+            print(
+                "close_preflight: could not write "
+                f"{projection_path(session_set_dir)}; the report above stands "
+                "but was NOT serialized, so the Work Explorer will keep "
+                "rendering whatever it had (or 'absent')",
+                file=sys.stderr,
+            )
+        else:
+            print(f"wrote {written}", file=sys.stderr)
+
     return report.exit_code
 
 

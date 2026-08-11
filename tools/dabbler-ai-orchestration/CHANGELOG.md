@@ -13,16 +13,101 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > `0.43.0` and `0.44.0` received in `0.45.0`.
 >
 > **Why the wait.** `0.51.0` below headlines `<- here` on the step a
-> session is on. Set 120 Session 3 **removes** that marker (operator
+> session is on. Set 120 Session 3 **removed** that marker from the
+> router and Set 115 Session 4 removed it from this extension (operator
 > ruling: the in-progress icon carries the same information without
-> claiming a single current step). Publishing first would show staff a
-> marker that appears in one release and disappears in the next.
+> claiming a single current step). Publishing first would have shown
+> staff a marker that appeared in one release and disappeared in the
+> next. The `0.51.0` prose below is left as written, with a pointer at
+> its head, because it is the record of what was staged — what the
+> folded release actually ships is the Unreleased entries here.
 
 ### Added
 
-- **(Set 115 S3) A session row offers the prompt to run it and the files
-  it produced.** Right-clicking a session in the Work Explorer now shows
-  two entries:
+- **(Set 115 S4) The Work Explorer's sixth level: what still stands
+  between an in-flight session and its close.** Expand the session in
+  flight and, under its steps, a **Close-out** row summarises the
+  obligations `close_session` will check — `1 blocking, 3 advisory`, or
+  `nothing outstanding` — and expands to one row per obligation, each
+  carrying the predicate's own remediation in its tooltip.
+
+  Two in five sessions fail close-out at least once, always on an
+  obligation nobody knew about until a gate refused. This is that list,
+  on the surface the operator already watches while work is in flight.
+
+  **The tree never computes it.** `python -m ai_router.close_preflight
+  --session-set-dir <set> --write` does, and the tree reads the file it
+  writes. The preflight takes 2–7 seconds (git-backed predicates plus
+  interpreter startup); calling it from a view that redraws on every
+  watcher tick would have made the panel feel broken and made a display
+  feature fail whenever the interpreter was unresolvable.
+
+  **It says how old its answer is, in four ways, and never claims more:**
+
+  - **absent** — nobody has run the preflight for this session. The row
+    says `not computed` and names the command, because "no answer" and
+    "nothing remains" are opposite facts.
+  - **unreadable** — the file is damaged, from a newer schema, or carries
+    a row this build cannot parse. It takes the cancelled glyph rather
+    than quietly rendering as empty; a damaged record is never silently
+    shortened into a confident one.
+  - **stale** — the set directory has changed since the projection was
+    computed. Said first in the row's own text and repeated on every
+    obligation under it; a list that silently lags is worse than none.
+  - **volatile rows** — `working tree clean`, `pushed to remote`,
+    `verification integrity`, `test run fresh` and the backstop read
+    state that lives **outside** the session-set directory: git, the
+    repo-wide work diff, or a digest of the source files a suite covers.
+    Those rows are dated `as of HH:MM` even in a projection that is
+    otherwise provably fresh, because no digest of the set directory can
+    speak for them.
+
+  A row may only render as done when the projection is fresh, nothing at
+  all is outstanding, **and** the recorded verdict says the close would
+  actually proceed — an all-met report whose verdict is
+  `undecided-backstop-would-route` still has a routed round standing
+  between it and closing.
+
+  The panel follows the file: `close-obligations.json` is on the same
+  watcher as the other session-set state files, so running the command
+  moves the row rather than waiting for the 30-second poll.
+
+### Changed
+
+- **(Set 115 S4, operator ruling at the set's UAT walk) "Open Session
+  Artifacts" is removed from the session row's menu.** Set 115 S3 shipped
+  it beside Copy Run Prompt; walking the finished row, the operator
+  judged one entry enough — the artifacts are a folder away, and a
+  session row's menu is worth more when it offers exactly what that row
+  is for. The command, its `package.json` entries and its `s<N>-*`
+  discovery helpers went with it rather than being left registered and
+  unreachable (it was hidden from the Command Palette by design, so the
+  menu was its only door). A session the run phrase does not resolve to
+  now has an empty context menu, which is the honest result.
+
+  This also retired the two Layer 3 scenarios that drove the artifact
+  click end to end — the two that were failing in CI on both platforms
+  while passing locally, because a fast runner right-clicks before the
+  menu's entries populate. What replaces their coverage is an ABSENCE
+  assertion at both layers: no session row carries the token, and the
+  live menu does not offer the label.
+
+- **(Set 115 S4) `<- here` is gone from the step rows; the in-progress
+  icon says it instead.** Operator ruling (Set 120 S3), finished here in
+  the second language: the marker picked exactly one row by rule — first
+  unfinished logged step, else the first pending planned row — and that
+  inference is what pointed confidently at step 1 of a session whose real
+  work was four steps further on, because four statuses were unreadable.
+
+  What replaces it is a fact rather than a guess: the step whose recorded
+  status **is** `in-progress` gets the in-progress glyph. Two steps can be
+  in flight at once, which the single-valued marker could not represent,
+  and none can — a real answer it had to fake. The description column on
+  step rows is now empty; the marker was the only thing that ever went
+  there.
+
+- **(Set 115 S3) A session row offers the prompt to run it.** Right-clicking
+  a session in the Work Explorer shows:
 
   - **Copy Run Prompt** — writes `Start the next session of \`<slug>\`.`
     to the clipboard. It appears on **one row per set**: the session that
@@ -31,12 +116,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
     session than the row it came from, so those rows do not offer one. An
     unrecognised session status offers nothing anywhere in the set rather
     than guessing which session is next.
-  - **Open Session Artifacts** — the files that session produced,
-    discovered **by convention** (`s<N>-*` in the set folder) rather than
-    from a hardcoded list, so new artifact shapes need no code change.
-    One match opens directly; several open a picker; none says so
-    plainly, naming the convention. The entry is always offered and the
-    folder is read on the **click**, never on the tree scan.
+
+  S3 also shipped **Open Session Artifacts** here; S4 removed it at the
+  operator's ruling (see *Changed* above), so it never reached a
+  published build.
 
 - **(Set 115 S2) Click a session row and land on its plan.** The Work
   Explorer's session rows were labels you could not click. Activating one
@@ -113,6 +196,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   are unaffected.
 
 ## [0.51.0] — 2026-08-10 (staged; publish operator-gated)
+
+> **⚠ Superseded in part by the Unreleased section above.** This release
+> was staged before the operator ruled the `<- here` marker out. It never
+> published, and the marker never shipped: Set 120 S3 removed it from the
+> router and Set 115 S4 from this extension. Read every `<- here` below as
+> a record of what was staged, not of what an installed build does — what
+> the folded release ships is the in-progress icon.
 
 > **An in-flight session's steps now render in the Work Explorer.** Expand
 > the session that is in flight and you see its checklist: the plan

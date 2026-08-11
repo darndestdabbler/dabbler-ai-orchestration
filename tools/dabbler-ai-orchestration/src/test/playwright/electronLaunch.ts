@@ -154,6 +154,27 @@ export function startSession(h: FixtureHandle, n: number): void {
   runHarness(["start", ..._handleArgs(h), "--session-number", String(n)]);
 }
 
+/**
+ * Set 115 S4 — write the real close-out obligation projection into the
+ * fixture, by running the shipping `close_preflight.write_projection`.
+ *
+ * Slow on purpose (the preflight runs git-backed predicates), and worth
+ * it: the scenario then renders what the production writer produced, so
+ * the digest map the Python side records and the one the extension
+ * recomputes are proven to agree in a real repository. A hand-written
+ * fixture JSON would prove the renderer and nothing else — and freshness
+ * is exactly the half a faked file cannot exercise.
+ */
+export function writeCloseObligations(h: FixtureHandle): {
+  path: string | null;
+  state: string;
+} {
+  return runHarness(["close-preflight", ..._handleArgs(h)]) as {
+    path: string | null;
+    state: string;
+  };
+}
+
 export function makeActivity(
   h: FixtureHandle,
   n: number,
@@ -982,10 +1003,20 @@ export async function revealSetRow(
 }
 
 /**
- * Open a row's context menu and return the menu's rendered text.
+ * Open a row's context menu and return the menu's rendered text — or the
+ * empty string when the row offers no menu at all.
  *
  * The menu is a workbench-level overlay, not a child of the pane, so it is
  * located off the page rather than off the pane locator.
+ *
+ * **"No menu" is a real answer, not a timeout.** Set 115 S4 removed the
+ * artifact entry from session rows, which made the empty case reachable
+ * for the first time: a session the run phrase does not resolve to now
+ * offers nothing, and VS Code renders no menu rather than an empty one.
+ * A helper that insisted on a visible menu turned that correct behaviour
+ * into a 15-second failure — which is exactly how the full Layer 3 run
+ * reported it. Waiting the full timeout for an absence is also the slow
+ * way to ask, so the wait is short and its expiry is the answer.
  */
 export async function rowContextMenuText(
   page: Page,
@@ -993,8 +1024,13 @@ export async function rowContextMenuText(
 ): Promise<string> {
   await row.click({ button: "right" });
   const menu = page.locator(".context-view .monaco-menu");
-  await menu.waitFor({ state: "visible", timeout: 15_000 });
-  const text = await menu.innerText();
+  let text = "";
+  try {
+    await menu.waitFor({ state: "visible", timeout: 5_000 });
+    text = await menu.innerText();
+  } catch {
+    // No menu: the row carries no applicable entries.
+  }
   await page.keyboard.press("Escape");
   await page.waitForTimeout(200);
   return text;

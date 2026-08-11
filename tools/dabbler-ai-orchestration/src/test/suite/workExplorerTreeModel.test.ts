@@ -15,19 +15,27 @@
 //     level costs nothing until it is opened.
 
 import * as assert from "assert";
-import { SessionRecord, SessionSet } from "../../types";
+import { CloseObligations, SessionRecord, SessionSet } from "../../types";
 import { ActionSupports, ROW_ACTIONS } from "../../providers/ActionRegistry";
 import { VisibleModule } from "../../providers/SessionSetsModel";
+import * as treeModel from "../../providers/workExplorerTreeModel";
 import {
   MODULE_TOKEN,
   NODE_TOKEN,
   actionToken,
+  asOfLabel,
   bucketDescriptor,
   bucketNodes,
   childrenOf,
+  closeOutDescriptor,
+  closeOutGlyph,
+  closeOutNodes,
+  closeOutSummary,
   hasToken,
   moduleDescriptor,
   moduleNodes,
+  obligationDescriptor,
+  obligationNodes,
   preselectFromTreeNode,
   sessionDescriptor,
   sessionNodes,
@@ -753,19 +761,61 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     for (const id of ids) assert.ok(id.startsWith("step:114-live/2/"), id);
   });
 
-  test("exactly one step row carries the current-step marker", () => {
-    const set = inFlightSet();
+  test("the step in flight is named by its ICON, not by a marker in the description", () => {
+    // Set 115 S4, finishing Set 120 S3's operator ruling in the second
+    // language. `<- here` is gone; what an operator reads instead is the
+    // recorded `in-progress` status reaching the glyph.
+    //
+    // Planted in the arrangement the removed rule existed to handle — an
+    // untouched planned row ABOVE the step actually in flight — because
+    // a glyph that came from row order rather than from the ledger would
+    // land on "Register" here and look entirely plausible.
+    const set = inFlightSet({
+      stepLedger: {
+        sessionNumber: 2,
+        entries: [
+          ...PLAN,
+          {
+            sessionNumber: 2,
+            stepNumber: 2,
+            stepKey: "build-it",
+            description: "Halfway through building the thing.",
+            status: "in-progress",
+          },
+        ],
+        specSteps: SPEC_STEPS,
+      },
+    });
     const descriptors = childrenOf(sessionNode(set, 2)).map((n) =>
       n.kind === "step" ? stepDescriptor(n) : null,
     );
-    const marked = descriptors.filter((d) => d?.description === "<- here");
-    assert.strictEqual(marked.length, 1);
-    // Quiet everywhere else: the marker is only findable at a glance if
-    // it is the only thing in the description column.
-    assert.strictEqual(
-      descriptors.filter((d) => d?.description !== undefined).length,
-      1,
+    assert.deepStrictEqual(
+      descriptors.map((d) => d?.icon),
+      [
+        { kind: "file", slug: "not-started.svg" },
+        { kind: "file", slug: "in-progress.svg" },
+      ],
     );
+    // The description column is empty on EVERY step row now. The marker
+    // was the only thing that ever went there.
+    assert.deepStrictEqual(
+      descriptors.map((d) => d?.description),
+      [undefined, undefined],
+    );
+  });
+
+  test("nothing in the tree model still spells the removed marker", () => {
+    // The anti-resurrection guard (L-112-1), mirroring
+    // `test_session_checklist.py`'s `assert not hasattr(sc, "HERE_MARKER")`
+    // on the Python side. A re-added export would compile and quietly put
+    // an inferred row back on screen.
+    assert.strictEqual("HERE_MARKER" in treeModel, false);
+    const set = inFlightSet();
+    const rendered = childrenOf(sessionNode(set, 2))
+      .map((n) => (n.kind === "step" ? stepDescriptor(n) : null))
+      .flatMap((d) => [d?.description ?? "", d?.tooltip ?? ""])
+      .join("\n");
+    assert.strictEqual(rendered.includes("<- here"), false, rendered);
   });
 
   test("a step row's label is the humanized key and its tooltip carries the prose", () => {
@@ -819,5 +869,309 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     assert.ok(sessionDescriptor(sessionNode(set, 2)).tooltip?.includes("2 steps"));
     // A leaf session row says nothing about steps it does not have.
     assert.ok(!sessionDescriptor(sessionNode(set, 1)).tooltip?.includes("step"));
+  });
+});
+
+suite("Set 115 S4 — the close-out obligations under the in-flight session", () => {
+  // The rows are RENDERED here, never computed: `close_preflight` costs
+  // 2-7 seconds and this model runs on every watcher tick. What is
+  // asserted is the honesty contract around a recorded answer — that a
+  // projection which cannot be shown to be current never renders as
+  // truth, in any of the three ways it can fail to be current (absent,
+  // unreadable, stale) plus the fourth that no digest can detect at all
+  // (a git-backed row in a projection that IS fresh).
+
+  const PLAN = [
+    { sessionNumber: 2, stepNumber: 1, stepKey: "register", description: "Register.", status: "pending", kind: "plan-step" },
+  ];
+
+  function obligations(over: Partial<CloseObligations> = {}): CloseObligations {
+    return {
+      state: "fresh",
+      sessionNumber: 2,
+      verdict: "would-refuse",
+      generatedAt: "2026-08-11T13:42:00-04:00",
+      obligations: [
+        {
+          check: "working_tree_clean",
+          met: false,
+          blocking: true,
+          detail: "working tree has uncommitted changes in scope",
+          action: "commit the listed paths",
+          cost_warning: "",
+          volatile: true,
+        },
+        {
+          check: "activity_log_entry",
+          met: false,
+          blocking: false,
+          detail: "no logged step for session 2",
+          action: "log what this session did",
+          cost_warning: "",
+          volatile: false,
+        },
+        {
+          check: "disposition_present",
+          met: true,
+          blocking: true,
+          detail: "",
+          action: "",
+          cost_warning: "",
+          volatile: false,
+        },
+      ],
+      ...over,
+    };
+  }
+
+  function liveSet(over: Partial<SessionSet> = {}): SessionSet {
+    return fakeSet({
+      name: "115-live",
+      state: "in-progress",
+      sessions: ledger("complete", "in-progress", "not-started"),
+      stepLedger: { sessionNumber: 2, entries: PLAN, specSteps: ["Register."] },
+      closeObligations: obligations(),
+      ...over,
+    });
+  }
+
+  function sessionNode(set: SessionSet, number: number) {
+    const node = sessionNodes({ kind: "set", set }).find(
+      (n) => n.session.number === number,
+    );
+    assert.ok(node, `no session ${number} on ${set.name}`);
+    return node;
+  }
+
+  function closeOut(set: SessionSet, number = 2) {
+    const [node] = closeOutNodes(sessionNode(set, number));
+    assert.ok(node, "expected a close-out node");
+    return node;
+  }
+
+  test("the close-out row sits under the in-flight session, after its steps", () => {
+    const children = childrenOf(sessionNode(liveSet(), 2));
+    assert.deepStrictEqual(
+      children.map((n) => n.kind),
+      ["step", "closeout"],
+    );
+  });
+
+  test("no other session gets one, however the set is configured", () => {
+    // A closed session's obligations are answered by the fact that it
+    // closed; a not-started one has no close to preflight.
+    const set = liveSet();
+    for (const n of [1, 3]) {
+      assert.deepStrictEqual(closeOutNodes(sessionNode(set, n)), []);
+    }
+  });
+
+  test("a projection about ANOTHER session is not shown as this one's", () => {
+    // The same rule the step ledger follows: a record about session 1
+    // says nothing about session 2, and attaching it here would be worse
+    // than silence — it would be a false answer to the exact question
+    // this row exists to answer.
+    const set = liveSet({ closeObligations: obligations({ sessionNumber: 1 }) });
+    const d = closeOutDescriptor(closeOut(set));
+    assert.strictEqual(d.description, "not computed");
+    assert.strictEqual(d.collapsible, "none");
+  });
+
+  test("the group row summarizes unmet obligations by blocking-ness", () => {
+    const d = closeOutDescriptor(closeOut(liveSet()));
+    assert.strictEqual(d.label, "Close-out");
+    assert.strictEqual(d.description, "1 blocking, 1 advisory");
+    assert.strictEqual(d.collapsible, "collapsed");
+  });
+
+  test("a fresh projection whose CLOSE IS SETTLED is the only way to read done", () => {
+    const clean = obligations({
+      obligations: obligations().obligations.map((o) => ({ ...o, met: true })),
+      verdict: "would-close",
+    });
+    const d = closeOutDescriptor(closeOut(liveSet({ closeObligations: clean })));
+    assert.ok(d.description?.startsWith("nothing outstanding"), d.description);
+    // Dated even so: two of the rows behind it read git, which nothing
+    // here can re-check.
+    assert.ok(d.description?.includes("as of 13:42"), d.description);
+    assert.deepStrictEqual(d.icon, { kind: "file", slug: "done.svg" });
+
+    // ...and the falsifiers. The same all-met rows, one state worse, must
+    // NOT read as done. A list that says "nothing remains" while
+    // something does is the failure this whole feature is built against.
+    for (const state of ["stale", "absent", "unreadable"] as const) {
+      const g = closeOutGlyph({ ...clean, state });
+      assert.notStrictEqual(g, "complete", `${state} rendered as complete`);
+    }
+  });
+
+  test("all rows met but the close undecided is NOT an all-clear", () => {
+    // Found by an end-of-set path-aware critic. `close_preflight` reports
+    // three verdicts, not two: when every hand-fixable row is met but no
+    // settling verification evidence exists, the close turns on a routed
+    // round that has not run — `would_close` is null, not true. Counting
+    // only unmet rows painted the tick there and told the operator they
+    // were done.
+    const undecided = obligations({
+      obligations: obligations().obligations.map((o) => ({ ...o, met: true })),
+      verdict: "undecided-backstop-would-route",
+    });
+    const d = closeOutDescriptor(
+      closeOut(liveSet({ closeObligations: undecided })),
+    );
+    assert.deepStrictEqual(d.icon, { kind: "file", slug: "not-started.svg" });
+    assert.ok(d.description?.includes("not decided"), d.description);
+    assert.ok(d.description?.includes("backstop"), d.description);
+  });
+
+  test("an unrecognised verdict never reads as settled either", () => {
+    // The Set 086 posture: an unrecognised token is treated as severe
+    // rather than clean, so a hand-edited or future verdict cannot buy a
+    // tick it did not earn.
+    const odd = obligations({
+      obligations: obligations().obligations.map((o) => ({ ...o, met: true })),
+      verdict: "probably-fine",
+    });
+    assert.strictEqual(closeOutGlyph(odd), "not-started");
+    assert.strictEqual(closeOutGlyph({ ...odd, verdict: null }), "not-started");
+  });
+
+  test("stale is said first, and never omitted", () => {
+    const d = closeOutDescriptor(
+      closeOut(liveSet({ closeObligations: obligations({ state: "stale" }) })),
+    );
+    assert.ok(d.description?.startsWith("stale"), d.description);
+    assert.ok(d.description?.includes("1 blocking"), d.description);
+    assert.ok(d.tooltip?.includes("close_preflight"), d.tooltip);
+  });
+
+  test("absent is a state the operator is told about, not an empty row", () => {
+    // "Nobody has computed this" and "there is nothing to compute" are
+    // opposite facts. The row names the command that resolves it.
+    const set = liveSet({
+      closeObligations: {
+        state: "absent",
+        sessionNumber: null,
+        verdict: null,
+        generatedAt: null,
+        obligations: [],
+      },
+    });
+    const d = closeOutDescriptor(closeOut(set));
+    assert.strictEqual(d.description, "not computed");
+    assert.strictEqual(d.collapsible, "none", "a twisty onto nothing");
+    assert.ok(d.tooltip?.includes("--write"), d.tooltip);
+    assert.ok(hasToken(d.contextValue, "closeout-absent"), d.contextValue);
+  });
+
+  test("an unreadable projection takes the fault glyph, not the quiet one", () => {
+    // `step-ledger-findings.md` §4 records the tree concealing a
+    // data-quality fault the CLI showed as `[?]`. This row does not
+    // repeat that: unreadable is visibly wrong, not silently empty.
+    const set = liveSet({
+      closeObligations: obligations({ state: "unreadable", obligations: [] }),
+    });
+    const d = closeOutDescriptor(closeOut(set));
+    assert.deepStrictEqual(d.icon, { kind: "file", slug: "cancelled.svg" });
+    assert.ok(d.description?.includes("regenerate"), d.description);
+  });
+
+  test("a session with no steps but a projection is still expandable", () => {
+    const set = liveSet({ stepLedger: null });
+    assert.deepStrictEqual(stepNodes(sessionNode(set, 2)), []);
+    assert.strictEqual(
+      sessionDescriptor(sessionNode(set, 2)).collapsible,
+      "collapsed",
+    );
+  });
+
+  test("obligation rows are leaves with stable, unique ids", () => {
+    const rows = obligationNodes(closeOut(liveSet()));
+    const ids = rows.map((n) => obligationDescriptor(n).id);
+    assert.strictEqual(new Set(ids).size, ids.length);
+    for (const id of ids) assert.ok(id.startsWith("obligation:115-live/2/"), id);
+    assert.deepStrictEqual(childrenOf(rows[0]), []);
+    assert.strictEqual(obligationDescriptor(rows[0]).collapsible, "none");
+  });
+
+  test("an unmet row says whether it can refuse the close", () => {
+    const [blocking, advisory, met] = obligationNodes(closeOut(liveSet())).map(
+      obligationDescriptor,
+    );
+    assert.strictEqual(blocking.label, "Working tree clean");
+    assert.ok(blocking.description?.includes("blocking"), blocking.description);
+    assert.ok(advisory.description?.includes("advisory"), advisory.description);
+    assert.deepStrictEqual(met.icon, { kind: "file", slug: "done.svg" });
+    // A met row makes no claim about blocking-ness: there is nothing to
+    // refuse, so the qualifier would be noise on the row that needs none.
+    assert.strictEqual(met.description, undefined);
+  });
+
+  test("a git-backed row is dated even when the projection is fresh", () => {
+    // The property `volatile` exists for. Committing changes no byte this
+    // projection digested, so "fresh" cannot speak for these two rows and
+    // the row says so itself rather than borrowing the parent's verdict.
+    const [gitRow, fileRow] = obligationNodes(closeOut(liveSet())).map(
+      obligationDescriptor,
+    );
+    assert.ok(gitRow.description?.includes("as of 13:42"), gitRow.description);
+    assert.ok(gitRow.tooltip?.includes("git"), gitRow.tooltip);
+    assert.ok(!fileRow.description?.includes("as of"), fileRow.description);
+  });
+
+  test("a stale projection dates EVERY row, not only the volatile ones", () => {
+    const set = liveSet({ closeObligations: obligations({ state: "stale" }) });
+    const rows = obligationNodes(closeOut(set)).map(obligationDescriptor);
+    for (const row of rows) {
+      assert.ok(row.description?.includes("as of 13:42"), row.description);
+    }
+  });
+
+  test("an unparseable timestamp degrades to what was written", () => {
+    assert.strictEqual(asOfLabel(null), "as of an unrecorded time");
+    assert.strictEqual(asOfLabel("not a date"), "as of not a date");
+  });
+
+  test("close-out rows carry their own tokens and no session token", () => {
+    const group = closeOutDescriptor(closeOut(liveSet()));
+    assert.ok(hasToken(group.contextValue, NODE_TOKEN.closeout));
+    assert.ok(!hasToken(group.contextValue, NODE_TOKEN.session));
+    assert.ok(hasToken(group.contextValue, "closeout-fresh"));
+
+    const [row] = obligationNodes(closeOut(liveSet())).map(obligationDescriptor);
+    assert.ok(hasToken(row.contextValue, NODE_TOKEN.obligation));
+    assert.ok(!hasToken(row.contextValue, NODE_TOKEN.step));
+    assert.ok(hasToken(row.contextValue, "obligation-unmet"));
+    assert.ok(hasToken(row.contextValue, "obligation-blocking"));
+    assert.ok(hasToken(row.contextValue, "obligation-volatile"));
+  });
+
+  test("a routed-round cost is surfaced with the vocabulary the CLI uses", () => {
+    const withCost = obligations({
+      obligations: [
+        {
+          check: "verification_backstop",
+          met: true,
+          blocking: true,
+          detail: "this close carries no settling verification evidence",
+          action: "",
+          cost_warning: "closing now SPENDS a routed verification round",
+          volatile: false,
+        },
+      ],
+    });
+    const [row] = obligationNodes(
+      closeOut(liveSet({ closeObligations: withCost })),
+    ).map(obligationDescriptor);
+    assert.ok(row.description?.includes("$"), row.description);
+    assert.ok(row.tooltip?.includes("routed verification round"), row.tooltip);
+  });
+
+  test("summary counting is driven by the rows, not by the verdict token", () => {
+    // The verdict is recorded prose; the counts are what the operator
+    // acts on. Deriving one from the other would let a stale or
+    // hand-edited verdict silently contradict the list under it.
+    const contradicting = obligations({ verdict: "would-close" });
+    assert.strictEqual(closeOutSummary(contradicting), "1 blocking, 1 advisory");
   });
 });

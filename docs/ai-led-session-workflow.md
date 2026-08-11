@@ -1502,10 +1502,14 @@ log.log_step(
 > name renders the whole session as not-started (Set 119 S2).
 >
 > **`skipped` is deliberately not legal.** It has no box in the checklist
-> reader and is not terminal in either the CLI or the Work Explorer, so a
-> skipped step renders `[?]` and steals the `<- here` marker from real
-> work. Record a skip in the step's `description` until both readers
-> learn the token (operator ruling, 2026-08-11).
+> reader, so a skipped step renders `[?]` — the corrupt-data glyph — in
+> the CLI and as `not-started` in the Work Explorer, neither of which is
+> what it means. Record a skip in the step's `description` until both
+> readers learn the token (operator ruling, 2026-08-11). The ruling
+> originally also cited the `<- here` marker, which such a step would
+> steal from real work; that marker was removed from both languages
+> later the same day (Sets 120 S3 and 115 S4), and the rest of the
+> reasoning stands without it.
 
 **Reasoning tasks** — delegate to the router:
 ```python

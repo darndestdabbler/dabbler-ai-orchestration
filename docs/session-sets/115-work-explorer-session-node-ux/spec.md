@@ -23,6 +23,20 @@
 > with root causes diagnosed from the session that produced them.
 > Two are bugs; the third is a design question to decide, not patch.
 
+> **⚠ Read [`step-ledger-findings.md`](step-ledger-findings.md) before
+> starting this set.** Recorded 2026-08-11, after the same defects were
+> observed live again during Set 119 Session 2 and traced to a single
+> root cause the notes above predate: **the step-status field has no
+> vocabulary.** "Done" is spelled four ways across the repo's
+> activity logs (`complete` 2,412, `completed` 229, `done` 42,
+> `complete-with-known-failures` 1), and ~6 entries carry
+> multi-paragraph prose in the status field. Roughly **10% of all step
+> entries are mis-rendered** as a result, and `<- here` is behaving
+> correctly on corrupt data rather than misbehaving.
+>
+> **Sessions 1–3 are unaffected and stand as authored.** **Session 4
+> should not run as written** — see the note at its heading.
+
 ---
 
 ## Session Set Configuration
@@ -223,6 +237,49 @@ computes the title map it fails to use.
 ---
 
 ### Session 4 of 4: The checklist tells the truth about what remains
+
+> **⚠ DO NOT RUN AS WRITTEN.** Three findings recorded 2026-08-11 in
+> [`step-ledger-findings.md`](step-ledger-findings.md), any one of which
+> is disqualifying on its own:
+>
+> **1. It would render corrupt data.** The step-status field has no
+> validated vocabulary; ~10% of step entries carry an unrecognised token.
+> Nothing this session builds renders correctly until a status allowlist
+> lands at the writer — a **router** change, out of this set's scope.
+>
+> **2. It contains a contradiction** (independent review, GPT-5.6 Sol):
+> it requires showing *outstanding lifecycle phases* while *rendering only
+> what is recorded, never what is planned.* Before verification,
+> disposition, remediation or close happens there is no record, and
+> absence cannot distinguish pending from not-applicable from
+> not-yet-knowable from corrupt. It therefore cannot deliver its own
+> "fully ticked means actually finished" promise without synthesising
+> expected obligations from policy — which it forbids itself.
+>
+> **3. Its motivating measurement needs rebaselining.** The 57-minute
+> figure below is a **mean**, and wall-clock spans include operator-away
+> time — Set 116's spec had already ruled that *"the median is the honest
+> signal and the maxima are not effort,"* and the operator has since
+> confirmed the 402-minute outlier cited below was waiting on a human.
+> Measured from `session-events.jsonl` across 104 sets / 295 sessions,
+> **close-out execution is 0.1 min median.** The phenomenon the operator
+> observed is real — a ticked checklist can hide remaining work — but its
+> magnitude, and therefore this session's budget, is unestablished.
+>
+> **Also unresolved:** Sol's sixth precondition asks for *evidence that
+> operators keep the session node expanded and act on it.* The tree is
+> lazy and its rows are collapsed by default, so "persistent" does not
+> establish "watched at the moment intervention matters."
+>
+> **And the architecture may make this session smaller.** The same
+> derivation exists twice — 1,680 lines of Python against 1,830 of
+> TypeScript, guarded by 110 TS tests plus a parity harness that exists
+> only because there are two implementations. Computing the projection
+> once in Python and serialising it (the operator's 2026-08-11 proposal)
+> would reduce this session to a renderer.
+>
+> **Re-author after the prerequisites in `step-ledger-findings.md` §7, or
+> drop this session and ship Sessions 1–3.**
 
 The operator's observation, 2026-08-10: *"you can have all tasks checked
 off and there is still a lot of outstanding work to be done (e.g., a final

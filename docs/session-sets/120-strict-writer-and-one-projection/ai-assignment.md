@@ -92,3 +92,105 @@ asserts it: `session_checklist.STATUS_BOXES` still renders `done` as
 all three sessions. This session shipped **19** (50 parametrised cases) in
 one module, `ai_router/tests/test_step_status_vocabulary.py`, leaving 21
 for Sessions 2 and 3.
+
+---
+
+## Session 2 — What to do about the history already on disk
+
+**Orchestrator:** `copilot` / `anthropic` / `claude-opus-5`, effort `high`
+(Copilot CLI transport — this seat carries no provider API keys by design,
+and their absence is not an error).
+
+**Verification:** routed to `gpt-5.5` across all three rounds, as the
+cross-provider rule requires (anthropic excluded by model-registry
+lookup).
+
+**The spec asked whether the inventory would contradict it. It did not —
+and saying so precisely is the answer.** The command measures 109
+activity logs, 2,805 entries, 286 drifted (10.2%) across 24 files, split
+271 lossless and 15 loaded. That is the spec's *amended* table exactly.
+The spec has been wrong here once, and S1 already corrected it (the
+pre-amendment "roughly a hundred session-set directories" against a real
+24), so the remaining question was whether the amendment itself held. It
+does. What the original one-off query missed was not a count but two
+facts about its own reach: a **110th** activity log exists outside
+`docs/session-sets` — the pinned UAT fixture, with 2 further `completed`
+— and the logs are not uniformly formatted.
+
+**The formatting fact changed the implementation, not just a comment.**
+108 of 109 logs are CRLF, 39 carry a trailing newline and 69 do not, and
+Set 028's was written `ensure_ascii=False` so it holds a literal `→` that
+a default `json.dump` would escape. The obvious migration —
+parse, mutate, dump — would therefore have rewritten bytes in files it
+was asked not to touch, and would have made the ruling's own acceptance
+condition ("the 15 loaded entries are byte-identical") impossible to
+evaluate, because everything would have moved. The migrator locates each
+`"status"` member as a **raw-text span** instead, cross-checks those
+spans against what the JSON parser sees, and rewrites only the ruled
+ones.
+
+**The premise was falsified on three signals, and the negative result is
+worth what the net was.** Owning-session-never-completed: 0 hits.
+Same-step-re-logged-non-terminal: 0 hits. Description-asserts-
+non-completion: 1 hit. The description signal first ran word-level
+(`failed` / `failure` / `blocked` / `deferred`) and produced **38** hits;
+all 38 were read in full and every one was incidental text — `0 failed`
+inside a suite count, `test_failure_injection.py` inside a file list,
+`deferred to Set 062` as a scope note. Narrowing to phrase-level left one
+real hit: Set 061 S4 `deferral-close`, where *"cut short"* describes the
+**set** (the operator moved Set 061's UAT and 0.30.0 release into Set
+062) while the step's own job — record the deferral, write
+`change-log.md` — was done, and the session closed complete with a
+VERIFIED verdict. That reading is recorded in-module as an adjudication,
+so `--check-premise` exits 0 today and still exits 2 the day a new
+counter-example appears. A check that stays permanently red is a check
+nobody reads.
+
+**Both verification findings were the same defect class, and both were
+right: intent documented, not enforced.** Round 1 (spec-conformance)
+found `--check-premise` and `--migrate` were independent CLI branches —
+so a consumer repo, *invited by my own changelog entry*, could run
+`--migrate --in-place` on history that had never been through the check.
+Round 2 (supplementary) found the identical shape one layer over: I
+journaled the UAT-fixture exclusion and wrote "deliberately out of scope"
+in the docstring, then implemented it as **nothing at all** — it held
+only because the *default* scan root avoided it, and `--scan` is a
+supported flag. I had encoded both rules as my own discipline and then
+shipped them as promises. The fixes make them behaviour: the premise
+check is an enforced precondition at both entry points with no `--force`
+(the way past a flag is to read it and record the reading), and
+`EXCLUDED_PATH_SEGMENTS` matches on path segments so `--scan .` cannot
+reach a fixture tree. Round 3 remediation-review: VERIFIED, 2
+fix-accepted, 0 findings.
+
+**The result was checked independently of the tool that produced it.**
+Beyond the migrator's own two internal assertions, `git diff` across the
+21 migrated files is exactly 271 removed `"status"` lines and 271 added
+and nothing else; re-running `--in-place` changes 0 files; and the
+post-migration inventory reports drift down from 286 (10.2%) to exactly
+the 15 preserved entries (0.5%).
+
+**What Session 3 inherits:**
+
+1. **The 15 preserved entries are S3's headline test case** — 4 absent
+   statuses (Set 028), 8 prose blobs (Set 110) and 1 JSON array (Set
+   068), 1 `skipped` (Set 009), 1 `complete-with-known-failures` (Set
+   014). They were preserved precisely so S3's explicit `unknown` /
+   `stale` / `unreadable` states have something true to render.
+2. **The absent-status four are the open decision S1 named.** Whether
+   absence should be refused at the writer is still a decision to make
+   on purpose, and these four are the concrete case.
+3. **Any remaining `[?]` in a rendered ledger is now a TRUE signal.**
+   With the mechanical drift gone, the parity proof measures something
+   real rather than noise.
+4. **Test budget: 7 remaining.** The cap is 40 across the set; S1 spent
+   19 and S2 spent 14 (17 cases). S3 has four progress keys, so the
+   coverage has to be chosen rather than accumulated.
+
+**Test budget:** **14** test functions / 17 cases in
+`ai_router/tests/test_step_status_drift.py`. Both verification findings
+are planted rather than merely fixed, both directions of the raw scan
+are planted as a look-alike pair, and two mutation checks confirm the
+suite falsifies: a `json.dump` re-serialize fails 5 cases, and widening
+the ruled scope to swallow `skipped` and `complete-with-known-failures`
+fails 6.

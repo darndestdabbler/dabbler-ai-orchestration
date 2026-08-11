@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "6a0b0f5a82486b19ab08811d1f3d03982aa0185e",
+  "fixedTree": "4206d637ef9bab79d5c92d2aaca43d70c0416aad",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-11T09:13:02.095291+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `--migrate --in-place` can rewrite records even when the premise check would have stopped the migration. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/1 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The write path must refuse and leave files unchanged whenever the same scan has any unadjudicated premise flag, including the public CLI path for --migrate --in-place.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

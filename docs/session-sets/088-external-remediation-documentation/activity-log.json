@@ -19,7 +19,7 @@
       "stepKey": "doc-routed-for-feedback",
       "dateTime": "2026-07-10T12:06:52.116591-04:00",
       "description": "Routed docs/verification-loop-remediation-2026-07.md via route(task_type=documentation); reviewer gemini-pro (cross-provider), auto-verifier gpt-5-4-mini VERIFIED; applied 4 material traceability corrections, deferred immaterial polish. Raw record: s1-doc-feedback.md",
-      "status": "completed",
+      "status": "complete",
       "routedApiCalls": [
         {
           "model": "gemini-pro",
@@ -35,7 +35,7 @@
       "stepKey": "discoverability-linked",
       "dateTime": "2026-07-10T12:06:52.117590-04:00",
       "description": "Added a Recent-version-walk pointer in docs/repository-reference.md to the remediation doc + the 088 capture; grounded commit refs; captured the Set 086 cancellation/salvage linkage. Skipped lessons-learned.md edit to respect the Set 085 preload slimming.",
-      "status": "completed"
+      "status": "complete"
     }
   ]
 }

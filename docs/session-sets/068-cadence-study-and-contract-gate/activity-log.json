@@ -139,7 +139,7 @@
       "stepKey": "session-003/register",
       "dateTime": "2026-06-15T19:05:54.451863-04:00",
       "description": "Registered S3 start (claude-opus-4-8 high; S2 routed rec was sonnet/medium but the S2 disposition flagged the statistical-honesty analysis as opus-warranted at the S3 boundary, matching S1/S2 - operator started this session on opus).",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 3,
@@ -147,7 +147,7 @@
       "stepKey": "session-003/harness-built",
       "dateTime": "2026-06-15T19:05:54.453872-04:00",
       "description": "Built the staged-snapshot harness on the S1 run_test cage: build_snapshots.py (numkit, 5 monotone snapshots), catalogue.json (12 defects across the 4 taxonomy classes; invariants + min counts asserted PASS), run_arms.py (R/Q/E per provider K=3, raw-first, run_test cage for E via temp git repo), grade.py (per-repeat first-catch, cost_model, decision-rule contrasts/bands).",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 3,
@@ -155,7 +155,7 @@
       "stepKey": "session-003/exp-b-arms-run",
       "dateTime": "2026-06-15T19:05:54.455880-04:00",
       "description": "Ran the pilot (google R/Q/E + GPT path-aware convergence check) per prereg Sec10 - it caught a real seed defect (coupling-blind docstrings leaked the cross-file contract; fixed code to the FIXED taxonomy before spending), then the full K=3 two-provider sweep (42 cells, no errors, all E arms converged with verdicts). run_test exercised live in arm E. ~$0.70 metered.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 3,
@@ -163,7 +163,7 @@
       "stepKey": "session-003/exp-b-verdict",
       "dateTime": "2026-06-15T19:05:54.455880-04:00",
       "description": "Graded + symmetric mechanism audit (audit.json, no removals - all catches verified real). Wrote experiment-b-results.md: cadence MECHANISM real (R realizes early window 5/5 both providers; R earlier/cheaper than Q AND E on cadence-payoff) BUT controls not clean (no-coupling s=1.0 surface artifact via BD12; always-visible s=3.0 pure earliness) -> A3 fails, B3 fires -> pre-registered verdict CADENCE DEFENSE DOES NOT HOLD via clause B3 (not B1: not no-cadence-value). S4 input: demote/retire-leaning, narrow R-vs-E rework-timing edge the countervailing consideration.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 3,
@@ -171,7 +171,7 @@
       "stepKey": "session-003/s3-verified",
       "dateTime": "2026-06-15T19:05:54.455880-04:00",
       "description": "Cross-provider verification (gpt-5.4 high): R1 ISSUES_FOUND (1 Major arm-E capability overstatement [E gemini misses BD6 Critical, not 1 minor; E_google catches only 1 of 2 coupling-blind] + 3 Minor: grade.py evidence-file wording, mean/median sign-agreement not folded into resolved, run_test live-use not cited) -> all fixed + echoes propagated (L-065-1) -> R2 (all resolved, 1 trivial new docstring nit) -> R3 VERIFIED. ~$0.556 verification.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 3,
@@ -179,7 +179,7 @@
       "stepKey": "session-003/next-orch",
       "dateTime": "2026-06-15T19:05:54.455880-04:00",
       "description": "Routed next-orchestrator rec for S4 via route(task_type=analysis): claude-sonnet-4-6/medium (S4 = route the keep/demote/retire decision through consensus + small well-scoped config/doc implementation; not large coding; avoids gpt-5.4 orchestrator budget risk L-067-1).",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 4,
@@ -303,7 +303,7 @@
       "stepKey": "register",
       "dateTime": "2026-06-16T01:12:51.000560-04:00",
       "description": "Registered S6 (final): synthesis + docs + release + dogfood + close. Read S1-S5 deliverables + required guidance.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -311,7 +311,7 @@
       "stepKey": "predicate-wired",
       "dateTime": "2026-06-16T01:12:51.000560-04:00",
       "description": "Wired the routed-gate predicate (ai_router/routed_gate.py +27 tests): executes the S4 DEMOTE cut-over -- per-session routed verification mandatory -> GATED on a deterministic blast-radius/coupling predicate. Exported from __init__.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -319,7 +319,7 @@
       "stepKey": "cut-over",
       "dateTime": "2026-06-16T01:12:51.002053-04:00",
       "description": "Flipped the workflow default: docs/ai-led-session-workflow.md Step 6 + Session-def + Cross-Provider-Verification echoes + diagram (mandatory -> gated; transition guard cleared) + router-config.yaml verification anchor + live routed_gate sub-block.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -327,7 +327,7 @@
       "stepKey": "synthesis-written",
       "dateTime": "2026-06-16T01:12:51.003063-04:00",
       "description": "Authored docs/verification-surface-strategy.md -- the settled synthesis; supersedes the Set 065 proposal open questions.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -335,7 +335,7 @@
       "stepKey": "docs-updated",
       "dateTime": "2026-06-16T01:12:51.004063-04:00",
       "description": "Updated ai_router/docs/close-out.md + pull-verifier.md. Prepared adversarial-critique-prompt.md. Refined L-067-1.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -343,7 +343,7 @@
       "stepKey": "released",
       "dateTime": "2026-06-16T01:12:51.005369-04:00",
       "description": "pyproject 0.21.1 -> 0.22.0; fixed stale __version__ 0.20.0 -> 0.22.0 (dogfood-caught); CHANGELOG 0.22.0; change-log.md S2-S6; routed next-set rec (Set 069). Operator pushes tag v0.22.0.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -351,7 +351,7 @@
       "stepKey": "dogfooded",
       "dateTime": "2026-06-16T01:12:51.007086-04:00",
       "description": "pathAwareCritique=required dogfood via the automated producer over the full repo-root sandbox (google VERIFIED + openai ISSUES); real findings folded (version drift + 2 workflow echoes per L-065-1). Gate OK (2 distinct providers).",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 6,
@@ -359,7 +359,7 @@
       "stepKey": "s6-verified",
       "dateTime": "2026-06-16T01:12:51.008084-04:00",
       "description": "Cross-provider session verification gpt-5-4 (S6 diff trips the predicate -> REQUIRED): R1 FAIL -> fixes -> R2 PASS. Full suite 1668 passed / 1 skip.",
-      "status": "completed"
+      "status": "complete"
     }
   ]
 }

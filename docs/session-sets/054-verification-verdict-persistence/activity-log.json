@@ -9,7 +9,7 @@
       "stepKey": "audit/re-verify-diagnosis",
       "dateTime": "2026-06-02T08:05:48.972798-04:00",
       "description": "Re-verified the 3-layer verificationVerdict-drop diagnosis against current code (close_session.py:1621 omits arg; Disposition has no verdict field; parse_verification_response already emits the canonical token; --no-router records null). Confirmed PyPI-only (TS reads/derives only).",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -17,7 +17,7 @@
       "stepKey": "audit/cross-provider-consensus",
       "dateTime": "2026-06-02T08:05:48.973799-04:00",
       "description": "Wrote proposal.md with 10 dispositions; ran cross-provider design consensus.",
-      "status": "completed",
+      "status": "complete",
       "routedApiCalls": [
         {
           "task": "design-consensus",
@@ -41,7 +41,7 @@
       "stepKey": "audit/design-lock",
       "dateTime": "2026-06-02T08:05:48.973799-04:00",
       "description": "Synthesized verdict.md (3 objections accepted + 1 partial): verdict domain collapsed to VERIFIED/ISSUES_FOUND/null; explicit-wins-under-force precedence; R4 re-close invariant. Locked spec scope block.",
-      "status": "completed"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -49,7 +49,7 @@
       "stepKey": "ai-assignment",
       "dateTime": "2026-06-02T08:05:48.974736-04:00",
       "description": "Authored ai-assignment.md via routed analysis (S2=Sonnet-tier, S3=Haiku-tier).",
-      "status": "completed",
+      "status": "complete",
       "routedApiCalls": [
         {
           "task": "analysis",
@@ -65,7 +65,7 @@
       "stepKey": "end-of-session-verification",
       "dateTime": "2026-06-02T08:05:48.974736-04:00",
       "description": "Cross-provider verification of the locked design (gemini-pro) = VERIFIED, 0 issues across all 4 checks.",
-      "status": "completed",
+      "status": "complete",
       "routedApiCalls": [
         {
           "task": "session-verification",
@@ -89,7 +89,7 @@
       "stepKey": "session-3/docs-reconcile-version-bump",
       "dateTime": "2026-06-02T08:48:30.572183-04:00",
       "description": "Reconciled docs: ai-led-session-workflow.md (Step 6 verdict-in-disposition step, Lightweight null fix, Step 8 disposition section, Rule 16 CLI names), session-state-schema.md (lines 219+994), close-out.md (Section 0 table, Section 2, Section 3 step 9), disposition-schema.md (new verification_verdict row). Created change-log.md. Bumped dabbler-ai-router 0.14.0->0.15.0 (pyproject.toml, __init__.py, CHANGELOG.md). CLAUDE.md walk.",
-      "status": "completed"
+      "status": "complete"
     }
   ]
 }

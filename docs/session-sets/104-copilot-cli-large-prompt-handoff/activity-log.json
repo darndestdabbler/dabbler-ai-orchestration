@@ -19,7 +19,7 @@
       "stepKey": "register",
       "dateTime": "2026-07-14T21:34:53.446936-04:00",
       "description": "Registered S1 via start_session (claude/anthropic/opus-4-8/high); confirmed active set, no decision queue",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -27,7 +27,7 @@
       "stepKey": "read-spec-consult",
       "dateTime": "2026-07-14T21:34:53.457058-04:00",
       "description": "Read spec.md + authoring-consult-synthesis.md; cached config block (full tier, requiresUAT/E2E false, pathAwareCritique advisory)",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -35,7 +35,7 @@
       "stepKey": "read-sources",
       "dateTime": "2026-07-14T21:34:53.457058-04:00",
       "description": "Read cli_transport.py, test_cli_transport.py, router-config copilot-cli block, transport_diagnostics.py (redaction discipline)",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -43,7 +43,7 @@
       "stepKey": "impl-handoff",
       "dateTime": "2026-07-14T21:34:53.457058-04:00",
       "description": "Implemented threshold-gated handoff in cli_transport.py: _rendered_utf16_units, handoff branch (mkstemp payload + nonce footer + POSIX bootstrap), ack validate+strip, ERROR_CLASS_HANDOFF_INCOMPLETE (non-retryable), finally cleanup all paths, additive metadata incl payload_file_modified, retention under diagnostics toggle",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -51,7 +51,7 @@
       "stepKey": "tests-extended",
       "dateTime": "2026-07-14T21:34:53.457058-04:00",
       "description": "Added 25 fake-spawner tests (UTF-16 measurement, branch selection, exact payload+UTF8-no-BOM+closed-handle, POSIX-path+no-nonce bootstrap, ack success/missing/mismatch, cleanup on 6 paths, payload_file_modified, retention toggle, inline regression). 58/58 cli_transport tests green",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -59,7 +59,7 @@
       "stepKey": "docs",
       "dateTime": "2026-07-14T21:39:15.677879-04:00",
       "description": "CHANGELOG 0.34.0 staged (publish operator-gated); tier-model.md handoff bullet; 078 spec transport-contract Set-104 pointer note; cancel-to-pause recipe added to ai-led-session-workflow.md (no-paused-enum decision record, session-boundary guard, D6 review discipline, 103 CANCELLED.md worked example); close-out.md stranded-vs-paused pointer. Verified restore_session_set round-trips preCancelStatus + leaves sessions[] untouched",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -67,7 +67,7 @@
       "stepKey": "pre-commit",
       "dateTime": "2026-07-14T22:04:31.902692-04:00",
       "description": "Full pre-commit pass: python -m pytest = 3055 passed / 6 skipped (@e2e real-CLI skips); ai_router cli_transport 58/58; guidance_report --check preload ceilings OK. No TS/Playwright change (Python transport + docs; L-064-12 trigger not fired).",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -75,7 +75,7 @@
       "stepKey": "ai-assignment",
       "dateTime": "2026-07-14T22:04:31.902692-04:00",
       "description": "Step 3.5: authored ai-assignment.md; routed next-orchestrator analysis (task_type=analysis, excl anthropic -> gemini-2.5-pro, $0.0026, truncation-clean) saved as s1-ai-assignment-analysis.json. Verdict: S2 primary codex/openai/gpt-5-6 (cross-provider live-probe diagnostics), runner-up claude/anthropic/opus-4-8, effort low, hard auth-preflight precondition.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 1,
@@ -83,7 +83,7 @@
       "stepKey": "verify",
       "dateTime": "2026-07-14T22:04:31.903675-04:00",
       "description": "Mandatory phased verification -- discovery phase, cross-provider gpt-5-6 (anthropic auto-excluded), 2/2 fan-out, up-front conventions block w/ consequence rubric. Verdict VERIFIED, 0 findings, non-blocking -> effectively VERIFIED (no supplementary needed on a zero-finding discovery round). Cost $0.44. Raw: s1-verification.md + s1-verification-fanout-2.md.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 2,
@@ -91,7 +91,7 @@
       "stepKey": "preflight",
       "dateTime": "2026-07-14T22:15:04.748936-04:00",
       "description": "Step 1: registered S2 (claude/anthropic/opus-4-8/high, sanctioned runner-up per S1 disposition). Copilot seat auth-preflight: free checks pass (binary C:/Users/denmi/AppData/Local/Microsoft/WinGet/Links/copilot.EXE, credential dir C:/Users/denmi/.copilot); LIVE probe PASSED (model claude-sonnet-4.6, session c2bf12af, 1 premium request). Precondition met -> session viable. OBSERVATION: installed CLI is 1.0.69 but copilot-catalog.lock pins 1.0.68 (cli_version_pin_required=true); sonnet-4.6 still resolves on 1.0.69 -- record as probe evidence, not a blocker.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 2,
@@ -99,7 +99,7 @@
       "stepKey": "ai-assignment",
       "dateTime": "2026-07-14T22:17:02.473221-04:00",
       "description": "Step 3.5: appended S2 ai-assignment block (orchestrator=claude/anthropic/opus-4-8/high as sanctioned runner-up; probe orchestrator-direct, verification routed cross-provider). Routed next-SET analysis (task_type=analysis, anthropic-excluded) -> s2-ai-assignment-analysis.json: next set = configurable severity knob (Set 096 small follow-on) since restore-103 is gated on operator PyPI publish (D6). Note: verdict's model string gpt-4-turbo is stale/not-in-registry; substantive next-set pick + D6 rationale stand.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 2,
@@ -107,7 +107,7 @@
       "stepKey": "live-probe",
       "dateTime": "2026-07-14T22:20:15.627366-04:00",
       "description": "Step 2+3: live >40KiB probe through pinned Copilot CLI 1.0.69 on Windows (model claude-sonnet-4.6). Handoff probe: 81829-char prompt -> 81925 UTF-16 units -> PULL path; facts at offsets 559/41194/81820; response fused all three (DEPLOY-AUTH: BLUE-HERON-42 may deploy at 03:17 UTC using rollback token QX-7791.), ack validated+stripped, handoff=true, payload_bytes=82231, payload_file_modified=false, 1 premium req. Control probe: below-threshold INLINE path handoff=false, sentinel echoed, 1 premium req. ALL assertions green -> Step 3 fix-loop a no-op. Evidence: s2-live-probe.md + s2-live-probe-raw.json. CLI-version note: 1.0.69 installed vs 1.0.68 catalog pin (works; separate follow-on).",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 2,
@@ -115,7 +115,7 @@
       "stepKey": "release-staged",
       "dateTime": "2026-07-14T22:21:27.854527-04:00",
       "description": "Step 4: bumped pyproject.toml 0.33.0->0.34.0 AND ai_router/__init__.py __version__ (kept in sync). Finalized CHANGELOG 0.34.0: header note now 'release-ready' (Session 2 landed version+evidence); added ### Verified subsection with the live >32KiB probe evidence line (81829-char prompt, 3 facts fused, ack validated+stripped, handoff:true, 82231 bytes, 1 premium req; inline control handoff:false; CLI 1.0.69-vs-1.0.68 field note). Publish stays operator-gated; restore-103 named as resume condition.",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 2,
@@ -123,7 +123,7 @@
       "stepKey": "verify",
       "dateTime": "2026-07-14T22:44:52.196216-04:00",
       "description": "Steps 5-6: Full pytest 3055 passed/6 skipped (green). guidance ceilings OK. Mandatory cross-provider verification (discovery, gpt-5-6, anthropic auto-excluded, 2/2 fanout, $0.257): ISSUES_FOUND, 2 blocking (both = SAME finding). Finding (VALID, accepted): probe ran on Copilot CLI 1.0.69 but copilot-catalog.lock pins 1.0.68 (cli_version_pin_required=true); pin is RUNTIME fail-closed (validate_catalog in route() copilot-cli setup) so a real profile route() on 1.0.69 raises CLI-version-drift before handoff -> blocks Set 103 walk. Overclaim corrected in s2-live-probe.md + CHANGELOG (no longer 'through the pinned CLI'/'release-ready'; added Known-issue/blocks-publish). Remediation requires OPERATOR decision (env/money/pin-policy) -> stopping to operator per Recovery ladder (not re-rounding a non-disputed finding).",
-      "status": "done"
+      "status": "complete"
     },
     {
       "sessionNumber": 2,
@@ -131,7 +131,7 @@
       "stepKey": "remediation",
       "dateTime": "2026-07-15T02:52:46.211606-04:00",
       "description": "Step 7: version-pin finding accepted (not disputed). Corrected all overclaims in s2-live-probe.md + CHANGELOG (verifier's accepted option iii = remove pinned/VERIFIED/release-ready claims); disclosed drift as first-class Known Issue (fail-closed mechanism, copilot-cli-profile-only blast radius); operator adjudicated via AskUserQuestion -> ship 0.34.0 now + reconcile pin in Set-103 seat prep. Wrote s2-remediation-round-1.md sidecar. Remediation-review (round 2, gpt-5-6, anthropic-excluded, $0.039): VERIFIED, 1 fix accepted/0 rejected/0 blocking. Loop converged in 2 bounded rounds. disposition verdict=VERIFIED.",
-      "status": "done"
+      "status": "complete"
     }
   ]
 }

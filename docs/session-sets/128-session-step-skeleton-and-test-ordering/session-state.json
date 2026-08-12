@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The shape a session declares",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-12T18:18:03.010713-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-12T19:41:46.916886-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

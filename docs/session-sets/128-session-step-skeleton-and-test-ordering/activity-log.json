@@ -123,6 +123,14 @@
       "dateTime": "2026-08-12T19:36:27.775524-04:00",
       "description": "All three expensive suites run after the last code change and recorded as runs of record: pytest 4142 passed / 9 skipped in 507s; mocha 1524 passing / 2 pending in 36s; Playwright Layer 3 31 passed in 295s. Layer 2 and Layer 3 are owed this session only because the operator directed the mid-session Explorer fixes into it (L-064-12 trigger list: Explorer rendering surfaces).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-12T19:42:03.695093-04:00",
+      "description": "disposition.json authored (VERIFIED, next_orchestrator for session 2, four lessons cited, three residuals and the advisory checklist gap recorded rather than waived); cite_lessons run; committed d3e87ba and pushed; close_session succeeded with every blocking gate PASS and checklist_posted the one advisory WARN.",
+      "status": "complete"
     }
   ]
 }

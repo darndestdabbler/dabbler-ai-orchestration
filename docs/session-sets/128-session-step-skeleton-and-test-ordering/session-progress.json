@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-12T19:41:46.921056-04:00",
+  "sessionSetDir": "128-session-step-skeleton-and-test-ordering",
+  "inputs": {
+    "activity-log.json": "3af625cd2a9844936c86cc7893134fb83343f001e622c9cead1276636dc2ce53",
+    "session-state.json": "19e1d5720c205115c6e503819eb7e14b86635dd914cbae3d61cb06a32a7c02dc",
+    "spec.md": "f8e4a67d40e25207a63ce54dcf699160149130c9e0d679ff9b845c46b173a57e"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 1; journalled the two operator ratifications to decisions.jsonl: work-step budget N=3 (7 declared, N=4 rejected as a deliberate loosening), and the shape verdict is blocking (requires restructuring) for unstarted sets with an informational note for started/complete/cancelled ones.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T18:18:03.010713-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "add-the-shape-check-to-ai",
+          "description": "Added check_step_shape to ai_router/spec_admission.py beside the count check: intent recognisers (register / cross-provider verification / required portion of the full test suite / close-out) matched by family of phrasings rather than exact prose, a positional tail assertion, and a compression finding when one tail step names more than one stage. Gating per the operator ratification: blocking (REQUIRES RESTRUCTURING) when the set has no session-state.json or is not-started, an informational note otherwise.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T18:26:44.418107-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-in-both-directions-l-112",
+          "description": "Added ai_router/tests/test_spec_admission_shape.py: 12 test functions / 19 cases, planting the malformations rather than reading the regexes. FIRES: the Set 127 S2 compressed step verbatim, the same compression in the reverse internal order, a tail out of order, a missing tail step, work after close-out, a session that never registers, fewer steps than the ceremony. DOES NOT FIRE: a conforming spec at the budget, one with a declared sessionSizeException, a tail written in non-canonical prose, a work step that merely describes the ceremony. STRUCTURAL: this set own three sessions have zero shape findings, and the default cap equals ceremony + the ratified budget. A mutation probe gutting check_step_shape failed 12 of the 19 cases, then was reverted byte-for-byte.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T18:33:10.582962-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "re-baseline-the-budget-authoring",
+          "description": "Re-baselined authoring.max_steps_per_session 5 -> 7 in ai_router/router-config.yaml with a comment saying what the number now counts, and rewrote the authoring guide session-size cap section: a new step-skeleton section (the table, the operator wording ruling, the two incidents, the intent-not-prose rule, the requires-restructuring vs informational-note gating) plus the Set 111 S4 table carried with the re-reading beside it, so an author compares N to 3 rather than 7 to 5. Spec template snippet now shows the skeleton. DEFAULT_MAX_STEPS is derived as CEREMONY_STEPS + WORK_STEP_BUDGET. ai_router/CHANGELOG.md entry added.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T18:35:49.035525-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Three rounds against gpt-5.5 (orchestrator provider anthropic excluded). Round 1 discovery, 2-lens fan-out: 3 blocking Majors. Round 2 supplementary (run BEFORE remediating): 1 more blocking Major. All four accepted and fixed once - the FULL_SUITE recogniser missed the plural full suites and all tests wording, resolve_set_status bypassed progress.canonicalize_status so a completed/done alias would have demanded restructuring of a finished set, and a bare close let any final work step satisfy close-out. Acceptance harness run for rounds 1 and 2; finding 3 criterion was itself a SyntaxError that failed identically pre and post fix, so its intent was proved by targeted mutation instead and recorded in the sidecar. Round 3 remediation-review: VERIFIED, 4 fixes accepted, 0 rejected, 0 findings.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T18:38:32.651315-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three expensive suites run after the last code change and recorded as runs of record: pytest 4142 passed / 9 skipped in 507s; mocha 1524 passing / 2 pending in 36s; Playwright Layer 3 31 passed in 295s. Layer 2 and Layer 3 are owed this session only because the operator directed the mid-session Explorer fixes into it (L-064-12 trigger list: Explorer rendering surfaces).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T19:20:48.026827-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 1,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 7
+      },
+      "current": [],
+      "remaining": [
+        "close-out"
+      ]
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

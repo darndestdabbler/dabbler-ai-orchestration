@@ -7,7 +7,10 @@
 > ever produce `pending` and `complete`. This set **derives** the missing
 > middle frame from rows both surfaces already read, in the one Python
 > derivation and its TypeScript mirror, without adding a writer or a
-> convention anybody has to remember.
+> convention anybody has to remember — and then closes the same gap on the
+> *other* surface that answers the same question, the step checklist, whose
+> post at a verification-round boundary depends on an orchestrator
+> remembering during a machine-driven sequence no human is watching.
 > **Created:** 2026-08-12
 > **Session Set:** `docs/session-sets/127-the-active-step-shows-in-progress/`
 > **Prerequisite:** None (Sets 114, 115 and 120 shipped the plan seeding, the
@@ -22,6 +25,13 @@ written and appears in no current set), and deferred because it surfaced
 mid-session in another set. That note is the authority for the diagnosis and
 for the three options below; this spec picks one and schedules it.
 
+**Why the checklist gate is in this set and not its own.** The note's own
+framing is the reason: *"The step checklist and the Explorer are the
+operator's window into where a session is."* Both answer one question —
+**where is this session right now** — and both were failing it for the same
+structural reason: a signal that depends on someone remembering to emit it.
+Session 3 is scoped by that sentence, not by the module it happens to touch.
+
 ---
 
 ## Session Set Configuration
@@ -32,7 +42,7 @@ requiresE2E: true         # Session 2 changes an Explorer rendering surface, whi
 uatStyle: ad-hoc
 uatScope: per-set
 sessionSizeException: 1 - Operator-authorized 6 steps, 2026-08-12, for the start-time step. The timestamp is derived from the same rows and by the same rule as the in-progress state, so it is one more assertion against an existing predicate rather than a second feature.
-sessionSizeException: 2 - Operator-authorized 6 steps, 2026-08-12, same reason as session 1. Splitting the two timestamp additions into a third session would pay a full session's fixed overhead (registration, preload, verification, close) for two small changes adjacent to work already in these sessions.
+sessionSizeException: 2 - Operator-authorized 6 steps, 2026-08-12, same reason as session 1. The timestamp work is deliberately NOT deferred into session 3, which is a different surface (the checklist gate) with its own ratification requirement; moving two small additions there would neither shrink this session's risk nor fit that one's scope.
 ```
 
 > Rationale: `requiresUAT` is true for one reason only — the reporter asked
@@ -102,6 +112,60 @@ Taken 2026-08-12, at authoring, and journalled at Session 1 registration:
    `dateTime` is *registration* time, not a start, so rendering it would be
    a fresh wrong signal of exactly the kind this set exists to remove.
 
+### The third surface: a post nobody was there to make
+
+The same question — *where is this session right now* — is answered for the
+operator's terminal by `python -m ai_router.session_checklist`, and
+`gate_checks.check_checklist_posted` audits it: for transitions
+t₁ < t₂ < … < tₖ, each tᵢ needs a post in the window `[tᵢ, tᵢ₊₁)`. The
+positional windows are deliberate and stay — they are what stops one
+catch-up post at the end from covering a whole session, which is exactly
+how the prose version of this obligation decayed in Set 111 S4.
+
+**One transition type cannot realistically be met, and it is failing
+repeatedly.** A blocking discovery round forces `discovery →
+supplementary → remediate → remediation-review` in immediate succession.
+Those rounds are minutes apart, machine-driven, and no human is watching
+the terminal during them; the orchestrator is mid-remediation. Set 126
+Session 2 missed rounds 2 and 3 that way, and it is not the first:
+
+```
+12:08:17  ROUND 2 (discovery)      <- window closed at 12:21:17, unmet
+12:21:17  ROUND 3 (supplementary)  <- window closed at 12:27:20, unmet
+12:27:20  ROUND 4 (remediation-review)
+12:27:37  POST                     <- could only be spent on round 4
+```
+
+A miss cannot be repaired (you cannot post into the past), so the only exit
+is an operator-attested waiver — which means a recurring, structurally
+predictable omission keeps landing on the operator's desk as paperwork.
+
+**The fix is removal, not more discipline** (project-guidance: *prefer
+removal over addition when fixing*): `verify_session` renders the checklist
+itself at the end of each round, through the same code path that records a
+post, so the record remains a genuine render to the operator's terminal —
+the round output becomes *more* informative, not less. What the gate loses
+is a failure mode, not a check: the other transition types (test-run
+recorded, operator stop, last logged step) keep binding exactly as they do
+now, and they are the ones a human can actually hit.
+
+### The one decision Session 3 must have ratified before it starts
+
+This touches how much a close-time gate can still catch, so it is **not**
+self-authorizable — it is journalled at Session 3 registration with the
+operator's answer, and the spec records the alternatives rather than
+pretending there is only one:
+
+1. **Auto-render inside `verify_session`** *(recommended)* — eliminates the
+   failure mode; costs the verification-round transition its diagnostic
+   value, since it can no longer be missed.
+2. **Orchestrator discipline only** — keeps every transition diagnostic, and
+   keeps failing on the exact sequence where no human is watching. The
+   evidence says this decays.
+3. **Re-arm the gate as blocking** (it is advisory by the Set 116 S3
+   operator ruling) — strongest signal; would have refused Set 126 S2's
+   close and forced a waiver for a paperwork miss during remediation.
+
 ### Non-goals
 
 - **No new writer, and no orchestrator discipline.** Option 1 (log
@@ -124,6 +188,14 @@ Taken 2026-08-12, at authoring, and journalled at Session 1 registration:
   derived onto the shared row model in both languages so the two cannot
   disagree about it, but only the tree *renders* it — the checklist is a
   what-is-left list, not a timeline, and widening it is a separate question.
+- **The checklist gate's positional windows are not touched.** Session 3
+  removes a failure mode inside one transition type; it does not loosen the
+  one-post-per-window rule, does not excuse any other transition, and does
+  not change the waiver path. A spec that widened the windows would be
+  re-opening the decay Set 111 S4 was written to end.
+- **No synthetic post records.** Session 3's post is recorded *because a
+  render happened*, through the existing writer. A gate satisfied by an
+  entry nobody rendered is worse than a gate that fails.
 
 ### The one thing that must not regress
 
@@ -138,7 +210,7 @@ languages (`L-112-1`).
 
 ## Sessions
 
-### Session 1 of 2: The record can say a step is in flight
+### Session 1 of 3: The record can say a step is in flight
 
 **Steps:**
 
@@ -188,7 +260,7 @@ row that has started carries a derived start time the tree can render.
 
 ---
 
-### Session 2 of 2: The Explorer shows it
+### Session 2 of 3: The Explorer shows it
 
 **Steps:**
 
@@ -208,9 +280,7 @@ row that has started carries a derived start time the tree can render.
    glyph renders on the active step of an in-flight fixture session, run the
    full `npm run test:playwright` **after the last code change** (L-064-12),
    and only then offer the one-item guided walk.
-5. Full pytest and the Layer 3 run recorded as runs of record; verify; close;
-   Step 9 review, `change-log.md`, and `disposition.json` (this is the set's
-   final session).
+5. Full pytest and the Layer 3 run recorded as runs of record; verify; close.
 6. **Mirror the start time and render it `12:06-`.** Same derivation as
    Session 1, in the TS row model, displayed in the tree row's **dimmed
    description slot** — not concatenated into the label, which is narrow and
@@ -220,7 +290,7 @@ row that has started carries a derived start time the tree can render.
 
 **Creates:** the TypeScript mirror, the cross-language parity falsifier, and
 `127-the-active-step-shows-in-progress-uat-checklist.json`
-**Touches:** `tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts`, `tools/dabbler-ai-orchestration/src/test/suite/sessionStepModel.test.ts`, the Layer 3 rendering spec, `docs/planning/work-explorer-in-progress-step-icon.md`
+**Touches:** `tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts`, `tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts`, `tools/dabbler-ai-orchestration/src/test/suite/sessionStepModel.test.ts`, the Layer 3 rendering spec
 **Ends with:** the operator opens the Work Explorer on a live session and the
 step it is on carries the in-progress glyph, says so in its tooltip, and shows
 `12:06-` for when it started — the answer to the question that opened the note,
@@ -235,6 +305,58 @@ provably deriving the same rows the same way.
 
 ---
 
+### Session 3 of 3: The round sequence posts its own checklist
+
+The third surface answering *where is this session right now* — and the one
+whose signal depends on a human being at the terminal during a sequence no
+human watches. Scope and rationale: **The third surface: a post nobody was
+there to make**, above.
+
+**Steps:**
+
+1. Register. **Journal the ratified mechanism first** — the operator's
+   answer among the three options above, with the two rejected ones and
+   their consequences recorded. A session that starts before that answer
+   exists is implementing an unratified change to what a gate can catch.
+2. **Render the checklist at the end of every `verify_session` round**, in
+   every phase, through the **existing** `record_post` path so the record
+   still means "a render happened". Never on a round that did not complete:
+   a refused round (past the bound), a routed-call failure, and `--dry-run`
+   record nothing, because nothing was shown.
+3. **Falsify in both directions** (`L-112-1`). FIRES: the Set 126 S2
+   sequence — discovery → supplementary → remediation-review back to back —
+   leaves one post inside each round's own window, and `check_checklist_posted`
+   reports no unmet round transitions. DOES NOT FIRE: a refused or failed
+   round records no post; the **other** transition types still bind, so a
+   session that skips its test-run or last-step post is still reported
+   exactly as it is today. STRUCTURAL: the gate's window rule itself is
+   unchanged — assert it against a hand-built ledger, not by reading the
+   new call site.
+4. **Correct the cadence documentation to match the mechanism** — the
+   constitution's Step 4 cadence sentence, the authoring guide's
+   *step-checklist cadence* section, and `check_checklist_posted`'s own
+   docstring, which currently teaches an obligation the tool will now
+   discharge on the orchestrator's behalf for one transition type. An
+   instruction that survives a change it describes is the defect family Set
+   126 spent a session on.
+5. Targeted pytest; verify; close; Step 9 review, `change-log.md`, and
+   `disposition.json` (this is the set's final session).
+
+**Creates:** the round-boundary auto-post and its falsifiers
+**Touches:** `ai_router/verify_session.py`, `ai_router/tests/test_verify_session*.py`, `ai_router/tests/test_gate_checks*.py`, `docs/session-constitution.md`, `docs/planning/session-set-authoring-guide.md`, `ai_router/gate_checks.py` (docstring), `ai_router/CHANGELOG.md`, `docs/planning/work-explorer-in-progress-step-icon.md`
+**Ends with:** a blocking-findings session that runs three rounds in ten
+minutes closes with three posts on the record and no unmet round transition —
+because the tool that ran the rounds showed the operator where the session
+was, instead of asking someone mid-remediation to remember.
+**Progress keys:** `roundPostsAutomatic`, `otherTransitionsStillBind`, `cadenceDocsMatch`
+
+> **Irony budget: 8 new test functions.** Small because the change is one
+> call at one boundary; most of the eight go to the negative direction — the
+> rounds that must NOT record a post, and the transition types that must
+> still fail when missed.
+
+---
+
 ## End-of-set deliverables
 
 - An active step that renders as in-progress in **both** surfaces, and a
@@ -246,6 +368,10 @@ provably deriving the same rows the same way.
   started, plus a parity fixture that fails when the two implementations
   drift.
 - A one-item UAT walk, attested by the operator who reported the defect.
+- A verification-round boundary that posts its own checklist, so a
+  blocking-findings session no longer owes the operator a waiver for
+  paperwork it could not have filed — with every other transition type
+  still binding exactly as it does today.
 - `docs/planning/work-explorer-in-progress-step-icon.md` moved from
   **"diagnosed, not fixed"** to fixed, citing the sessions that closed it and
   recording the deliberate non-backfill of the five prose-status rows.

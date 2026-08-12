@@ -17,6 +17,7 @@ import argparse
 import json
 import subprocess
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
@@ -2194,3 +2195,325 @@ class TestFanoutCostsOneRoundOfBudget:
         assert (set_dir / "s1-verification-fanout-2.md").exists()
         assert (set_dir / "s1-verification-fanout-3.md").exists()
         assert vs.resolve_round(set_dir, 1, None) == 2
+
+
+# ---------------------------------------------------------------------------
+# Set 127 S3: the round sequence posts its own checklist
+# ---------------------------------------------------------------------------
+
+def _posts(set_dir: Path) -> list:
+    """Session-1 checklist-post records, oldest first."""
+    from ai_router.session_checklist import read_posts
+
+    return read_posts(str(set_dir), 1)
+
+
+def _checklist_gate(set_dir: Path):
+    from ai_router.gate_checks import check_checklist_posted
+
+    return check_checklist_posted(str(set_dir), None)
+
+
+def _round_transitions_in(remediation: str) -> list:
+    """The ``verification-round N`` labels a gate failure names."""
+    import re
+
+    from ai_router.gate_checks import CHECKLIST_TRANSITION_ROUND
+
+    return re.findall(rf"{CHECKLIST_TRANSITION_ROUND} \d+", remediation)
+
+
+class TestRoundBoundaryPostsItsOwnChecklist:
+    """Set 127 S3, falsified in both directions (L-112-1).
+
+    The operator ratified auto-render (spec option 1) because the
+    machine-driven ``discovery -> supplementary -> remediation-review``
+    sequence closes each round's post window minutes apart with nobody at
+    the terminal. A mechanism that only ever posts proves as little as a
+    gate that only ever passes, so the rounds that must NOT post are
+    asserted here beside the rounds that must.
+    """
+
+    # -- FIRES ---------------------------------------------------------
+
+    def test_the_set_126_s2_sequence_leaves_a_post_in_every_round_window(
+        self, repo: Path, monkeypatch
+    ):
+        """Three blocking rounds back to back, and no unmet round window.
+
+        This is the exact shape that failed in Set 126 S2: three
+        transitions inside ~19 minutes, each window closing before anyone
+        could post into it. All three exit blocking, which is why nobody
+        was at the terminal for any of them -- the orchestrator was
+        mid-remediation.
+        """
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([BLOCKING_RESPONSE]),
+        ) == vs.EXIT_BLOCKING
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_SUPPLEMENTARY),
+            route_fn=FakeMultiRoute([BLOCKING_RESPONSE_B]),
+        ) == vs.EXIT_BLOCKING
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_REMEDIATION_REVIEW),
+            route_fn=FakeMultiRoute([FIX_REVIEW_CLEAN]),
+        ) == vs.EXIT_BLOCKING
+
+        rounds = _ledger(set_dir, vs.ROUND_EVENT_COMPLETED)
+        assert [r["verificationRound"] for r in rounds] == [1, 2, 3]
+        posts = _posts(set_dir)
+        assert len(posts) == 3
+
+        # Positionally: one post inside each round's own [t_i, t_i+1).
+        for index, record in enumerate(rounds):
+            opened = record["recordedAt"]
+            closed = (
+                rounds[index + 1]["recordedAt"]
+                if index + 1 < len(rounds)
+                else None
+            )
+            covering = [
+                p for p in posts
+                if p["postedAt"] >= opened
+                and (closed is None or p["postedAt"] < closed)
+            ]
+            assert len(covering) == 1, (
+                f"round {record['verificationRound']} window "
+                f"[{opened}, {closed}) is not covered by exactly one post"
+            )
+
+        ok, remediation = _checklist_gate(set_dir)
+        assert ok is True, remediation
+
+    def test_the_post_is_a_render_through_the_existing_writer(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        """Not a synthetic record: the operator is shown the checklist.
+
+        The spec forbids a post that satisfies the gate without anyone
+        being shown anything, so the round's stdout must carry the
+        rendered block and the ledger line must describe that render.
+        """
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        # A real logged step, so the render has a row to draw.
+        from ai_router.session_log import SessionLog
+
+        SessionLog(str(set_dir), total_sessions=2).log_step(
+            1, 1, "build-it", "Built the widget.", "complete"
+        )
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([VERIFIED_RESPONSE]),
+        ) == vs.EXIT_OK
+
+        out = capsys.readouterr().out
+        assert "Session 1 step" in out
+        assert "[x] Built the widget" in out or "[x] build it" in out.lower()
+
+        posts = _posts(set_dir)
+        assert len(posts) == 1
+        assert posts[0]["surface"] == "text"
+        assert posts[0]["stepCount"] >= 1
+
+    # -- DOES NOT FIRE -------------------------------------------------
+
+    def test_a_dry_run_shows_nothing_and_records_nothing(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        fake = FakeMultiRoute([VERIFIED_RESPONSE])
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY, dry_run=True),
+            route_fn=fake,
+        ) == vs.EXIT_OK
+
+        assert fake.calls == []
+        assert _posts(set_dir) == []
+        assert _ledger(set_dir, vs.ROUND_EVENT_COMPLETED) == []
+
+    def test_a_refused_round_records_no_post(
+        self, repo: Path, monkeypatch
+    ):
+        """Past the bound there is no round, so there is nothing to show."""
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        _seed_round(set_dir, 1, vs.PHASE_DISCOVERY)
+        _seed_round(set_dir, 2, vs.PHASE_SUPPLEMENTARY)
+        fake = FakeMultiRoute([BLOCKING_RESPONSE])
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        ) == vs.EXIT_USAGE
+
+        assert fake.calls == []
+        assert _posts(set_dir) == []
+
+    def test_a_failed_routed_call_records_no_post(
+        self, repo: Path, monkeypatch
+    ):
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([RuntimeError("provider outage")]),
+        ) == vs.EXIT_ROUTE_FAILED
+
+        assert _posts(set_dir) == []
+        assert _ledger(set_dir, vs.ROUND_EVENT_COMPLETED) == []
+
+    def test_a_close_backstop_round_records_no_post(self, repo: Path):
+        """The ledger writer does not post; only ``run()`` does.
+
+        A backstop round runs in-process DURING the close, so its window
+        opens after the last moment anyone could post into it -- which is
+        why ``_checklist_transitions`` skips it. Posting there would
+        manufacture a record for a render the operator never saw.
+        """
+        set_dir = _set_dir(repo)
+        vs.record_round_completed(
+            vs.round_ledger_path(set_dir, 1),
+            session_number=1,
+            round_number=1,
+            phase=None,
+            verdict="VERIFIED",
+            blocking=False,
+            ended_loop=True,
+            source=vs.ROUND_SOURCE_CLOSE_BACKSTOP,
+        )
+
+        assert len(_ledger(set_dir, vs.ROUND_EVENT_COMPLETED)) == 1
+        assert _posts(set_dir) == []
+        ok, remediation = _checklist_gate(set_dir)
+        assert _round_transitions_in(remediation) == []
+
+    def test_the_other_transition_types_still_bind(
+        self, repo: Path, monkeypatch
+    ):
+        """Only the round transition is discharged for the orchestrator.
+
+        A session that posts at every round and skips its test-run post is
+        reported exactly as it is today -- otherwise this change would
+        have quietly disarmed the whole gate instead of one failure mode.
+        """
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([VERIFIED_RESPONSE]),
+        ) == vs.EXIT_OK
+
+        # A test run recorded AFTER the round's post: its own window is
+        # open and unposted.
+        later = (
+            datetime.now().astimezone() + timedelta(minutes=5)
+        ).isoformat()
+        (set_dir / "test-runs.jsonl").write_text(
+            json.dumps(
+                {
+                    "suite": "pytest",
+                    "command": "pytest",
+                    "outcome": "passed",
+                    "surfaceDigest": "deadbeef",
+                    "recordedAt": later,
+                    "sessionNumber": 1,
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        ok, remediation = _checklist_gate(set_dir)
+        assert ok is False
+        assert "test-run-recorded" in remediation
+        assert _round_transitions_in(remediation) == []
+
+    # -- STRUCTURAL ----------------------------------------------------
+
+    def test_the_windows_still_bind_against_a_hand_built_ledger(
+        self, repo: Path
+    ):
+        """The gate's one-post-per-window rule is untouched.
+
+        Asserted against a ledger written by hand rather than by the new
+        call site: two round transitions covered by a single later post
+        must still leave the first one unmet. If auto-posting had been
+        implemented by widening the window (or by excusing the round
+        transition), this is the test that would go green for the wrong
+        reason.
+        """
+        set_dir = _set_dir(repo)
+        base = datetime.now().astimezone()
+        for offset, round_number in ((0, 1), (5, 2)):
+            vs._append_round_ledger(
+                vs.round_ledger_path(set_dir, 1),
+                {
+                    "event": vs.ROUND_EVENT_COMPLETED,
+                    "sessionNumber": 1,
+                    "verificationRound": round_number,
+                    "phase": vs.PHASE_DISCOVERY,
+                    "source": vs.ROUND_SOURCE_VERIFY_SESSION,
+                    "verdict": "ISSUES_FOUND",
+                    "blocking": True,
+                    "endedLoop": False,
+                    "recordedAt": (
+                        base + timedelta(minutes=offset)
+                    ).isoformat(),
+                },
+            )
+        # One catch-up post after BOTH rounds -- the exact shape the
+        # positional windows exist to refuse.
+        (set_dir / "checklist-posts.jsonl").write_text(
+            json.dumps(
+                {
+                    "sessionNumber": 1,
+                    "postedAt": (base + timedelta(minutes=9)).isoformat(),
+                    "stepCount": 1,
+                    "surface": "text",
+                    "inProgressStepKeys": [],
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        ok, remediation = _checklist_gate(set_dir)
+        assert ok is False
+        assert _round_transitions_in(remediation) == ["verification-round 1"]
+
+    def test_a_ledger_failure_costs_the_round_nothing(
+        self, repo: Path, monkeypatch, capsys
+    ):
+        """Fail-open, and NAMED (L-079-1).
+
+        The checklist is bookkeeping appended after a metered call has
+        already been paid for; an unwritable ledger must not turn a
+        completed round into a failure, and it must not do so silently
+        either.
+        """
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        monkeypatch.setattr(
+            "ai_router.session_checklist.record_post",
+            lambda *a, **k: None,
+        )
+
+        assert vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY),
+            route_fn=FakeMultiRoute([VERIFIED_RESPONSE]),
+        ) == vs.EXIT_OK
+
+        captured = capsys.readouterr()
+        assert "Session 1 step" in captured.out  # the render still happened
+        assert "NOT recorded" in captured.err
+        assert _posts(set_dir) == []
+

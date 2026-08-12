@@ -2191,6 +2191,30 @@ def check_checklist_posted(
     makes the final transition's window the "before close" post by
     construction — no separate close concept needed.
 
+    **One transition type discharges itself (Set 127 S3).** The
+    ``verification-round`` transitions are no longer the orchestrator's
+    to remember: ``verify_session`` renders the checklist at the end of
+    every round that completed, through the same ``record_post`` path, so
+    the record still means a render happened. The machine-driven
+    ``discovery -> supplementary -> remediate -> remediation-review``
+    sequence closed each of those windows minutes apart with nobody at
+    the terminal (Set 126 S2 missed rounds 2 and 3), and a missed window
+    can only be waived — a structurally predictable omission arriving on
+    the operator's desk as paperwork. The operator ratified removing the
+    failure mode rather than re-teaching the obligation
+    (``authority: "human"``, ``verification_effect: "reduces"``, Set
+    127's ``decisions.jsonl``), knowing the cost: a round transition can
+    no longer be missed, so it can no longer be reported.
+
+    Nothing else moved. This gate is unchanged — it still derives round
+    transitions from ``sN-rounds.jsonl`` and still applies the positional
+    windows to them — and every other transition type (session start,
+    test-run recorded, operator stop, last logged step) binds exactly as
+    it did, which is the half a human can actually hit. A round the
+    CLOSE BACKSTOP ran still posts nothing and is still not a transition
+    (see :func:`_checklist_transitions`), and neither is a round that was
+    refused, failed, or dry-run.
+
     Exactly one transition may be excused, and only by being older than
     the session's first recorded post: **the session start**. A ledger
     cannot describe the time before it existed, so a session already in

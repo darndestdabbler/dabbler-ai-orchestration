@@ -859,7 +859,8 @@ Suites are declared in `router-config.yaml` under `testing.suites`
 ## The step-checklist cadence (Set 114 S1)
 
 `python -m ai_router.session_checklist` renders the session's logged
-steps with the current one marked `<- here`. Set 111 S4 shipped it and
+steps, drawing the active one `[~]` and each started row's start time.
+Set 111 S4 shipped it and
 told the orchestrator to post it "at every transitional boundary" —
 without saying what one is. An undefined cadence cannot be followed
 consistently or checked at all, so that session posted **once** in many
@@ -873,11 +874,32 @@ every step is scrolled past like any other banner:
 | :--- | :--- | :--- |
 | **Session start** | Right after `start_session`, once the plan's steps are logged. | Yes |
 | **A test suite's run is recorded** | After a blocking suite finishes **and its record is written** — `run_of_record record` first, then post. | Yes |
-| **A verification round completes** | After `verify_session` returns and appends its `round-completed` line to `sN-rounds.jsonl`, before remediating or moving on. | Yes |
+| **A verification round completes** | **Nothing to do (Set 127 S3): `verify_session` posts this one itself**, at the end of every round that completed. | Yes |
 | **Before a long-running command** | Before you start one you expect to block for minutes (a full suite, a routed round). | **No** — see below |
 | **An operator stop is journaled** | After `decision_journal` records the human-authority decision. | Yes |
 | **Before the education-mode brief** | Immediately before you put the question to the human, so they see where the session is while they decide. | **No** — see below |
 | **Before close** | After the last logged step, before `close_session`. | Yes |
+
+> **The verification-round post is automatic (Set 127 S3).** A blocking
+> discovery round drives `discovery → supplementary → remediate →
+> remediation-review` minutes apart, machine-driven, with nobody at the
+> terminal — so those windows kept closing unmet (Set 126 S2 missed
+> rounds 2 and 3), and a missed window can only be waived. On the
+> operator's ratified answer the failure mode was **removed** rather than
+> re-taught: `verify_session` renders the checklist itself at the end of
+> each round, through the same `record_post` path, so the record still
+> means a render happened and the round's output tells the operator where
+> the session is. It posts only for a round that **completed** — a round
+> refused past its bound, a failed routed call, `--dry-run`, and a
+> close-backstop round record nothing. Everything else on this table is
+> unchanged: the windows, the waiver path, and every other transition
+> type still bind exactly as they did, and that is asserted in both
+> directions in `test_verify_session_phases.py`.
+>
+> The cost, stated plainly: that row can no longer be *missed*, so it can
+> no longer report a missing post. The operator took that trade
+> knowingly — it is journaled in Set 127's `decisions.jsonl` with
+> `authority: "human"` and `verification_effect: "reduces"`.
 
 > **"Checked" no longer means "blocked" (Set 116 S3).** The operator's
 > 2026-08-10 gate ruling demoted `checklist_posted` to warn-not-block:
@@ -894,8 +916,9 @@ every step is scrolled past like any other banner:
 ### Posting is recorded by the act of posting
 
 Rendering the checklist appends one line to `checklist-posts.jsonl` in
-the session-set directory (session, timestamp, step count, which step
-carried `<- here`). Nobody attests to anything: the `checklist_posted`
+the session-set directory (session, timestamp, step count, and which
+steps were drawn in flight). Nobody attests to anything: the
+`checklist_posted`
 close gate compares that ledger against the transitions the session's
 **own records** already show — `startedAt` in `session-state.json`, each
 `test-runs.jsonl` record, each completed round in `sN-rounds.jsonl`,
@@ -908,8 +931,8 @@ happens, so a single post at the end does not cover a whole session.
 timestamp is the `recordedAt` of the run-of-record line, so record the
 run and *then* post. Posting before you record leaves the transition
 uncovered and the close gate will say so. A verification round needs no
-such care: `verify_session` writes its own `round-completed` line before
-it returns, so any post after the command finishes covers it.
+such care at all: `verify_session` writes its own `round-completed` line
+and then posts its own checklist, in that order, before it returns.
 
 Three limits worth stating plainly:
 

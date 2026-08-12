@@ -61,10 +61,11 @@ Run every router CLI through the workspace venv
     step to its planned one — and **post the step checklist**
     (`python -m ai_router.session_checklist`, `--markdown` for a chat
     surface) at each named transition: session start; before a
-    long-running command and again once its run is **recorded**; after
-    each verification round completes; every operator stop (post before
-    the brief — the gate sees the post after the decision is journaled);
-    and before close. Rendering it is what
+    long-running command and again once its run is **recorded**; every
+    operator stop (post before the brief — the gate sees the post
+    after the decision is journaled); and before close.
+    `verify_session` posts the round transitions itself (Set 127 S3).
+    Rendering it is what
     records it, and the `checklist_posted` close gate compares that
     record against the transitions your own records show — a session
     that never posted cannot close quietly. The active

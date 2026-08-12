@@ -254,6 +254,91 @@
       "dateTime": "2026-08-12T16:47:57.842849-04:00",
       "description": "Full pytest 4092 passed / 9 skipped; full Playwright 31 passed; full mocha 1520 passing -- all three recorded as runs of record, and mocha + Playwright RE-RUN and re-recorded after the round-1 remediation staled them. Verification: round 1 discovery (fan-out 2, gpt-5.5 both lenses) 1 Major; round 2 supplementary VERIFIED nothing new; remediated once with a pre/post-fix-discriminating falsifier; round 3 remediation-review VERIFIED, fix accepted, 0 findings. close_preflight: test_run_fresh green, uat_walk_recorded green, checklist_posted advisory with 4 unrecoverable windows recorded honestly.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T16:59:21.210201-04:00",
+      "description": "Register. **Journal the ratified mechanism first** \u2014 the operator's answer among the three options above, with the two rejected ones and their consequences recorded. A session that starts before that answer exists is implementing an unratified change to what a gate can catch.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "render-the-checklist-at-the-end",
+      "dateTime": "2026-08-12T16:59:21.210201-04:00",
+      "description": "**Render the checklist at the end of every `verify_session` round**, in every phase, through the **existing** `record_post` path so the record still means \"a render happened\". Never on a round that did not complete: a refused round (past the bound), a routed-call failure, and `--dry-run` record nothing, because nothing was shown.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T16:59:21.210201-04:00",
+      "description": "**Falsify in both directions** (`L-112-1`). FIRES: the Set 126 S2 sequence \u2014 discovery \u2192 supplementary \u2192 remediation-review back to back \u2014 leaves one post inside each round's own window, and `check_checklist_posted` reports no unmet round transitions. DOES NOT FIRE: a refused or failed round records no post; the **other** transition types still bind, so a session that skips its test-run or last-step post is still reported exactly as it is today. STRUCTURAL: the gate's window rule itself is unchanged \u2014 assert it against a hand-built ledger, not by reading the new call site.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "correct-the-cadence-documentation-to-match",
+      "dateTime": "2026-08-12T16:59:21.210201-04:00",
+      "description": "**Correct the cadence documentation to match the mechanism** \u2014 the constitution's Step 4 cadence sentence, the authoring guide's *step-checklist cadence* section, and `check_checklist_posted`'s own docstring, which currently teaches an obligation the tool will now discharge on the orchestrator's behalf for one transition type. An instruction that survives a change it describes is the defect family Set 126 spent a session on.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest",
+      "dateTime": "2026-08-12T16:59:21.210201-04:00",
+      "description": "Targeted pytest; verify; close; Step 9 review, `change-log.md`, and `disposition.json` (this is the set's final session).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T17:04:09.581264-04:00",
+      "description": "Registered session 3 (start_session, engine github-copilot / claude-opus-5) and journalled the ratified mechanism to decisions.jsonl: the operator chose Option 1 -- auto-render inside verify_session -- with the two rejected options (orchestrator discipline only; re-arm the gate as blocking) and their consequences recorded, authority=human, rubric_line=escalate-to-human, verification_effect=reduces. Session-start checklist posted before the brief.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "render-the-checklist-at-the-end",
+      "dateTime": "2026-08-12T17:09:52.705136-04:00",
+      "description": "Added verify_session.post_round_checklist() and called it from exactly one place: the line after record_round_completed() in run(). It renders through session_checklist.render and records through the existing record_post path, so the record still means a render happened. Every path that does not complete a round returns before that line (bound refusal, routed-call failure, --dry-run), and a close-backstop round never reaches it because close_backstop calls record_round_completed directly. Both failure modes (checklist unimportable/unrenderable; ledger append refused) are non-fatal and NAMED on stderr per L-079-1.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T17:09:52.707500-04:00",
+      "description": "Added TestRoundBoundaryPostsItsOwnChecklist to ai_router/tests/test_verify_session_phases.py: 9 functions. FIRES: the Set 126 S2 sequence (discovery -> supplementary -> remediation-review back to back) leaves exactly one post inside each round positional window and check_checklist_posted returns ok; the post is a real render through the existing writer (rendered block on stdout, surface/stepCount on the record). DOES NOT FIRE: --dry-run, a refused past-the-bound round, a failed routed call, and a close-backstop round all record nothing; the other transition types still bind (an unposted test-run transition is still reported, with no round transition named). STRUCTURAL: the one-post-per-window rule asserted against a hand-built ledger, not by reading the new call site. Plus the named fail-open. 9 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "correct-the-cadence-documentation-to-match",
+      "dateTime": "2026-08-12T17:14:06.968347-04:00",
+      "description": "Corrected every surface that taught the obligation the tool now discharges: docs/session-constitution.md Step 4 (the verification-round entry removed from the orchestrator transition list, replaced by one shorter sentence -- net effect kept the file UNDER its 4,000-token preload ceiling, verified with guidance_report --check, since ceilings ratchet down only); docs/planning/session-set-authoring-guide.md step-checklist cadence table plus a block stating the automation, its bounds, and the ratified cost; and check_checklist_posted own docstring. Also fixed two stale <- here claims in the guide (removed by the Set 120 S3 ruling), added a step 7 to the verify_session module docstring, and moved docs/planning/work-explorer-in-progress-step-icon.md from diagnosed-not-fixed to FIXED with the deliberate non-backfill of the five prose-status rows recorded. ai_router/CHANGELOG.md gains a Set 127 Unreleased entry covering S1 and S3.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest",
+      "dateTime": "2026-08-12T18:10:12.475189-04:00",
+      "description": "Targeted pytest (408 passed across the 7 affected test modules), then the full pytest run of record after the last code change: 4101 passed, 9 skipped, 0 failed in 574s. Layer 2 and Layer 3 are not owed -- covers is by path and this session touched only ai_router/ and docs/, hitting no Explorer rendering surface, listed state-file writer, extension manifest or fixture harness. Verification round 1 (discovery, fan-out 2, spec-conformance + failure-scenario lenses, both gpt-5.5, anthropic excluded): VERIFIED, 0 blocking, 0 minor -- and the round posted its own checklist, which is the mechanism working in production. Set-terminal deliverables authored: change-log.md for all three sessions, the Set 127 entry in ai_router/CHANGELOG.md, disposition.json, and the Step 9 guidance review (no changes recommended; all four preload files sit at 99-100% of ceiling and the candidate lesson is already the project-guidance principle this session applied). Operator walked s2-uat-walk.md and attested PASS on all three items with no changes requested.",
+      "status": "complete"
     }
   ]
 }

@@ -4,8 +4,39 @@
 > *"I'm not seeing the In Progress icon on the active step in the Work
 > Explorer."*
 >
-> **Status:** diagnosed, **not fixed**. Captured as a durable note because it
-> surfaced mid-session in another set. No session owns it yet.
+> **Status: FIXED by Set 127** (`docs/session-sets/127-the-active-step-shows-in-progress/`).
+> Option 2 below — *derive it* — was the one scheduled, and it shipped in
+> both implementations of the row model:
+>
+> - **Session 1** — `ai_router/session_checklist.py`: `build_rows()` derives
+>   the active step (the lowest-numbered seeded `plan-step` row with nothing
+>   logged against it, in a session `session-state.json` says is in flight)
+>   and each started row's start time. `session_projection` serializes the
+>   derived fields rather than recomputing them.
+> - **Session 2** — `sessionStepModel.ts`, the mirror the Work Explorer
+>   reads, with a cross-language parity fixture that fails when the two
+>   implementations drift. The start time renders `12:06-` in the dimmed
+>   `description` slot; the operator who reported this attested the walk.
+> - **Session 3** — the same question on the third surface: the step
+>   checklist's post at a verification-round boundary, which
+>   `verify_session` now renders itself rather than depending on an
+>   orchestrator remembering during a machine-driven sequence.
+>
+> No writer was added and no orchestrator convention was introduced, so
+> **every historical set is fixed retroactively** — which is exactly what
+> options 1 and 3 could not do.
+>
+> **The secondary finding below was deliberately NOT backfilled.** The five
+> prose-in-`status` entries pre-date Set 120 S1's strict writer, nothing new
+> can land that way, and rewriting historical records to flatter a renderer
+> is the wrong direction. The obligation they create is the opposite one and
+> it *was* met: the derivation does not trust the status field blindly — it
+> reads whether an entry EXISTS, not what its status says (Set 127 S2's
+> journaled decision, pinned by the corpus case
+> `the-start-time-chain-does-not-read-the-status-vocabulary`).
+>
+> *Originally captured as a durable note (diagnosed, not fixed) because it
+> surfaced mid-session in another set.*
 
 ## Diagnosis: the renderer is fine — nothing ever writes the state
 
@@ -106,3 +137,6 @@ blindly.
 - Set 115 — Work Explorer session-node UX.
 - Set 120 S1 — the strict step-status writer; S3 — the one computed
   projection, whose shape option 2 mirrors.
+- **Set 127 — the set that closed this note.** S1 derived the state and the
+  start time in Python; S2 mirrored both in TypeScript and rendered them; S3
+  closed the same gap on the step checklist's round-boundary post.

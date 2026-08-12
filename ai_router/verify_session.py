@@ -54,6 +54,13 @@ What it does, in order:
 6. Patches ``disposition.json`` (``verification_method: "api"``, the
    verdict token verbatim) preserving every unrelated field, and prints
    the verdict, the blocking classification, and the exact next action.
+7. **Posts the step checklist** for the round that just completed (Set
+   127 S3) -- rendered through ``session_checklist`` and recorded
+   through its existing ``record_post`` path, so the operator sees where
+   the session is at every round boundary without anyone having to
+   remember mid-remediation. Only a round that COMPLETED posts: a round
+   refused past its bound, a failed routed call, and ``--dry-run``
+   record nothing, because nothing was shown.
 
 **The phased loop (Set 096 S2).** ``--phase`` selects one of three
 framings; **omitted, the classic single-call behavior is unchanged**
@@ -1867,6 +1874,108 @@ def record_round_completed(
     if discovery_baseline_tree:
         record["discoveryBaselineTree"] = discovery_baseline_tree
     return _append_round_ledger(path, record)
+
+
+def post_round_checklist(
+    session_set_dir: Path, session_number: int
+) -> Optional[dict]:
+    """Render the step checklist for the round that just completed.
+
+    Set 127 S3, on the operator's ratified answer (Option 1 in the spec's
+    *The one decision Session 3 must have ratified before it starts*;
+    journaled with ``authority=human`` and
+    ``verification_effect=reduces``).
+
+    The cadence asks for a post after each verification round completes,
+    and ``check_checklist_posted`` enforces it positionally: the post for
+    round R must land in ``[t_R, t_R+1)``. A blocking discovery round
+    drives ``discovery -> supplementary -> remediate ->
+    remediation-review`` minutes apart, machine-driven, with nobody at the
+    terminal — so those windows kept closing unmet (Set 126 S2 missed
+    rounds 2 and 3), and a missed window cannot be re-entered, which put a
+    structurally predictable omission on the operator's desk as waiver
+    paperwork. The fix is REMOVAL of the failure mode rather than more
+    discipline (project-guidance: *prefer removal over addition*): the
+    tool that ran the round shows the operator where the session is.
+
+    What this is NOT: it is not a synthetic post. It goes through the same
+    ``render`` + ``record_post`` pair the CLI uses, in that order, so the
+    record still means "a render happened" and the round's output is
+    genuinely more informative. It is called from exactly one place — the
+    line after :func:`record_round_completed` in :func:`run` — which is
+    what pairs a post with a ledgered round and nothing else:
+
+    * a round REFUSED past its bound returns long before that line,
+    * a routed-call failure (``VerificationUnavailableError``, an empty
+      results list) returns before it,
+    * ``--dry-run`` returns before it,
+    * and a CLOSE-BACKSTOP round never reaches it at all: the backstop
+      calls :func:`record_round_completed` directly, and its rounds are
+      not checklist transitions (they run in-process during the close,
+      so their window opens after the last moment anyone could post).
+
+    Nothing else about the gate moves: the positional-window rule, the
+    waiver path, and every other transition type (test-run recorded,
+    operator stop, last logged step) bind exactly as they did.
+
+    Returns the post record, or ``None`` when nothing was recorded. Every
+    failure here is non-fatal and NAMED (L-079-1): a checklist problem
+    must never cost the operator a round they have already paid for, and
+    a silent skip would be the invisible omission this mechanism exists
+    to end.
+    """
+    try:
+        try:
+            from .session_checklist import (  # type: ignore[import-not-found]
+                SURFACE_TEXT,
+                build_rows,
+                posts_path,
+                record_post,
+                render,
+            )
+        except ImportError:
+            from session_checklist import (  # type: ignore[no-redef]
+                SURFACE_TEXT,
+                build_rows,
+                posts_path,
+                record_post,
+                render,
+            )
+    except ImportError as exc:  # pragma: no cover - defensive
+        print(
+            f"verify_session: NOTE -- session_checklist unavailable "
+            f"({exc}); this round's checklist was NOT posted and the "
+            f"close gate will not count it.",
+            file=sys.stderr,
+        )
+        return None
+
+    set_dir = str(session_set_dir)
+    try:
+        rows = build_rows(set_dir, session_number)
+        print()
+        print(render(rows, session_number))
+    except (OSError, ValueError, KeyError, TypeError) as exc:
+        print(
+            f"verify_session: NOTE -- could not render the step checklist "
+            f"({exc}); this round's checklist was NOT posted and the close "
+            f"gate will not count it.",
+            file=sys.stderr,
+        )
+        return None
+
+    # The render is the record, and it is written AFTER the output so a
+    # ledger problem can never cost the operator the checklist itself --
+    # the same ordering session_checklist.run uses.
+    record = record_post(set_dir, session_number, rows, surface=SURFACE_TEXT)
+    if record is None:
+        print(
+            f"verify_session: NOTE -- could not append to "
+            f"{posts_path(set_dir)}; this round's checklist was rendered "
+            f"but NOT recorded, and the close gate will not count it.",
+            file=sys.stderr,
+        )
+    return record
 
 
 
@@ -3847,6 +3956,14 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         ended_loop=ended_loop,
         discovery_baseline_tree=snapshot_tree,
     )
+
+    # -- Set 127 S3: the round that just completed posts its own
+    #    checklist. Immediately after the ledger record, so a post is
+    #    paired with a ledgered round and with nothing else -- every path
+    #    that does NOT complete a round (refused past the bound, routed-call
+    #    failure, --dry-run) has already returned above. See
+    #    post_round_checklist for the ratified decision and its bounds.
+    post_round_checklist(session_set_dir, session_number)
 
     disposition_path = patch_disposition(
         session_set_dir, session_verdict, round_qualification

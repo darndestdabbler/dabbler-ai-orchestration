@@ -22,6 +22,24 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > its head, because it is the record of what was staged — what the
 > folded release actually ships is the Unreleased entries here.
 
+### Fixed
+
+- **(Set 126 S2) The README stopped telling operators to commit a
+  gitignored file, and now names the command that finishes setup.** The
+  extension README still described the project's verify type as *"written
+  to `project-verify-type.txt` at the repo root and **committed** — it is
+  project configuration, not machine state"*. That is the precise inverse
+  of Set 124 S1's ruling: the file **is** machine/project state, the writer
+  adds the `.gitignore` rule before writing it, and committing it publishes
+  one seat's transport to every clone. The README now says so, and its
+  setup section names `python -m ai_router.verify_type --set-env` — the
+  Set 126 helper that persists `AI_ORCHESTRATION_VERIFY_TYPE` at USER scope
+  on Windows and prints the `export` line on macOS/Linux — because setup is
+  finished only when both halves carry the same value. The
+  consumer-bootstrap `getting-started.md.template` this extension renders
+  at scaffold time carries the same correction (and `dist/templates/` was
+  rebuilt from it).
+
 ### Removed
 
 - **(Set 123 S3) Every webview in the extension is gone.** The Getting

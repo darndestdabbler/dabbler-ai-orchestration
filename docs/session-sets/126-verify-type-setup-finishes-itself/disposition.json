@@ -1,33 +1,39 @@
 {
   "status": "completed",
-  "summary": "Set 126 Session 1 made the second half of setup visible. `verify_type` has always stated its own bar -- setup is finished when BOTH $AI_ORCHESTRATION_VERIFY_TYPE is set and project-verify-type.txt carries the same value -- and branch 1 captured `env_value` from the day it was written without ever comparing it, so a project with no environment half and a project whose environment half CONTRADICTED the file both printed the same confident [x] as a finished one. `VerifyTypeResolution.env_agreement` is that missing comparison (agrees / missing / disagrees, plus not-applicable on branches 2 and 3 where the file has not answered and a disagreement would have to be invented from a single value); it is published on `to_dict()` for --json consumers, and `describe()` now reports it -- a disagreement naming BOTH values and stating that dispatch uses the FILE. Narration only, by spec authoring decision 2: the file still wins silently, `resolved` still means 'the project file answered', and no exit code moved, which eight falsifiers pin in both directions (fires on a missing half, on a contradiction, and on an invalid env value -- reported rather than raised, because describe() is a narration path; does not fire on agreeing halves, which assert the EXACT two-line output, nor on a blank variable, which is `missing` because branch 2 already treats blank as unset). Two verification rounds, both VERIFIED cross-provider with zero blocking findings. ADJUDICATED-MINOR RESIDUAL, owner Session 2 (which already touches this module): two docstring-precision nits from round 2 -- `describe()` still calls itself an 'ASCII-only paragraph' though its first line echoes a project path that can be non-ASCII, and `resolve_verify_type()` still says broadly that an invalid environment value raises, which was never true on branch 1. Both are pre-existing claims this session did not create, both are zero-impact prose, and both were left rather than restale a stamp at the round cap for a docstring. The round-1 nit that this session DID create -- `resolved` documenting itself as 'True only when setup is finished', which this work makes false -- was fixed in flight and re-verified.",
+  "summary": "Set 126 Session 2 (final) made setup's second half EXECUTABLE and then corrected every instruction that described the old manual step. `python -m ai_router.verify_type --set-env` derives the value from project-verify-type.txt -- never asking again, which is what makes drift impossible rather than merely reported (Session 1 taught the tool to REPORT it) -- and branches by OS because what a helper can honestly do differs by platform. Windows persists at USER scope through the registry API under HKEY_CURRENT_USER\\Environment, preferred over setx (which truncates past 1024 chars and cannot tell the calling process), and publishes the value into the running process so the command's own next line of narration does not report the half it just finished as missing; a best-effort WM_SETTINGCHANGE broadcast notifies running programs and a failure there is a NAMED warning (L-079-1), never a failed setup. POSIX writes NOTHING and prints the export line: there is no OS-level user environment on Unix, so a helper that exited 0 having persisted nothing would be defect 1 wearing a success message. Machine scope is REFUSED, not merely unused -- the writer raises on any scope but 'user' BEFORE winreg is imported, which is what makes the guarantee provable on the ubuntu and macOS runners the python-tests matrix already pays for. 12 falsifiers, exactly the irony budget, including a byte-identical-tree assertion for the POSIX no-write path and a platform x value matrix over every scope ever passed. DOGFOODED LIVE on this machine: the HKCU\\Environment value was blanked, --set-env was run, and reg query confirmed AI_ORCHESTRATION_VERIFY_TYPE REG_SZ COPILOT_CLI restored. INSTRUCTION SURFACE, re-derived rather than trusted (L-069-1): the spec named four surfaces and warned the list was incomplete, and it was. Beyond the known extension-README 'committed' inversion, the pass found docs/quick-start.md and docs/adoption-bootstrap.md both telling operators to COMMIT the gitignored file; and cross-provider verification round 2 found a Major nobody had listed -- five surfaces, including the SHIPPED LIGHTWEIGHT_REMOVED_MESSAGE, still instructing Copilot-only users to set transport.profile in ai_router/local-overrides.yaml, a key Set 124 S2 retired and config.py now REFUSES at load. That one did not merely mislead: it walked its exact target population into a guaranteed loader error. All corrected in one pass, with test_spec_config now pinning the replacement AND the negatives so the old wording cannot creep back. Session 1's adjudicated-minor residual (two pre-existing docstring imprecisions, owner named as Session 2) is cleared. Four verification rounds: discovery VERIFIED with 2 nits (both fixed rather than banked -- one was a real --json contract break on the refusal path, fixed by REMOVING the special-case early return); discovery round 2 ISSUES_FOUND with the Major above; supplementary VERIFIED with nothing new; remediation-review VERIFIED with the fix accepted. RESIDUAL, non-blocking and advisory: the checklist_posted gate reports 3 transitions (verification rounds 2 and 3, and the last logged step) that left a record without a post -- the posts were made at session start, after round 1, before the full suite, and at close, but not at every round boundary. Recorded here rather than silently retried; no operator waiver is claimed.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
     "ai_router/verify_type.py",
     "ai_router/tests/test_verify_type_resolution.py",
+    "ai_router/spec_config.py",
+    "ai_router/tests/test_spec_config.py",
+    "ai_router/CHANGELOG.md",
+    "README.md",
+    "docs/quick-start.md",
+    "docs/adoption-bootstrap.md",
+    "docs/clone-setup.md",
+    "docs/cross-repo-lightweight-removal-notice.md",
+    "docs/ai-led-session-workflow.md",
+    "docs/tutorials/adopt-dabbler.md",
+    "docs/templates/consumer-bootstrap/getting-started.md.template",
+    "test-fixtures/cold-start/full/docs/dabbler/getting-started.md",
+    "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/getting-started.md.template",
     "docs/planning/verify-type-resolution.md",
-    "docs/session-sets/126-verify-type-setup-finishes-itself/spec.md",
-    "docs/session-sets/126-verify-type-setup-finishes-itself/s1-conventions.md",
-    "docs/session-sets/126-verify-type-setup-finishes-itself/decisions.jsonl",
+    "docs/planning/verify-type-env-var-setup-gap.md",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/s2-conventions.md",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/s2-remediation-round-2.md",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/change-log.md",
     "docs/session-sets/126-verify-type-setup-finishes-itself/disposition.json"
   ],
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 2 ships the OS-branching env-write helper and the instruction-surface correction in the same module Session 1 just changed, and it must not re-derive the settled scope ruling (User scope, never Machine), the Python-not-PowerShell rationale, or the two authoring decisions now journalled. Continuity of that context is worth more than a fresh perspective here, and this seat's Copilot CLI transport is also the environment the Windows User-scope write has to be dogfooded on."
-    }
-  },
   "blockers": [],
   "lessons_cited": [
+    "L-069-1",
     "L-112-1",
     "L-079-1",
-    "L-064-8",
-    "L-064-9"
+    "L-064-8"
   ]
 }

@@ -149,6 +149,7 @@ the terminal, once per machine:
 
 ```
 python -m ai_router.verify_type --set DIRECT_API     # or COPILOT_CLI
+python -m ai_router.verify_type --set-env            # the second half
 ```
 
 `DIRECT_API` means direct `DABBLER_*` provider API keys; `COPILOT_CLI`
@@ -159,7 +160,11 @@ subscription with no provider keys. The answer lands in
 to be recorded differently. The file is **gitignored** (the command adds
 the rule itself): what verifies a project is machine/project state, so
 one checkout can honestly answer `COPILOT_CLI` on a Copilot seat and
-`DIRECT_API` on a machine holding provider keys. `python -m
+`DIRECT_API` on a machine holding provider keys. Setup is finished when
+BOTH that file and `AI_ORCHESTRATION_VERIFY_TYPE` carry the same value —
+`--set-env` derives the variable from the file rather than asking again,
+persisting it at USER scope on Windows and printing the `export` line for
+your shell profile on macOS/Linux. `python -m
 ai_router.verify_type` with no flags prints what the project currently
 resolves to, or the guided setup if this machine has not answered yet.
 

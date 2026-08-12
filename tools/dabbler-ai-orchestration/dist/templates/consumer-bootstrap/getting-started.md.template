@@ -51,7 +51,7 @@ silently faking verification.
 
 ## 1a. Say What Verifies This Project
 
-Tell the project which of the two you picked. This is one command,
+Tell the project which of the two you picked. These are two commands,
 answered once **per machine**, and **gitignored** — it is machine/project
 state, not project configuration, so one checkout can honestly answer
 `COPILOT_CLI` on a Copilot seat and `DIRECT_API` on a machine that holds
@@ -60,6 +60,7 @@ provider keys:
 ```
 python -m ai_router.verify_type                 # prints the guided setup
 python -m ai_router.verify_type --set DIRECT_API
+python -m ai_router.verify_type --set-env       # the second half of setup
 ```
 
 That writes `project-verify-type.txt` at the repo root holding exactly
@@ -67,7 +68,14 @@ That writes `project-verify-type.txt` at the repo root holding exactly
 `.gitignore` first, so the answer is never committable — **do not commit
 it**. The router **derives** its
 transport from that file, so there is no second place to configure and
-nothing that can disagree with it. If your machine already sets
+nothing that can disagree with it. Setup is finished when **both** that
+file and `AI_ORCHESTRATION_VERIFY_TYPE` carry the same value, which is what
+`--set-env` is for: it derives the variable from the file rather than
+asking you again, persists it at USER scope on Windows, and on macOS/Linux
+prints the exact `export` line for your shell profile instead of editing
+the profile behind your back. Either way, terminals that are already open
+keep their old environment until they are restarted. If your machine
+already sets
 `AI_ORCHESTRATION_VERIFY_TYPE`, the command offers that value as a
 suggestion and `python -m ai_router.verify_type --confirm` writes it;
 until you confirm, a machine default changes nothing about how this

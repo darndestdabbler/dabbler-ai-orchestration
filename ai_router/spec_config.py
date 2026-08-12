@@ -36,14 +36,22 @@ TriStateFlag = Union[bool, Literal["suggested"]]
 # The one-line migration message a stranded reader sees. It has to answer
 # "what do I do next" without further reading, so it names both remedies:
 # the keyed path and the Copilot-seat path.
+#
+# Set 126 S2 (verification round 2, Major): the Copilot half used to say
+# "'transport: {profile: copilot-cli}' in ai_router/local-overrides.yaml".
+# Set 124 S2 RETIRED that key and `config._apply_local_overrides` now
+# REFUSES it, so this message -- shipped, and read by exactly the stranded
+# Copilot-only reader it was written for -- was walking that reader into a
+# guaranteed loader error. It names the one sanctioned entry point instead.
 LIGHTWEIGHT_REMOVED_MESSAGE = (
     "tier: lightweight was removed in Set 112 -- there is one tier now. "
     "Fix: set 'tier: full' in the Session Set Configuration block (or drop "
     "the tier: line entirely), then give the router a provider to call -- "
     "either DABBLER_ANTHROPIC_API_KEY / DABBLER_GEMINI_API_KEY / "
     "DABBLER_OPENAI_API_KEY for the Direct APIs transport, or an "
-    "authenticated GitHub Copilot CLI seat with "
-    "'transport: {profile: copilot-cli}' in ai_router/local-overrides.yaml. "
+    "authenticated GitHub Copilot CLI seat selected with "
+    "'python -m ai_router.verify_type --set COPILOT_CLI' followed by "
+    "'python -m ai_router.verify_type --set-env'. "
     "See docs/cross-repo-lightweight-removal-notice.md."
 )
 

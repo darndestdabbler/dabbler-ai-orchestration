@@ -35,7 +35,9 @@ hold Copilot subscriptions and no provider keys. Either way you need reach to
 
 Run **`Dabbler: Set Up New Project`** in VS Code to scaffold, then
 **`python -m ai_router.verify_type --set DIRECT_API`** (or `COPILOT_CLI`) to
-record what verifies the project on this machine; **`Dabbler: Get Started`** opens the
+record what verifies the project on this machine, and
+**`python -m ai_router.verify_type --set-env`** to finish setup's second
+half; **`Dabbler: Get Started`** opens the
 step-by-step companion doc. The scaffold also declares
 a `default` module with two starter sets already scaffolded —
 `001-default-plan` (create or import your project plan) and
@@ -227,10 +229,13 @@ decision stay human. Setup and the raw commands each action runs:
   scaffolds `ai_router/router-config.yaml`, then **hand-author
   `ai_router/budget.yaml`** (see
   [`docs/budget-yaml-schema.md`](budget-yaml-schema.md)) — the palette
-  scaffold has no budget input and writes no budget file — and commit what
-  verifies the project with `python -m ai_router.verify_type --set <VALUE>`.
+  scaffold has no budget input and writes no budget file — and record what
+  verifies the project with `python -m ai_router.verify_type --set <VALUE>`
+  followed by `python -m ai_router.verify_type --set-env` (that file is
+  **gitignored** machine/project state — do not commit it; the second
+  command is what finishes setup's other half).
   Without VS Code, create both YAML files by hand and run the same
-  `verify_type` command.
+  `verify_type` commands.
 - [ ] **Pick your transport, then set only what it needs.** There are two
   supported populations and neither is a degraded version of the other:
   - **Direct APIs** — set `DABBLER_ANTHROPIC_API_KEY`,
@@ -239,8 +244,11 @@ decision stay human. Setup and the raw commands each action runs:
     Google, and OpenAI; only the environment variable names are
     Dabbler-prefixed.
   - **Copilot CLI** — a **GitHub Copilot CLI seat** instead of `DABBLER_*`
-    keys. Set `transport.profile: copilot-cli` in the gitignored
-    `ai_router/local-overrides.yaml` and follow
+    keys. Select it with `python -m ai_router.verify_type --set COPILOT_CLI`
+    (then `--set-env`) — the router derives `transport.profile: copilot-cli`
+    from the gitignored `project-verify-type.txt` that writes; setting the
+    key in `ai_router/local-overrides.yaml` was retired by Set 124 and is
+    now refused at config load. Then follow
     [`docs/copilot-seat-setup-checklist.md`](copilot-seat-setup-checklist.md)
     once per machine (install + `copilot login` + the auth-preflight). An
     unauthenticated seat is blocked at session start rather than silently
@@ -323,5 +331,5 @@ and say:
 - **Releasing, hotfixing, rolling back:**
   [`docs/tutorials/release-and-recovery.md`](tutorials/release-and-recovery.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).
-- **Setting up a new project:** `Dabbler: Set Up New Project`, then `python -m ai_router.verify_type --set <VALUE>`; without VS Code, the manual-setup note under [One tier, one verification story](#one-tier-one-verification-story) above.
+- **Setting up a new project:** `Dabbler: Set Up New Project`, then `python -m ai_router.verify_type --set <VALUE>` and `python -m ai_router.verify_type --set-env`; without VS Code, the manual-setup note under [One tier, one verification story](#one-tier-one-verification-story) above.
 - **UAT checklists, outsource-last, adjudication, advanced flags:** Reference section of the workflow doc — only read what applies to your set's configuration.

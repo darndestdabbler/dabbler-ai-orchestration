@@ -109,13 +109,17 @@ For a Copilot-only setup, follow
 2. Run a real headless model probe.
 3. Run `copilot_preflight` through this clone's `.venv`.
 4. Refresh the seat-local catalog.
-5. Select the seat transport **in `ai_router/local-overrides.yaml`**, which is
-   ignored:
+5. Select the seat transport by declaring what verifies **this checkout**:
 
-   ```yaml
-   transport:
-     profile: copilot-cli
    ```
+   python -m ai_router.verify_type --set COPILOT_CLI
+   python -m ai_router.verify_type --set-env
+   ```
+
+   The router **derives** `transport.profile: copilot-cli` from the
+   gitignored `project-verify-type.txt` that first command writes, and the
+   second persists `AI_ORCHESTRATION_VERIFY_TYPE` to match (USER scope on
+   Windows; the `export` line for your shell profile on macOS/Linux).
 
 **Do not put `transport.profile: copilot-cli` in
 `ai_router/router-config.yaml`.** That file is package data — `pyproject.toml`
@@ -123,8 +127,14 @@ ships it in the wheel — so a seat-local profile committed there makes the rout
 fail to load for every API-key-only consumer: it skips the API-key validation
 they need and then tries to read a `copilot-catalog.lock` that is deliberately
 never tracked. Set 110 S4 committed exactly that and the close-out backstop
-caught it; `transport.profile` became a supported local override in the same
-change, and `test_local_overrides_merge.py` now pins the shipped file to `api`.
+caught it; `test_local_overrides_merge.py` now pins the shipped file to `api`.
+
+**Nor in `ai_router/local-overrides.yaml`.** Set 110 S4 made
+`transport.profile` a supported local override; **Set 124 S2 retired it**,
+because what verifies a project is machine/project state and
+`project-verify-type.txt` is the one place that records it. A stale key
+there is now **refused** at config load with the replacement command, so an
+older clone carrying one must have its `transport:` block deleted.
 
 The catalog at `ai_router/copilot-catalog.lock` is deliberately ignored. It
 is probed per seat and must not be committed or shared as project truth. The

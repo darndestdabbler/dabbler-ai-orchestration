@@ -47,7 +47,8 @@ tier: lightweight was removed in Set 112 -- there is one tier now. Fix: set
 entirely), then give the router a provider to call -- either
 DABBLER_ANTHROPIC_API_KEY / DABBLER_GEMINI_API_KEY / DABBLER_OPENAI_API_KEY
 for the Direct APIs transport, or an authenticated GitHub Copilot CLI seat
-with 'transport: {profile: copilot-cli}' in ai_router/local-overrides.yaml.
+selected with 'python -m ai_router.verify_type --set COPILOT_CLI' followed by
+'python -m ai_router.verify_type --set-env'.
 See docs/cross-repo-lightweight-removal-notice.md.
 ```
 
@@ -104,13 +105,22 @@ replacement for what Lightweight gave you:
 1. Install the GitHub Copilot CLI and log in to your tenant. The one-time
    per-machine checklist is
    [`docs/copilot-seat-setup-checklist.md`](copilot-seat-setup-checklist.md).
-2. Create `ai_router/local-overrides.yaml` (gitignored — it is per-machine,
-   not per-repo) containing:
+2. Declare what verifies the project, and finish setup's second half:
 
-   ```yaml
-   transport:
-     profile: copilot-cli
    ```
+   python -m ai_router.verify_type --set COPILOT_CLI
+   python -m ai_router.verify_type --set-env
+   ```
+
+   That writes the gitignored `project-verify-type.txt` at the repo root
+   (machine/project state — the router **derives**
+   `transport.profile: copilot-cli` from it) and persists
+   `AI_ORCHESTRATION_VERIFY_TYPE` to match.
+
+   > **Do not set `transport.profile` in `ai_router/local-overrides.yaml`.**
+   > That was the Set 110 route and Set 124 S2 **retired** it: a stale key
+   > there is now **refused** at config load. If an older copy of these
+   > instructions had you create it, delete the `transport:` block.
 
 3. Run `python -m ai_router.copilot_preflight` to confirm the seat
    authenticates and to refresh its model catalog.

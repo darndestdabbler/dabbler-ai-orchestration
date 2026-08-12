@@ -57,6 +57,19 @@ reports it. It is **narration, not dispatch**: the file still wins silently,
 moves** (spec authoring decision 2 -- making the bar enforceable is a separate,
 breaking decision owned by whoever can survey the callers of exit 3).
 
+**The other half is a command now, not a sentence** (Set 126 S2).
+:func:`set_env_verify_type` persists the environment half, deriving its value
+from ``project-verify-type.txt`` so the two halves cannot drift apart -- drift
+being exactly the condition S1 taught the tool to report. It **does** on
+Windows (User scope, via ``HKEY_CURRENT_USER\\Environment``) and **instructs**
+on POSIX (it prints the ``export`` line and writes nothing at all, because
+there is no OS-level user environment to write and silently editing a
+developer's shell profile is not this tool's business). It never blurs which
+of the two it just did, and it **never writes Machine scope**: a Copilot seat
+is licensed per GitHub identity, not per box, so a machine-wide answer would
+impose one seat's transport on every other account -- the same failure Set 124
+S1 removed from git by gitignoring the project file.
+
 Reuse, not reinvention (spec Session 1 step 4 audit): seat readiness stays in
 :mod:`ai_router.copilot_preflight`, transport diagnosis in
 :mod:`ai_router.transport_diagnostics`, effective-provider identity in
@@ -155,6 +168,34 @@ ENV_AGREEMENT_STATES: frozenset[str] = frozenset(
 PROFILE_SOURCE_PROJECT_FILE = "project-file"
 PROFILE_SOURCE_CONFIG = "config"
 PROFILE_SOURCE_DEFAULT = "default"
+
+# --- Persisting the environment half (Set 126 S2) --------------------------
+#
+# The design's bar is BOTH halves, and until now one half was a command and
+# the other was a sentence. What a helper can honestly do differs by OS, and
+# the difference is not cosmetic: there is no OS-level "user environment" on
+# Unix at all, so a helper that claimed to write one there would exit 0 and
+# persist nothing -- a silent no-op, which is the worst possible outcome for
+# a setup helper (it is the same defect it was written to fix, wearing a
+# success message).
+
+PLATFORM_WINDOWS = "windows"
+PLATFORM_POSIX = "posix"
+
+#: The **only** environment scope this module will ever write. Machine scope
+#: is not a missing feature, it is a refused one: a Copilot seat is licensed
+#: per GitHub identity, not per box, so a machine-wide answer would tell every
+#: other account on the box -- service accounts included -- that this project
+#: is verified the way THIS seat verifies it.
+ENV_SCOPE_USER = "user"
+
+#: Where User-scope environment variables live on Windows. The hive *is* the
+#: scope: a Machine-scope write would have to name ``HKEY_LOCAL_MACHINE``, so
+#: pinning this constant pins the scope structurally -- and it is a plain
+#: string precisely so the guarantee is assertable on a runner that has no
+#: ``winreg`` module at all (the CI matrix runs ubuntu and macOS too).
+WINDOWS_ENV_REGISTRY_ROOT = "HKEY_CURRENT_USER"
+WINDOWS_ENV_REGISTRY_SUBKEY = "Environment"
 
 
 class VerifyTypeError(ValueError):
@@ -486,10 +527,16 @@ def resolve_verify_type(
 ) -> VerifyTypeResolution:
     """Resolve the verify type through the three-branch rule. One entry point.
 
-    Raises :class:`VerifyTypeError` when a declared value is invalid -- in
-    either the project file or the environment. A caller that wants "is this
-    project set up?" without the exception should catch it; that IS the
-    answer ("set up wrong"), and it must not be confused with "not set up".
+    Raises :class:`VerifyTypeError` when the value a branch is about to
+    **use** is invalid: an unparseable project file (branch 1), or an
+    unparseable environment value where the environment is the answer
+    (branch 2). It does **not** raise for a bad environment value on branch
+    1 -- there the file has already answered and the environment is only
+    captured for :attr:`VerifyTypeResolution.env_agreement`, which reports
+    an unusable value as a disagreement rather than an exception. A caller
+    that wants "is this project set up?" without the exception should catch
+    it; that IS the answer ("set up wrong"), and it must not be confused
+    with "not set up".
     """
     environ = os.environ if env is None else env
 
@@ -599,6 +646,271 @@ def derive_transport_profile(
     )
 
 
+# --- Writing the environment half ------------------------------------------
+
+
+#: The one spelling of the command that finishes setup. Named once so the
+#: guided instructions, the half-finished note and the disagreement note
+#: cannot drift into three slightly different commands.
+SET_ENV_COMMAND = "python -m ai_router.verify_type --set-env"
+
+
+def current_platform() -> str:
+    """``windows`` or ``posix`` -- what this process can actually persist.
+
+    Injected as a seam by :func:`set_env_verify_type` so both branches are
+    provable on the CI runner that is *not* the target OS. A cross-platform
+    claim tested only on the platform it is about is not tested.
+    """
+    return PLATFORM_WINDOWS if os.name == "nt" else PLATFORM_POSIX
+
+
+class EnvWriteOutcome(NamedTuple):
+    """What :func:`set_env_verify_type` did, said, and could not do.
+
+    ``persisted`` is the honest half of the OS split: it is ``True`` only
+    when this process actually wrote the value somewhere durable. On POSIX it
+    is always ``False`` -- the instructions are the whole deliverable there,
+    and a helper that reported success for printing a line would be exactly
+    the silent no-op this design refuses.
+    """
+
+    platform: str
+    value: str
+    persisted: bool
+    scope: Optional[str]
+    instructions: str
+    warnings: tuple = ()
+
+    def to_dict(self) -> dict:
+        return {
+            "platform": self.platform,
+            "value": self.value,
+            "persisted": self.persisted,
+            "scope": self.scope,
+            "instructions": self.instructions,
+            "warnings": list(self.warnings),
+        }
+
+
+def write_windows_user_env(
+    name: str, value: str, scope: str = ENV_SCOPE_USER
+) -> None:
+    """Persist *name* = *value* in this Windows user's environment.
+
+    The registry API rather than ``setx``, on the gap note's reasoning:
+    ``setx`` truncates values past 1024 characters and does not affect the
+    calling process either, so it buys nothing and loses data at the edge.
+
+    *scope* exists to be **refused**. A future caller reaching for Machine
+    scope hits an exception here rather than a comment asking it not to, and
+    the refusal is what a falsifier can plant a violation against.
+    """
+    if scope != ENV_SCOPE_USER:
+        raise VerifyTypeError(
+            f"Refusing to write environment scope {scope!r}: this module "
+            f"writes {ENV_SCOPE_USER!r} scope only. A Copilot seat is "
+            "licensed per GitHub identity, not per machine, so a machine-wide "
+            "answer would impose one seat's transport on every other account "
+            "on this box."
+        )
+    import winreg  # noqa: PLC0415 - Windows-only; imported where it is used
+
+    root = getattr(winreg, WINDOWS_ENV_REGISTRY_ROOT)
+    with winreg.CreateKeyEx(
+        root, WINDOWS_ENV_REGISTRY_SUBKEY, 0, winreg.KEY_SET_VALUE
+    ) as key:
+        winreg.SetValueEx(key, name, 0, winreg.REG_SZ, value)
+
+
+def broadcast_environment_change(timeout_ms: int = 5000) -> None:
+    """Tell running programs the environment block changed (Windows).
+
+    ``setx`` does this and a bare registry write does not, and the difference
+    is operator-visible: Explorer (and the editor or terminal app it
+    launched) hands its own cached environment to every child process, so
+    without the broadcast even a **newly opened** terminal keeps the old
+    value until the next sign-out. Advice to "open a new terminal" would then
+    be one more instruction that does not do what it says.
+
+    Best-effort by contract: the value is already persisted when this runs,
+    so a failure here is a named warning, never a failed setup.
+    """
+    import ctypes  # noqa: PLC0415 - Windows-only; imported where it is used
+    from ctypes import wintypes
+
+    hwnd_broadcast = 0xFFFF
+    wm_settingchange = 0x001A
+    smto_abortifhung = 0x0002
+
+    user32 = ctypes.WinDLL("user32", use_last_error=True)
+    send = user32.SendMessageTimeoutW
+    send.argtypes = [
+        wintypes.HWND,
+        wintypes.UINT,
+        wintypes.WPARAM,
+        wintypes.LPCWSTR,
+        wintypes.UINT,
+        wintypes.UINT,
+        ctypes.POINTER(ctypes.c_size_t),
+    ]
+    send.restype = wintypes.LPARAM
+    result = ctypes.c_size_t()
+    if not send(
+        hwnd_broadcast,
+        wm_settingchange,
+        0,
+        "Environment",
+        smto_abortifhung,
+        timeout_ms,
+        ctypes.byref(result),
+    ):
+        raise OSError(
+            ctypes.get_last_error(),
+            "SendMessageTimeoutW(WM_SETTINGCHANGE) reported failure",
+        )
+
+
+def _windows_env_instructions(
+    value: str, project_file: Optional[Path], warnings: Iterable[str]
+) -> str:
+    lines = [
+        f"[x] ${ENV_VAR} = {value}, persisted at USER scope",
+        f"    ({WINDOWS_ENV_REGISTRY_ROOT}\\{WINDOWS_ENV_REGISTRY_SUBKEY}).",
+        f"    The value was taken from the project file, never asked for",
+        "    again, so the two halves cannot drift apart:",
+        f"        {project_file}",
+        "    USER scope, never Machine: a Copilot seat is licensed per",
+        "    GitHub identity, not per box, so every other account on this",
+        "    machine stays free to answer differently.",
+        "    Already-open terminals keep their OLD environment until they",
+        "    are restarted -- and so do the apps that launched them, since",
+        "    an editor caches its environment at startup. Nothing about",
+        f"    dispatch changed: {PROJECT_FILE_NAME} is what decides.",
+    ]
+    lines.extend(warnings)
+    return "\n".join(lines)
+
+
+def _posix_env_instructions(value: str, project_file: Optional[Path]) -> str:
+    return "\n".join(
+        [
+            "[ ] Nothing was written, and that is the honest answer here:",
+            "    this platform has no OS-level user environment to write.",
+            "    Persistence lives in your shell profile, and editing that",
+            "    without asking is not this tool's business.",
+            "",
+            "    Add this line to ~/.bashrc, ~/.zshenv, or your shell's",
+            "    equivalent:",
+            "",
+            f"        export {ENV_VAR}={value}",
+            "",
+            f"    The value came from the project file, never asked for",
+            "    again, so the two halves cannot drift apart:",
+            f"        {project_file}",
+            "    Already-open shells keep their OLD environment until the",
+            "    profile is re-sourced or the shell is restarted. Nothing",
+            f"    about dispatch changed: {PROJECT_FILE_NAME} is what decides.",
+        ]
+    )
+
+
+def _no_value_to_derive_message(resolution: VerifyTypeResolution) -> str:
+    """Why ``--set-env`` cannot act, and what to run instead. One wording,
+    shared by the library raise and the CLI's own exit path."""
+    hint = (
+        "Confirm the machine default first: "
+        "python -m ai_router.verify_type --confirm"
+        if resolution.source == SOURCE_ENVIRONMENT
+        else "Declare it first: python -m ai_router.verify_type --set <VALUE>"
+    )
+    return (
+        f"{PROJECT_FILE_NAME} has not answered for this project, so there "
+        f"is no value to derive ${ENV_VAR} from. {hint}. The environment "
+        "half is deliberately derived from the file and never asked for "
+        "separately -- two answers is how the halves drift apart."
+    )
+
+
+def set_env_verify_type(
+    *,
+    start: Optional[Path | str] = None,
+    env: Optional[Mapping[str, str]] = None,
+    platform: Optional[str] = None,
+    writer=None,
+    broadcaster=None,
+) -> EnvWriteOutcome:
+    """Finish setup's second half, deriving the value from the project file.
+
+    The value is **never** re-asked for: it is read from
+    ``project-verify-type.txt``, which is what makes drift between the two
+    halves impossible rather than merely reported. A project the file has not
+    answered for therefore has nothing to derive from, and raises rather than
+    guessing -- writing an environment half that no file agrees with would
+    manufacture the disagreement this whole set exists to remove.
+
+    Windows persists (User scope). POSIX prints and writes nothing at all.
+    Both say plainly which of the two just happened.
+
+    On the Windows path the value is also published into **this** process's
+    environment, which ``setx`` notably does not do: without it the caller's
+    own next resolution would read a stale block and report the half just
+    finished as still missing. On POSIX nothing was persisted, so nothing is
+    published -- a process-local claim no shell can back is the lie this
+    module exists to remove.
+    """
+    resolution = resolve_verify_type(start=start, env=env)
+    if not resolution.resolved:
+        raise VerifyTypeError(_no_value_to_derive_message(resolution))
+
+    value = resolution.verify_type
+    chosen = platform or current_platform()
+
+    if chosen != PLATFORM_WINDOWS:
+        return EnvWriteOutcome(
+            platform=chosen,
+            value=value,
+            persisted=False,
+            scope=None,
+            instructions=_posix_env_instructions(value, resolution.project_file),
+        )
+
+    write = writer if writer is not None else write_windows_user_env
+    write(ENV_VAR, value, ENV_SCOPE_USER)
+    # The one thing ``setx`` cannot do, and the gap note names as its flaw:
+    # tell THIS process. Without it the very next line of narration would
+    # read the stale block and report the half we just finished as missing.
+    os.environ[ENV_VAR] = value
+
+    warnings: list = []
+    broadcast = (
+        broadcaster if broadcaster is not None else broadcast_environment_change
+    )
+    try:
+        broadcast()
+    except Exception as exc:  # noqa: BLE001 - any failure here is cosmetic
+        # Named, never swallowed (L-079-1): the value IS persisted, but an
+        # operator told only "open a new terminal" would be following advice
+        # that quietly stopped being sufficient.
+        warnings.append(
+            f"    [!] could not notify running programs of the change "
+            f"({ascii(str(exc))}).\n"
+            "        The value IS persisted; a newly opened terminal may not\n"
+            "        see it until you sign out and back in."
+        )
+
+    return EnvWriteOutcome(
+        platform=chosen,
+        value=value,
+        persisted=True,
+        scope=ENV_SCOPE_USER,
+        instructions=_windows_env_instructions(
+            value, resolution.project_file, warnings
+        ),
+        warnings=tuple(warnings),
+    )
+
+
 # --- Operator-facing narration --------------------------------------------
 
 
@@ -628,7 +940,14 @@ def guided_setup_instructions(project_root: Optional[Path | str] = None) -> str:
         "Then, in order:\n"
         "\n"
         "  1. python -m ai_router.verify_type --set <VALUE>\n"
-        f"  2. set {ENV_VAR}=<VALUE> in this machine's user environment\n"
+        f"  2. {SET_ENV_COMMAND}\n"
+        "       Windows: persists it for you at USER scope.\n"
+        "       macOS/Linux: prints the exact export line for your shell\n"
+        "       profile -- this tool does not edit shell profiles.\n"
+        f"     Do NOT set ${ENV_VAR} by hand with `set`\n"
+        "     or `export` alone: both are process-scoped and evaporate\n"
+        "     with the terminal, so setup looks finished today and is\n"
+        "     unfinished tomorrow.\n"
         "  3. prove the credentials actually work before declaring setup done:\n"
         "       COPILOT_CLI -> python -m ai_router.copilot_preflight\n"
         "       DIRECT_API  -> confirm the DABBLER_*_API_KEY vars resolve and\n"
@@ -668,7 +987,8 @@ def env_half_note(resolution: VerifyTypeResolution) -> Optional[str]:
             "        decides -- but setup is finished only when BOTH halves\n"
             "        carry the same value. A terminal opened before the\n"
             "        variable was set keeps its old environment until it is\n"
-            "        restarted."
+            "        restarted.\n"
+            f"        Finish it: {SET_ENV_COMMAND}"
         )
     if agreement == ENV_AGREEMENT_DISAGREES:
         declared = ascii((resolution.env_value or "").strip())
@@ -681,13 +1001,24 @@ def env_half_note(resolution: VerifyTypeResolution) -> Optional[str]:
             f"        {resolution.transport_profile}). The environment half is "
             "a machine\n"
             "        default this project overrides, so fix whichever of the\n"
-            "        two is wrong."
+            "        two is wrong.\n"
+            f"        If the FILE is right: {SET_ENV_COMMAND}\n"
+            "        rewrites the environment half from it. If the\n"
+            "        environment is right, change the file with --set."
         )
     return None
 
 
 def describe(resolution: VerifyTypeResolution) -> str:
-    """One ASCII-only paragraph describing a resolution, for a terminal."""
+    """One paragraph describing a resolution, for a terminal.
+
+    Everything this function *composes* is ASCII, and
+    :func:`env_half_note` guarantees the same for the arbitrary machine
+    state it renders. The one part that is not this function's to promise is
+    the project **path** it echoes, which carries whatever the operator's own
+    directory names carry -- re-encoding a path to make a docstring true
+    would be a different (pre-existing, out-of-scope) change.
+    """
     if resolution.source == SOURCE_PROJECT_FILE:
         lines = [
             f"[x] verify type: {resolution.verify_type} "
@@ -724,8 +1055,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         description=(
             "Resolve what verifies this project: project-verify-type.txt, "
             "else the confirmed-once machine default, else guided setup. "
-            "Exit 0 = resolved, 2 = a declared value is invalid, 3 = guided "
-            "setup required."
+            "Exit 0 = resolved, 2 = a declared value is invalid or a "
+            "requested write could not be performed, 3 = guided setup "
+            "required."
         ),
     )
     parser.add_argument(
@@ -752,6 +1084,20 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=None,
         choices=sorted(VALID_VERIFY_TYPES),
         help="Branch 3: write this value to the project file.",
+    )
+    parser.add_argument(
+        "--set-env",
+        dest="set_env",
+        action="store_true",
+        help=(
+            f"Finish setup's second half: persist ${ENV_VAR}, deriving the "
+            f"value from {PROJECT_FILE_NAME} (never asked for again, so the "
+            "two halves cannot drift). On Windows it is written at USER "
+            "scope -- never Machine. On macOS/Linux nothing is written: the "
+            "export line for your shell profile is printed instead. Opt-in "
+            "on purpose: --set touches only the project, while this reaches "
+            "outside it."
+        ),
     )
     parser.add_argument(
         "--json",
@@ -796,6 +1142,7 @@ def main(argv: Optional[list] = None) -> int:
 
     read_from = Path(args.project_root) if args.project_root else Path.cwd()
 
+    env_write: Optional[EnvWriteOutcome] = None
     try:
         if args.set_value is not None:
             write_project_verify_type(
@@ -815,14 +1162,42 @@ def main(argv: Optional[list] = None) -> int:
                 _resolve_write_root(args.project_root), resolution.verify_type
             )
             resolution = resolve_verify_type(start=read_from)
+        if args.set_env:
+            # Last, and from the FINAL resolution: --set/--confirm may have
+            # just written the file this derives its value from. A project
+            # the file has not answered for is reported on stderr and falls
+            # through to the normal narration, which already exits 3 --
+            # "guided setup required" is both the remedy and the exit code,
+            # and stdout keeps whichever shape (--json or prose) was asked
+            # for.
+            if not resolution.resolved:
+                print(_no_value_to_derive_message(resolution), file=sys.stderr)
+            else:
+                env_write = set_env_verify_type(start=read_from)
+                # Re-resolve so the narration reflects the write instead of
+                # the environment block this process started with.
+                resolution = resolve_verify_type(start=read_from)
     except VerifyTypeError as exc:
         print(str(exc), file=sys.stderr)
         return EXIT_INVALID
+    except OSError as exc:
+        print(
+            f"Could not persist ${ENV_VAR} ({exc}). "
+            f"{PROJECT_FILE_NAME} is unchanged and dispatch is unaffected; "
+            "setup is simply still half-finished.",
+            file=sys.stderr,
+        )
+        return EXIT_INVALID
 
     if args.json:
-        print(json.dumps(resolution.to_dict(), indent=2))
+        payload = resolution.to_dict()
+        if env_write is not None:
+            payload["env_write"] = env_write.to_dict()
+        print(json.dumps(payload, indent=2))
     else:
         print(describe(resolution))
+        if env_write is not None:
+            print(env_write.instructions)
 
     return EXIT_OK if resolution.resolved else EXIT_SETUP_REQUIRED
 

@@ -1,13 +1,20 @@
 # The verify-type environment-variable setup gap
 
-> **Status:** diagnosed, **not fixed**. Operator-requested durable note,
-> 2026-08-12, raised during Set 124 Session 2 and deliberately deferred so a
-> full pytest run of record and a verification stamp were not invalidated
-> mid-session.
+> **Status: FIXED by Set 126** (`docs/session-sets/126-verify-type-setup-finishes-itself/`).
+> Defect 2 closed in Session 1 (the half-finished state is reported);
+> defects 3 and 1 closed in Session 2 (the `--set-env` helper ships, and
+> every instruction that told the operator to persist the variable by hand
+> was corrected). The diagnosis below is preserved unedited as the record
+> of what was wrong and why the design took the shape it did — see
+> **How it was fixed** at the end for what is true now.
+>
+> Operator-requested durable note, 2026-08-12, raised during Set 124
+> Session 2 and deliberately deferred so a full pytest run of record and a
+> verification stamp were not invalidated mid-session.
 >
 > **Origin:** the operator asked *"should we go ahead and set my ENVIRONMENT
 > VARIABLE for COPILOT_CLI? ... Or is that already handled by the extension?"*
-> It is not handled, by the extension or anything else.
+> It was not handled, by the extension or anything else.
 
 ## The gap
 
@@ -141,3 +148,42 @@ from git by gitignoring the project file.
 - Set 124 S1/S2 — the machine/project re-scoping, and the retirement of
   `local-overrides.yaml`'s `transport.profile`, which left this variable as
   the only half of setup still done by hand.
+
+## How it was fixed (Set 126)
+
+**Session 1 — defect 2.** `VerifyTypeResolution.env_agreement` is the
+comparison branch 1 never made: `agrees` / `missing` / `disagrees`, plus
+`not-applicable` on branches 2 and 3 where the file has not answered and a
+disagreement would have to be invented from a single value. It is published
+on `to_dict()` for `--json` consumers, and `describe()` reports it — a
+disagreement naming **both** values and stating that dispatch uses the file.
+Narration only: no exit code moved, which its falsifiers pin explicitly.
+
+**Session 2 — defects 3 and 1, in that order** (the corrected instruction has
+to name the helper, so fixing the prose first would only have been undone):
+
+- `python -m ai_router.verify_type --set-env` ships in `verify_type` itself.
+  It derives the value from `project-verify-type.txt` rather than asking
+  again, writes **USER** scope on Windows through the registry API at
+  `HKEY_CURRENT_USER\Environment` (and publishes it into the running process,
+  which `setx` cannot do), and on POSIX **writes nothing at all** — it prints
+  the `export` line for the shell profile, exactly as the *Recommended
+  design* above required. Machine scope is refused by the writer, not merely
+  avoided by its callers.
+- The instruction surface was re-derived rather than trusted from the
+  authoring list, and every echo corrected in one pass (`L-069-1`):
+  `guided_setup_instructions()` (which now names `--set-env` and says
+  plainly that a bare `set`/`export` does not persist), the extension
+  `README.md` — including the pre-existing claim that the project file is
+  *"committed ... project configuration, not machine state"*, the precise
+  inverse of Set 124's ruling — the repo `README.md`, `docs/quick-start.md`,
+  `docs/adoption-bootstrap.md`, `docs/tutorials/adopt-dabbler.md`, the
+  consumer-bootstrap `getting-started.md.template`, and the regenerated
+  cold-start golden fixture. Two further "commit what verifies the project"
+  echoes were found in that pass and were not in the authoring list.
+
+What deliberately did **not** change: the three-branch rule, the exit codes,
+and the decision to keep the environment write opt-in rather than folding it
+into `--set` (Set 126 authoring decision 1 — the counter-argument is recorded
+in that set's `decisions.jsonl`, and reversing it is a default flip, not a
+redesign).

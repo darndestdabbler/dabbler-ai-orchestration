@@ -19,10 +19,14 @@ right path below (and help them follow it).
 1. Install the **Dabbler AI Orchestration** extension from the VS Code
    Marketplace (`DarndestDabbler.dabbler-ai-orchestration`).
 2. Open the project folder and run **`Dabbler: Set Up New Project`**,
-   then commit what verifies it with
+   then record what verifies it with
    **`python -m ai_router.verify_type --set DIRECT_API`** (or
-   `COPILOT_CLI`). The scaffold writes the project structure (`.venv` +
-   router package, agent instruction files, `docs/session-sets/`).
+   `COPILOT_CLI`) and finish setup's second half with
+   **`python -m ai_router.verify_type --set-env`**. That answer lives in
+   `project-verify-type.txt`, which is **gitignored** machine/project
+   state — do not commit it. The scaffold writes the project structure
+   (`.venv` + router package, agent instruction files,
+   `docs/session-sets/`).
 
 ## Setting up without VS Code (manual path)
 

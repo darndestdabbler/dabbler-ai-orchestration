@@ -19,6 +19,8 @@ holds however either side is spelled.
 
 from __future__ import annotations
 
+import json
+import os
 import textwrap
 from pathlib import Path
 
@@ -935,3 +937,339 @@ def test_env_agreement_is_total_ascii_and_published(project, monkeypatch):
         vt.resolve_verify_type().env_agreement
         in vt.ENV_AGREEMENT_STATES
     )
+
+
+# ---------------------------------------------------------------------------
+# Set 126 S2 -- one command finishes setup, on whichever OS is running it.
+#
+# S1 made the missing half visible; this makes it executable. The risk is not
+# in the happy path, it is in the OS SPLIT: `[System.Environment]::
+# SetEnvironmentVariable(..., 'User')` is a silent no-op on Linux and macOS,
+# which is defect 1 wearing a success message, so the helper must *do* on
+# Windows and *instruct* on POSIX and never blur which it just did.
+#
+# Both directions (L-112-1), and both provable on the runner that is NOT the
+# target OS -- `python-tests` runs ubuntu + macOS + windows, so a
+# cross-platform claim tested only where it is true is untested where it
+# matters. The seams (`platform=`, `writer=`, `broadcaster=`) exist for
+# exactly that.
+# ---------------------------------------------------------------------------
+
+
+class _WriterSpy:
+    """Records every environment write attempt, and performs none.
+
+    A spy rather than a real registry write on purpose: a falsifier that
+    mutated the developer's own user environment would be a test with a
+    machine-wide side effect.
+    """
+
+    def __init__(self):
+        self.calls: list = []
+
+    def __call__(self, name, value, scope):
+        self.calls.append((name, value, scope))
+
+    @property
+    def scopes(self) -> set:
+        return {scope for _name, _value, scope in self.calls}
+
+
+def _tree_snapshot(root: Path) -> dict:
+    """Every file under *root*, by relative path -> bytes."""
+    return {
+        str(path.relative_to(root)): path.read_bytes()
+        for path in sorted(root.rglob("*"))
+        if path.is_file()
+    }
+
+
+def test_the_windows_path_persists_the_files_value_at_user_scope(project):
+    """FIRES (defect 3): on Windows the helper actually writes, at USER
+    scope, the value the project file already carries."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    spy = _WriterSpy()
+
+    outcome = vt.set_env_verify_type(
+        platform=vt.PLATFORM_WINDOWS, writer=spy, broadcaster=lambda: None
+    )
+
+    assert spy.calls == [(vt.ENV_VAR, vt.COPILOT_CLI, vt.ENV_SCOPE_USER)]
+    assert outcome.persisted is True
+    assert outcome.scope == vt.ENV_SCOPE_USER
+    assert outcome.platform == vt.PLATFORM_WINDOWS
+    assert outcome.value == vt.COPILOT_CLI
+    assert "USER scope" in outcome.instructions
+    assert str(project / vt.PROJECT_FILE_NAME) in outcome.instructions
+    assert outcome.to_dict()["persisted"] is True
+
+
+def test_the_value_is_derived_from_the_file_never_from_the_environment(
+    project, monkeypatch
+):
+    """FIRES, and it is the whole point: the two halves cannot drift because
+    the second one is DERIVED from the first, never asked for again.
+
+    Planted defect: an environment half that already contradicts the file.
+    A helper that read the environment (or prompted) would preserve the
+    contradiction it was run to end."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    monkeypatch.setenv(vt.ENV_VAR, vt.DIRECT_API)
+    assert vt.resolve_verify_type().env_agreement == vt.ENV_AGREEMENT_DISAGREES
+
+    spy = _WriterSpy()
+    outcome = vt.set_env_verify_type(
+        platform=vt.PLATFORM_WINDOWS, writer=spy, broadcaster=lambda: None
+    )
+
+    assert spy.calls == [(vt.ENV_VAR, vt.COPILOT_CLI, vt.ENV_SCOPE_USER)]
+    assert outcome.value == vt.COPILOT_CLI
+    # ...and the disagreement is now closed, not merely reported.
+    assert vt.resolve_verify_type().env_agreement == vt.ENV_AGREEMENT_AGREES
+
+
+def test_the_posix_path_writes_nothing_at_all_and_returns_the_export_line(
+    project, monkeypatch
+):
+    """DOES NOT FIRE: there is no OS-level user environment to write on
+    POSIX, so the honest deliverable is instructions.
+
+    Structural, not textual: the injected writer is never called, the
+    process environment is untouched, and the project tree is byte-identical
+    afterwards. A helper that "succeeded" by printing would be the silent
+    no-op this design exists to refuse."""
+    vt.write_project_verify_type(project, vt.DIRECT_API)
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+    spy = _WriterSpy()
+    before = _tree_snapshot(project)
+
+    outcome = vt.set_env_verify_type(
+        platform=vt.PLATFORM_POSIX, writer=spy, broadcaster=lambda: None
+    )
+
+    assert spy.calls == []
+    assert outcome.persisted is False
+    assert outcome.scope is None
+    assert _tree_snapshot(project) == before
+    assert vt.ENV_VAR not in os.environ
+    assert f"export {vt.ENV_VAR}={vt.DIRECT_API}" in outcome.instructions
+    assert "Nothing was written" in outcome.instructions
+
+
+def test_neither_path_ever_writes_machine_scope(project, monkeypatch):
+    """STRUCTURAL, and the reason it is structural: reading the argument at
+    one call site proves nothing about the other branch, or about tomorrow.
+
+    Every write this module can be driven to make, across both platforms and
+    both values, is asserted to carry USER scope -- and the Windows hive
+    constant is pinned, because on Windows the hive IS the scope: a Machine
+    write would have to name HKEY_LOCAL_MACHINE. Machine scope is refused,
+    not merely unused: a Copilot seat is licensed per GitHub identity, so a
+    machine-wide answer imposes one seat's transport on every other account
+    -- the failure Set 124 S1 removed from git."""
+    spy = _WriterSpy()
+    for value in (vt.COPILOT_CLI, vt.DIRECT_API):
+        vt.write_project_verify_type(project, value)
+        for platform in (vt.PLATFORM_WINDOWS, vt.PLATFORM_POSIX):
+            vt.set_env_verify_type(
+                platform=platform, writer=spy, broadcaster=lambda: None
+            )
+
+    assert spy.calls, "the matrix must actually exercise the writing branch"
+    assert spy.scopes == {vt.ENV_SCOPE_USER}
+    assert "machine" not in {scope.lower() for scope in spy.scopes}
+    assert vt.WINDOWS_ENV_REGISTRY_ROOT == "HKEY_CURRENT_USER"
+    assert "LOCAL_MACHINE" not in vt.WINDOWS_ENV_REGISTRY_ROOT
+
+
+@pytest.mark.parametrize("scope", ["machine", "Machine", "MACHINE", "process"])
+def test_the_windows_writer_refuses_any_scope_but_user(scope):
+    """The planted violation (L-112-1): a caller that reaches for Machine
+    scope hits an exception, not a comment asking it not to.
+
+    The refusal happens BEFORE ``winreg`` is imported, which is what makes
+    this assertion meaningful on ubuntu and macOS -- where importing winreg
+    would raise ImportError instead. A test that could only run on Windows
+    would leave the guarantee unchecked on two thirds of the CI matrix."""
+    with pytest.raises(vt.VerifyTypeError) as excinfo:
+        vt.write_windows_user_env(vt.ENV_VAR, vt.COPILOT_CLI, scope)
+
+    assert scope in str(excinfo.value)
+    assert vt.ENV_SCOPE_USER in str(excinfo.value)
+
+
+def test_both_paths_state_the_restart_caveat(project):
+    """DOES NOT FIRE as a claim of immediate effect, on either OS.
+
+    The surprise is on the record: during Set 124 S1 the value was set
+    correctly and read empty in the terminal that was already open. A helper
+    that stayed silent about it would send the operator to re-do a setup that
+    was already finished."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+
+    for platform in (vt.PLATFORM_WINDOWS, vt.PLATFORM_POSIX):
+        outcome = vt.set_env_verify_type(
+            platform=platform, writer=_WriterSpy(), broadcaster=lambda: None
+        )
+        assert "restarted" in outcome.instructions, platform
+        assert "OLD environment" in outcome.instructions, platform
+
+
+def test_a_project_the_file_has_not_answered_for_is_refused(
+    project, monkeypatch
+):
+    """DOES NOT FIRE where there is nothing to derive from.
+
+    Branch 3 (nothing at all) and branch 2 (an unconfirmed machine default)
+    both refuse, and both name the command that would make the file answer.
+    Writing an environment half no file agrees with would MANUFACTURE the
+    disagreement this whole set exists to remove."""
+    spy = _WriterSpy()
+
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+    with pytest.raises(vt.VerifyTypeError) as branch_3:
+        vt.set_env_verify_type(writer=spy, platform=vt.PLATFORM_WINDOWS)
+    assert "--set" in str(branch_3.value)
+
+    monkeypatch.setenv(vt.ENV_VAR, vt.COPILOT_CLI)
+    with pytest.raises(vt.VerifyTypeError) as branch_2:
+        vt.set_env_verify_type(writer=spy, platform=vt.PLATFORM_WINDOWS)
+    assert "--confirm" in str(branch_2.value)
+
+    assert spy.calls == []
+
+
+def test_a_broadcast_failure_is_named_and_never_fails_the_write(project):
+    """Fail-open is correct HERE -- the value is already persisted when the
+    broadcast runs -- but the skip must be NAMED (L-079-1).
+
+    An operator told only "open a new terminal" would otherwise be following
+    advice that quietly stopped being sufficient."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    spy = _WriterSpy()
+
+    def boom():
+        raise OSError(5, "access denied")
+
+    outcome = vt.set_env_verify_type(
+        platform=vt.PLATFORM_WINDOWS, writer=spy, broadcaster=boom
+    )
+
+    assert outcome.persisted is True
+    assert spy.calls == [(vt.ENV_VAR, vt.COPILOT_CLI, vt.ENV_SCOPE_USER)]
+    assert len(outcome.warnings) == 1
+    assert "sign out" in outcome.instructions
+    assert "IS persisted" in outcome.instructions
+
+
+def test_the_broadcast_is_attempted_on_windows_only(project):
+    """DOES NOT FIRE on POSIX: there is nothing to notify anyone about,
+    because nothing was written. A broadcast there would be a Windows API
+    call on a platform that has none."""
+    vt.write_project_verify_type(project, vt.DIRECT_API)
+    attempts: list = []
+
+    vt.set_env_verify_type(
+        platform=vt.PLATFORM_WINDOWS,
+        writer=_WriterSpy(),
+        broadcaster=lambda: attempts.append(vt.PLATFORM_WINDOWS),
+    )
+    assert attempts == [vt.PLATFORM_WINDOWS]
+
+    vt.set_env_verify_type(
+        platform=vt.PLATFORM_POSIX,
+        writer=_WriterSpy(),
+        broadcaster=lambda: attempts.append(vt.PLATFORM_POSIX),
+    )
+    assert attempts == [vt.PLATFORM_WINDOWS]
+
+
+def test_only_the_persisting_path_publishes_the_value_into_this_process(
+    project, monkeypatch
+):
+    """The one thing ``setx`` cannot do, and the one thing POSIX must not do.
+
+    On Windows the value is genuinely in the user's environment when this
+    returns, so telling THIS process is honest -- and without it the caller's
+    own next resolution reads a stale block and reports the half just
+    finished as missing. On POSIX nothing was persisted, so a process-local
+    claim would be one no shell could back."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+    vt.set_env_verify_type(
+        platform=vt.PLATFORM_POSIX, writer=_WriterSpy(), broadcaster=lambda: None
+    )
+    assert vt.ENV_VAR not in os.environ
+    assert vt.resolve_verify_type().env_agreement == vt.ENV_AGREEMENT_MISSING
+
+    vt.set_env_verify_type(
+        platform=vt.PLATFORM_WINDOWS, writer=_WriterSpy(), broadcaster=lambda: None
+    )
+    assert os.environ[vt.ENV_VAR] == vt.COPILOT_CLI
+    assert vt.resolve_verify_type().env_agreement == vt.ENV_AGREEMENT_AGREES
+
+
+def test_the_env_write_narration_is_ascii_on_both_platforms(project):
+    """L-079-1, and it is not theoretical here: this output names a project
+    PATH and a Windows API failure string, both arbitrary machine state, and
+    it prints to a cp1252 console."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    assert str(project).isascii()  # the premise of the checks below
+
+    def boom():
+        raise OSError("caf\u00e9 \u2014 access denied")
+
+    for platform in (vt.PLATFORM_WINDOWS, vt.PLATFORM_POSIX):
+        for broadcaster in (lambda: None, boom):
+            outcome = vt.set_env_verify_type(
+                platform=platform,
+                writer=_WriterSpy(),
+                broadcaster=broadcaster,
+            )
+            assert outcome.instructions.isascii(), (platform, outcome)
+            outcome.instructions.encode("cp1252")
+
+
+def test_the_cli_finishes_setup_in_one_command_and_moves_no_exit_code(
+    project, monkeypatch, capsys
+):
+    """The CLI wiring, end to end, with the exit-code guarantee intact.
+
+    ``--set`` and ``--set-env`` compose into the one command the SIMPLE
+    counter-argument asked for (authoring decision 1 kept them separable, it
+    did not make them unusable together). An unresolved project exits 3 --
+    "guided setup required", which is exactly the remedy -- rather than 2:
+    nothing about the request was malformed."""
+    spy = _WriterSpy()
+    monkeypatch.setattr(vt, "write_windows_user_env", spy)
+    monkeypatch.setattr(vt, "broadcast_environment_change", lambda: None)
+    monkeypatch.setattr(vt, "current_platform", lambda: vt.PLATFORM_WINDOWS)
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+
+    assert vt.main(["--set-env"]) == vt.EXIT_SETUP_REQUIRED
+    assert spy.calls == []
+    assert vt.PROJECT_FILE_NAME in capsys.readouterr().err
+
+    # ...and the refusal keeps whichever stdout shape was asked for: a
+    # --json consumer piping into a parser gets JSON, not setup prose.
+    assert vt.main(["--set-env", "--json"]) == vt.EXIT_SETUP_REQUIRED
+    refused = capsys.readouterr()
+    assert json.loads(refused.out)["resolved"] is False
+    assert vt.PROJECT_FILE_NAME in refused.err
+    assert spy.calls == []
+
+    assert vt.main(["--set", vt.COPILOT_CLI, "--set-env"]) == vt.EXIT_OK
+    assert spy.calls == [(vt.ENV_VAR, vt.COPILOT_CLI, vt.ENV_SCOPE_USER)]
+    out = capsys.readouterr().out
+    assert "persisted at USER scope" in out
+    # The half-finished nag is GONE in the same breath -- the command that
+    # finished setup must not then report it as unfinished.
+    assert "HALF-FINISHED" not in out
+
+    assert vt.main(["--set-env", "--json"]) == vt.EXIT_OK
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["env_agreement"] == vt.ENV_AGREEMENT_AGREES
+    assert payload["env_write"]["scope"] == vt.ENV_SCOPE_USER
+    assert payload["env_write"]["persisted"] is True
+

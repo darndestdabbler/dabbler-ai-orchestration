@@ -1,0 +1,7 @@
+**VERIFIED** — I checked the changed `verify_type` helper/CLI, the new falsifier tests, regenerated template/dist output, and the corrected setup docs. The blocking requirements are covered: derived file value, Windows USER-scope persistence with process update, POSIX no-write export guidance, no Machine-scope write path, and corrected primary instruction surfaces.
+
+**NITS**
+- **Nit:** `--set-env --json` in the unresolved path prints prose to stdout before the JSON branch is reached (`ai_router/verify_type.py:1165-1174`), so JSON consumers get non-JSON on that exit-3 path.
+- **Nit:** the `OSError` handler wraps both project-file writes and env writes, so failures before or after a composed `--set ... --set-env` can get the misleading env-only message that `project-verify-type.txt` is unchanged (`ai_router/verify_type.py:1147-1189`).
+- **Nit:** the new env-write narration interpolates the raw project path, so the claimed ASCII/cp1252 safety is only true for ASCII checkout paths (`ai_router/verify_type.py:774-815`, test premise at `ai_router/tests/test_verify_type_resolution.py:1213-1231`).
+- **Nit:** the agent bootstrap pointer files still mention only `--set` / `--confirm` and omit the new `--set-env` half, though they do link to the updated canonical doc (`AGENTS.md:130-137`, `CLAUDE.md:131-138`, `GEMINI.md:130-137`).

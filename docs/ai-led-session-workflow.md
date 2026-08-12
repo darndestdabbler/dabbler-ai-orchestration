@@ -2581,10 +2581,12 @@ On Windows, use `.venv/Scripts/python.exe` to run Python.
 #### Routing through the GitHub Copilot CLI (Set 078)
 
 Projects normally dispatch every call over a direct provider HTTPS API
-(`transport.profile: api` in `router-config.yaml`, the default).
+(`transport.profile: api`, the default).
 Shops whose staff hold only a GitHub Copilot seat — no `DABBLER_*` provider
-key is possible under corporate policy — can instead set
-`transport.profile: copilot-cli`, which routes every call through the
+key is possible under corporate policy — can instead resolve
+`COPILOT_CLI` for the project (`python -m ai_router.verify_type --set
+COPILOT_CLI`, then `--set-env`), which derives
+`transport.profile: copilot-cli` and routes every call through the
 Copilot CLI's headless mode while every other mechanic (task
 typing, tiering, cross-provider verification, metrics) stays unchanged.
 The guarantees are explicitly degraded (asserted, not confirmed, provider

@@ -94,11 +94,28 @@ def test_tier_lightweight_raises_with_the_migration_message(tmp_path: Path) -> N
 
 
 def test_migration_message_names_both_remedies() -> None:
-    """Both populations get an answer: keyed users and Copilot-seat users."""
+    """Both populations get an answer: keyed users and Copilot-seat users.
+
+    Set 126 S2: the Copilot half must name the **sanctioned entry point**,
+    not the retired local override. `transport.profile` in
+    `ai_router/local-overrides.yaml` was retired by Set 124 S2 and is now
+    REFUSED at config load, so a migration message recommending it would
+    walk a stranded Copilot-only reader straight into a loader error --
+    which is precisely the population this message exists to rescue. The
+    negative assertions are the falsifier: a message that quietly regains
+    the old wording fails here rather than in a consumer's terminal.
+    """
     m = LIGHTWEIGHT_REMOVED_MESSAGE
     assert "tier: full" in m
     assert "DABBLER_ANTHROPIC_API_KEY" in m
-    assert "copilot-cli" in m
+    assert "verify_type --set COPILOT_CLI" in m
+    assert "verify_type --set-env" in m
+    # The negatives are the falsifier, and they name the RETIRED key
+    # rather than the word "transport" -- which legitimately survives in
+    # "for the Direct APIs transport".
+    assert "local-overrides" not in m
+    assert "transport.profile" not in m
+    assert "transport: {" not in m
     assert "cross-repo-lightweight-removal-notice.md" in m
     # ASCII-only: this string reaches a Windows cp1252 console.
     m.encode("cp1252")

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "e38e417e54e1382390cf52d5b331f5d32710d57a",
+  "fixedTree": "eadc7f58445a908a101681a605e2a963ace68a22",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T16:24:45.866393+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Stale setup instructions still tell Copilot users to configure the retired `transport.profile` local override. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `ai_router/sp ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "All live setup/migration surfaces and the `LIGHTWEIGHT_REMOVED_MESSAGE` direct Copilot users to `python -m ai_router.verify_type --set COPILOT_CLI` plus `python -m ai_router.verify_type --set-env`, and no longer instruct them to set `transport.profile` in `ai_router/local-overrides.yaml`; the corresponding spec-config test pins that replacement.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** Stale setup instructions still tell Copilot users to configure the retired `transport.profile` local override.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/spec_config.py:39-48`, `ai_router/config.py:840-872`, `docs/quick-start.md:239-249`, `docs/clone-setup.md:103-128`, `docs/cross-repo-lightweight-removal-notice.md:45-51,107-113`, `ai_router/tests/test_spec_config.py:96-104`
+  - **Failure scenario:** A Copilot-only user following the quick-start, clone setup, or the lightweight-migration error message is told to create `ai_router/local-overrides.yaml` with `transport.profile: copilot-cli`. That is probable because these are the live setup/migration surfaces for exactly that user path; the next config load then fails because `config.py` explicitly refuses `transport.profile` in local overrides.
+  - **Acceptance criterion:** JUDGMENT - All live setup/migration surfaces and the `LIGHTWEIGHT_REMOVED_MESSAGE` direct Copilot users to `python -m ai_router.verify_type --set COPILOT_CLI` plus `python -m ai_router.verify_type --set-env`, and no longer instruct them to set `transport.profile` in `ai_router/local-overrides.yaml`; the corresponding spec-config test pins that replacement.
+  - **Details:** **Violation:** the session promised setup instructions “agree with Set 124's gitignored machine/project-state ruling,” while `config.py` says `transport.profile` is “NO LONGER an allowed local override” and is refused. **Impact:** this changes the merge decision because a main-path Copilot migration/onboarding instruction sends users into a guaranteed loader error instead of the new helper. **Evidence:** `spec_config.py` and the docs still recommend the forbidden local override, while `_apply_local_overrides()` raises on that exact key and tells users it was retired.

@@ -107,7 +107,11 @@ the framework is built around.
    `python -m ai_router.verify_type --set COPILOT_CLI` (or `DIRECT_API` on the
    direct-API variant) — that writes `project-verify-type.txt`, which is
    **gitignored**, because what verifies a project is machine/project state and
-   each machine answers for itself. On the Copilot path
+   each machine answers for itself. Then run
+   `python -m ai_router.verify_type --set-env`, which finishes setup's second
+   half by deriving `AI_ORCHESTRATION_VERIFY_TYPE` from that file (persisted at
+   USER scope on Windows; printed as an `export` line for your shell profile on
+   macOS/Linux). On the Copilot path
    run **`Dabbler: Set Up Copilot Seat`**. On the direct-API variant, hand-author
    `ai_router/budget.yaml` with your not-to-exceed budget.
 

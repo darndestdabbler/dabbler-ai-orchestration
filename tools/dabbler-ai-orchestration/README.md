@@ -31,11 +31,14 @@ Two ways to give the router a provider to call:
 
 Either way you need reach to **at least two provider families**, or
 cross-provider verification has nothing to cross to. Which one a project
-uses is its **committed** answer, written once by
+uses is answered once per machine by
 `python -m ai_router.verify_type --set DIRECT_API` (or `COPILOT_CLI`) and
-recorded in `project-verify-type.txt` at the repo root — the router derives
-`transport.profile` from that file, so the choice travels with the project
-rather than with the machine.
+recorded in `project-verify-type.txt` at the repo root — **gitignored on
+purpose**, because what verifies a project is machine/project state: one
+checkout answers `COPILOT_CLI` on a Copilot seat and `DIRECT_API` on a
+machine that holds provider keys. The router derives `transport.profile`
+from that file, so there is no second place for the fact to be recorded
+differently.
 
 > **Upgrading from a version before 2026-08?** A second "Lightweight"
 > tier used to let a session set opt out of routed verification
@@ -110,23 +113,32 @@ asks for in the terminal you are already in.
    `docs/session-sets/` home. It checks prerequisites before writing
    anything, so a missing tool fails with a friendly explainer instead of
    a raw error, leaving no partial setup behind.
-2. **Say what verifies the project** - one terminal command, answered
-   once and committed:
+2. **Say what verifies the project** - two terminal commands, answered
+   once per machine:
 
    ```
    python -m ai_router.verify_type            # prints the guided setup
    python -m ai_router.verify_type --set DIRECT_API
+   python -m ai_router.verify_type --set-env  # the second half of setup
    ```
 
    `DIRECT_API` means provider API keys; `COPILOT_CLI` means a GitHub
    Copilot seat and no `DABBLER_*` keys. The answer is written to
-   `project-verify-type.txt` at the repo root and **committed** - it is
-   project configuration, not machine state, so it does not change with
-   whichever machine the repo is checked out on, and the router's
-   `transport.profile` is derived from it rather than configured
-   separately. If your machine sets `AI_ORCHESTRATION_VERIFY_TYPE`, that
-   value is offered as a suggestion and `--confirm` commits it; until
-   then it changes nothing. On the Copilot path,
+   `project-verify-type.txt` at the repo root and **gitignored** - it is
+   machine/project state, not project configuration, so the same checkout
+   can honestly answer `COPILOT_CLI` on a Copilot seat and `DIRECT_API` on
+   a machine that holds provider keys; committing it would publish one
+   seat's answer to everyone. The router's `transport.profile` is derived
+   from it rather than configured separately. Setup is finished when BOTH
+   that file and `AI_ORCHESTRATION_VERIFY_TYPE` carry the same value, which
+   is what `--set-env` does: on Windows it persists the variable at USER
+   scope (never Machine), and on macOS/Linux it prints the exact `export`
+   line for your shell profile rather than editing it behind your back.
+   Either way, already-open terminals keep their old environment until they
+   are restarted. If your machine already sets
+   `AI_ORCHESTRATION_VERIFY_TYPE`, that value is offered as a suggestion and
+   `--confirm` writes it to the project; until then it changes nothing. On
+   the Copilot path,
    **`Dabbler: Set Up Copilot Seat`** checks the seat's model catalog and
    enables the seat profile only when the seat confirms two distinct
    provider families - validated so far only on a single personal seat, so

@@ -1,0 +1,6 @@
+VERIFIED — I checked the implementation, CLI wiring, new falsifiers, changelogs, required README/template/cold-start instruction surfaces, and the fixed planning note. The spec-promised helper behavior is present: Windows writes USER scope from the project file, POSIX writes nothing and prints the export line, Machine scope is refused structurally, `--set-env` composes with `--set`, and the documented setup surfaces now name the shipped helper.
+
+NITS
+
+- **Nit:** `docs/templates/consumer-bootstrap/getting-started.md.template` and the regenerated cold-start fixture still say “This is one command” while showing both `--set` and `--set-env`. The commands are correct, so this is a wording inconsistency rather than a blocking setup failure.
+- **Nit:** `--set-env --json` on an unresolved project still prints human setup prose before exiting 3 instead of preserving JSON stdout. Existing JSON resolution behavior remains intact for the normal no-write path and for successful env writes, so this is an edge-case CLI consistency issue, not a spec blocker.

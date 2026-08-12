@@ -74,6 +74,39 @@ It is narration only: the file still wins silently, `resolved` still means
 *enforceable* is a separate, breaking decision (Set 126 authoring decision
 2, journalled in that set's `decisions.jsonl`).
 
+**Set 126 S2 made the second half executable.** `python -m
+ai_router.verify_type --set-env` derives the value from
+`project-verify-type.txt` — never asking for it again, so the two halves
+cannot drift — and then branches by OS, because what a helper can honestly
+do differs by platform:
+
+- **Windows:** the value is persisted at **USER** scope, written through
+  the registry API at `HKEY_CURRENT_USER\Environment` (rather than `setx`,
+  which truncates past 1024 characters and cannot tell the calling process),
+  and published into the running process so the very next resolution is not
+  reading a stale environment block. A best-effort `WM_SETTINGCHANGE`
+  broadcast tells other running programs; if it fails the value is still
+  persisted and the skip is named.
+- **POSIX:** **nothing is written at all.** There is no OS-level user
+  environment on Unix — `SetEnvironmentVariable(..., 'User')` is a no-op
+  there, and a helper that exited 0 having persisted nothing would be the
+  defect it was written to fix, wearing a success message. The exact
+  `export` line for `~/.bashrc` / `~/.zshenv` is printed instead; editing a
+  developer's shell profile without asking is not this tool's business.
+
+**Machine scope is refused, not merely unused.** A Copilot seat is licensed
+per GitHub identity, not per box, so a machine-wide answer would tell every
+other account — service accounts included — that this project is verified
+the way one seat verifies it. That is the same failure Set 124 S1 removed
+from git by gitignoring the project file. The writer raises on any scope but
+`user`, and the falsifiers assert it structurally on all three CI platforms.
+
+The write is **opt-in** (`--set-env`), not folded into `--set`: writing the
+project file touches only the project, while writing the environment is a
+machine-scoped mutation outside the repo, and this framework keeps those
+explicit (Set 126 authoring decision 1). The two compose —
+`--set <VALUE> --set-env` finishes both halves in one command.
+
 ## The `DIRECT_API` precondition, and the warning that is not a block
 
 When the resolved type is `DIRECT_API`, at least one provider must have

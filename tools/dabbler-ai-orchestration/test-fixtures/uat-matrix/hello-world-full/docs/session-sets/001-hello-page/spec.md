@@ -31,6 +31,13 @@ Used as the control row in the UAT fixture matrix: session 2
 is mid-flight, so the Explorer should show `1/3` with the in-flight
 annotation and no markers of any kind.
 
+Session 2's plan is **seeded** (`kind: "plan-step"` rows), the way
+`start_session` has written it since Set 114 S2, and its first step is
+logged complete. That is what makes this row exercise the whole fifth
+level rather than a single logged line: one finished step, one step the
+Explorer DERIVES as in flight (Set 127 — nothing on disk says so), and
+one that has not started and therefore carries no start time at all.
+
 ---
 
 ## Sessions
@@ -54,6 +61,7 @@ annotation and no markers of any kind.
 **Steps:**
 1. Extend `js/hello.js` to append a formatted date line.
 2. Style the date line distinctly from the heading.
+3. Verify the date renders in the operator's locale, and close.
 **Creates:** —
 **Touches:** `js/hello.js`, `index.html`
 **Ends with:** The page shows the greeting and today's date.

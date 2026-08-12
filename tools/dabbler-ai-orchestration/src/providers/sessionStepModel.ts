@@ -41,6 +41,15 @@
 // `build_rows`, `plan_matches_spec` and `_humanize` — plus the spec-step
 // parse those last two need (`spec_admission.parse_session_plans` /
 // `parse_step_texts`).
+//
+// Set 127 S2 adds the DERIVED half to the mirrored part:
+// `session_flight_facts`, `_active_step_index`, `_derive_progress` and
+// `ChecklistRow.effective_status`. The one deliberate difference is that
+// `sessionFlightFacts` takes an already-parsed `session-state.json` rather
+// than reading it — this file has no `fs` import, and the Explorer's scan
+// has the parsed state in hand already. What the timestamp LOOKS like is
+// not here either: formatting is a rendering concern and lives beside the
+// other row formatters in `workExplorerTreeModel.ts`.
 
 /**
  * The `kind` marker on a seeded plan entry. `log_step` writes no `kind` at
@@ -63,6 +72,13 @@ export interface StepEntry {
   description?: string;
   status?: string;
   kind?: string;
+  /**
+   * Set 127 S2: when `log_step` wrote this entry — which, because it
+   * writes AFTER the step is done, is that step's COMPLETION. It is the
+   * only start-time evidence the ledger contains, and the next row's
+   * start is derived from it ({@link completionOf}).
+   */
+  dateTime?: string;
 }
 
 /** One rendered row. Mirrors `session_checklist.ChecklistRow`. */
@@ -78,6 +94,26 @@ export interface StepRow {
    * explicitly, and "no timestamp" is not the same question.
    */
   isPlanned: boolean;
+  /**
+   * Set 127 S2, DERIVED — never read from disk and never written to it.
+   * True on the one row a session is currently working. `status` is left
+   * exactly as the ledger wrote it; only {@link effectiveStatusOf} moves,
+   * so a consumer can always see that the ledger said `pending` and the
+   * tree drew the in-progress glyph, and why.
+   *
+   * Mirrors `session_checklist.ChecklistRow.is_active`.
+   */
+  isActive: boolean;
+  /**
+   * Set 127 S2, DERIVED. When this row's step started, as the raw ISO-8601
+   * string taken from the PREVIOUS step's completion (or the session's
+   * `startedAt` for the first row). `null` means "has not started" or
+   * "cannot be derived" — never a guess, and never this row's own seeded
+   * registration timestamp (operator ruling 3, 2026-08-12).
+   *
+   * Mirrors `session_checklist.ChecklistRow.started_at`.
+   */
+  startedAt: string | null;
 }
 
 // Set 115 S4: `TERMINAL_STATUSES` is gone with `markHere`, the only thing
@@ -114,6 +150,130 @@ const STATUS_GLYPHS: Record<string, StepGlyphStatus> = {
 
 export function glyphStatusOf(status: string): StepGlyphStatus {
   return STATUS_GLYPHS[pyStr(status).toLowerCase()] ?? "not-started";
+}
+
+/**
+ * The canonical token for a step in flight — the one a DERIVED active step
+ * presents through {@link effectiveStatusOf}.
+ *
+ * Must equal `session_checklist.IN_PROGRESS_STATUS`, and it is kept beside
+ * the glyph table it maps into so a rename of either cannot silently split
+ * them.
+ */
+export const IN_PROGRESS_STATUS = "in-progress";
+
+/**
+ * Which status tokens mean "nothing has started this yet", derived from the
+ * glyph table rather than re-spelled (L-069-1) — the mirror of
+ * `session_checklist._UNSTARTED_STATUSES`, which is derived from
+ * `STATUS_BOXES` the same way.
+ *
+ * Membership is asked of the RAW token, never of `glyphStatusOf`, and the
+ * difference is load-bearing: `glyphStatusOf` answers `not-started` for an
+ * UNRECOGNISED token (it refuses to claim progress it cannot see), where the
+ * CLI boxes that token `[?]`. Reading eligibility through the fallback would
+ * make the five legacy prose-in-`status` rows eligible here and ineligible in
+ * Python — a divergence the corpus would not catch unless a case carried one,
+ * which `a-prose-status-is-evidence-of-nothing` now does.
+ */
+const UNSTARTED_STATUSES: ReadonlySet<string> = new Set(
+  Object.entries(STATUS_GLYPHS)
+    .filter(([, glyph]) => glyph === "not-started")
+    .map(([token]) => token),
+);
+
+/**
+ * The glyphs that mean the RECORD has already answered "where is this
+ * session": a step in flight, or one that stopped (`blocked` / `failed`,
+ * which the tree paints with its one did-not-go-well asset). Either way
+ * there is no silence for the derivation to fill.
+ *
+ * Mirrors `session_checklist._RECORD_ANSWERS_BOXES` — `{[~], [!]}`. Asking
+ * `glyphStatusOf` IS correct here, unlike for {@link UNSTARTED_STATUSES}: an
+ * unrecognised token answers `not-started` here and boxes `[?]` there, and
+ * neither is a record answer, so the two agree.
+ */
+const RECORD_ANSWERS_GLYPHS: ReadonlySet<StepGlyphStatus> = new Set<StepGlyphStatus>([
+  "in-progress",
+  "cancelled",
+]);
+
+/**
+ * What a row SAYS it is, record first, derivation second.
+ *
+ * A derived active step has no token of its own on disk — deriving it is the
+ * whole point — so this is where `in-progress` appears for it. Every display
+ * surface reads this rather than `row.status`; `row.status` stays the record.
+ *
+ * Mirrors `session_checklist.ChecklistRow.effective_status`.
+ */
+export function effectiveStatusOf(row: StepRow): string {
+  return row.isActive ? IN_PROGRESS_STATUS : row.status;
+}
+
+/**
+ * `(is this session in flight, when did it start)` for *sessionNumber*,
+ * read from an already-parsed `session-state.json` and from nothing else.
+ *
+ * Mirrors `session_checklist.session_flight_facts` minus its file read —
+ * this module is pure, and the Explorer's scan has the parsed state in hand
+ * already. Returned as one value rather than two because both answers come
+ * from the same record.
+ *
+ * `{ inFlight: false, startedAt: null }` is the answer for an absent,
+ * unreadable or silent state file: no derivation, which is the status quo
+ * the whole model had before Set 127.
+ *
+ * **The plan-less carve-out** (a set whose plan is not yet committed writes
+ * a v4 file with no `sessions[]` array and a top-level `status` /
+ * `startedAt` instead) contributes its `startedAt` and **nothing else** —
+ * the file names no session number to attach a *current step* to. Nothing is
+ * lost by the refusal: a plan-less set has no `### Session N` headings, so
+ * no plan rows are seeded and there is no candidate row to derive onto.
+ */
+export interface SessionFlightFacts {
+  inFlight: boolean;
+  /** Raw ISO-8601 as the state file wrote it; never reformatted here. */
+  startedAt: string | null;
+}
+
+/** The answer for a session nothing knows anything about. */
+export const NOT_IN_FLIGHT: SessionFlightFacts = { inFlight: false, startedAt: null };
+
+/** Python's `_iso_or_none`: a non-blank string, else `null`. */
+function isoOrNull(value: unknown): string | null {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+
+export function sessionFlightFacts(
+  state: unknown,
+  sessionNumber: number,
+): SessionFlightFacts {
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
+    return NOT_IN_FLIGHT;
+  }
+  const sessions = (state as { sessions?: unknown }).sessions;
+  // Absent OR empty: Python's reader shim normalises the carve-out's
+  // missing array to `[]` and leaves the top-level passthroughs beside it,
+  // so "no per-session ledger" is the one condition, spelled once.
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    return {
+      inFlight: false,
+      startedAt: isoOrNull((state as { startedAt?: unknown }).startedAt),
+    };
+  }
+  for (const entry of sessions) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) continue;
+    const e = entry as { number?: unknown; status?: unknown; startedAt?: unknown };
+    // Mirrors Python's `isinstance(number, int) and not isinstance(number, bool)`.
+    if (typeof e.number !== "number" || !Number.isInteger(e.number)) continue;
+    if (e.number !== sessionNumber) continue;
+    return {
+      inFlight: e.status === "in-progress",
+      startedAt: isoOrNull(e.startedAt),
+    };
+  }
+  return NOT_IN_FLIGHT;
 }
 
 /**
@@ -226,6 +386,88 @@ function rowFromEntry(entry: StepEntry, isPlanned: boolean): StepRow {
     description: pyStr(entry.description),
     status: pyStr(entry.status),
     isPlanned,
+    // Derived last, by `deriveProgress`, on every path. Constructed at
+    // their null answers so a row is never half-built.
+    isActive: false,
+    startedAt: null,
+  };
+}
+
+/**
+ * When the step this entry describes finished, if it is a step at all.
+ *
+ * `log_step` stamps `dateTime` as it writes, and it writes AFTER the step is
+ * done, so an ordinary entry's timestamp is that step's completion — the
+ * next row's start.
+ *
+ * Guarded by {@link isLoggedStep}, because two other kinds of entry carry a
+ * `dateTime` and neither is a completion: a seeded `plan-step` row, whose
+ * stamp is REGISTRATION time (identical across every row of the session, and
+ * rendering it as a start is the fresh wrong signal operator ruling 3 forbids);
+ * and a bookkeeping record (`path_aware_critique`, `contract_gate`,
+ * `dual_surface_mode`, `suggestion_disposition`), which is a record ABOUT the
+ * session written by machinery, usually at registration.
+ *
+ * **The status is deliberately not consulted** (Set 127 S1 round 2's
+ * adjudicated-minor residual, settled in S2 so one rule lands in both
+ * languages at once). What advances the chain is the entry EXISTING:
+ * `log_step` writes when the orchestrator records the step, so its stamp is
+ * the last known moment of that step's activity and the best available lower
+ * bound for the row below it. Gating on a *recognised terminal* token would
+ * make the start times depend on the status vocabulary, which this model
+ * refuses to trust in either direction — `completed` is one of the 15
+ * non-canonical tokens Set 120 S2 preserved, and every legacy set spelling it
+ * that way would silently lose its start times. Pinned in the corpus by
+ * `the-start-time-chain-does-not-read-the-status-vocabulary`.
+ *
+ * Mirrors `session_checklist._completion_of`.
+ */
+function completionOf(entry: StepEntry): string | null {
+  if (!isLoggedStep(entry)) return null;
+  return pyStr(entry.dateTime).trim() || null;
+}
+
+/**
+ * One row plus the two facts the derivation needs about its entry.
+ *
+ * Deliberately not folded into {@link StepRow}: `completion` and `isStep` are
+ * inputs to a derivation, not things a consumer renders, and a row model that
+ * carried a completion would invite a surface to draw an end time the operator
+ * ruled against.
+ *
+ * Mirrors `session_checklist._RowEvidence`.
+ */
+export interface RowEvidence {
+  row: StepRow;
+  /** This step's completion, or `null` when it is not a step that finished. */
+  completion: string | null;
+  /**
+   * True when the entry is work the session logged, rather than a seeded
+   * plan row or a bookkeeping record about the session.
+   */
+  isStep: boolean;
+}
+
+/**
+ * True when this row stands for a STEP — done, or merely planned.
+ *
+ * The distinction that matters to the start-time chain. A planned row is a
+ * step nobody has finished, so it BREAKS the chain: the row after it starts
+ * at an unknown time. A bookkeeping record is not a step at all, so it is
+ * TRANSPARENT: the row after it starts when the previous real step finished,
+ * not when a policy was written down.
+ *
+ * Mirrors `session_checklist._RowEvidence.is_step_row`.
+ */
+function isStepRow(item: RowEvidence): boolean {
+  return item.isStep || item.row.isPlanned;
+}
+
+function evidenceOf(entry: StepEntry, isPlanned: boolean): RowEvidence {
+  return {
+    row: rowFromEntry(entry, isPlanned),
+    completion: completionOf(entry),
+    isStep: isLoggedStep(entry),
   };
 }
 
@@ -255,14 +497,20 @@ function rowFromEntry(entry: StepEntry, isPlanned: boolean): StepRow {
  * stays a pending row carrying the spec's own words, and a logged step the
  * plan did not predict appends after the plan in first-logged order.
  *
+ * Returns one {@link RowEvidence} per row (Set 127 S2): the row as it will
+ * render, beside the timestamp the NEXT row's start is derived from and
+ * whether this row is a step at all. An unclaimed planned row contributes
+ * neither, because a plan row's `dateTime` is registration time rather than
+ * a completion ({@link completionOf}).
+ *
  * Mirrors `session_checklist._reconcile`.
  */
 export function reconcile(
   plan: readonly StepEntry[],
   real: readonly StepEntry[],
   allowOrdinal: boolean,
-): StepRow[] {
-  const planRows = plan.map((entry) => rowFromEntry(entry, true));
+): RowEvidence[] {
+  const evidence = plan.map((entry) => evidenceOf(entry, true));
 
   const byNumber = new Map<number, number>();
   const byKey = new Map<string, number>();
@@ -295,28 +543,116 @@ export function reconcile(
   }
 
   for (const [position, target] of claims) {
-    planRows[target] = rowFromEntry(real[position], false);
+    evidence[target] = evidenceOf(real[position], false);
   }
   const extra = real
     .filter((_entry, position) => !claims.has(position))
-    .map((entry) => rowFromEntry(entry, false));
-  return [...planRows, ...extra];
+    .map((entry) => evidenceOf(entry, false));
+  return [...evidence, ...extra];
+}
+
+// Set 115 S4 removed `markHere` here, and `TERMINAL_STATUSES` with it —
+// the mirror of the `session_checklist._mark_here` removal Set 120 S3 made
+// by operator ruling. The rule it implemented (first unfinished logged row,
+// else the first pending planned row, else the last row) is exactly what
+// pointed confidently at step 1 of Set 119 S2 when four statuses were
+// unreadable.
+//
+// Set 127 S2 is NOT that marker returning. {@link activeStepIndex} fires
+// only where the record is SILENT — it never overrides a logged status, it
+// stands down entirely the moment any row carries the in-progress or
+// did-not-go-well glyph, and it produces nothing at all in a session
+// `session-state.json` does not report as in flight. The marker's failure
+// was that it always named exactly one row, including when it had no idea;
+// this names at most one, and prefers naming none.
+
+/**
+ * Which row a session in flight is currently working, if any.
+ *
+ * The rule, in one line: **the first seeded plan row nothing has logged
+ * against, and only while the record is otherwise silent.**
+ *
+ * Two guards, both of them the difference between "no signal" and "a wrong
+ * signal":
+ *
+ *   1. **the record wins outright** — if any row already carries the
+ *      in-progress or cancelled glyph (a logged `in-progress`, a `blocked`,
+ *      a `failed`), the ledger has answered "where is this session" itself
+ *      and this returns `null`. Deriving a second in-flight row beside a
+ *      logged one is precisely the two-current-rows defect the removed
+ *      `<- here` marker produced;
+ *   2. **an unrecognised token is evidence of nothing** — eligibility asks
+ *      for a token the table actually knows ({@link UNSTARTED_STATUSES}),
+ *      not merely for one that FALLS BACK to not-started, so the legacy
+ *      prose-in-`status` rows neither become the active step nor let a
+ *      later row become it by looking finished.
+ *
+ * Callers pass rows that carry no derivation yet, so `row.status` here is
+ * the record's own token.
+ *
+ * Mirrors `session_checklist._active_step_index`.
+ */
+export function activeStepIndex(rows: readonly StepRow[]): number | null {
+  if (rows.some((row) => RECORD_ANSWERS_GLYPHS.has(glyphStatusOf(row.status)))) {
+    return null;
+  }
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row.isPlanned && UNSTARTED_STATUSES.has(pyStr(row.status).toLowerCase())) {
+      return index;
+    }
+  }
+  return null;
 }
 
 /**
- * Set 115 S4 — `markHere` is GONE, and so is `TERMINAL_STATUSES`, which
- * existed only to serve it.
+ * Add the two derived facts to *evidence*'s rows.
  *
- * `session_checklist._mark_here` was removed by operator ruling in Set 120
- * S3; that set's standing decision 3 ("no extension changes") left this
- * mirror computing a field nothing would render, and its CHANGELOG said
- * so — the derivation stood "until the carve deletes it wholesale". This
- * is that deletion. The rule it implemented (first unfinished logged row,
- * else the first pending planned row, else the last row) is exactly what
- * pointed confidently at step 1 of Set 119 S2 when four statuses were
- * unreadable; the `in-progress` token now carries the fact directly, so
- * the renderer reads it instead of inferring it.
+ * Pure: rows in, rows out. The two facts are computed together in one pass
+ * because they answer one question between them — *where is this session,
+ * and since when* — and a second pass over the same rows would be a second
+ * place for the answers to disagree.
+ *
+ * **The active step** is derived only for a session in flight. A closed
+ * session derives nothing: an in-progress glyph on a session that finished
+ * last month is a worse answer than the silence it replaced, because an
+ * operator would have a reason to believe it.
+ *
+ * **The start time** is derived for every row that has started, in flight or
+ * not — "when did step 3 start" is as good a question on a session that
+ * closed months ago as on the live one. A row has started when it is a
+ * logged step, or when it is the derived active step. Each started row's
+ * start is **the previous step's** completion, seeded with the session's own
+ * `startedAt` for the first row; a bookkeeping row between two steps is
+ * stepped over rather than treated as one ({@link isStepRow}). A gap between
+ * two steps is therefore INSIDE the elapsed time, which is the honest
+ * reading of "how long has this been running", and a row whose predecessor
+ * is a step that never completed carries `null` rather than a borrowed
+ * timestamp from further up.
+ *
+ * Mirrors `session_checklist._derive_progress`.
  */
+export function deriveProgress(
+  evidence: readonly RowEvidence[],
+  flight: SessionFlightFacts,
+): StepRow[] {
+  const rows = evidence.map((item) => item.row);
+  const active = flight.inFlight ? activeStepIndex(rows) : null;
+
+  const derived: StepRow[] = [];
+  let previousCompletion: string | null = flight.startedAt;
+  evidence.forEach((item, index) => {
+    const isActive = index === active;
+    const hasStarted = isActive || item.isStep;
+    derived.push({
+      ...item.row,
+      isActive,
+      startedAt: hasStarted ? previousCompletion : null,
+    });
+    if (isStepRow(item)) previousCompletion = item.completion;
+  });
+  return derived;
+}
 
 // ---------------------------------------------------------------------------
 // The spec's step texts — mirror of `ai_router/spec_admission.py`
@@ -516,12 +852,23 @@ export function planMatchesSpec(
  * expected to hand in `[]` for an absent or unreadable activity log, which
  * degrades to no children rather than to a stale or invented list.
  *
+ * Set 127 S2 adds *flight* — `(is this session in flight, when did it
+ * start)`, from {@link sessionFlightFacts} — and applies
+ * {@link deriveProgress} as the last thing that happens to every row, on
+ * both paths, so a legacy set with no plan gets its start times and a
+ * planned set gets both. It defaults to {@link NOT_IN_FLIGHT}, which is the
+ * same answer Python derives from an absent `session-state.json`: no active
+ * step and no start times, which is exactly the behaviour this model had
+ * before. Nothing about which rows exist, or what the ledger says they say,
+ * changes.
+ *
  * Mirrors `session_checklist.build_rows`.
  */
 export function buildStepRows(
   entries: readonly StepEntry[],
   sessionNumber: number,
   specSteps: readonly string[],
+  flight: SessionFlightFacts = NOT_IN_FLIGHT,
 ): StepRow[] {
   const mine = entries.filter(
     (entry) =>
@@ -538,10 +885,11 @@ export function buildStepRows(
   // row, which `reconcile` enforces via `isLoggedStep`.
   const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
 
-  if (plan.length === 0) {
-    return real.map((entry) => rowFromEntry(entry, false));
-  }
-  return reconcile(plan, real, planMatchesSpec(plan, specSteps));
+  const evidence =
+    plan.length === 0
+      ? real.map((entry) => evidenceOf(entry, false))
+      : reconcile(plan, real, planMatchesSpec(plan, specSteps));
+  return deriveProgress(evidence, flight);
 }
 
 /**

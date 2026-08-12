@@ -9,6 +9,7 @@ import {
   parseUatChecklist,
   readSessionSets,
 } from "../../utils/fileSystem";
+import { sessionNodes, stepNodes } from "../../providers/workExplorerTreeModel";
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-test-"));
@@ -1183,9 +1184,108 @@ suite("fileSystem — readSessionSets stepLedger (Set 114 S3)", () => {
     for (const e of set.stepLedger.entries) {
       assert.deepStrictEqual(
         Object.keys(e).sort(),
-        ["description", "kind", "sessionNumber", "status", "stepKey", "stepNumber"],
+        ["dateTime", "description", "kind", "sessionNumber", "status", "stepKey", "stepNumber"],
       );
     }
+    // Set 127 S2: the flight facts come off the same state file the scan
+    // already read — no second source of truth for progress, and no
+    // second read. Session 1 is the one in flight here.
+    assert.deepStrictEqual(set.stepLedger.flight, {
+      inFlight: true,
+      startedAt: "2026-08-10T00:00:00-04:00",
+    });
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a set with NO state file arms no derivation, whatever the log says", () => {
+    // Set 127 S2 round 1, Major (spec-conformance lens). `readSessionSets`
+    // supports an absent `session-state.json` by inferring one in memory
+    // from `activity-log.json` — and that inference says `in-progress` and
+    // carries a `startedAt` lifted from the log's EARLIEST entry. Python's
+    // `session_flight_facts` answers `(False, None)` for the same set,
+    // because `read_session_state` returns `None` for a missing file. If
+    // the inferred object reached `sessionFlightFacts`, the tree would
+    // derive an active step and start times the CLI checklist does not —
+    // a cross-language divergence on a supported path, which this set
+    // calls strictly worse than the silence it replaced.
+    //
+    // The inference still does its real job: the set buckets as in
+    // progress and its session rows render. Only the flight facts are
+    // withheld.
+    const { root, setDir } = stage({ activity: LOG });
+    fs.rmSync(path.join(setDir, "session-state.json"));
+
+    const [set] = readSessionSets(root);
+    assert.strictEqual(set.state, "in-progress", "the inference still buckets the set");
+    assert.ok(set.stepLedger, "the rows are real and must still render");
+    assert.deepStrictEqual(set.stepLedger.flight, {
+      inFlight: false,
+      startedAt: null,
+    });
+
+    // And the rows themselves: no active step, no start times — the same
+    // answer `session_checklist.build_rows` gives for a set with no state
+    // file, which the parity corpus pins as
+    // `no-state-file-means-no-derivation-at-all`.
+    const session = sessionNodes({ kind: "set", set }).find(
+      (n) => n.session.number === set.stepLedger!.sessionNumber,
+    )!;
+    const rows = stepNodes(session).map((n) => n.row);
+    assert.ok(rows.length > 0, "expected step rows to render");
+    assert.ok(rows.every((r) => !r.isActive), "derived an active step with no state file");
+    assert.ok(rows.every((r) => r.startedAt === null), "derived a start time with no state file");
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("the flight facts are the SESSION's, not the file's top level", () => {
+    // The derivation is armed by ONE thing, and this is where the tree
+    // gets it. A v4 file carries a top-level `startedAt` beside the
+    // per-session ledger, and they are different facts: the top-level one
+    // is whenever the file was last touched. Reading the wrong one would
+    // date every first row to the set's own start, which on a 3-session
+    // set is hours or days wrong.
+    const { root } = stage({
+      activity: LOG,
+      state: JSON.stringify({
+        schemaVersion: 4,
+        sessionSetName: "live-set",
+        status: "in-progress",
+        startedAt: "2026-08-01T00:00:00-04:00",
+        sessions: [
+          { number: 1, title: "Session 1", status: "in-progress", startedAt: "2026-08-10T00:00:00-04:00", completedAt: null, orchestrator: null, verificationVerdict: null },
+          { number: 2, title: "Session 2", status: "not-started", startedAt: null, completedAt: null, orchestrator: null, verificationVerdict: null },
+        ],
+      }),
+    });
+    const [set] = readSessionSets(root);
+    assert.ok(set.stepLedger, "no stepLedger on an in-flight set");
+    assert.deepStrictEqual(set.stepLedger.flight, {
+      inFlight: true,
+      startedAt: "2026-08-10T00:00:00-04:00",
+    });
+    fs.rmSync(root, { recursive: true });
+  });
+
+  test("a session with no recorded start carries none, rather than one invented", () => {
+    // `startedAt` is explicitly nullable in the schema. Falling back to
+    // the set's own start, or to the log's first timestamp, would be a
+    // guess presented as a record — the failure mode this whole set
+    // exists to remove.
+    const { root } = stage({
+      activity: LOG,
+      state: JSON.stringify({
+        schemaVersion: 4,
+        sessionSetName: "live-set",
+        status: "in-progress",
+        sessions: [
+          { number: 1, title: "Session 1", status: "in-progress", startedAt: null, completedAt: null, orchestrator: null, verificationVerdict: null },
+          { number: 2, title: "Session 2", status: "not-started", startedAt: null, completedAt: null, orchestrator: null, verificationVerdict: null },
+        ],
+      }),
+    });
+    const [set] = readSessionSets(root);
+    assert.ok(set.stepLedger, "no stepLedger on an in-flight set");
+    assert.strictEqual(set.stepLedger.flight.startedAt, null);
     fs.rmSync(root, { recursive: true });
   });
 

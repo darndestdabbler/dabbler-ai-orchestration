@@ -37,25 +37,23 @@ Set 115 S4 finished it: ``markHere``, the ``isHere`` field and the tree's
 ``HERE_MARKER`` are gone, the corpus no longer carries the field, and
 both halves compare the same five fields again.
 
-One field-set split, bounded and self-closing (Set 127 S1)
-----------------------------------------------------------
-Set 127 derives two new facts onto ``ChecklistRow`` — the active step and
-each started row's start time — and its TypeScript mirror lands in
-Session 2. That is a one-session window in which Python has fields the
-extension does not, so the split is declared
-(:data:`SHARED_ROW_FIELDS` versus :data:`DERIVED_ROW_FIELDS`) rather than
-left implicit.
+One field-set split, opened and closed (Sets 127 S1 + S2)
+---------------------------------------------------------
+Set 127 S1 derived two new facts onto ``ChecklistRow`` — the active step
+and each started row's start time — with the TypeScript mirror scheduled
+for Session 2. That was a one-session window in which Python had fields
+the extension did not, so the split was declared (``SHARED_ROW_FIELDS``
+versus a ``DERIVED_ROW_FIELDS`` tuple) rather than left implicit, and a
+test proved the undeclared fields were provably INERT on every case here:
+the corpus modelled no ``session-state.json`` and no entry ``dateTime``,
+so both derived to their null answer.
 
-It is not the ``isHere`` shape returning. ``isHere`` was PINNED by the
-corpus for one language, so the fixture asserted a value only half of it
-could produce. These fields are pinned by neither half, and
-:func:`test_the_derived_fields_are_inert_on_every_corpus_case` proves
-they cannot be observed through any case here — the corpus models no
-``session-state.json`` and no entry timestamps, so both derive to their
-null answer. The corpus's row-for-row claim is therefore as complete as
-it was before. That same test is the trigger that closes the window: the
-inputs Session 2 must add to pin the derivation are exactly the inputs
-that make it fail.
+Session 2 closed it, exactly as that test's docstring said it would.
+The corpus now carries both inputs (a case may declare ``sessionState``,
+and an entry may carry ``dateTime``), the mirror produces both fields,
+and they are compared in both languages like every other field. There is
+one field set again, and ``DERIVED_ROW_FIELDS`` is gone with the window
+it described.
 """
 
 from __future__ import annotations
@@ -85,46 +83,32 @@ def _load_corpus() -> List[dict]:
 CASES = _load_corpus()
 CASE_IDS = [c["name"] for c in CASES]
 
-#: The row fields the corpus pins in BOTH languages — the RECORD half of
-#: a row, which is everything ``build_rows`` reads off the ledger. A
-#: field added to ``ChecklistRow`` and not declared here or in
-#: :data:`DERIVED_ROW_FIELDS` silently stops being compared, so
-#: :func:`test_the_shared_fields_are_the_whole_python_row` pins both
-#: tuples against the dataclass itself.
+#: Every row field the corpus pins, in BOTH languages — the RECORD half of
+#: a row (what ``build_rows`` reads off the ledger) plus the DERIVED half
+#: (what it computes from those rows and ``session-state.json``). A field
+#: added to ``ChecklistRow`` and not declared here silently stops being
+#: compared, so :func:`test_the_shared_fields_are_the_whole_python_row`
+#: pins this tuple against the dataclass itself.
 SHARED_ROW_FIELDS = (
     "stepNumber",
     "stepKey",
     "description",
     "status",
     "isPlanned",
-)
-
-#: The fields Set 127 S1 DERIVES rather than reads (the active step and
-#: each started row's start time). They are not in the compared set yet
-#: for one structural reason: both are functions of inputs this corpus
-#: does not model — ``session-state.json`` (is this session in flight,
-#: and when did it start) and the entries' ``dateTime`` — and the
-#: TypeScript mirror lands in Session 2 with the corpus extension that
-#: feeds them.
-#:
-#: That is deliberately NOT the ``isHere`` situation this corpus's guards
-#: exist to prevent. ``isHere`` was a field the corpus PINNED for one
-#: language, so the fixture asserted something only half of it could
-#: satisfy. These fields are pinned by neither half; instead
-#: :func:`test_the_derived_fields_are_inert_on_every_corpus_case` proves
-#: they are provably inert on every case here — ``False`` and ``None``
-#: throughout — so the corpus's row-for-row parity claim remains exactly
-#: as true as it was before they existed. The moment a case gains the
-#: inputs that would wake them, that test fails and the fields have to
-#: move into :data:`SHARED_ROW_FIELDS`, which is Session 2's job.
-DERIVED_ROW_FIELDS = (
     "isActive",
     "startedAt",
 )
 
 
 def _materialize(case: dict, tmp_path) -> str:
-    """Write *case* to a session-set directory and return its path."""
+    """Write *case* to a session-set directory and return its path.
+
+    ``sessionState`` is written only when the case declares one, and its
+    ABSENCE is a modelled case rather than a gap: an absent (or
+    unreadable) ``session-state.json`` is what a legacy or mid-scaffold
+    set really has, and both languages must answer it with no derivation
+    at all.
+    """
     set_dir = tmp_path / case["name"]
     set_dir.mkdir(parents=True, exist_ok=True)
     (set_dir / "spec.md").write_text(case["specMarkdown"], encoding="utf-8")
@@ -136,6 +120,9 @@ def _materialize(case: dict, tmp_path) -> str:
     }
     with open(set_dir / "activity-log.json", "w", encoding="utf-8") as fh:
         json.dump(log, fh, indent=2)
+    if case.get("sessionState") is not None:
+        with open(set_dir / "session-state.json", "w", encoding="utf-8") as fh:
+            json.dump(case["sessionState"], fh, indent=2)
     return str(set_dir)
 
 
@@ -146,6 +133,8 @@ def _as_dict(row: session_checklist.ChecklistRow) -> Dict[str, object]:
         "description": row.description,
         "status": row.status,
         "isPlanned": row.is_planned,
+        "isActive": row.is_active,
+        "startedAt": row.started_at,
     }
 
 
@@ -190,46 +179,20 @@ def test_the_shared_fields_are_the_whole_python_row():
     Asserted against the dataclass rather than a hand-written list, so
     the check cannot go stale.
 
-    A field is either COMPARED in both languages
-    (:data:`SHARED_ROW_FIELDS`) or DERIVED and provably inert here
-    (:data:`DERIVED_ROW_FIELDS`, whose inertness is its own test below).
-    There is no third category, and a field in neither tuple fails this.
+    Set 127 S2 closed the one-session split its S1 opened, so there is
+    one category again: every field is COMPARED in both languages, and a
+    field in neither the dataclass nor the tuple fails this.
     """
     fields = [f.name for f in dataclasses.fields(session_checklist.ChecklistRow)]
     camel = [
         "".join(w if i == 0 else w.capitalize() for i, w in enumerate(f.split("_")))
         for f in fields
     ]
-    assert sorted(camel) == sorted(SHARED_ROW_FIELDS + DERIVED_ROW_FIELDS), (
+    assert sorted(camel) == sorted(SHARED_ROW_FIELDS), (
         "ChecklistRow gained or lost a field; add it to SHARED_ROW_FIELDS "
         "(and to the corpus + the TypeScript half) or the parity gate "
         "stops proving it"
     )
-
-
-@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
-def test_the_derived_fields_are_inert_on_every_corpus_case(case, tmp_path):
-    """The uncompared fields must be unobservable through this corpus.
-
-    This is what keeps :data:`DERIVED_ROW_FIELDS` honest while only one
-    language produces them. A case here writes ``spec.md`` and
-    ``activity-log.json`` and nothing else: no ``session-state.json``, so
-    no session is in flight and no active step can be derived; no
-    ``dateTime`` on any entry, so no start time can be. Every derived
-    value is therefore the null answer, and the row-for-row parity the
-    corpus asserts is exactly as complete as it was before Set 127.
-
-    It is also the trigger that closes the gap. Add a state file or a
-    timestamp to a case — which is precisely what Session 2 must do to
-    pin the derivation across the two languages — and this fails until
-    the fields move into :data:`SHARED_ROW_FIELDS` and the TypeScript
-    half produces them.
-    """
-    set_dir = _materialize(case, tmp_path)
-    rows = session_checklist.build_rows(set_dir, case["sessionNumber"])
-    assert not any(r.is_active for r in rows), case["why"]
-    assert all(r.started_at is None for r in rows), case["why"]
-    assert not os.path.exists(os.path.join(set_dir, "session-state.json"))
 
 
 def test_the_corpus_carries_no_field_only_one_language_produces():
@@ -263,6 +226,67 @@ def test_the_corpus_carries_no_field_only_one_language_produces():
         if field not in row
     }
     assert not missing, f"expectedRows lost {sorted(missing)}"
+
+
+def test_the_corpus_pins_the_derivation_in_both_directions():
+    """A derivation only one direction of which is tested proves nothing.
+
+    L-112-1, applied to a corpus rather than a regex: cases where the
+    active step FIRES and cases where it must NOT are both required by
+    name, because a mirror that never derives anything would pass a
+    corpus made only of the negative half, and one that derives
+    everywhere would pass a corpus made only of the positive half.
+
+    The structural claim is asserted over every case rather than named:
+    **at most one** row per case may be active, whatever the ledger
+    contains. That is the spec's one-thing-that-must-not-regress, and it
+    holds however a status happens to be spelled.
+    """
+    fires = {
+        case["name"]
+        for case in CASES
+        if any(row["isActive"] for row in case["expectedRows"])
+    }
+    assert "the-active-step-is-derived-where-the-record-is-silent" in fires
+    assert "an-unfinished-planned-row-breaks-the-start-time-chain" in fires
+    assert "a-prose-status-is-evidence-of-nothing" in fires
+
+    for name in (
+        "a-closed-session-derives-no-active-step-but-keeps-its-times",
+        "a-blocked-row-is-not-overwritten-by-the-derivation",
+        "in-flight-is-the-logged-step-not-an-earlier-pending-plan-row",
+        "no-state-file-means-no-derivation-at-all",
+    ):
+        case = next(c for c in CASES if c["name"] == name)
+        assert not any(row["isActive"] for row in case["expectedRows"]), (
+            f"{name} is one of the corpus's DOES-NOT-FIRE cases and it now "
+            "derives an active step"
+        )
+
+    for case in CASES:
+        active = [row for row in case["expectedRows"] if row["isActive"]]
+        assert len(active) <= 1, (
+            f"{case['name']} expects {len(active)} active rows; exactly one "
+            "row per session may ever be derived in flight"
+        )
+
+
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
+def test_a_case_with_no_state_file_derives_no_active_step(case, tmp_path):
+    """The state file is the ONLY thing that can arm the derivation.
+
+    Runs every case a second time with ``session-state.json`` withheld,
+    whatever the case declares, and asserts nothing is ever active. That
+    falsifies the failure this set's spec calls strictly worse than the
+    silence it replaced — a derivation that fires on a session nobody
+    said was in flight — over the whole corpus rather than on the one
+    case written for it.
+    """
+    stripped = {k: v for k, v in case.items() if k != "sessionState"}
+    set_dir = _materialize(stripped, tmp_path)
+    assert not os.path.exists(os.path.join(set_dir, "session-state.json"))
+    rows = session_checklist.build_rows(set_dir, case["sessionNumber"])
+    assert not any(r.is_active for r in rows), case["why"]
 
 
 def test_the_corpus_still_pins_a_step_in_flight():
@@ -314,6 +338,16 @@ def test_the_corpus_covers_the_cases_the_tree_depends_on():
         "a-falsy-non-string-kind-is-no-kind-at-all",
         "falsy-non-string-fields-read-as-empty",
         "a-session-with-no-entries-renders-nothing",
+        # Set 127 S2 — the derivation, both directions and both fields.
+        "the-active-step-is-derived-where-the-record-is-silent",
+        "a-closed-session-derives-no-active-step-but-keeps-its-times",
+        "a-blocked-row-is-not-overwritten-by-the-derivation",
+        "a-prose-status-is-evidence-of-nothing",
+        "an-unfinished-planned-row-breaks-the-start-time-chain",
+        "a-bookkeeping-record-is-transparent-to-the-start-time-chain",
+        "a-plan-less-state-file-still-dates-the-first-row",
+        "no-state-file-means-no-derivation-at-all",
+        "the-start-time-chain-does-not-read-the-status-vocabulary",
     }
     assert required <= {c["name"] for c in CASES}
 

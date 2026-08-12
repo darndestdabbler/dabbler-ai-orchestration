@@ -46,6 +46,7 @@ import {
   setIcon,
   stepDescriptor,
   stepNodes,
+  stepStartLabel,
   verdictIsUnclean,
 } from "../../providers/workExplorerTreeModel";
 
@@ -663,9 +664,15 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     { sessionNumber: 2, stepNumber: 2, stepKey: "build-it", description: "Build it.", status: "pending", kind: "plan-step" },
   ];
   const LOGGED = [
-    { sessionNumber: 2, stepNumber: 1, stepKey: "registration", description: "Registered.", status: "complete" },
+    { sessionNumber: 2, stepNumber: 1, stepKey: "registration", description: "Registered.", status: "complete", dateTime: "2026-08-11T12:06:00-04:00" },
   ];
   const SPEC_STEPS = ["Register.", "Build it."];
+  // Set 127 S2: the flight facts the scan lifts from `session-state.json`
+  // for this same session. They belong in every fixture ledger because
+  // the real one always carries them — session 2 IS in flight in this
+  // set's `sessions` ledger above, so a fixture claiming otherwise would
+  // be testing a shape that cannot occur.
+  const FLIGHT = { inFlight: true, startedAt: "2026-08-11T11:58:00-04:00" };
 
   function inFlightSet(over: Partial<SessionSet> = {}): SessionSet {
     return fakeSet({
@@ -676,6 +683,7 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
         sessionNumber: 2,
         entries: [...PLAN, ...LOGGED],
         specSteps: SPEC_STEPS,
+        flight: FLIGHT,
       },
       ...over,
     });
@@ -687,6 +695,27 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     );
     assert.ok(node, `no session ${number} on ${set.name}`);
     return node;
+  }
+
+  // Set 127 S2: a THREE-step plan, so there is still a purely-planned row
+  // behind the one the derivation claims. With a two-step plan every
+  // unlogged row is the active one, and the tests that are about the rows
+  // BEHIND it would have nothing to assert on.
+  const THREE_PLAN = [
+    ...PLAN,
+    { sessionNumber: 2, stepNumber: 3, stepKey: "verify-close", description: "Verify, close.", status: "pending", kind: "plan-step" },
+  ];
+  const THREE_SPEC = [...SPEC_STEPS, "Verify, close."];
+
+  function threePlanSet(flight = FLIGHT): SessionSet {
+    return inFlightSet({
+      stepLedger: {
+        sessionNumber: 2,
+        entries: [...THREE_PLAN, ...LOGGED],
+        specSteps: THREE_SPEC,
+        flight,
+      },
+    });
   }
 
   test("the in-flight session expands to its reconciled steps", () => {
@@ -730,14 +759,14 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     // authoritative for its own session and silent about every other, so
     // the row must not borrow another session's steps.
     const set = inFlightSet({
-      stepLedger: { sessionNumber: 1, entries: [...PLAN, ...LOGGED], specSteps: SPEC_STEPS },
+      stepLedger: { sessionNumber: 1, entries: [...PLAN, ...LOGGED], specSteps: SPEC_STEPS, flight: FLIGHT },
     });
     assert.deepStrictEqual(stepNodes(sessionNode(set, 2)), []);
   });
 
   test("a ledger whose rows come back empty leaves the row a leaf", () => {
     const set = inFlightSet({
-      stepLedger: { sessionNumber: 2, entries: [], specSteps: SPEC_STEPS },
+      stepLedger: { sessionNumber: 2, entries: [], specSteps: SPEC_STEPS, flight: FLIGHT },
     });
     assert.deepStrictEqual(stepNodes(sessionNode(set, 2)), []);
     assert.strictEqual(sessionDescriptor(sessionNode(set, 2)).collapsible, "none");
@@ -770,6 +799,12 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     // untouched planned row ABOVE the step actually in flight — because
     // a glyph that came from row order rather than from the ledger would
     // land on "Register" here and look entirely plausible.
+    //
+    // Set 127 S2 keeps this case as the DERIVATION's falsifier too: the
+    // session is genuinely in flight, so the active-step rule is armed,
+    // and it must still stand down because the record has answered. Two
+    // rows claiming to be current is precisely the defect the marker
+    // produced.
     const set = inFlightSet({
       stepLedger: {
         sessionNumber: 2,
@@ -784,9 +819,11 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
           },
         ],
         specSteps: SPEC_STEPS,
+        flight: FLIGHT,
       },
     });
-    const descriptors = childrenOf(sessionNode(set, 2)).map((n) =>
+    const nodes = childrenOf(sessionNode(set, 2));
+    const descriptors = nodes.map((n) =>
       n.kind === "step" ? stepDescriptor(n) : null,
     );
     assert.deepStrictEqual(
@@ -796,8 +833,15 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
         { kind: "file", slug: "in-progress.svg" },
       ],
     );
-    // The description column is empty on EVERY step row now. The marker
-    // was the only thing that ever went there.
+    // Exactly one row is current, and it is the one the LEDGER named.
+    assert.deepStrictEqual(
+      nodes.map((n) => (n.kind === "step" ? n.row.isActive : "?")),
+      [false, false],
+    );
+    // The description column carries a START TIME now, never a marker —
+    // and only on a row that has one. Nothing started here (step 1 was
+    // never logged, so it never finished, and the chain breaks there), so
+    // the slot is as empty as it has been since Set 115 S4.
     assert.deepStrictEqual(
       descriptors.map((d) => d?.description),
       [undefined, undefined],
@@ -833,9 +877,12 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     const icons = childrenOf(sessionNode(set, 2)).map((n) =>
       n.kind === "step" ? stepDescriptor(n).icon : undefined,
     );
+    // Set 127 S2: the second row is the step this session is ON — nothing
+    // is logged against it and the record is silent — so it carries the
+    // in-progress glyph even though the ledger still says `pending`.
     assert.deepStrictEqual(icons, [
       { kind: "file", slug: "done.svg" },
-      { kind: "file", slug: "not-started.svg" },
+      { kind: "file", slug: "in-progress.svg" },
     ]);
   });
 
@@ -857,11 +904,115 @@ suite("Set 114 S3 — the fifth level: an in-flight session's steps", () => {
     // `isPlanned` is carried rather than re-derived (Set 114 S2's
     // assignment note 2): "the spec promised this" and "the orchestrator
     // logged it as pending" are different facts.
-    const set = inFlightSet();
+    //
+    // Asserted on the LAST planned row rather than the first, because Set
+    // 127 S2 derives the first unlogged planned row into the in-progress
+    // state and this test is about the ones behind it.
+    const set = threePlanSet();
+    const [, , third] = childrenOf(sessionNode(set, 2));
+    const d = stepDescriptor(third as never);
+    assert.ok(hasToken(d.contextValue, "step-planned"), d.contextValue);
+    assert.ok(hasToken(d.contextValue, "step-not-started"), d.contextValue);
+    assert.ok(!hasToken(d.contextValue, "step-active"), d.contextValue);
+    assert.ok(d.tooltip?.includes("planned — not started"), d.tooltip);
+    // A row that has not started shows no time — a seeded row's own
+    // `dateTime` is REGISTRATION time, and rendering it as a start would
+    // be the fresh wrong signal operator ruling 3 forbids.
+    assert.strictEqual(d.description, undefined);
+  });
+
+  test("the tooltip agrees with the glyph on the derived active step", () => {
+    // Set 127 S2, step 2's real requirement: `stepDescriptor` has TWO
+    // consumers of a row's status, and the tooltip's planned branch would
+    // otherwise call the running step "planned — not started" in prose
+    // while the icon beside it showed it running (L-069-1 — enumerate
+    // every consumer, do not fix the reported one).
+    const set = threePlanSet();
     const [, second] = childrenOf(sessionNode(set, 2));
-    const cv = stepDescriptor(second as never).contextValue;
-    assert.ok(hasToken(cv, "step-planned"), cv);
-    assert.ok(stepDescriptor(second as never).tooltip?.includes("planned"));
+    assert.strictEqual(second.kind === "step" ? second.row.isActive : false, true);
+    const d = stepDescriptor(second as never);
+    assert.deepStrictEqual(d.icon, { kind: "file", slug: "in-progress.svg" });
+    assert.ok(d.tooltip?.includes("in progress"), d.tooltip);
+    assert.ok(!d.tooltip?.includes("not started"), d.tooltip);
+    // Both facts are true of this row and both are offered to `when`
+    // clauses: it is a planned row, and it is the one in flight.
+    assert.ok(hasToken(d.contextValue, "step-planned"), d.contextValue);
+    assert.ok(hasToken(d.contextValue, "step-active"), d.contextValue);
+    assert.ok(hasToken(d.contextValue, "step-in-progress"), d.contextValue);
+  });
+
+  test("a started row shows when it started, in the dimmed description slot", () => {
+    // The operator's follow-up question — how long has it been running —
+    // answered in the slot the `<- here` marker vacated, so nothing is
+    // displaced. Local, 24-hour, hour and minute, trailing dash to mark it
+    // a START rather than a completion.
+    const set = threePlanSet();
+    const descriptions = childrenOf(sessionNode(set, 2)).map((n) =>
+      n.kind === "step" ? stepDescriptor(n).description : "?",
+    );
+    assert.deepStrictEqual(descriptions, [
+      stepStartLabel("2026-08-11T11:58:00-04:00"),
+      stepStartLabel("2026-08-11T12:06:00-04:00"),
+      undefined,
+    ]);
+    // Computed from the local clock, not asserted as a literal, because a
+    // fixed string would pin the test to one machine's timezone. What IS
+    // asserted literally is the SHAPE.
+    assert.match(descriptions[0] as string, /^\d{2}:\d{2}-$/);
+  });
+
+  test("the start-time label formats, and refuses to guess", () => {
+    // A local-clock helper, so the hour is asserted through the same
+    // `Date` the renderer uses; the FORMAT is what this pins.
+    const iso = "2026-08-11T12:06:00-04:00";
+    const when = new Date(iso);
+    const hh = String(when.getHours()).padStart(2, "0");
+    assert.strictEqual(stepStartLabel(iso), `${hh}:06-`);
+    // No derived start: the slot stays as empty as it was before Set 127.
+    assert.strictEqual(stepStartLabel(null), "");
+    // An unparseable timestamp renders NOTHING here rather than
+    // "Invalid Date" or a raw ISO string in a slot a few characters wide.
+    // It is not lost: the tooltip carries the raw value.
+    assert.strictEqual(stepStartLabel("not a date"), "");
+  });
+
+  test("the full timestamp is in the tooltip, where width is free", () => {
+    const set = threePlanSet();
+    const [first] = childrenOf(sessionNode(set, 2));
+    const d = stepDescriptor(first as never);
+    assert.ok(d.tooltip?.includes("2026-08-11T11:58:00-04:00"), d.tooltip);
+    // And nothing is claimed for a row that has no start.
+    const [, , third] = childrenOf(sessionNode(set, 2));
+    assert.ok(!stepDescriptor(third as never).tooltip?.includes("Started"));
+  });
+
+  test("nothing is derived once the session is no longer in flight", () => {
+    // The negative direction, at the rendering surface: the same ledger
+    // with `session-state.json` no longer calling this session current.
+    // An in-progress glyph on a session that finished is strictly worse
+    // than the silence it replaced, because an operator would have a
+    // reason to believe it.
+    const set = threePlanSet({ inFlight: false, startedAt: "2026-08-11T11:58:00-04:00" });
+    const nodes = childrenOf(sessionNode(set, 2));
+    assert.deepStrictEqual(
+      nodes.map((n) => (n.kind === "step" ? n.row.isActive : "?")),
+      [false, false, false],
+    );
+    assert.deepStrictEqual(
+      nodes.map((n) => (n.kind === "step" ? stepDescriptor(n).icon : "?")),
+      [
+        { kind: "file", slug: "done.svg" },
+        { kind: "file", slug: "not-started.svg" },
+        { kind: "file", slug: "not-started.svg" },
+      ],
+    );
+    // The start time that WAS recorded still shows: "when did step 1
+    // start" is as good a question on a session that closed as on the
+    // live one.
+    assert.strictEqual(
+      nodes[0].kind === "step" ? stepDescriptor(nodes[0]).description : "?",
+      stepStartLabel("2026-08-11T11:58:00-04:00"),
+    );
   });
 
   test("the session tooltip says how many steps are under it", () => {
@@ -929,7 +1080,12 @@ suite("Set 115 S4 — the close-out obligations under the in-flight session", ()
       name: "115-live",
       state: "in-progress",
       sessions: ledger("complete", "in-progress", "not-started"),
-      stepLedger: { sessionNumber: 2, entries: PLAN, specSteps: ["Register."] },
+      stepLedger: {
+        sessionNumber: 2,
+        entries: PLAN,
+        specSteps: ["Register."],
+        flight: { inFlight: true, startedAt: "2026-08-11T13:00:00-04:00" },
+      },
       closeObligations: obligations(),
       ...over,
     });

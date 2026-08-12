@@ -43,7 +43,34 @@
     "an operator reads instead of the marker is the in-progress GLYPH on",
     "the step whose recorded status is in-progress — which is why the",
     "'logged-step-in-flight' case matters: it is the one that pins a real",
-    "in-progress row for the icon to come from."
+    "in-progress row for the icon to come from.",
+    "",
+    "Set 127 Session 2 closed the one-session field-set split S1 opened.",
+    "The row model now carries two DERIVED fields — isActive (the step an",
+    "in-flight session is currently on) and startedAt (when that step",
+    "started) — and both are compared here, in both languages, like every",
+    "other field. Neither is read from disk in either language: they are",
+    "computed from rows both surfaces already read.",
+    "",
+    "That needed two new inputs, so a case may now declare:",
+    "",
+    "  sessionState",
+    "      the session-state.json content. Python writes it to the case's",
+    "      tmpdir and session_checklist.build_rows reads it; TypeScript",
+    "      passes it to sessionStepModel.sessionFlightFacts, which is the",
+    "      same function minus the file read. ABSENT means no state file,",
+    "      which is a real and tested case (no derivation at all).",
+    "",
+    "  dateTime, on an entry",
+    "      log_step writes AFTER a step finishes, so an entry's timestamp",
+    "      is that step's COMPLETION and the next row's derived start.",
+    "",
+    "The rule that must not regress, and that the negative cases here",
+    "pin in both languages: EXACTLY ONE row per session may be derived in",
+    "flight, and only while that session genuinely is. A derivation that",
+    "marks a step in a closed session, or marks several at once, replaces",
+    "'no signal' with 'a wrong signal' — strictly worse, because the",
+    "operator would then have a reason to believe it."
   ],
   "cases": [
     {
@@ -51,16 +78,65 @@
       "why": "Session start: start_session seeded the plan and nothing has been logged. This is the forward view Set 114 S2 exists for — every row pending, nothing in flight, and no logged step anywhere.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isPlanned": true}
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -68,18 +144,79 @@
       "why": "The common case. The orchestrator's own step keys are prose-free handles that do NOT equal the slugs the seeder derived from the spec's sentences, so every claim here is made by the ordinal pass. Steps 1-2 are logged and own their rows' content; step 3 is still the spec's own words, and the step logged in-progress is the one the tree draws its in-progress glyph from.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered and read the preload.", "status": "complete"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "registration",
+          "description": "Registered and read the preload.",
+          "status": "complete"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "tree-expansion",
+          "description": "Wiring the fifth tree level.",
+          "status": "in-progress"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "registration", "description": "Registered and read the preload.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "tree-expansion", "description": "Wiring the fifth tree level.", "status": "in-progress", "isPlanned": false},
-        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isPlanned": true}
+        {
+          "stepNumber": 1,
+          "stepKey": "registration",
+          "description": "Registered and read the preload.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "tree-expansion",
+          "description": "Wiring the fifth tree level.",
+          "status": "in-progress",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -87,17 +224,72 @@
       "why": "A logged step whose stepKey EQUALS a planned key claims that row even though its stepNumber points elsewhere. A key match asserts identity and cannot be wrong; an ordinal match is an inference. Round 2 of Set 114 S2's verification is why the passes are in this order.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "verify-close",
+          "description": "Closed out early.",
+          "status": "complete"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 1, "stepKey": "verify-close", "description": "Closed out early.", "status": "complete", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 1,
+          "stepKey": "verify-close",
+          "description": "Closed out early.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -105,18 +297,82 @@
       "why": "THE PLANTED DEFECT (L-112-1). The spec gained a step after registration, so the seeded plan no longer matches spec.md and the ordinal pass is switched OFF. With it on, the inserted step would claim the old step 2's row, that step would claim step 3's, and the LAST planned row would vanish — a planned step nobody executed, silently dropped. Here every planned row survives and the logged step appends.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Do the newly-inserted thing.\n3. Build it.\n4. Verify, close.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Do the newly-inserted thing.", "Build it.", "Verify, close."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Do the newly-inserted thing.",
+        "Build it.",
+        "Verify, close."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "inserted-work",
+          "description": "Did the newly-inserted thing.",
+          "status": "complete"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "inserted-work", "description": "Did the newly-inserted thing.", "status": "complete", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "inserted-work",
+          "description": "Did the newly-inserted thing.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -124,16 +380,64 @@
       "why": "An entry carrying a `kind` is machinery's record ABOUT the session — several are written at registration, before any work exists. It RENDERS (it is part of the record and Set 111 S4 showed it) but it may not mark a planned step done. Without this rule a set with pathAwareCritique configured would show step 1 as complete before the session started.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "kind": "path_aware_critique"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "path-aware-critique-policy",
+          "description": "Recorded pathAwareCritique: advisory.",
+          "status": "complete",
+          "kind": "path_aware_critique"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 1, "stepKey": "path-aware-critique-policy", "description": "Recorded pathAwareCritique: advisory.", "status": "complete", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 1,
+          "stepKey": "path-aware-critique-policy",
+          "description": "Recorded pathAwareCritique: advisory.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -143,14 +447,56 @@
       "specMarkdown": "# Fixture spec\n\nNo session headings at all, so nothing parses.\n",
       "expectedSpecSteps": [],
       "entries": [
-        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete"},
-        {"sessionNumber": 2, "stepNumber": 2, "stepKey": "the-work", "description": "Doing the work.", "status": "in-progress"},
-        {"sessionNumber": 2, "stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending"}
+        {
+          "sessionNumber": 2,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered.",
+          "status": "complete"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 2,
+          "stepKey": "the-work",
+          "description": "Doing the work.",
+          "status": "in-progress"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 3,
+          "stepKey": "close",
+          "description": "Close out.",
+          "status": "pending"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "the-work", "description": "Doing the work.", "status": "in-progress", "isPlanned": false},
-        {"stepNumber": 3, "stepKey": "close", "description": "Close out.", "status": "pending", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "the-work",
+          "description": "Doing the work.",
+          "status": "in-progress",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "close",
+          "description": "Close out.",
+          "status": "pending",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -160,13 +506,47 @@
       "specMarkdown": "# Fixture spec\n",
       "expectedSpecSteps": [],
       "entries": [
-        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "the-work", "description": "Starting the work.", "status": "in-progress"},
-        {"sessionNumber": 2, "stepNumber": 2, "stepKey": "second-thing", "description": "Second thing.", "status": "pending"},
-        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete"}
+        {
+          "sessionNumber": 2,
+          "stepNumber": 1,
+          "stepKey": "the-work",
+          "description": "Starting the work.",
+          "status": "in-progress"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 2,
+          "stepKey": "second-thing",
+          "description": "Second thing.",
+          "status": "pending"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 1,
+          "stepKey": "the-work",
+          "description": "Finished the work.",
+          "status": "complete"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "the-work", "description": "Finished the work.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "second-thing", "description": "Second thing.", "status": "pending", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "the-work",
+          "description": "Finished the work.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "second-thing",
+          "description": "Second thing.",
+          "status": "pending",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -176,12 +556,38 @@
       "specMarkdown": "# Fixture spec\n",
       "expectedSpecSteps": [],
       "entries": [
-        {"sessionNumber": 2, "stepNumber": 1, "description": "First anonymous step.", "status": "complete"},
-        {"sessionNumber": 2, "stepNumber": 2, "description": "Second anonymous step.", "status": "complete"}
+        {
+          "sessionNumber": 2,
+          "stepNumber": 1,
+          "description": "First anonymous step.",
+          "status": "complete"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 2,
+          "description": "Second anonymous step.",
+          "status": "complete"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "", "description": "First anonymous step.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "", "description": "Second anonymous step.", "status": "complete", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "",
+          "description": "First anonymous step.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "",
+          "description": "Second anonymous step.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -191,46 +597,181 @@
       "specMarkdown": "# Fixture spec\n",
       "expectedSpecSteps": [],
       "entries": [
-        {"sessionNumber": 2, "stepNumber": 1, "stepKey": "a", "description": "A.", "status": "complete"},
-        {"sessionNumber": 2, "stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done"}
+        {
+          "sessionNumber": 2,
+          "stepNumber": 1,
+          "stepKey": "a",
+          "description": "A.",
+          "status": "complete"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 2,
+          "stepKey": "b",
+          "description": "B.",
+          "status": "done"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "a", "description": "A.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "b", "description": "B.", "status": "done", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "a",
+          "description": "A.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "b",
+          "description": "B.",
+          "status": "done",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
       "name": "in-flight-is-the-logged-step-not-an-earlier-pending-plan-row",
-      "why": "The case the removed marker used to get wrong, and the one the in-progress GLYPH now gets right for free. An unstarted planned step 2 sits above a logged step in flight; the old rule had to be TOLD to prefer the logged row, while reading the recorded in-progress status cannot point anywhere else. This is also the corpus's proof that a real in-progress row survives reconciliation, which is what the tree's icon is drawn from.",
+      "why": "The case the removed marker used to get wrong, and the one the in-progress GLYPH now gets right for free. An unstarted planned step 2 sits above a logged step in flight; the old rule had to be TOLD to prefer the logged row, while reading the recorded in-progress status cannot point anywhere else. This is also the corpus's proof that a real in-progress row survives reconciliation, which is what the tree's icon is drawn from. Set 127 S2 adds the state file that makes this the DERIVATION's falsifier too: the session is genuinely in flight, so the active-step rule is armed, and it must still stand down because a row already says in-progress. Two rows claiming to be current is the exact defect the removed `<- here` marker produced; `isActive` is false on every row here, including the pending planned one above the logged step.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it.", "Verify, close."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "verify-close", "description": "Verify, close.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "closing",
+          "description": "Closing out.",
+          "status": "in-progress"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true},
-        {"stepNumber": 3, "stepKey": "closing", "description": "Closing out.", "status": "in-progress", "isPlanned": false}
-      ]
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "closing",
+          "description": "Closing out.",
+          "status": "in-progress",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
+      ],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00"
+          }
+        ]
+      }
     },
     {
       "name": "steps-in-a-fenced-block-are-not-this-specs-steps",
       "why": "A spec that quotes a template full of numbered lines must not have that template read as its own plan — the seeded plan would then never match spec.md and ordinal reconciliation would be off for no reason.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 1: With a sample\n\n1. Register.\n2. Build it.\n\n```markdown\n1. Not a step.\n2. Also not a step.\n```\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "registration",
+          "description": "Registered.",
+          "status": "complete"
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "isPlanned": true}
+        {
+          "stepNumber": 1,
+          "stepKey": "registration",
+          "description": "Registered.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -238,16 +779,63 @@
       "why": "THE PATH-AWARE CRITIQUE'S CATCH (gpt-5.5, Set 114 S3). `kind` is untrusted on-disk data, and Python reads it with `str(x or \"\")` -- so `0` and `false` are 'no kind', i.e. an ORDINARY LOGGED STEP that may claim a planned row. The TypeScript mirror originally used `String(x ?? \"\")`, which falls back only on null/undefined and turned those into the literal strings \"0\" and \"false\" -- bookkeeping, forbidden from claiming. The two surfaces then disagreed about which row was current and whether a planned step had been executed. No shipping writer emits this, which is exactly why only a second reading lens found it and why it belongs here now: the corpus is what stops it reopening.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n\n**Creates:** the thing\n",
-      "expectedSpecSteps": ["Register.", "Build it."],
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Register.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "build-it", "description": "Build it.", "status": "pending", "kind": "plan-step"},
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "kind": 0},
-        {"sessionNumber": 1, "stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "kind": false}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "registration",
+          "description": "Registered.",
+          "status": "complete",
+          "kind": 0
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "the-build",
+          "description": "Built it.",
+          "status": "in-progress",
+          "kind": false
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "registration", "description": "Registered.", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "the-build", "description": "Built it.", "status": "in-progress", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "registration",
+          "description": "Registered.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "the-build",
+          "description": "Built it.",
+          "status": "in-progress",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -257,12 +845,40 @@
       "specMarkdown": "# Fixture spec\n",
       "expectedSpecSteps": [],
       "entries": [
-        {"sessionNumber": 2, "stepNumber": 1, "stepKey": 0, "description": false, "status": "complete"},
-        {"sessionNumber": 2, "stepNumber": 2, "stepKey": 0, "description": "Second one.", "status": 0}
+        {
+          "sessionNumber": 2,
+          "stepNumber": 1,
+          "stepKey": 0,
+          "description": false,
+          "status": "complete"
+        },
+        {
+          "sessionNumber": 2,
+          "stepNumber": 2,
+          "stepKey": 0,
+          "description": "Second one.",
+          "status": 0
+        }
       ],
       "expectedRows": [
-        {"stepNumber": 1, "stepKey": "", "description": "", "status": "complete", "isPlanned": false},
-        {"stepNumber": 2, "stepKey": "", "description": "Second one.", "status": "", "isPlanned": false}
+        {
+          "stepNumber": 1,
+          "stepKey": "",
+          "description": "",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "",
+          "description": "Second one.",
+          "status": "",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
       ]
     },
     {
@@ -270,11 +886,745 @@
       "why": "The Work Explorer's required degradation: no rows means no children, never a stale or invented list.",
       "sessionNumber": 3,
       "specMarkdown": "# Fixture spec\n\n### Session 3 of 3: Untouched\n\n1. Register.\n",
-      "expectedSpecSteps": ["Register."],
+      "expectedSpecSteps": [
+        "Register."
+      ],
       "entries": [
-        {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register", "description": "Registered.", "status": "complete"}
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered.",
+          "status": "complete"
+        }
       ],
       "expectedRows": []
+    },
+    {
+      "name": "the-active-step-is-derived-where-the-record-is-silent",
+      "why": "The whole point of Set 127, in both languages. Step 1 is logged complete and nothing has been logged since, so the record says nothing about where the session is — and the session IS in flight. The lowest-numbered seeded plan row with nothing logged against it (step 2) is derived active, and it is the ONLY one: step 3 is equally unlogged and must not also claim to be current. The start times come off the same pass — step 1 started when the session did, step 2 started when step 1 finished, and step 3, which has not started, carries no time at all rather than its seeded registration stamp (operator ruling 3).",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The derived middle frame\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00",
+            "completedAt": null
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": true,
+          "startedAt": "2026-08-10T09:12:00-04:00"
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
+      ]
+    },
+    {
+      "name": "a-closed-session-derives-no-active-step-but-keeps-its-times",
+      "why": "The negative direction, and the one the spec calls strictly worse than silence: an in-progress glyph on a session that finished last month would give an operator a reason to believe it. Identical ledger to the case above; only session-state.json differs. Nothing is active. The START TIMES still derive, deliberately — 'when did step 1 start' is as good a question on a set that closed months ago as on the live one — so step 1 keeps its time and the two unlogged rows, which never started, keep their silence.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The derived middle frame\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "complete",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "complete",
+            "startedAt": "2026-08-10T09:00:00-04:00",
+            "completedAt": "2026-08-10T12:00:00-04:00"
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
+      ]
+    },
+    {
+      "name": "a-blocked-row-is-not-overwritten-by-the-derivation",
+      "why": "The record answering with a STOP, rather than with progress. Step 2 is logged `blocked` in a session that is genuinely in flight. The ledger has already said where this session is, so the derivation stands down entirely — step 1's pending planned row above it does NOT become active, and the blocked row keeps its own token rather than being relabelled in-progress. Both languages box this `[!]` / paint it with the one did-not-go-well glyph. The blocked row also carries NO start: step 1 above it is a planned row nobody ever logged, so it is a step that never finished and it breaks the start-time chain rather than handing the row below it the session's own start.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The derived middle frame\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00",
+            "completedAt": null
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Blocked on a missing key.",
+          "status": "blocked",
+          "dateTime": "2026-08-10T09:30:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Blocked on a missing key.",
+          "status": "blocked",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
+      ]
+    },
+    {
+      "name": "a-prose-status-is-evidence-of-nothing",
+      "why": "The five legacy prose-in-`status` rows pre-date Set 120 S1's strict writer, and the obligation they create is that the derivation must not TRUST the status field blindly. A planned row carrying prose is not a token either language recognises, so it is not eligible to be the active step — and it does not stop the rule, because `[?]` is a question rather than an answer. The next genuinely-pending planned row is the active one. This is also the falsifier for the mirror's one real trap: TypeScript's `glyphStatusOf` FALLS BACK to `not-started` for an unknown token, so an eligibility test written through it would pick the prose row here and disagree with Python by one row.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The derived middle frame\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00",
+            "completedAt": null
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "Ran the suite; 349 passed",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "Ran the suite; 349 passed",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": true,
+          "startedAt": null
+        }
+      ]
+    },
+    {
+      "name": "an-unfinished-planned-row-breaks-the-start-time-chain",
+      "why": "Steps 1 and 3 are logged and step 2 never was. Step 2 is the lowest-numbered seeded plan row with nothing logged against it, so it is derived active — the spec's rule read literally, and the row genuinely is the outstanding one. The start-time half is the deliberate asymmetry: an unclaimed PLANNED row is a step that never finished, so it breaks the chain, and step 3 below it therefore carries NO start rather than borrowing step 1's completion from further up. Guessing there would be worse than silence.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The derived middle frame\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00",
+            "completedAt": null
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verified and closed.",
+          "status": "complete",
+          "dateTime": "2026-08-10T11:45:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": true,
+          "startedAt": "2026-08-10T09:12:00-04:00"
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verified and closed.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        }
+      ]
+    },
+    {
+      "name": "a-bookkeeping-record-is-transparent-to-the-start-time-chain",
+      "why": "A `path_aware_critique` / `contract_gate` / `dual_surface_mode` / `suggestion_disposition` entry carries a dateTime and renders as a row, but it is a record ABOUT the session written by machinery — which is already why it may not claim a planned row. It must not receive a start of its own, and it must not act as the previous STEP's completion for the row below it: the second step here starts when the first step finished (09:12), not when the policy record was written (10:00). Driven through the plan-less path so the bookkeeping row sits BETWEEN two steps, which is the only place the transparency is observable.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 1: No plan seeded\n\nProse only.\n",
+      "expectedSpecSteps": [],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00",
+            "completedAt": null
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepKey": "path-aware-critique-policy",
+          "description": "pathAwareCritique: none",
+          "status": "complete",
+          "kind": "path_aware_critique",
+          "dateTime": "2026-08-10T10:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Built the thing.",
+          "status": "complete",
+          "dateTime": "2026-08-10T11:00:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "stepNumber": null,
+          "stepKey": "path-aware-critique-policy",
+          "description": "pathAwareCritique: none",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Built the thing.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:12:00-04:00"
+        }
+      ]
+    },
+    {
+      "name": "a-plan-less-state-file-still-dates-the-first-row",
+      "why": "A set whose plan is not yet committed writes a v4 file with NO sessions[] ledger and a top-level status / startedAt instead (docs/session-state-schema.md, 'Plan-less carve-out'). Read strictly per-session it would answer 'no start time' for every row and the first row would lose a start the file records explicitly. It contributes its startedAt and NEVER an in-flight claim: the file names no session number to attach a current step to. Nothing is lost by that refusal, because a plan-less set has no `### Session N` headings and therefore no seeded plan rows to derive onto — which is exactly the shape of this case.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\nNo session headings at all.\n",
+      "expectedSpecSteps": [],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "startedAt": "2026-08-10T08:30:00-04:00",
+        "sessions": []
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Built the thing.",
+          "status": "in-progress",
+          "dateTime": "2026-08-10T10:00:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T08:30:00-04:00"
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Built the thing.",
+          "status": "in-progress",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:12:00-04:00"
+        }
+      ]
+    },
+    {
+      "name": "no-state-file-means-no-derivation-at-all",
+      "why": "The status quo this whole feature had to preserve. Same in-flight ledger as the first derived case, with session-state.json ABSENT — which is what the reader answers for an unreadable or corrupt one too. session-state.json is the single source of truth for progress, and file presence is never a state signal, so the answer is the conservative one: no active step, and no start time even on the row that plainly ran (the session's own start is unknowable, so the chain has nothing to begin with).",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The derived middle frame\n\n1. Register.\n2. Build it.\n3. Verify, close.\n\n**Creates:** the thing\n",
+      "expectedSpecSteps": [
+        "Register.",
+        "Build it.",
+        "Verify, close."
+      ],
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "kind": "plan-step",
+          "dateTime": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Build it.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "verify-close",
+          "description": "Verify, close.",
+          "status": "pending",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null
+        }
+      ]
+    },
+    {
+      "name": "the-start-time-chain-does-not-read-the-status-vocabulary",
+      "why": "Set 127 S1 round 2 left one adjudicated-minor residual for this session: an entry's dateTime is read as its step's completion whatever its status says. Settled as BY DESIGN, in both languages at once, and pinned here. `completed` is one of the 15 non-canonical tokens Set 120 S2 deliberately preserved; the renderer boxes it `[?]` because it is not in the table. A chain that only advanced on a RECOGNISED terminal token would silently strip the start times off every legacy set that spells it that way -- and the derivation's own rule is that an unrecognised token is evidence of nothing, which has to cut both ways: it may not be read as evidence of completion, and it may not be read as evidence of non-completion either. What advances the chain is the ENTRY EXISTING: log_step writes when the orchestrator records the step, so its stamp is the last known moment of that step's activity and the best available lower bound for the row below it. The case the residual worried about -- a step still in flight dating the row under it -- cannot mislead in the shape that actually occurs: a row saying in-progress makes the record the answer, so no planned row below it is ever derived active, and a planned row that is not active carries no time at all.",
+      "sessionNumber": 1,
+      "specMarkdown": "# Fixture spec\n\n### Session 1 of 1: No plan seeded\n\nProse only.\n",
+      "expectedSpecSteps": [],
+      "sessionState": {
+        "schemaVersion": 4,
+        "sessionSetName": "parity",
+        "status": "in-progress",
+        "sessions": [
+          {
+            "number": 1,
+            "title": "S1",
+            "status": "in-progress",
+            "startedAt": "2026-08-10T09:00:00-04:00"
+          }
+        ]
+      },
+      "entries": [
+        {
+          "sessionNumber": 1,
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "completed",
+          "dateTime": "2026-08-10T09:12:00-04:00"
+        },
+        {
+          "sessionNumber": 1,
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Built the thing.",
+          "status": "complete",
+          "dateTime": "2026-08-10T10:00:00-04:00"
+        }
+      ],
+      "expectedRows": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered the session.",
+          "status": "completed",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:00:00-04:00"
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-it",
+          "description": "Built the thing.",
+          "status": "complete",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-10T09:12:00-04:00"
+        }
+      ]
     }
   ]
 }

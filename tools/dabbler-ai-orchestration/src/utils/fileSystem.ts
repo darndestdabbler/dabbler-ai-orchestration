@@ -7,7 +7,7 @@ import { listGitWorktrees } from "./git";
 import { inferStateInMemory, readStatus } from "./sessionState";
 import { isCancelled, readCancellationState } from "./cancelLifecycle";
 import { readProgress, SessionStateInvariantError, normalizeToV4Shape, canonicalizeStatus } from "./progress";
-import { parseSpecSteps } from "../providers/sessionStepModel";
+import { parseSpecSteps, sessionFlightFacts } from "../providers/sessionStepModel";
 import {
   CloseObligation,
   CloseObligations,
@@ -868,12 +868,19 @@ export function readLatestIssuesEnvelope(dir: string): unknown | null {
  * most once per in-flight set, and it is tolerant: an unreadable spec
  * yields `[]`, which makes `planMatchesSpec` answer `false` and costs only
  * the ordinal half of reconciliation.
+ *
+ * Set 127 S2 adds *state*: the already-normalized `session-state.json` the
+ * caller has in hand, from which `sessionFlightFacts` lifts the two facts
+ * the derivation needs. No new read, and no second source of truth for
+ * progress — it is the same object `readProgress` resolved
+ * `currentSession` from.
  */
 export function buildStepLedger(
   state: SessionState,
   currentSession: number | null,
   entries: SessionStepEntry[] | null,
   specPath: string,
+  sessionState?: unknown,
 ): SessionStepLedger | null {
   if (state !== "in-progress") return null;
   if (currentSession === null || !Array.isArray(entries)) return null;
@@ -905,8 +912,10 @@ export function buildStepLedger(
       description: e.description,
       status: e.status,
       kind: e.kind,
+      dateTime: e.dateTime,
     })),
     specSteps,
+    flight: sessionFlightFacts(sessionState, currentSession),
   };
 }
 
@@ -1241,6 +1250,12 @@ export function readSessionSets(root: string): SessionSet[] {
     // from the parse below so the fifth tree level (an in-flight session's
     // steps) needs no second read. Stays null on every other set.
     let rawStepEntries: SessionStepEntry[] | null = null;
+    // Set 127 S2: the NORMALIZED state object, retained for the same
+    // reason `rawStepEntries` is — the fifth tree level's derivation needs
+    // `(is this session in flight, when did it start)`, and this is the
+    // object `readProgress` already resolved `currentSession` from. Not a
+    // second source of truth, and not a second read.
+    let normalizedState: unknown = null;
     const eventsPath = path.join(dir, "session-events.jsonl");
 
     // Activity log is a step log, not a count source. The activity-log
@@ -1297,7 +1312,8 @@ export function readSessionSets(root: string): SessionSet[] {
         // them. `needsMigration` detection below reads the RAW parsed
         // object (`rawSd`) because the v3/v4 distinction is precisely
         // the signal we're checking for there.
-        const rawSd = (fs.existsSync(statePath)
+        const stateFileOnDisk = fs.existsSync(statePath);
+        const rawSd = (stateFileOnDisk
           ? JSON.parse(fs.readFileSync(statePath, "utf8"))
           : (inferredState ?? inferStateInMemory(dir))) as {
           schemaVersion?: number;
@@ -1408,6 +1424,21 @@ export function readSessionSets(root: string): SessionSet[] {
         // the normalized ledger is the right predicate input for
         // every input schema version.
         ledgerSessions = sd.sessions ?? null;
+        // Set 127 S2 round 1 (Major, spec-conformance lens): ONLY a state
+        // file that is really on disk may arm the derivation. When it is
+        // absent, `inferStateInMemory` synthesizes an `in-progress`
+        // snapshot from `activity-log.json` — including a `startedAt`
+        // taken from the log's EARLIEST entry, which is a different
+        // quantity from a session's start — and Python's
+        // `session_flight_facts` answers `(False, None)` for the same set,
+        // because `read_session_state` returns `None` for a missing file.
+        // Passing the inferred object here would make the tree derive an
+        // active step and start times the CLI checklist does not: a
+        // cross-language divergence on a path this repo supports, which is
+        // the one thing this set says is worse than the silence it
+        // replaced. The inference still drives bucketing and the session
+        // rows, exactly as before — only the flight facts are withheld.
+        normalizedState = stateFileOnDisk ? sd : null;
 
         // Set 030 Session 3: route progress reads through the v3/v4
         // helper. `readProgress` itself runs through `normalizeToV4Shape`
@@ -1564,6 +1595,7 @@ export function readSessionSets(root: string): SessionSet[] {
       liveSession?.currentSession ?? null,
       rawStepEntries,
       specPath,
+      normalizedState,
     );
 
     sets.push({

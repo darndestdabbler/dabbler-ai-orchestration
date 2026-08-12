@@ -136,6 +136,124 @@
       "dateTime": "2026-08-12T14:16:35.590347-04:00",
       "description": "Targeted pytest across the nine suites touching these modules: 351 passed. Cross-provider verification, two discovery rounds, both VERIFIED on both lenses (spec-conformance and failure-scenario), 0 blocking findings in either. Round 1 returned two nits, both accepted and fixed with their own falsifiers -- the plan-less state carve-out (no sessions[] ledger, top-level startedAt) lost the first row start time, and bookkeeping records were acting as step completions in the start-time chain; the fix made the rule say what the spec says (the previous STEP completion), so a bookkeeping row is transparent while an unclaimed plan row still breaks the chain. Round 2 re-stamped clean; its one remaining nit (a non-complete logged status read as a completion) is recorded as an adjudicated-minor residual owned by Session 2. Full pytest run of record: 4055 passed, 9 skipped, 963s, recorded after the last code change. mocha and playwright owe nothing -- this session touched no surface they cover.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T14:38:40.626663-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "mirror-the-derivation-in-sessionstepmodel-ts",
+      "dateTime": "2026-08-12T14:38:40.626663-04:00",
+      "description": "**Mirror the derivation in `sessionStepModel.ts`,** the model the tree actually reads, then **enumerate every consumer of a row's status** before declaring it done (`L-069-1`, and the authoring guide's echo-pass anti-pattern): `stepDescriptor`'s glyph *and* its tooltip, which currently says `planned \u2014 not started` for any planned row and would otherwise call the running step not-started in prose while showing it as running in the icon.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-typescript-with-the-same",
+      "dateTime": "2026-08-12T14:38:40.626663-04:00",
+      "description": "**Falsify in TypeScript with the same both-direction pairs, and pin the parity.** A shared fixture drives both implementations and asserts they agree row-for-row \u2014 two mirrored derivations that no test compares are two derivations that will diverge.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "layer-3-rendering-smoke-then-the",
+      "dateTime": "2026-08-12T14:38:40.626663-04:00",
+      "description": "**Layer 3 rendering smoke**, then the human look: assert the in-progress glyph renders on the active step of an in-flight fixture session, run the full `npm run test:playwright` **after the last code change** (L-064-12), and only then offer the one-item guided walk.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-and-the-layer-3",
+      "dateTime": "2026-08-12T14:38:40.626663-04:00",
+      "description": "Full pytest and the Layer 3 run recorded as runs of record; verify; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "mirror-the-start-time-and-render",
+      "dateTime": "2026-08-12T14:38:40.626663-04:00",
+      "description": "**Mirror the start time and render it `12:06-`.** Same derivation as Session 1, in the TS row model, displayed in the step row's **dimmed description slot** \u2014 `RowDescriptor.description`, which VS Code renders in grey immediately after the label, as session rows already do with `in flight`. Not concatenated into the label, which is narrow and already carries the step text plus its own label tests. That slot is currently **empty on every step row** and its own comment says why: it held the `<- here` marker until Set 115 S4 retired it. The timestamp reuses the slot that was vacated by a worse answer to the same question, so nothing is displaced. Local time, 24-hour, hour and minute only, trailing dash; the full timestamp goes in the tooltip, where width is free. A row with no derived start renders no description at all \u2014 the slot stays as empty as it is today.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "mirror-the-derivation-in-sessionstepmodel-ts",
+      "dateTime": "2026-08-12T14:42:11.245306-04:00",
+      "description": "Mirror the Set 127 S1 derivation (active step + start time) in sessionStepModel.ts and enumerate every consumer of a row status.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "mirror-the-derivation-in-sessionstepmodel-ts",
+      "dateTime": "2026-08-12T15:00:06.387272-04:00",
+      "description": "Mirrored session_flight_facts / _active_step_index / _derive_progress / effective_status in sessionStepModel.ts (reconcile now returns RowEvidence), plumbed the flight facts through SessionStepLedger + buildStepLedger, and enumerated every consumer of a row status: stepDescriptor's glyph AND its tooltip both now read effectiveStatusOf, with a step-active contextValue token.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-typescript-with-the-same",
+      "dateTime": "2026-08-12T15:00:06.389231-04:00",
+      "description": "Extended the shared parity corpus from 14 to 22 cases with the two inputs the derivation needs (per-case sessionState, per-entry dateTime) and both derived fields on every expectedRow; closed the S1 field-set split (DERIVED_ROW_FIELDS removed, isActive/startedAt now compared in both languages); both halves independently assert the corpus still pins the derivation in both directions, and both re-run every case with the state file withheld.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "mirror-the-start-time-and-render",
+      "dateTime": "2026-08-12T15:00:06.390542-04:00",
+      "description": "Start time mirrored onto the TS row model and rendered as 12:06- in the step row's dimmed description slot (stepStartLabel), with the full timestamp in the tooltip; a row with no derived start renders no description at all.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T15:00:24.561740-04:00",
+      "description": "Registered session 2 of set 127 via start_session (github-copilot / claude-opus-5 / anthropic), read the preload, and posted the step checklist. The three decisions this set takes were journalled at session 1 registration and are settled; this session ratifies nothing new.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "layer-3-rendering-smoke-then-the",
+      "dateTime": "2026-08-12T15:18:43.197548-04:00",
+      "description": "Layer 3 rendering spec updated and green (4/4): the seeded-plan scenario now asserts the derived in-progress glyph on the first unlogged planned row, exactly one such row, and the HH:MM- start time in the description slot with no time on an unstarted row; the refresh scenario asserts the derivation STANDS DOWN the moment a step is logged in-progress. Eight planted mutations across both languages were each caught by the new falsifiers. The uat-matrix fixture the walk runs on was given a seeded session-2 plan so the walk demonstrates the feature, and its rendered rows are pinned by a Layer 2 test through the real scan. s2-uat-walk.md authored (one Look item, two Decide items) and offered.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-and-the-layer-3",
+      "dateTime": "2026-08-12T15:18:43.201688-04:00",
+      "description": "Full pytest and the full Layer 3 Playwright run, recorded as runs of record after the last code change.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-and-the-layer-3",
+      "dateTime": "2026-08-12T16:47:57.842849-04:00",
+      "description": "Full pytest 4092 passed / 9 skipped; full Playwright 31 passed; full mocha 1520 passing -- all three recorded as runs of record, and mocha + Playwright RE-RUN and re-recorded after the round-1 remediation staled them. Verification: round 1 discovery (fan-out 2, gpt-5.5 both lenses) 1 Major; round 2 supplementary VERIFIED nothing new; remediated once with a pre/post-fix-discriminating falsifier; round 3 remediation-review VERIFIED, fix accepted, 0 findings. close_preflight: test_run_fresh green, uat_walk_recorded green, checklist_posted advisory with 4 unrecoverable windows recorded honestly.",
+      "status": "complete"
     }
   ]
 }

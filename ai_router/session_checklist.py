@@ -483,6 +483,21 @@ def _completion_of(entry: dict) -> Optional[str]:
       it is not work, which is exactly why it may not claim a planned row
       either. A row whose predecessor is one of these therefore starts at
       an unknown time, not at the moment a policy was recorded.
+
+    **The status is deliberately not consulted** (Set 127 S1 round 2's
+    adjudicated-minor residual, settled in S2). What advances the chain is
+    the entry EXISTING: ``log_step`` writes when the orchestrator records
+    the step, so its stamp is the last known moment of that step's
+    activity and the best available lower bound for the row below it.
+    Gating on a *recognised terminal* token instead would make the start
+    times depend on the status vocabulary, which this module refuses to
+    trust in either direction — ``completed`` is one of the 15
+    non-canonical tokens Set 120 S2 preserved and boxes ``[?]``, so every
+    legacy set spelling it that way would silently lose its start times.
+    The shape the residual worried about cannot mislead: a row that says
+    ``in-progress`` makes the record the answer, so no planned row below
+    it is ever derived active, and a planned row that is not active
+    carries no time at all.
     """
     if not is_logged_step(entry):
         return None

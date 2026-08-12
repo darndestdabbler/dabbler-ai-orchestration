@@ -18,6 +18,13 @@ import * as path from "path";
 import { SessionSet } from "../../types";
 import { applicableActions } from "../../providers/ActionRegistry";
 import { readSessionSets } from "../../utils/fileSystem";
+import { effectiveStatusOf, glyphStatusOf } from "../../providers/sessionStepModel";
+import {
+  sessionNodes,
+  stepDescriptor,
+  stepNodes,
+  stepStartLabel,
+} from "../../providers/workExplorerTreeModel";
 
 const EXT_ROOT = path.resolve(__dirname, "../../..");
 const MATRIX_ROOT = path.join(EXT_ROOT, "test-fixtures", "uat-matrix");
@@ -62,6 +69,41 @@ suite("uat-matrix fixtures — hello-world-full (Set 062 S4)", () => {
     assert.strictEqual(s.liveSession?.currentSession, 2);
     assert.strictEqual(s.needsMigration, false);
     assert.strictEqual(s.blockedByPrereqs, false);
+  });
+
+  test("001-hello-page is the row the Set 127 guided look is walked on", () => {
+    // The walk (`s2-uat-walk.md`) asks the operator to look at one thing:
+    // a finished step, the step the session is DERIVED to be on, and an
+    // unstarted one below it — the last carrying no time at all. An
+    // instruction nothing checks is an instruction not known to be
+    // followable (project-guidance: UAT is pre-verified by automation),
+    // so the fixture's own rows are pinned here, through the real scan
+    // and the real row builder.
+    const s = sets.get("001-hello-page")!;
+    const node = { kind: "set", set: s } as const;
+    const session = sessionNodes(node).find((n) => n.session.number === 2)!;
+    const rows = stepNodes(session).map((n) => n.row);
+    assert.deepStrictEqual(
+      rows.map((r) => [glyphStatusOf(effectiveStatusOf(r)), r.isActive, r.startedAt]),
+      [
+        ["complete", false, "2026-06-01T11:00:00-04:00"],
+        ["in-progress", true, "2026-06-01T11:30:00-04:00"],
+        ["not-started", false, null],
+      ],
+    );
+    // Derived, not recorded: nothing on disk says `in-progress`, which is
+    // the whole claim of Set 127 and the reason this row is worth walking.
+    assert.strictEqual(rows[1].status, "pending");
+    // And the same three rows agree with the Python checklist, which the
+    // cross-language corpus proves case by case.
+    assert.deepStrictEqual(
+      stepNodes(session).map((n) => stepDescriptor(n).description),
+      [
+        stepStartLabel("2026-06-01T11:00:00-04:00"),
+        stepStartLabel("2026-06-01T11:30:00-04:00"),
+        undefined,
+      ],
+    );
   });
 
   test("002-style-the-greeting is blocked by a REAL pending prerequisite", () => {

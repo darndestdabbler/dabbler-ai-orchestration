@@ -1,5 +1,11 @@
 export type SessionState = "complete" | "in-progress" | "not-started" | "cancelled";
 
+// Set 127 S2: the step ledger carries the flight facts the row builder
+// derives from, and the row builder owns that vocabulary. A TYPE-only
+// import, and `providers/sessionStepModel.ts` imports nothing at all, so
+// there is no cycle and no runtime edge.
+import type { SessionFlightFacts } from "./providers/sessionStepModel";
+
 // Set 030 Session 1 — session-state.json schema v3 ledger.
 // The set-level `SessionState` above is the extension's bucketing
 // state (Cancelled / Complete / Active / Not Started). Set 030
@@ -222,6 +228,17 @@ export interface SessionStepLedger {
    * and never as a source of rows.
    */
   specSteps: string[];
+  /**
+   * Set 127 S2: `(is this session in flight, when did it start)`, lifted
+   * from the same normalized `session-state.json` the rest of the scan
+   * reads — the single source of truth for progress, never file presence.
+   *
+   * The row builder derives the ACTIVE step and each started row's start
+   * time from it. Carried rather than re-read on expand for the same reason
+   * `entries` is: the scan has already parsed the file, and a second read
+   * on a tree that refreshes on every watcher tick would be pure cost.
+   */
+  flight: SessionFlightFacts;
 }
 
 /** One `activity-log.json` entry, narrowed to the row builder's inputs. */
@@ -232,6 +249,11 @@ export interface SessionStepEntry {
   description?: string;
   status?: string;
   kind?: string;
+  /**
+   * Set 127 S2: `log_step` writes AFTER a step finishes, so this is that
+   * step's COMPLETION — and the next row's derived start.
+   */
+  dateTime?: string;
 }
 
 /**

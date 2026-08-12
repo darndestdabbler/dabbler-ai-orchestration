@@ -80,7 +80,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## State The Suite Baseline And Release Contract Up Front In Verification Round 1
-<!-- lesson: id="L-064-10" added-set="062" last-used-set="110" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-10" added-set="062" last-used-set="127" status="archived" scope="portable" -->
 
 - **Promoted.** This lesson now lives at `project-guidance.md` →
   Conventions → Workflow Expectations: *"Open every session-verification
@@ -799,7 +799,7 @@ found the same file still quoting an 8.0m Layer 3 run after the run of record ha
 become 11.3m. The canonical rule now lives in `project-guidance.md`.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="110" status="archived" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" last-used-set="127" status="archived" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them
@@ -819,7 +819,7 @@ instruction is still live: the rubric has not shipped in
 `project-guidance.md`.
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="123" status="archived" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="127" status="archived" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

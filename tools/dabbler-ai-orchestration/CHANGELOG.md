@@ -92,6 +92,36 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 127 S2) The Work Explorer says which step a session is ON, and
+  since when.** Expand an in-flight session and the step it is actually
+  working now carries the **in-progress** glyph, says so in its tooltip,
+  and shows its start time (`12:06-`) in the dimmed slot at the end of the
+  row. Neither fact was ever written to disk: `start_session` seeds every
+  planned step as `pending` and `log_step` writes `complete` *after* a step
+  finishes, so the tree could not tell *"step 5 has not been started"* from
+  *"step 5 has been running for forty minutes"* — the exact question the
+  in-progress icon exists to answer. Both are **derived** at read time from
+  rows the tree already reads, which is why they also light up on sets that
+  closed months ago.
+
+  The rule is deliberately silent rather than confident. It fires only on a
+  session `session-state.json` reports as in flight; it stands down
+  entirely the moment any row already says `in-progress`, `blocked` or
+  `failed` (the record has answered); it will never mark two rows at once;
+  an unrecognised status token makes it silent rather than confident; and a
+  step that has not started shows no time at all, because a seeded row's
+  own timestamp is *registration* time, not a start. This is not the
+  `<- here` marker returning — that named exactly one row whether or not it
+  knew, which is how it came to point at a step that had finished hours
+  earlier.
+
+  `providers/sessionStepModel.ts` gains `sessionFlightFacts`,
+  `activeStepIndex`, `deriveProgress` and `effectiveStatusOf`, mirroring
+  the Python originals in `ai_router/session_checklist.py`; the
+  cross-language parity corpus grew from 14 cases to 22 and now compares
+  both derived fields in both languages, with the derivation's
+  does-not-fire direction pinned case by case.
+
 - **(Set 115 S4) The Work Explorer's sixth level: what still stands
   between an in-flight session and its close.** Expand the session in
   flight and, under its steps, a **Close-out** row summarises the

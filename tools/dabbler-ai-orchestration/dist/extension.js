@@ -9902,6 +9902,47 @@ var STATUS_GLYPHS = {
 function glyphStatusOf(status) {
   return STATUS_GLYPHS[pyStr(status).toLowerCase()] ?? "not-started";
 }
+var IN_PROGRESS_STATUS = "in-progress";
+var UNSTARTED_STATUSES = new Set(
+  Object.entries(STATUS_GLYPHS).filter(([, glyph]) => glyph === "not-started").map(([token]) => token)
+);
+var RECORD_ANSWERS_GLYPHS = /* @__PURE__ */ new Set([
+  "in-progress",
+  "cancelled"
+]);
+function effectiveStatusOf(row) {
+  return row.isActive ? IN_PROGRESS_STATUS : row.status;
+}
+var NOT_IN_FLIGHT = { inFlight: false, startedAt: null };
+function isoOrNull(value) {
+  return typeof value === "string" && value.trim() !== "" ? value : null;
+}
+function sessionFlightFacts(state, sessionNumber) {
+  if (!state || typeof state !== "object" || Array.isArray(state)) {
+    return NOT_IN_FLIGHT;
+  }
+  const sessions = state.sessions;
+  if (!Array.isArray(sessions) || sessions.length === 0) {
+    return {
+      inFlight: false,
+      startedAt: isoOrNull(state.startedAt)
+    };
+  }
+  for (const entry of sessions) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry))
+      continue;
+    const e = entry;
+    if (typeof e.number !== "number" || !Number.isInteger(e.number))
+      continue;
+    if (e.number !== sessionNumber)
+      continue;
+    return {
+      inFlight: e.status === "in-progress",
+      startedAt: isoOrNull(e.startedAt)
+    };
+  }
+  return NOT_IN_FLIGHT;
+}
 function pyStr(value) {
   return value ? String(value) : "";
 }
@@ -9939,11 +9980,30 @@ function rowFromEntry(entry, isPlanned) {
     stepKey: pyStr(entry.stepKey),
     description: pyStr(entry.description),
     status: pyStr(entry.status),
-    isPlanned
+    isPlanned,
+    // Derived last, by `deriveProgress`, on every path. Constructed at
+    // their null answers so a row is never half-built.
+    isActive: false,
+    startedAt: null
+  };
+}
+function completionOf(entry) {
+  if (!isLoggedStep(entry))
+    return null;
+  return pyStr(entry.dateTime).trim() || null;
+}
+function isStepRow(item) {
+  return item.isStep || item.row.isPlanned;
+}
+function evidenceOf(entry, isPlanned) {
+  return {
+    row: rowFromEntry(entry, isPlanned),
+    completion: completionOf(entry),
+    isStep: isLoggedStep(entry)
   };
 }
 function reconcile(plan, real, allowOrdinal) {
-  const planRows = plan.map((entry) => rowFromEntry(entry, true));
+  const evidence = plan.map((entry) => evidenceOf(entry, true));
   const byNumber = /* @__PURE__ */ new Map();
   const byKey = /* @__PURE__ */ new Map();
   plan.forEach((entry, index) => {
@@ -9978,10 +10038,40 @@ function reconcile(plan, real, allowOrdinal) {
     });
   }
   for (const [position, target] of claims) {
-    planRows[target] = rowFromEntry(real[position], false);
+    evidence[target] = evidenceOf(real[position], false);
   }
-  const extra = real.filter((_entry, position) => !claims.has(position)).map((entry) => rowFromEntry(entry, false));
-  return [...planRows, ...extra];
+  const extra = real.filter((_entry, position) => !claims.has(position)).map((entry) => evidenceOf(entry, false));
+  return [...evidence, ...extra];
+}
+function activeStepIndex(rows) {
+  if (rows.some((row) => RECORD_ANSWERS_GLYPHS.has(glyphStatusOf(row.status)))) {
+    return null;
+  }
+  for (let index = 0; index < rows.length; index += 1) {
+    const row = rows[index];
+    if (row.isPlanned && UNSTARTED_STATUSES.has(pyStr(row.status).toLowerCase())) {
+      return index;
+    }
+  }
+  return null;
+}
+function deriveProgress(evidence, flight) {
+  const rows = evidence.map((item) => item.row);
+  const active = flight.inFlight ? activeStepIndex(rows) : null;
+  const derived = [];
+  let previousCompletion = flight.startedAt;
+  evidence.forEach((item, index) => {
+    const isActive = index === active;
+    const hasStarted = isActive || item.isStep;
+    derived.push({
+      ...item.row,
+      isActive,
+      startedAt: hasStarted ? previousCompletion : null
+    });
+    if (isStepRow(item))
+      previousCompletion = item.completion;
+  });
+  return derived;
 }
 var SESSION_HEAD_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+(\d+))?\s*:\s*(.*)$/gm;
 var STEP_RE = /^(\s{0,3})(\d+)\.\s+\S/gm;
@@ -10050,7 +10140,7 @@ function planMatchesSpec(plan, specSteps) {
   const seeded = plan.map((entry) => pyStr(entry.description));
   return seeded.length === specSteps.length && seeded.every((text, i2) => text === specSteps[i2]);
 }
-function buildStepRows(entries, sessionNumber, specSteps) {
+function buildStepRows(entries, sessionNumber, specSteps, flight = NOT_IN_FLIGHT) {
   const mine = entries.filter(
     (entry) => entry && typeof entry === "object" && !Array.isArray(entry) && entry.sessionNumber === sessionNumber
   );
@@ -10058,10 +10148,8 @@ function buildStepRows(entries, sessionNumber, specSteps) {
     return [];
   const plan = collapseByStepKey(mine.filter((e) => e.kind === PLAN_STEP_KIND));
   const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
-  if (plan.length === 0) {
-    return real.map((entry) => rowFromEntry(entry, false));
-  }
-  return reconcile(plan, real, planMatchesSpec(plan, specSteps));
+  const evidence = plan.length === 0 ? real.map((entry) => evidenceOf(entry, false)) : reconcile(plan, real, planMatchesSpec(plan, specSteps));
+  return deriveProgress(evidence, flight);
 }
 function humanizeStepKey(stepKey) {
   const text = pyStr(stepKey).replace(/[_-]/g, " ").trim();
@@ -10527,7 +10615,7 @@ function parseUatChecklist(checklistPath) {
   }
   return { totalItems: items.length, pendingItems: pending, e2eRefs: Array.from(e2eRefs) };
 }
-function buildStepLedger(state, currentSession, entries, specPath) {
+function buildStepLedger(state, currentSession, entries, specPath, sessionState) {
   if (state !== "in-progress")
     return null;
   if (currentSession === null || !Array.isArray(entries))
@@ -10550,9 +10638,11 @@ function buildStepLedger(state, currentSession, entries, specPath) {
       stepKey: e.stepKey,
       description: e.description,
       status: e.status,
-      kind: e.kind
+      kind: e.kind,
+      dateTime: e.dateTime
     })),
-    specSteps
+    specSteps,
+    flight: sessionFlightFacts(sessionState, currentSession)
   };
 }
 var CLOSE_OBLIGATIONS_REL = path6.join(
@@ -10733,6 +10823,7 @@ function readSessionSets(root) {
     let ledgerSessions = null;
     let schemaVersionOnDisk = null;
     let rawStepEntries = null;
+    let normalizedState = null;
     const eventsPath = path6.join(dir, "session-events.jsonl");
     if (fs6.existsSync(activityPath)) {
       try {
@@ -10751,7 +10842,8 @@ function readSessionSets(root) {
     }
     {
       try {
-        const rawSd = fs6.existsSync(statePath) ? JSON.parse(fs6.readFileSync(statePath, "utf8")) : inferredState ?? inferStateInMemory(dir);
+        const stateFileOnDisk = fs6.existsSync(statePath);
+        const rawSd = stateFileOnDisk ? JSON.parse(fs6.readFileSync(statePath, "utf8")) : inferredState ?? inferStateInMemory(dir);
         if (rawSd && typeof rawSd === "object" && !Array.isArray(rawSd)) {
           const sv = rawSd.schemaVersion;
           schemaVersionOnDisk = typeof sv === "number" ? sv : null;
@@ -10788,6 +10880,7 @@ function readSessionSets(root) {
           inferredState !== null ? /* @__PURE__ */ new Map() : void 0
         );
         ledgerSessions = sd.sessions ?? null;
+        normalizedState = stateFileOnDisk ? sd : null;
         let progressTotal = null;
         let progressCompleted = null;
         let progressCurrent = null;
@@ -10866,7 +10959,8 @@ function readSessionSets(root) {
       state,
       liveSession?.currentSession ?? null,
       rawStepEntries,
-      specPath
+      specPath,
+      normalizedState
     );
     sets.push({
       name: entry.name,
@@ -22066,7 +22160,8 @@ function stepNodes(node) {
   return buildStepRows(
     ledger.entries,
     ledger.sessionNumber,
-    ledger.specSteps
+    ledger.specSteps,
+    ledger.flight
   ).map((row, position) => ({
     kind: "step",
     set: node.set,
@@ -22335,27 +22430,45 @@ function sessionTooltip(node, stepCount) {
 }
 function stepDescriptor(node) {
   const { row } = node;
-  const glyph = glyphStatusOf(row.status);
+  const status = effectiveStatusOf(row);
+  const glyph = glyphStatusOf(status);
   const tooltipLines = [`**${stepRowLabel(row)}**`];
-  const state = row.isPlanned ? "planned \u2014 not started" : String(row.status || "unknown").replace(/[-_]/g, " ");
+  const state = row.isActive ? "in progress \u2014 derived from the plan, not yet logged" : row.isPlanned ? "planned \u2014 not started" : String(row.status || "unknown").replace(/[-_]/g, " ");
   tooltipLines.push("", state);
+  if (row.startedAt)
+    tooltipLines.push("", `Started ${row.startedAt}`);
   const description = String(row.description || "").trim();
   if (description)
     tooltipLines.push("", description);
+  const started = stepStartLabel(row.startedAt);
   return {
     // `position` disambiguates: an unplanned logged step can append
     // alongside a planned row that carries the same key.
     id: `step:${node.set.name}/${node.session.number}/${node.position}`,
     label: stepRowLabel(row),
+    ...started ? { description: started } : {},
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[glyph] },
     contextValue: tokenString([
       NODE_TOKEN.step,
       `step-${glyph}`,
-      row.isPlanned ? "step-planned" : "step-logged"
+      row.isPlanned ? "step-planned" : "step-logged",
+      // A derived active step is planned AND running; a `when` clause that
+      // wants one or the other can say so without re-deriving anything.
+      ...row.isActive ? ["step-active"] : []
     ]),
     collapsible: "none"
   };
+}
+function stepStartLabel(startedAt) {
+  if (!startedAt)
+    return "";
+  const when = new Date(startedAt);
+  if (Number.isNaN(when.getTime()))
+    return "";
+  const hh = String(when.getHours()).padStart(2, "0");
+  const mm = String(when.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}-`;
 }
 var CLOSE_PREFLIGHT_COMMAND = "python -m ai_router.close_preflight --session-set-dir <set> --write";
 function asOfLabel(generatedAt) {

@@ -63,6 +63,7 @@ import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 import {
   StepRow,
   buildStepRows,
+  effectiveStatusOf,
   glyphStatusOf,
   humanizeStepKey,
   stepRowLabel,
@@ -278,6 +279,7 @@ export function stepNodes(node: SessionNode): StepNode[] {
     ledger.entries,
     ledger.sessionNumber,
     ledger.specSteps,
+    ledger.flight,
   ).map((row, position) => ({
     kind: "step",
     set: node.set,
@@ -756,44 +758,95 @@ function sessionTooltip(node: SessionNode, stepCount: number): string {
  * text is in the tooltip. This is the same trade
  * `session_checklist._summarize` makes for the terminal.
  *
- * The DESCRIPTION slot is empty on every step row. It carried the
- * `<- here` marker until Set 115 S4; the operator ruled the marker out
- * (Set 120 S3) and what replaces it is the ICON: the step whose recorded
- * status is `in-progress` gets the in-progress glyph, which is a fact the
- * ledger states rather than a row the renderer picked. Two steps can be
- * in flight at once, which a single-valued marker could not represent,
- * and zero can — a real answer the marker had to fake.
+ * The DESCRIPTION slot carried the `<- here` marker until Set 115 S4, and
+ * has been empty on every step row since the operator ruled the marker out
+ * (Set 120 S3). Set 127 S2 fills it with the step's derived START TIME
+ * (`12:06-`) — the slot vacated by a worse answer to the same question, so
+ * nothing is displaced. A row with no derived start renders no description
+ * at all, which is what stops a seeded row's registration timestamp being
+ * shown as a start.
  *
  * The ICON is the same authored lifecycle glyph the session and set rows
- * use, mapped from the step's status by `glyphStatusOf` — "the same status
- * glyphs" is the spec's phrase, and it is met by reusing the assets rather
- * than by inventing a fifth-level vocabulary.
+ * use — "the same status glyphs" is the spec's phrase, met by reusing the
+ * assets rather than by inventing a fifth-level vocabulary.
+ *
+ * Everything that reads a status reads `effectiveStatusOf`, not
+ * `row.status`: Set 127 derives the in-progress state for the step an
+ * in-flight session is actually on, and a surface that read the raw record
+ * would call that step "not started" in prose while the icon beside it said
+ * it was running (`L-069-1` — one predicate, every consumer).
  */
 export function stepDescriptor(node: StepNode): RowDescriptor {
   const { row } = node;
-  const glyph = glyphStatusOf(row.status);
+  const status = effectiveStatusOf(row);
+  const glyph = glyphStatusOf(status);
   const tooltipLines = [`**${stepRowLabel(row)}**`];
-  const state = row.isPlanned
-    ? "planned — not started"
-    : String(row.status || "unknown").replace(/[-_]/g, " ");
+  // A DERIVED active step is still `isPlanned` — nothing has logged against
+  // it, which is precisely why it was derived — so the planned branch must
+  // not answer first, or the tooltip would read "planned — not started" on
+  // the row the icon shows as running.
+  const state = row.isActive
+    ? "in progress — derived from the plan, not yet logged"
+    : row.isPlanned
+      ? "planned — not started"
+      : String(row.status || "unknown").replace(/[-_]/g, " ");
   tooltipLines.push("", state);
+  // The full timestamp goes here, where width is free, and it is shown even
+  // when the narrow slot cannot render it (an unparseable value): the
+  // description is a convenience, the tooltip is the record.
+  if (row.startedAt) tooltipLines.push("", `Started ${row.startedAt}`);
   const description = String(row.description || "").trim();
   if (description) tooltipLines.push("", description);
 
+  const started = stepStartLabel(row.startedAt);
   return {
     // `position` disambiguates: an unplanned logged step can append
     // alongside a planned row that carries the same key.
     id: `step:${node.set.name}/${node.session.number}/${node.position}`,
     label: stepRowLabel(row),
+    ...(started ? { description: started } : {}),
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[glyph] },
     contextValue: tokenString([
       NODE_TOKEN.step,
       `step-${glyph}`,
       row.isPlanned ? "step-planned" : "step-logged",
+      // A derived active step is planned AND running; a `when` clause that
+      // wants one or the other can say so without re-deriving anything.
+      ...(row.isActive ? ["step-active"] : []),
     ]),
     collapsible: "none",
   };
+}
+
+/**
+ * A derived start time as the row shows it: `12:06-`, local, 24-hour, hour
+ * and minute only, with a trailing dash marking it a START rather than a
+ * completion (operator rulings, 2026-08-12).
+ *
+ * Three deliberate absences, all ruled on at spec authoring:
+ *
+ *   * **no end time** — a finished step's end is the next row's start, one
+ *     line below it, so rendering both is duplicate data on every row;
+ *   * **no date, and no midnight special case** — it would cost width on
+ *     every row to disambiguate a case most sets never hit, and the
+ *     giveaway is already free (the next row's hour being SMALLER says the
+ *     day rolled over);
+ *   * **nothing at all when there is no derived start** — the slot stays as
+ *     empty as it is today rather than showing a placeholder.
+ *
+ * An UNPARSEABLE timestamp also renders nothing here, unlike `asOfLabel`,
+ * which falls back to the raw string: this slot is a few characters wide
+ * beside a label, and a raw ISO string in it would be noise. The tooltip
+ * carries the raw value, so the fact is not lost.
+ */
+export function stepStartLabel(startedAt: string | null): string {
+  if (!startedAt) return "";
+  const when = new Date(startedAt);
+  if (Number.isNaN(when.getTime())) return "";
+  const hh = String(when.getHours()).padStart(2, "0");
+  const mm = String(when.getMinutes()).padStart(2, "0");
+  return `${hh}:${mm}-`;
 }
 
 // ---------------------------------------------------------------------------

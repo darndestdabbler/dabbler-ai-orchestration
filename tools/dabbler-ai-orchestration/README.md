@@ -259,6 +259,16 @@ Sign-up links and a full prerequisites checklist live in the
   with the surrounding context still a scroll away. Right-click offers
   **Copy Run Prompt** — on the one session the trigger phrase actually
   runs, so a prompt copied from a row always starts that row's session.
+- **The in-flight session shows which step it is ON, and since when.**
+  Expand it and the step being worked carries the in-progress glyph and
+  a grey start time (`12:06-`) at the end of the row; finished steps are
+  ticks with their own start times, and steps that have not started show
+  nothing. Both facts are *derived* from records the panel already reads
+  — no writer produces them and nothing has to be remembered — so they
+  also light up on sets that closed months ago. Exactly one step is ever
+  marked, and only while the session really is in flight: the moment a
+  step is logged `in-progress`, `blocked` or `failed`, the record answers
+  and the derivation stands down.
 - **The in-flight session shows what still stands between it and close.**
   Expand it and, under its steps, a **Close-out** row summarises the
   obligations `close_session` will check (`1 blocking, 3 advisory`, or

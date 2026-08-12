@@ -14,12 +14,20 @@
 // What only a real host can show is what an operator would actually
 // report: that the twisty exists on the row that has steps and is ABSENT
 // on the rows that do not, that the step in flight is painted with the
-// in-progress glyph (Set 115 S4 — the `<- here` marker is gone from both
-// languages), that the close-out obligations the shipping Python writer
-// serialized are the ones the tree renders, and — the one Set 114 S3's
-// step 3 is really about — that the list FOLLOWS THE LEDGER when the
-// ledger changes underneath it, rather than freezing at whatever it
-// showed when the panel was opened.
+// in-progress glyph — the one the ledger names, or, since Set 127 S2,
+// the one DERIVED for a session whose ledger names none — that the
+// close-out obligations the shipping Python writer serialized are the
+// ones the tree renders, and — the one Set 114 S3's step 3 is really
+// about — that the list FOLLOWS THE LEDGER when the ledger changes
+// underneath it, rather than freezing at whatever it showed when the
+// panel was opened.
+//
+// Set 127 S2 note: the fixtures below are built by the SHIPPING
+// `start_session`, so the plan they seed is entirely `pending` on disk.
+// Every in-progress glyph these scenarios assert on an unlogged row is
+// therefore derived at read time, from a file nothing wrote it to — which
+// is the whole claim of that set, and it can only be proven end to end
+// here, where Python writes the state and TypeScript paints it.
 
 import { expect, test } from "@playwright/test";
 import {
@@ -93,13 +101,30 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await expect(treeRow(pane, "Build the thing")).toBeVisible();
     await expect(treeRow(pane, "Verify close")).toBeVisible();
 
-    // Set 115 S4: nothing says "here". A seeded plan is entirely pending,
-    // so every row carries the not-started glyph and NO row claims to be
-    // where the session is — which is the truth, and is the answer the
-    // removed marker could not give (it put "<- here" on step 1 whether
-    // or not anything had started).
+    // Set 127 S2: a seeded plan is entirely `pending` on disk, and the
+    // Explorer now says where the session IS anyway — the first planned
+    // row nothing has been logged against carries the in-progress glyph,
+    // derived from rows the tree already reads. This is the operator's
+    // reported defect, asserted in a real host: before this set the same
+    // fixture painted three identical not-started rows and could not tell
+    // "step 1 has not been started" from "step 1 has been running for
+    // forty minutes".
+    await expectFileIcon(treeRow(pane, "Register"), "in-progress.svg");
+    // EXACTLY one, and only that one. A second derived row would be the
+    // two-current-rows defect the removed `<- here` marker produced.
+    await expectFileIcon(treeRow(pane, "Build the thing"), "not-started.svg");
+    await expectFileIcon(treeRow(pane, "Verify close"), "not-started.svg");
+    // And the marker itself is still gone — what replaced it is a glyph
+    // and a timestamp, not a text arrow in the description column.
     await expect(treeRows(pane).filter({ hasText: "<- here" })).toHaveCount(0);
-    await expectFileIcon(treeRow(pane, "Register"), "not-started.svg");
+    // The follow-up question the operator asked next: SINCE WHEN. The
+    // active row shows the session's own start in the dimmed description
+    // slot, `HH:MM-` — a start, not a completion.
+    await expect(treeRow(pane, "Register")).toContainText(/\d{2}:\d{2}-/);
+    // A row that has not started shows no time at all. A seeded row's
+    // `dateTime` is REGISTRATION time, identical across every row, and
+    // rendering it would be a fresh wrong signal (operator ruling 3).
+    await expect(treeRow(pane, "Verify close")).not.toContainText(/\d{2}:\d{2}-/);
   });
 
   test("a session with no steps to show is a leaf, not a dead twisty", async () => {
@@ -137,7 +162,10 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await revealSetRow(pane, { bucket: "In Progress", set: "114-live-refresh" });
     await expandTreeRow(pane, "114-live-refresh");
     await expandTreeRow(pane, "Fixture session 1");
-    await expectFileIcon(treeRow(pane, "Register"), "not-started.svg");
+    // Set 127 S2: nothing is logged yet, so the derived active step is
+    // the first planned row. This is the "before" half of the assertion
+    // below — the signal has to MOVE when the ledger moves.
+    await expectFileIcon(treeRow(pane, "Register"), "in-progress.svg");
 
     // A real logged step lands in `activity-log.json` — written by the
     // shipping fixture path, not hand-rolled. It is logged as the spec's
@@ -164,6 +192,11 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     // painted a minute ago would still show three not-started rows.
     await expectFileIcon(logged, "in-progress.svg");
     await expect(treeRows(pane).filter({ hasText: "<- here" })).toHaveCount(0);
+    // Set 127 S2: the record now answers "where is this session", so the
+    // DERIVATION stands down — "Register" goes back to not-started rather
+    // than staying lit beside the logged step. Exactly one row is ever
+    // current, and this is the moment the answer changes hands.
+    await expectFileIcon(treeRow(pane, "Register"), "not-started.svg");
     // Nothing was dropped in either direction, and expansion survived the
     // refresh: stable row ids, proven in the host.
     await expect(treeRow(pane, "Verify close")).toBeVisible();

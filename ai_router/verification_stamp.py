@@ -182,6 +182,21 @@ STAMP_FIELDS = (
     "verdict",
 )
 
+# Set 123 S2: stamp keys that are legitimately ABSENT on most rows, so they
+# cannot join :data:`STAMP_FIELDS` — ``validate_stamped_row``'s presence
+# sweep requires every field there to be truthy, and a cross-provider row
+# carries no qualification by design (omit-null).
+#
+# The metrics writer must still persist them, or the field dies between
+# ``complete_stamp`` and the JSONL row and the close gate then rejects
+# exactly the same-provider verdict this machinery exists to permit (S2
+# discovery finding: computed but never persisted). Kept as a named tuple
+# beside STAMP_FIELDS rather than an ad-hoc key in metrics.py so the writer
+# and the validator keep reading one definition (L-069-1).
+STAMP_OPTIONAL_FIELDS = (
+    "verification_qualification",
+)
+
 # Git's well-known empty-tree object — the diff base for a session in a
 # repo with no pre-session commit (a fresh repo's first session): the
 # session's work IS the whole tree, and diffing against the empty tree
@@ -720,11 +735,12 @@ def build_stamp(
 ) -> dict:
     """Assemble the producer-side stamp (pre-route).
 
-    ``verifier_model`` and ``artifact_sha256`` are deliberately absent:
-    ``route()`` fills them at record time — the verifier model is only
-    known post-escalation, and the artifact hash is the hash of the
-    routed response itself. Raises ``ValueError`` on a source outside
-    :data:`STAMP_SOURCES` (the producer set is closed by design).
+    ``verifier_model``, ``artifact_sha256`` and ``verification_qualification``
+    are deliberately absent: ``route()`` fills them at record time — the
+    verifier model is only known post-escalation, the artifact hash is the
+    hash of the routed response itself, and the qualification depends on
+    which provider actually answered. Raises ``ValueError`` on a source
+    outside :data:`STAMP_SOURCES` (the producer set is closed by design).
     """
     if source not in STAMP_SOURCES:
         raise ValueError(
@@ -759,7 +775,8 @@ def build_stamp(
 
 
 def complete_stamp(
-    stamp: dict, *, verifier_model: str, response_content: str
+    stamp: dict, *, verifier_model: str, response_content: str,
+    verifier_provider: Optional[str] = None,
 ) -> dict:
     """Return the record-time stamp: producer fields + the
     route()-filled fields — ``verifier_model``, ``artifact_sha256``
@@ -767,11 +784,26 @@ def complete_stamp(
     writes), and the ``verdict`` parsed from those same bytes
     (I-084-S2-7: the verdict is stamped from the content the artifact
     hash binds, so a later hand-flipped disposition claim can never
-    ride this row)."""
+    ride this row).
+
+    Set 123 S2: when *verifier_provider* is supplied and equals the stamp's
+    ``orchestrator_effective_provider``, the row also carries
+    ``verification_qualification: "same-provider"``. Omit-null — a
+    cross-provider row never grows the key — and self-declared on purpose:
+    :func:`validate_stamped_row` accepts a same-provider row **only** when
+    it carries this field, so a weaker verdict cannot be read later as a
+    corroborated one.
+    """
     try:
-        from .verification import parse_verification_response
+        from .verification import (
+            classify_verification_qualification,
+            parse_verification_response,
+        )
     except ImportError:
-        from verification import parse_verification_response  # type: ignore[no-redef]
+        from verification import (  # type: ignore[no-redef]
+            classify_verification_qualification,
+            parse_verification_response,
+        )
 
     completed = dict(stamp)
     completed["verifier_model"] = verifier_model
@@ -780,6 +812,11 @@ def complete_stamp(
     )
     verdict, _issues = parse_verification_response(response_content)
     completed["verdict"] = verdict
+    qualification = classify_verification_qualification(
+        verifier_provider, stamp.get("orchestrator_effective_provider")
+    )
+    if qualification:
+        completed["verification_qualification"] = qualification
     return completed
 
 
@@ -1005,7 +1042,11 @@ def validate_stamped_row(
        different row's model fails).
     5. ``orchestrator_effective_provider`` equals the gate's own
        resolution of the session orchestrator AND differs from the
-       verifier's resolved provider (the F2 exclusion, re-checked).
+       verifier's resolved provider (the F2 exclusion, re-checked) —
+       unless the row declares
+       ``verification_qualification: "same-provider"`` (Set 123 S2),
+       which is checked as a bijection: the flag must be present exactly
+       when the two providers coincide.
     6. ``artifact_path`` names an ``s<N>-verification*.md`` file at
        the session-set root whose bytes hash to ``artifact_sha256``.
     7. ``package_version`` is a non-empty string.
@@ -1088,6 +1129,19 @@ def validate_stamped_row(
         from orchestrator_identity import (  # type: ignore[no-redef]
             resolve_model_provider,
         )
+    # Set 123 S2: imported locally for the same reason as
+    # ``parse_verification_response`` above — ``verification`` is not a
+    # module-level dependency of this one.
+    try:
+        from .verification import (  # type: ignore[import-not-found]
+            QUALIFICATION_SAME_PROVIDER,
+            VERDICT_QUALIFICATIONS,
+        )
+    except ImportError:
+        from verification import (  # type: ignore[no-redef]
+            QUALIFICATION_SAME_PROVIDER,
+            VERDICT_QUALIFICATIONS,
+        )
     verifier_provider = resolve_model_provider(
         row.get("model"), models_registry
     )
@@ -1108,10 +1162,36 @@ def validate_stamped_row(
             f"the resolved session orchestrator "
             f"({orchestrator_effective_provider!r})"
         )
-    if verifier_provider == orchestrator_effective_provider:
+    # Set 123 S2: the exclusion is still the default, but a DIRECT_API
+    # project with no different-provider key may verify same-provider —
+    # provided the row SAYS SO (operator ruling, 2026-08-11; journaled as a
+    # verification-reduction). The check is a bijection, enforced both ways,
+    # because a one-way check would let the flag become decorative: a
+    # same-provider row without the flag is the old silent failure, and a
+    # cross-provider row WITH the flag is a verdict understating itself,
+    # which corrodes the field's meaning just as surely.
+    qualification = row.get("verification_qualification")
+    if qualification is not None and qualification not in VERDICT_QUALIFICATIONS:
+        return False, (
+            f"stamp verification_qualification {qualification!r} is not a "
+            f"known qualification (expected one of "
+            f"{', '.join(sorted(VERDICT_QUALIFICATIONS))}, or absent)"
+        )
+    same_provider = verifier_provider == orchestrator_effective_provider
+    if same_provider and qualification != QUALIFICATION_SAME_PROVIDER:
         return False, (
             f"the verifier resolves to the orchestrator's own provider "
-            f"({verifier_provider!r}) — not cross-provider"
+            f"({verifier_provider!r}) — not cross-provider, and the row "
+            f"does not declare verification_qualification="
+            f"{QUALIFICATION_SAME_PROVIDER!r}"
+        )
+    if not same_provider and qualification == QUALIFICATION_SAME_PROVIDER:
+        return False, (
+            f"the row declares verification_qualification="
+            f"{QUALIFICATION_SAME_PROVIDER!r} but its verifier "
+            f"({verifier_provider!r}) differs from the orchestrator "
+            f"({orchestrator_effective_provider!r}) — a cross-provider "
+            "verdict must not understate itself"
         )
 
     # 6. Artifact binding.

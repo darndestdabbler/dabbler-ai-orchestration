@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "5d7a61158e30a48c5433fae9e5b6af08252de92f",
+  "fixedTree": "0f468b602519ba17ba68b3de9770e8aef78d916d",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T00:39:22.499743+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The DIRECT_API precondition is checked after dispatch-time config loading still requires every enabled provider key. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_rout ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In a committed DIRECT_API project with only the orchestrator provider key present and at least one other enabled provider missing its key, session verification reaches the same-provider verifier path with a warning instead of failing during config/API-key validation.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `verify_session` still passes the orchestrator provider as an explicit exclusion, so the degraded route cannot select the same provider. - **Category:** Correctness - **Severity:** Major - **Eviden ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Through the real verify_session CLI path, a degraded committed DIRECT_API session must not pass an effective exclusion set that still excludes the orchestrator provider after route() has authorized the same-provider fallback.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** The same-provider qualification is computed but never persisted to the metrics stamp row. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/verification_stamp.py:15 ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec(\\\"import json, os, sys, tempfile\\nsys.path.insert(0, 'ai_router')\\nfrom metrics import record_call\\nfrom verification_stamp import complete_stamp\\nwith tempfile.TemporaryDirectory() as d:\\n    path = os.path.join(d, 'metrics.jsonl')\\n    os.environ['AI_ROUTER_METRICS_PATH'] = path\\n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED\\\\n', verifier_provider='anthropic')\\n    record_call({'metrics': {'enabled': True}}, call_type='route', task_type='session-verification', model='model', provider='anthropic', tier=1, complexity_score=1, generation_params={}, input_tokens=1, output_tokens=1, cost_usd=0, elapsed_seconds=0, escalated=False, stop_reason='stop', session_set='set', session_number=1, stamp=stamp)\\n    row = json.loads(open(path, encoding='utf-8').readline())\\n    assert row.get('verification_qualification') == 'same-provider', row\\\")\"",
+      "criterionSha256": "3a2cf5d42f23bd656756eb9d71af243c0c473270f605e70e456caeb5dc24d65b",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec(\"import json, os, sys, tempfile\\nsys.path.insert(0, 'ai_router')\\nfrom metrics import record_call\\nfrom verification_stamp import complete_stamp\\nwith tempfile.TemporaryDirectory() as d:\\n    path = os.path.join(d, 'metrics.jsonl')\\n    os.environ['AI_ROUTER_METRICS_PATH'] = path\\n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED\\n', verifier_provider='anthropic')\\n    record_call({'metrics': {'enabled': True}}, call_type='route', task_type='session-verification', model='model', provider='anthropic', tier=1, complexity_score=1, generation_params={}, input_tokens=1, output_tokens=1, cost_usd=0, elapsed_seconds=0, escalated=False, stop_reason='stop', session_set='set', session_number=1, stamp=stamp)\\n    row = json.loads(open(path, encoding='utf-8').readline())\\n    assert row.get('verification_qualification') == 'same-provider', row\")"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec(\"import json, os, sys, tempfile/nsys.path.insert(0, 'ai_router')/nfrom metrics import record_call/nfrom verification_stamp import complete_stamp/nwith tempfile.TemporaryDirectory() as d:/n    path = os.path.join(d, 'metrics.jsonl')/n    os.environ['AI_ROUTER_METRICS_PATH'] = path/n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED/n', verifier_provider='anthropic')/n    record_call({'metrics': {'enabled': True}}, call_type='route', task_type='session-verification', model='model', provider='anthropic', tier=1, complexity_score=1, generation_params={}, input_tokens=1, output_tokens=1, cost_usd=0, elapsed_seconds=0, escalated=False, stop_reason='stop', session_set='set', session_number=1, stamp=stamp)/n    row = json.loads(open(path, encoding='utf-8').readline())/n    assert row.get('verification_qualification') == 'same-provider', row\")"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 2276,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec(\"import json, os, sys, tempfile\\nsys.path.insert(0, 'ai_router')\\nfrom metrics import record_call\\nfrom verification_stamp import complete_stamp\\nwith tempfile.TemporaryDirectory() as d:\\n    path = os.path.join(d, 'metrics.jsonl')\\n    os.environ['AI_ROUTER_METRICS_PATH'] = path\\n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED\\n', verifier_provider='anthropic')\\n    record_call({'metrics': {'enabled': True}}, call_type='route', task_type='session-verification', model='model', provider='anthropic', tier=1, complexity_score=1, generation_params={}, input_tokens=1, output_tokens=1, cost_usd=0, elapsed_seconds=0, escalated=False, stop_reason='stop', session_set='set', session_number=1, stamp=stamp)\\n    row = json.loads(open(path, encoding='utf-8').readline())\\n    assert row.get('verification_qualification') == 'same-provider', row\")\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED\n                                                                                                                      ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "fixed": {
+        "exitCode": 1,
+        "outputChars": 2276,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec(\"import json, os, sys, tempfile\\nsys.path.insert(0, 'ai_router')\\nfrom metrics import record_call\\nfrom verification_stamp import complete_stamp\\nwith tempfile.TemporaryDirectory() as d:\\n    path = os.path.join(d, 'metrics.jsonl')\\n    os.environ['AI_ROUTER_METRICS_PATH'] = path\\n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED\\n', verifier_provider='anthropic')\\n    record_call({'metrics': {'enabled': True}}, call_type='route', task_type='session-verification', model='model', provider='anthropic', tier=1, complexity_score=1, generation_params={}, input_tokens=1, output_tokens=1, cost_usd=0, elapsed_seconds=0, escalated=False, stop_reason='stop', session_set='set', session_number=1, stamp=stamp)\\n    row = json.loads(open(path, encoding='utf-8').readline())\\n    assert row.get('verification_qualification') == 'same-provider', row\")\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    stamp = complete_stamp({'orchestrator_effective_provider': 'anthropic'}, verifier_model='model', response_content='VERIFIED\n                                                                                                                      ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "baselinePassed": false,
+      "fixedPassed": false,
+      "outcome": "still-failing",
+      "reason": "the criterion still FAILS on the fixed tree: the fix does not satisfy the verifier's own acceptance condition"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "** The same-provider fallback is not actually reachable/usable for the target Direct API degraded case. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/__init__.py:1 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In a committed DIRECT_API project whose orchestrator effective provider is anthropic and whose only available provider key is DABBLER_ANTHROPIC_API_KEY, session-verification must warn, route to an Anthropic verifier, and write the same-provider qualification instead of raising a missing OpenAI/Gemini key error.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

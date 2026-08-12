@@ -47,6 +47,11 @@
       "type": "string",
       "minLength": 1
     },
+    "verification_qualification": {
+      "description": "Set 123 S2, omit-null. Present only when the verdict beside it is real but WEAKER than the cross-provider standard: 'same-provider' means every verifier call resolved to the orchestrator's own effective provider, so the verdict is not independently corroborated. Written by verify_session (and the close backstop) for a project whose committed verify type is DIRECT_API and which holds no usable API key outside its orchestrator's provider. The vocabulary is CLOSED and fails closed -- unlike verification_verdict, whose non-canonical tokens are warned-but-accepted, an unrecognized qualification is a validation error, because a token nobody can interpret does this field's only job (letting a later reader tell a corroborated verdict from an uncorroborated one) worse than no token at all. The authoritative copy is the paired metrics stamp row, where the close gate enforces it as a bijection against the verifier's registry-resolved provider.",
+      "type": "string",
+      "enum": ["same-provider"]
+    },
     "lessons_cited": {
       "type": "array",
       "items": { "type": "string" }

@@ -6,7 +6,11 @@
 > `ai_router/tests/test_verify_type_resolution.py`. Run
 > `python -m ai_router.verify_type` to see which branch answers for a
 > given project. The `DIRECT_API` precondition and the qualified verdict
-> below are **Session 2**; retiring the webview is **Session 3**.
+> below are **implemented by Session 2** in
+> [`ai_router/verification.py`](../../ai_router/verification.py) and
+> [`ai_router/verification_stamp.py`](../../ai_router/verification_stamp.py),
+> with falsifiers in `ai_router/tests/test_qualified_verdict.py`;
+> retiring the webview is **Session 3**.
 > This replaced the "detect → confirm → persist" placeholder that was R3
 > in [`the target-state proposal`](../proposals/2026-08-10-smaller-framework-target-state.md#3-3-both-transports-r3),
 > and it is the operator's design, not an inferred one.
@@ -79,6 +83,43 @@ ruling, verbatim:
 
 Not a new gate (Set 116's standing rule) — a **field on the record**.
 
+### How Session 2 implemented it
+
+`ai_router.verification.check_direct_api_precondition` answers the
+question; `route()` acts on it. Three things the design did not anticipate,
+each settled during implementation:
+
+- **The status quo was not "no verification."** When no different-provider
+  verifier existed, `verify_session` hard-blocked with
+  `verification_unavailable`, whose only exit was
+  `close_session --manual-verify` with an operator attestation naming a
+  different-provider surface — and `verification_stamp.validate_stamped_row`
+  check 5 *machine-rejected* any row whose verifier resolved to the
+  orchestrator's provider. Proceeding therefore meant relaxing a close
+  gate, not merely skipping a warning. The operator re-ruled on that
+  sharper question in session (2026-08-11) and chose the automatic path;
+  the decision is journaled in Set 123's `decisions.jsonl` with
+  `verification_effect: reduces` and an operator attestation, because
+  reducing verification is never self-authorized.
+- **The permission is derived inside `route()`, never passed to it.** A
+  parameter would have re-opened `I-084-S1-3` (a caller-supplied exclusion
+  list that omits the orchestrator's provider). No caller can *ask* for a
+  same-provider verification; only the project's committed answer plus the
+  machine's actual key set can produce one, and it warns on stderr when it
+  does. An **uncommitted** `AI_ORCHESTRATION_VERIFY_TYPE` cannot trigger it
+  — a suggestion that could weaken every verdict on a machine would be the
+  action-at-a-distance branch 2 exists to avoid.
+- **The flag is enforced as a bijection.** The close gate accepts a
+  same-provider row only when it carries
+  `verification_qualification: "same-provider"`, *and* rejects a
+  cross-provider row that carries it. A one-way check would let the flag be
+  attached unconditionally, at which point it would distinguish nothing —
+  and distinguishing is its only job (`L-112-1`).
+
+Scope stayed narrow: a Copilot seat keeps its fail-closed
+`ProvenanceUnavailable` contract (Sets 083/084) untouched, because the
+operator's ruling was about `DIRECT_API` key availability, not about seats.
+
 ## What already exists, and must be reused rather than rebuilt
 
 A future set should audit these before writing anything:
@@ -119,10 +160,22 @@ is not helpful*, rather than picking a target number.
    `.git`), so a project never inherits an unrelated parent directory's
    answer. It is committed — project configuration, not machine state.
    Session 3 names it in the three bootstrap files.
-2. **How does the qualified verdict surface?** Open — **Session 2** owns it.
-   A field on the verdict record is the cheap answer; whether
-   `close_session` prints it, and whether the Work Explorer shows it, is a
-   separate call.
+2. **How does the qualified verdict surface?** **Settled (Set 123 S2):** as
+   an omit-null field on the three **router-owned** verdict records — the
+   metrics stamp row (`verification_qualification`, the machine-checked
+   copy the close gate enforces), the findings envelope
+   (`verificationQualification`), and `disposition.json`
+   (`verification_qualification`, actively *removed* when a later
+   unqualified round supersedes a qualified one, so a stale weaker claim
+   cannot outlive the verdict it described). `verify_session` prints a
+   warning on stderr naming the round as qualified.
+
+   It is deliberately **not** written to `session-state.json`, and the Work
+   Explorer does not show it: that file is the Explorer's surface, and
+   operator decision **P4** keeps orchestrator/verifier provenance out of
+   the Explorer. Promoting it there is a later set's call if the P4 line
+   ever moves — the placement decision is journaled in Set 123's
+   `decisions.jsonl`.
 3. **What happens when the file and the environment disagree?**
    **Settled (Set 123 S1):** the file wins, silently, and the
    implementation says so rather than leaving it implicit —

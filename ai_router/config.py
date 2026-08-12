@@ -127,7 +127,7 @@ def _resolve_config_path(path: str | None = None) -> str:
 
 
 def validate_provider_api_keys(config: dict) -> None:
-    """Raise unless every enabled provider's API key is present.
+    """Raise unless this machine can dispatch to **some** enabled provider.
 
     **Called at DISPATCH, not at config load** (Set 111 S2, operator
     decision 2026-08-07). There are two clean populations of user, and a
@@ -144,19 +144,81 @@ def validate_provider_api_keys(config: dict) -> None:
     reports, registry checks that touch no provider at all — fail on a
     perfectly healthy Copilot seat, complaining about credentials nothing
     in that code path would have used.
+
+    **Set 123 S2 — a keyless provider is DISABLED, not fatal.** This used
+    to raise on the first enabled provider missing a key, which made the
+    single-key ``DIRECT_API`` machine impossible to serve: that is the exact
+    machine the operator's same-provider ruling exists for, and it died here
+    (during ``_init()``) long before any precondition or verifier selection
+    could act on it. A provider whose key is absent cannot be dispatched to,
+    so the honest repair is to mark it disabled and say so, leaving the
+    config's live provider set equal to what the machine can actually reach
+    — which also stops model selection pinning a verifier the process could
+    never call.
+
+    What still raises is the case that is genuinely fatal: **no** enabled
+    provider has a key, so a direct-API dispatch has nowhere to go. The
+    message names every variable that was missing, because at that point all
+    of them are actionable.
     """
     if (config.get("transport") or {}).get("profile") == "copilot-cli":
         return
+
+    keyed: list[str] = []
+    keyless: list[tuple[str, str]] = []
     for name, provider in (config.get("providers") or {}).items():
         if not provider.get("enabled", True):
             continue
         env_var = provider["api_key_env"]
-        if not resolve_secret(env_var):
-            raise EnvironmentError(
-                f"Missing environment variable {env_var} "
-                f"for provider '{name}'. "
-                f"Set it with: export {env_var}=your-key-here"
-            )
+        if resolve_secret(env_var):
+            keyed.append(name)
+        else:
+            keyless.append((name, env_var))
+
+    if not keyless:
+        return
+
+    if not keyed:
+        details = "; ".join(
+            f"Missing environment variable {env_var} for provider '{name}'"
+            for name, env_var in keyless
+        )
+        raise EnvironmentError(
+            f"{details}. No enabled provider has an API key, so a direct-API "
+            "dispatch has nowhere to go. Set at least one with: export "
+            f"{keyless[0][1]}=your-key-here"
+        )
+
+    for name, env_var in keyless:
+        config["providers"][name]["enabled"] = False
+        # Disabling the PROVIDER is not enough to remove it from selection:
+        # ``models.pick_model`` consults each model's ``is_enabled`` and the
+        # caller's ``exclude_providers``, and never looks at
+        # ``providers.<name>.enabled`` at all. Leaving the models enabled
+        # made the disabling cosmetic -- a keyless-but-PINNED verifier
+        # (the shipped session-verification pin is OpenAI) would still be
+        # selected and then die at dispatch on the missing key, even on a
+        # machine that held a perfectly good cross-provider key elsewhere.
+        # Disabling the models is what makes "removed from selection" true,
+        # and pick_model already falls back correctly past a disabled pin,
+        # tier assignment, or escalation target.
+        for model_cfg in (config.get("models") or {}).values():
+            if isinstance(model_cfg, dict) and model_cfg.get("provider") == name:
+                model_cfg["is_enabled"] = False
+    print(
+        "[dabbler] NOTE: disabled provider(s) "
+        + ", ".join(
+            f"{name} (no {env_var})" for name, env_var in keyless
+        )
+        + "; dispatching with "
+        + ", ".join(sorted(keyed))
+        + ". A provider with no key cannot be called, so it is removed from "
+        "selection rather than failing the whole run. Cross-provider "
+        "verification needs a key for a provider OTHER than the "
+        "orchestrator's; without one the verdict is recorded as "
+        "same-provider.",
+        file=sys.stderr,
+    )
 
 
 def load_config(path: str | None = None, *,

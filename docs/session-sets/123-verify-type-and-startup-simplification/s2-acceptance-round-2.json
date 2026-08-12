@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "1dfeae6f62a95887a08c3dbbba2925c0eb86c83e",
+  "fixedTree": "a643d84774afd51de820f33db92ca918da92041a",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T00:40:39.904925+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The disposition JSON Schema rejects the new qualified-verdict field. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `ai_router/schemas/disposition.schema.json:5-8,46-53`, ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec(\\\"import json\\\\nfrom pathlib import Path\\\\nimport jsonschema\\\\nschema=json.loads(Path('ai_router/schemas/disposition.schema.json').read_text(encoding='utf-8'))\\\\npayload={'status':'completed','summary':'s','files_changed':[],'verification_method':'api','verification_message_ids':[],'next_orchestrator':None,'blockers':[],'verification_verdict':'VERIFIED','verification_qualification':'same-provider'}\\\\njsonschema.validators.validator_for(schema).check_schema(schema)\\\\njsonschema.validate(payload, schema)\\\\n\\\")\"",
+      "criterionSha256": "23b63d9d5b90e063cbf2e62829e3e241afcf561f459de62f19e39fde23a2f6a3",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec(\"import json\\nfrom pathlib import Path\\nimport jsonschema\\nschema=json.loads(Path('ai_router/schemas/disposition.schema.json').read_text(encoding='utf-8'))\\npayload={'status':'completed','summary':'s','files_changed':[],'verification_method':'api','verification_message_ids':[],'next_orchestrator':None,'blockers':[],'verification_verdict':'VERIFIED','verification_qualification':'same-provider'}\\njsonschema.validators.validator_for(schema).check_schema(schema)\\njsonschema.validate(payload, schema)\\n\")"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec(\"import json/nfrom pathlib import Path/nimport jsonschema/nschema=json.loads(Path('ai_router/schemas/disposition.schema.json').read_text(encoding='utf-8'))/npayload={'status':'completed','summary':'s','files_changed':[],'verification_method':'api','verification_message_ids':[],'next_orchestrator':None,'blockers':[],'verification_verdict':'VERIFIED','verification_qualification':'same-provider'}/njsonschema.validators.validator_for(schema).check_schema(schema)/njsonschema.validate(payload, schema)/n\")"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 7127,
+        "output": "...[truncated]...\n            'next_orchestrator': {'oneOf': [{'type': 'null'},\n                                                    {'$ref': '#/$defs/NextOrchestrator'}]},\n                    'blockers': {'type': 'array',\n                                 'items': {'type': 'string'}},\n                    'verification_verdict': {'type': 'string',\n                                             'minLength': 1},\n                    'lessons_cited': {'type': 'array',\n                                      'items': {'type': 'string'}}},\n     'allOf': [{'if': {'required': ['verification_method']},\n                'then': {'properties': {'verification_message_ids': {'type': 'array',\n                                                                     'maxItems': 0}}}},\n               {'if': {'type': 'object',\n                       'properties': {'next_orchestrator': {'type': 'object',\n                                                            'properties': {'reason': {'type': 'object',\n                                                                                      'properties': {'code': {'const': 'switch-due-to-blocker'}},\n                                                                                      'required': ['code']}},\n                                                            'required': ['reason']}},\n                       'required': ['next_orchestrator']},\n                'then': {'properties': {'blockers': {'type': 'array',\n                                                     'minItems': 1,\n                                                     'items': {'type': 'string'}}}}}],\n     '$defs': {'NextOrchestrator': {'type': 'object',\n                                    'additionalProperties': False,\n                                    'required': ['engine',\n                                                 'provider',\n                                                 'model',\n                                                 'effort',\n                                                 'reason'],\n                                    'properties': {'engine': {'type': 'string',\n                                                              'minLength': 1},\n                                                   'provider': {'type': 'string',\n                                                                'minLength': 1},\n                                                   'model': {'type': 'string',\n                                                             'minLength': 1},\n                                                   'effort': {'type': 'string',\n                                                              'minLength': 1},\n                                                   'reason': {'type': 'object',\n                                                              'additionalProperties': False,\n                                                              'required': ['code',\n                                                                           'specifics'],\n                                                              'properties': {'code': {'enum': ['continue-current-trajectory',\n                                                                                               'switch-due-to-blocker',\n                                                                                               'switch-due-to-cost',\n                                                                                               'other']},\n                                                                             'specifics': {'type': 'string',\n                                                                                           'minLength': 30}}}}}}}\n\nOn instance:\n    {'status': 'completed',\n     'summary': 's',\n     'files_changed': [],\n     'verification_method': 'api',\n     'verification_message_ids': [],\n     'next_orchestrator': None,\n     'blockers': [],\n     'verification_verdict': 'VERIFIED',\n     'verification_qualification': 'same-provider'}\n"
+      },
+      "fixed": {
+        "exitCode": 0,
+        "outputChars": 0,
+        "output": ""
+      },
+      "baselinePassed": false,
+      "fixedPassed": true,
+      "outcome": "auto-closed",
+      "reason": "baseline discrimination holds: the unchanged criterion FAILS on the pre-fix tree and PASSES on the fixed tree"
+    }
+  ]
+}

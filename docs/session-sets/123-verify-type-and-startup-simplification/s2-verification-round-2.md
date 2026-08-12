@@ -1,0 +1,10 @@
+**ISSUES FOUND**
+
+- **Issue 1:** The disposition JSON Schema rejects the new qualified-verdict field.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/schemas/disposition.schema.json:5-8,46-53`, `ai_router/disposition.py:178-186,248-273,531-547`
+  - **Failure scenario:** A degraded `DIRECT_API` same-provider run writes `verification_qualification: "same-provider"` to `disposition.json`; any consumer validating that disposition against the shipped schema deterministically fails because the schema has `additionalProperties: false` and does not define the new field.
+  - **Acceptance criterion:** `python -c "exec(\"import json\\nfrom pathlib import Path\\nimport jsonschema\\nschema=json.loads(Path('ai_router/schemas/disposition.schema.json').read_text(encoding='utf-8'))\\npayload={'status':'completed','summary':'s','files_changed':[],'verification_method':'api','verification_message_ids':[],'next_orchestrator':None,'blockers':[],'verification_verdict':'VERIFIED','verification_qualification':'same-provider'}\\njsonschema.validators.validator_for(schema).check_schema(schema)\\njsonschema.validate(payload, schema)\\n\")"`
+  - **Acceptance expectation:** exit 0
+  - **Details:** Violation: the schema says it “Mirrors `ai_router/disposition.py::Disposition`,” while `Disposition` now serializes and validates `verification_qualification`. Impact: the new target artifact is internally inconsistent with the public schema contract, so schema-validating readers reject exactly the qualified disposition this session is meant to produce. Evidence: `disposition.py` adds the field and writer/validator support, but `disposition.schema.json` omits it from `properties` while forbidding additional properties. The schema should add the closed `"same-provider"` field and parity tests.

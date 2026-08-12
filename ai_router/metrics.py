@@ -295,15 +295,25 @@ def record_call(
     # ``setdefault`` on the no-stamp path keeps a verify call's own
     # verdict intact.
     try:
-        from .verification_stamp import STAMP_FIELDS
+        from .verification_stamp import STAMP_FIELDS, STAMP_OPTIONAL_FIELDS
     except ImportError:
-        from verification_stamp import STAMP_FIELDS  # type: ignore[no-redef]
+        from verification_stamp import (  # type: ignore[no-redef]
+            STAMP_FIELDS,
+            STAMP_OPTIONAL_FIELDS,
+        )
     if stamp:
         for stamp_field in STAMP_FIELDS:
             record[stamp_field] = stamp.get(stamp_field)
     else:
         for stamp_field in STAMP_FIELDS:
             record.setdefault(stamp_field, None)
+    # Set 123 S2: the optional stamp keys travel too. They are written as
+    # None when absent (same always-present-column shape as the rest), so a
+    # jq-style reader never has to distinguish "old row" from "unqualified
+    # row" -- and, critically, so a same-provider row reaches the close gate
+    # still carrying the declaration the gate requires of it.
+    for stamp_field in STAMP_OPTIONAL_FIELDS:
+        record[stamp_field] = stamp.get(stamp_field) if stamp else None
 
     try:
         path = _log_path(config)

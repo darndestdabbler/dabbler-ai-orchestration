@@ -965,9 +965,41 @@ def run_close_backstop(
 
     verdict, issues = parse_verification_response(result.content)
     classification = classify_blocking(verdict, issues)
+    # Set 123 S2 (L-069-1 -- the backstop is a sibling writer of the same
+    # two records verify_session writes, so it resolves the qualification
+    # the same way rather than leaving the machine-checked stamp row saying
+    # "same-provider" while the human-readable records stay silent).
+    try:
+        from .orchestrator_identity import (  # type: ignore[import-not-found]
+            resolve_model_provider as _resolve_model_provider,
+        )
+        from .verification import (  # type: ignore[import-not-found]
+            classify_verification_qualification as _classify_qualification,
+        )
+    except ImportError:
+        from orchestrator_identity import (  # type: ignore[no-redef]
+            resolve_model_provider as _resolve_model_provider,
+        )
+        from verification import (  # type: ignore[no-redef]
+            classify_verification_qualification as _classify_qualification,
+        )
+    round_qualification = _classify_qualification(
+        _resolve_model_provider(getattr(result, "model_name", None)),
+        identity.effective_provider,
+    )
+    if round_qualification:
+        print(
+            "close_session backstop: WARNING -- this round's verdict is "
+            f"QUALIFIED ({round_qualification}). The verifier resolved to "
+            f"the orchestrator's own effective provider "
+            f"({identity.effective_provider}), so the verdict is real but "
+            "NOT independently corroborated.",
+            file=sys.stderr,
+        )
     if issues:
         _vs.write_issues_artifact(
-            issues_path, session_number, round_number, verdict, issues
+            issues_path, session_number, round_number, verdict, issues,
+            qualification=round_qualification,
         )
         written.append(str(issues_path))
 
@@ -998,7 +1030,9 @@ def run_close_backstop(
     )
     written.append(str(ledger_path))
 
-    disposition_path = _vs.patch_disposition(set_dir, verdict)
+    disposition_path = _vs.patch_disposition(
+        set_dir, verdict, round_qualification
+    )
     written.append(str(disposition_path))
 
     cost = float(getattr(result, "total_cost_usd", 0.0) or 0.0)

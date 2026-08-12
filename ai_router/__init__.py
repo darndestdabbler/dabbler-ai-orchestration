@@ -143,6 +143,15 @@ from .verification import (
     pick_copilot_cli_verifier, CopilotCliVerifierSelection,
     ProvenanceUnavailable, walk_role_prefer,
     VerificationUnavailableError,
+    # Set 123 S2: the DIRECT_API precondition and the verdict it qualifies.
+    DirectApiPrecondition, check_direct_api_precondition,
+    classify_verification_qualification, providers_with_keys,
+    QUALIFICATION_SAME_PROVIDER, VERDICT_QUALIFICATIONS,
+)
+from .verify_type import (
+    DIRECT_API as DIRECT_API_VERIFY_TYPE,
+    VerifyTypeError,
+    resolve_verify_type,
 )
 # Set 084 (F1/F2): shared orchestrator-identity resolution — the close
 # gate, verifier exclusion, and start_session validation all resolve the
@@ -201,6 +210,7 @@ import time
 import os
 import json
 import logging
+import sys
 
 # Module-level singletons, initialized on first call
 _config = None
@@ -243,6 +253,41 @@ _copilot_transport: Optional[CopilotCliTransport] = None
 _copilot_catalog: Optional[CopilotCatalog] = None
 _copilot_invocation_count = 0
 _copilot_invocation_lock = threading.Lock()
+
+
+def _direct_api_precondition(
+    orchestrator_effective_provider: str,
+) -> Optional[DirectApiPrecondition]:
+    """Resolve the Set 123 S2 ``DIRECT_API`` precondition for this process.
+
+    Returns ``None`` when the question cannot be asked at all (no project,
+    an unparseable project file, no loaded config). ``None`` and a
+    *satisfied* result are treated identically by the caller — both keep the
+    cross-provider exclusion — so the failure direction here is always
+    "verify normally", never "quietly relax the rule".
+    """
+    try:
+        resolution = resolve_verify_type()
+    except VerifyTypeError:
+        # A project that has declared something invalid gets the strict
+        # path, not the lenient one. config.load_config raises on the same
+        # file, so this branch is defensive rather than reachable in
+        # practice.
+        return None
+    except OSError:  # pragma: no cover - defensive
+        return None
+
+    if not resolution.committed:
+        # An uncommitted machine default is a suggestion (Session 1's
+        # standing rule). A suggestion must not be able to relax the
+        # cross-provider guarantee.
+        return None
+
+    return check_direct_api_precondition(
+        verify_type=resolution.verify_type,
+        orchestrator_provider=orchestrator_effective_provider,
+        config=_config or {},
+    )
 
 
 def _init():
@@ -817,6 +862,7 @@ def _route_via_copilot_cli(
             verification_stamp,
             verifier_model=model_id,
             response_content=result.content,
+            verifier_provider=provider,
         )
     record_call(
         _config,
@@ -1156,14 +1202,73 @@ def route(
         identity = resolve_session_orchestrator_identity(
             session_set, session_number
         )
+        _verifier_exclusion = identity.effective_provider
+        # Set 123 S2: the ONE sanctioned way the exclusion yields. A
+        # project whose committed verify type is DIRECT_API but which
+        # holds no API key for any provider other than its own
+        # orchestrator's cannot verify cross-provider at all; the operator
+        # ruled (2026-08-11, journaled to Set 123's decisions.jsonl as a
+        # verification-reduction) that such a session PROCEEDS and the
+        # record carries the limitation, rather than hard-blocking into
+        # the operator-attested manual path.
+        #
+        # This is deliberately derived here, not accepted as an argument:
+        # a boolean parameter would be exactly the "explicit list that
+        # omitted the orchestrator's provider" that I-084-S1-3 closed off.
+        # A caller cannot ask for same-provider verification; only the
+        # project's own committed answer plus the machine's actual key set
+        # can produce it, and it stays loud when it does.
+        _precondition = _direct_api_precondition(identity.effective_provider)
+        if _precondition is not None and _precondition.degraded:
+            print(
+                "[dabbler] WARNING: same-provider verification. This "
+                f"project's verify type is {DIRECT_API_VERIFY_TYPE} but "
+                f"{_precondition.reason}. The session proceeds and the "
+                "verdict is REAL, but it is not independently corroborated "
+                "-- every record it lands on carries "
+                f"verification_qualification={QUALIFICATION_SAME_PROVIDER!r}. "
+                "To restore a cross-provider verdict, set a second "
+                "provider's DABBLER_*_API_KEY.",
+                file=sys.stderr,
+            )
+            _verifier_exclusion = None
         exclude_providers = sorted(
             {
                 str(p).strip().lower()
                 for p in (exclude_providers or [])
                 if p
             }
-            | {identity.effective_provider}
+            | ({_verifier_exclusion} if _verifier_exclusion else set())
         )
+        if _precondition is not None and _precondition.degraded:
+            # The caller's own list must not silently re-impose what the
+            # router just lifted. verify_session passes the orchestrator's
+            # provider explicitly (it computes the same exclusion for its
+            # own reporting), so unioning alone left the degraded path
+            # excluded anyway and the permission was unreachable through the
+            # sanctioned CLI -- S2 discovery finding.
+            #
+            # This does NOT reopen I-084-S1-3. That lesson closed the hole
+            # where a caller-supplied list OMITTING the orchestrator could
+            # buy itself a same-provider verifier; here no caller input is
+            # consulted at all. The router decided, from the project's own
+            # committed file plus the machine's actual key set, that no
+            # cross-provider verifier exists -- a state a caller cannot
+            # fabricate by passing (or not passing) anything.
+            exclude_providers = [
+                p for p in exclude_providers
+                if p != identity.effective_provider
+            ]
+            # And bar every provider the machine cannot reach, so selection
+            # cannot land on a configured-but-keyless model and fail at the
+            # socket instead of verifying with the key that IS present.
+            _reachable = set(_precondition.keyed_providers)
+            _unreachable = sorted(
+                name
+                for name in (_config.get("providers") or {})
+                if name not in _reachable
+            )
+            exclude_providers = sorted(set(exclude_providers) | set(_unreachable))
 
     # Set 078 S3: the copilot-cli profile is a fully separate body — see
     # _route_via_copilot_cli's docstring for why this branches here rather
@@ -1323,6 +1428,9 @@ def route(
             verification_stamp,
             verifier_model=current_model_name,
             response_content=result.content,
+            verifier_provider=(
+                _config["models"][current_model_name]["provider"]
+            ),
         )
     record_call(
         _config,

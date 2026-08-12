@@ -13,6 +13,57 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 123 S2) The `DIRECT_API` precondition, and the qualified
+  verdict.** `verification.check_direct_api_precondition()` answers whether
+  a project can verify cross-provider *right now*: it compares the
+  providers whose `api_key_env` actually resolves against the
+  orchestrator's **effective** provider (registry-resolved via
+  `orchestrator_identity`, never a configured seat label — a
+  `github-copilot` seat labelled `anthropic` may be running an OpenAI
+  model, and the cross-provider claim rests on the effective one).
+
+  When a project whose committed verify type is `DIRECT_API` holds no
+  usable key outside its own orchestrator's provider, `route()` **warns on
+  stderr and proceeds** with a same-provider verifier rather than
+  hard-blocking into the operator-attested manual path. This is the
+  operator's ruling — *"verification with the same provider is better than
+  no verification at all, but the results should be flagged with this
+  limitation"* — re-confirmed in session on 2026-08-11 against the sharper
+  question (the change relaxes a close gate), and journaled with
+  `verification_effect: reduces` plus an operator attestation, because
+  reducing verification is never self-authorized.
+
+  **The permission is derived inside `route()`, never passed to it.** A
+  parameter would re-open `I-084-S1-3` (a caller-supplied exclusion list
+  that omits the orchestrator's provider). No caller can ask for a
+  same-provider verification, and an **uncommitted**
+  `AI_ORCHESTRATION_VERIFY_TYPE` cannot trigger one: a machine-level
+  suggestion that could weaken every verdict on that machine is exactly the
+  action-at-a-distance Session 1's branch 2 exists to prevent. The
+  Copilot-seat path keeps its fail-closed `ProvenanceUnavailable` contract
+  (Sets 083/084) untouched.
+
+  **The qualification travels with the verdict, omit-null**, on the three
+  router-owned records: the metrics stamp row
+  (`verification_qualification`), the findings envelope
+  (`verificationQualification`), and `disposition.json`
+  (`verification_qualification`, *removed* when a later unqualified round
+  supersedes a qualified one). `classify_verification_qualification()` is
+  the single mechanism that decides, so the three cannot disagree.
+
+  **The close gate enforces it as a bijection** (`validate_stamped_row`
+  check 5): a same-provider row passes only when it declares the
+  qualification, *and* a cross-provider row declaring it is refused. A
+  one-way check would let the flag be attached unconditionally, at which
+  point it would distinguish nothing — and distinguishing is its only job
+  (`L-112-1`). The vocabulary is closed and fails closed, unlike
+  `verification_verdict`'s warned-but-accepted extension tokens: a token
+  nobody can interpret does this field's job worse than no token at all.
+
+  Not written to `session-state.json` — that is the Work Explorer's
+  surface, and operator decision **P4** keeps orchestrator/verifier
+  provenance out of it.
+
 - **(Set 115 S4) `close_preflight --write` / `--check` — the close-out
   obligations, serialized where a renderer can read them.** The preflight
   costs 2-7 seconds (git-backed predicates plus interpreter startup), so

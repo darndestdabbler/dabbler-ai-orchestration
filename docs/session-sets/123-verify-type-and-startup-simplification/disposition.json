@@ -1,21 +1,29 @@
 {
   "status": "completed",
-  "summary": "Session 1 shipped ai_router/verify_type.py: the operator's three-branch rule as one entry point (project-verify-type.txt at the project root, else the machine default confirmed once and written there, else guided setup in the terminal), and made config.load_config DERIVE transport.profile from it instead of defaulting it independently. Where a project has committed an answer, that answer IS the profile -- over the tracked config and over a seat-local local-overrides.yaml both -- so the two facts cannot disagree; the api default survives as the last step of resolution rather than as a parallel answer beside it. An unconfirmed environment default never silently re-routes dispatch, and a resolution names a transport profile only when the project has committed one. Five verification rounds settled the precedence rule: the first anchor that lands in a project answers outright, the loaded config's project before the caller's, and a project that has committed nothing is answered by its own configured profile rather than by another project's file. 16 falsifiers (both directions, look-alikes, and a structural bijection against config's profile vocabulary); full pytest 3952 passed / 9 skipped.",
+  "summary": "Session 2 shipped the DIRECT_API precondition and the qualified verdict. check_direct_api_precondition() compares the providers whose api_key_env actually resolves against the orchestrator's EFFECTIVE provider (registry-resolved, never a seat label); when a project whose committed verify type is DIRECT_API holds no usable key outside its own orchestrator's provider, route() warns loudly and PROCEEDS with a same-provider verifier instead of hard-blocking into the operator-attested manual path. That permission is derived inside route(), never accepted as an argument, so I-084-S1-3 stays closed and an uncommitted AI_ORCHESTRATION_VERIFY_TYPE cannot weaken anything; the Copilot-seat fail-closed contract is untouched. classify_verification_qualification() is the single mechanism deciding whether a verdict is qualified, and the qualification travels omit-null on the three router-owned records (metrics stamp row, sN-issues.json envelope, disposition.json, the last actively cleared when an unqualified round supersedes a qualified one). The close gate enforces it as a BIJECTION: a same-provider row passes only if it declares itself, and a cross-provider row declaring it is refused, so the flag can be neither missing nor decorative. Deliberately not written to session-state.json (operator decision P4 keeps orchestrator provenance out of the Explorer; the design doc reserved that call). Four verification rounds, six findings, all accepted -- every one of them the same class: the machinery was correct and UNREACHABLE (config load died before the precondition ran; the CLI re-imposed the exclusion route() had lifted; the qualification was dropped by the metrics writer the close gate reads; the disposition JSON Schema rejected the field; disabling a keyless provider left its models selectable). 12 falsifiers; full pytest 3967 passed / 9 skipped.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "ai_router/verify_type.py",
-    "ai_router/config.py",
+    "ai_router/verification.py",
+    "ai_router/verification_stamp.py",
     "ai_router/__init__.py",
-    "ai_router/router-config.yaml",
-    "ai_router/tests/test_verify_type_resolution.py",
+    "ai_router/config.py",
+    "ai_router/metrics.py",
+    "ai_router/disposition.py",
+    "ai_router/verify_session.py",
+    "ai_router/close_backstop.py",
+    "ai_router/schemas/disposition.schema.json",
+    "ai_router/tests/test_qualified_verdict.py",
+    "ai_router/CHANGELOG.md",
+    "docs/session-issues.schema.json",
+    "docs/session-issues-schema.md",
+    "docs/disposition-schema.md",
     "docs/planning/verify-type-resolution.md",
-    "docs/session-sets/123-verify-type-and-startup-simplification/spec.md",
     "docs/session-sets/123-verify-type-and-startup-simplification/ai-assignment.md",
-    "docs/session-sets/123-verify-type-and-startup-simplification/s1-remediation-round-1.md",
-    "docs/session-sets/123-verify-type-and-startup-simplification/s1-remediation-round-2.md",
-    "docs/session-sets/123-verify-type-and-startup-simplification/s1-remediation-round-3.md",
-    "docs/session-sets/123-verify-type-and-startup-simplification/s1-remediation-round-4.md"
+    "docs/session-sets/123-verify-type-and-startup-simplification/decisions.jsonl",
+    "docs/session-sets/123-verify-type-and-startup-simplification/s2-remediation-round-1.md",
+    "docs/session-sets/123-verify-type-and-startup-simplification/s2-remediation-round-2.md",
+    "docs/session-sets/123-verify-type-and-startup-simplification/s2-remediation-round-3.md"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -25,13 +33,13 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 (the qualified verdict) reasons about the precondition this session just defined -- that a resolution names a transport profile only when the project has committed one -- and touches verification*.py / session_state.py with that guarantee in hand. Same surface, live context, no blocker and no capability gap; the verifier stays cross-provider by registry exclusion regardless."
+      "specifics": "Session 3 deletes the webview and rewrites the first-run walkthrough against the terminal setup path Sessions 1-2 built, so it needs live knowledge of what the resolver guarantees and where setup now lives. It is mostly deletion plus a package.json edit paying L-064-12's full Layer 3 run. It should also carry forward this session's config change -- a keyless provider is now disabled rather than fatal -- because that is exactly the state a fresh project is in during the step-2 true cold-start dogfood (L-079-3). No blocker, no capability gap; the verifier stays cross-provider by registry exclusion regardless."
     }
   },
   "blockers": [],
   "lessons_cited": [
     "L-112-1",
     "L-069-1",
-    "L-064-8"
+    "L-066-1"
   ]
 }

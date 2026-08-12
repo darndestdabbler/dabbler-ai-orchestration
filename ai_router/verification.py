@@ -33,6 +33,14 @@ try:  # package vs bare-import (mirrors the rest of ai_router)
 except ImportError:  # pragma: no cover - test/bare context
     from pricing import worst_case_output_cost_per_1m  # type: ignore[import-not-found]
 
+# Set 123 S2: the precondition below is scoped by the project's committed
+# verify type, which Session 1 made a single entry point. ``verify_type`` is
+# stdlib-only by design, so importing it here adds no cycle.
+try:
+    from .verify_type import DIRECT_API as DIRECT_API_VERIFY_TYPE
+except ImportError:  # pragma: no cover - test/bare context
+    from verify_type import DIRECT_API as DIRECT_API_VERIFY_TYPE  # type: ignore[import-not-found]
+
 
 @dataclass
 class VerifierSelection:
@@ -1138,3 +1146,207 @@ def pick_copilot_cli_verifier(
             "on_violation: fail_closed)"
         )
     )
+
+
+# ---------------------------------------------------------------------------
+# Set 123 S2: the DIRECT_API precondition, and the verdict it qualifies
+#
+# The cross-provider rule the whole verification model rests on needs a
+# second provider to actually be REACHABLE, not merely configured.
+# ``pick_verifier_model`` filters on the static config -- provider, tier,
+# enablement -- and knows nothing about whether that provider's key is
+# present, so a single-key DIRECT_API machine picked a verifier it could
+# not call and died at dispatch with ``Missing environment variable ...``.
+#
+# The operator's ruling (spec standing decision 3, verbatim): *"Verification
+# with the same provider is better than no verification at all, but the
+# results should be flagged with this limitation."* So this pair of helpers
+# does two things and deliberately not a third:
+#
+# - ``check_direct_api_precondition`` answers "can this project verify
+#   cross-provider right now?" It NEVER blocks; the caller warns.
+# - ``classify_verification_qualification`` turns the verifier that actually
+#   answered into the qualification the record carries.
+# - It does not gate. Set 116's standing rule holds: this is a field on the
+#   record, not a new check that can refuse a session.
+#
+# Scope is deliberately narrow (operator ruling, 2026-08-11, journaled to
+# this set's ``decisions.jsonl`` as a ``verification-reduction``): the
+# degraded path opens ONLY for a project whose committed verify type is
+# ``DIRECT_API``. A Copilot seat keeps its fail-closed
+# :class:`ProvenanceUnavailable` contract (Set 083/084), and a project that
+# has committed nothing has not asked for anything.
+# ---------------------------------------------------------------------------
+
+#: The one qualification token. A verdict carrying it is REAL but WEAKER:
+#: the verifier resolved to the orchestrator's own effective provider, so
+#: the verdict is not independently corroborated. Kept as a closed
+#: vocabulary so a reader can match it exactly rather than sniff prose.
+QUALIFICATION_SAME_PROVIDER = "same-provider"
+VERDICT_QUALIFICATIONS: frozenset[str] = frozenset({QUALIFICATION_SAME_PROVIDER})
+
+
+@dataclass(frozen=True)
+class DirectApiPrecondition:
+    """Whether a ``DIRECT_API`` project can verify cross-provider right now.
+
+    ``applies`` is false for every project that has not committed
+    ``DIRECT_API`` -- a Copilot seat, or a project that has committed
+    nothing. On those, :attr:`degraded` is false no matter what keys the
+    machine holds, so nothing about their verification changes.
+    """
+
+    applies: bool
+    satisfied: bool
+    reason: str
+    orchestrator_provider: Optional[str] = None
+    keyed_providers: tuple = ()
+    cross_provider_candidates: tuple = ()
+
+    @property
+    def degraded(self) -> bool:
+        """True only when this project asked for cross-provider and cannot
+        have it -- the single condition that permits a same-provider run."""
+        return self.applies and not self.satisfied
+
+    def to_dict(self) -> dict:
+        return {
+            "applies": self.applies,
+            "satisfied": self.satisfied,
+            "degraded": self.degraded,
+            "reason": self.reason,
+            "orchestrator_provider": self.orchestrator_provider,
+            "keyed_providers": list(self.keyed_providers),
+            "cross_provider_candidates": list(self.cross_provider_candidates),
+        }
+
+
+def providers_with_keys(config: dict, resolve=None) -> tuple:
+    """Return the enabled providers whose ``api_key_env`` actually resolves.
+
+    Sorted for determinism. *resolve* defaults to
+    :func:`ai_router.secret_resolver.resolve_secret`; it is a parameter so a
+    falsifier can plant a key set without touching the real environment.
+
+    A provider with no ``api_key_env`` is skipped rather than assumed
+    keyless-but-usable: on the direct-API path a provider with no declared
+    key variable cannot be dispatched to, and guessing otherwise would
+    manufacture a cross-provider candidate that fails at the socket.
+    """
+    if resolve is None:
+        try:
+            from .secret_resolver import resolve_secret  # type: ignore[import-not-found]
+        except ImportError:  # pragma: no cover - test/bare context
+            from secret_resolver import resolve_secret  # type: ignore[no-redef]
+        resolve = resolve_secret
+
+    found = []
+    for name, provider in (config.get("providers") or {}).items():
+        if not isinstance(provider, dict):
+            continue
+        if not provider.get("enabled", True):
+            continue
+        env_var = provider.get("api_key_env")
+        if not env_var:
+            continue
+        try:
+            if resolve(env_var):
+                found.append(name)
+        except Exception:  # noqa: BLE001 - a backend failure is "no key"
+            continue
+    return tuple(sorted(found))
+
+
+def check_direct_api_precondition(
+    *,
+    verify_type: Optional[str],
+    orchestrator_provider: Optional[str],
+    config: dict,
+    resolve=None,
+) -> DirectApiPrecondition:
+    """Answer whether a ``DIRECT_API`` project can verify cross-provider.
+
+    *orchestrator_provider* must be the **effective** provider from
+    :mod:`ai_router.orchestrator_identity` -- the registry-resolved value,
+    never a configured seat label. They differ (a ``github-copilot`` seat
+    labelled ``anthropic`` may in fact be running an OpenAI model), and the
+    cross-provider claim rests on the effective one, so comparing the label
+    would let a same-provider pairing read as cross-provider.
+
+    Never raises and never blocks: an unresolvable input reports
+    ``applies=False`` so the caller's behaviour is unchanged, which is the
+    correct fail direction for a check whose only power is to warn.
+    """
+    if verify_type != DIRECT_API_VERIFY_TYPE:
+        return DirectApiPrecondition(
+            applies=False,
+            satisfied=True,
+            reason=(
+                f"the precondition applies only to a project whose committed "
+                f"verify type is {DIRECT_API_VERIFY_TYPE} (this project "
+                f"resolves {verify_type!r})"
+            ),
+            orchestrator_provider=orchestrator_provider,
+        )
+
+    if not orchestrator_provider:
+        return DirectApiPrecondition(
+            applies=False,
+            satisfied=True,
+            reason=(
+                "the orchestrator's effective provider is unknown, so there "
+                "is nothing to compare against; verifier selection keeps its "
+                "own fail-closed contract"
+            ),
+        )
+
+    keyed = providers_with_keys(config, resolve)
+    cross = tuple(p for p in keyed if p != orchestrator_provider)
+    if cross:
+        return DirectApiPrecondition(
+            applies=True,
+            satisfied=True,
+            reason=(
+                f"provider(s) {', '.join(cross)} hold a key and differ from "
+                f"the orchestrator's effective provider "
+                f"({orchestrator_provider})"
+            ),
+            orchestrator_provider=orchestrator_provider,
+            keyed_providers=keyed,
+            cross_provider_candidates=cross,
+        )
+
+    return DirectApiPrecondition(
+        applies=True,
+        satisfied=False,
+        reason=(
+            "no provider holds an API key that differs from the "
+            f"orchestrator's effective provider ({orchestrator_provider}); "
+            f"providers with keys: {', '.join(keyed) or '(none)'}"
+        ),
+        orchestrator_provider=orchestrator_provider,
+        keyed_providers=keyed,
+        cross_provider_candidates=(),
+    )
+
+
+def classify_verification_qualification(
+    verifier_provider: Optional[str],
+    orchestrator_effective_provider: Optional[str],
+) -> Optional[str]:
+    """Return the qualification a verdict carries, or ``None``.
+
+    ``None`` is the ordinary cross-provider case and means "unqualified" --
+    the field is omit-null everywhere it is written, so a record that has
+    always been cross-provider never grows a key.
+
+    The single source of the qualification: every writer calls this rather
+    than comparing providers itself, so the stamp, the findings envelope and
+    the disposition cannot disagree about whether one verdict was
+    independently corroborated.
+    """
+    if not verifier_provider or not orchestrator_effective_provider:
+        return None
+    if verifier_provider == orchestrator_effective_provider:
+        return QUALIFICATION_SAME_PROVIDER
+    return None

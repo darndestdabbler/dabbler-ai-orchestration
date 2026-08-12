@@ -168,6 +168,7 @@ try:
     from verification import (  # type: ignore[import-not-found]
         build_verification_prompt,
         classify_blocking,
+        classify_verification_qualification,
         is_blocking_issue,
         parse_fix_verdicts,
         parse_verification_response,
@@ -194,6 +195,7 @@ except ImportError:
     from .verification import (  # type: ignore[no-redef]
         build_verification_prompt,
         classify_blocking,
+        classify_verification_qualification,
         is_blocking_issue,
         parse_fix_verdicts,
         parse_verification_response,
@@ -2462,6 +2464,7 @@ def write_issues_artifact(
     phase: Optional[str] = None,
     discovery_baseline_tree: Optional[str] = None,
     fix_verdicts: Optional[List[dict]] = None,
+    qualification: Optional[str] = None,
 ) -> None:
     """Write the Set 055 findings envelope (only called on a
     findings-bearing round; presence of the file means issues found).
@@ -2477,6 +2480,11 @@ def write_issues_artifact(
     enumeration in the immutable, stamp-bound ``sN-verification*.md``
     artifact instead — the envelope field exists for the blocking rounds
     the loop continues on.
+
+    Set 123 S2 adds a fourth, on the same omit-null terms:
+    ``verificationQualification``. It is present only when the round's
+    verdict is qualified (today: ``"same-provider"``), so an envelope that
+    has always been cross-provider never grows the key.
     """
     envelope = {
         "schemaVersion": 1,
@@ -2491,13 +2499,19 @@ def write_issues_artifact(
         envelope["discoveryBaselineTree"] = discovery_baseline_tree
     if fix_verdicts:
         envelope["fixVerdicts"] = fix_verdicts
+    if qualification:
+        envelope["verificationQualification"] = qualification
     path.write_text(
         json.dumps(envelope, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
 
 
-def patch_disposition(session_set_dir: Path, verdict: str) -> Path:
+def patch_disposition(
+    session_set_dir: Path,
+    verdict: str,
+    qualification: Optional[str] = None,
+) -> Path:
     """Patch ``disposition.json``: ``verification_method: "api"`` and the
     verdict token verbatim, preserving every unrelated field.
 
@@ -2506,6 +2520,12 @@ def patch_disposition(session_set_dir: Path, verdict: str) -> Path:
     and is idempotent. When no disposition exists yet, a minimal partial
     record carrying only the two fields is created -- Step 8 authors the
     full disposition later and must preserve them.
+
+    Set 123 S2: ``verification_qualification`` travels with the verdict on
+    the same terms. It is written when the round is qualified and
+    **actively removed** when it is not -- an unqualified round following a
+    qualified one must not leave the older, weaker claim standing beside a
+    fresh verdict it does not describe.
     """
     path = session_set_dir / "disposition.json"
     data: dict = {}
@@ -2530,6 +2550,10 @@ def patch_disposition(session_set_dir: Path, verdict: str) -> Path:
             data = {}
     data["verification_method"] = "api"
     data["verification_verdict"] = verdict
+    if qualification:
+        data["verification_qualification"] = qualification
+    else:
+        data.pop("verification_qualification", None)
     serialized = json.dumps(data, indent=2, ensure_ascii=False) + "\n"
     tmp_path = f"{path}.tmp.{os.getpid()}"
     with open(tmp_path, "w", encoding="utf-8") as f:
@@ -3712,6 +3736,46 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
 
     classification = classify_blocking(verdict, merged_issues)
 
+    # -- Set 123 S2: what qualification does THIS round's verdict carry?
+    #    Resolved from the model that actually answered, through the same
+    #    registry the exclusion and the stamp use, so the envelope, the
+    #    disposition and the stamped row cannot disagree.
+    #
+    #    A fan-out round is qualified only when NO call reached a different
+    #    provider. One cross-provider call IS independent corroboration, and
+    #    flagging that round would understate it -- which erodes the field's
+    #    meaning exactly as badly as failing to flag a same-provider one.
+    try:
+        from .orchestrator_identity import (  # type: ignore[import-not-found]
+            resolve_model_provider as _resolve_model_provider,
+        )
+    except ImportError:
+        from orchestrator_identity import (  # type: ignore[no-redef]
+            resolve_model_provider as _resolve_model_provider,
+        )
+    call_qualifications = [
+        classify_verification_qualification(
+            _resolve_model_provider(getattr(result, "model_name", None)),
+            identity.effective_provider,
+        )
+        for _call_index, result in results
+    ]
+    round_qualification = (
+        call_qualifications[0]
+        if call_qualifications and all(call_qualifications)
+        else None
+    )
+    if round_qualification:
+        print(
+            f"verify_session: WARNING -- this round's verdict is QUALIFIED "
+            f"({round_qualification}). Every verifier call resolved to the "
+            f"orchestrator's own effective provider "
+            f"({identity.effective_provider}), so the verdict is real but "
+            "NOT independently corroborated. The envelope, the disposition "
+            "and the stamped row all record the qualification.",
+            file=sys.stderr,
+        )
+
     if merged_issues:
         write_issues_artifact(
             issues_path,
@@ -3733,6 +3797,7 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                 else None
             ),
             fix_verdicts=fix_verdicts or None,
+            qualification=round_qualification,
         )
 
     # -- S2 verification round 1 (gate hole): a CLEAN supplementary round
@@ -3783,7 +3848,9 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
         discovery_baseline_tree=snapshot_tree,
     )
 
-    disposition_path = patch_disposition(session_set_dir, session_verdict)
+    disposition_path = patch_disposition(
+        session_set_dir, session_verdict, round_qualification
+    )
 
     # -- Report (ASCII-only). (A load-bearing truncation was already handled
     #    above as a hard verification-unavailable outcome, so every result

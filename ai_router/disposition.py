@@ -65,6 +65,15 @@ DISPOSITION_STATUSES = ("completed", "failed", "requires_review")
 VERIFICATION_METHODS = ("api", "manual-via-other-engine", "skipped")
 CANONICAL_VERDICTS = ("VERIFIED", "ISSUES_FOUND")
 
+# Set 123 S2: the closed vocabulary of verdict qualifications. Sourced from
+# ``verification`` so the disposition validator, the stamp gate and the
+# router all read one definition -- two copies of a vocabulary is the
+# two-mechanisms-for-one-fact class this repo keeps re-learning (L-069-1).
+try:
+    from .verification import VERDICT_QUALIFICATIONS  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - test/bare context
+    from verification import VERDICT_QUALIFICATIONS  # type: ignore[no-redef]
+
 # Retired / renamed method tokens, each rejected with a message that names
 # its replacement (Set 083 S2 — the live 2026-07-06 bypass incident wrote
 # the bare "manual" token and a self-attested verdict, and nothing on the
@@ -174,6 +183,7 @@ class Disposition:
     next_orchestrator: Optional[NextOrchestrator] = None
     blockers: List[str] = field(default_factory=list)
     verification_verdict: Optional[str] = None
+    verification_qualification: Optional[str] = None
     lessons_cited: List[str] = field(default_factory=list)
     uat: Optional[dict] = None
     checklist: Optional[dict] = None
@@ -257,6 +267,10 @@ def disposition_to_dict(disposition: Disposition) -> dict:
     }
     if disposition.verification_verdict is not None:
         d["verification_verdict"] = disposition.verification_verdict
+    # Omit-null (Set 123 S2): present only when the verdict is qualified,
+    # so a record that has always been cross-provider never grows the key.
+    if disposition.verification_qualification is not None:
+        d["verification_qualification"] = disposition.verification_qualification
     # Omit-empty (Set 064 D3): the key is absent when no lessons were
     # cited, so readers that pre-date this field never see it.
     if disposition.lessons_cited:
@@ -287,6 +301,7 @@ def disposition_from_dict(data: dict) -> Disposition:
         next_orchestrator=_next_orchestrator_from_dict(data.get("next_orchestrator")),
         blockers=list(data.get("blockers") or []),
         verification_verdict=data.get("verification_verdict"),
+        verification_qualification=data.get("verification_qualification"),
         lessons_cited=list(data.get("lessons_cited") or []),
         uat=data.get("uat") if isinstance(data.get("uat"), dict) else None,
         checklist=(
@@ -511,6 +526,24 @@ def validate_disposition(
                 f"non-canonical (expected one of {CANONICAL_VERDICTS}); "
                 "accepted but consider using the canonical token",
                 file=sys.stderr,
+            )
+
+    # Set 123 S2: the qualification, when present, must be a token the
+    # framework knows. Unlike verification_verdict (whose non-canonical
+    # tokens are warned-but-accepted so a new extension token stays
+    # forward-compatible), this vocabulary is CLOSED and fails closed: the
+    # field's entire job is to let a later reader distinguish a corroborated
+    # verdict from an uncorroborated one, and a token nobody can interpret
+    # does that job worse than no token at all.
+    qualification = data.get("verification_qualification")
+    if qualification is not None:
+        if (
+            not isinstance(qualification, str)
+            or qualification not in VERDICT_QUALIFICATIONS
+        ):
+            errors.append(
+                "verification_qualification must be null or one of "
+                f"{sorted(VERDICT_QUALIFICATIONS)} (got {qualification!r})"
             )
 
     # Set 064 D3: lessons_cited, when present, must be a list of strings.

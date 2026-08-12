@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "1044f88108c548628a1b2de75ca82d5af789b5f8",
+  "fixedTree": "cd487b493cbc15e0a8f338e1fe2dcd941e00e5ed",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T13:13:35.967440+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The extension hides `verify_type`’s successful-with-warning `.gitignore` failure and still reports the file as gitignored. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `a ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A successful verify_type subprocess that emits stderr warning text about adding /project-verify-type.txt to .gitignore must surface that warning in the seat-setup outcome/toast instead of reporting an unconditional gitignored success.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

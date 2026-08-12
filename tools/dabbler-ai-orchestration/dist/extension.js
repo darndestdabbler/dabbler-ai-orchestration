@@ -17514,6 +17514,7 @@ var CATALOG_LOCKFILE_REL = path13.posix.join(
   "ai_router",
   "copilot-catalog.lock"
 );
+var VERIFY_TYPE_FILE_REL = "project-verify-type.txt";
 function deriveSeatId(hostname2, username) {
   const canonical = `${hostname2.trim().toLowerCase()}|${username.trim().toLowerCase()}`;
   const digest = crypto2.createHash("sha256").update(canonical, "utf8").digest("hex");
@@ -17555,72 +17556,6 @@ function parseRefreshStdout(stdout) {
     confirmed: Number(m[2]),
     total: Number(m[3]),
     providers
-  };
-}
-function locateTransportProfile(text) {
-  const blockMatch = /^transport:[ \t]*(?:#.*)?$/m.exec(text);
-  if (!blockMatch)
-    return null;
-  let lineStart = blockMatch.index + blockMatch[0].length;
-  while (lineStart < text.length && (text[lineStart] === "\r" || text[lineStart] === "\n")) {
-    if (text[lineStart] === "\n") {
-      lineStart += 1;
-      break;
-    }
-    lineStart += 1;
-  }
-  let childIndent = null;
-  while (lineStart < text.length) {
-    let lineEnd = text.indexOf("\n", lineStart);
-    if (lineEnd === -1)
-      lineEnd = text.length;
-    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
-    if (/^[^ \t\r\n#]/.test(line))
-      return null;
-    const content = /^([ \t]+)\S/.exec(line);
-    if (content && !/^[ \t]*#/.test(line)) {
-      const indent = content[1].length;
-      if (childIndent === null)
-        childIndent = indent;
-      if (indent === childIndent) {
-        const m = /^([ \t]+profile:[ \t]*)([^\s#]+)/.exec(line);
-        if (m) {
-          const valueStart = lineStart + m[1].length;
-          return {
-            valueStart,
-            valueEnd: valueStart + m[2].length,
-            value: m[2]
-          };
-        }
-      }
-    }
-    lineStart = lineEnd + 1;
-  }
-  return null;
-}
-function hasTopLevelTransportBlock(text) {
-  return /^transport:[ \t]*(?:#.*)?$/m.test(text);
-}
-function renderTransportProfile(configText, profile) {
-  const loc = locateTransportProfile(configText);
-  if (!loc) {
-    return {
-      ok: false,
-      reason: "no `transport:` block with a `profile:` field was found in local-overrides.yaml (the seeded template shape this write expects)"
-    };
-  }
-  if (loc.value === profile)
-    return { ok: true, text: configText, changed: false };
-  if (loc.value !== "api") {
-    return {
-      ok: false,
-      reason: `transport.profile is ${JSON.stringify(loc.value)} \u2014 not the seeded default \`api\`, so it looks operator-edited and will not be overwritten`
-    };
-  }
-  return {
-    ok: true,
-    changed: true,
-    text: configText.slice(0, loc.valueStart) + profile + configText.slice(loc.valueEnd)
   };
 }
 var SEAT_STATUS_MARKER_REL = path13.posix.join(
@@ -17763,59 +17698,6 @@ function runCatalogRefresh(deps) {
     }
   });
 }
-var GITIGNORE_REL = ".gitignore";
-var LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
-function isLocalOverridesIgnored(gitignoreText) {
-  const covering = /* @__PURE__ */ new Set([
-    LOCAL_OVERRIDES_REL,
-    `/${LOCAL_OVERRIDES_REL}`,
-    "local-overrides.yaml",
-    "**/local-overrides.yaml"
-  ]);
-  return gitignoreText.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")).some((line) => covering.has(line));
-}
-function ensureLocalOverridesIgnored(ops, projectDir) {
-  const abs = path13.join(projectDir, GITIGNORE_REL);
-  try {
-    const existing = ops.exists(abs) ? ops.readFile(abs) : "";
-    if (isLocalOverridesIgnored(existing))
-      return { ok: true, added: false };
-    const prefix = existing === "" || existing.endsWith("\n") ? existing : `${existing}
-`;
-    ops.writeFile(
-      abs,
-      `${prefix}
-# Per-machine router overrides (Copilot seat transport profile).
-# Machine-specific by design \u2014 committing it breaks API-key-only clones.
-${LOCAL_OVERRIDES_IGNORE_RULE}
-`
-    );
-    return { ok: true, added: true };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: err instanceof Error ? err.message : String(err)
-    };
-  }
-}
-var CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
-function writeConfigAtomically(ops, configAbs, content) {
-  if (!ops.rename) {
-    ops.writeFile(configAbs, content);
-    return;
-  }
-  const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
-  ops.writeFile(tmpAbs, content);
-  try {
-    ops.rename(tmpAbs, configAbs);
-  } catch (err) {
-    try {
-      ops.removeRecursive(tmpAbs);
-    } catch {
-    }
-    throw err;
-  }
-}
 function resolveKillStrategy(platform, pid) {
   if (!pid)
     return "plain";
@@ -17851,35 +17733,35 @@ function rerunRefreshHint() {
 function describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) {
   const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunHint}`;
   const keyless = "no DABBLER_* provider key is set, so the router is not yet functional";
-  const keyed = "the DABBLER_* provider key(s) already set keep the api profile working wherever this project's committed verify type is DIRECT_API";
-  const notEnabled = "the copilot-cli seat profile was NOT enabled in ai_router/local-overrides.yaml (and project-verify-type.txt, not that file, decides this project's effective transport)";
+  const keyed = "the DABBLER_* provider key(s) already set keep the api profile working wherever this project's verify type resolves to DIRECT_API";
+  const notRecorded = `this project's verify type was NOT set to COPILOT_CLI (${VERIFY_TYPE_FILE_REL} is what decides the effective transport)`;
   switch (outcome.kind) {
     case "success":
       return {
-        level: outcome.ignoreWarning ? "warning" : "info",
-        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/local-overrides.yaml.` + (outcome.ignoreWarning ? ` Warning: ${outcome.ignoreWarning}.` : "")
+        level: outcome.writerWarning ? "warning" : "info",
+        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). ` + (outcome.writerWarning ? `COPILOT_CLI written to ${VERIFY_TYPE_FILE_REL}, but it is NOT git-ignored: ${outcome.writerWarning}` : `COPILOT_CLI written to ${VERIFY_TYPE_FILE_REL} (gitignored \u2014 the router derives transport.profile: copilot-cli from it).`)
       };
     case "insufficient-providers": {
       const cause = outcome.confirmed === 0 ? "No models responded at all \u2014 the Copilot CLI may be missing from PATH, not signed in, or blocked by policy. " : outcome.providers.length === 1 ? "This seat may expose only one provider family (an enterprise-managed seat can do this), in which case re-running will not change the result. " : "";
       return {
         level: "warning",
-        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so ${notEnabled}. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
+        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so ${notRecorded}. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
       };
     }
     case "refresh-failed":
       return {
         level: "warning",
-        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. So ${notEnabled}, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. So ${notEnabled}, and ${keyless}. Fix the cause, then: ${rerun}`
+        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. So ${notRecorded}, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. So ${notRecorded}, and ${keyless}. Fix the cause, then: ${rerun}`
       };
     case "cancelled":
       return {
         level: "warning",
-        message: `Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and ${notEnabled}. ` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
+        message: `Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and ${notRecorded}. ` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
       };
-    case "config-write-failed":
+    case "verify-type-write-failed":
       return {
         level: "warning",
-        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/local-overrides.yaml failed: ${outcome.detail}. Set \`profile: copilot-cli\` under the \`transport:\` block in that file by hand \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? "the router keeps running on whatever profile project-verify-type.txt resolves to, with the DABBLER_* key(s) already set." : "the router is not yet functional (the seat profile is unwritten and no DABBLER_* provider key is set).")
+        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but recording this project's verify type failed: ${outcome.detail}. Run \`${verifyTypeCommandHint("COPILOT_CLI")}\` in the project folder \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? `the router keeps running on whatever ${VERIFY_TYPE_FILE_REL} resolves to, with the DABBLER_* key(s) already set.` : "the router is not yet functional (the verify type is unrecorded and no DABBLER_* provider key is set).")
       };
     default: {
       const unreachable = outcome;
@@ -17895,6 +17777,70 @@ function outputTail(s) {
   if (!trimmed2)
     return "";
   return trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
+}
+function buildVerifyTypeArgs(verifyType, projectDir) {
+  return [
+    "-m",
+    "ai_router.verify_type",
+    "--set",
+    verifyType,
+    "--project-root",
+    projectDir
+  ];
+}
+function verifyTypeCommandHint(verifyType) {
+  return `python -m ai_router.verify_type --set ${verifyType}`;
+}
+function extractWriterWarning(stderr) {
+  const lines = (stderr || "").split(/\r?\n/).map((line) => line.trim()).filter((line) => line.startsWith("WARNING: "));
+  return lines.length > 0 ? lines.join(" ") : void 0;
+}
+function writeVerifyTypeThroughRouter(deps, verifyType) {
+  return new Promise((resolve7) => {
+    let settled = false;
+    let stdout = "";
+    let stderr = "";
+    const settle = (result) => {
+      if (settled)
+        return;
+      settled = true;
+      resolve7(result);
+    };
+    const failed = (detail) => settle({ ok: false, detail });
+    try {
+      deps.spawn(
+        deps.venvPythonPath,
+        buildVerifyTypeArgs(verifyType, deps.projectDir),
+        { cwd: deps.projectDir },
+        {
+          onStdout: (chunk) => {
+            stdout += chunk;
+          },
+          onStderr: (chunk) => {
+            stderr += chunk;
+          },
+          onClose: (exitCode) => {
+            if (exitCode === 0) {
+              const warning = extractWriterWarning(stderr);
+              settle(warning === void 0 ? { ok: true } : { ok: true, warning });
+              return;
+            }
+            const tail = outputTail(stderr || stdout);
+            failed(
+              `\`${verifyTypeCommandHint(verifyType)}\` exited with code ${exitCode}${tail ? `: ${tail}` : ""}`
+            );
+          },
+          onError: (err) => {
+            failed(`the write subprocess could not start: ${err.message}`);
+          }
+        }
+      );
+    } catch (err) {
+      failed(
+        `the write subprocess could not start: ${err instanceof Error ? err.message : String(err)}`
+      );
+    }
+  });
 }
 async function performCopilotSeatSetup(deps) {
   const outcome = await runCatalogRefresh(deps);
@@ -17926,56 +17872,15 @@ async function performCopilotSeatSetup(deps) {
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path13.join(deps.projectDir, LOCAL_OVERRIDES_REL);
-      const ignored = ensureLocalOverridesIgnored(
-        deps.fileOps,
-        deps.projectDir
-      );
-      const ignoreWarning = ignored.ok ? void 0 : `could not confirm ${LOCAL_OVERRIDES_REL} is git-ignored (${ignored.reason}) \u2014 add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing, or an API-key-only clone will inherit this machine's Copilot seat profile`;
-      const succeeded = () => ignoreWarning === void 0 ? { kind: "success", ...base } : { kind: "success", ...base, ignoreWarning };
-      if (!deps.fileOps.exists(configAbs)) {
-        writeConfigAtomically(
-          deps.fileOps,
-          configAbs,
-          "transport:\n  profile: copilot-cli\n"
-        );
-        return succeeded();
-      }
-      try {
-        const text = deps.fileOps.readFile(configAbs);
-        const loc = locateTransportProfile(text);
-        if (!loc) {
-          if (hasTopLevelTransportBlock(text)) {
-            const rendered2 = renderTransportProfile(text, "copilot-cli");
-            return {
-              kind: "config-write-failed",
-              providers: distinct,
-              detail: rendered2.ok ? "transport.profile could not be located for replacement" : rendered2.reason
-            };
-          }
-          const newText = text + (text.endsWith("\n") ? "" : "\n") + "transport:\n  profile: copilot-cli\n";
-          writeConfigAtomically(deps.fileOps, configAbs, newText);
-          return succeeded();
-        }
-        const rendered = renderTransportProfile(text, "copilot-cli");
-        if (!rendered.ok) {
-          return {
-            kind: "config-write-failed",
-            providers: distinct,
-            detail: rendered.reason
-          };
-        }
-        if (rendered.changed) {
-          writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
-        }
-        return succeeded();
-      } catch (err) {
+      const written = await writeVerifyTypeThroughRouter(deps, "COPILOT_CLI");
+      if (!written.ok) {
         return {
-          kind: "config-write-failed",
+          kind: "verify-type-write-failed",
           providers: distinct,
-          detail: err instanceof Error ? err.message : String(err)
+          detail: written.detail
         };
       }
+      return written.warning === void 0 ? { kind: "success", ...base } : { kind: "success", ...base, writerWarning: written.warning };
     }
   }
 }

@@ -1,33 +1,42 @@
 {
   "status": "completed",
-  "summary": "Set 124 Session 2 left exactly one mechanism for the machine/project fact. Session 1 re-scoped project-verify-type.txt to gitignored machine/project state; that made ai_router/local-overrides.yaml -- per-machine and living inside the checkout -- occupy the identical scope, so both files answered 'what verifies this project, on THIS machine' and only one could be authoritative. transport.profile is retired as a local override: no transport.* key is locally overridable now, and a stale key is REFUSED at config load with a message naming `python -m ai_router.verify_type --set <VALUE>`, where <VALUE> is DERIVED from the stale profile via VERIFY_TYPE_BY_PROFILE rather than left as a placeholder. Refuse-vs-warn was decided under prefer-reversible and journaled to decisions.jsonl: on a Copilot seat with no project file, warn-and-ignore would silently fall the profile back to `api` and then fail validate_provider_api_keys on a seat that has no keys by design -- a confusing credential error a long way from its cause, where a refusal naming one command is reversible in seconds. Both tests that pinned the retired precedence were REPLACED rather than deleted, and the claim was propagated to router-config.yaml (two comment blocks) and verify_type.py's derivation docstring. Migration dogfooded on this seat, which carried the key: the refusal fired naming COPILOT_CLI correctly, and after deleting the block load_config still resolves copilot-cli from the project file with copilot_preflight green. Full pytest: 3991 passed, 9 skipped. COMMIT PROVENANCE, disclosed rather than rewritten: this session's code changes (config.py, router-config.yaml, verify_type.py and two test files) landed in commit e96943c5, whose message reads 'docs: note the missing In Progress step icon in the Work Explorer'. Cause: an earlier `git add -A` staged for verification left everything in the index, and the later `git commit` took the whole index rather than only the path passed to the preceding `git add`. The label is wrong; the content is intact and reviewed. It was already pushed, and rewriting pushed history requires a force-push, which is operator-authority only -- so the mislabel is recorded here instead of being quietly amended. Commit 13b30174 carries the remainder (the placeholder_provider_keys fix and this session's artifacts).",
+  "summary": "Set 124 Session 3 propagated the machine/project claim to every live echo, then found and fixed two defects the spec had not anticipated -- one of them Critical, and created by this set's own Session 2. THE DOC PASS (as planned): README.md, docs/quick-start.md (both inventory rows -- local-overrides.yaml now names its retired transport.profile), AGENTS/CLAUDE/GEMINI.md, docs/planning/verify-type-resolution.md (a Set 124 amendment banner in the status preamble per L-064-8 rather than a rewrite, because it is a dated design record), docs/tutorials/adopt-dabbler.md, and docs/templates/consumer-bootstrap/getting-started.md.template, which had asserted the EXACT INVERSE of the operator's ruling; an already-committed consumer is now told to git rm --cached. DEFECT 1 (Critical, fixed): performCopilotSeatSetup still rendered transport.profile: copilot-cli into ai_router/local-overrides.yaml -- the key S2 made a HARD REFUSAL -- so a SUCCESSFUL 'Dabbler: Set Up Copilot Seat' handed the operator a project whose every load_config raised ValueError. Reproduced in a throwaway fixture before deciding anything, brought to the operator as an education-mode brief rather than fixed unilaterally (it expanded session scope), and journaled under goal-over-letter. The operator's constraint -- 'we can't break the Direct API option, but we need to support COPILOT_CLI' -- selected the fix: retarget the write to the ONE sanctioned entry point, spawning `<venvPython> -m ai_router.verify_type --set COPILOT_CLI --project-root <dir>` through the same scaffolded interpreter the catalog refresh uses, so there is exactly one writer of project-verify-type.txt. Direct API is untouched by construction: an 'api' pick was always a no-op. The retired YAML-render machinery (locateTransportProfile / hasTopLevelTransportBlock / renderTransportProfile / RenderProfileResult) is deleted, readTransportProfile became readProjectVerifyType, and outcome kind config-write-failed became verify-type-write-failed. DEFECT 2 (Major, fixed), found BY the cold-start walk the spec required: write_project_verify_type embeds a header reading 'Gitignored on purpose', and nothing gitignored it -- the documented first run left the answer untracked and COMMITTABLE (git check-ignore exit 1). The writer now calls a new ensure_gitignored() BEFORE writing the file, so there is no window in which the answer exists un-ignored; is_gitignored_by() is conservative in the safe direction and never counts comments or '!' re-includes. That made the .gitignore guarantee this session had JUST added to the extension a second implementation of one fact, so it was deleted (with writeFileAtomically, whose last caller it was) and the extension inherits the guarantee through the spawn. VERIFICATION found the seam left by that removal (round 1, Major, accepted): the guarantee moved but its failure signal did not, so an unwritable .gitignore would have produced a toast claiming the file was gitignored when it was not. The extension now RELAYS the writer's own stderr warning rather than re-deriving anything, matched line-anchored on 'WARNING: ' so Python's own RuntimeWarning noise -- present on every invocation -- cannot be mistaken for it. Round 3 remediation-review: VERIFIED, fix accepted. THE COLD START itself passed end to end from an empty folder plus bare git init: branch 3 fired (exit 3) naming the gitignore rationale, --set COPILOT_CLI resolved the project on branch 1 (exit 0), and the re-walk showed check-ignore claiming the file with git status clean of it. Suites: pytest 4006 passed / 9 skipped; Playwright 31 passed; mocha 1462 passing / 2 pending -- all re-run after the last code change. CHECKLIST DISCLOSURE: three verification-round transitions left a record with no checklist post before the next one happened. The gate is advisory and no waiver is claimed here, because an operator attestation is not the orchestrator's to author; the misses are disclosed instead.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/config.py",
-    "ai_router/router-config.yaml",
+    "README.md",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "docs/quick-start.md",
+    "docs/planning/verify-type-resolution.md",
+    "docs/tutorials/adopt-dabbler.md",
+    "docs/templates/consumer-bootstrap/getting-started.md.template",
+    "test-fixtures/cold-start/full/docs/dabbler/getting-started.md",
     "ai_router/verify_type.py",
     "ai_router/tests/test_verify_type_resolution.py",
-    "ai_router/tests/test_local_overrides_merge.py",
-    "ai_router/tests/test_routing_exclusion_integrity.py",
-    "docs/session-sets/124-verify-type-is-machine-project-state/s2-conventions.md",
-    "docs/planning/work-explorer-in-progress-step-icon.md"
+    "tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts",
+    "tools/dabbler-ai-orchestration/src/utils/providerKey.ts",
+    "tools/dabbler-ai-orchestration/src/commands/copilotSeatSetupCommand.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/copilotSeatSetup.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldSeatSetup.test.ts",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/getting-started.md.template",
+    "docs/session-sets/124-verify-type-is-machine-project-state/change-log.md",
+    "docs/session-sets/124-verify-type-is-machine-project-state/s3-conventions.md",
+    "docs/session-sets/124-verify-type-is-machine-project-state/s3-remediation-round-1.md",
+    "docs/session-sets/124-verify-type-is-machine-project-state/ai-assignment.md"
   ],
   "lessons_cited": [
     "L-112-1",
     "L-069-1",
-    "L-064-8"
+    "L-079-1",
+    "L-064-8",
+    "L-064-9"
   ],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 3 propagates the machine/project claim to every remaining echo -- README, quick-start, the three engine bootstrap files, verify-type-resolution.md, adopt-dabbler.md, the consumer-bootstrap template, and copilotSeatSetup.ts plus the two suite tests pinning its strings -- then walks a true cold start, which is now the normal first run on every machine. It needs the live context of what Sessions 1 and 2 actually shipped, because the doc edits must describe the delivered behaviour rather than the design intent, and it owes the full Playwright suite at close because it edits extension source."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": []
 }

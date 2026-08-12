@@ -35,7 +35,7 @@ hold Copilot subscriptions and no provider keys. Either way you need reach to
 
 Run **`Dabbler: Set Up New Project`** in VS Code to scaffold, then
 **`python -m ai_router.verify_type --set DIRECT_API`** (or `COPILOT_CLI`) to
-commit what verifies the project; **`Dabbler: Get Started`** opens the
+record what verifies the project on this machine; **`Dabbler: Get Started`** opens the
 step-by-step companion doc. The scaffold also declares
 a `default` module with two starter sets already scaffolded —
 `001-default-plan` (create or import your project plan) and
@@ -72,8 +72,8 @@ After `pip install dabbler-ai-router` and `Dabbler: Set Up New Project` (or the 
 |---|---|
 | `ai_router/router-config.yaml` | Outsourcing mode, verification settings, providers and their API-key env-var names, significance flagging, Pushover notifications. Committed. |
 | `ai_router/budget.yaml` | Spending threshold, scope (project-lifetime / monthly), warn-at percent. Committed. |
-| `ai_router/local-overrides.yaml` | Per-machine settings — **gitignored**. Anything that differs between your machine and a teammate's belongs here. |
-| `project-verify-type.txt` | **What verifies this project**, `DIRECT_API` or `COPILOT_CLI`. Committed, at the repo root, and the router *derives* `transport.profile` from it — so this file outranks a `transport.profile` set in either of the two above. Write it with `python -m ai_router.verify_type --set <VALUE>`; read what a project currently resolves to with the same command and no flags. |
+| `ai_router/local-overrides.yaml` | Per-machine *preferences* — **gitignored**. Anything that differs between your machine and a teammate's belongs here, except what verifies the project: Set 124 retired `transport.profile` from this file, and a stale one is refused at config load with the replacement command. |
+| `project-verify-type.txt` | **What verifies this project**, `DIRECT_API` or `COPILOT_CLI`. **Gitignored** — machine/project state, answered once per machine, at the repo root — and the router *derives* `transport.profile` from it, so it outranks the `transport.profile` shipped in `router-config.yaml`. Write it with `python -m ai_router.verify_type --set <VALUE>`, which adds the ignore rule before it writes; read what a project currently resolves to with the same command and no flags. |
 
 Provider API keys and Pushover credentials are environment variables, not config values; the config files only name the variables to read.
 

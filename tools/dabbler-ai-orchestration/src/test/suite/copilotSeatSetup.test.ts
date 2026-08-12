@@ -1,7 +1,7 @@
 // Set 079 Session 2 — Layer-2 tests for the Copilot seat-setup wrapper
 // (src/utils/copilotSeatSetup.ts). Pins the spec's happy path
-// (sequencing inputs, pinned argv, parse-not-exit-code, the anchored
-// transport.profile template render) and the critique-M1 hygiene
+// (sequencing inputs, pinned argv, parse-not-exit-code, the verify-type
+// write through the router's own CLI) and the critique-M1 hygiene
 // (cancel/teardown kill the child and restore the lockfile snapshot).
 // Cases generated via routed test-generation (gemini-pro) and adapted
 // (platform-safe label paths; typed action-message helper).
@@ -16,7 +16,6 @@ import * as assert from "assert";
 import * as path from "path";
 import {
   CATALOG_LOCKFILE_REL,
-  CONFIG_WRITE_TMP_SUFFIX,
   SEAT_STATUS_MARKER_REL,
   CancellationLike,
   KillEffects,
@@ -34,20 +33,19 @@ import {
   deriveSeatLabel,
   describeSeatSetupOutcome,
   describeSkipInstallIncompleteHonesty,
+  extractWriterWarning,
   dispatchKill,
-  ensureLocalOverridesIgnored,
-  isLocalOverridesIgnored,
+  buildVerifyTypeArgs,
   parseRefreshStdout,
   performCopilotSeatSetup,
   readCopilotSeatStatusMarker,
-  readTransportProfile,
-  renderTransportProfile,
+  readProjectVerifyType,
   rerunRefreshHint,
   resolveKillStrategy,
   runCatalogRefresh,
   spawnDetached,
   writeCopilotSeatStatusMarker,
-  writeConfigAtomically,
+  verifyTypeCommandHint,
 } from "../../utils/copilotSeatSetup";
 
 // --- Fakes (hand-rolled; the suite convention — no sinon) ---
@@ -100,6 +98,11 @@ class FakeFileOps implements SeatSetupFileOps, SeedReadOps {
 interface FakeSpawnerState {
   spawner: RefreshChildSpawner;
   lastCall: { cmd: string; args: string[]; opts: { cwd: string } } | null;
+  /** Set 124 S3: performCopilotSeatSetup now spawns TWICE on the happy
+   * path -- the catalog refresh, then the verify-type write through
+   * `python -m ai_router.verify_type`. Every call is recorded so a test
+   * can assert the second invocation's argv, not just the first. */
+  calls: { cmd: string; args: string[]; opts: { cwd: string } }[];
   child: {
     callbacks: RefreshChildCallbacks | null;
     handle: { killCount: number; kill(): void };
@@ -112,10 +115,12 @@ function createFakeSpawner(): FakeSpawnerState {
     spawner: (cmd, args, opts, callbacks) => {
       if (state.child.throwOnSpawn) throw state.child.throwOnSpawn;
       state.lastCall = { cmd, args, opts };
+      state.calls.push({ cmd, args, opts });
       state.child.callbacks = callbacks;
       return state.child.handle;
     },
     lastCall: null,
+    calls: [],
     child: {
       callbacks: null,
       handle: {
@@ -262,140 +267,122 @@ suite("copilotSeatSetup", () => {
     });
   });
 
-  suite("renderTransportProfile", () => {
-    const baseConfig = [
-      "# Some header",
-      "transport: # the main block",
-      "  profile: api # the key to replace",
-      "# another comment",
-      "transports:",
-      "  copilot-cli:",
-      "    # not this one",
-      "    profile: some-other-value",
-      "",
-    ].join("\n");
+  // Set 124 S3: the renderTransportProfile suite went with the renderer.
+  // It pinned an anchored YAML field replacement for `transport.profile` in
+  // local-overrides.yaml -- a key S2 retired outright, so there is nothing
+  // left for it to be right about. Its replacement is the
+  // buildVerifyTypeArgs / writeVerifyTypeThroughRouter coverage below: the
+  // extension no longer edits a config field, it invokes the one writer.
 
-    test("replaces api with copilot-cli inside the transport block only", () => {
-      const result = renderTransportProfile(baseConfig, "copilot-cli");
-      assert.ok(result.ok);
-      if (result.ok) {
-        assert.strictEqual(result.changed, true);
-        assert.ok(result.text.includes("profile: copilot-cli # the key to replace"));
-        assert.ok(!result.text.includes("profile: api # the key to replace"));
-        // the sibling block's own profile key is untouched
-        assert.ok(result.text.includes("profile: some-other-value"));
-      }
-    });
-
-    test("preserves CRLF line endings", () => {
-      const crlfConfig = baseConfig.replace(/\n/g, "\r\n");
-      const result = renderTransportProfile(crlfConfig, "copilot-cli");
-      assert.ok(result.ok);
-      if (result.ok) {
-        assert.strictEqual(result.changed, true);
-        assert.ok(
-          result.text.includes("profile: copilot-cli # the key to replace\r\n"),
-        );
-        assert.strictEqual(
-          (result.text.match(/\r\n/g) || []).length,
-          (crlfConfig.match(/\r\n/g) || []).length,
-        );
-      }
-    });
-
-    test("idempotent when the profile is already copilot-cli", () => {
-      const config = baseConfig.replace(
-        "profile: api # the key to replace",
-        "profile: copilot-cli # the key to replace",
+  suite("buildVerifyTypeArgs (the pinned write invocation)", () => {
+    test("names the module, the value, and an EXPLICIT --project-root", () => {
+      assert.deepStrictEqual(
+        buildVerifyTypeArgs("COPILOT_CLI", "/proj"),
+        [
+          "-m",
+          "ai_router.verify_type",
+          "--set",
+          "COPILOT_CLI",
+          "--project-root",
+          "/proj",
+        ],
       );
-      const result = renderTransportProfile(config, "copilot-cli");
-      assert.ok(result.ok);
-      if (result.ok) {
-        assert.strictEqual(result.changed, false);
-        assert.strictEqual(result.text, config);
-      }
     });
 
-    test("fails loud when there is no transport block", () => {
-      const result = renderTransportProfile("# no transport block", "copilot-cli");
-      assert.strictEqual(result.ok, false);
+    // WHY this is pinned rather than left to the spawn cwd: verify_type
+    // resolves a write target by walking up to the first ancestor holding
+    // `.git`. A scaffolded project that is not yet a git repo would write
+    // somewhere ABOVE itself -- silently answering for the wrong project.
+    test("does NOT rely on cwd: --project-root is always present", () => {
+      const args = buildVerifyTypeArgs("DIRECT_API", "/somewhere/else");
+      assert.ok(args.includes("--project-root"));
+      assert.strictEqual(args[args.indexOf("--project-root") + 1], "/somewhere/else");
     });
 
-    test("fails loud when the block has no profile key (never appends one)", () => {
-      const result = renderTransportProfile("transport:\n  other: key\n", "copilot-cli");
-      assert.strictEqual(result.ok, false);
-    });
-
-    test("targets the DIRECT child, not a nested sub-block's profile key", () => {
-      // S2 code-review cross-verifier Major: a nested `profile:` before
-      // the direct child must not be matched — rewriting it would report
-      // success while the real transport.profile stayed api.
-      const config = [
-        "transport:",
-        "  nested:",
-        "    profile: api",
-        "  profile: api   # api | copilot-cli",
-        "",
-      ].join("\n");
-      const result = renderTransportProfile(config, "copilot-cli");
-      assert.ok(result.ok);
-      if (result.ok) {
-        assert.ok(result.text.includes("    profile: api\n"), "nested key untouched");
-        assert.ok(
-          result.text.includes("  profile: copilot-cli   # api | copilot-cli"),
-          "direct child rewritten",
-        );
-      }
-    });
-
-    test("refuses to overwrite an operator-edited value", () => {
-      const config = baseConfig.replace(
-        "profile: api # the key to replace",
-        "profile: custom-value # the key to replace",
-      );
-      const result = renderTransportProfile(config, "copilot-cli");
-      assert.strictEqual(result.ok, false);
-      if (!result.ok) assert.ok(result.reason.includes("operator-edited"));
+    test("never names the retired local-overrides transport key", () => {
+      const joined = buildVerifyTypeArgs("COPILOT_CLI", "/proj").join(" ");
+      assert.doesNotMatch(joined, /transport/);
+      assert.doesNotMatch(joined, /local-overrides/);
     });
   });
 
-  suite("readTransportProfile", () => {
-    const projectRoot = "/proj";
-    const configPath = path.join(projectRoot, "ai_router", "local-overrides.yaml");
+  suite("verifyTypeCommandHint", () => {
+    test("is the exact command an operator can paste", () => {
+      assert.strictEqual(
+        verifyTypeCommandHint("COPILOT_CLI"),
+        "python -m ai_router.verify_type --set COPILOT_CLI",
+      );
+      assert.strictEqual(
+        verifyTypeCommandHint("DIRECT_API"),
+        "python -m ai_router.verify_type --set DIRECT_API",
+      );
+    });
+  });
 
-    test("reads api", () => {
+  suite("readProjectVerifyType", () => {
+    const projectRoot = "/proj";
+    const verifyTypePath = path.join(projectRoot, "project-verify-type.txt");
+
+    test("reads DIRECT_API", () => {
       const ops = new FakeFileOps();
-      ops.files.set(configPath, "transport:\n  profile: api\n");
-      assert.strictEqual(readTransportProfile(projectRoot, ops), "api");
+      ops.files.set(verifyTypePath, "DIRECT_API\n");
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), "DIRECT_API");
     });
 
-    test("reads copilot-cli", () => {
+    test("reads COPILOT_CLI", () => {
       const ops = new FakeFileOps();
-      ops.files.set(configPath, "transport:\n  profile: copilot-cli\n");
-      assert.strictEqual(readTransportProfile(projectRoot, ops), "copilot-cli");
+      ops.files.set(verifyTypePath, "COPILOT_CLI\n");
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), "COPILOT_CLI");
+    });
+
+    // The Python writer emits a multi-line comment header explaining why the
+    // file is gitignored. A reader that choked on it would report "never
+    // chose Copilot" for every seat the extension itself configured.
+    test("skips the comment header the sanctioned writer emits", () => {
+      const ops = new FakeFileOps();
+      ops.files.set(
+        verifyTypePath,
+        "# How this project is verified, ON THIS MACHINE. Gitignored on\n" +
+          "# purpose: this is machine/project state, not committed project\n" +
+          "#\n" +
+          "\n" +
+          "COPILOT_CLI\n",
+      );
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), "COPILOT_CLI");
     });
 
     test("null when the file does not exist", () => {
-      assert.strictEqual(readTransportProfile(projectRoot, new FakeFileOps()), null);
+      assert.strictEqual(readProjectVerifyType(projectRoot, new FakeFileOps()), null);
     });
 
     test("null when readFile throws", () => {
       const ops = new FakeFileOps();
-      ops.files.set(configPath, "anything");
+      ops.files.set(verifyTypePath, "anything");
       ops.errors.readFile = true;
-      assert.strictEqual(readTransportProfile(projectRoot, ops), null);
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), null);
     });
 
-    test("null for an unrecognized profile value", () => {
+    test("null for an unrecognized value", () => {
       const ops = new FakeFileOps();
-      ops.files.set(configPath, "transport:\n  profile: custom\n");
-      assert.strictEqual(readTransportProfile(projectRoot, ops), null);
+      ops.files.set(verifyTypePath, "SOMETHING_ELSE\n");
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), null);
     });
 
-    test("null when only a different top-level block carries profile:", () => {
+    test("null for a comments-only file", () => {
       const ops = new FakeFileOps();
-      ops.files.set(configPath, "transports:\n  profile: api\n");
-      assert.strictEqual(readTransportProfile(projectRoot, ops), null);
+      ops.files.set(verifyTypePath, "# just a header\n\n");
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), null);
+    });
+
+    // The old reader answered from ai_router/local-overrides.yaml. A reader
+    // that still did would resurrect the retired mechanism as a SEED.
+    test("does not answer from a local-overrides transport.profile", () => {
+      const ops = new FakeFileOps();
+      ops.files.set(
+        path.join(projectRoot, "ai_router", "local-overrides.yaml"),
+        "transport:\n  profile: copilot-cli\n",
+      );
+      assert.strictEqual(readProjectVerifyType(projectRoot, ops), null);
     });
   });
 
@@ -501,15 +488,15 @@ suite("copilotSeatSetup", () => {
   });
 
   suite("deriveCopilotSeatChosenUnconfirmed (Set 097 D1)", () => {
-    test("never chose: marker null -> false, whatever the durable profile", () => {
+    test("never chose: marker null -> false, whatever the durable verify type", () => {
       assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, null), false);
-      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, "api"), false);
-      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, "copilot-cli"), false);
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, "DIRECT_API"), false);
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed(null, "COPILOT_CLI"), false);
     });
 
-    test("chose + confirmed: durable profile is copilot-cli -> false, even with a stale marker", () => {
+    test("chose + confirmed: durable verify type is COPILOT_CLI -> false, even with a stale marker", () => {
       assert.strictEqual(
-        deriveCopilotSeatChosenUnconfirmed("unconfirmed", "copilot-cli"),
+        deriveCopilotSeatChosenUnconfirmed("unconfirmed", "COPILOT_CLI"),
         false,
       );
     });
@@ -519,7 +506,7 @@ suite("copilotSeatSetup", () => {
       // "unconfirmed", profile stays "api" or the file never existed) —
       // that IS the point: the derivation cannot and need not tell them
       // apart, only whether the seat is durably confirmed.
-      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed("unconfirmed", "api"), true);
+      assert.strictEqual(deriveCopilotSeatChosenUnconfirmed("unconfirmed", "DIRECT_API"), true);
       assert.strictEqual(deriveCopilotSeatChosenUnconfirmed("unconfirmed", null), true);
     });
   });
@@ -755,14 +742,18 @@ suite("copilotSeatSetup", () => {
     let cancellation: FakeCancellation;
 
     const projectDir = "/project";
-    const configPath = path.join(projectDir, "ai_router", "local-overrides.yaml");
-    const baseConfig = "transport:\n  profile: api   # api | copilot-cli\n";
+    const gitignorePath = path.join(projectDir, ".gitignore");
+    const verifyTypePath = path.join(projectDir, "project-verify-type.txt");
+    const localOverridesPath = path.join(
+      projectDir,
+      "ai_router",
+      "local-overrides.yaml",
+    );
 
     setup(() => {
       fileOps = new FakeFileOps();
       spawnerState = createFakeSpawner();
       cancellation = new FakeCancellation();
-      fileOps.files.set(configPath, baseConfig);
       deps = {
         venvPythonPath: "/venv/bin/python",
         projectDir,
@@ -782,9 +773,29 @@ suite("copilotSeatSetup", () => {
       spawnerState.child.callbacks!.onClose(code);
     }
 
-    test("success: >=2 distinct providers rewrites transport.profile", async () => {
+    /** Settle the SECOND spawn -- the verify-type write. Yields the
+     * microtask/timer queue until performCopilotSeatSetup has reached it,
+     * so the test never races the await between the two children. */
+    async function closeVerifyTypeWrite(
+      code: number | null,
+      stderr = "",
+    ): Promise<void> {
+      for (let i = 0; i < 20 && spawnerState.calls.length < 2; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      assert.strictEqual(
+        spawnerState.calls.length,
+        2,
+        "the verify-type write must have been spawned",
+      );
+      if (stderr) spawnerState.child.callbacks!.onStderr(stderr);
+      spawnerState.child.callbacks!.onClose(code);
+    }
+
+    test("success: >=2 distinct providers records COPILOT_CLI through verify_type", async () => {
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 3/3 models confirmed, providers=['a', 'b', 'a']");
+      await closeVerifyTypeWrite(0);
       const outcome = await promise;
 
       assert.strictEqual(outcome.kind, "success");
@@ -793,11 +804,76 @@ suite("copilotSeatSetup", () => {
         assert.strictEqual(outcome.confirmed, 3);
         assert.strictEqual(outcome.total, 3);
       }
-      const newConfig = fileOps.readFile(configPath);
-      assert.ok(newConfig.includes("profile: copilot-cli   # api | copilot-cli"));
+      // The write goes through the router's own entry point, in the
+      // scaffolded venv, against THIS project.
+      const write = spawnerState.calls[1];
+      assert.strictEqual(write.cmd, "/venv/bin/python");
+      assert.deepStrictEqual(
+        write.args,
+        buildVerifyTypeArgs("COPILOT_CLI", projectDir),
+      );
+      assert.strictEqual(write.opts.cwd, projectDir);
     });
 
-    test("insufficient-providers: config stays api", async () => {
+    // THE REGRESSION THIS SESSION EXISTS TO PREVENT (Set 124 S3). Until
+    // now this branch rendered `transport.profile: copilot-cli` into
+    // ai_router/local-overrides.yaml. Set 124 S2 made that key a HARD
+    // REFUSAL at config load, so a "successful" seat setup handed the
+    // operator a project whose every load_config raised. A planted
+    // assertion, not a code read, is what separates a fixed writer from a
+    // fixed-looking one (L-112-1).
+    test("success: writes NOTHING into local-overrides.yaml (the retired key)", async () => {
+      const promise = performCopilotSeatSetup(deps);
+      closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      await closeVerifyTypeWrite(0);
+      assert.strictEqual((await promise).kind, "success");
+
+      assert.ok(
+        !fileOps.exists(localOverridesPath),
+        "seat setup must not create ai_router/local-overrides.yaml at all",
+      );
+      for (const [, content] of fileOps.files) {
+        assert.doesNotMatch(
+          content,
+          /profile:\s*copilot-cli/,
+          "no file this command writes may carry the retired transport.profile key",
+        );
+      }
+    });
+
+    // The look-alike (L-112-1): an operator's EXISTING local-overrides.yaml
+    // must be left exactly as found -- the fix is "stop writing that key",
+    // not "clobber that file".
+    test("success: an existing local-overrides.yaml is left byte-identical", async () => {
+      const preexisting = "notifications:\n  pushover: true\n";
+      fileOps.files.set(localOverridesPath, preexisting);
+      const promise = performCopilotSeatSetup(deps);
+      closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      await closeVerifyTypeWrite(0);
+      assert.strictEqual((await promise).kind, "success");
+      assert.strictEqual(fileOps.readFile(localOverridesPath), preexisting);
+    });
+
+    // Set 124 S3: this module writes NOTHING now. The two tests that stood
+    // here pinned the extension-side .gitignore guarantee and its
+    // ignoreWarning; both moved into `verify_type.write_project_verify_type`,
+    // which establishes the rule before it writes the file. What stays
+    // pinnable here is the negative: the seat setup touches no files at all.
+    test("success: the seat setup itself writes no files", async () => {
+      const promise = performCopilotSeatSetup(deps);
+      closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      await closeVerifyTypeWrite(0);
+      assert.strictEqual((await promise).kind, "success");
+
+      // The lockfile is the refresh CLI's own artifact (written by the child,
+      // not by this module) and the project file belongs to verify_type, so
+      // nothing reaches disk through the injected ops on the happy path.
+      assert.ok(!fileOps.exists(gitignorePath));
+      assert.ok(!fileOps.exists(verifyTypePath));
+      assert.ok(!fileOps.exists(localOverridesPath));
+    });
+
+    test("insufficient-providers: no verify-type write is spawned at all", async () => {
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 1/3 models confirmed, providers=['google']");
       const outcome = await promise;
@@ -806,44 +882,104 @@ suite("copilotSeatSetup", () => {
       if (outcome.kind === "insufficient-providers") {
         assert.deepStrictEqual(outcome.providers, ["google"]);
       }
-      assert.strictEqual(fileOps.readFile(configPath), baseConfig);
+      assert.strictEqual(spawnerState.calls.length, 1, "refresh only");
+      assert.ok(!fileOps.exists(verifyTypePath));
     });
 
-    test("success: creates local-overrides.yaml when it is missing", async () => {
-      fileOps.files.delete(configPath);
+    // S3 discovery round 1, Major: exit 0 is NOT unconditional success. The
+    // writer fails open on an unwritable .gitignore -- it records the answer
+    // and warns on stderr -- and swallowing that warning would leave the
+    // operator with a committable machine-local answer while the toast
+    // claimed it was gitignored.
+    test("success: relays the writer's stderr warning instead of claiming gitignored", async () => {
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      await closeVerifyTypeWrite(
+        0,
+        "WARNING: could not add '/project-verify-type.txt' to " +
+          "/project/.gitignore (read-only file system). " +
+          "project-verify-type.txt is machine/project state -- add that rule " +
+          "by hand before committing.\n",
+      );
       const outcome = await promise;
 
       assert.strictEqual(outcome.kind, "success");
-      assert.strictEqual(
-        fileOps.readFile(configPath),
-        "transport:\n  profile: copilot-cli\n",
-      );
+      if (outcome.kind === "success") {
+        assert.ok(outcome.writerWarning, "the fail-open skip must be named");
+        assert.ok(outcome.writerWarning!.includes("could not add"));
+      }
+      const msg = describeSeatSetupOutcome(outcome, false, "hint");
+      assert.strictEqual(msg.level, "warning");
+      assert.match(msg.message, /NOT git-ignored/);
     });
 
-    test("success: appends transport block when local-overrides has no transport block", async () => {
-      fileOps.files.set(configPath, "routing:\n  outsourcing_mode: disabled\n");
+    // The look-alike (L-112-1): Python's own interpreter noise reaches the
+    // same stream. `<frozen runpy>:130: RuntimeWarning: ...` must NOT be
+    // mistaken for the writer's warning, or every single successful setup
+    // would tell the operator their answer is committable.
+    test("success: unrelated stderr noise is NOT reported as a warning", async () => {
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      await closeVerifyTypeWrite(
+        0,
+        "<frozen runpy>:130: RuntimeWarning: 'ai_router.verify_type' found in " +
+          "sys.modules after import of package 'ai_router'\n",
+      );
       const outcome = await promise;
 
       assert.strictEqual(outcome.kind, "success");
+      if (outcome.kind === "success") {
+        assert.strictEqual(outcome.writerWarning, undefined);
+      }
+      const msg = describeSeatSetupOutcome(outcome, false, "hint");
+      assert.strictEqual(msg.level, "info");
+      assert.match(msg.message, /gitignored/);
+    });
+
+    test("extractWriterWarning: fires on the contract, ignores the noise", () => {
       assert.strictEqual(
-        fileOps.readFile(configPath),
-        "routing:\n  outsourcing_mode: disabled\ntransport:\n  profile: copilot-cli\n",
+        extractWriterWarning("WARNING: could not add '/x' to /y (EACCES)."),
+        "WARNING: could not add '/x' to /y (EACCES).",
+      );
+      assert.strictEqual(extractWriterWarning(""), undefined);
+      assert.strictEqual(
+        extractWriterWarning("<frozen runpy>:130: RuntimeWarning: whatever"),
+        undefined,
+      );
+      // A line MENTIONING a warning mid-sentence is not the contract.
+      assert.strictEqual(
+        extractWriterWarning("wrote the file; no WARNING: was emitted"),
+        undefined,
       );
     });
 
-    test("config-write-failed: transport block exists without profile", async () => {
-      fileOps.files.set(configPath, "transport:\n  diagnostics: true\n");
+    test("verify-type-write-failed: the write CLI exits non-zero", async () => {
       const promise = performCopilotSeatSetup(deps);
       closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      await closeVerifyTypeWrite(2, "Refusing to write 'NOPE'.");
       const outcome = await promise;
 
-      assert.strictEqual(outcome.kind, "config-write-failed");
-      if (outcome.kind === "config-write-failed") {
-        assert.ok(outcome.detail.includes("no `transport:` block"));
+      assert.strictEqual(outcome.kind, "verify-type-write-failed");
+      if (outcome.kind === "verify-type-write-failed") {
+        assert.ok(outcome.detail.includes("exited with code 2"));
+        assert.ok(outcome.detail.includes("Refusing to write"));
+        assert.deepStrictEqual(outcome.providers, ["a", "b"]);
+      }
+    });
+
+    test("verify-type-write-failed: the write subprocess cannot start", async () => {
+      const promise = performCopilotSeatSetup(deps);
+      closeWith(0, "Wrote f: 2/2 models confirmed, providers=['a', 'b']");
+      for (let i = 0; i < 20 && spawnerState.calls.length < 2; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+      spawnerState.child.callbacks!.onError(new Error("ENOENT"));
+      const outcome = await promise;
+
+      assert.strictEqual(outcome.kind, "verify-type-write-failed");
+      if (outcome.kind === "verify-type-write-failed") {
+        assert.ok(outcome.detail.includes("could not start"));
+        assert.ok(outcome.detail.includes("ENOENT"));
       }
     });
 
@@ -857,6 +993,7 @@ suite("copilotSeatSetup", () => {
         assert.ok(outcome.detail.includes("exited with code 1"));
         assert.ok(outcome.detail.includes("Something went wrong."));
       }
+      assert.strictEqual(spawnerState.calls.length, 1, "no write on a failed probe");
     });
 
     test("refresh-failed passthrough: exit 0 with unparseable output", async () => {
@@ -870,13 +1007,15 @@ suite("copilotSeatSetup", () => {
       }
     });
 
-    test("cancelled passthrough", async () => {
+    test("cancelled passthrough: nothing is written and nothing is spawned twice", async () => {
       const promise = performCopilotSeatSetup(deps);
       cancellation.cancel();
       spawnerState.child.callbacks!.onClose(null);
       const outcome = await promise;
       assert.strictEqual(outcome.kind, "cancelled");
-      assert.strictEqual(fileOps.readFile(configPath), baseConfig);
+      assert.strictEqual(spawnerState.calls.length, 1);
+      assert.ok(!fileOps.exists(verifyTypePath));
+      assert.ok(!fileOps.exists(gitignorePath));
     });
   });
 
@@ -929,7 +1068,8 @@ suite("copilotSeatSetup", () => {
         test("message is level:info, identical for keyed/keyless states", () => {
           const expected =
             "Copilot seat set up: 10/12 models confirmed (providers: p1, p2). " +
-            "transport.profile: copilot-cli written to ai_router/local-overrides.yaml.";
+            "COPILOT_CLI written to project-verify-type.txt (gitignored — the " +
+            "router derives transport.profile: copilot-cli from it).";
           const msgKeyless = describeSeatSetupOutcome(outcome, false, rerunHint);
           assert.strictEqual(msgKeyless.level, "info");
           assert.strictEqual(msgKeyless.message, expected);
@@ -1031,13 +1171,13 @@ suite("copilotSeatSetup", () => {
         });
       });
 
-      suite("kind: config-write-failed", () => {
+      suite("kind: verify-type-write-failed", () => {
         const outcome: SeatSetupOutcome = {
-          kind: "config-write-failed",
+          kind: "verify-type-write-failed",
           providers: ["p1", "p2"],
           detail: "test detail",
         };
-        test("keyless: warns 'not yet functional', gives hand-edit (not re-probe) guidance", () => {
+        test("keyless: warns 'not yet functional', gives the one-command (not re-probe) guidance", () => {
           const msg = describeSeatSetupOutcome(outcome, false, rerunHint);
           assert.strictEqual(msg.level, "warning");
           assert.match(msg.message, /not yet functional/);
@@ -1046,18 +1186,31 @@ suite("copilotSeatSetup", () => {
           assert.ok(!msg.message.includes(rerunHint));
         });
 
-        test("keys present: affirms the keys keep working, gives hand-edit guidance", () => {
+        test("keys present: affirms the keys keep working, names the exact command", () => {
           const msg = describeSeatSetupOutcome(outcome, true, rerunHint);
           assert.strictEqual(msg.level, "warning");
           // Set 123 S3: the old pin was /api profile with the DABBLER_\* key/,
           // which asserted an EFFECTIVE profile this code cannot know — the
-          // committed project-verify-type.txt decides it. What stays true, and
+          // resolved project-verify-type.txt decides it. What stays true, and
           // is what the operator needs, is that the keys are still usable.
           assert.match(msg.message, /DABBLER_\* key\(s\) already set/);
           assert.match(msg.message, /project-verify-type\.txt resolves to/);
           assert.doesNotMatch(msg.message, /not yet functional/);
           assert.match(msg.message, /no re-probe is needed/);
           assert.ok(!msg.message.includes(rerunHint));
+        });
+
+        // Set 124 S3: the recovery instruction must be a command the operator
+        // can paste, not a YAML field to hand-edit in a file that no longer
+        // accepts it. Naming `transport:` here would send an operator to edit
+        // the exact key that now refuses at config load.
+        test("both states name `verify_type --set COPILOT_CLI`, never the retired key", () => {
+          for (const keys of [true, false]) {
+            const msg = describeSeatSetupOutcome(outcome, keys, rerunHint);
+            assert.ok(msg.message.includes(verifyTypeCommandHint("COPILOT_CLI")));
+            assert.doesNotMatch(msg.message, /transport:/);
+            assert.doesNotMatch(msg.message, /local-overrides\.yaml/);
+          }
         });
       });
     });
@@ -1075,133 +1228,9 @@ suite("copilotSeatSetup", () => {
       });
     });
 
-    suite("writeConfigAtomically", () => {
-      test("with rename support: stages through the tmp path, no tmp left behind", () => {
-        const ops = new FakeFileOpsWithRename();
-        const newContent = "new content";
-        const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
-
-        writeConfigAtomically(ops, configAbs, newContent);
-
-        assert.deepStrictEqual(
-          ops.renameLog,
-          [{ old: tmpAbs, new: configAbs }],
-          "must stage through the tmp path and rename over the target",
-        );
-        assert.ok(!ops.files.has(tmpAbs), "temp file should be gone after rename");
-        assert.strictEqual(ops.files.get(configAbs), newContent, "final file has new content");
-      });
-
-      test("when rename throws: propagates error, removes temp file, leaves original", () => {
-        const ops = new FakeFileOpsWithRename();
-        const newContent = "new content";
-        const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
-        const renameError = new Error("Fake rename fail");
-        ops.throwOnRename = renameError;
-        ops.files.set(configAbs, baseConfigContent);
-
-        assert.throws(() => writeConfigAtomically(ops, configAbs, newContent), renameError);
-
-        assert.strictEqual(ops.files.get(configAbs), baseConfigContent, "original untouched");
-        assert.deepStrictEqual(
-          ops.removeRecursiveLog,
-          [tmpAbs],
-          "should clean up temp file",
-        );
-        assert.ok(!ops.files.has(tmpAbs), "temp file should be gone");
-      });
-
-      test("without rename support: falls back to plain writeFile", () => {
-        const ops = new FakeFileOps(); // the original fake without .rename
-        const newContent = "new content";
-
-        writeConfigAtomically(ops, configAbs, newContent);
-
-        assert.strictEqual(ops.files.get(configAbs), newContent);
-        const tempFileWritten = [...ops.files.keys()].some((k) =>
-          k.endsWith(CONFIG_WRITE_TMP_SUFFIX),
-        );
-        assert.ok(!tempFileWritten, "no temp file should be created");
-      });
-    });
-
-    suite("performCopilotSeatSetup (atomic write integration)", () => {
-      let deps: RunCatalogRefreshDeps;
-      let fileOps: FakeFileOpsWithRename;
-      let spawner: FakeSpawnerState;
-      let cancellation: FakeCancellation;
-
-      setup(() => {
-        fileOps = new FakeFileOpsWithRename();
-        spawner = createFakeSpawner();
-        cancellation = new FakeCancellation();
-        deps = {
-          venvPythonPath: "python",
-          projectDir,
-          seatId: "seat-123",
-          seatLabel: "project",
-          spawn: spawner.spawner,
-          fileOps,
-          cancellation,
-          registerDisposal: () => ({ dispose: () => {} }),
-        };
-      });
-
-      test("success with atomic write: renames config, outcome is success", async () => {
-        fileOps.files.set(configAbs, baseConfigContent);
-        const run = performCopilotSeatSetup(deps);
-        await new Promise((r) => setTimeout(r, 0));
-        spawner.child.callbacks?.onStdout(
-          "Wrote ai_router/copilot-catalog.lock: 3/3 models confirmed, providers=['p1', 'p2']",
-        );
-        spawner.child.callbacks?.onClose(0);
-
-        const outcome = await run;
-        assert.deepStrictEqual(outcome, {
-          kind: "success",
-          providers: ["p1", "p2"],
-          confirmed: 3,
-          total: 3,
-        });
-
-        const finalContent = fileOps.files.get(configAbs);
-        assert.ok(finalContent, "config file should exist");
-        assert.match(finalContent!, /profile: copilot-cli/);
-        assert.strictEqual(fileOps.renameLog.length, 1);
-        assert.ok(
-          !fileOps.files.has(configAbs + CONFIG_WRITE_TMP_SUFFIX),
-          "temp file should not exist",
-        );
-      });
-
-      test("when rename fails: outcome is config-write-failed, original config intact", async () => {
-        const renameError = new Error("EPERM: rename failed");
-        fileOps.throwOnRename = renameError;
-        fileOps.files.set(configAbs, baseConfigContent);
-        const run = performCopilotSeatSetup(deps);
-        await new Promise((r) => setTimeout(r, 0));
-        spawner.child.callbacks?.onStdout(
-          "Wrote ai_router/copilot-catalog.lock: 3/3 models confirmed, providers=['p1', 'p2']",
-        );
-        spawner.child.callbacks?.onClose(0);
-
-        const outcome = await run;
-        assert.strictEqual(outcome.kind, "config-write-failed");
-        if (outcome.kind === "config-write-failed") {
-          assert.strictEqual(outcome.detail, renameError.message);
-        }
-        assert.strictEqual(
-          fileOps.files.get(configAbs),
-          baseConfigContent,
-          "config file is unchanged",
-        );
-        assert.deepStrictEqual(
-          fileOps.removeRecursiveLog,
-          [configAbs + CONFIG_WRITE_TMP_SUFFIX],
-          "attempted to clean temp file",
-        );
-      });
-    });
+    // Set 124 S3: the writeFileAtomically suites went with the writer. The
+    // atomic-replace guarantee was not weakened, it MOVED -- the only file
+    // this flow still causes to be written is written by `verify_type`.
 
     suite("kill strategy", () => {
       suite("resolveKillStrategy", () => {
@@ -1291,170 +1320,10 @@ suite("copilotSeatSetup", () => {
 });
 
 
-  suite("local-overrides gitignore guarantee (Set 110 S4, round 6)", () => {
-    // WHY: performCopilotSeatSetup creates ai_router/local-overrides.yaml and
-    // the config-editor UI tells the operator it "is in your .gitignore" and
-    // that values there "never get pushed" -- but nothing wrote that rule. In a
-    // scaffolded consumer repo the file landed untracked and committable, and a
-    // committed seat-local `copilot-cli` recreates the round-4 failure for every
-    // API-key-only teammate.
-
-    test("recognises the patterns that genuinely cover the file", () => {
-      for (const rule of [
-        "ai_router/local-overrides.yaml",
-        "/ai_router/local-overrides.yaml",
-        "local-overrides.yaml",
-        "**/local-overrides.yaml",
-      ]) {
-        assert.ok(
-          isLocalOverridesIgnored(`node_modules/\n${rule}\n.venv/\n`),
-          `should treat "${rule}" as covering`,
-        );
-      }
-    });
-
-    test("does NOT treat a comment or a near-miss as coverage", () => {
-      // A false positive is the dangerous direction: it would leave the file
-      // committable while the UI promises it is ignored.
-      for (const notCovering of [
-        "# ai_router/local-overrides.yaml",
-        "ai_router/",
-        "local-overrides",
-        "ai_router/local-overrides.yml",
-        "!ai_router/local-overrides.yaml",
-        // Round 7 nit: a leading slash anchors to the REPO ROOT, so this
-        // matches a root-level local-overrides.yaml and never the one under
-        // ai_router/. Counting it would be the false positive this suite
-        // exists to rule out.
-        "/local-overrides.yaml",
-        "",
-      ]) {
-        assert.strictEqual(
-          isLocalOverridesIgnored(`node_modules/\n${notCovering}\n`),
-          false,
-          `should NOT treat "${notCovering}" as covering`,
-        );
-      }
-    });
-
-    test("writes the rule when .gitignore does not exist at all", () => {
-      const ops = new FakeFileOps();
-      const res = ensureLocalOverridesIgnored(ops, "/project");
-      assert.deepStrictEqual(res, { ok: true, added: true });
-      const written = ops.files.get(path.join("/project", ".gitignore"));
-      assert.ok(written && isLocalOverridesIgnored(written));
-    });
-
-    test("appends to an existing .gitignore without destroying it", () => {
-      const ops = new FakeFileOps();
-      const gitignore = path.join("/project", ".gitignore");
-      ops.files.set(gitignore, "node_modules/\n.venv/\n");
-      const res = ensureLocalOverridesIgnored(ops, "/project");
-      assert.deepStrictEqual(res, { ok: true, added: true });
-      const written = ops.files.get(gitignore)!;
-      assert.ok(written.startsWith("node_modules/\n.venv/\n"));
-      assert.ok(isLocalOverridesIgnored(written));
-    });
-
-    test("is idempotent — an already-covered file is left byte-identical", () => {
-      const ops = new FakeFileOps();
-      const gitignore = path.join("/project", ".gitignore");
-      const before = "node_modules/\nai_router/local-overrides.yaml\n";
-      ops.files.set(gitignore, before);
-      const res = ensureLocalOverridesIgnored(ops, "/project");
-      assert.deepStrictEqual(res, { ok: true, added: false });
-      assert.strictEqual(ops.files.get(gitignore), before);
-    });
-
-    test("reports rather than throws when the ignore file cannot be written", () => {
-      const ops = new FakeFileOps();
-      ops.errors.writeFile = true;
-      const res = ensureLocalOverridesIgnored(ops, "/project");
-      assert.strictEqual(res.ok, false);
-    });
-  });
-
-  suite("performCopilotSeatSetup ensures the ignore rule (Set 110 S4, round 6)", () => {
-    const projectDir = "/project";
-    const gitignoreAbs = path.join(projectDir, ".gitignore");
-    const configAbs = path.join(projectDir, "ai_router", "local-overrides.yaml");
-
-    function makeDeps(fileOps: FakeFileOps, spawner: FakeSpawnerState) {
-      return {
-        venvPythonPath: "/venv/bin/python",
-        projectDir,
-        seatId: "seat-id",
-        seatLabel: "seat-label",
-        spawn: spawner.spawner,
-        fileOps,
-        cancellation: new FakeCancellation(),
-        registerDisposal: () => ({ dispose: () => {} }),
-      } as RunCatalogRefreshDeps;
-    }
-
-    async function runSeatSetup(fileOps: FakeFileOps): Promise<SeatSetupOutcome> {
-      const spawner = createFakeSpawner();
-      const promise = performCopilotSeatSetup(makeDeps(fileOps, spawner));
-      await new Promise((r) => setTimeout(r, 0));
-      spawner.child.callbacks!.onStdout(
-        "Wrote lock: 3/3 models confirmed, providers=['a', 'b']",
-      );
-      spawner.child.callbacks!.onClose(0);
-      return promise;
-    }
-
-    test("a repo with no .gitignore gets one, and the seat file is covered", async () => {
-      const fileOps = new FakeFileOps();
-      const outcome = await runSeatSetup(fileOps);
-
-      assert.strictEqual(outcome.kind, "success");
-      assert.ok(
-        fileOps.files.has(configAbs),
-        "the seat profile file should have been created",
-      );
-      const ignoreText = fileOps.files.get(gitignoreAbs);
-      assert.ok(ignoreText, ".gitignore should have been created");
-      assert.ok(
-        isLocalOverridesIgnored(ignoreText!),
-        "the created .gitignore must actually cover the seat file",
-      );
-    });
-
-    test("the ignore rule is written BEFORE the file it protects", async () => {
-      // Ordering is the invariant, not a detail: any window in which the file
-      // exists un-ignored is a window in which `git add -A` commits it.
-      const writeOrder: string[] = [];
-      class OrderingOps extends FakeFileOps {
-        writeFile(absPath: string, content: string): void {
-          writeOrder.push(absPath);
-          super.writeFile(absPath, content);
-        }
-      }
-      const fileOps = new OrderingOps();
-      await runSeatSetup(fileOps);
-
-      const ignoreAt = writeOrder.indexOf(gitignoreAbs);
-      const configAt = writeOrder.findIndex((p) => p.startsWith(configAbs));
-      assert.ok(ignoreAt >= 0, `.gitignore was never written: ${writeOrder}`);
-      assert.ok(configAt >= 0, `seat file was never written: ${writeOrder}`);
-      assert.ok(
-        ignoreAt < configAt,
-        `.gitignore (${ignoreAt}) must be written before the seat file (${configAt})`,
-      );
-    });
-
-    test("an already-correct .gitignore is not rewritten and raises no warning", async () => {
-      const fileOps = new FakeFileOps();
-      fileOps.files.set(gitignoreAbs, "ai_router/local-overrides.yaml\n");
-      const outcome = await runSeatSetup(fileOps);
-
-      assert.strictEqual(outcome.kind, "success");
-      if (outcome.kind === "success") {
-        assert.strictEqual(outcome.ignoreWarning, undefined);
-      }
-      assert.strictEqual(
-        fileOps.files.get(gitignoreAbs),
-        "ai_router/local-overrides.yaml\n",
-      );
-    });
-  });
+  // Set 124 S3: the two .gitignore suites that stood here went with the
+  // extension-side guarantee they pinned. The rule is now established by
+  // `verify_type.write_project_verify_type` itself, and it is falsified on
+  // that side -- in ai_router/tests/test_verify_type_resolution.py, both
+  // directions (a planted un-ignored repo gets the rule; a look-alike rule
+  // is not mistaken for coverage). Re-pinning it here would test a
+  // guarantee this module no longer makes.

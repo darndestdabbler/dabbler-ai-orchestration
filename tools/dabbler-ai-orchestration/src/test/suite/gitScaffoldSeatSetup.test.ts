@@ -238,13 +238,18 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     assert.ok(captured.performDeps, "perform ran");
   });
 
-  test("success outcome reports an info toast naming the config write", async () => {
+  test("success outcome reports an info toast naming what was recorded", async () => {
     const { captured, seams } = makeSeams(success);
     await runCopilotSeatSetupWithProgress(fakeContext(), projectDir, venvPath, seams);
     assert.strictEqual(captured.warnings.length, 0);
     assert.strictEqual(captured.infos.length, 1);
     assert.ok(captured.infos[0].includes("10/18"));
-    assert.ok(captured.infos[0].includes("transport.profile: copilot-cli"));
+    // Set 124 S3: the toast used to name `transport.profile: copilot-cli`
+    // written to local-overrides.yaml — a key S2 retired and this command no
+    // longer writes. It now names the file that actually records the answer.
+    assert.ok(captured.infos[0].includes("COPILOT_CLI"));
+    assert.ok(captured.infos[0].includes("project-verify-type.txt"));
+    assert.ok(!captured.infos[0].includes("local-overrides.yaml"));
   });
 
   test("insufficient-providers warns honestly: fail-closed, seat profile not enabled, lockfile kept", async () => {
@@ -260,19 +265,19 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     assert.ok(captured.warnings[0].includes("fail closed"));
     // Set 123 S3 (supplementary verification, Major): this used to pin
     // "transport.profile: api" — a claim Session 1 made FALSE, because
-    // `derive_transport_profile()` answers from the committed
+    // `derive_transport_profile()` answers from the resolved
     // `project-verify-type.txt` before it reads local-overrides.yaml. The
-    // message must report what this command did (the seat profile was not
-    // enabled) and must NOT assert an effective profile it cannot know.
-    assert.ok(captured.warnings[0].includes("was NOT enabled"));
+    // message must report what this command did (the verify type was not
+    // recorded) and must NOT assert an effective profile it cannot know.
+    assert.ok(captured.warnings[0].includes("was NOT set to COPILOT_CLI"));
     assert.ok(captured.warnings[0].includes("project-verify-type.txt"));
     assert.ok(!captured.warnings[0].includes("keeps transport.profile: api"));
     assert.ok(captured.warnings[0].includes("Re-run seat setup"));
   });
 
-  test("config-write-failed warns with the two-step partial state, not a refresh failure", async () => {
+  test("verify-type-write-failed warns with the two-step partial state, not a refresh failure", async () => {
     const { captured, seams } = makeSeams({
-      kind: "config-write-failed",
+      kind: "verify-type-write-failed",
       providers: ["anthropic", "google"],
       detail: "disk full",
     });
@@ -281,14 +286,17 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     assert.ok(captured.warnings[0].includes("probe succeeded"));
     assert.ok(captured.warnings[0].includes("disk full"));
     assert.ok(captured.warnings[0].includes("no re-probe is needed"));
+    assert.ok(
+      captured.warnings[0].includes("python -m ai_router.verify_type --set COPILOT_CLI"),
+    );
   });
 
-  test("cancelled warns that the lockfile was restored and the seat profile was not enabled", async () => {
+  test("cancelled warns that the lockfile was restored and the verify type was not recorded", async () => {
     const { captured, seams } = makeSeams({ kind: "cancelled", by: "operator" });
     await runCopilotSeatSetupWithProgress(fakeContext(), projectDir, venvPath, seams);
     assert.strictEqual(captured.warnings.length, 1);
     assert.ok(captured.warnings[0].includes("restored"));
-    assert.ok(captured.warnings[0].includes("was NOT enabled"));
+    assert.ok(captured.warnings[0].includes("was NOT set to COPILOT_CLI"));
     assert.ok(!captured.warnings[0].includes("keeps transport.profile: api"));
   });
 

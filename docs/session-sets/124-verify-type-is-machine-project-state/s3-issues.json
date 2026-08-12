@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The extension hides `verify_type`’s successful-with-warning `.gitignore` failure and still reports the file as gitignored.\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `ai_router/verify_type.py:311-323`, `tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts:1004-1033`, `tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts:850-858`\n- **Failure scenario:** During the normal `Dabbler: Set Up Copilot Seat` path, if `.gitignore` is read-only/locked/unwritable but the project file itself can still be written, `write_project_verify_type` prints a stderr warning and exits 0. The extension treats exit 0 as unconditional success, discards stderr, and shows “gitignored,” so the operator can commit the machine-local answer with `git add -A`. This is probable for every user who hits the explicitly supported fail-open branch; the branch was important enough to add a falsifier, but the extension path suppresses its only signal.\n- **Acceptance criterion:** `JUDGMENT - A successful verify_type subprocess that emits stderr warning text about adding /project-verify-type.txt to .gitignore must surface that warning in the seat-setup outcome/toast instead of reporting an unconditional gitignored success.`\n- **Details:** Violation: the change claims the extension “inherits the guarantee through the spawn,” while `write_project_verify_type` explicitly says a `.gitignore` failure “is reported on stderr and does not block the answer itself.” Impact: the merge would reintroduce the exact committable machine-state failure this session is meant to eliminate for the extension’s primary Copilot setup path. Evidence: Python warns and exits successfully; TypeScript ignores stdout/stderr on exit 0 and the success message asserts the file is gitignored.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "During the normal `Dabbler: Set Up Copilot Seat` path, if `.gitignore` is read-only/locked/unwritable but the project file itself can still be written, `write_project_verify_type` prints a stderr warning and exits 0. The extension treats exit 0 as unconditional success, discards stderr, and shows “gitignored,” so the operator can commit the machine-local answer with `git add -A`. This is probable for every user who hits the explicitly supported fail-open branch; the branch was important enough to add a falsifier, but the extension path suppresses its only signal.",
+      "evidencePaths": [
+        "ai_router/verify_type.py",
+        "tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A successful verify_type subprocess that emits stderr warning text about adding /project-verify-type.txt to .gitignore must surface that warning in the seat-setup outcome/toast instead of reporting an unconditional gitignored success."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "1044f88108c548628a1b2de75ca82d5af789b5f8"
+}

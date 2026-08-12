@@ -36,10 +36,30 @@
 // landing mid-write must not leave a half-written file a later `route()`
 // could read, and must not destroy a prior successful run's lock either).
 // A disposal hook the caller registers into `context.subscriptions` does
-// the same on extension-host teardown. The refresh and the config write
-// are two separate steps: a refresh that succeeds followed by a config
-// write that fails is reported as its own `config-write-failed` state,
-// never conflated with "refresh failed".
+// the same on extension-host teardown. The refresh and the verify-type
+// write are two separate steps: a refresh that succeeds followed by a
+// write that fails is reported as its own `verify-type-write-failed`
+// state, never conflated with "refresh failed".
+//
+// Set 124 S3 — WHAT THIS MODULE PERSISTS, AND WHY IT CHANGED. Through Set
+// 110 this module recorded a confirmed seat by rendering
+// `transport.profile: copilot-cli` into `ai_router/local-overrides.yaml`.
+// Set 124 S2 retired that key outright: what verifies a project is
+// machine/project state, `project-verify-type.txt` is the one place that
+// records it, and a stale `transport.profile` in local-overrides.yaml is
+// now REFUSED at config load. A seat setup that kept writing it would
+// hand the operator a project whose every `load_config` raises — a
+// successful command that bricks what it just configured. So the write is
+// retargeted to the one sanctioned entry point, `python -m
+// ai_router.verify_type --set COPILOT_CLI`, spawned through the SAME
+// scaffolded venv interpreter the catalog refresh already uses. The
+// extension deliberately does NOT write the file itself: one writer means
+// the file always carries the explanatory header `write_project_verify_type`
+// emits, however it was created.
+//
+// The Direct API path is untouched by all of this. An `"api"` pick was
+// always a no-op here (the seeded `router-config.yaml` default IS `api`),
+// and it still is.
 //
 // VS Code-free by design (the tierMarkerStore.ts pattern): the process
 // spawner, filesystem, cancellation token, and disposal registration are
@@ -50,7 +70,6 @@ import * as crypto from "crypto";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { LOCAL_OVERRIDES_REL } from "./aiRouterInstall";
 
 /** Where the refresh writes the seat-scoped lockfile, relative to the
  * project root. Mirrors `copilot_catalog.DEFAULT_LOCKFILE_PATH` (the
@@ -61,6 +80,16 @@ export const CATALOG_LOCKFILE_REL = path.posix.join(
   "ai_router",
   "copilot-catalog.lock",
 );
+
+/**
+ * The project's answer to "what verifies this project, on this machine",
+ * relative to the project root. Mirrors `verify_type.PROJECT_FILE_NAME`.
+ * Machine/project state (Set 124): gitignored, never committed.
+ */
+export const VERIFY_TYPE_FILE_REL = "project-verify-type.txt";
+
+/** The two values `project-verify-type.txt` may hold — `verify_type.VALID_VERIFY_TYPES`. */
+export type VerifyType = "DIRECT_API" | "COPILOT_CLI";
 
 export type TransportProfile = "api" | "copilot-cli";
 
@@ -172,122 +201,15 @@ export function parseRefreshStdout(stdout: string): RefreshSummary | null {
 }
 
 // ---------------------------------------------------------------------------
-// transport.profile — template-variable render over the seeded config
-// (spec Feature 1 → Config write, critique M4)
+// What the confirmed seat writes (Set 124 S3)
 // ---------------------------------------------------------------------------
-
-interface ProfileLocation {
-  valueStart: number;
-  valueEnd: number;
-  value: string;
-}
-
-/**
- * Locate the `transport:` block's `profile:` value in a router-config
- * text. Anchored on the block AND on the block's DIRECT-child indent —
- * a `profile` key under some other top-level block must never match,
- * and neither may a `profile` key nested inside a sub-block of
- * `transport:` itself (S2 code-review cross-verifier Major: matching
- * the first indented `profile:` anywhere in the block could rewrite a
- * nested field and report success while the real `transport.profile`
- * stayed `api`). The direct-child indent is taken from the block's
- * first indented non-comment line; only lines at exactly that indent
- * are candidates. Scanning stops at the next top-level key (a column-0
- * non-comment line), so the sibling `transports:` block is out of
- * bounds. Returns null when the anchor is absent (fail loud at the
- * caller — never append a second `transport.profile:` key; that is the
- * exact last-wins YAML corruption critique M4 forbids).
- */
-function locateTransportProfile(text: string): ProfileLocation | null {
-  const blockMatch = /^transport:[ \t]*(?:#.*)?$/m.exec(text);
-  if (!blockMatch) return null;
-  let lineStart = blockMatch.index + blockMatch[0].length;
-  // Step past the matched line's EOL.
-  while (lineStart < text.length && (text[lineStart] === "\r" || text[lineStart] === "\n")) {
-    if (text[lineStart] === "\n") {
-      lineStart += 1;
-      break;
-    }
-    lineStart += 1;
-  }
-  let childIndent: number | null = null;
-  while (lineStart < text.length) {
-    let lineEnd = text.indexOf("\n", lineStart);
-    if (lineEnd === -1) lineEnd = text.length;
-    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
-    if (/^[^ \t\r\n#]/.test(line)) return null; // next top-level key — out of the block
-    const content = /^([ \t]+)\S/.exec(line);
-    if (content && !/^[ \t]*#/.test(line)) {
-      const indent = content[1].length;
-      if (childIndent === null) childIndent = indent; // the block's direct-child depth
-      if (indent === childIndent) {
-        const m = /^([ \t]+profile:[ \t]*)([^\s#]+)/.exec(line);
-        if (m) {
-          const valueStart = lineStart + m[1].length;
-          return {
-            valueStart,
-            valueEnd: valueStart + m[2].length,
-            value: m[2],
-          };
-        }
-        // a direct child that isn't profile: — keep scanning siblings
-      }
-      // deeper-indented lines are sub-block internals — never candidates
-    }
-    lineStart = lineEnd + 1;
-  }
-  return null;
-}
-
-function hasTopLevelTransportBlock(text: string): boolean {
-  return /^transport:[ \t]*(?:#.*)?$/m.test(text);
-}
-
-export type RenderProfileResult =
-  | { ok: true; text: string; changed: boolean }
-  | { ok: false; reason: string };
-
-/**
- * Render `transport.profile: <profile>` into a router-config text — the
- * config write as a resolved template variable: one anchored field
- * replacement on the known seeded shape, never an append and never a
- * general YAML-surgery pass. Fail postures:
- *   - anchor absent (no `transport:` block / no `profile:` under it) →
- *     `ok: false` — the caller reports the specific partial state;
- *   - current value is neither `api` nor the target → `ok: false` — an
- *     unexpected value means an operator hand-edited the field, and the
- *     guided flow must not clobber an explicit operator choice.
- * Already at the target value → `ok: true, changed: false` (idempotent).
- */
-export function renderTransportProfile(
-  configText: string,
-  profile: TransportProfile,
-): RenderProfileResult {
-  const loc = locateTransportProfile(configText);
-  if (!loc) {
-    return {
-      ok: false,
-      reason:
-        "no `transport:` block with a `profile:` field was found in " +
-        "local-overrides.yaml (the seeded template shape this write expects)",
-    };
-  }
-  if (loc.value === profile) return { ok: true, text: configText, changed: false };
-  if (loc.value !== "api") {
-    return {
-      ok: false,
-      reason:
-        `transport.profile is ${JSON.stringify(loc.value)} — not the seeded ` +
-        "default `api`, so it looks operator-edited and will not be overwritten",
-    };
-  }
-  return {
-    ok: true,
-    changed: true,
-    text:
-      configText.slice(0, loc.valueStart) + profile + configText.slice(loc.valueEnd),
-  };
-}
+//
+// Set 110's anchored `transport.profile` YAML renderer lived here:
+// locateTransportProfile / hasTopLevelTransportBlock / renderTransportProfile,
+// plus the RenderProfileResult union. All of it existed to edit ONE key in
+// ai_router/local-overrides.yaml that Set 124 S2 retired outright, so it is
+// deleted rather than repointed -- a YAML field renderer is the wrong shape
+// for a one-value file, and `verify_type --set` owns that write anyway.
 
 /** The `{exists, readFile}` subset the durable-seed reader needs. */
 export interface SeedReadOps {
@@ -309,19 +231,23 @@ const nodeSeedReadOps: SeedReadOps = {
 };
 
 /**
- * The durable seat-profile seed source (S1 close-out note: "Session 2
- * creates the durable source alongside the transport.profile template
- * write"): the workspace `ai_router/local-overrides.yaml`'s
- * `transport.profile` value. Tolerant like the marker readers — a
- * missing file, unreadable file, absent block, or unrecognized value
- * all read as null (the form falls back to its volatile default);
- * fail-loud narrowing stays at the form/scaffold boundary.
+ * The durable seat-confirmation seed source. Through Set 110 this read
+ * `transport.profile` out of `ai_router/local-overrides.yaml`; Set 124 S2
+ * retired that key, so the durable answer now comes from the file that
+ * actually records it — `project-verify-type.txt` at the project root.
+ *
+ * Tolerant like the marker readers: a missing file, an unreadable file, or
+ * an unrecognized value all read as null. The parse mirrors
+ * `verify_type.parse_verify_type` — comment lines (the header the Python
+ * writer emits) and blank lines are skipped, and the first remaining line
+ * must be exactly one of the two values. Fail-loud narrowing stays at the
+ * form/scaffold boundary.
  */
-export function readTransportProfile(
+export function readProjectVerifyType(
   root: string,
   ops: SeedReadOps = nodeSeedReadOps,
-): TransportProfile | null {
-  const abs = path.join(root, LOCAL_OVERRIDES_REL);
+): VerifyType | null {
+  const abs = path.join(root, VERIFY_TYPE_FILE_REL);
   if (!ops.exists(abs)) return null;
   let text: string;
   try {
@@ -329,9 +255,12 @@ export function readTransportProfile(
   } catch {
     return null;
   }
-  const loc = locateTransportProfile(text);
-  if (!loc) return null;
-  return loc.value === "api" || loc.value === "copilot-cli" ? loc.value : null;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line === "" || line.startsWith("#")) continue;
+    return line === "DIRECT_API" || line === "COPILOT_CLI" ? line : null;
+  }
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -426,28 +355,33 @@ export function clearCopilotSeatStatusMarker(
  * 5-state matrix: never-chose / chose+confirmed / chose+cancelled /
  * chose+CLI-missing / chose+install-incomplete). The three "attempted but
  * not confirmed" reasons are indistinguishable on disk by design (same
- * marker, same api-profile router-config) and share one honest note — the
+ * marker, same unresolved verify type) and share one honest note — the
  * derivation only needs to tell "confirmed" and "never chose" apart from
  * everything else:
  *   - never chose (or explicitly rebuilt away from Copilot — the marker is
- *     cleared then): marker is null -> false, regardless of profile.
- *   - chose + confirmed (a later retry succeeded): durableProfile is
- *     "copilot-cli" -> false, even with a stale "unconfirmed" marker still
- *     on disk from the earlier failed attempt (the marker is cleared only
- *     on an explicit non-Copilot rebuild, not on a confirmed retry — but
- *     the profile check alone already suppresses the note either way).
+ *     cleared then): marker is null -> false, regardless of verify type.
+ *   - chose + confirmed (a later retry succeeded): the durable verify type
+ *     is "COPILOT_CLI" -> false, even with a stale "unconfirmed" marker
+ *     still on disk from the earlier failed attempt (the marker is cleared
+ *     only on an explicit non-Copilot rebuild, not on a confirmed retry —
+ *     but the verify-type check alone already suppresses the note either
+ *     way).
  *   - chose + (cancelled | CLI-missing | insufficient-providers |
  *     install-incomplete), no rebuild away from Copilot since: marker is
- *     "unconfirmed" AND durableProfile is NOT "copilot-cli" -> true.
+ *     "unconfirmed" AND the durable verify type is NOT "COPILOT_CLI" -> true.
  * Independent of any VOLATILE webview control state (gsState) by design —
  * the whole point is a note that survives the exact repaint that reverts
  * the radio (S097 defect chain step 3).
+ *
+ * Set 124 S3: the durable half was `transport.profile` from
+ * local-overrides.yaml until S2 retired that key. Same 5-state matrix,
+ * same truth table — read off the file that now records the answer.
  */
 export function deriveCopilotSeatChosenUnconfirmed(
   marker: SeatStatusMarker | null,
-  durableProfile: TransportProfile | null,
+  durableVerifyType: VerifyType | null,
 ): boolean {
-  return marker === "unconfirmed" && durableProfile !== "copilot-cli";
+  return marker === "unconfirmed" && durableVerifyType !== "COPILOT_CLI";
 }
 
 // ---------------------------------------------------------------------------
@@ -709,87 +643,15 @@ export function runCatalogRefresh(
 // The full seat-setup step: refresh → provider check → config write
 // ---------------------------------------------------------------------------
 
-/** The repo-root ignore file the seat setup must keep honest. */
-export const GITIGNORE_REL = ".gitignore";
-
-/** The rule written when `ai_router/local-overrides.yaml` is not yet ignored. */
-export const LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
-
-/**
- * Does this `.gitignore` text already cover `ai_router/local-overrides.yaml`?
- *
- * Deliberately conservative: it recognises the handful of literal patterns that
- * unambiguously cover the file and treats anything else as "not covered". A
- * false negative costs one duplicate ignore line, which git tolerates; a false
- * POSITIVE would leave a seat-local `copilot-cli` committable while the UI
- * promises it is ignored, which is the defect this exists to prevent. Negation
- * (`!`) lines are ignored as coverage for the same reason — a re-include means
- * NOT covered.
- *
- * Round 7 nit: `/local-overrides.yaml` is NOT in the set. A leading slash
- * anchors the pattern to the repository root, so it matches a root-level file
- * of that name and never the one under `ai_router/` — counting it would have
- * been exactly the false positive this comment warns about. `local-overrides.yaml`
- * (no slash at all) DOES match at any depth, which is why it stays.
- */
-export function isLocalOverridesIgnored(gitignoreText: string): boolean {
-  const covering = new Set([
-    LOCAL_OVERRIDES_REL,
-    `/${LOCAL_OVERRIDES_REL}`,
-    "local-overrides.yaml",
-    "**/local-overrides.yaml",
-  ]);
-  return gitignoreText
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter((line) => line !== "" && !line.startsWith("#"))
-    .some((line) => covering.has(line));
-}
-
-export type EnsureIgnoredResult =
-  | { ok: true; added: boolean }
-  | { ok: false; reason: string };
-
-/**
- * Guarantee the ignore rule BEFORE the local file is created.
- *
- * Set 110 S4 round 6: `performCopilotSeatSetup` creates
- * `ai_router/local-overrides.yaml` and the config-editor UI tells the operator
- * it "is in your .gitignore" and that values there "never get pushed" — but
- * nothing ever wrote that rule. In a scaffolded consumer repo the file lands
- * untracked and committable, and a committed seat-local `copilot-cli` recreates
- * the round-4 failure for every API-key-only teammate: they skip provider
- * API-key validation and then fail on the intentionally ignored catalog
- * lockfile.
- *
- * Ordering is the whole point. The rule is written first, so there is no window
- * in which the file exists un-ignored — a `git add -A` in that window is
- * exactly how it would get committed.
- */
-export function ensureLocalOverridesIgnored(
-  ops: SeatSetupFileOps,
-  projectDir: string,
-): EnsureIgnoredResult {
-  const abs = path.join(projectDir, GITIGNORE_REL);
-  try {
-    const existing = ops.exists(abs) ? ops.readFile(abs) : "";
-    if (isLocalOverridesIgnored(existing)) return { ok: true, added: false };
-    const prefix =
-      existing === "" || existing.endsWith("\n") ? existing : `${existing}\n`;
-    ops.writeFile(
-      abs,
-      `${prefix}\n# Per-machine router overrides (Copilot seat transport profile).\n` +
-        `# Machine-specific by design — committing it breaks API-key-only clones.\n` +
-        `${LOCAL_OVERRIDES_IGNORE_RULE}\n`,
-    );
-    return { ok: true, added: true };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
+// Set 124 S3: the .gitignore guarantee that lived here (GITIGNORE_REL,
+// VERIFY_TYPE_IGNORE_RULE, isVerifyTypeIgnored, ensureVerifyTypeIgnored)
+// moved INTO the one writer. `verify_type.write_project_verify_type` now
+// establishes its own precondition -- it writes the ignore rule before the
+// project file, in the same process, so the ordering invariant Set 110 S4
+// round 6 established is preserved and the guarantee reaches every caller,
+// including an operator running `verify_type --set` by hand. Keeping a
+// second implementation here would have been a fresh instance of exactly
+// the two-mechanisms-for-one-fact defect this set exists to remove.
 
 export type SeatSetupOutcome =
   | {
@@ -797,15 +659,17 @@ export type SeatSetupOutcome =
       providers: string[];
       confirmed: number;
       total: number;
-      /** Present only when the ignore rule could NOT be guaranteed. The seat
-       * itself is configured, so this is not a failure — but the promise that
-       * the file is ignored is now false, and saying so is the difference
-       * between a warning and a lie. */
-      ignoreWarning?: string;
+      /** Present only when the writer reported a non-fatal skip on stderr —
+       * in practice, an unwritable `.gitignore`. The seat IS set up and the
+       * answer IS recorded, so this is not a failure; but the answer is now
+       * committable, and saying so is the difference between a warning and a
+       * lie. Relayed from the one writer, never re-derived here. */
+      writerWarning?: string;
     }
   | {
       /** Refresh completed but <2 distinct providers confirmed — routed
-       * dispatch would fail closed, so transport.profile stays `api`.
+       * dispatch would fail closed, so the verify type is left unwritten
+       * and the project keeps resolving however it already did.
        * The lockfile (the CLI's own artifact) is kept for inspection. */
       kind: "insufficient-providers";
       providers: string[];
@@ -816,53 +680,22 @@ export type SeatSetupOutcome =
   | { kind: "cancelled"; by: "operator" | "teardown" }
   | {
       /** The two-step non-atomicity state (critique M1): the refresh
-       * succeeded — the lockfile is in place — but the config write did
-       * not. Reported as its own state, never conflated with a refresh
-       * failure; the fix is the one-field config edit, not a re-probe. */
-      kind: "config-write-failed";
+       * succeeded — the lockfile is in place — but persisting the answer
+       * did not. Reported as its own state, never conflated with a refresh
+       * failure; the fix is one terminal command, not a re-probe.
+       * Set 124 S3 renamed this from `config-write-failed`: the write is
+       * no longer a config edit, and a name that says otherwise is the
+       * stale-echo class this set removes. */
+      kind: "verify-type-write-failed";
       providers: string[];
       detail: string;
     };
 
-/** Suffix for the temp file the atomic config write stages through —
- * distinctive so a crash-orphaned temp is attributable at a glance. */
-export const CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
-
-/**
- * The config write, atomically when the ops support it (S3, the named S2
- * residual): stage the full new content in a sibling temp file, then
- * rename over the target — a PROCESS crash between the write and the
- * rename leaves the original local-overrides.yaml intact (plus an orphaned
- * temp), never a truncated config. (The guarantee is process-crash
- * atomic-replacement; sudden power loss without an fsync is out of scope
- * — S3 review finding 5, scoped deliberately.) When the injected ops
- * carry no `rename`, fall back to the plain write (the pre-S3 behavior)
- * rather than silently skipping the write. A failed rename cleans up its
- * temp best-effort and rethrows so the caller reports
- * `config-write-failed` with the real cause.
- */
-export function writeConfigAtomically(
-  ops: SeatSetupFileOps,
-  configAbs: string,
-  content: string,
-): void {
-  if (!ops.rename) {
-    ops.writeFile(configAbs, content);
-    return;
-  }
-  const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
-  ops.writeFile(tmpAbs, content);
-  try {
-    ops.rename(tmpAbs, configAbs);
-  } catch (err) {
-    try {
-      ops.removeRecursive(tmpAbs);
-    } catch {
-      // best-effort cleanup — the rename failure is the real story
-    }
-    throw err;
-  }
-}
+// Set 124 S3: writeFileAtomically / ATOMIC_WRITE_TMP_SUFFIX went with the
+// .gitignore write that was their last caller. Nothing in this module writes
+// a file any more -- the lockfile is the refresh CLI's own artifact, and the
+// project file belongs to `verify_type`. The atomic-replace guarantee did not
+// disappear with them: it moved to the writer that now owns the write.
 
 // ---------------------------------------------------------------------------
 // Child-kill strategy (S3, the named S2 residual: POSIX process-tree kill)
@@ -956,9 +789,9 @@ export interface SeatSetupMessage {
  * S1 discovery supplementary Major (Set 097): this used to be a
  * copy-pasteable `python -m ai_router.copilot_catalog --refresh …`
  * command — but that CLI invocation only refreshes the seat-scoped
- * lockfile (copilot_catalog.py has no knowledge of local-overrides.yaml at
- * all); it never invokes performCopilotSeatSetup, so transport.profile
- * was NEVER promoted and the persistent "unconfirmed" note NEVER cleared,
+ * lockfile (copilot_catalog.py records no verify type at all); it never
+ * invokes performCopilotSeatSetup, so the project's verify type was
+ * NEVER recorded and the persistent "unconfirmed" note NEVER cleared,
  * no matter how many providers the refresh confirmed. The instruction now
  * points at `Dabbler: Set Up Copilot Seat` (copilotSeatSetupCommand.ts), a
  * standalone command that runs the SAME confirmation-gated
@@ -998,32 +831,39 @@ export function describeSeatSetupOutcome(
   // Set 123 S3 (supplementary verification, Major): this used to read "keep
   // the api profile working" flat, and every failure branch below claimed
   // "local-overrides.yaml keeps transport.profile: api". Both became FALSE in
-  // Session 1: `verify_type.derive_transport_profile()` returns the committed
+  // Session 1: `verify_type.derive_transport_profile()` returns the resolved
   // `project-verify-type.txt` profile BEFORE it reads any configured
-  // `transport.profile`, so on a project that committed COPILOT_CLI the
+  // `transport.profile`, so on a project that resolved COPILOT_CLI the
   // effective profile stays copilot-cli no matter what this file says. An
   // operator told "you are safely on api" would proceed on a broken seat.
   //
   // The fix is subtraction, not a new file read: these messages now report
-  // only what this command actually DID (the seat profile was not enabled)
+  // only what this command actually DID (the verify type was not recorded)
   // and name the file that really decides, rather than asserting an effective
   // profile they are not in a position to know.
+  //
+  // Set 124 S3: local-overrides.yaml is out of this story entirely — S2
+  // retired its `transport.profile` key, so naming it as the thing that was
+  // "not enabled" would point the operator at a file that can no longer hold
+  // the answer at all.
   const keyed =
     "the DABBLER_* provider key(s) already set keep the api profile working " +
-    "wherever this project's committed verify type is DIRECT_API";
-  const notEnabled =
-    "the copilot-cli seat profile was NOT enabled in " +
-    "ai_router/local-overrides.yaml (and project-verify-type.txt, not that " +
-    "file, decides this project's effective transport)";
+    "wherever this project's verify type resolves to DIRECT_API";
+  const notRecorded =
+    `this project's verify type was NOT set to COPILOT_CLI (${VERIFY_TYPE_FILE_REL} ` +
+    "is what decides the effective transport)";
   switch (outcome.kind) {
     case "success":
       return {
-        level: outcome.ignoreWarning ? "warning" : "info",
+        level: outcome.writerWarning ? "warning" : "info",
         message:
           `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models ` +
           `confirmed (providers: ${outcome.providers.join(", ")}). ` +
-          "transport.profile: copilot-cli written to ai_router/local-overrides.yaml." +
-          (outcome.ignoreWarning ? ` Warning: ${outcome.ignoreWarning}.` : ""),
+          (outcome.writerWarning
+            ? `COPILOT_CLI written to ${VERIFY_TYPE_FILE_REL}, but it is NOT ` +
+              `git-ignored: ${outcome.writerWarning}`
+            : `COPILOT_CLI written to ${VERIFY_TYPE_FILE_REL} (gitignored — the ` +
+              "router derives transport.profile: copilot-cli from it)."),
       };
     case "insufficient-providers": {
       // Reason-specific guidance: zero confirmations means the CLI never
@@ -1046,7 +886,7 @@ export function describeSeatSetupOutcome(
         message:
           `Copilot seat setup completed, but only ${outcome.providers.length} ` +
           `distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) — ` +
-          `routed dispatch would fail closed, so ${notEnabled}. ${cause}` +
+          `routed dispatch would fail closed, so ${notRecorded}. ${cause}` +
           (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) +
           "The probe lockfile was kept for inspection at " +
           `ai_router/copilot-catalog.lock. ${rerun}`,
@@ -1056,11 +896,11 @@ export function describeSeatSetupOutcome(
       return {
         level: "warning",
         message: providerKeysPresent
-          ? `Copilot seat setup failed: ${outcome.detail}. So ${notEnabled}, ` +
+          ? `Copilot seat setup failed: ${outcome.detail}. So ${notRecorded}, ` +
             `and ${keyed}. To use the Copilot ` +
             `seat instead, fix the cause first. ${rerun}`
           : `Scaffold completed, but the Copilot seat setup did not: ` +
-            `${outcome.detail}. So ${notEnabled}, ` +
+            `${outcome.detail}. So ${notRecorded}, ` +
             `and ${keyless}. Fix the cause, then: ${rerun}`,
       };
     case "cancelled":
@@ -1068,27 +908,25 @@ export function describeSeatSetupOutcome(
         level: "warning",
         message:
           "Copilot seat setup was cancelled — the lockfile was restored to " +
-          `its pre-run state and ${notEnabled}. ` +
+          `its pre-run state and ${notRecorded}. ` +
           (providerKeysPresent
             ? `Meanwhile ${keyed}. `
             : `Note ${keyless} until seat setup completes. `) +
           rerun,
       };
-    case "config-write-failed":
+    case "verify-type-write-failed":
       return {
         level: "warning",
         message:
           `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) ` +
-          "and the lockfile is in place, but writing transport.profile to " +
-          `ai_router/local-overrides.yaml failed: ${outcome.detail}. Set ` +
-          "`profile: copilot-cli` under the `transport:` block in that file " +
-          "by hand — no re-probe is needed. Until then " +
+          "and the lockfile is in place, but recording this project's verify " +
+          `type failed: ${outcome.detail}. Run \`${verifyTypeCommandHint("COPILOT_CLI")}\` ` +
+          "in the project folder — no re-probe is needed. Until then " +
           (providerKeysPresent
-            ? "the router keeps running on whatever profile " +
-              "project-verify-type.txt resolves to, with the " +
-              "DABBLER_* key(s) already set."
-            : "the router is not yet functional (the seat profile is " +
-              "unwritten and no DABBLER_* provider key is set)."),
+            ? `the router keeps running on whatever ${VERIFY_TYPE_FILE_REL} ` +
+              "resolves to, with the DABBLER_* key(s) already set."
+            : "the router is not yet functional (the verify type is " +
+              "unrecorded and no DABBLER_* provider key is set)."),
       };
     default: {
       // Exhaustiveness guard (S3 review finding 6): a future
@@ -1121,6 +959,149 @@ function outputTail(s: string): string {
   return trimmed.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
 }
 
+/**
+ * The CLI contract for persisting the project's answer, pinned here the
+ * same way the catalog-refresh invocation is (critique M5 — drift becomes
+ * a noticed decision):
+ *   - invocation: `python -m ai_router.verify_type --set <VALUE>
+ *     --project-root <projectDir>`;
+ *   - `--project-root` is passed EXPLICITLY rather than relying on the
+ *     spawn cwd: `verify_type` otherwise resolves the write target by
+ *     walking up to the first ancestor holding `.git`, and a scaffolded
+ *     project that is not yet a git repo would then either fail or write
+ *     somewhere above itself;
+ *   - exit 0 = written; 2 = the value was rejected; 3 = setup still
+ *     required. Only 0 is success.
+ */
+export function buildVerifyTypeArgs(
+  verifyType: VerifyType,
+  projectDir: string,
+): string[] {
+  return [
+    "-m",
+    "ai_router.verify_type",
+    "--set",
+    verifyType,
+    "--project-root",
+    projectDir,
+  ];
+}
+
+/** The command an operator runs by hand when the spawned write fails. */
+export function verifyTypeCommandHint(verifyType: VerifyType): string {
+  return `python -m ai_router.verify_type --set ${verifyType}`;
+}
+
+export type VerifyTypeWriteResult =
+  | { ok: true; warning?: string }
+  | { ok: false; detail: string };
+
+/**
+ * The writer's own stderr contract (pinned here the same way the refresh
+ * CLI's stdout contract is): `ai_router` reports a non-fatal skip as a line
+ * beginning `WARNING: `. The only one this command can provoke is the
+ * fail-open branch in `write_project_verify_type` — an unwritable
+ * `.gitignore`, where the answer is still recorded but is left committable.
+ *
+ * Line-anchored on purpose. Python's own `<frozen runpy>:130: RuntimeWarning:
+ * ...` noise reaches the same stream and must NOT be mistaken for the
+ * writer's warning; it does not begin a line with `WARNING: `.
+ */
+export function extractWriterWarning(stderr: string): string | undefined {
+  const lines = (stderr || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line.startsWith("WARNING: "));
+  return lines.length > 0 ? lines.join(" ") : undefined;
+}
+
+/**
+ * Persist the project's verify type through the ONE sanctioned writer.
+ *
+ * Set 124 S3: the extension deliberately does not write
+ * `project-verify-type.txt` itself. `verify_type.write_project_verify_type`
+ * emits an explanatory header explaining why the file is gitignored, and a
+ * second writer here would produce header-less files that read as
+ * hand-dropped — the two-mechanisms-for-one-fact defect this whole set
+ * removes, recreated one layer up. Spawning the router's own entry point
+ * through the SAME scaffolded venv interpreter the refresh already used
+ * costs one short-lived subprocess and keeps the writer singular.
+ *
+ * Never rejects: every failure path resolves as `{ ok: false }` so the
+ * caller reports the two-step partial state rather than throwing out of
+ * the progress notification.
+ */
+export function writeVerifyTypeThroughRouter(
+  deps: Pick<RunCatalogRefreshDeps, "venvPythonPath" | "projectDir" | "spawn">,
+  verifyType: VerifyType,
+): Promise<VerifyTypeWriteResult> {
+  return new Promise((resolve) => {
+    let settled = false;
+    let stdout = "";
+    let stderr = "";
+    const settle = (result: VerifyTypeWriteResult): void => {
+      if (settled) return;
+      settled = true;
+      resolve(result);
+    };
+    const failed = (detail: string): void => settle({ ok: false, detail });
+    try {
+      deps.spawn(
+        deps.venvPythonPath,
+        buildVerifyTypeArgs(verifyType, deps.projectDir),
+        { cwd: deps.projectDir },
+        {
+          onStdout: (chunk: string) => {
+            stdout += chunk;
+          },
+          onStderr: (chunk: string) => {
+            stderr += chunk;
+          },
+          onClose: (exitCode: number | null) => {
+            if (exitCode === 0) {
+              // Exit 0 is NOT unconditional success: the writer fails open on
+              // an unwritable .gitignore, records the answer anyway, and says
+              // so on stderr. Swallowing that would leave the operator with a
+              // committable machine-local answer while the toast claims it is
+              // gitignored — the exact failure this session removes (S3
+              // discovery round 1, Major).
+              const warning = extractWriterWarning(stderr);
+              settle(warning === undefined ? { ok: true } : { ok: true, warning });
+              return;
+            }
+            const tail = outputTail(stderr || stdout);
+            failed(
+              `\`${verifyTypeCommandHint(verifyType)}\` exited with code ` +
+                `${exitCode}${tail ? `: ${tail}` : ""}`,
+            );
+          },
+          onError: (err: Error) => {
+            failed(`the write subprocess could not start: ${err.message}`);
+          },
+        },
+      );
+    } catch (err) {
+      failed(
+        `the write subprocess could not start: ` +
+          `${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  });
+}
+
+/**
+ * The whole guided seat-setup step. Decides usability from the refresh's
+ * PARSED result (never the exit code); on >=2 distinct confirmed
+ * providers it guarantees the `.gitignore` rule and then records
+ * `COPILOT_CLI` as this project's verify type through
+ * {@link writeVerifyTypeThroughRouter}, from which the router derives
+ * `transport.profile: copilot-cli`.
+ *
+ * Set 124 S3 replaced the previous `transport.profile` write into
+ * `ai_router/local-overrides.yaml`: S2 retired that key, so the old write
+ * produced a project whose every `load_config` raised — a successful
+ * command that bricked what it had just configured.
+ */
 /**
  * The whole guided seat-setup step. Decides usability from the refresh's
  * PARSED result (never the exit code); on >=2 distinct confirmed
@@ -1169,77 +1150,24 @@ export async function performCopilotSeatSetup(
       if (distinct.length < 2) {
         return { kind: "insufficient-providers", ...base };
       }
-      const configAbs = path.join(deps.projectDir, LOCAL_OVERRIDES_REL);
-      // The ignore rule is written BEFORE the file, so the file never exists
-      // in an un-ignored state (round 6). A failure here does not abort the
-      // seat setup — the seat is still correctly configured — but it must be
-      // reported, because the UI otherwise promises an ignore that is absent.
-      const ignored = ensureLocalOverridesIgnored(
-        deps.fileOps,
-        deps.projectDir,
-      );
-      const ignoreWarning = ignored.ok
-        ? undefined
-        : `could not confirm ${LOCAL_OVERRIDES_REL} is git-ignored ` +
-          `(${ignored.reason}) — add "${LOCAL_OVERRIDES_IGNORE_RULE}" to ` +
-          ".gitignore before committing, or an API-key-only clone will " +
-          "inherit this machine's Copilot seat profile";
-      // Omit the key entirely when there is nothing to warn about, so the
-      // success outcome keeps its existing exact shape for callers (and tests)
-      // that compare it structurally.
-      const succeeded = (): SeatSetupOutcome =>
-        ignoreWarning === undefined
-          ? { kind: "success", ...base }
-          : { kind: "success", ...base, ignoreWarning };
-      if (!deps.fileOps.exists(configAbs)) {
-        writeConfigAtomically(
-          deps.fileOps,
-          configAbs,
-          "transport:\n  profile: copilot-cli\n",
-        );
-        return succeeded();
-      }
-      try {
-        const text = deps.fileOps.readFile(configAbs);
-        const loc = locateTransportProfile(text);
-        if (!loc) {
-          if (hasTopLevelTransportBlock(text)) {
-            const rendered = renderTransportProfile(text, "copilot-cli");
-            return {
-              kind: "config-write-failed",
-              providers: distinct,
-              detail: rendered.ok
-                ? "transport.profile could not be located for replacement"
-                : rendered.reason,
-            };
-          }
-          const newText =
-            text +
-            (text.endsWith("\n") ? "" : "\n") +
-            "transport:\n  profile: copilot-cli\n";
-          writeConfigAtomically(deps.fileOps, configAbs, newText);
-          return succeeded();
-        }
-
-        const rendered = renderTransportProfile(text, "copilot-cli");
-        if (!rendered.ok) {
-          return {
-            kind: "config-write-failed",
-            providers: distinct,
-            detail: rendered.reason,
-          };
-        }
-        if (rendered.changed) {
-          writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
-        }
-        return succeeded();
-      } catch (err) {
+      // The verify-type write establishes its own .gitignore precondition:
+      // `write_project_verify_type` adds the rule BEFORE it writes the file,
+      // in the same process, so the file never exists in an un-ignored state
+      // (the Set 110 S4 round-6 ordering invariant, now owned by the writer
+      // rather than duplicated here).
+      const written = await writeVerifyTypeThroughRouter(deps, "COPILOT_CLI");
+      if (!written.ok) {
         return {
-          kind: "config-write-failed",
+          kind: "verify-type-write-failed",
           providers: distinct,
-          detail: err instanceof Error ? err.message : String(err),
+          detail: written.detail,
         };
       }
+      // Relay the writer's own non-fatal skip rather than re-deriving it:
+      // one guarantee, one signal (S3 discovery round 1, Major).
+      return written.warning === undefined
+        ? { kind: "success", ...base }
+        : { kind: "success", ...base, writerWarning: written.warning };
     }
   }
 }

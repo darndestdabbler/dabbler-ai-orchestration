@@ -11,7 +11,7 @@
 // verifies this project". That answer now lives in one place only,
 // `project-verify-type.txt`, resolved by `python -m ai_router.verify_type`
 // (Set 123 S1). A key being present says nothing about which type the
-// project committed to, and this module must never be read as though it did.
+// project resolved to, and this module must never be read as though it did.
 
 // The provider keys the router can route through. Any ONE of them present
 // is enough — the router needs at least one provider, not all three.

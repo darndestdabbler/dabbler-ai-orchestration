@@ -145,7 +145,7 @@ checking prerequisites before any write so a missing one fails with a
 friendly explainer and leaves nothing behind.
 
 Then answer the one setup question — **what verifies this project** — in
-the terminal, once, and commit it:
+the terminal, once per machine:
 
 ```
 python -m ai_router.verify_type --set DIRECT_API     # or COPILOT_CLI
@@ -155,11 +155,13 @@ python -m ai_router.verify_type --set DIRECT_API     # or COPILOT_CLI
 means a GitHub Copilot CLI seat that routes calls through your Copilot
 subscription with no provider keys. The answer lands in
 `project-verify-type.txt` at the repo root, and the router **derives**
-`transport.profile` from it — so a project's committed choice is not
-overridden by whichever machine it is checked out on, and there is no
-second place for that fact to be recorded differently. `python -m
+`transport.profile` from it — so there is no second place for that fact
+to be recorded differently. The file is **gitignored** (the command adds
+the rule itself): what verifies a project is machine/project state, so
+one checkout can honestly answer `COPILOT_CLI` on a Copilot seat and
+`DIRECT_API` on a machine holding provider keys. `python -m
 ai_router.verify_type` with no flags prints what the project currently
-resolves to, or the guided setup if it has not chosen yet.
+resolves to, or the guided setup if this machine has not answered yet.
 
 On the Copilot path, **`Dabbler: Set Up Copilot Seat`** runs the seat's
 catalog check and enables the seat profile only when the seat confirms

@@ -592,3 +592,112 @@ def test_cli_walks_a_project_from_setup_required_to_resolved(
     assert vt.read_project_verify_type(project / vt.PROJECT_FILE_NAME) == (
         vt.DIRECT_API
     )
+
+# ---------------------------------------------------------------------------
+# Set 124 S3 -- the writer establishes its own gitignore precondition.
+#
+# Found by the cold-start walk the spec required (L-079-3): the header
+# write_project_verify_type embeds says the file is "Gitignored on purpose",
+# and until S3 nothing made that true. A consumer who followed the documented
+# first run got an untracked, COMMITTABLE file carrying its own claim to the
+# contrary. These are both-direction falsifiers (L-112-1): one plants the
+# defect and asserts the guarantee fires, one plants a legitimate look-alike
+# and asserts it is not mistaken for coverage.
+# ---------------------------------------------------------------------------
+
+
+def test_writing_the_answer_adds_the_gitignore_rule(project):
+    """FIRES: a project with no .gitignore at all gets one that covers the file."""
+    assert not (project / vt.GITIGNORE_FILE_NAME).exists()
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    text = (project / vt.GITIGNORE_FILE_NAME).read_text(encoding="utf-8")
+    assert vt.GITIGNORE_RULE in text.splitlines()
+    assert vt.is_gitignored_by(text)
+
+
+def test_the_rule_is_written_before_the_file_it_protects(project):
+    """Ordering IS the guarantee: any window in which the file exists
+    un-ignored is a window in which ``git add -A`` commits it."""
+    written: list[str] = []
+    real_write = Path.write_text
+
+    def spy(self, *args, **kwargs):
+        written.append(self.name)
+        return real_write(self, *args, **kwargs)
+
+    Path.write_text = spy  # type: ignore[method-assign]
+    try:
+        vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    finally:
+        Path.write_text = real_write  # type: ignore[method-assign]
+
+    assert vt.GITIGNORE_FILE_NAME in written
+    assert vt.PROJECT_FILE_NAME in written
+    assert written.index(vt.GITIGNORE_FILE_NAME) < written.index(
+        vt.PROJECT_FILE_NAME
+    ), f"the ignore rule must precede the file it protects: {written}"
+
+
+def test_an_existing_gitignore_is_appended_to_never_clobbered(project):
+    """The operator's own rules survive -- a guarantee that destroys the file
+    it edits is not a guarantee."""
+    (project / vt.GITIGNORE_FILE_NAME).write_text(
+        "node_modules/\n.venv/\n", encoding="utf-8"
+    )
+    vt.write_project_verify_type(project, vt.DIRECT_API)
+    text = (project / vt.GITIGNORE_FILE_NAME).read_text(encoding="utf-8")
+    assert text.startswith("node_modules/\n.venv/\n")
+    assert vt.is_gitignored_by(text)
+
+
+def test_an_already_covered_gitignore_is_left_byte_identical(project):
+    """Idempotent: re-running setup must not accrete duplicate rules."""
+    before = "node_modules/\n/project-verify-type.txt\n"
+    (project / vt.GITIGNORE_FILE_NAME).write_text(before, encoding="utf-8")
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    assert (project / vt.GITIGNORE_FILE_NAME).read_text(encoding="utf-8") == before
+
+
+@pytest.mark.parametrize(
+    "rule",
+    ["project-verify-type.txt", "/project-verify-type.txt", "**/project-verify-type.txt"],
+)
+def test_is_gitignored_by_recognises_genuine_coverage(rule):
+    assert vt.is_gitignored_by(f"node_modules/\n{rule}\n.venv/\n")
+
+
+@pytest.mark.parametrize(
+    "look_alike",
+    [
+        "# project-verify-type.txt",  # a comment is not a rule
+        "!project-verify-type.txt",  # a re-include is the OPPOSITE
+        "project-verify-type",  # no extension
+        "project-verify-type.text",  # wrong extension
+        "verify-type.txt",  # different file
+        "ai_router/local-overrides.yaml",  # the RETIRED rule (Set 124 S2)
+        "",
+    ],
+)
+def test_is_gitignored_by_rejects_look_alikes(look_alike):
+    """A false POSITIVE is the dangerous direction: it leaves the file
+    committable while the written header promises it is ignored. A gate that
+    matches everything is indistinguishable from one that matches the right
+    thing (L-112-1)."""
+    assert not vt.is_gitignored_by(f"node_modules/\n{look_alike}\n")
+
+
+def test_an_unwritable_gitignore_warns_but_still_records_the_answer(
+    project, monkeypatch, capsys
+):
+    """Fail-open is correct HERE -- an operator must still be able to declare
+    what verifies their project -- but the skip must be NAMED (L-079-1)."""
+
+    def boom(self, *args, **kwargs):
+        raise OSError("read-only file system")
+
+    monkeypatch.setattr(vt, "ensure_gitignored", lambda root: boom(root))
+    path = vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    assert vt.read_project_verify_type(path) == vt.COPILOT_CLI
+    err = capsys.readouterr().err
+    assert vt.GITIGNORE_RULE in err
+    assert "by hand" in err

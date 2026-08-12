@@ -105,7 +105,9 @@ the framework is built around.
    sets yet. Run **`Dabbler: Set Up New Project`** from the Command Palette — it is
    non-interactive. Then declare how this project is verified:
    `python -m ai_router.verify_type --set COPILOT_CLI` (or `DIRECT_API` on the
-   direct-API variant), commit `project-verify-type.txt`, and on the Copilot path
+   direct-API variant) — that writes `project-verify-type.txt`, which is
+   **gitignored**, because what verifies a project is machine/project state and
+   each machine answers for itself. On the Copilot path
    run **`Dabbler: Set Up Copilot Seat`**. On the direct-API variant, hand-author
    `ai_router/budget.yaml` with your not-to-exceed budget.
 

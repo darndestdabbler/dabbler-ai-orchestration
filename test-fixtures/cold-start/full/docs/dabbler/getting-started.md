@@ -52,9 +52,10 @@ silently faking verification.
 ## 1a. Say What Verifies This Project
 
 Tell the project which of the two you picked. This is one command,
-answered once, and **committed** — it is project configuration, not
-machine state, so it stays true no matter whose machine the repo is
-checked out on:
+answered once **per machine**, and **gitignored** — it is machine/project
+state, not project configuration, so one checkout can honestly answer
+`COPILOT_CLI` on a Copilot seat and `DIRECT_API` on a machine that holds
+provider keys:
 
 ```
 python -m ai_router.verify_type                 # prints the guided setup
@@ -62,14 +63,22 @@ python -m ai_router.verify_type --set DIRECT_API
 ```
 
 That writes `project-verify-type.txt` at the repo root holding exactly
-`DIRECT_API` or `COPILOT_CLI`. Commit it. The router **derives** its
+`DIRECT_API` or `COPILOT_CLI`, and adds `/project-verify-type.txt` to your
+`.gitignore` first, so the answer is never committable — **do not commit
+it**. The router **derives** its
 transport from that file, so there is no second place to configure and
 nothing that can disagree with it. If your machine already sets
 `AI_ORCHESTRATION_VERIFY_TYPE`, the command offers that value as a
-suggestion and `python -m ai_router.verify_type --confirm` commits it;
+suggestion and `python -m ai_router.verify_type --confirm` writes it;
 until you confirm, a machine default changes nothing about how this
 project dispatches. A value that is neither of the two is reported as an
 error rather than guessed at.
+
+> **Already committed it?** The ignore rule only stops *new* commits — git
+> keeps tracking a file it already tracks. Untrack it without losing your
+> answer: `git rm --cached project-verify-type.txt`, then commit that. A
+> committed answer forces every clone onto one machine's transport — the
+> failure this scoping removes.
 
 
 **What Build gives you.** Building the project structure also

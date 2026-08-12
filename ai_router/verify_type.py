@@ -79,6 +79,25 @@ PROJECT_FILE_NAME = "project-verify-type.txt"
 #: The machine default. Only ever a branch-2 suggestion (see module docstring).
 ENV_VAR = "AI_ORCHESTRATION_VERIFY_TYPE"
 
+#: The ``.gitignore`` rule that keeps the project file machine-local, and the
+#: file it is written to. Anchored to the repo root because the project file
+#: answers at the repo root only -- exactly the coverage needed, nothing more.
+GITIGNORE_FILE_NAME = ".gitignore"
+GITIGNORE_RULE = f"/{PROJECT_FILE_NAME}"
+
+#: The literal ``.gitignore`` patterns that unambiguously cover the project
+#: file. Deliberately conservative, and the conservatism has a direction: a
+#: false NEGATIVE costs one duplicate line, which git tolerates, while a false
+#: POSITIVE leaves the file committable while this module's own header
+#: promises it is ignored. Negation (``!``) lines never count as coverage.
+_COVERING_GITIGNORE_RULES: frozenset[str] = frozenset(
+    {
+        PROJECT_FILE_NAME,
+        f"/{PROJECT_FILE_NAME}",
+        f"**/{PROJECT_FILE_NAME}",
+    }
+)
+
 #: The one true mapping onto ``transport.profile``. Kept bijective so a
 #: resolved type always names exactly one profile and vice versa.
 PROFILE_BY_VERIFY_TYPE: dict[str, str] = {
@@ -216,6 +235,59 @@ def read_project_verify_type(path: Path | str) -> str:
     return parse_verify_type(text, origin=str(path))
 
 
+def is_gitignored_by(gitignore_text: str) -> bool:
+    """Does this ``.gitignore`` text already cover the project file?
+
+    Only literal, unambiguous patterns count (see
+    :data:`_COVERING_GITIGNORE_RULES`). Comments and re-includes never do.
+    """
+    for raw in gitignore_text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line in _COVERING_GITIGNORE_RULES:
+            return True
+    return False
+
+
+def ensure_gitignored(project_root: Path | str) -> bool:
+    """Guarantee the project file's ``.gitignore`` rule. Returns True if added.
+
+    Set 124 S3, found by the cold-start walk the spec required: the header
+    :func:`write_project_verify_type` embeds says the file is *"Gitignored on
+    purpose"*, and until now nothing made that true. A consumer who followed
+    the documented first run got an untracked, **committable** file carrying
+    its own claim to the contrary -- and a single ``git add -A`` then
+    published one machine's answer to the whole team, which is the exact
+    failure this scoping exists to remove. A promise in shipped output that
+    nothing enforces is the defect, not the wording.
+
+    Called BEFORE the project file is written, so there is no window in which
+    the file exists un-ignored. Idempotent, and never destructive: an existing
+    ``.gitignore`` is appended to, never rewritten. Best-effort by design --
+    an unwritable ``.gitignore`` must not stop an operator from declaring what
+    verifies their project, so the caller warns rather than fails.
+    """
+    root = Path(project_root)
+    path = root / GITIGNORE_FILE_NAME
+    try:
+        existing = path.read_text(encoding="utf-8") if path.is_file() else ""
+    except (OSError, UnicodeDecodeError):
+        existing = ""
+    if is_gitignored_by(existing):
+        return False
+    prefix = existing if existing == "" or existing.endswith("\n") else existing + "\n"
+    path.write_text(
+        prefix
+        + "\n# What verifies this project, ON THIS MACHINE. Machine/project\n"
+        "# state by design -- committing it forces every clone onto one\n"
+        "# machine's transport.\n"
+        f"{GITIGNORE_RULE}\n",
+        encoding="utf-8",
+    )
+    return True
+
+
 def write_project_verify_type(
     project_root: Path | str, verify_type: str
 ) -> Path:
@@ -225,10 +297,29 @@ def write_project_verify_type(
     branch 1 forever. Idempotent -- writing the same value twice is a no-op
     in effect. The written file carries a comment header, which
     :func:`parse_verify_type` tolerates by design.
+
+    The ``.gitignore`` rule is guaranteed FIRST (:func:`ensure_gitignored`),
+    so the file never exists in a committable state -- the header's
+    "Gitignored on purpose" is a fact this function establishes, not a hope
+    it expresses. A failure to write the rule is reported on stderr and does
+    not block the answer itself.
     """
     if verify_type not in VALID_VERIFY_TYPES:
         raise VerifyTypeError(
             f"Refusing to write {verify_type!r}: expected {_valid_values_hint()}."
+        )
+    try:
+        ensure_gitignored(project_root)
+    except OSError as exc:
+        # Named, never swallowed (L-079-1's fail-open rule): an operator who
+        # is not told still has a committable answer sitting in their repo.
+        print(
+            f"WARNING: could not add {GITIGNORE_RULE!r} to "
+            f"{Path(project_root) / GITIGNORE_FILE_NAME} ({exc}). "
+            f"{PROJECT_FILE_NAME} is machine/project state -- add that rule by "
+            "hand before committing, or every clone inherits this machine's "
+            "answer.",
+            file=sys.stderr,
         )
     path = Path(project_root) / PROJECT_FILE_NAME
     path.write_text(

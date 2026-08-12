@@ -172,6 +172,83 @@
       "dateTime": "2026-08-12T07:30:07.176727-04:00",
       "description": "Targeted 194 passed. Full pytest run of record: 3991 passed, 9 skipped (618s). The first full run exposed 7 failures caused BY this session: TestPinnedOverrideRespectsIsEnabled (6) and TestSessionVerificationPathWasNeverAffected (1) call ai_router._init() with require_api_keys=True and had been passing on this keyless Copilot seat only because local-overrides.yaml set transport.profile=copilot-cli, which exempts the key check. S2 retired that override and S1 conftest guard already blocks the real project file inside the suite, so the config resolved api and demanded keys the seat never had. Fixed with the sanctioned placeholder_provider_keys fixture (Set 111 S2) at class level -- same machine-state-coupling class S1 found, surfaced from the other side.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T07:57:17.573835-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "fix-every-documentation-echo-in-one",
+      "dateTime": "2026-08-12T07:57:17.573835-04:00",
+      "description": "**Fix every documentation echo in one pass.** Grep the *old* phrasing \u2014 \"committed\", \"commit it\", \"project configuration, not machine state\" \u2014 across `README.md`, `docs/quick-start.md` (the inventory table row), `AGENTS.md` / `CLAUDE.md` / `GEMINI.md`, `docs/planning/verify-type-resolution.md` (its preamble and open question 1), `docs/tutorials/adopt-dabbler.md` (which instructs `commit project-verify-type.txt`), and `docs/templates/consumer-bootstrap/getting-started.md.template` (which asserts the exact inverse of the operator's ruling). A consistency fix is global, not point-local. Tell an already-committed consumer to `git rm --cached`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "fix-the-extension-side-echoes-and",
+      "dateTime": "2026-08-12T07:57:17.573835-04:00",
+      "description": "**Fix the extension-side echoes and the tests that pin them** \u2014 `copilotSeatSetup.ts`'s operator-facing strings, the comments in `providerKey.ts` and `extension.ts`, and the assertions in `copilotSeatSetup.test.ts` / `gitScaffoldSeatSetup.test.ts`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "walk-the-cold-start-because-it",
+      "dateTime": "2026-08-12T07:57:17.573835-04:00",
+      "description": "**Walk the cold start, because it is now the normal first run.** From a fresh checkout carrying no `project-verify-type.txt`, drive branch 3 to a finished setup and assert the resolved answer; `L-079-3` requires the walk begin from genuinely unprovisioned state, not a seeded fixture.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "extension-source-changed-so-l-064",
+      "dateTime": "2026-08-12T07:57:17.573835-04:00",
+      "description": "Extension source changed, so **`L-064-12` applies**: run the full `npm run test:playwright` after the last edit, then full pytest, verify, close, and run the Step 9 guidance review.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T08:04:37.701576-04:00",
+      "description": "Registered Set 124 S3 (github-copilot/anthropic/claude-opus-5); preload read; no decision-review queue; prerequisites confirmed (S1 gitignore rule live via git check-ignore, S2 leaves no transport key in _LOCAL_OVERRIDE_ALLOWED).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "fix-every-documentation-echo-in-one",
+      "dateTime": "2026-08-12T08:04:37.703335-04:00",
+      "description": "Fixed every documentation echo of the retired 'committed' claim in one pass: README.md (setup paragraph + the inverted 'a project's committed choice is not overridden by whichever machine' sentence), docs/quick-start.md (the run-this line and BOTH inventory rows -- local-overrides.yaml now names its retired transport.profile), AGENTS/CLAUDE/GEMINI.md (identical pointer block), docs/planning/verify-type-resolution.md (a Set 124 amendment banner in the status preamble per L-064-8, the same-provider paragraph's 'committed answer'/'uncommitted env var', and settled open question 1), docs/tutorials/adopt-dabbler.md (dropped 'commit project-verify-type.txt'), and docs/templates/consumer-bootstrap/getting-started.md.template (which asserted the exact inverse of the operator ruling; now also carries the git rm --cached recipe and the .gitignore rule). Regenerated the golden cold-start fixture the template pins (UPDATE_GOLDEN=1 npm run test:unit, 1471 passing).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "fix-the-extension-side-echoes-and",
+      "dateTime": "2026-08-12T08:25:26.593520-04:00",
+      "description": "FOUND A CRITICAL DEFECT THIS SESSION'S SPEC DID NOT ANTICIPATE, then fixed it. The spec scoped Step 3 as operator-facing STRING echoes; the strings were describing a write that S2 had turned into poison. performCopilotSeatSetup still rendered transport.profile: copilot-cli into ai_router/local-overrides.yaml -- the exact key S2 made a hard refusal -- so a SUCCESSFUL 'Dabbler: Set Up Copilot Seat' handed the operator a project whose every load_config raised ValueError. Reproduced in a throwaway fixture before deciding anything. Operator briefed (education-mode) and chose the recommendation; journaled to decisions.jsonl under goal-over-letter. FIX: the write is retargeted to the ONE sanctioned entry point -- the extension now spawns `<venvPython> -m ai_router.verify_type --set COPILOT_CLI --project-root <projectDir>` through the same scaffolded interpreter the catalog refresh uses, so there is exactly one writer of project-verify-type.txt and every such file carries the header write_project_verify_type emits. Deleted the whole retired YAML-render machinery (locateTransportProfile, hasTopLevelTransportBlock, renderTransportProfile, RenderProfileResult). readTransportProfile -> readProjectVerifyType (parses the writer's comment header). deriveCopilotSeatChosenUnconfirmed's durable half follows. Outcome kind config-write-failed -> verify-type-write-failed. RETARGETED THE GITIGNORE GUARANTEE from local-overrides.yaml to /project-verify-type.txt: the extension no longer writes the former and does cause the latter, and an un-ignored verify type is exactly the committed-answer failure this set removes. writeConfigAtomically -> writeFileAtomically, repointed at the .gitignore write so the utility keeps a real caller. Direct API path untouched by construction (the 'api' pick was always a no-op). Comment echoes fixed in providerKey.ts, copilotSeatSetupCommand.ts, gitScaffold.ts. Tests: replaced rather than deleted -- buildVerifyTypeArgs/verifyTypeCommandHint/readProjectVerifyType suites, a two-spawn fake spawner, and L-112-1 PLANTED falsifiers (asserts NO file the command writes carries profile: copilot-cli; asserts an existing local-overrides.yaml is left byte-identical; asserts the retired ignore rule is NOT read as coverage for the new file). Layer 2: 1475 passing, 2 pending, 0 failing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "walk-the-cold-start-because-it",
+      "dateTime": "2026-08-12T08:35:42.811816-04:00",
+      "description": "Walked branch 3 from a GENUINELY unprovisioned checkout per L-079-3 -- an empty tmp dir plus `git init`, no seeded config, no env var, no project file. Branch 3 fired (exit 3) and its guided text already named the gitignore rationale; `--set COPILOT_CLI` then resolved the project on branch 1 (exit 0, transport.profile derives to copilot-cli). THE WALK EARNED ITS KEEP: `git status` showed the freshly written project-verify-type.txt as untracked and COMMITTABLE, and `git check-ignore` exited 1 -- while the header the writer embeds says 'Gitignored on purpose'. The writer was shipping a promise nothing kept, the same class as the S1 en-route finding (a header that said 'Committed on purpose'). Fixed in the writer: write_project_verify_type now calls a new ensure_gitignored() BEFORE it writes the file, so there is no window in which the answer exists un-ignored; is_gitignored_by() is conservative in the safe direction (a false positive would leave it committable) and never counts comments or ! re-includes. Best-effort with a NAMED skip on stderr per L-079-1. Re-walked: check-ignore now claims the file and git status shows only .gitignore. CONSEQUENCE FOR THE EXTENSION: the guarantee I had just added there (ensureVerifyTypeIgnored/isVerifyTypeIgnored/VERIFY_TYPE_IGNORE_RULE/GITIGNORE_REL/EnsureIgnoredResult/ignoreWarning) became a SECOND implementation of one fact -- the very defect this set removes -- so it was deleted along with writeFileAtomically/ATOMIC_WRITE_TMP_SUFFIX, whose last caller it was. The extension inherits the guarantee through the spawn. 7 new falsifiers, both directions (L-112-1): the rule fires on a bare repo, precedes the file it protects, appends without clobbering, is idempotent, recognises the three genuine patterns, and rejects seven look-alikes INCLUDING the retired local-overrides rule. MUTATION-TESTED: disabling ensure_gitignored fails exactly 4 of them; restored 46 pass. Docs corrected -- the template/README/quick-start no longer tell the reader to add the rule by hand, and the git rm --cached callout now explains WHY an ignore rule does not untrack an already-tracked file.",
+      "status": "complete"
     }
   ]
 }

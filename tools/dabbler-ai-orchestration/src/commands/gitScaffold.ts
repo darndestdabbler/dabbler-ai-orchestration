@@ -339,10 +339,12 @@ function makeScaffoldInstallPrompts() {
  * existing scaffold sequence (venv → pip install → template render)
  * reports ``installOk`` (spec Sequencing, critique C2) — the guided
  * Copilot seat setup runs: a cancellable catalog refresh through the
- * scaffolded venv's own interpreter, then the ``transport.profile``
- * template write on ≥2 confirmed providers. Callers without a pick
- * (the Command Palette) leave it unset; ``"api"`` is a no-op — the
- * seeded default already IS api.
+ * scaffolded venv's own interpreter, then the project's verify type is
+ * recorded as ``COPILOT_CLI`` through ``python -m ai_router.verify_type``
+ * on ≥2 confirmed providers (Set 124 S3 — it was a ``transport.profile``
+ * write into local-overrides.yaml until S2 retired that key). Callers
+ * without a pick (the Command Palette) leave it unset; ``"api"`` is a
+ * no-op — the seeded default already IS api.
  *
  * ``seams`` (S2 verification round 2): test-only injection points so the
  * Layer-2 suite drives THIS function — the real build path — and pins

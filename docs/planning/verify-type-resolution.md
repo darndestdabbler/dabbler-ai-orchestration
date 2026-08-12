@@ -11,6 +11,12 @@
 > [`ai_router/verification_stamp.py`](../../ai_router/verification_stamp.py),
 > with falsifiers in `ai_router/tests/test_qualified_verdict.py`;
 > retiring the webview is **Session 3**.
+> **Amended by Set 124 (2026-08-12):** `project-verify-type.txt` is
+> **gitignored machine/project state**, not committed project
+> configuration — the operator's correction to Set 123's scoping. Set 124
+> S2 also retired `transport.profile` as a `local-overrides.yaml` key, so
+> the file below is now the *only* mechanism for that fact. Read every
+> "committed" claim in the sections below as historical.
 > This replaced the "detect → confirm → persist" placeholder that was R3
 > in [`the target-state proposal`](../proposals/2026-08-10-smaller-framework-target-state.md#3-3-both-transports-r3),
 > and it is the operator's design, not an inferred one.
@@ -104,9 +110,9 @@ each settled during implementation:
 - **The permission is derived inside `route()`, never passed to it.** A
   parameter would have re-opened `I-084-S1-3` (a caller-supplied exclusion
   list that omits the orchestrator's provider). No caller can *ask* for a
-  same-provider verification; only the project's committed answer plus the
+  same-provider verification; only the project file's answer plus the
   machine's actual key set can produce one, and it warns on stderr when it
-  does. An **uncommitted** `AI_ORCHESTRATION_VERIFY_TYPE` cannot trigger it
+  does. An **unconfirmed** `AI_ORCHESTRATION_VERIFY_TYPE` cannot trigger it
   — a suggestion that could weaken every verdict on a machine would be the
   action-at-a-distance branch 2 exists to avoid.
 - **The flag is enforced as a bijection.** The close gate accepts a
@@ -158,7 +164,11 @@ is not helpful*, rather than picking a target number.
    the project root, found by walking up from the working directory and
    **stopping at the repository boundary** (the first ancestor holding
    `.git`), so a project never inherits an unrelated parent directory's
-   answer. It is committed — project configuration, not machine state.
+   answer. **Re-scoped by Set 124:** it is **gitignored** machine/project
+   state — the answer to "what verifies *this project*, on *this machine*"
+   — not committed project configuration. One project checked out on two
+   machines may legitimately differ, so a committed answer would force
+   every clone onto one machine's transport.
    Session 3 names it in the three bootstrap files.
 2. **How does the qualified verdict surface?** **Settled (Set 123 S2):** as
    an omit-null field on the three **router-owned** verdict records — the

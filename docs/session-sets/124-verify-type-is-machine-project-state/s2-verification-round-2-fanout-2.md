@@ -1,0 +1,4 @@
+VERIFIED — I checked `ai_router/config.py`, `verify_type.py`, the replacement tests, router-config comments, decision journal, and the live gitignored state. The delivered behavior matches the session contract: `transport.profile` is no longer locally allowed, stale keys hard-fail with the derived `verify_type --set` command, and allowed local overrides still work.
+
+NITS:
+- **Nit:** `ai_router/tests/test_local_overrides_merge.py:323-325` has a stale assertion failure message telling maintainers to put `copilot-cli` in `ai_router/local-overrides.yaml`; that contradicts this session’s retirement, but only affects a test-failure hint.

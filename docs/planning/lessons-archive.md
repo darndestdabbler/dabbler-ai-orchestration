@@ -148,7 +148,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
 
 
 ## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
-<!-- lesson: id="L-079-3" added-set="079" last-used-set="107" status="archived" scope="portable" -->
+<!-- lesson: id="L-079-3" added-set="079" last-used-set="123" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
   2026-07-06** after instrumental application across Sets 079 (origin: the
@@ -797,7 +797,7 @@ instruction is still live: the rubric has not shipped in
 `project-guidance.md`.
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="115" status="archived" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" last-used-set="123" status="archived" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families

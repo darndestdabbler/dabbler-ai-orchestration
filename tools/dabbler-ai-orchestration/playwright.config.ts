@@ -32,7 +32,18 @@ export default defineConfig({
   // If this ever proves flaky, the cause to check first is memory:
   // four Electron instances at roughly 0.5–1 GB each against a 7–16 GB
   // runner. Drop to 2 before dropping the isolation.
-  workers: 4,
+  //
+  // 2026-08-12 — it proved flaky, and this is that fallback, applied only
+  // where the machine is small. `windows-latest` is four vCPUs and 16 GB, so
+  // four Electron instances plus this suite's own real venv + pip install
+  // leave the workbench nothing to be responsive with, and steps that wait a
+  // fixed number of seconds start losing the bet. Four of the seven Windows
+  // runs after the bump went red, split between the first-run walkthrough's
+  // command palette (never opened within 15s) and native-tree's row count,
+  // while the Linux and macOS legs stayed green on the same commits — which
+  // is what says "small runner", not "broken product". The isolation is
+  // untouched and a developer's box still gets all four workers.
+  workers: process.env.CI ? 2 : 4,
   fullyParallel: false,
   // Set 110 S4: add the `github` reporter in CI so each failure becomes a
   // workflow ANNOTATION carrying the spec file, line and message.

@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-12T06:35:20.188563-04:00",
+  "sessionSetDir": "125-routed-calls-cannot-mutate",
+  "inputs": {
+    "activity-log.json": "3da55117b4a5fe512396caddd4ba6c4029dcbb6205b12b0075433024b7c78b97",
+    "session-state.json": "5ceac8ba2f650e0a12b143eff2fd64edb9a352700324184fd6fb9cd93e28748e",
+    "spec.md": "159d5dba6309fe1d07b49889106a59e857f3034c2eb7e0fb2167c36a6f0b8a62"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered Set 125 S1 (github-copilot/anthropic/claude-opus-5). Single-session set run as the operator-requested Session 0 ahead of Set 124 S2.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "constrain-both-dispatch-paths",
+          "description": "Added READ_ONLY_TOOLS=(view,grep,glob), MUTATING_TOOLS, and _tool_grant_argv() to cli_transport.py, applied to BOTH the inline (:683) and Set 104 handoff (:725) argv builds from one shared helper so they cannot drift. --allow-all-tools retained (it governs headless auto-approval, not the universe); temp-dir access retained for the handoff pull.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-in-both-directions-l-112",
+          "description": "12 falsifiers in test_routed_calls_cannot_mutate.py, parametrized across both dispatch paths. Mutation-proved: returning no flags fails 5; adding edit/powershell to the allowlist fails 3; restored 12 pass. LIVE end-to-end route() proof: the model tried to write, fell back to PowerShell (its words: I cannot write files directly with my tools), and the target file was unchanged.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "record-the-transport-parity-guarantee-where",
+          "description": "Recorded the parity guarantee in its operative homes rather than a new doc: router-config.yaml transport block (what a developer reads when choosing a profile) and ai_router/CHANGELOG.md under Security. Explicitly scoped it AGAINST Set 078 degraded guarantees, which cover provenance and billing, never write access. tier-model.md was rejected as a home (historical doc about a removed feature); repository-reference.md is the release log.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-the",
+          "description": "Full pytest: 3987 passed, 9 skipped, 1 failed (494.7s). Sole failure was the one-active-set drift check (sets 124+125 both in-progress) -- repo STATE, not code. Set 124 paused via the sanctioned cancel writer under operator authorization; failing check + this session suites re-ran green (112 passed); no ai_router/ code changed between, so the full run exercised this exact tree. Recorded as the pytest run of record with that provenance in --detail. Verification: VERIFIED, cross-provider (gpt-5.5, anthropic excluded), 2 lenses, 0 findings, \\.00. DOGFOOD: that round dispatched under the new constrained grant and mutated nothing outside this session own work.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 5,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 5
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

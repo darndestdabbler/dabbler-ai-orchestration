@@ -25,6 +25,28 @@
 
 ## Archived Lessons
 
+Archived by Set 125 (Step 9, operator-approved): the active tier was at its
+preload ceiling, so admitting `L-125-1` required removing prose of comparable
+size. `L-075-1` was the least-recently-cited active lesson — unused since Set
+084, 41 sets stale — and its failure mode (`No module named ...`) is loud and
+self-diagnosing rather than silent. Full text preserved; reactivate with
+`cite_lessons`.
+
+## A Dependency-Pin Bump Is Not Enablement
+<!-- lesson: id="L-075-1" added-set="075" last-used-set="084" status="archived" scope="portable" -->
+
+- A raised floor in `requirements.txt` (or any manifest) does not touch
+  the already-provisioned environment; the downstream step still fails
+  with `No module named ...` mid-session on an expensive path. Enablement
+  is three steps: bump the pin, **upgrade the target venv**
+  (`pip install -U "<pkg>>=<floor>"`), and **prove the entrypoint**
+  imports and parses the exact args the downstream step will pass. Record
+  the resolved installed version at close, not just the declared floor.
+
+---
+
+## Archived Lessons
+
 Archived by Set 073 (promoted-lesson sweep): each lesson below was promoted to
 `project-guidance.md` / the authoring guide (its canonical rule), so its active-tier
 copy was redundant. Full text preserved here; reactivate with `cite_lessons`.

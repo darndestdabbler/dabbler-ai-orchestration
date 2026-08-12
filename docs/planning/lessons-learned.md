@@ -150,19 +150,16 @@ full text in `lessons-archive.md`:
   the code. Add a **structural** assertion beside the textual one; it
   holds however a thing is spelled.
 
-## A Dependency-Pin Bump Is Not Enablement
-<!-- lesson: id="L-075-1" added-set="075" last-used-set="084" status="active" scope="portable" -->
+## Compare What A Transport CAN DO, Not What It Returns
+<!-- lesson: id="L-125-1" added-set="125" last-used-set="125" status="active" scope="portable" -->
 
-- A raised floor in `requirements.txt` (or any manifest) does not touch
-  the already-provisioned environment; the downstream step still fails
-  with `No module named ...` mid-session on an expensive path. Enablement
-  is three steps: bump the pin, **upgrade the target venv**
-  (`pip install -U "<pkg>>=<floor>"`), and **prove the entrypoint**
-  imports and parses the exact args the downstream step will pass. Record
-  the resolved installed version at close, not just the declared floor.
-
-
----
+- Backends behind one interface differ in **capability**, not output. Under
+  one `route()` contract, direct-API sends no `tools` key and cannot touch
+  disk; the CLI transport dispatches an **agentic** process with shell and
+  file-write. The gap lived in one subprocess flag, surfacing when routed
+  calls silently edited 23 files, and a reviewer able to edit what it judges
+  can VERIFY its own edit. **Refusal is not a control:** grant least
+  privilege as an **allowlist** (denylists fail open).---
 
 ## Repo-Specific Lessons
 

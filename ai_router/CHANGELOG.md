@@ -11,6 +11,54 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased] — one computed projection, and the marker goes (Set 120 S3)
 
+### Security
+
+- **(Set 125) A routed call can no longer mutate the workspace on the
+  `copilot-cli` transport.** `route()` is one contract, but its two
+  transports did not honour it equally. On `api` a routed call is a plain
+  HTTPS completion — `providers.py` sends model/max_tokens/system/messages
+  and **no `tools` key** — so the provider returns text and the call cannot
+  touch the filesystem by construction. On `copilot-cli` the same call
+  dispatches an **agentic** CLI, and `--allow-all-tools` alone handed the
+  model the entire tool universe against the live working tree: arbitrary
+  shell (`powershell`), file creation and editing (`create`, `edit`), and
+  sub-agent spawning (`task`, `write_agent`).
+
+  This was not theoretical. On 2026-08-12, routed calls fired from the test
+  suite modified **23 files** in this repo with no human in the loop —
+  including two production modules, extension source, the built `dist`
+  bundle, a JSON schema, six docs, and one 150-line document the model
+  invented outright — and wrote two spurious rounds into a live
+  verification ledger. The deeper hazard is independent of that trigger: a
+  verifier that can edit the code it is judging can fix a finding and then
+  report VERIFIED on its own edit, which dissolves the cross-provider
+  guarantee the workflow rests on.
+
+  `cli_transport.py` now passes `--available-tools` with a read-only
+  allowlist (`view`, `grep`, `glob`) on **both** dispatch paths — the inline
+  path and the Set 104 large-prompt handoff — from one shared
+  `_tool_grant_argv()` helper so the two cannot drift.
+
+  Notes on the shape of the fix: an **allowlist**, because
+  `--available-tools` removes a tool from the model's view while
+  `--deny-tool` only withholds permission, and a denylist fails open on any
+  tool a future CLI release adds. `--allow-all-tools` is **retained** — it
+  governs auto-approval without prompting, which headless dispatch
+  requires; once the universe is read-only, "allow all" allows only
+  read-only tools. `view` is **required**, not incidental: the Set 104
+  handoff instructs the model to pull its payload from a temp file with a
+  file-read tool. Temp-dir access is likewise retained.
+
+  Verified by a matched pair on an identical prompt (`--allow-all-tools`
+  alone rewrote the target file, `filesModified: ["sample.txt"]`; with the
+  allowlist, `filesModified: []`) and by a live end-to-end `route()` call in
+  which the model tried to comply, reported *"I can't write files directly
+  with my tools"*, fell back to shell, was blocked there too, and left the
+  target unchanged. Note that an earlier blunt "create breach.txt" prompt
+  was *declined by the model* while a benign "bring this file into line
+  with the convention" framing wrote immediately — **refusal is not a
+  control; the grant is.**
+
 ### Added
 
 - **(Set 123 S2) The `DIRECT_API` precondition, and the qualified

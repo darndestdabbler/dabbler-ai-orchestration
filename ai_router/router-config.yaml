@@ -86,6 +86,20 @@ providers:
 # — over this file and over local-overrides.yaml both. Two mechanisms for one
 # fact is a defect class this repo has hit three times; the file is the one.
 # `python -m ai_router.verify_type` prints which branch answered.
+#
+# Set 125: TRANSPORT PARITY — a routed call CANNOT MUTATE THE WORKSPACE on
+# either profile. On "api" that was always true by construction (providers.py
+# sends no `tools` key, so the provider returns text). On "copilot-cli" it was
+# NOT: the profile dispatches an agentic CLI, and `--allow-all-tools` alone
+# granted the model arbitrary shell plus file create/edit plus sub-agent
+# spawning against the live working tree. On 2026-08-12 routed calls fired
+# from the test suite modified 23 files here with no human in the loop, and a
+# verifier able to edit the code it judges can report VERIFIED on its own
+# edit. cli_transport.py now also passes `--available-tools` with a read-only
+# allowlist (view, grep, glob) on BOTH dispatch paths, so the seat profile
+# gives the same guarantee the api profile always did. This is NOT part of
+# the "explicitly degraded guarantees" above — those cover provenance and
+# billing, never write access.
 transport:
   profile: api   # api | copilot-cli — derived from project-verify-type.txt when present
   # This is PACKAGE DATA (pyproject.toml ships this file), so it must carry the

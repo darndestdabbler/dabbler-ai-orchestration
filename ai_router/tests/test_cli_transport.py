@@ -158,6 +158,7 @@ def test_argument_construction():
         "-p", expected_prompt,
         "--model", "gpt-5.4",
         "--allow-all-tools",
+        "--available-tools", "view,grep,glob",
         "--output-format", "json",
         "--no-auto-update",
     ]
@@ -967,12 +968,14 @@ def test_inline_path_argv_byte_identical_below_threshold():
     transport.dispatch(
         model_id="gpt-5.4", system_prompt="Be concise.", user_message="Say hello."
     )
-    # Identical to the pre-Set-104 inline argv contract.
+    # Identical to the pre-Set-104 inline argv contract, plus the Set 125
+    # least-privilege tool grant (which both dispatch paths now carry).
     assert spawner.calls[0].argv == [
         "gh-copilot",
         "-p", "Be concise.\n\nSay hello.",
         "--model", "gpt-5.4",
         "--allow-all-tools",
+        "--available-tools", "view,grep,glob",
         "--output-format", "json",
         "--no-auto-update",
     ]

@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "124-verify-type-is-machine-project-state",
-  "status": "in-progress",
+  "status": "cancelled",
   "sessions": [
     {
       "number": 1,
@@ -35,5 +35,6 @@
       "orchestrator": null,
       "verificationVerdict": null
     }
-  ]
+  ],
+  "preCancelStatus": "in-progress"
 }

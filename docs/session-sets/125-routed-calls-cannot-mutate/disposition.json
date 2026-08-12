@@ -1,0 +1,26 @@
+{
+  "status": "completed",
+  "summary": "Set 125 closed a transport-parity defect: a routed call could mutate the repo on the copilot-cli profile but not on api. On api, providers.py sends no `tools` key, so a routed call is a text completion and cannot touch the filesystem by construction; on copilot-cli the same call dispatches an agentic CLI that --allow-all-tools had granted arbitrary shell (powershell), file create/edit, and sub-agent spawning against the live working tree. Observed on 2026-08-12: routed calls fired from the test suite modified 23 files with no human in the loop, including two production modules, extension source, the built dist bundle and a JSON schema, plus one 150-line doc the model invented, and wrote two spurious rounds into a live verification ledger. cli_transport.py now passes --available-tools with a read-only allowlist (view, grep, glob) on BOTH dispatch paths -- inline and the Set 104 large-prompt handoff -- from one shared _tool_grant_argv() helper so they cannot drift. --allow-all-tools is retained deliberately (it governs headless auto-approval, not the universe) and `view` is retained because the handoff pull requires a file-read tool. Proven by mutation tests (5 and 3 failures on two mutations, 12 green restored), a live matched pair through the raw CLI (filesModified ['sample.txt'] before, [] after), and a live end-to-end route() call in which the model tried to comply, said it could not write with its tools, fell back to shell, was blocked, and left the file unchanged. This set's own verification round dispatched under the new grant and mutated nothing.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    "ai_router/cli_transport.py",
+    "ai_router/tests/test_routed_calls_cannot_mutate.py",
+    "ai_router/tests/test_cli_transport.py",
+    "ai_router/router-config.yaml",
+    "ai_router/CHANGELOG.md",
+    "docs/session-sets/125-routed-calls-cannot-mutate/spec.md",
+    "docs/session-sets/125-routed-calls-cannot-mutate/s1-conventions.md",
+    "docs/session-sets/125-routed-calls-cannot-mutate/change-log.md",
+    "docs/session-sets/125-routed-calls-cannot-mutate/s1-step9-guidance-review.md"
+  ],
+  "lessons_cited": [
+    "L-112-1",
+    "L-069-1",
+    "L-064-9"
+  ],
+  "next_orchestrator": null,
+  "blockers": []
+}
+

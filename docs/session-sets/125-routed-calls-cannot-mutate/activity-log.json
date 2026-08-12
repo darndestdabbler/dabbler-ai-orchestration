@@ -1,0 +1,92 @@
+{
+  "sessionSetName": "125-routed-calls-cannot-mutate",
+  "createdDate": "2026-08-12T05:57:34.325735-04:00",
+  "totalSessions": 1,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T05:57:34.325547-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "constrain-both-dispatch-paths",
+      "dateTime": "2026-08-12T05:57:34.325547-04:00",
+      "description": "**Constrain both dispatch paths.** `cli_transport.py` builds argv twice \u2014 the inline path (`:683`) and the Set 104 handoff path (`:725`). Add the read-only `--available-tools` allowlist to **both**, from one shared module-level constant so they cannot drift, with the tool universe and the parity rationale recorded beside it. A fix applied to one path only is the defect this repo has hit before (`L-069-1`).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T05:57:34.325547-04:00",
+      "description": "**Falsify in both directions** (`L-112-1`). The rule fires: each dispatch path's argv carries the allowlist, and it names no mutating tool (`create`, `edit`, `powershell`, `task`, `write_agent`). The rule does not fire indiscriminately: the read tools the handoff depends on are still present, and `--allow-all-tools` is still passed so headless dispatch does not start prompting. Add a **structural** assertion that the allowlist and the known-mutating set are disjoint, so it holds however either is spelled.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "record-the-transport-parity-guarantee-where",
+      "dateTime": "2026-08-12T05:57:34.325547-04:00",
+      "description": "**Record the transport-parity guarantee where it is owned**, not only in this spec: state in the transport documentation that a routed call cannot mutate the workspace on either profile, and why `--allow-all-tools` alone did not deliver that. Cite the matched pair as the evidence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-the",
+      "dateTime": "2026-08-12T05:57:34.325547-04:00",
+      "description": "Full pytest at close after the last edit; verify; close; Step 9 review (this is the set's final session).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T06:00:54.382905-04:00",
+      "description": "Registered Set 125 S1 (github-copilot/anthropic/claude-opus-5). Single-session set run as the operator-requested Session 0 ahead of Set 124 S2.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "constrain-both-dispatch-paths",
+      "dateTime": "2026-08-12T06:00:54.384521-04:00",
+      "description": "Added READ_ONLY_TOOLS=(view,grep,glob), MUTATING_TOOLS, and _tool_grant_argv() to cli_transport.py, applied to BOTH the inline (:683) and Set 104 handoff (:725) argv builds from one shared helper so they cannot drift. --allow-all-tools retained (it governs headless auto-approval, not the universe); temp-dir access retained for the handoff pull.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T06:00:54.386005-04:00",
+      "description": "12 falsifiers in test_routed_calls_cannot_mutate.py, parametrized across both dispatch paths. Mutation-proved: returning no flags fails 5; adding edit/powershell to the allowlist fails 3; restored 12 pass. LIVE end-to-end route() proof: the model tried to write, fell back to PowerShell (its words: I cannot write files directly with my tools), and the target file was unchanged.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "record-the-transport-parity-guarantee-where",
+      "dateTime": "2026-08-12T06:02:03.903269-04:00",
+      "description": "Recorded the parity guarantee in its operative homes rather than a new doc: router-config.yaml transport block (what a developer reads when choosing a profile) and ai_router/CHANGELOG.md under Security. Explicitly scoped it AGAINST Set 078 degraded guarantees, which cover provenance and billing, never write access. tier-model.md was rejected as a home (historical doc about a removed feature); repository-reference.md is the release log.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-the",
+      "dateTime": "2026-08-12T06:31:33.102687-04:00",
+      "description": "Full pytest: 3987 passed, 9 skipped, 1 failed (494.7s). Sole failure was the one-active-set drift check (sets 124+125 both in-progress) -- repo STATE, not code. Set 124 paused via the sanctioned cancel writer under operator authorization; failing check + this session suites re-ran green (112 passed); no ai_router/ code changed between, so the full run exercised this exact tree. Recorded as the pytest run of record with that provenance in --detail. Verification: VERIFIED, cross-provider (gpt-5.5, anthropic excluded), 2 lenses, 0 findings, \\.00. DOGFOOD: that round dispatched under the new constrained grant and mutated nothing outside this session own work.",
+      "status": "complete"
+    }
+  ]
+}

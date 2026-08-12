@@ -152,6 +152,79 @@ _HANDOFF_ACK_PREFIX = "HANDOFF-ACK"
 _DIAGNOSTICS_ENV_VAR = "DABBLER_COPILOT_DIAGNOSTICS"
 _DIAGNOSTICS_TRUTHY = frozenset({"1", "true", "yes", "on"})
 
+# ---------------------------------------------------------------------------
+# Least-privilege tool grant (Set 125). TRANSPORT PARITY, not a Copilot quirk.
+#
+# ``route()`` is one contract, but its two transports did not honour it
+# equally. On the ``api`` profile a routed call is a plain HTTPS completion:
+# ``providers.py`` sends model/max_tokens/system/messages and NO ``tools``
+# key, so the provider returns text and the call cannot touch the filesystem
+# by construction. On this profile the same call dispatches an *agentic* CLI,
+# and ``--allow-all-tools`` alone handed it the whole tool universe against
+# the live working tree:
+#
+#     powershell, read_powershell, stop_powershell, list_powershell, view,
+#     create, edit, web_fetch, fetch_copilot_cli_documentation, skill, sql,
+#     session_store_sql, read_agent, list_agents, write_agent, grep, glob,
+#     task, github-mcp-server-*
+#
+# That is arbitrary shell, file creation, file editing and sub-agent
+# spawning. It is not theoretical: on 2026-08-12 routed calls fired from the
+# test suite modified 23 files in this repo with no human in the loop --
+# two production modules, extension source, the built dist bundle, a JSON
+# schema, six docs, plus one 150-line doc the model invented outright -- and
+# wrote two spurious rounds into a live verification ledger. A verifier that
+# can edit the code it judges can fix a finding and then report VERIFIED on
+# its own edit, which dissolves the cross-provider guarantee.
+#
+# The router owns model choice, prompt shaping and metrics; ORCHESTRATORS own
+# mechanics (reading, editing, running commands). So no routed call needs to
+# write, and the grant below is transport-wide rather than
+# verification-only -- one rule is also the one a developer can explain.
+#
+# Why an ALLOWLIST: ``--available-tools`` removes a tool from the model's
+# view, while ``--deny-tool`` only withholds permission; a denylist would
+# also fail open on any tool a future CLI release adds. Why
+# ``--allow-all-tools`` STAYS: it governs auto-approval without prompting,
+# which headless dispatch requires. Once the universe is read-only, "allow
+# all" allows only read-only tools.
+#
+# Why these three: ``view`` is REQUIRED -- the Set 104 large-prompt handoff
+# instructs the model to pull its payload from a temp file with a file-read
+# tool, so removing it would break every large dispatch. ``grep``/``glob``
+# keep path-aware review able to locate what it is asked to review.
+#
+# Matched-pair evidence (identical prompt, only the grant differs):
+#   --allow-all-tools alone        -> filesModified: ["sample.txt"], 1 line changed
+#   + --available-tools=view,...   -> filesModified: []
+# Note the earlier blunt "create breach.txt" phrasing was DECLINED by the
+# model while the benign "bring this file into line with the convention"
+# framing wrote immediately: refusal is not a control, the grant is.
+# ---------------------------------------------------------------------------
+
+#: The only tools a routed call may use. Read-only by construction.
+READ_ONLY_TOOLS: tuple[str, ...] = ("view", "grep", "glob")
+
+#: Tools that can mutate the workspace, escape the process, or spawn more
+#: agents. Never granted to a routed call. Kept explicit so the disjointness
+#: falsifier is structural rather than a re-statement of the allowlist.
+MUTATING_TOOLS: frozenset[str] = frozenset({
+    "powershell", "read_powershell", "stop_powershell", "list_powershell",
+    "create", "edit", "web_fetch", "skill", "sql", "session_store_sql",
+    "task", "read_agent", "list_agents", "write_agent",
+})
+
+
+def _tool_grant_argv() -> list[str]:
+    """The argv fragment restricting a dispatch to read-only tools.
+
+    One helper, used by BOTH the inline and handoff paths, so the two cannot
+    drift -- a fix applied to only one dispatch path is exactly the
+    fix-one-site defect class this repo keeps re-learning (L-069-1).
+    """
+    return ["--available-tools", ",".join(READ_ONLY_TOOLS)]
+
+
 
 def _diagnostics_retention_enabled(env: Optional[dict] = None) -> bool:
     """True iff the diagnostics env toggle is explicitly truthy -- the only
@@ -685,6 +758,7 @@ class CopilotCliTransport:
             "-p", prompt,
             "--model", model_id,
             "--allow-all-tools",
+            *_tool_grant_argv(),
             "--output-format", "json",
             _NO_AUTO_UPDATE_FLAG,
         ]
@@ -727,6 +801,7 @@ class CopilotCliTransport:
             "-p", _build_handoff_bootstrap(Path(path).as_posix()),
             "--model", model_id,
             "--allow-all-tools",
+            *_tool_grant_argv(),
             "--output-format", "json",
             _NO_AUTO_UPDATE_FLAG,
         ]

@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-12T11:06:35.471238-04:00",
+  "sessionSetDir": "126-verify-type-setup-finishes-itself",
+  "inputs": {
+    "activity-log.json": "8a25b08f4a3ca5f2e5f355e453db907271984ab15a073847e47cea91bf2df544",
+    "session-state.json": "ef6c0bc26c4fe1cfbdbded4d1697cf56656734f53ab1d2db777ec402b4f0b9ce",
+    "spec.md": "b71307f9b763d4f86858ddd88ca4d29b9f8ff3d35983a6e4d0569371ee6494df"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered Set 126 Session 1 (github-copilot / claude-opus-5 / anthropic); journaled both authoring decisions to decisions.jsonl citing spec.md as origin; posted session-start checklist.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "name-the-agreement-state-on-the",
+          "description": "Added the agreement state the record never had: ENV_AGREEMENT_AGREES/MISSING/DISAGREES/NOT_APPLICABLE + ENV_AGREEMENT_STATES, and VerifyTypeResolution.env_agreement comparing the captured env_value against the file that decides. Published on to_dict() for --json consumers. Never raises (an invalid env value is a disagreement, not an exception, so narration cannot throw); resolved/transport_profile/exit codes untouched.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "report-it-in-describe",
+          "description": "describe() branch 1 now appends env_half_note(): a HALF-FINISHED line when the env half is missing (naming the restart-your-terminal caveat), and a DISAGREE block naming BOTH values and stating that dispatch uses the FILE. Agreeing halves and branches 2/3 print exactly what they printed before. Env value rendered through ascii() so arbitrary machine state cannot crash a cp1252 console (L-079-1). Dogfooded live on this seat in all three states: exit 0 in every one.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "falsify-in-both-directions-l-112",
+          "description": "Added 8 falsifiers (irony budget exactly). FIRES: file-only reports HALF-FINISHED naming the restart caveat; a contradiction names both values and that dispatch uses the FILE; an invalid env value is a disagreement, not an exception in a display path. DOES NOT FIRE: agreeing halves assert the EXACT two-line output (not merely no-[!]); a blank var is missing, not disagreeing (branch 2 already treats blank as unset); branches 2/3 keep [~]/[ ] narration and not-applicable. STRUCTURAL: exit code identical across every agreement state (0 resolved incl. disagreeing, 3 for both unresolved branches) and env_agreement is total, published on to_dict, and ASCII/cp1252-safe for arbitrary env values. Targeted run: 54 passed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-the",
+          "description": "Verification round 1 (phase=discovery, fan-out 2, lenses spec-conformance + failure-scenario) returned VERIFIED from gpt-5.5 on both calls, anthropic excluded as the orchestrator effective provider; 0 blocking findings. Both verifiers independently raised the same nit: VerifyTypeResolution.resolved still documented itself as True only when setup is finished, which THIS session makes false. Fixed, plus the second nit scoping the ASCII claim to env_half_note (describe first line echoes the project path, pre-existing). Full pytest AFTER that last edit: 4014 passed, 9 skipped in 506s; recorded as the run of record.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 5,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 5
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

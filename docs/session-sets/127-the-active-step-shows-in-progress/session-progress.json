@@ -1,0 +1,136 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-12T14:18:23.576932-04:00",
+  "sessionSetDir": "127-the-active-step-shows-in-progress",
+  "inputs": {
+    "activity-log.json": "cfa9f08244ea31afa18171ab51be666efd33115c1ccbb48f3fb6e455fa64129c",
+    "session-state.json": "46ae5195a7993f367d67f21f12605005c28fb7535b13c2e100a0e0705a002c06",
+    "spec.md": "2ffc59714918daf9ae83760d3e81d83f83a88d316624e8ffc91f10d515f649c1"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 1 of set 127 with start_session (github-copilot / anthropic / claude-opus-5, 3 sessions). Journalled the three decisions Step 1 names: DERIVE-NEVER-WRITE (options 1 and 3 from the source-of-record note recorded as the rejected alternatives, rubric prefer-reversible), DISPLAY-ONLY (the derived state moves no exit code, adds nothing to the log_step vocabulary, and is read by no gate), and the three operator rulings on the timestamp (start only, no date handling, no time on a row that has not started) journalled verbatim as human-authority and tagged for the UAT Decide section.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T13:03:49.157636-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "derive-the-active-step-in-build",
+          "description": "Derivation landed in session_checklist.build_rows via _active_step_index + _derive_progress, plus session_flight_facts (the one read of session-state.json for both in-flight and startedAt). NOT-A-MARKER guards, each with its own falsifier: only a seeded plan row is eligible; only a session the state file reports in-flight; stands down entirely when any row already boxes [~] or [!]; eligibility requires a token the renderer boxes [ ], so an unrecognised prose status is evidence of nothing. The record is untouched -- raw status stays as written and ChecklistRow.effective_status is the display token. Existing expectations updated where they encoded the pre-derivation answer (test_plan_seeding: 6 assertions, one test renamed to test_the_step_after_the_last_logged_one_is_where_the_session_is with the reversal argued in its docstring); _in_flight now reads the box (what is shown) and record_post records the derived key because the render it attests drew it. Targeted suites green: 114 + 156 passed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T13:16:21.899696-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-in-both-directions-l-112",
+          "description": "Both-direction falsifiers landed: TestTheDerivedActiveStep (FIRES retroactively on a ledger that never wrote the token, with the on-disk record asserted unchanged afterwards; DOES NOT FIRE on a closed session, an all-logged plan, a logged in-progress row, a blocked row, an unrecognised prose status on either a planned or a logged row, or a set with no seeded plan; STRUCTURAL: exactly one derived row over a six-row plan logged out of order) and TestTheDerivedStartTime (first row = session startedAt, each later row = the previous row completion including across a 35-minute gap; no time on an unstarted row, none from the plan registration stamp, none for a legacy set with no state file). PROVEN TO BITE, not merely green: four planted mutations run against the suite -- dropping the record-wins guard (3 failures), ignoring the in-flight gate (8), marking every eligible planned row (8), and reading a plan row registration stamp as a completion (initially SURVIVED, which exposed a blind spot; added the logged-row-after-an-unclaimed-plan-row case and it now fails). L-112-1 cited.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T13:23:02.899760-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "confirm-the-projection-agrees",
+          "description": "session_projection._step_from_row now reads the row effective_status for state and box and carries isActive + startedAt, so the derived state reaches session-progress.json with no second implementation -- the projection still serializes what build_rows returns. New falsifier asserts it through write_projection/read_projection (the FILE, not the in-memory dict) plus the record-versus-display split: status stays pending, state/box say in-progress, isActive says why they differ, current and counts follow state. docs/session-progress-schema.md updated: the shape block, a new isActive/startedAt section with the derivation rules and the wall-clock-proxy caveat, the inputs table (session-state.json now also contributes startedAt), the current-is-a-list section (why this is not the <- here marker returning, point by point), and the parity section (the derived fields are proven through the file and are not yet in the cross-language corpus, with the trigger that closes that window named).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T13:27:37.892534-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "targeted-pytest-for-the-changed-modules",
+          "description": "Targeted pytest across the nine suites touching these modules: 351 passed. Cross-provider verification, two discovery rounds, both VERIFIED on both lenses (spec-conformance and failure-scenario), 0 blocking findings in either. Round 1 returned two nits, both accepted and fixed with their own falsifiers -- the plan-less state carve-out (no sessions[] ledger, top-level startedAt) lost the first row start time, and bookkeeping records were acting as step completions in the start-time chain; the fix made the rule say what the spec says (the previous STEP completion), so a bookkeeping row is transparent while an unclaimed plan row still breaks the chain. Round 2 re-stamped clean; its one remaining nit (a non-complete logged status read as a completion) is recorded as an adjudicated-minor residual owned by Session 2. Full pytest run of record: 4055 passed, 9 skipped, 963s, recorded after the last code change. mocha and playwright owe nothing -- this session touched no surface they cover.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T13:29:50.213470-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "derive-the-start-time-onto-the",
+          "description": "Complete -- authored in the same pass as step 2 because both facts are one derivation over one row list, and computing them separately would be a second place for them to disagree. ChecklistRow.started_at is the previous row completion, seeded with the session startedAt for the first row; None for a row that has not started. _reconcile returns (row, completion) pairs so a seeded plan row contributes NO completion at all -- its dateTime is registration time, one stamp shared by the whole plan, and the mutation that reads it as a completion is one of the four planted in step 3. Boundaries falsified: first step, a 35-minute gap between steps, an unstarted row, a logged row whose predecessor never completed, and a set with no state file.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T14:16:35.590347-04:00",
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 6
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

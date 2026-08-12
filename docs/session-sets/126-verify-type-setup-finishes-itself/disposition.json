@@ -1,4 +1,33 @@
 {
+  "status": "completed",
+  "summary": "Set 126 Session 1 made the second half of setup visible. `verify_type` has always stated its own bar -- setup is finished when BOTH $AI_ORCHESTRATION_VERIFY_TYPE is set and project-verify-type.txt carries the same value -- and branch 1 captured `env_value` from the day it was written without ever comparing it, so a project with no environment half and a project whose environment half CONTRADICTED the file both printed the same confident [x] as a finished one. `VerifyTypeResolution.env_agreement` is that missing comparison (agrees / missing / disagrees, plus not-applicable on branches 2 and 3 where the file has not answered and a disagreement would have to be invented from a single value); it is published on `to_dict()` for --json consumers, and `describe()` now reports it -- a disagreement naming BOTH values and stating that dispatch uses the FILE. Narration only, by spec authoring decision 2: the file still wins silently, `resolved` still means 'the project file answered', and no exit code moved, which eight falsifiers pin in both directions (fires on a missing half, on a contradiction, and on an invalid env value -- reported rather than raised, because describe() is a narration path; does not fire on agreeing halves, which assert the EXACT two-line output, nor on a blank variable, which is `missing` because branch 2 already treats blank as unset). Two verification rounds, both VERIFIED cross-provider with zero blocking findings. ADJUDICATED-MINOR RESIDUAL, owner Session 2 (which already touches this module): two docstring-precision nits from round 2 -- `describe()` still calls itself an 'ASCII-only paragraph' though its first line echoes a project path that can be non-ASCII, and `resolve_verify_type()` still says broadly that an invalid environment value raises, which was never true on branch 1. Both are pre-existing claims this session did not create, both are zero-impact prose, and both were left rather than restale a stamp at the round cap for a docstring. The round-1 nit that this session DID create -- `resolved` documenting itself as 'True only when setup is finished', which this work makes false -- was fixed in flight and re-verified.",
   "verification_method": "api",
-  "verification_verdict": "VERIFIED"
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "ai_router/verify_type.py",
+    "ai_router/tests/test_verify_type_resolution.py",
+    "docs/planning/verify-type-resolution.md",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/spec.md",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/s1-conventions.md",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/decisions.jsonl",
+    "docs/session-sets/126-verify-type-setup-finishes-itself/disposition.json"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 ships the OS-branching env-write helper and the instruction-surface correction in the same module Session 1 just changed, and it must not re-derive the settled scope ruling (User scope, never Machine), the Python-not-PowerShell rationale, or the two authoring decisions now journalled. Continuity of that context is worth more than a fresh perspective here, and this seat's Copilot CLI transport is also the environment the Windows User-scope write has to be dogfooded on."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-112-1",
+    "L-079-1",
+    "L-064-8",
+    "L-064-9"
+  ]
 }

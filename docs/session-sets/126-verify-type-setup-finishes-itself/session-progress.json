@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-12T11:06:35.471238-04:00",
+  "generatedAt": "2026-08-12T12:48:22.994044-04:00",
   "sessionSetDir": "126-verify-type-setup-finishes-itself",
   "inputs": {
-    "activity-log.json": "8a25b08f4a3ca5f2e5f355e453db907271984ab15a073847e47cea91bf2df544",
-    "session-state.json": "ef6c0bc26c4fe1cfbdbded4d1697cf56656734f53ab1d2db777ec402b4f0b9ce",
+    "activity-log.json": "81e8f52c52c93c250230dae1ba74db952452a1be406a39473431ec178cb3ff01",
+    "session-state.json": "5676f3b0d11c6b55fc3d4e9507e9cea824978c0c9298a934318eb25bab5b707a",
     "spec.md": "b71307f9b763d4f86858ddd88ca4d29b9f8ff3d35983a6e4d0569371ee6494df"
   },
   "orphanEntries": 0,
@@ -80,16 +80,67 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered Set 126 Session 2 (github-copilot / claude-opus-5 / anthropic); posted the session-start checklist; read the four preload files; confirmed Session 1 closed VERIFIED and its env_agreement work is live on this seat (verify_type prints the HALF-FINISHED note).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "ship-the-env-write-helper-in-verify",
+          "description": "Shipped set_env_verify_type() in verify_type: OS-branching (current_platform seam), Windows writes USER scope through winreg HKEY_CURRENT_USER\\\\Environment (registry API, not setx -- no 1024-char truncation, and it publishes the value into this process too, which setx cannot), POSIX writes NOTHING and returns the export line for the shell profile. Value derived from project-verify-type.txt, never re-asked; an unresolved project is refused. write_windows_user_env REFUSES any scope but user. Best-effort WM_SETTINGCHANGE broadcast, failure named not swallowed (L-079-1). CLI: --set-env (opt-in per authoring decision 1), --json carries env_write, exit 3 (not 2) when there is no value to derive.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-in-both-directions-including",
+          "description": "12 falsifiers (the spec irony budget exactly). FIRES: Windows persists the FILE value at user scope; a contradicting env half is closed, not copied. DOES NOT FIRE: POSIX calls no writer, leaves the tree byte-identical and os.environ untouched, and returns the export line; no broadcast off Windows; only the persisting path publishes into this process. STRUCTURAL: every scope ever passed across a platform x value matrix is user, the hive constant is HKEY_CURRENT_USER, and write_windows_user_env REFUSES machine/process scope BEFORE importing winreg -- which is what makes the guarantee provable on ubuntu/macOS. Plus ASCII/cp1252 on both platforms and the CLI exit codes (3 not 2 when nothing to derive). 69 passed in test_verify_type_resolution.py + test_verify_type_is_gitignored.py. LIVE WALK on this machine: blanked HKCU\\\\Environment value, ran --set-env, registry restored to COPILOT_CLI REG_SZ.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "enumerate-the-instruction-surface-then",
+          "description": "ROUND 2 REMEDIATION (1 Major, accepted): verification found sibling sites of this session own defect class that the authoring list did not name -- LIGHTWEIGHT_REMOVED_MESSAGE (shipped error text), docs/cross-repo-lightweight-removal-notice.md, docs/clone-setup.md, docs/quick-start.md and docs/ai-led-session-workflow.md all still told Copilot-only users to set transport.profile in ai_router/local-overrides.yaml, which Set 124 S2 retired and config.py now REFUSES at load. Confirmed against config.py:746-748/840+ before remediating. All five corrected to verify_type --set COPILOT_CLI + --set-env; test_spec_config now pins the replacement AND the negatives so the old wording cannot creep back. 107 passed. Sidecar: s2-remediation-round-2.md.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-the",
+          "description": "Full pytest after the last code change: 4029 passed, 9 skipped in 954.98s, recorded as the run of record (digest b306e3b089fc). Set 126 S1 was 4014 passed / 9 skipped. Verification: 4 rounds -- round 1 discovery VERIFIED with 2 nits (both fixed: --set-env --json printed prose on the refusal path; a stale -one command- lead-in), round 2 discovery ISSUES_FOUND with 1 Major (stale local-overrides transport.profile instructions), round 3 supplementary VERIFIED nothing new, round 4 remediation-review VERIFIED with the fix accepted. Layer 2 npm run test:unit 1462 passing, clean after regenerating the golden. Layer 3 not owed: nothing under its covers was touched.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 5
       },
       "current": [],
       "remaining": []

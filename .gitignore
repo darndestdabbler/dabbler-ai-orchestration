@@ -60,3 +60,23 @@ ai_router/copilot-catalog.lock
 # never committed. A committed proposal would be a stale second opinion
 # about live prices.
 ai_router/pricing-proposal.json
+# Set 124 S1 (operator ruling, 2026-08-12), correcting Set 123: what verifies
+# a project is MACHINE/PROJECT state — "this project, on THIS machine" — not
+# committed project configuration. It is not machine-wide (two projects on one
+# box may legitimately differ) and not project-wide (one project on two boxes
+# may legitimately differ: a Copilot seat holds no DABBLER_* keys and must
+# resolve COPILOT_CLI, while a teammate who installed the wheel with provider
+# keys must resolve DIRECT_API for that same checkout). Committing it would
+# force one seat's answer onto every clone — the same mistake, one file over,
+# that keeps `transport.profile` out of the packaged router-config.yaml. The
+# machine-wide default lives in $AI_ORCHESTRATION_VERIFY_TYPE; the project-wide
+# default lives in the committed router-config.yaml; this file is the
+# intersection and belongs to neither. Write it with
+# `python -m ai_router.verify_type --set <VALUE>`.
+#
+# ANCHORED to the repo root on purpose. `verify_type.find_project_file` reads
+# the project-root copy and nothing else — a nested one is a stale sample that
+# can never answer — so an unanchored pattern would buy no safety and would
+# silently swallow a fixture some future test means to commit. That is the
+# look-alike the Set 124 falsifier plants.
+/project-verify-type.txt

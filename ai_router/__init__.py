@@ -277,8 +277,8 @@ def _direct_api_precondition(
     except OSError:  # pragma: no cover - defensive
         return None
 
-    if not resolution.committed:
-        # An uncommitted machine default is a suggestion (Session 1's
+    if not resolution.resolved:
+        # An unwritten machine default is a suggestion (Session 1's
         # standing rule). A suggestion must not be able to relax the
         # cross-provider guarantee.
         return None
@@ -1204,7 +1204,7 @@ def route(
         )
         _verifier_exclusion = identity.effective_provider
         # Set 123 S2: the ONE sanctioned way the exclusion yields. A
-        # project whose committed verify type is DIRECT_API but which
+        # project whose resolved verify type is DIRECT_API but which
         # holds no API key for any provider other than its own
         # orchestrator's cannot verify cross-provider at all; the operator
         # ruled (2026-08-11, journaled to Set 123's decisions.jsonl as a
@@ -1216,7 +1216,7 @@ def route(
         # a boolean parameter would be exactly the "explicit list that
         # omitted the orchestrator's provider" that I-084-S1-3 closed off.
         # A caller cannot ask for same-provider verification; only the
-        # project's own committed answer plus the machine's actual key set
+        # project's own resolved answer plus the machine's actual key set
         # can produce it, and it stays loud when it does.
         _precondition = _direct_api_precondition(identity.effective_provider)
         if _precondition is not None and _precondition.degraded:
@@ -1252,7 +1252,7 @@ def route(
             # where a caller-supplied list OMITTING the orchestrator could
             # buy itself a same-provider verifier; here no caller input is
             # consulted at all. The router decided, from the project's own
-            # committed file plus the machine's actual key set, that no
+            # resolved project file plus the machine's actual key set, that no
             # cross-provider verifier exists -- a state a caller cannot
             # fabricate by passing (or not passing) anything.
             exclude_providers = [

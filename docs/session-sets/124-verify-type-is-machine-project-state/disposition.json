@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "summary": "Set 124 Session 1 re-scoped project-verify-type.txt from Set 123's committed project configuration to gitignored machine/project state, per the operator's 2026-08-12 ruling ('it isn't machine state per se, it is machine/project state'). Shipped an ANCHORED /project-verify-type.txt .gitignore rule with both-direction falsifiers that plant real violations in a throwaway repo seeded from the real .gitignore; the rule was mutation-tested (unanchoring fails the nested-look-alike guard, deleting fails both fire tests). Retired the 'committed' vocabulary in ai_router/verify_type.py: the committed property is gone, resolved is promoted to the real implementation, the to_dict key is renamed, and the three operator-facing CLI messages plus the writer's embedded file header were corrected. Updated the one production consumer (ai_router/__init__.py) and three stale comments there. Finally resolved THIS repo, the symptom that opened the set: verify_type went from exit 3 (setup required) on the canonical repo that shipped it, to exit 0 on branch 1, with load_config deriving transport.profile=copilot-cli and copilot_preflight still green. Full pytest: 3976 passed, 9 skipped.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    ".gitignore",
+    "ai_router/verify_type.py",
+    "ai_router/__init__.py",
+    "ai_router/tests/conftest.py",
+    "ai_router/tests/test_verify_type_is_gitignored.py",
+    "ai_router/tests/test_verify_type_resolution.py",
+    "ai_router/tests/test_transport_profile_config.py",
+    "ai_router/tests/test_local_overrides_merge.py",
+    "docs/session-sets/124-verify-type-is-machine-project-state/spec.md",
+    "docs/session-sets/124-verify-type-is-machine-project-state/ai-assignment.md",
+    "docs/session-sets/124-verify-type-is-machine-project-state/s1-conventions.md"
+  ],
+  "lessons_cited": [
+    "L-112-1",
+    "L-069-1",
+    "L-064-9",
+    "L-064-8"
+  ],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 retires ai_router/local-overrides.yaml's transport.profile, which now occupies the identical machine/project scope as the project file and is therefore the duplicate mechanism Set 123's own config comment calls a defect class this repo has hit three times. It needs the live context of what Session 1's renamed resolution property guarantees and of the new conftest isolation guard, because the retirement changes behaviour on a seat that is currently working. Session 2 Step 3 also owes a journaled refuse-vs-warn decision."
+    }
+  },
+  "blockers": []
+}
+

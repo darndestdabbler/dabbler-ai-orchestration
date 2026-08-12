@@ -25,8 +25,8 @@ The operator's three-branch rule (designed in
 Two rules this module makes executable rather than implicit:
 
 - **The file wins silently over the environment** (spec standing decision 5).
-  A project's committed choice is not overridden by whichever machine it
-  happens to be checked out on.
+  A project's own answer is not overridden by a machine-wide default that
+  spans every project on the box.
 - **An invalid value is reported, never guessed at.** An unparseable project
   file does *not* quietly fall through to the environment: falling through
   would answer a question the project already tried to answer, and answer it
@@ -70,8 +70,10 @@ DIRECT_API = "DIRECT_API"
 COPILOT_CLI = "COPILOT_CLI"
 VALID_VERIFY_TYPES: frozenset[str] = frozenset({DIRECT_API, COPILOT_CLI})
 
-#: The project's committed answer. Repo root, committed to version control:
-#: it is project configuration, not machine state.
+#: The project's answer for THIS checkout. Repo root, and **gitignored**:
+#: Set 124 S1 (operator ruling, 2026-08-12) corrected Set 123's scoping --
+#: this is machine/project state, not committed project configuration. Two
+#: projects on one machine may differ; one project on two machines may differ.
 PROJECT_FILE_NAME = "project-verify-type.txt"
 
 #: The machine default. Only ever a branch-2 suggestion (see module docstring).
@@ -116,8 +118,8 @@ def _valid_values_hint() -> str:
 def parse_verify_type(text: Optional[str], *, origin: str) -> str:
     """Parse *text* into a verify type, or raise naming *origin*.
 
-    Blank lines and ``#`` comment lines are ignored so a committed project
-    file can explain itself; exactly one value line must remain. Anything
+    Blank lines and ``#`` comment lines are ignored so the project file can
+    explain itself; exactly one value line must remain. Anything
     else raises -- this is the "reported, never guessed at" rule, and it is
     why a typo like ``DIRECT-API`` stops a session instead of silently
     selecting the other transport.
@@ -158,8 +160,8 @@ def find_project_root(start: Optional[Path | str] = None) -> Optional[Path]:
     file, and the worktree layout is this shop's standard.
 
     ``None`` means "no project here". That is a real answer, not a failure:
-    a project file is *committed* configuration, so a directory outside any
-    repository has no project answer to read, and inventing one from the
+    the project file is anchored to a repository root, so a directory outside
+    any repository has no project answer to read, and inventing one from the
     working directory is what makes a fact cwd-dependent.
     """
     try:
@@ -188,8 +190,8 @@ def find_project_file(start: Optional[Path | str] = None) -> Optional[Path]:
     Looked up **at the project root only** -- never at the nearest ancestor
     that happens to hold one. A nested copy (a stale sample, a fixture, a
     scratch dir) must not be able to answer for the project: the whole point
-    of a committed file is that the answer does not change with the directory
-    a tool was launched from.
+    of a root-anchored file is that the answer does not change with the
+    directory a tool was launched from.
     """
     root = find_project_root(start)
     if root is None:
@@ -230,9 +232,12 @@ def write_project_verify_type(
         )
     path = Path(project_root) / PROJECT_FILE_NAME
     path.write_text(
-        "# How this project is verified. Committed on purpose: it is project\n"
-        "# configuration, not machine state, so it does not change with\n"
-        "# whichever machine the project is checked out on.\n"
+        "# How this project is verified, ON THIS MACHINE. Gitignored on\n"
+        "# purpose: this is machine/project state, not committed project\n"
+        "# configuration. A Copilot seat holds no DABBLER_* keys and must\n"
+        "# resolve COPILOT_CLI; a teammate who installed with provider keys\n"
+        "# must resolve DIRECT_API for this same checkout. Committing it\n"
+        "# would publish one seat's answer to everyone.\n"
         "#\n"
         f"# Valid values: {_valid_values_hint()}\n"
         "# The router derives transport.profile from this value.\n"
@@ -247,7 +252,7 @@ class VerifyTypeResolution:
     """The answer to "what verifies this project", plus how it was reached.
 
     ``transport_profile`` is the profile **dispatch will actually use**, and
-    it is therefore ``None`` until the answer is committed. An unconfirmed
+    it is therefore ``None`` until the answer is resolved. An unconfirmed
     machine default is reported as :attr:`suggested_transport_profile`
     instead. Claiming a profile for a suggestion is what would let this
     record and ``load_config`` disagree -- the exact split-brain this module
@@ -262,34 +267,34 @@ class VerifyTypeResolution:
     needs_setup: bool = False
 
     @property
-    def committed(self) -> bool:
-        """True when the project has committed its answer to the file."""
+    def resolved(self) -> bool:
+        """True only when setup is finished: the project file exists and is valid.
+
+        A branch-2 suggestion is deliberately *not* resolved. The design's own
+        bar is that setup is finished when both the environment variable is
+        set and the project file carries the same value.
+
+        Set 124 S1 retired the old name for this, ``committed``. The file is
+        machine/project state and is gitignored, so "committed" named
+        something that must never happen; what the answer actually is, is
+        *resolved for this checkout*.
+        """
         return self.source == SOURCE_PROJECT_FILE and self.verify_type is not None
 
     @property
     def transport_profile(self) -> Optional[str]:
-        """The profile dispatch uses now, or ``None`` if nothing is committed."""
-        if not self.committed:
+        """The profile dispatch uses now, or ``None`` if nothing is resolved."""
+        if not self.resolved:
             return None
         return PROFILE_BY_VERIFY_TYPE[self.verify_type]
 
     @property
     def suggested_transport_profile(self) -> Optional[str]:
-        """The profile this answer *would* select once committed. Narration
+        """The profile this answer *would* select once written. Narration
         only -- never what dispatch reads."""
         if self.verify_type is None:
             return None
         return PROFILE_BY_VERIFY_TYPE[self.verify_type]
-
-    @property
-    def resolved(self) -> bool:
-        """True only when setup is finished: the file exists and is valid.
-
-        A branch-2 suggestion is deliberately *not* resolved. The design's own
-        bar is that setup is finished when both the environment variable is
-        set and the committed file carries the same value.
-        """
-        return self.committed
 
     def to_dict(self) -> dict:
         return {
@@ -297,7 +302,7 @@ class VerifyTypeResolution:
             "source": self.source,
             "project_file": str(self.project_file) if self.project_file else None,
             "env_value": self.env_value,
-            "committed": self.committed,
+            "resolved": self.resolved,
             "needs_confirmation": self.needs_confirmation,
             "needs_setup": self.needs_setup,
             "transport_profile": self.transport_profile,
@@ -368,7 +373,7 @@ def derive_transport_profile(
     *anchors* are ordered directories to look for a project from (``None``
     means the working directory). **The first anchor that lands in a project
     answers, and the search stops there** -- whether or not that project has
-    committed a file. A project without a ``project-verify-type.txt`` has
+    written a file. A project without a ``project-verify-type.txt`` has
     said "I have not chosen yet", which is answered by its own configured
     profile; it is *not* an invitation for some other project's file to
     answer on its behalf.
@@ -377,9 +382,9 @@ def derive_transport_profile(
 
     1. Its ``project-verify-type.txt``. This **wins over a configured
        profile**, including a seat-local ``local-overrides.yaml`` one: a
-       project that has committed its answer is not overridden by the machine
-       it is checked out on. This is the branch the disagreement falsifier
-       drives.
+       project that has resolved its answer for this checkout is not
+       overridden by a profile configured elsewhere. This is the branch the
+       disagreement falsifier drives.
     2. An explicitly configured ``transport.profile``.
     3. ``api``, the default -- now reached *through* resolution rather than
        beside it.
@@ -460,7 +465,11 @@ def guided_setup_instructions(project_root: Optional[Path | str] = None) -> str:
         "                      make one real routed call\n"
         "\n"
         f"Setup is finished when BOTH ${ENV_VAR} is set and\n"
-        f"{PROJECT_FILE_NAME} is committed carrying the same value."
+        f"{PROJECT_FILE_NAME} exists carrying the same value.\n"
+        "\n"
+        f"{PROJECT_FILE_NAME} is gitignored on purpose: it is machine/project\n"
+        "state (this project, on THIS machine), so each checkout answers for\n"
+        "itself and no seat's answer is published to the whole team."
     )
 
 
@@ -475,8 +484,8 @@ def describe(resolution: VerifyTypeResolution) -> str:
     if resolution.source == SOURCE_ENVIRONMENT:
         return (
             f"[~] verify type: {resolution.verify_type} "
-            f"(machine default ${ENV_VAR}; NOT yet committed to this project)\n"
-            "    transport.profile is UNCHANGED until this is committed: an\n"
+            f"(machine default ${ENV_VAR}; NOT yet written to this project)\n"
+            "    transport.profile is UNCHANGED until it is written: an\n"
             "    unconfirmed default never silently re-routes dispatch. It\n"
             f"    would derive to {resolution.suggested_transport_profile}.\n"
             "    Confirm it with the human, then run:\n"
@@ -549,7 +558,7 @@ def _resolve_write_root(explicit: Optional[str]) -> Path:
     if root is None:
         raise VerifyTypeError(
             f"No project root found at or above {Path.cwd()} (looked for a "
-            ".git entry), so there is nowhere to commit "
+            ".git entry), so there is nowhere to write "
             f"{PROJECT_FILE_NAME}. Run `git init` first, or pass "
             "--project-root explicitly."
         )

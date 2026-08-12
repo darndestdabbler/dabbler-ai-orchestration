@@ -134,6 +134,69 @@ def _no_live_backstop_routing(monkeypatch):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _no_real_project_verify_type(monkeypatch):
+    """Set 124 S1: the developer's own ``project-verify-type.txt`` must never
+    answer for a test.
+
+    Set 123 made the project file outrank **any** configured
+    ``transport.profile``, and ``verify_type.find_project_root`` walks up from
+    the cwd anchor. Inside the suite the cwd is this repo, so the moment a
+    developer follows the documented setup (``verify_type --set``), the real
+    file starts answering for fixtures that never asked: synthetic configs
+    declaring ``api`` silently derive ``copilot-cli``, and tests that mock the
+    HTTP layer dispatch through the real Copilot CLI subprocess instead.
+
+    Measured on this machine when the canonical repo first resolved its own
+    type: **21 tests** flipped -- 10 in the config/overrides fixtures and 11
+    across ``test_drift_guard`` / ``test_orchestrator_identity`` /
+    ``test_routing_exclusion_integrity``, the latter group taking 380s instead
+    of 52s because it was making real seat calls. The suite had been passing
+    only because this repo had never been set up.
+
+    This blocks **only the real repo's** answer. A fixture that builds its own
+    project (a ``.git`` marker under ``tmp_path``) still resolves normally, so
+    the verify-type tests keep exercising the true resolution order, and the
+    guard cannot mask a genuine regression in it.
+
+    Both seams are covered on purpose: ``resolve_verify_type`` goes through
+    ``find_project_file``, but ``derive_transport_profile`` -- the one
+    ``load_config`` calls -- does **not**; it walks ``find_project_root`` and
+    builds the path itself. Patching only the former looks like a fix and
+    leaves the dispatch path still reading the developer's file.
+
+    Same genre as ``_no_live_backstop_routing`` above: the suite is isolated
+    from machine state it must not depend on, on both module identities.
+    """
+    repo_root = AI_ROUTER_DIR.parent
+    real_project_file = repo_root / "project-verify-type.txt"
+
+    for module_name in ("verify_type", "ai_router.verify_type"):
+        try:
+            module = importlib.import_module(module_name)
+        except ImportError:  # pragma: no cover - defensive
+            continue
+
+        original_file = module.find_project_file
+        original_root = module.find_project_root
+
+        def _blocking_real_file(start=None, _original=original_file):
+            found = _original(start)
+            if found is not None and Path(found) == real_project_file:
+                return None
+            return found
+
+        def _blocking_real_root(start=None, _original=original_root):
+            found = _original(start)
+            if found is not None and Path(found) == repo_root:
+                return None
+            return found
+
+        monkeypatch.setattr(module, "find_project_file", _blocking_real_file)
+        monkeypatch.setattr(module, "find_project_root", _blocking_real_root)
+    yield
+
+
 @pytest.fixture()
 def placeholder_provider_keys(monkeypatch):
     """Set placeholder ``DABBLER_*`` provider keys for a direct-API test.

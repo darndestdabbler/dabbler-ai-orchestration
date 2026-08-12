@@ -1,0 +1,1 @@
+**VERIFIED** — I tried to break the scoped Session 1 work and found no Critical/Major defects. I checked the live ignore/index behavior, `verify_type.py` API/vocabulary changes, production consumer path, user-environment value, branch-1 CLI resolution, Copilot preflight, and the targeted pytest matrix; the deliverables are substantiated.

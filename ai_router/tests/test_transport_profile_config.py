@@ -18,7 +18,16 @@ _TEST_API_KEY_ENV = "AI_ROUTER_TESTS__SOME_PROVIDER_API_KEY"
 
 
 def _write_config_yaml(target_dir: Path, content: str) -> Path:
-    """Write the given content to router-config.yaml in the target dir."""
+    """Write the given content to router-config.yaml in the target dir.
+
+    The ``.git`` marker bounds *target_dir* as its own project. Without it,
+    ``verify_type.find_project_root`` walks past the temp tree, falls through
+    to the cwd anchor, and the REAL repo's ``project-verify-type.txt``
+    derives a ``transport.profile`` this synthetic config never declared.
+    Latent from Set 123 until Set 124 S1 -- see the sibling note in
+    ``test_local_overrides_merge._setup_workspace``.
+    """
+    (target_dir / ".git").mkdir(exist_ok=True)
     path = target_dir / "router-config.yaml"
     path.write_text(textwrap.dedent(content), encoding="utf-8")
     return path

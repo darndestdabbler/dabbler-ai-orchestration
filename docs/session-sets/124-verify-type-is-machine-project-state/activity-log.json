@@ -1,0 +1,92 @@
+{
+  "sessionSetName": "124-verify-type-is-machine-project-state",
+  "createdDate": "2026-08-12T04:31:45.647845-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T04:31:45.647590-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "gitignore-project-verify-type-txt-with",
+      "dateTime": "2026-08-12T04:31:45.647590-04:00",
+      "description": "**Gitignore `project-verify-type.txt`**, with a comment naming the scope (machine \u00d7 project) and the reason, in the same voice as the `local-overrides.yaml` and `copilot-catalog.lock` entries above it. Ship the falsifier **both ways** (`L-112-1`): one that plants the file at the repo root and asserts `git check-ignore` claims it, one that asserts a deliberately-tracked look-alike is **not** ignored \u2014 a rule that ignores everything is indistinguishable from one that ignores the right thing.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "retire-the-committed-vocabulary-in-ai",
+      "dateTime": "2026-08-12T04:31:45.647590-04:00",
+      "description": "**Retire the `committed` vocabulary in `ai_router/verify_type.py`.** Rename the property to one that means \"the project file answered\", correct `to_dict()`, the branch-2 narration, the no-git-root error (*\"nowhere to commit\"*), and the setup message's final line so the bar reads *the file exists carrying the same value*. Do not change the resolution order or the repo-boundary walk.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "resolve-this-repo-and-prove-it",
+      "dateTime": "2026-08-12T04:31:45.647590-04:00",
+      "description": "**Resolve this repo, and prove it.** Run `verify_type --set COPILOT_CLI`, set `AI_ORCHESTRATION_VERIFY_TYPE` in the machine's user environment, and show `python -m ai_router.verify_type` exiting 0 on branch 1 with `copilot_preflight` still green. The canonical repo failing its own setup check is the symptom that opened this set; it closes here.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest",
+      "dateTime": "2026-08-12T04:31:45.647590-04:00",
+      "description": "Targeted pytest; verify; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T04:32:33.374744-04:00",
+      "description": "Registered Set 124 S1 (github-copilot/anthropic/claude-opus-5); plan seeded; no decision-review queue; start checklist posted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "gitignore-project-verify-type-txt-with",
+      "dateTime": "2026-08-12T04:36:48.266173-04:00",
+      "description": "Added anchored /project-verify-type.txt to .gitignore with scope rationale. Shipped 6 falsifiers in ai_router/tests/test_verify_type_is_gitignored.py (planted violations in a throwaway repo seeded from the REAL .gitignore, never the working tree). Mutation-proved both directions: unanchoring fails the nested look-alike guard; deleting the rule fails both fire tests; restored green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "retire-the-committed-vocabulary-in-ai",
+      "dateTime": "2026-08-12T04:40:12.584511-04:00",
+      "description": "Retired the committed vocabulary: VerifyTypeResolution.committed removed, resolved promoted to the real implementation, to_dict key committed->resolved. Corrected PROJECT_FILE_NAME comment, three docstrings, the guided-setup message (now names the gitignore rationale), the branch-2 narration and the no-git-root error. Updated the one production consumer (ai_router/__init__.py) plus three stale comments there. Added a structural falsifier pinning the retirement (no committed attr, no committed key, no commit wording in the setup message). Resolution order and repo-boundary walk untouched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "resolve-this-repo-and-prove-it",
+      "dateTime": "2026-08-12T04:41:28.543766-04:00",
+      "description": "Wrote COPILOT_CLI (no DABBLER_* keys; copilot_preflight authenticates a live probe) and set AI_ORCHESTRATION_VERIFY_TYPE=COPILOT_CLI in the User environment. verify_type now exits 0 on branch 1 (was exit 3 at session start); load_config derives transport.profile=copilot-cli; preflight still green; git reports the file ignored and invisible to status. FOUND AND FIXED en route: write_project_verify_type embedded a header reading Committed on purpose: it is project configuration, not machine state -- the exact inverse of the ruling, shipped into every file the setup command writes. A case-sensitive grep missed the capitalised word, so it is now pinned by a falsifier asserting the written artifact.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest",
+      "dateTime": "2026-08-12T04:44:03.827945-04:00",
+      "description": "Targeted pytest green: 42 verify-type/qualified-verdict + 62 transport/overrides/copilot-routing + 254 remaining load_config consumers. FOUND A LATENT SET 123 DEFECT: 10 tests in test_transport_profile_config.py and test_local_overrides_merge.py passed ONLY while this repo had no project-verify-type.txt. Their synthetic workspaces carry no .git marker, so find_project_root walked past the tmp tree to the cwd anchor and the real repo answered, deriving copilot-cli into configs declaring no transports.copilot-cli block. Proved by moving the file away (20 passed) and back (10 failed). Fixed at both shared helpers by bounding each fixture as its own project; swept the other six load_config consumers per L-069-1 and found the class contained.",
+      "status": "complete"
+    }
+  ]
+}

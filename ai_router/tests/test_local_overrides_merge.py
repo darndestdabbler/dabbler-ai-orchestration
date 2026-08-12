@@ -97,7 +97,21 @@ _MINIMAL_RC = textwrap.dedent("""\
 
 
 def _setup_workspace(tmp_path: Path, overrides_yaml: str | None = None) -> Path:
-    """Write a minimal workspace and return the path to router-config.yaml."""
+    """Write a minimal workspace and return the path to router-config.yaml.
+
+    The ``.git`` marker bounds the workspace as its OWN project. Without it,
+    ``verify_type.find_project_root`` walks past this tmp dir (nothing above
+    it in the temp tree is a repo), falls through to the cwd anchor, and the
+    REAL repo's ``project-verify-type.txt`` answers for this fixture --
+    deriving ``transport.profile: copilot-cli`` into a config that declares
+    no ``transports.copilot-cli`` block, so ``load_config`` raises.
+
+    That coupling was latent from Set 123 until Set 124 S1: these tests
+    passed only while the canonical repo had never resolved its own verify
+    type, so the first developer to run the documented
+    ``verify_type --set`` broke ten of them.
+    """
+    (tmp_path / ".git").mkdir(exist_ok=True)
     ai_router_dir = tmp_path / "ai_router"
     ai_router_dir.mkdir()
     rc = ai_router_dir / "router-config.yaml"

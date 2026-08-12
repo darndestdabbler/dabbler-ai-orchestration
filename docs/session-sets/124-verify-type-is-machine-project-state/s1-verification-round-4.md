@@ -1,0 +1,4 @@
+VERIFIED — I checked the Session 1 obligations against the actual tree: the root ignore rule is anchored and falsified both ways, `verify_type.py` retired the `committed` API/keyed output in favor of `resolved`, the repo’s own verify type resolves on branch 1, and `copilot_preflight` is green. I also checked the added test isolation guard at both seams (`find_project_file` and `find_project_root`) and found no blocking third seam.
+
+NITS
+- `ai_router/verification.py` still has stale “committed verify type” wording in one non-degraded reason string/comment, and `ai_router/tests/test_qualified_verdict.py` / `tools/dabbler-ai-orchestration/src/utils/providerKey.ts` retain similar stale comment text. These are non-blocking wording leftovers, not behavior defects in Session 1’s promised `verify_type.py` surface.

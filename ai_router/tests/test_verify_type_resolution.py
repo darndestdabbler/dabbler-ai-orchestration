@@ -75,8 +75,8 @@ def _write_config(target_dir: Path, body: str) -> Path:
 
 
 def test_project_file_wins_silently_over_the_environment(project, monkeypatch):
-    """Standing decision 5: a project's committed choice is not overridden by
-    whichever machine it happens to be checked out on."""
+    """Standing decision 5: a project's own answer is not overridden by a
+    machine-wide default that spans every project on the box."""
     vt.write_project_verify_type(project, vt.DIRECT_API)
     monkeypatch.setenv(vt.ENV_VAR, vt.COPILOT_CLI)
 
@@ -92,7 +92,7 @@ def test_project_file_wins_silently_over_the_environment(project, monkeypatch):
 def test_environment_default_is_a_suggestion_awaiting_confirmation(
     project, monkeypatch
 ):
-    """Branch 2 has an answer in hand but nothing committed -- so it claims no
+    """Branch 2 has an answer in hand but nothing written -- so it claims no
     transport profile, writes no file, and does not count as set up."""
     monkeypatch.setenv(vt.ENV_VAR, vt.COPILOT_CLI)
 
@@ -101,7 +101,6 @@ def test_environment_default_is_a_suggestion_awaiting_confirmation(
     assert resolution.verify_type == vt.COPILOT_CLI
     assert resolution.source == vt.SOURCE_ENVIRONMENT
     assert resolution.needs_confirmation is True
-    assert resolution.committed is False
     assert resolution.resolved is False
     assert resolution.transport_profile is None
     assert resolution.suggested_transport_profile == "copilot-cli"
@@ -202,7 +201,7 @@ def test_a_write_from_a_nested_directory_lands_at_the_project_root(
 
     assert (root / vt.PROJECT_FILE_NAME).is_file()
     assert not (nested / vt.PROJECT_FILE_NAME).exists()
-    assert vt.resolve_verify_type(start=root).committed is True
+    assert vt.resolve_verify_type(start=root).resolved is True
 
 
 def test_a_write_outside_any_repository_is_refused_not_guessed(
@@ -261,7 +260,11 @@ def test_project_file_beats_a_disagreeing_configured_copilot_profile(project):
 
 def test_project_file_beats_a_seat_local_override(project):
     """The seat-local override (Set 110 S4) is still the seat's home for the
-    profile -- until the project commits an answer, which outranks it."""
+    profile -- until the project resolves an answer, which outranks it.
+
+    Set 124 S2 revisits this: once the project file is gitignored both files
+    are machine/project scope, so this precedence becomes a duplicate
+    mechanism rather than a hierarchy."""
     config_path = _write_config(
         project, _MINIMAL_CONFIG + _COPILOT_TRANSPORTS_BLOCK
     )
@@ -330,7 +333,7 @@ def test_the_resolver_and_the_config_can_never_disagree(project, monkeypatch):
     assert resolution.needs_confirmation is True
     assert resolution.transport_profile is None and loaded == "api"
 
-    # Branch 1: committed -- and now the two are the same fact.
+    # Branch 1: resolved -- and now the two are the same fact.
     vt.write_project_verify_type(project, vt.COPILOT_CLI)
     resolution, loaded = _check()
     assert resolution.transport_profile == "copilot-cli" and loaded == "copilot-cli"
@@ -431,13 +434,69 @@ def test_verify_types_and_transport_profiles_are_bijective():
 # ---------------------------------------------------------------------------
 
 
-def test_cli_walks_a_project_from_setup_required_to_committed(
+def test_the_written_file_header_does_not_instruct_the_reader_to_commit_it():
+    """Set 124 S1, caught in this session by actually reading the file the
+    tool writes rather than the code that writes it.
+
+    ``write_project_verify_type`` embedded a header saying *"Committed on
+    purpose: it is project configuration, not machine state"* -- the exact
+    inverse of the operator's ruling, shipped inside every file the setup
+    command produces. A case-sensitive grep for "commit" missed it because
+    the word was capitalised, which is precisely why this is asserted on the
+    written artifact instead of reviewed by eye."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as tmp:
+        path = vt.write_project_verify_type(tmp, vt.COPILOT_CLI)
+        header = "\n".join(
+            line
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.startswith("#")
+        )
+
+    assert "gitignored" in header.lower()
+    assert "machine/project state" in header
+    assert "not committed project" in header
+    # The inverted Set 123 claim, in the shape it actually shipped.
+    assert "committed on purpose" not in header.lower()
+    assert "not machine state" not in header.lower()
+    # And the value still parses despite the header (the tolerance contract).
+    assert vt.parse_verify_type(
+        "\n".join([header, vt.COPILOT_CLI]), origin="test"
+    ) == vt.COPILOT_CLI
+
+
+def test_the_setup_message_never_tells_the_operator_to_commit_the_file():
+    """Set 124 S1. The file is gitignored machine/project state, so a setup
+    message that says 'committed' is instructing the operator to do the one
+    thing the .gitignore rule exists to prevent.
+
+    STRUCTURAL companion: the retired ``committed`` attribute must stay
+    retired. A property that silently came back would let a caller branch on
+    a concept the design no longer has, and no textual assertion would catch
+    it."""
+    message = vt.guided_setup_instructions()
+
+    assert "commit" not in message.lower(), message
+    assert "gitignored" in message
+    assert f"{vt.PROJECT_FILE_NAME} exists carrying the same value" in message
+
+    resolution = vt.VerifyTypeResolution(
+        verify_type=vt.DIRECT_API, source=vt.SOURCE_PROJECT_FILE
+    )
+    assert not hasattr(resolution, "committed")
+    assert resolution.resolved is True
+    assert "committed" not in resolution.to_dict()
+    assert resolution.to_dict()["resolved"] is True
+
+
+def test_cli_walks_a_project_from_setup_required_to_resolved(
     project, monkeypatch, capsys
 ):
     """The terminal journey that replaces the setup webview: unresolved ->
-    machine default confirmed once -> committed, in branch 1 forever. An
-    uncommitted machine default is deliberately still 'setup required': the
-    design's bar is that BOTH the variable and the committed file agree."""
+    machine default confirmed once -> resolved, in branch 1 forever. An
+    unwritten machine default is deliberately still 'setup required': the
+    design's bar is that BOTH the variable and the project file agree."""
     assert vt.main([]) == vt.EXIT_SETUP_REQUIRED
     assert vt.PROJECT_FILE_NAME in capsys.readouterr().out
 

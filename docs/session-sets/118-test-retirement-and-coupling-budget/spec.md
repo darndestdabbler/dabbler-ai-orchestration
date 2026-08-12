@@ -10,7 +10,13 @@
 > **Created:** 2026-08-10, from measurement, not opinion.
 > **Prerequisites:** Set 116 complete. Its Session 3 moves the full-suite
 > run to Step 8 and fixes what "a fresh test run" means; this set changes
-> which tests exist and must not race that.
+> which tests exist and must not race that. **Set 128 complete** (added
+> 2026-08-12): this spec is authored against the ordering rules as they
+> stood before Set 128, and Set 128 Session 3 re-authors it against the
+> new ones. Starting 118 first would execute a retirement rule and a
+> coupling budget stated in terms of "targeted" and "the required portion
+> of the full test suite" that Set 128 redefines. See
+> [`docs/planning/session-step-skeleton-and-verification-cost.md`](../../planning/session-step-skeleton-and-verification-cost.md).
 > **Session Set:** `docs/session-sets/118-test-retirement-and-coupling-budget/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
 
@@ -25,6 +31,8 @@ uatStyle: ad-hoc
 pathAwareCritique: required   # A set that deletes verification must itself be reviewed by something that retrieves repo ground truth independently, exactly as Set 116 required. End-of-set, so it costs once.
 prerequisites:
   - slug: 116-session-latency-and-verification-integrity
+    condition: complete
+  - slug: 128-session-step-skeleton-and-test-ordering
     condition: complete
 ```
 

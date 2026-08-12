@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-12T14:18:23.576932-04:00",
+  "generatedAt": "2026-08-12T16:48:27.476613-04:00",
   "sessionSetDir": "127-the-active-step-shows-in-progress",
   "inputs": {
-    "activity-log.json": "cfa9f08244ea31afa18171ab51be666efd33115c1ccbb48f3fb6e455fa64129c",
-    "session-state.json": "46ae5195a7993f367d67f21f12605005c28fb7535b13c2e100a0e0705a002c06",
+    "activity-log.json": "1802590720eeb48a0267028d901d9903629c358a8b4a3b7e5b85e6ebd0e6eb5e",
+    "session-state.json": "53123e6582b1635c70107c72e8dafefadf67c438c426248b4521648e71157def",
     "spec.md": "2ffc59714918daf9ae83760d3e81d83f83a88d316624e8ffc91f10d515f649c1"
   },
   "orphanEntries": 0,
@@ -102,16 +102,89 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 of set 127 via start_session (github-copilot / claude-opus-5 / anthropic), read the preload, and posted the step checklist. The three decisions this set takes were journalled at session 1 registration and are settled; this session ratifies nothing new.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T14:38:40.612173-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "mirror-the-derivation-in-sessionstepmodel-ts",
+          "description": "Mirrored session_flight_facts / _active_step_index / _derive_progress / effective_status in sessionStepModel.ts (reconcile now returns RowEvidence), plumbed the flight facts through SessionStepLedger + buildStepLedger, and enumerated every consumer of a row status: stepDescriptor's glyph AND its tooltip both now read effectiveStatusOf, with a step-active contextValue token.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T15:00:24.561740-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-in-typescript-with-the-same",
+          "description": "Extended the shared parity corpus from 14 to 22 cases with the two inputs the derivation needs (per-case sessionState, per-entry dateTime) and both derived fields on every expectedRow; closed the S1 field-set split (DERIVED_ROW_FIELDS removed, isActive/startedAt now compared in both languages); both halves independently assert the corpus still pins the derivation in both directions, and both re-run every case with the state file withheld.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T15:00:06.387272-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "layer-3-rendering-smoke-then-the",
+          "description": "Layer 3 rendering spec updated and green (4/4): the seeded-plan scenario now asserts the derived in-progress glyph on the first unlogged planned row, exactly one such row, and the HH:MM- start time in the description slot with no time on an unstarted row; the refresh scenario asserts the derivation STANDS DOWN the moment a step is logged in-progress. Eight planted mutations across both languages were each caught by the new falsifiers. The uat-matrix fixture the walk runs on was given a seeded session-2 plan so the walk demonstrates the feature, and its rendered rows are pinned by a Layer 2 test through the real scan. s2-uat-walk.md authored (one Look item, two Decide items) and offered.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T15:00:06.389231-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-and-the-layer-3",
+          "description": "Full pytest 4092 passed / 9 skipped; full Playwright 31 passed; full mocha 1520 passing -- all three recorded as runs of record, and mocha + Playwright RE-RUN and re-recorded after the round-1 remediation staled them. Verification: round 1 discovery (fan-out 2, gpt-5.5 both lenses) 1 Major; round 2 supplementary VERIFIED nothing new; remediated once with a pre/post-fix-discriminating falsifier; round 3 remediation-review VERIFIED, fix accepted, 0 findings. close_preflight: test_run_fresh green, uat_walk_recorded green, checklist_posted advisory with 4 unrecoverable windows recorded honestly.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T15:18:43.197548-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "mirror-the-start-time-and-render",
+          "description": "Start time mirrored onto the TS row model and rendered as 12:06- in the step row's dimmed description slot (stepStartLabel), with the full timestamp in the tooltip; a row with no derived start renders no description at all.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-12T16:47:57.842849-04:00",
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
       "remaining": []

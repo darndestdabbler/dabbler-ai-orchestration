@@ -381,10 +381,11 @@ def derive_transport_profile(
     Within the answering project, order is:
 
     1. Its ``project-verify-type.txt``. This **wins over a configured
-       profile**, including a seat-local ``local-overrides.yaml`` one: a
-       project that has resolved its answer for this checkout is not
-       overridden by a profile configured elsewhere. This is the branch the
-       disagreement falsifier drives.
+       profile**: a project that has resolved its answer for this checkout is
+       not overridden by a profile configured elsewhere. This is the branch
+       the disagreement falsifier drives. (Set 124 S2 retired the seat-local
+       ``local-overrides.yaml`` profile entirely, so the only configured
+       profile left to outrank is the packaged ``router-config.yaml`` one.)
     2. An explicitly configured ``transport.profile``.
     3. ``api``, the default -- now reached *through* resolution rather than
        beside it.

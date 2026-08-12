@@ -258,13 +258,22 @@ def test_project_file_beats_a_disagreeing_configured_copilot_profile(project):
     assert config["transport"]["profile"] == "api"
 
 
-def test_project_file_beats_a_seat_local_override(project):
-    """The seat-local override (Set 110 S4) is still the seat's home for the
-    profile -- until the project resolves an answer, which outranks it.
+def test_a_retired_seat_local_transport_profile_is_refused(project):
+    """Set 124 S2 REPLACES the old precedence test that lived here.
 
-    Set 124 S2 revisits this: once the project file is gitignored both files
-    are machine/project scope, so this precedence becomes a duplicate
-    mechanism rather than a hierarchy."""
+    It used to assert that a project file beat a seat-local
+    ``local-overrides.yaml`` ``transport.profile``. That precedence stopped
+    being meaningful the moment the project file became gitignored
+    machine/project state: both files then answered "what verifies this
+    project, on THIS machine", which is a duplicate mechanism rather than a
+    hierarchy. The loser is retired, so the coverage is replaced rather than
+    deleted -- the same input now has to be REFUSED.
+
+    Refusal rather than warn-and-ignore is journaled in this set's
+    decisions.jsonl: on a Copilot seat with no project file, ignoring the key
+    would silently fall the profile back to ``api`` and then fail on provider
+    keys the seat does not have by design.
+    """
     config_path = _write_config(
         project, _MINIMAL_CONFIG + _COPILOT_TRANSPORTS_BLOCK
     )
@@ -279,9 +288,78 @@ def test_project_file_beats_a_seat_local_override(project):
     )
     vt.write_project_verify_type(project, vt.DIRECT_API)
 
+    with pytest.raises(ValueError) as excinfo:
+        config_mod.load_config(str(config_path))
+
+    message = str(excinfo.value)
+    assert "transport.profile" in message
+    # Not merely "rejected": the generic Appendix B refusal also names the
+    # path, so asserting only that would pass even if the migration guidance
+    # were deleted. Pin the guidance itself.
+    assert "ai_router.verify_type" in message
+
+
+def test_the_refusal_names_the_replacement_command_and_the_right_value(project):
+    """A migration message that does not say what to run instead leaves an
+    existing seat guessing. The value is DERIVED from the stale profile, so
+    the operator is told the answer they already had, not a placeholder."""
+    config_path = _write_config(
+        project, _MINIMAL_CONFIG + _COPILOT_TRANSPORTS_BLOCK
+    )
+    (project / "local-overrides.yaml").write_text(
+        "transport:\n  profile: copilot-cli\n", encoding="utf-8"
+    )
+
+    with pytest.raises(ValueError) as excinfo:
+        config_mod.load_config(str(config_path))
+
+    message = str(excinfo.value)
+    assert "python -m ai_router.verify_type --set COPILOT_CLI" in message
+    assert "local-overrides.yaml" in message
+
+    # And the mirror value, so the derivation is not hardcoded to one profile.
+    (project / "local-overrides.yaml").write_text(
+        "transport:\n  profile: api\n", encoding="utf-8"
+    )
+    with pytest.raises(ValueError) as excinfo_api:
+        config_mod.load_config(str(config_path))
+    assert (
+        "python -m ai_router.verify_type --set DIRECT_API"
+        in str(excinfo_api.value)
+    )
+
+
+def test_local_overrides_still_work_for_what_is_still_allowed(project):
+    """LOOK-ALIKE: the retirement must not have broken local overrides
+    generally. A rule that refused everything would pass the two tests above
+    and be badly wrong."""
+    config_path = _write_config(
+        project, _MINIMAL_CONFIG + _COPILOT_TRANSPORTS_BLOCK
+    )
+    (project / "local-overrides.yaml").write_text(
+        textwrap.dedent(
+            """
+            routing:
+              outsourcing_mode: disabled
+            """
+        ),
+        encoding="utf-8",
+    )
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+
     config = config_mod.load_config(str(config_path))
 
-    assert config["transport"]["profile"] == "api"
+    assert config["routing"]["outsourcing_mode"] == "disabled"
+    assert config["transport"]["profile"] == "copilot-cli"
+
+
+def test_transport_profile_is_not_in_the_allowed_override_set():
+    """STRUCTURAL: holds however the refusal branch is later rewritten."""
+    assert "transport.profile" not in config_mod._LOCAL_OVERRIDE_ALLOWED
+    assert not any(
+        entry.startswith("transport.")
+        for entry in config_mod._LOCAL_OVERRIDE_ALLOWED
+    )
 
 
 def test_with_no_project_file_the_config_stays_in_charge(project):

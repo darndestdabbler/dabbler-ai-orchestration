@@ -83,8 +83,10 @@ providers:
 # Set 123 S1: this value is now the FALLBACK, not the authority. When the
 # project holds a project-verify-type.txt (DIRECT_API | COPILOT_CLI),
 # ai_router/verify_type.py derives transport.profile from it and the file wins
-# — over this file and over local-overrides.yaml both. Two mechanisms for one
-# fact is a defect class this repo has hit three times; the file is the one.
+# — over this file, and over anything a seat could once set locally. Two
+# mechanisms for one fact is a defect class this repo has hit three times; the
+# file is the one. Set 124 S2 finished the job by retiring
+# local-overrides.yaml's `transport.profile` outright.
 # `python -m ai_router.verify_type` prints which branch answered.
 #
 # Set 125: TRANSPORT PARITY — a routed call CANNOT MUTATE THE WORKSPACE on
@@ -103,16 +105,22 @@ providers:
 transport:
   profile: api   # api | copilot-cli — derived from project-verify-type.txt when present
   # This is PACKAGE DATA (pyproject.toml ships this file), so it must carry the
-  # profile that works for a fresh install with provider API keys. A machine
-  # that runs on a Copilot seat sets its own profile in the gitignored
-  # ai_router/local-overrides.yaml instead:
+  # profile that works for a fresh install with provider API keys.
   #
-  #     transport:
-  #       profile: copilot-cli
+  # Set 124 S2: a machine that runs on a Copilot seat no longer sets a profile
+  # in ai_router/local-overrides.yaml — `transport.profile` was RETIRED as a
+  # local override, because once project-verify-type.txt became gitignored
+  # machine/project state the two files answered the same question in the same
+  # scope. A stale key there is refused at config load with the replacement
+  # named. The one way to say it is now:
   #
-  # Set 110 S4 learned this the hard way: a seat-local `copilot-cli` was edited
-  # into this file and committed, which would have made the router fail to load
-  # for every API-key-only consumer of the wheel.
+  #     python -m ai_router.verify_type --set COPILOT_CLI
+  #
+  # Set 110 S4 learned the underlying rule the hard way: a seat-local
+  # `copilot-cli` was edited into this file and committed, which would have made
+  # the router fail to load for every API-key-only consumer of the wheel. That
+  # rule still holds — the seat's answer just has a better home than this file
+  # or local-overrides.yaml.
 
 # The copilot-cli profile's own settings. Only read/validated when
 # transport.profile == copilot-cli; otherwise inert. Roles are late-bound

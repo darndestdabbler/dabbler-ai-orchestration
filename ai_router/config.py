@@ -19,6 +19,7 @@ try:
     from .cli_transport import validate_transport_timeouts
     from .verify_type import (
         PROFILE_SOURCE_PROJECT_FILE,
+        VERIFY_TYPE_BY_PROFILE,
         derive_transport_profile,
     )
 except ImportError:  # test context — this module is also imported bare
@@ -32,6 +33,7 @@ except ImportError:  # test context — this module is also imported bare
     )
     from verify_type import (  # type: ignore[import-not-found]
         PROFILE_SOURCE_PROJECT_FILE,
+        VERIFY_TYPE_BY_PROFILE,
         derive_transport_profile,
     )
 
@@ -743,19 +745,22 @@ def _deep_merge(base: dict, override: dict) -> dict:
 # Paths NOT in this set are rejected with a clear error.
 _LOCAL_OVERRIDE_ALLOWED: frozenset[str] = frozenset({
     "routing.outsourcing_mode",
-    # Set 110 S4: the transport profile is a per-SEAT fact, not a project fact.
-    # router-config.yaml is package data (pyproject.toml ships it), so a machine
-    # that runs on a Copilot seat used to have no way to say so except by
-    # editing the tracked, shipped config -- which is exactly how a seat-local
-    # `copilot-cli` ended up committed, where it would have made the router
-    # unusable for every API-key-only consumer of the wheel. The seat choice
-    # now has a supported local home instead.
+    # Set 124 S2: ``transport.profile`` is NO LONGER an allowed local override.
     #
-    # Set 123 S1: still the seat's home, and still the answer BEFORE a project
-    # commits one -- but a project-verify-type.txt outranks it. A project's
-    # committed choice is not overridden by whichever machine it happens to be
-    # checked out on (spec standing decision 5).
-    "transport.profile",
+    # Set 110 S4 added it because router-config.yaml is package data and a
+    # Copilot seat had nowhere else to say "I dispatch through the CLI". Set
+    # 123 S1 then made project-verify-type.txt outrank it. Set 124 S1 settled
+    # (operator ruling, 2026-08-12) that the project file is **machine/project**
+    # state -- "this project, on THIS machine" -- and gitignored it.
+    #
+    # That collapsed the two into ONE scope: local-overrides.yaml is per-machine
+    # and lives inside the checkout, so both files answered "what verifies this
+    # project, on this machine" and only one of them was authoritative. Two
+    # mechanisms for one fact is the defect class router-config.yaml itself
+    # names as having bitten this repo three times, so the second one is gone.
+    # `python -m ai_router.verify_type --set <VALUE>` is now the only way to say
+    # it, and a stale key is REFUSED rather than ignored -- see the transport
+    # branch in _apply_local_overrides for why silence would be worse.
     # Per-provider fields — expressed as "providers.<id>.<field>"
     # but validated dynamically by _apply_local_overrides.
     # Also allow local-only sections entirely:
@@ -832,20 +837,43 @@ def _apply_local_overrides(config: dict, path: Path) -> None:
                 file=sys.stderr,
             )
 
-        # --- transport (Set 110 S4) ---
-        # Merged BEFORE _validate_transport runs, so selecting `copilot-cli`
-        # locally still has to satisfy the transports.copilot-cli block check
-        # and still skips the provider API-key requirement. A local override
-        # buys a different default, not a way around validation.
+        # --- transport (Set 110 S4; retired as an override by Set 124 S2) ---
+        # No transport key is locally overridable any more. `transport.profile`
+        # was the only one, and it now duplicates project-verify-type.txt's
+        # scope exactly (see _LOCAL_OVERRIDE_ALLOWED).
+        #
+        # REFUSED rather than warned-and-ignored, decided by the standing
+        # tiebreaks and journaled in this set's decisions.jsonl. The deciding
+        # case is a Copilot seat with NO project file: ignoring the key would
+        # silently fall its profile back to `api`, and validate_provider_api_keys
+        # would then fail on a seat that has no provider keys BY DESIGN -- a
+        # confusing credential error a long way from its cause. A refusal that
+        # names the one replacement command is reversible in seconds; a silent
+        # transport switch is a mis-dispatch.
         elif key == "transport" and isinstance(value, dict):
             for tk, tv in value.items():
                 full_path = f"transport.{tk}"
-                if full_path not in _LOCAL_OVERRIDE_ALLOWED:
+                if full_path == "transport.profile":
                     raise ValueError(
-                        f"local-overrides.yaml: '{full_path}' is not allowed "
-                        "as a local override per Appendix B."
+                        "local-overrides.yaml: 'transport.profile' is no "
+                        "longer a local override (Set 124 S2). What verifies "
+                        "a project is machine/project state, and "
+                        "project-verify-type.txt is the one place that "
+                        "records it -- two mechanisms for one fact is the "
+                        "defect this removes.\n"
+                        "\n"
+                        f"  Replace it: python -m ai_router.verify_type --set "
+                        f"{VERIFY_TYPE_BY_PROFILE.get(tv, '<DIRECT_API|COPILOT_CLI>')}\n"
+                        "  Then delete the 'transport:' block from "
+                        "ai_router/local-overrides.yaml.\n"
+                        "\n"
+                        "`python -m ai_router.verify_type` (no flags) prints "
+                        "what this project currently resolves to."
                     )
-                config.setdefault("transport", {})[tk] = tv
+                raise ValueError(
+                    f"local-overrides.yaml: '{full_path}' is not allowed "
+                    "as a local override per Appendix B."
+                )
 
         # --- local-only sections (notifications, decision_review) ---
         elif key in ("notifications", "decision_review"):

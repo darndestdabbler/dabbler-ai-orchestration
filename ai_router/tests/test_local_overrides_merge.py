@@ -254,23 +254,27 @@ def test_unknown_top_level_key_warns_and_ignores(
 # ---------------------------------------------------------------------------
 
 
-def test_local_transport_profile_overrides_shared(
+def test_local_transport_profile_is_refused_and_names_its_replacement(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """A Copilot-seat machine selects its transport WITHOUT touching shared data.
+    """Set 124 S2 REPLACES this test's original assertion.
 
-    The defect this closes: `router-config.yaml` is package data (pyproject
-    ships it), there was no supported local home for the profile, so the only
-    way to run on a seat was to edit and commit the tracked file — which would
-    make the router fail to load for every API-key-only consumer of the wheel.
+    It used to prove that a Copilot-seat machine could select its transport
+    here without touching shared package data (Set 110 S4). That home is
+    retired: once `project-verify-type.txt` became gitignored machine/project
+    state, this file answered the same question in the same scope, and two
+    mechanisms for one fact is the defect being removed.
+
+    The same input is now refused, with the replacement command named -- an
+    existing seat carrying this key must not be left guessing. Refusal rather
+    than warn-and-ignore is journaled in Set 124's decisions.jsonl: ignoring
+    it would silently fall a keyless seat back to `api` and fail on provider
+    credentials it does not have by design.
     """
     rc = _setup_workspace(tmp_path, overrides_yaml="""\
         transport:
           profile: copilot-cli
     """)
-    # The copilot-cli profile requires its transports block, so the minimal
-    # fixture would fail _validate_transport. Supply the block, which also
-    # proves the override is merged BEFORE validation rather than after.
     rc.write_text(
         rc.read_text(encoding="utf-8")
         + textwrap.dedent("""\
@@ -282,16 +286,19 @@ def test_local_transport_profile_overrides_shared(
             """),
         encoding="utf-8",
     )
-    # No API key is set: the copilot-cli profile must skip the key check, and
-    # it can only do that if the override was applied before validation.
-    cfg = config_mod.load_config(str(rc))
-    assert cfg["transport"]["profile"] == "copilot-cli"
+
+    with pytest.raises(ValueError) as excinfo:
+        config_mod.load_config(str(rc))
+
+    message = str(excinfo.value)
+    assert "transport.profile" in message
+    assert "python -m ai_router.verify_type --set COPILOT_CLI" in message
 
 
 def test_local_transport_unknown_key_is_rejected(
     tmp_path: Path, monkeypatch
 ) -> None:
-    """Only `profile` is overridable — the allow-list is not a whole section."""
+    """No transport key is overridable now — `profile` was the last one."""
     rc = _setup_workspace(tmp_path, overrides_yaml="""\
         transport:
           some_other_knob: true

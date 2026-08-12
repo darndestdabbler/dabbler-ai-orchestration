@@ -87,6 +87,83 @@
       "dateTime": "2026-08-12T04:44:03.827945-04:00",
       "description": "Targeted pytest green: 42 verify-type/qualified-verdict + 62 transport/overrides/copilot-routing + 254 remaining load_config consumers. FOUND A LATENT SET 123 DEFECT: 10 tests in test_transport_profile_config.py and test_local_overrides_merge.py passed ONLY while this repo had no project-verify-type.txt. Their synthetic workspaces carry no .git marker, so find_project_root walked past the tmp tree to the cwd anchor and the real repo answered, deriving copilot-cli into configs declaring no transports.copilot-cli block. Proved by moving the file away (20 passed) and back (10 failed). Fixed at both shared helpers by bounding each fixture as its own project; swept the other six load_config consumers per L-069-1 and found the class contained.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T06:49:32.732831-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "retire-transport-profile-from-ai-router",
+      "dateTime": "2026-08-12T06:49:32.732831-04:00",
+      "description": "**Retire `transport.profile` from `ai_router/local-overrides.yaml`.** Once the project file is gitignored, both files are machine \u00d7 project scope and the seat-local override is pure duplication \u2014 the defect class `router-config.yaml:86` names. `config.py` must stop honouring it and name `python -m ai_router.verify_type --set <VALUE>` as the one way to say it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "choose-refuse-vs-warn-by-the",
+      "dateTime": "2026-08-12T06:49:32.732831-04:00",
+      "description": "**Choose refuse-vs-warn by the tiebreaks and journal it** (`decision_journal`). A hard refusal is louder but strands any seat mid-session on an expensive path; a warn-and-ignore is reversible and self-describing. Whichever is chosen, the message must name the exact replacement command \u2014 an existing seat (this machine included) carries the legacy key today and must not be left guessing.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "replace-do-not-delete-the-coverage",
+      "dateTime": "2026-08-12T06:49:32.732831-04:00",
+      "description": "**Replace, do not delete, the coverage that pinned the old precedence.** `test_project_file_beats_a_seat_local_override` asserts a precedence that stops being meaningful when the loser is retired; it becomes the legacy-key falsifier. Add the sibling that plants the legacy key and asserts the operator-facing message names the replacement.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest",
+      "dateTime": "2026-08-12T06:49:32.732831-04:00",
+      "description": "Targeted pytest; verify; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T06:52:30.265148-04:00",
+      "description": "Registered Set 124 S2 (github-copilot/anthropic/claude-opus-5).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "retire-transport-profile-from-ai-router",
+      "dateTime": "2026-08-12T06:52:30.266760-04:00",
+      "description": "Removed transport.profile from config._LOCAL_OVERRIDE_ALLOWED so no transport key is locally overridable. Once the project file is gitignored machine/project state, local-overrides.yaml occupied the identical scope -- the two-mechanisms-for-one-fact defect router-config.yaml names.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "choose-refuse-vs-warn-by-the",
+      "dateTime": "2026-08-12T06:52:30.268008-04:00",
+      "description": "REFUSE, journaled to decisions.jsonl under prefer-reversible. Deciding case: a Copilot seat with no project file would, under warn-and-ignore, silently fall back to api and then fail validate_provider_api_keys on a seat that has no keys by design. Message names python -m ai_router.verify_type --set <VALUE> and DERIVES <VALUE> from the stale profile via VERIFY_TYPE_BY_PROFILE. Dogfooded on this machine, which carried the key: refusal fired naming COPILOT_CLI; after migration load_config still derives copilot-cli and copilot_preflight is green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "replace-do-not-delete-the-coverage",
+      "dateTime": "2026-08-12T06:57:17.367638-04:00",
+      "description": "Replaced rather than deleted both tests that pinned the retired precedence: test_project_file_beats_a_seat_local_override -> test_a_retired_seat_local_transport_profile_is_refused, and test_local_transport_profile_overrides_shared -> test_local_transport_profile_is_refused_and_names_its_replacement. Added the replacement-command falsifier (asserts the DERIVED value for both profiles), a look-alike proving still-allowed overrides work, and a structural assertion that no transport.* key remains in _LOCAL_OVERRIDE_ALLOWED. Propagated the claim to router-config.yaml (two comment blocks) and verify_type.py docstring. MUTATION-TESTED: disabling the targeted message fails all 3 refusal tests; restored 44 pass. A first mutation attempt silently did not apply (CRLF/LF mismatch in the PowerShell replace) and a first version of one test passed under mutation because the generic Appendix B refusal also names the path -- both caught and fixed.",
+      "status": "complete"
     }
   ]
 }

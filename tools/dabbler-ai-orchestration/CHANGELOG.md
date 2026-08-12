@@ -36,13 +36,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   assets.
 
   **What replaced the setup form.** A project says what verifies it in one
-  committed file, `project-verify-type.txt` at the repo root, holding
+  file, `project-verify-type.txt` at the repo root, holding
   `DIRECT_API` or `COPILOT_CLI`. `python -m ai_router.verify_type`
   resolves it — project file, else a machine default confirmed once, else
   a guided setup printed to the terminal — and the router **derives**
-  `transport.profile` from that file, so it outranks both the tracked
-  `router-config.yaml` and a seat-local `local-overrides.yaml` and the two
-  cannot disagree. Setup is `Dabbler: Set Up New Project` (non-interactive)
+  `transport.profile` from that file, so it outranks the tracked
+  `router-config.yaml` and nothing can disagree with it. (Set 124 re-scoped
+  that file to **gitignored machine/project state** — see the Set 124 entry
+  under *Changed* — and retired `transport.profile` from
+  `local-overrides.yaml` outright.) Setup is `Dabbler: Set Up New Project`
+  (non-interactive)
   plus that one command. The replacement was proven before the deletion:
   a true cold start walked from two `git init` folders holding nothing but
   `.git`, through both resolution branches, with no webview involved.
@@ -121,8 +124,42 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
-- **(Set 115 S4, operator ruling at the set's UAT walk) "Open Session
-  Artifacts" is removed from the session row's menu.** Set 115 S3 shipped
+- **(Set 124 S3) `Dabbler: Set Up Copilot Seat` records the verify type
+  instead of writing a retired config key — the previous behaviour left
+  the project unable to load its own config.** On ≥2 confirmed provider
+  families the command used to write `transport.profile: copilot-cli`
+  into `ai_router/local-overrides.yaml`. Set 124 S2 retired that key and
+  made a stale one a **hard refusal** at config load, so a *successful*
+  seat setup produced a project whose every `load_config` raised. The
+  command now records the answer through the one sanctioned writer —
+  `python -m ai_router.verify_type --set COPILOT_CLI`, run in the
+  scaffolded `.venv` — from which the router derives
+  `transport.profile: copilot-cli`. One writer, so the file always carries
+  the header explaining why it is machine-local.
+
+  **The Direct API path is unchanged.** A `DIRECT_API` project keeps
+  resolving exactly as before; the `"api"` seat pick was always a no-op
+  here, because the seeded `router-config.yaml` default already *is* `api`.
+
+  **`project-verify-type.txt` is now gitignored machine/project state**
+  (operator ruling, 2026-08-12): the answer to "what verifies *this
+  project*, on *this machine*". A Copilot seat holds no `DABBLER_*` keys
+  and must resolve `COPILOT_CLI`; a teammate who installed with provider
+  keys must resolve `DIRECT_API` for the same checkout — so committing it
+  would force every clone onto one machine's transport.
+  `verify_type --set` now adds the `.gitignore` rule itself, **before** it
+  writes the file, so there is no window in which the answer is
+  committable. If you already committed it, untrack it with
+  `git rm --cached project-verify-type.txt`.
+
+  **Toasts changed accordingly.** Success names the file it wrote rather
+  than a config key; every failure branch names
+  `python -m ai_router.verify_type --set COPILOT_CLI` as the one-command
+  recovery (no re-probe needed), and a seat whose `.gitignore` could not be
+  written is now told plainly that the answer is **not** git-ignored
+  instead of being told it is.
+
+
   it beside Copy Run Prompt; walking the finished row, the operator
   judged one entry enough — the artifacts are a folder away, and a
   session row's menu is worth more when it offers exactly what that row

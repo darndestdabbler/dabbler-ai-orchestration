@@ -9,6 +9,17 @@ architecture. Everything below traces to
 which two providers reached independently, plus the operator's
 confirmation of all seven points on 2026-08-11.
 
+> **Before starting this set, read
+> [`feature-candidates.md`](feature-candidates.md).** The operator supplied
+> module-UX and initial-planning design intent on 2026-08-12 (clean-project
+> first run, a module context menu with **View Help**, and a baked-in
+> `000-initial-plan-and-design` set whose interactive activities cover
+> plan import/creation, module-design consideration, and decomposition
+> into sets). Some of it lands inside Sessions 1–2 as specified; some is
+> new scope. That file records the intent, the seams, and four tensions to
+> resolve — including an unresolved *steps vs sessions* ambiguity — and is
+> **not** a change to the three sessions below.
+
 > **Authoring correction, recorded because it nearly cost the set its
 > point.** A first draft of this spec made the Python lifecycle CLI a
 > **non-goal**, on the grounds that it is a large port no developer can

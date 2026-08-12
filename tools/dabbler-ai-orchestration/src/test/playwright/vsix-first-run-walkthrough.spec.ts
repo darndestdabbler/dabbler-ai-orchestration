@@ -117,16 +117,63 @@ async function teardown(per: PerTest): Promise<void> {
 /** Open the Command Palette (F1 — the cross-platform binding) and run a
  * command by its palette title. fill() must re-include the `>` command
  * prefix F1 pre-filled (lesson 2 above). Only called after the extension
- * has activated (lesson 1). */
+ * has activated (lesson 1).
+ *
+ * One F1 is a BET, and the Windows CI runner loses it. Twice the
+ * windows-latest leg died exactly here — `.quick-input-widget input` never
+ * visible within 15s — on commits whose Linux and macOS legs were green, and
+ * which pass locally. Nothing refuses the keystroke; it arrives late. This
+ * walk's palette calls share a four-vCPU CI runner with the other Playwright
+ * workers AND with this spec's own real venv + pip install: when the key goes
+ * in, the extension host is still draining watcher events for the thousands
+ * of files that install just wrote. A single 15-second wait turns a slow
+ * machine into a red build. (Both recorded failures predate this session's
+ * rewrite, when Build was a webview form and this was the first palette call
+ * after the install. The rewrite put Build on the palette too, so the
+ * exposure grew from three calls to four.)
+ *
+ * Two cheap changes make the step patient instead of lucky:
+ *   - Re-home keyboard focus onto a live workbench widget before pressing.
+ *     A key event goes wherever focus last landed, and the surfaces this walk
+ *     drives — a terminal, a modal dialog, a quick input that just closed —
+ *     can be torn down by the very step that preceded the press.
+ *     `.monaco-list` carries tabindex=0, so focusing it is a no-op for the
+ *     tree, unlike CLICKING a row, which activates it. On the cold-start call
+ *     no list exists yet, which is why the focus is best-effort and the press
+ *     happens either way.
+ *   - Press up to three times. A palette that opens on the second try is a
+ *     slow runner; one that never opens in ~45s is a real defect, and still
+ *     fails here, with the same message at the same line.
+ *
+ * Never press while the palette is already up: the quick input closes when it
+ * loses focus, so re-homing on top of a late-but-open palette would shut the
+ * very thing being waited for. */
 async function runCommand(
   page: import("@playwright/test").Page,
   title: string,
 ): Promise<void> {
-  await page.keyboard.press("F1");
   const input = page.locator(".quick-input-widget input");
-  await input.waitFor({ state: "visible", timeout: 15_000 });
-  await input.fill(">" + title);
-  await page.keyboard.press("Enter");
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const alreadyOpen = await input.isVisible().catch(() => false);
+    if (!alreadyOpen) {
+      await page
+        .locator(".monaco-list")
+        .first()
+        .focus({ timeout: 5_000 })
+        .catch(() => undefined);
+      await page.keyboard.press("F1");
+    }
+    try {
+      await input.waitFor({ state: "visible", timeout: 15_000 });
+      await input.fill(">" + title);
+      await page.keyboard.press("Enter");
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError;
 }
 
 /** Wait for a QuickPick identified by its placeholder ATTRIBUTE

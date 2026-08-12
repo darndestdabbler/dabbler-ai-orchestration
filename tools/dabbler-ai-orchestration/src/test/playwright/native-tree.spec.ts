@@ -121,7 +121,13 @@ test.describe("Set 110 S2 — native Work Explorer tree", () => {
 
     await expandTreeRow(pane, "001-core-alpha");
     const sessionRows = pane.locator(".monaco-list-row").filter({ hasText: /^Session \d/ });
-    expect(await sessionRows.count()).toBeGreaterThan(0);
+    // Retrying, not a snapshot. `expect(await rows.count())` asks exactly
+    // once, and on a loaded CI runner the session rows paint a beat after the
+    // expand — so this line went red twice on windows-latest while every
+    // neighbouring assertion, all of which retry, would have waited it out.
+    // Asserting the first row is visible says the same thing (at least one
+    // session row exists) and says it patiently.
+    await expect(sessionRows.first()).toBeVisible({ timeout: 15_000 });
 
     // The in-flight session says so, and only it does — the operator's
     // ask 2 is a removal, and this is the surviving signal.

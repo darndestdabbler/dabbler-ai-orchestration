@@ -61,19 +61,11 @@ extension build, the publish runbook, and the CI matrix all live in
 
 ## Session state schema
 
-[`docs/session-state-schema.md`](docs/session-state-schema.md) is the
-authoritative reference for `session-state.json` (the v4 shape),
-consulted on demand whenever a state-file
-question arises (Set 085) — the sanctioned writers own the shape at
-runtime, and an orchestrator that hand-touches a state file without
-consulting the schema is the usual cause of the N−1/N display drift the
-Work Explorer surfaces. The per-session `orchestrator` block (the four `engine` /
-`provider` / `model` / `effort` fields, written omit-null) and the Set 049
-writer contract live there too; the engine-agnostic narrative of the
-coordination-layer rip-out — the `writer-bypass` (D3) check in
-`ai_router/writer_discipline.py` and the operator-locked "no orchestrator
-info in the Explorer" (P4) decision — is in
-[`docs/ai-led-session-workflow.md`](docs/ai-led-session-workflow.md).
+[`docs/session-state-schema.md`](docs/session-state-schema.md) is
+authoritative for `session-state.json` (the v4 shape, the per-session
+`orchestrator` block, the Set 049 writer contract) — read it on demand for
+any state-file question. Sanctioned writers own the shape; hand-touching a
+state file without it is the usual cause of the N−1/N display drift.
 
 ## Repo layout standard
 
@@ -134,34 +126,14 @@ reads `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` from the environment or the
 Windows User environment. (The provider API keys must be available first —
 see **Engine-specific bootstrap** at the end of this file.)
 
-## What verifies this project
+## What verifies this project (pointer)
 
-`project-verify-type.txt` **at the repo root** is the single source of
-truth, committed on purpose: it is project configuration, not machine
-state, so it does not change with whichever machine the repo is checked
-out on. It holds exactly one value, `DIRECT_API` or `COPILOT_CLI`, and
-`transport.profile` is **derived** from it — the file outranks both the
-tracked `ai_router/router-config.yaml` and a seat-local
-`ai_router/local-overrides.yaml`, so the two can never disagree.
-
-Resolution is one entry point, in the terminal you are already in:
-
-```
-.venv/Scripts/python.exe -m ai_router.verify_type          # what am I?
-.venv/Scripts/python.exe -m ai_router.verify_type --set COPILOT_CLI
-.venv/Scripts/python.exe -m ai_router.verify_type --confirm
-```
-
-Exit 0 = resolved, 2 = a declared value is invalid, 3 = setup required.
-The order is: the project file wins silently; else
-`AI_ORCHESTRATION_VERIFY_TYPE` is a **suggestion** that changes nothing
-until `--confirm` commits it; else the command prints the guided setup.
-An invalid value in either place is reported, never guessed at. Commit
-the file — an uncommitted answer is not the project's answer.
-
-Set 123 S3 retired the setup webview that used to ask these questions,
-along with the config editor and cost dashboard panels; the extension
-contributes no webview at all now. Canonical rule:
+`project-verify-type.txt` at the repo root is the single source of truth,
+committed: `DIRECT_API` or `COPILOT_CLI`, with `transport.profile` **derived**
+from it, so it outranks `router-config.yaml` and `local-overrides.yaml`.
+`python -m ai_router.verify_type` (`--set` / `--confirm`; exit 3 = setup
+required) is the one entry point. Set 123 S3 retired the setup webview; the
+extension contributes none. Canonical:
 [`docs/planning/verify-type-resolution.md`](docs/planning/verify-type-resolution.md).
 
 ## Delegation Discipline (pointer)

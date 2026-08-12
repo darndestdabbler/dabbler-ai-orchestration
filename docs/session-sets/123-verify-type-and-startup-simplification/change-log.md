@@ -144,3 +144,56 @@ echo discipline as a code fix.
   present at `HEAD` before this session's work: VS Code 1.132.1 makes
   `workspace.workspaceFolders` getter-only, which breaks a test helper that
   assigns it. Not this set's to fix, and not this set's to hide.
+
+---
+
+## Step 9 — guidance reorganization review (final session)
+
+**Outcome: two changes made, one recommendation left for the operator.**
+
+**1. A preload-ceiling breach, caused and then fixed here.** Adding the
+`What verifies this project` section to the three bootstrap files pushed
+`AGENTS.md` to 2,202 tokens against a 2,031 ceiling, and the preload total
+to 12,064 against 12,000. Ceilings ratchet **down** only, so the fix was to
+remove prose, not to raise a number: the new section was compressed to an
+eight-line pointer at its canonical doc, and the `Session state schema`
+section — sixteen lines restating what `docs/session-state-schema.md` and
+the workflow doc already own — was cut to five. `AGENTS.md` now sits at
+2,003 tokens (99% of ceiling) and the total at 11,865.
+
+Worth recording for the next set: `AGENTS.md` was **already** at ~2,037
+tokens before this session, a hairline breach nobody had caught. It is under
+now, but the file has no headroom left. The next section anyone adds must
+displace one.
+
+**2. Lesson citations flagged three archived lessons as instrumental.**
+`cite_lessons` reported `L-069-1` (a bug is a bug CLASS), `L-079-3`
+(dogfood the true cold start) and `L-064-12` (manifest changes run full
+Layer 3) as archived-but-used. All three earned their keep here: L-079-3 is
+the rule that gated the deletion, L-064-12 is why the full Layer 3 ran, and
+**L-069-1 was the failure mode of this session, twice** — two verification
+rejections, both because a fix was applied to the reported line rather than
+to the class.
+
+No reactivation is recommended. Their rules already live in
+`project-guidance.md`, which is preload, so the active tier would be pure
+redundancy — and the tier has no room. The citation counters now record the
+usage, which is what drives future archival decisions.
+
+**3. One recommendation for the operator, not actioned here.**
+`docs/planning/verify-type-resolution.md` still contains the measurement
+that sent this session wrong: *"The webview surface is 3,576 lines
+(configEditor/ 2,671 + wizard/ 583 + dashboard/ 322)."* Two of those three
+were never the setup webview, and none of the three exists now. It is a
+design doc rather than a session record, so unlike `docs/session-sets/**`
+it is fair game to correct — but correcting it is a judgement about how much
+of a superseded design doc to preserve, and this session had already spent
+one operator stop on scope. Left as a named residual rather than quietly
+rewritten.
+
+**No changes recommended to `lessons-learned.md`.** The two active lessons
+this session leaned on, `L-112-1` (ship gates with falsifiers) and
+`L-064-8` (a replacement doc inherits the retired doc's claims at its
+peril), were both directly instrumental and are correctly worded. L-064-8 in
+particular predicted this session's exact failure twice over; it does not
+need restating, it needed obeying.

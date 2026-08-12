@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-11T20:58:17.268843-04:00",
+  "generatedAt": "2026-08-12T03:29:27.633544-04:00",
   "sessionSetDir": "123-verify-type-and-startup-simplification",
   "inputs": {
-    "activity-log.json": "28cbcf6b34409eb6ea907504f2430d15cfe6e51b6c1b7fd21e65c7cebfc6e81a",
-    "session-state.json": "7a8ef854c93d47d9155e637a26dde3921a387044dab9b50935d4034adfc64c3e",
+    "activity-log.json": "e03b6db6903d5336d0143be9eab7b16262df30e8d89e492d73fe7ebff0229361",
+    "session-state.json": "5760d9b16f2d740fffda2ddf9bf3a6c02ae0db53d9964f675f79db4db9cae043",
     "spec.md": "61a51e9f329e8358eb5ba88264eade65e6830fa19f7be9e2823d34f81f9d73ab"
   },
   "orphanEntries": 0,
@@ -147,19 +147,82 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 via start_session (github-copilot / anthropic / claude-opus-5 / high); preload read (constitution, project-guidance, lessons-learned, AGENTS.md); set 123 confirmed the only in-progress set; no decision-review-queue entries; Sessions 1-2 deliverables confirmed on disk (ai_router/verify_type.py, verification.py qualification path, both test suites). Transport profile is copilot-cli via the seat-local local-overrides.yaml, so provider API keys are neither required nor warned about.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "dogfood-the-true-cold-start-first",
+          "description": "TRUE cold start walked (L-079-3) in two fresh git-init'd temp folders holding nothing but .git -- no project file, no AI_ORCHESTRATION_VERIFY_TYPE, no router-config.yaml. Branch 3: `python -m ai_router.verify_type` printed the guided-setup script and exited 3; the human's single answer via `--set COPILOT_CLI` wrote the file, exited 0, and git committed it. Branch 2: with AI_ORCHESTRATION_VERIFY_TYPE=DIRECT_API and no file, resolution reported the value as a SUGGESTION at exit 3 and derive_transport_profile still answered from config (source=config), proving an unconfirmed default does not re-route dispatch; one `--confirm` committed it and derivation flipped to source=project-file, overriding a deliberately disagreeing configured profile in BOTH directions (api file over copilot-cli config, copilot-cli file over api config). A second --confirm is refused with exit 2. The walk needs no webview at any point, so the deletion is earned. Verified at the same time that this seat resolves transport.profile=copilot-cli with zero provider keys present -- the degraded-but-legal shape Session 2 made survivable, and the state a fresh project is in.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "delete-configeditor-2-671-wizard-583",
+          "description": "Deleted EVERY webview in the extension, at the operator's ruling. The spec's target list rested on a measurement error I verified before cutting: wizard/ makes zero webview API calls (16 QuickPick/InputBox ones -- it is Import Project Plan plus two prompt generators), configEditor/ exports annotationParser + yamlReadWrite to the SURVIVING scanAnnotationsForActiveSet command, and the actual setup webview -- SetupStatusView, systemStatus, gettingStartedActions, gettingStartedDetection, the protocol module and media/session-sets-tree/* -- was never named in the spec yet is exactly what the 8 retired Layer 3 scenarios drive. Operator chose recommended-scope-plus-wizard. Removed: configEditor/ (11 files), wizard/, dashboard/, SetupStatusView.ts, systemStatus.ts, gettingStartedActions.ts, gettingStartedDetection.ts, scanState.ts, metrics.ts, routerConfig.ts, media/session-sets-tree/, the stray webview/dashboard.html, media/getting-started.png, 20 Layer 2 suites and the startupTiming webview bucket. RELOCATED rather than deleted so no surviving command lost its backing: annotationParser + yamlReadWrite -> utils/, providerKeyPresent -> utils/providerKey.ts, and sessionSetsWebviewProtocol.ts -> types/explorerPayloads.ts stripped to the row/bucket/module shapes SessionSetsModel still builds (renamed because a module called WebviewProtocol in an extension with no webview is the stale echo the consistency rule exists to prevent). package.json lost 5 commands, the webview view contribution and 2 menu entries; no surviving command id changed. Layer 3: getting-started-surface (4), overlay-click-swallow (1) and loading-state (1 -- the spec miscounted it as harness baseline, but it drives the Getting Started form) retired, plus 2 of system-status's 3.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "update-the-three-bootstrap-files-in",
+          "description": "AGENTS.md / CLAUDE.md / GEMINI.md each gained a byte-identical 'What verifies this project' section (sha256 of the section compared across all three: f7a3bb2809ed) naming project-verify-type.txt at the repo root, the three CLI invocations, the three-branch order, and the fact that transport.profile is derived rather than configured beside it. Then the sibling sweep (L-069-1): the extension README's whole Get started section rewritten off the deleted form and onto the palette command plus `python -m ai_router.verify_type` (also dropping the Cost Dashboard paragraph and the Visual config editor bullet), the consumer-bootstrap getting-started template re-cut with a new '1a. Say What Verifies This Project' section, and the cold-start golden fixture REGENERATED through its sanctioned writer (UPDATE_GOLDEN=1 npm run test:unit) rather than hand-edited. Broken dev tooling repaired in the same pass: capture-readme-shots.js lost its Getting Started capture, activation-harness.ts no longer walks the deleted media dir. Historical records (changelogs, docs/session-sets/**, docs/proposals/**, the one-off scripts/verify_session_0*.py pinned to old versions) deliberately left untouched -- they are records of what was true then.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "rename-the-work-explorer-caption-to",
+          "description": "Caption renamed in one pass across all four sites the operator note named (L-069-1 -- a rename is the same bug CLASS): the activitybar container title 'AI Work Explorer' -> 'AI Orch', the surviving dabblerWorkExplorerTree contextualTitle (the dabblerSessionSets one left with the webview), and BOTH electronLaunch.ts aria-label substring selectors -- one of which went with openSessionSetsView, the webview helper, so only openDabblerContainer's needed rewriting. The header now reads 'AI ORCH: WORK EXPLORER' instead of the same words twice. Container title, not a command id, so keybindings and when-clauses are untouched. Layer 2 at exact baseline parity afterwards: stub-mode 1470 passing / 0 failing, Electron-mode 1436 passing with zero NEW failures against a stashed HEAD baseline (32 pre-existing, all the VS Code 1.132.1 workspaceFolders getter-only harness break plus two env-specific ones).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "package-json-is-the-extension-manifest",
+          "description": "`package.json` is the extension MANIFEST, so **`L-064-12` applies**: full `npm run test:playwright` after the last edit. Expect **31 scenarios** if the walkthrough is rewritten in place, or 30 plus a rewritten one \u2014 the number is the *check*, not the goal. Then full pytest, verify, close.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "package-json-is-the-extension-manifest"
+      ]
     }
   ]
 }

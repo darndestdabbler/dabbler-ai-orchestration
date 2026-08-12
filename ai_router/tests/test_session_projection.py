@@ -215,6 +215,77 @@ def test_an_unnameable_token_projects_as_unknown_without_being_healed(tmp_path):
     }
 
 
+def test_the_derived_state_and_start_time_reach_the_serialized_projection(
+    tmp_path,
+):
+    """Set 127 S1 step 4: the projection agrees, through the FILE.
+
+    ``session_projection`` serializes what ``build_rows`` returns rather
+    than recomputing it, so a derived active step should arrive here with
+    nothing added. Asserted through ``write_projection`` /
+    ``read_projection`` and not just the in-memory dict, because the
+    file is what a later consumer reads: a serializer that dropped
+    ``isActive`` or ``startedAt`` would pass every in-memory check and
+    still leave the tree unable to draw the glyph.
+
+    The record-versus-display split is asserted in the same breath, since
+    that is the thing this projection has always existed to keep honest:
+    ``status`` still says ``pending`` (the ledger's own word, unlaundered),
+    ``state`` and ``box`` say what the operator was shown, and
+    ``isActive`` says WHY those two can differ, so no consumer has to
+    guess whether it is looking at a derivation or a corrupted token.
+    """
+    plan = [
+        {
+            "sessionNumber": 1,
+            "stepNumber": n,
+            "stepKey": key,
+            "description": f"Step {n}.",
+            "status": sc.PLAN_STEP_STATUS,
+            "kind": sc.PLAN_STEP_KIND,
+            "dateTime": "2026-01-01T08:59:00-05:00",
+        }
+        for n, key in ((1, "register"), (2, "build"), (3, "verify"))
+    ]
+    set_dir = _write_set(
+        tmp_path,
+        plan
+        + [
+            dict(
+                _entry(1, "register", "complete"),
+                dateTime="2026-01-01T09:05:00-05:00",
+            )
+        ],
+        sessions=[
+            {
+                "number": 1,
+                "status": "in-progress",
+                "startedAt": "2026-01-01T09:00:00-05:00",
+            }
+        ],
+    )
+    assert sp.write_projection(set_dir) == sp.projection_path(set_dir)
+    steps = sp.read_projection(set_dir)["sessions"][0]["steps"]
+
+    active = steps[1]
+    assert active["stepKey"] == "build"
+    assert active["isActive"] is True
+    assert active["state"] == "in-progress"
+    assert active["box"] == sc.IN_PROGRESS_BOX
+    assert active["status"] == "pending"
+    assert active["isPlanned"] is True
+    assert active["startedAt"] == "2026-01-01T09:05:00-05:00"
+
+    assert steps[0]["startedAt"] == "2026-01-01T09:00:00-05:00"
+    assert [s["isActive"] for s in steps] == [False, True, False]
+    assert steps[2]["startedAt"] is None
+
+    session = sp.read_projection(set_dir)["sessions"][0]
+    assert session["current"] == ["build"]
+    assert session["counts"]["in-progress"] == 1
+    assert session["counts"]["pending"] == 1
+
+
 def test_a_touched_input_makes_the_projection_stale(tmp_path):
     """A cache that cannot be checked against its inputs is a source.
 

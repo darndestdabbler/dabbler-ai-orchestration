@@ -1,0 +1,4 @@
+**VERIFIED** — I checked the Session 1 spec obligations against the actual Python row derivation, projection serialization, state-reader path, gate consumer, tests, and schema docs. The active-step derivation is display-only, per-session gated, preserves raw status, reaches projection, and the close gate does not consume the derived in-progress key list; no Critical/Major spec-conformance defects found.
+
+**NITS**
+- **Nit:** `_completion_of()` treats every ordinary logged entry’s `dateTime` as a completion, including `pending`, `in-progress`, or unrecognized status rows. That can put `startedAt` after a prior row whose status does not prove completion, but this is a display-only edge case rather than a blocking issue.

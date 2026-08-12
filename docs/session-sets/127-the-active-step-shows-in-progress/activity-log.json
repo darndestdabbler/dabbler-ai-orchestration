@@ -1,0 +1,141 @@
+{
+  "sessionSetName": "127-the-active-step-shows-in-progress",
+  "createdDate": "2026-08-12T13:03:49.197493-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T13:03:49.196788-04:00",
+      "description": "Register. Journal the two decisions this set takes as authored: **derive, never write** (with options 1 and 3 recorded as the rejected alternatives), and **display-only** \u2014 the derived state changes no exit code, no `log_step` vocabulary, and nothing stored on disk. Journal the three operator rulings on the timestamp (start only, no date handling, no time on an unstarted row).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "derive-the-active-step-in-build",
+      "dateTime": "2026-08-12T13:03:49.196788-04:00",
+      "description": "**Derive the active step in `build_rows()`.** The lowest-numbered seeded `plan-step` row with nothing logged against it, in the session `session-state.json` reports as in-progress. It must **never override what the record already says**: an explicitly logged status of any kind (including the 40 real `in-progress` writes, `blocked`, and `failed`) wins, and an *unrecognized* status token \u2014 the five legacy prose rows \u2014 is not read as evidence of anything.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T13:03:49.196788-04:00",
+      "description": "**Falsify in both directions** (`L-112-1`). FIRES: an in-flight session's first unlogged planned step renders `[~]`, including retroactively on a historical set that never wrote the token. DOES NOT FIRE: a completed session marks nothing; a session whose planned steps are all logged marks nothing; a set with no seeded plan renders exactly as before; a `blocked` row is not overwritten. STRUCTURAL: at most one derived in-flight row per session, whatever the log contains.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "confirm-the-projection-agrees",
+      "dateTime": "2026-08-12T13:03:49.196788-04:00",
+      "description": "**Confirm the projection agrees.** `session_projection` serializes what `build_rows()` returns, so assert the derived state reaches it \u2014 if it does not, there is a second implementation, which is the thing Set 120 S3 removed.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest-for-the-changed-modules",
+      "dateTime": "2026-08-12T13:03:49.196788-04:00",
+      "description": "Targeted pytest for the changed modules; verify; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "derive-the-start-time-onto-the",
+      "dateTime": "2026-08-12T13:03:49.196788-04:00",
+      "description": "**Derive the start time onto the row.** The previous step's completion, or the session's `startedAt` for the first step; `None` for a row that has not started, so nothing downstream can render a registration timestamp as a start. Falsify the boundaries (first step, a gap between steps, an unstarted row, a session with no seeded plan).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T13:16:21.899696-04:00",
+      "description": "Registered session 1 of set 127 with start_session (github-copilot / anthropic / claude-opus-5, 3 sessions). Journalled the three decisions Step 1 names: DERIVE-NEVER-WRITE (options 1 and 3 from the source-of-record note recorded as the rejected alternatives, rubric prefer-reversible), DISPLAY-ONLY (the derived state moves no exit code, adds nothing to the log_step vocabulary, and is read by no gate), and the three operator rulings on the timestamp (start only, no date handling, no time on a row that has not started) journalled verbatim as human-authority and tagged for the UAT Decide section.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "derive-the-active-step-in-build",
+      "dateTime": "2026-08-12T13:16:21.901162-04:00",
+      "description": "In progress. session_checklist.build_rows now derives the active step: the first seeded plan row nothing has logged against, in a session session-state.json reports as in flight, and ONLY where the record is silent -- any row already boxing [~] or [!] stands the derivation down entirely, which is what stops it re-creating the two-current-rows defect the removed <- here marker produced. Eligibility asks for a token the renderer boxes [ ], so an unrecognised prose status is evidence of nothing in either direction. The raw status is never touched; ChecklistRow.effective_status is what the box is drawn from. _reconcile now returns (row, completion) pairs so the start time can be derived in the same pass. Falsifiers still to write.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "derive-the-active-step-in-build",
+      "dateTime": "2026-08-12T13:23:02.899760-04:00",
+      "description": "Derivation landed in session_checklist.build_rows via _active_step_index + _derive_progress, plus session_flight_facts (the one read of session-state.json for both in-flight and startedAt). NOT-A-MARKER guards, each with its own falsifier: only a seeded plan row is eligible; only a session the state file reports in-flight; stands down entirely when any row already boxes [~] or [!]; eligibility requires a token the renderer boxes [ ], so an unrecognised prose status is evidence of nothing. The record is untouched -- raw status stays as written and ChecklistRow.effective_status is the display token. Existing expectations updated where they encoded the pre-derivation answer (test_plan_seeding: 6 assertions, one test renamed to test_the_step_after_the_last_logged_one_is_where_the_session_is with the reversal argued in its docstring); _in_flight now reads the box (what is shown) and record_post records the derived key because the render it attests drew it. Targeted suites green: 114 + 156 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T13:23:02.901124-04:00",
+      "description": "In progress. Writing the both-direction falsifiers for the derivation.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T13:27:37.892534-04:00",
+      "description": "Both-direction falsifiers landed: TestTheDerivedActiveStep (FIRES retroactively on a ledger that never wrote the token, with the on-disk record asserted unchanged afterwards; DOES NOT FIRE on a closed session, an all-logged plan, a logged in-progress row, a blocked row, an unrecognised prose status on either a planned or a logged row, or a set with no seeded plan; STRUCTURAL: exactly one derived row over a six-row plan logged out of order) and TestTheDerivedStartTime (first row = session startedAt, each later row = the previous row completion including across a 35-minute gap; no time on an unstarted row, none from the plan registration stamp, none for a legacy set with no state file). PROVEN TO BITE, not merely green: four planted mutations run against the suite -- dropping the record-wins guard (3 failures), ignoring the in-flight gate (8), marking every eligible planned row (8), and reading a plan row registration stamp as a completion (initially SURVIVED, which exposed a blind spot; added the logged-row-after-an-unclaimed-plan-row case and it now fails). L-112-1 cited.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "confirm-the-projection-agrees",
+      "dateTime": "2026-08-12T13:27:37.894338-04:00",
+      "description": "In progress.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "confirm-the-projection-agrees",
+      "dateTime": "2026-08-12T13:29:50.213470-04:00",
+      "description": "session_projection._step_from_row now reads the row effective_status for state and box and carries isActive + startedAt, so the derived state reaches session-progress.json with no second implementation -- the projection still serializes what build_rows returns. New falsifier asserts it through write_projection/read_projection (the FILE, not the in-memory dict) plus the record-versus-display split: status stays pending, state/box say in-progress, isActive says why they differ, current and counts follow state. docs/session-progress-schema.md updated: the shape block, a new isActive/startedAt section with the derivation rules and the wall-clock-proxy caveat, the inputs table (session-state.json now also contributes startedAt), the current-is-a-list section (why this is not the <- here marker returning, point by point), and the parity section (the derived fields are proven through the file and are not yet in the cross-language corpus, with the trigger that closes that window named).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest-for-the-changed-modules",
+      "dateTime": "2026-08-12T13:29:50.216720-04:00",
+      "description": "In progress.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "derive-the-start-time-onto-the",
+      "dateTime": "2026-08-12T13:30:52.379419-04:00",
+      "description": "Complete -- authored in the same pass as step 2 because both facts are one derivation over one row list, and computing them separately would be a second place for them to disagree. ChecklistRow.started_at is the previous row completion, seeded with the session startedAt for the first row; None for a row that has not started. _reconcile returns (row, completion) pairs so a seeded plan row contributes NO completion at all -- its dateTime is registration time, one stamp shared by the whole plan, and the mutation that reads it as a completion is one of the four planted in step 3. Boundaries falsified: first step, a 35-minute gap between steps, an unstarted row, a logged row whose predecessor never completed, and a set with no state file.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest-for-the-changed-modules",
+      "dateTime": "2026-08-12T14:16:35.590347-04:00",
+      "description": "Targeted pytest across the nine suites touching these modules: 351 passed. Cross-provider verification, two discovery rounds, both VERIFIED on both lenses (spec-conformance and failure-scenario), 0 blocking findings in either. Round 1 returned two nits, both accepted and fixed with their own falsifiers -- the plan-less state carve-out (no sessions[] ledger, top-level startedAt) lost the first row start time, and bookkeeping records were acting as step completions in the start-time chain; the fix made the rule say what the spec says (the previous STEP completion), so a bookkeeping row is transparent while an unclaimed plan row still breaks the chain. Round 2 re-stamped clean; its one remaining nit (a non-complete logged status read as a completion) is recorded as an adjudicated-minor residual owned by Session 2. Full pytest run of record: 4055 passed, 9 skipped, 963s, recorded after the last code change. mocha and playwright owe nothing -- this session touched no surface they cover.",
+      "status": "complete"
+    }
+  ]
+}

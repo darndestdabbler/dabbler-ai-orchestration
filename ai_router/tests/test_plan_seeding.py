@@ -97,6 +97,26 @@ def _keys(rows):
     return [r.step_key for r in rows]
 
 
+def _close_the_session(tmp_path, *, name="114-fixture", session=1):
+    """Flip the fixture's session to ``complete`` in ``session-state.json``.
+
+    Set 127 S1's derivation is gated on the state file — the single
+    source of truth for progress — so the falsifier for "a closed session
+    derives nothing" has to move the state, not the ledger. Written here
+    rather than through ``close_session`` because the gates that writer
+    runs are a whole other session's worth of fixture, and the only fact
+    under test is the one field the derivation reads.
+    """
+    path = tmp_path / name / "session-state.json"
+    state = json.loads(path.read_text(encoding="utf-8"))
+    for entry in state["sessions"]:
+        if entry.get("number") == session:
+            entry["status"] = "complete"
+            entry["completedAt"] = "2026-01-01T17:00:00-05:00"
+    state["status"] = "complete"
+    path.write_text(json.dumps(state), encoding="utf-8")
+
+
 def _in_flight(rows):
     """Step keys the checklist shows as in flight.
 
@@ -104,11 +124,15 @@ def _in_flight(rows):
     longer a rule's single answer but the ``in-progress`` status the
     strict writer guarantees, read straight off the row. This returns a
     LIST because zero and two are both real answers now.
+
+    Set 127 S1 reads the row's ``box`` rather than its raw ``status``, so
+    a DERIVED active step counts here too — this helper answers "what
+    does the checklist show as running", and the derivation is exactly
+    that and nothing more. A test that wants the RECORD instead asserts
+    on ``status``, which the derivation never touches.
     """
     return [
-        r.step_key
-        for r in rows
-        if sc.STATUS_BOXES.get(str(r.status).lower()) == sc.IN_PROGRESS_BOX
+        r.step_key for r in rows if r.box == sc.IN_PROGRESS_BOX
     ]
 
 
@@ -305,13 +329,22 @@ class TestReconciliation:
         return set_dir
 
     def test_an_unstarted_plan_renders_as_pending_rows(self, tmp_path):
+        """The plan is a forecast — with one row the session is ON.
+
+        Set 127 S1 changed the first row's box and nothing else. The
+        RECORD still says ``pending`` for all three (asserted below, and
+        it is what the ledger holds), all three are still planned rows,
+        and rows 2-3 are still visibly unstarted. What moved is the
+        answer to "which of these is the session working on", which for
+        a session ``session-state.json`` reports as in flight is the
+        first row nothing has been logged against.
+        """
         rows = sc.build_rows(self._seeded(tmp_path), 1)
-        assert [r.box for r in rows] == ["[ ]", "[ ]", "[ ]"]
+        assert [r.box for r in rows] == ["[~]", "[ ]", "[ ]"]
+        assert [r.status for r in rows] == ["pending"] * 3
         assert all(r.is_planned for r in rows)
         assert _keys(rows) == ["register", "build-the-thing", "verify-it"]
-        # Nothing is in flight: the plan is a forecast, not a claim of
-        # work started. The removed marker asserted "register" here.
-        assert _in_flight(rows) == []
+        assert _in_flight(rows) == ["register"]
 
     def test_a_logged_step_claims_its_planned_row_by_step_number(
         self, tmp_path
@@ -335,13 +368,25 @@ class TestReconciliation:
         assert rows[2].status == "complete"
 
     def test_a_planned_step_nobody_did_stays_visibly_unchecked(self, tmp_path):
+        """A skipped planned row is never claimed or relabelled.
+
+        Set 127 S1 moved its BOX: the spec's rule is "the lowest-numbered
+        seeded plan row with nothing logged against it", and in a session
+        the state file reports as in flight that is this row — the step
+        still outstanding — even though a later step was logged first.
+        What the derivation may not do, and does not do here, is claim
+        the row: it is still planned, still carries the plan's own
+        ``pending``, and still shows the spec's words rather than the
+        logged step's.
+        """
         set_dir = self._seeded(tmp_path)
         log = SessionLog(set_dir)
         log.log_step(1, 1, "register", "Registered.", "complete")
         log.log_step(1, 3, "verify-it", "Verified.", "complete")
         rows = sc.build_rows(set_dir, 1)
         assert rows[1].step_key == "build-the-thing"
-        assert rows[1].box == "[ ]"
+        assert rows[1].status == "pending"
+        assert rows[1].box == "[~]"
         assert rows[1].is_planned is True
 
     def test_an_unplanned_step_appears_rather_than_being_dropped(
@@ -407,7 +452,13 @@ class TestReconciliation:
         )
         rows = sc.build_rows(set_dir, 1)
         assert rows[0].step_key == "register"
-        assert rows[0].box == "[ ]"
+        # The bookkeeping entry did not CLAIM the row: it is still a
+        # planned row carrying the plan's own ``pending``. Its box is
+        # ``[~]`` because Set 127 S1 derives the first unlogged planned
+        # row of an in-flight session as the active step, which is a
+        # different claim from "a step was logged against it".
+        assert rows[0].status == "pending"
+        assert rows[0].box == "[~]"
         assert rows[0].is_planned is True
         assert rows[-1].step_key == "session-001/path-aware-critique"
 
@@ -439,7 +490,12 @@ class TestReconciliation:
         ]
         verify = rows[2]
         assert verify.is_planned is True
-        assert verify.box == "[ ]"
+        assert verify.status == "pending"
+        # `[~]` since Set 127 S1: it is the one planned row nothing has
+        # been logged against, in a session that is in flight. The claim
+        # this test makes is that it is still HERE, as a planned row with
+        # the plan's own words, rather than evicted by the renumbering.
+        assert verify.box == "[~]"
         assert rows[3].is_planned is False
 
     def test_a_key_match_wins_over_a_different_rows_number(self, tmp_path):
@@ -507,7 +563,12 @@ class TestOrdinalClaimingIsGatedOnTheSpec:
             "new-work",
             "build",
         ]
-        assert [r.box for r in rows[1:3]] == ["[ ]", "[ ]"]
+        assert [r.box for r in rows[1:3]] == ["[~]", "[ ]"]
+        # `build-the-thing` boxes `[~]` as the derived active step (Set
+        # 127 S1) and `verify-it` stays visibly unstarted; both are still
+        # PLANNED rows carrying the plan's own words, which is what this
+        # test is about — a renumbering evicted neither.
+        assert [r.status for r in rows[1:3]] == ["pending", "pending"]
         assert all(r.is_planned for r in rows[1:3])
         assert not any(r.is_planned for r in rows[3:])
 
@@ -607,17 +668,50 @@ class TestWhatIsInFlight:
         rows = sc.build_rows(set_dir, 1)
         assert _in_flight(rows) == ["verify-it"]
 
-    def test_nothing_is_in_flight_when_work_is_caught_up(self, tmp_path):
-        """Zero is a real answer, and the marker could not give it.
+    def test_the_step_after_the_last_logged_one_is_where_the_session_is(
+        self, tmp_path
+    ):
+        """Set 127 S1 reversed this case deliberately, and only this one.
 
-        With step 1 complete and nothing started, the marker pointed at
-        the next planned row and called it "here" — an inference that
-        read as a claim the session was working on it. Nothing is.
+        Before: step 1 complete, nothing logged since, answer "nothing is
+        in flight". That answer is what the operator reported as the
+        defect — it cannot tell "step 2 has not been started" from "step
+        2 has been running for forty minutes", which is the exact
+        question the in-progress glyph exists to answer.
+
+        This is NOT the removed ``<- here`` marker returning. The marker
+        pointed at the first non-terminal row of ANY kind, in ANY
+        session, which is how it came to point confidently at a step that
+        had finished hours earlier when four statuses were unparseable
+        (Set 119 S2). This fires only on a SEEDED PLAN row, only in a
+        session ``session-state.json`` reports as in flight, only when no
+        row already boxes ``[~]`` or ``[!]``, and never on an
+        unrecognised token — all four of which the marker lacked, and
+        each of which has its own falsifier below.
         """
         set_dir = self._seeded(tmp_path)
         SessionLog(set_dir).log_step(
             1, 1, "register", "Registered.", "complete"
         )
+        rows = sc.build_rows(set_dir, 1)
+        assert _in_flight(rows) == ["build-the-thing"]
+        # The RECORD is untouched — the derivation writes nothing and
+        # overrides nothing.
+        assert [r.status for r in rows] == ["complete", "pending", "pending"]
+
+    def test_a_closed_session_derives_nothing(self, tmp_path):
+        """Zero is still a real answer, and this is where it is real.
+
+        The same ledger as above, with the session closed. A ``[~]`` on a
+        session that finished is strictly worse than the silence it
+        replaced, because the operator would have a reason to believe it.
+        """
+        set_dir = _make_set(tmp_path)
+        sc.seed_session_plan(set_dir, 1)
+        SessionLog(set_dir).log_step(
+            1, 1, "register", "Registered.", "complete"
+        )
+        _close_the_session(tmp_path)
         rows = sc.build_rows(set_dir, 1)
         assert _in_flight(rows) == []
 
@@ -822,19 +916,26 @@ class TestRenderingASeededPlan:
         assert "A longer sentence that wraps" in out
 
     def test_a_post_records_what_is_in_flight(self, tmp_path):
-        """A plan-only session has nothing in flight, and says so.
+        """The post records what the operator was SHOWN.
 
         The old record claimed ``hereStepKey: "register"`` here — the
-        marker's inference, not a fact. An empty list is the true
-        answer, and the key is present rather than omitted so "nothing
-        in flight" cannot be confused with "not recorded".
+        marker's inference, not a fact. Set 127 S1 makes it a fact: the
+        render this post attests draws ``[~]`` on ``register``, the
+        derived active step of a session in flight, so the ledger line
+        says ``register`` because that is what was on the screen. The key
+        is always present, so "nothing in flight" (asserted below on a
+        closed session) cannot be confused with "not recorded".
         """
         set_dir = _make_set(tmp_path)
         sc.seed_session_plan(set_dir, 1)
         rows = sc.build_rows(set_dir, 1)
         record = sc.record_post(set_dir, 1, rows)
         assert record["stepCount"] == 3
-        assert record["inProgressStepKeys"] == []
+        assert record["inProgressStepKeys"] == ["register"]
+
+        _close_the_session(tmp_path)
+        closed = sc.record_post(set_dir, 1, sc.build_rows(set_dir, 1))
+        assert closed["inProgressStepKeys"] == []
 
 
 class TestStartSessionWiring:

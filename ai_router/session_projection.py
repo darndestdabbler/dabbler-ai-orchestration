@@ -232,18 +232,26 @@ def _step_from_row(row: "session_checklist.ChecklistRow") -> Dict[str, object]:
     precisely so they would keep saying what they said — and the state is
     what a consumer renders. Collapsing the two would launder exactly the
     entries that were protected from laundering.
+
+    Set 127 S1 adds the two derived fields and keeps the same discipline.
+    ``status`` is still the record and nothing moves it; ``state`` and
+    ``box`` follow the row's ``effective_status``, so the projection shows
+    what the checklist shows; and ``isActive`` says *why* they can differ,
+    so a consumer never has to infer that a ``pending`` record drawing
+    ``[~]`` is a derivation rather than a corrupted token. ``startedAt``
+    is ``None`` on any row that has not started.
     """
-    state = normalize_step_state(row.status)
+    state = normalize_step_state(row.effective_status)
     return {
         "stepNumber": row.step_number,
         "stepKey": row.step_key,
         "description": row.description,
         "status": str(row.status or ""),
         "state": state,
-        "box": session_checklist.STATUS_BOXES.get(
-            str(row.status).lower(), session_checklist.UNKNOWN_BOX
-        ),
+        "box": row.box,
         "isPlanned": bool(row.is_planned),
+        "isActive": bool(row.is_active),
+        "startedAt": row.started_at,
         "isTerminal": state in _TERMINAL_STATES,
     }
 

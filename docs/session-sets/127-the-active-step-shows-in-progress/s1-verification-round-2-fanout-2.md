@@ -1,0 +1,4 @@
+VERIFIED — I reviewed the active-step derivation, start-time chain, state normalization, projection serialization, and the tests/docs pinning the new behavior. I found no Critical/Major issue: the derived `[~]` is per-session state-gated, single-row, display-only, and serialized through the existing projection path.
+
+**NITS**
+- **Nit:** `started_at` treats any ordinary logged entry’s `dateTime` as the prior step’s completion, even for allowed non-complete statuses like `pending`, `in-progress`, or `blocked` (`ai_router/session_checklist.py:463`, `ai_router/session_checklist.py:723`). That can make a later row inherit a timestamp from a status update rather than a true completion, but it is a low-probability display-only edge.

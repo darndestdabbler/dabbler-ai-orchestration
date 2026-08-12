@@ -35,9 +35,27 @@ and this docstring declared the divergence.
 
 Set 115 S4 finished it: ``markHere``, the ``isHere`` field and the tree's
 ``HERE_MARKER`` are gone, the corpus no longer carries the field, and
-both halves compare the same five fields again. :data:`SHARED_ROW_FIELDS`
-is therefore the WHOLE row on both sides, which is the state a parity
-gate should be in — nothing declared, nothing projected out.
+both halves compare the same five fields again.
+
+One field-set split, bounded and self-closing (Set 127 S1)
+----------------------------------------------------------
+Set 127 derives two new facts onto ``ChecklistRow`` — the active step and
+each started row's start time — and its TypeScript mirror lands in
+Session 2. That is a one-session window in which Python has fields the
+extension does not, so the split is declared
+(:data:`SHARED_ROW_FIELDS` versus :data:`DERIVED_ROW_FIELDS`) rather than
+left implicit.
+
+It is not the ``isHere`` shape returning. ``isHere`` was PINNED by the
+corpus for one language, so the fixture asserted a value only half of it
+could produce. These fields are pinned by neither half, and
+:func:`test_the_derived_fields_are_inert_on_every_corpus_case` proves
+they cannot be observed through any case here — the corpus models no
+``session-state.json`` and no entry timestamps, so both derive to their
+null answer. The corpus's row-for-row claim is therefore as complete as
+it was before. That same test is the trigger that closes the window: the
+inputs Session 2 must add to pin the derivation are exactly the inputs
+that make it fail.
 """
 
 from __future__ import annotations
@@ -67,17 +85,41 @@ def _load_corpus() -> List[dict]:
 CASES = _load_corpus()
 CASE_IDS = [c["name"] for c in CASES]
 
-#: The row fields, which are now the WHOLE row on both sides (Set 115 S4
-#: removed ``isHere``, the last field only one language produced). A field
-#: added to ``ChecklistRow`` and not to this tuple silently stops being
-#: compared, so :func:`test_the_shared_fields_are_the_whole_python_row`
-#: pins the tuple against the dataclass itself.
+#: The row fields the corpus pins in BOTH languages — the RECORD half of
+#: a row, which is everything ``build_rows`` reads off the ledger. A
+#: field added to ``ChecklistRow`` and not declared here or in
+#: :data:`DERIVED_ROW_FIELDS` silently stops being compared, so
+#: :func:`test_the_shared_fields_are_the_whole_python_row` pins both
+#: tuples against the dataclass itself.
 SHARED_ROW_FIELDS = (
     "stepNumber",
     "stepKey",
     "description",
     "status",
     "isPlanned",
+)
+
+#: The fields Set 127 S1 DERIVES rather than reads (the active step and
+#: each started row's start time). They are not in the compared set yet
+#: for one structural reason: both are functions of inputs this corpus
+#: does not model — ``session-state.json`` (is this session in flight,
+#: and when did it start) and the entries' ``dateTime`` — and the
+#: TypeScript mirror lands in Session 2 with the corpus extension that
+#: feeds them.
+#:
+#: That is deliberately NOT the ``isHere`` situation this corpus's guards
+#: exist to prevent. ``isHere`` was a field the corpus PINNED for one
+#: language, so the fixture asserted something only half of it could
+#: satisfy. These fields are pinned by neither half; instead
+#: :func:`test_the_derived_fields_are_inert_on_every_corpus_case` proves
+#: they are provably inert on every case here — ``False`` and ``None``
+#: throughout — so the corpus's row-for-row parity claim remains exactly
+#: as true as it was before they existed. The moment a case gains the
+#: inputs that would wake them, that test fails and the fields have to
+#: move into :data:`SHARED_ROW_FIELDS`, which is Session 2's job.
+DERIVED_ROW_FIELDS = (
+    "isActive",
+    "startedAt",
 )
 
 
@@ -140,24 +182,54 @@ def test_rows_match_the_corpus(case, tmp_path):
 
 
 def test_the_shared_fields_are_the_whole_python_row():
-    """A new row field must be added to the parity comparison, not just the row.
+    """A new row field must be declared, not just added to the row.
 
     Without this, adding a field to ``ChecklistRow`` would leave it
     uncompared and the two implementations free to disagree about it
     forever — the silent divergence the corpus exists to make impossible.
     Asserted against the dataclass rather than a hand-written list, so
     the check cannot go stale.
+
+    A field is either COMPARED in both languages
+    (:data:`SHARED_ROW_FIELDS`) or DERIVED and provably inert here
+    (:data:`DERIVED_ROW_FIELDS`, whose inertness is its own test below).
+    There is no third category, and a field in neither tuple fails this.
     """
     fields = [f.name for f in dataclasses.fields(session_checklist.ChecklistRow)]
     camel = [
         "".join(w if i == 0 else w.capitalize() for i, w in enumerate(f.split("_")))
         for f in fields
     ]
-    assert sorted(camel) == sorted(SHARED_ROW_FIELDS), (
+    assert sorted(camel) == sorted(SHARED_ROW_FIELDS + DERIVED_ROW_FIELDS), (
         "ChecklistRow gained or lost a field; add it to SHARED_ROW_FIELDS "
         "(and to the corpus + the TypeScript half) or the parity gate "
         "stops proving it"
     )
+
+
+@pytest.mark.parametrize("case", CASES, ids=CASE_IDS)
+def test_the_derived_fields_are_inert_on_every_corpus_case(case, tmp_path):
+    """The uncompared fields must be unobservable through this corpus.
+
+    This is what keeps :data:`DERIVED_ROW_FIELDS` honest while only one
+    language produces them. A case here writes ``spec.md`` and
+    ``activity-log.json`` and nothing else: no ``session-state.json``, so
+    no session is in flight and no active step can be derived; no
+    ``dateTime`` on any entry, so no start time can be. Every derived
+    value is therefore the null answer, and the row-for-row parity the
+    corpus asserts is exactly as complete as it was before Set 127.
+
+    It is also the trigger that closes the gap. Add a state file or a
+    timestamp to a case — which is precisely what Session 2 must do to
+    pin the derivation across the two languages — and this fails until
+    the fields move into :data:`SHARED_ROW_FIELDS` and the TypeScript
+    half produces them.
+    """
+    set_dir = _materialize(case, tmp_path)
+    rows = session_checklist.build_rows(set_dir, case["sessionNumber"])
+    assert not any(r.is_active for r in rows), case["why"]
+    assert all(r.started_at is None for r in rows), case["why"]
+    assert not os.path.exists(os.path.join(set_dir, "session-state.json"))
 
 
 def test_the_corpus_carries_no_field_only_one_language_produces():

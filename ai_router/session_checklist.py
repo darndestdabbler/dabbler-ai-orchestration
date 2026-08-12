@@ -105,6 +105,41 @@ off that marker:
 Seeding happens **once** per session and is never re-applied: the ledger
 stays append-only, an idempotent re-registration writes nothing, and no
 mid-session write can stale a verification evidence stamp.
+
+The middle frame, DERIVED (Set 127 S1)
+--------------------------------------
+Between the two writers above there was no way to say *"this step is
+running right now"*: ``seed_session_plan`` writes ``pending`` and
+``log_step`` writes ``complete`` **after** the step finishes, so the
+``in-progress`` token the boxes have always been able to render was
+almost never on disk — the checklist could not distinguish "step 5 has
+not been started" from "step 5 has been running for forty minutes".
+
+Set 127 fills that gap by **derivation, never by a new writer**
+(journalled decision, ``127-…/decisions.jsonl``). Two facts are computed
+from rows this module already reads, and **nothing is written to disk to
+make either true**:
+
+* :attr:`ChecklistRow.is_active` — the session's active step. The first
+  seeded plan row nothing has logged against, in a session
+  ``session-state.json`` reports as in flight, **and only when the record
+  is otherwise silent**: any row already carrying ``[~]`` or ``[!]``
+  means the ledger has answered "where is this session" itself, and a
+  derivation that added a second ``[~]`` beside it would be the
+  two-current-rows defect the removed ``<- here`` marker used to produce.
+* :attr:`ChecklistRow.started_at` — when a row's step started, which is
+  the previous row's **completion** (or the session's ``startedAt`` for
+  the first row). Nothing records a start, so this is a wall-clock proxy
+  that includes any gap between steps; that is the honest reading of
+  "how long is this taking". A row that has not started carries ``None``,
+  because a seeded row's own ``dateTime`` is *registration* time and
+  rendering it as a start would be a fresh wrong signal.
+
+Both are **display-only**: no exit code moves, the ``log_step``
+vocabulary is unchanged, and no gate reads them. The raw ``status`` stays
+exactly as written — :attr:`ChecklistRow.effective_status` is what the
+box is drawn from, so the record and what the operator sees are never
+confused for one another.
 """
 
 from __future__ import annotations
@@ -114,9 +149,9 @@ import json
 import os
 import re
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import List, Optional, Sequence
+from typing import List, NamedTuple, Optional, Sequence, Tuple
 
 try:
     from .session_state import read_session_state  # type: ignore[import-not-found]
@@ -171,6 +206,37 @@ UNKNOWN_BOX = "[?]"
 # from rather than by a second list of tokens (L-069-1).
 IN_PROGRESS_BOX = "[~]"
 
+# The box a step nothing has started renders as, and the box a step that
+# stopped renders as. Named because Set 127 S1's derivation asks two
+# questions of them — "is this row eligible to be the active step" and
+# "has the record already said where this session is" — and asking them
+# with bare literals would be a second table of tokens.
+NOT_STARTED_BOX = "[ ]"
+STOPPED_BOX = "[!]"
+
+# The canonical token for a step in flight. Written by ``log_step`` when
+# an orchestrator logs one, and the token a DERIVED active step presents
+# through :attr:`ChecklistRow.effective_status`. Kept beside the box it
+# maps to; ``test_the_in_progress_status_and_box_stay_in_step`` pins the
+# pair so a rename of either cannot silently split them.
+IN_PROGRESS_STATUS = "in-progress"
+
+# Which status tokens mean "nothing has started this yet", derived from
+# the box table rather than re-spelled (L-069-1): a token the renderer
+# boxes as ``[ ]`` is one this module may derive an active step onto, and
+# teaching the renderer a new spelling teaches this with nothing to edit.
+# An UNRECOGNISED token is deliberately absent from the set — it boxes
+# ``[?]``, and the five legacy prose-in-``status`` rows must not be read
+# as evidence of anything, in either direction.
+_UNSTARTED_STATUSES = frozenset(
+    token for token, box in STATUS_BOXES.items() if box == NOT_STARTED_BOX
+)
+
+# The boxes that mean the RECORD has already answered "where is this
+# session": a step in flight, or one that stopped. Either way there is no
+# silence for the derivation to fill.
+_RECORD_ANSWERS_BOXES = frozenset({IN_PROGRESS_BOX, STOPPED_BOX})
+
 
 @dataclass(frozen=True)
 class ChecklistRow:
@@ -183,10 +249,33 @@ class ChecklistRow:
     # every existing construction (and consumer-repo caller) is
     # unchanged.
     is_planned: bool = False
+    # Set 127 S1, DERIVED — never read from disk, never written to it.
+    # True on the one row a session is currently working (see the module
+    # docstring, "The middle frame"). The row's ``status`` is left exactly
+    # as the ledger wrote it; only :attr:`effective_status` moves.
+    is_active: bool = False
+    # Set 127 S1, DERIVED. When this row's step started, as an ISO-8601
+    # string taken from the PREVIOUS row's completion (or the session's
+    # ``startedAt`` for the first row). ``None`` means "has not started"
+    # or "cannot be derived" — never a guess, and never this row's own
+    # seeded registration timestamp.
+    started_at: Optional[str] = None
+
+    @property
+    def effective_status(self) -> str:
+        """What this row SAYS it is, record first, derivation second.
+
+        A derived active step has no token of its own on disk — deriving
+        it is the whole point — so this is where ``in-progress`` appears
+        for it. ``status`` stays the record; every display surface reads
+        this. The two are separate so a consumer can always see that the
+        ledger said ``pending`` and the tree drew ``[~]``, and why.
+        """
+        return IN_PROGRESS_STATUS if self.is_active else self.status
 
     @property
     def box(self) -> str:
-        return STATUS_BOXES.get(str(self.status).lower(), UNKNOWN_BOX)
+        return STATUS_BOXES.get(str(self.effective_status).lower(), UNKNOWN_BOX)
 
 
 def _ascii_safe(text: str) -> str:
@@ -237,6 +326,67 @@ def current_session_number(session_set_dir: str) -> Optional[int]:
         if s.get("status") == "complete":
             closed.append(number)
     return max(closed) if closed else None
+
+
+def session_flight_facts(
+    session_set_dir: str, session_number: int
+) -> Tuple[bool, Optional[str]]:
+    """``(is this session in flight, when did it start)`` for *session_number*.
+
+    Read from ``session-state.json`` — the single source of truth for
+    session progress — and from nothing else. File presence is never a
+    state signal, and this function never writes.
+
+    Returned as one call rather than two because both answers come from
+    the same record and a caller that read them separately could see a
+    session start between the two reads. ``(False, None)`` is the answer
+    for an absent, unreadable or silent state file: no derivation, which
+    is the status quo the whole module had before Set 127.
+
+    **The plan-less carve-out** (a set whose plan is not yet committed
+    writes a v4 file with no ``sessions[]`` array and a top-level
+    ``status`` / ``startedAt`` instead) contributes its ``startedAt`` and
+    **nothing else**. That is deliberately asymmetric: the file has one
+    start and no per-session ledger to attribute it to, so using it as a
+    session start is the best evidence there is, while claiming a session
+    is in flight from a top-level flag would be attributing a *current
+    step* to a session number the file never names. Nothing is lost by
+    the refusal — a plan-less set has no ``### Session N`` headings, so
+    ``seed_session_plan`` writes no plan rows and there is no candidate
+    row to derive in the first place.
+    """
+    state = read_session_state(session_set_dir)
+    if not isinstance(state, dict):
+        return False, None
+    sessions = state.get("sessions")
+    # Absent OR empty: the reader shim normalises the carve-out's missing
+    # array to ``[]`` and leaves the top-level passthroughs beside it, so
+    # "no per-session ledger" is the one condition, spelled once.
+    if not isinstance(sessions, list) or not sessions:
+        return False, _iso_or_none(state.get("startedAt"))
+    for entry in sessions:
+        if not isinstance(entry, dict):
+            continue
+        number = entry.get("number")
+        if not isinstance(number, int) or isinstance(number, bool):
+            continue
+        if number != session_number:
+            continue
+        return (
+            entry.get("status") == "in-progress",
+            _iso_or_none(entry.get("startedAt")),
+        )
+    return False, None
+
+
+def _iso_or_none(value: object) -> Optional[str]:
+    """*value* when it is a non-empty timestamp string, else ``None``.
+
+    ``startedAt`` is explicitly nullable in the schema, and a hand-edited
+    state file can hold anything at all. One coercion, used at both read
+    sites, so the two cannot answer differently (L-069-1).
+    """
+    return value if isinstance(value, str) and value.strip() else None
 
 
 def _collapse_by_step_key(entries: Sequence[dict]) -> List[dict]:
@@ -310,9 +460,78 @@ def _row_from_entry(entry: dict, *, is_planned: bool) -> ChecklistRow:
     )
 
 
+def _completion_of(entry: dict) -> Optional[str]:
+    """When the step this entry describes finished, if it is a step at all.
+
+    ``log_step`` stamps ``dateTime`` as it writes, and it writes **after**
+    the step is done, so an ordinary entry's timestamp is that step's
+    completion. It is the only start-time evidence the ledger contains:
+    the next row's start is this row's completion.
+
+    Guarded by :func:`is_logged_step`, the module's one predicate for
+    "work the session did", because two other kinds of entry carry a
+    ``dateTime`` and neither is a completion:
+
+    * a seeded ``plan-step`` row, whose stamp is *registration* time —
+      the moment the whole plan was written, identical across every row
+      of the session. Treating it as a completion would hand every
+      unstarted step a start time (operator ruling 3, 2026-08-12).
+    * a bookkeeping record (``path_aware_critique``, ``contract_gate``,
+      ``dual_surface_mode``, ``suggestion_disposition``), which is a
+      record *about* the session written by machinery, usually at
+      registration. It renders as a row — Set 111 S4 settled that — but
+      it is not work, which is exactly why it may not claim a planned row
+      either. A row whose predecessor is one of these therefore starts at
+      an unknown time, not at the moment a policy was recorded.
+    """
+    if not is_logged_step(entry):
+        return None
+    value = str(entry.get("dateTime") or "").strip()
+    return value or None
+
+
+class _RowEvidence(NamedTuple):
+    """One row plus the two facts the derivation needs about its entry.
+
+    Private, and deliberately not folded into :class:`ChecklistRow`:
+    ``completion`` and ``is_step`` are inputs to a derivation, not things
+    a consumer renders, and a row model that carried a completion would
+    invite a surface to draw an end time the operator ruled against.
+    """
+
+    row: ChecklistRow
+    #: This step's completion, or ``None`` when the entry is not a step
+    #: that finished (:func:`_completion_of`).
+    completion: Optional[str]
+    #: True when the entry is work the session logged, rather than a
+    #: seeded plan row or a bookkeeping record about the session.
+    is_step: bool
+
+    @property
+    def is_step_row(self) -> bool:
+        """True when this row stands for a STEP — done, or merely planned.
+
+        The distinction that matters to the start-time chain. A planned
+        row is a step nobody has finished, so it BREAKS the chain: the
+        row after it starts at an unknown time. A bookkeeping record is
+        not a step at all, so it is TRANSPARENT: the row after it starts
+        when the previous real step finished, not when a policy was
+        written down.
+        """
+        return self.is_step or self.row.is_planned
+
+
+def _evidence(entry: dict, *, is_planned: bool) -> "_RowEvidence":
+    return _RowEvidence(
+        row=_row_from_entry(entry, is_planned=is_planned),
+        completion=_completion_of(entry),
+        is_step=is_logged_step(entry),
+    )
+
+
 def _reconcile(
     plan: Sequence[dict], real: Sequence[dict], *, allow_ordinal: bool = True
-) -> List[ChecklistRow]:
+) -> List["_RowEvidence"]:
     """Merge the seeded plan with what the session actually logged.
 
     The rule, in one line: **the plan owns each row's position, the
@@ -359,9 +578,15 @@ def _reconcile(
     it is visible without displacing a planned row it never corresponded
     to. One planned row is claimed at most once — a second logged step
     that shares a ``stepNumber`` is real work too, and appends.
+
+    Returns one :class:`_RowEvidence` per row (Set 127 S1): the row as it
+    will render, beside the timestamp the NEXT row's start is derived
+    from and whether this row is a step at all. An unclaimed planned row
+    contributes neither, because a plan row's ``dateTime`` is
+    registration time rather than a completion (:func:`_completion_of`).
     """
-    plan_rows: List[ChecklistRow] = [
-        _row_from_entry(e, is_planned=True) for e in plan
+    evidence: List[_RowEvidence] = [
+        _evidence(e, is_planned=True) for e in plan
     ]
     by_number: dict = {}
     by_key: dict = {}
@@ -394,13 +619,13 @@ def _reconcile(
             _claim(by_number, _step_number_of(entry), position)
 
     for position, target in claims.items():
-        plan_rows[target] = _row_from_entry(real[position], is_planned=False)
+        evidence[target] = _evidence(real[position], is_planned=False)
     extra = [
-        _row_from_entry(entry, is_planned=False)
+        _evidence(entry, is_planned=False)
         for position, entry in enumerate(real)
         if position not in claims
     ]
-    return plan_rows + extra
+    return evidence + extra
 
 
 # Set 120 S3 removed ``_mark_here`` here (operator ruling, 2026-08-11).
@@ -411,6 +636,103 @@ def _reconcile(
 # contract", for why. Nothing replaced it: what is in flight is the
 # ``in-progress`` status the strict writer guarantees, read straight off
 # the row.
+#
+# Set 127 S1 is NOT that marker returning. ``_active_step_index`` fires
+# only where the record is SILENT — it never overrides a logged status,
+# it stands down entirely the moment any row says ``[~]`` or ``[!]``, and
+# it produces nothing at all in a session ``session-state.json`` does not
+# report as in flight. The marker's failure was that it always named
+# exactly one row, including when it had no idea; this names at most one,
+# and prefers naming none.
+
+
+def _active_step_index(rows: Sequence[ChecklistRow]) -> Optional[int]:
+    """Which row a session in flight is currently working, if any.
+
+    The rule, in one line: **the first seeded plan row nothing has logged
+    against, and only while the record is otherwise silent.**
+
+    Two guards, both of them the difference between "no signal" and "a
+    wrong signal":
+
+    1. **The record wins outright.** If any row already boxes ``[~]`` or
+       ``[!]`` — a logged ``in-progress``, a ``blocked``, a ``failed`` —
+       the ledger has answered "where is this session" itself, and this
+       returns ``None``. Deriving a second ``[~]`` beside a logged one is
+       precisely the two-current-rows defect the removed ``<- here``
+       marker produced, and the parity corpus pins the shape of it
+       (``in-flight-is-the-logged-step-not-an-earlier-pending-plan-row``).
+    2. **An unrecognised token is evidence of nothing.** Eligibility asks
+       for a token the renderer boxes ``[ ]``, not merely for the absence
+       of a real one, so the five legacy prose-in-``status`` rows neither
+       become the active step nor let a later row become it by looking
+       finished. They box ``[?]``, and ``[?]`` is a question, not an
+       answer.
+
+    Callers pass rows that carry no derivation yet, so ``row.box`` here is
+    the record's own box.
+    """
+    if any(row.box in _RECORD_ANSWERS_BOXES for row in rows):
+        return None
+    for index, row in enumerate(rows):
+        if row.is_planned and str(row.status).lower() in _UNSTARTED_STATUSES:
+            return index
+    return None
+
+
+def _derive_progress(
+    evidence: Sequence["_RowEvidence"],
+    *,
+    in_flight: bool,
+    session_started_at: Optional[str],
+) -> List[ChecklistRow]:
+    """Add the two derived facts to *evidence*'s rows (Set 127 S1).
+
+    Pure: rows in, rows out, nothing read and nothing written. The two
+    facts are deliberately computed together in one pass, because they
+    answer one question between them — *where is this session, and since
+    when* — and a second pass over the same rows would be a second place
+    for the answers to disagree.
+
+    **The active step** is derived only for a session in flight
+    (:func:`_active_step_index`). A closed session derives nothing: a
+    ``[~]`` on a session that finished last month is a worse answer than
+    the silence it replaced, because an operator would have a reason to
+    believe it.
+
+    **The start time** is derived for every row that has started, in
+    flight or not — the question "when did step 3 start" is as good on a
+    session that closed months ago as on the live one. A row has started
+    when it is a logged step, or when it is the derived active step; a
+    seeded plan row nobody reached and a bookkeeping record about the
+    session are neither, and carry no time at all. Each started row's
+    start is **the previous step's** completion, seeded with the
+    session's own ``startedAt`` for the first row — a bookkeeping row
+    between two steps is stepped over rather than treated as one
+    (:attr:`_RowEvidence.is_step_row`). A gap between two steps is
+    therefore *inside* the elapsed time, which is the honest reading of
+    "how long has this been running", and a row whose predecessor is a
+    step that never completed carries ``None`` rather than a borrowed
+    timestamp from further up.
+    """
+    rows = [item.row for item in evidence]
+    active = _active_step_index(rows) if in_flight else None
+
+    derived: List[ChecklistRow] = []
+    previous_completion = session_started_at
+    for index, item in enumerate(evidence):
+        is_active = index == active
+        has_started = is_active or item.is_step
+        derived.append(
+            replace(
+                item.row,
+                is_active=is_active,
+                started_at=previous_completion if has_started else None,
+            )
+        )
+        if item.is_step_row:
+            previous_completion = item.completion
+    return derived
 
 
 def build_rows(
@@ -439,6 +761,12 @@ def build_rows(
     and any spec whose steps do not parse) renders exactly as it did
     before: the logged steps, collapsed by ``stepKey``, in first-logged
     order.
+
+    Set 127 S1 adds the two derived fields (:func:`_derive_progress`) as
+    the last thing that happens to every row, on both paths, so a legacy
+    set with no plan gets its start times and a planned set gets both.
+    Nothing about which rows exist, or what the ledger says they say,
+    changes.
     """
     log = read_activity_log(session_set_dir)
     if log is None:
@@ -465,11 +793,18 @@ def build_rows(
         [e for e in mine if e.get("kind") != PLAN_STEP_KIND]
     )
     if not plan:
-        return [_row_from_entry(e, is_planned=False) for e in real]
-    return _reconcile(
-        plan,
-        real,
-        allow_ordinal=plan_matches_spec(session_set_dir, session_number, plan),
+        evidence = [_evidence(e, is_planned=False) for e in real]
+    else:
+        evidence = _reconcile(
+            plan,
+            real,
+            allow_ordinal=plan_matches_spec(
+                session_set_dir, session_number, plan
+            ),
+        )
+    in_flight, started_at = session_flight_facts(session_set_dir, session_number)
+    return _derive_progress(
+        evidence, in_flight=in_flight, session_started_at=started_at
     )
 
 
@@ -629,6 +964,14 @@ def record_post(
     the skip by name (L-079-1: a fail-open branch around I/O must NAME
     the skip in operator-facing output) — silence here would be the
     invisible omission this whole mechanism exists to end.
+
+    Set 127 S1: ``inProgressStepKeys`` is read from each row's own ``box``
+    rather than from its raw ``status``, so a DERIVED active step is
+    recorded too. The record's job is to say what the operator was shown,
+    and the render they were shown draws ``[~]`` on that row; a ledger
+    line claiming nothing was in flight would contradict the output it
+    exists to attest. No gate reads this field — ``check_checklist_posted``
+    reads only ``postedAt`` — so the derived state stays display-only.
     """
     record = {
         "sessionNumber": session_number,
@@ -636,9 +979,7 @@ def record_post(
         "stepCount": len(rows),
         "surface": surface,
         "inProgressStepKeys": [
-            r.step_key
-            for r in rows
-            if STATUS_BOXES.get(str(r.status).lower()) == IN_PROGRESS_BOX
+            r.step_key for r in rows if r.box == IN_PROGRESS_BOX
         ],
     }
     try:
@@ -966,6 +1307,9 @@ if __name__ == "__main__":  # pragma: no cover
 __all__ = [
     "STATUS_BOXES",
     "IN_PROGRESS_BOX",
+    "IN_PROGRESS_STATUS",
+    "NOT_STARTED_BOX",
+    "STOPPED_BOX",
     "UNKNOWN_BOX",
     "PLAN_STEP_KIND",
     "PLAN_STEP_STATUS",
@@ -987,6 +1331,7 @@ __all__ = [
     "render",
     "render_markdown",
     "seed_session_plan",
+    "session_flight_facts",
     "main",
     "run",
 ]

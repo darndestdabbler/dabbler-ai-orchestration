@@ -1,0 +1,38 @@
+{
+  "status": "completed",
+  "summary": "Set 127 Session 1 gives the framework its missing middle frame: the record can now say which step a session is ON, and since when, without a single new writer. `start_session` seeds plan rows as `pending` and `log_step` writes `complete` AFTER a step finishes, so the `in-progress` token the renderer has always been able to box was almost never on disk (~1.4% of every step status ever written, and in no current set) -- which is why neither the CLI checklist nor the Work Explorer could tell 'step 5 has not been started' from 'step 5 has been running for forty minutes', the operator-reported defect in docs/planning/work-explorer-in-progress-step-icon.md.\n\n(1) DERIVED, NEVER WRITTEN. `session_checklist.build_rows` -- the one Python derivation of a session's step rows -- now derives two facts from rows it already reads: `ChecklistRow.is_active` (the first seeded plan row nothing has been logged against, in a session `session-state.json` reports as in flight) and `ChecklistRow.started_at` (the previous STEP's completion, seeded with the session's own `startedAt` for the first row). Nothing is written to disk to make either true, no writer changed, no `log_step` vocabulary moved, and no orchestrator convention was introduced -- which is also why it fixes historical sets retroactively, the one thing the two write-it options in the source note could not do. Both journalled at registration with their rejected alternatives (decisions.jsonl: derive-never-write, display-only, plus the three operator rulings on the timestamp).\n\n(2) IT IS NOT THE REMOVED `<- here` MARKER, AND THAT IS STRUCTURAL, NOT A CLAIM. The marker pointed at the first non-terminal row of ANY kind in ANY session with no knowledge of whether the session was running, which is how it came to point confidently at a step that had finished hours earlier when four of Set 119 S2's statuses were unparseable. `_active_step_index` differs on four counts, each with its own falsifier: only a SEEDED PLAN row is eligible (so it cannot land on a logged step at all); only in a session the state file reports `in-progress` (a closed session derives nothing); it stands down ENTIRELY when any row already boxes `[~]` or `[!]`, so the record answering for itself always wins and two current rows are impossible; and eligibility requires a token the renderer boxes `[ ]`, so the five legacy prose-in-`status` rows are evidence of nothing in either direction. One prior test asserted the pre-defect answer ('nothing is in flight when work is caught up') and was deliberately reversed, renamed, and its reversal argued in its docstring rather than quietly edited.\n\n(3) THE RECORD IS NEVER LAUNDERED. `status` stays exactly the token the ledger holds; `ChecklistRow.effective_status` is what the box is drawn from; `session_projection` carries `isActive` and `startedAt` beside the raw `status`, so `session-progress.json` can show `status: pending` with `state: in-progress` and say WHY, rather than leaving a consumer to read the difference as a corrupted token. The projection still SERIALIZES what `build_rows` returns -- there is no second implementation -- and the new falsifier proves the derived fields survive the round trip through the FILE, which is the property the tree will depend on.\n\n(4) FALSIFIERS PROVEN TO BITE, NOT MERELY GREEN. Four defects were planted against the finished suite: dropping the record-wins guard (3 failures), ignoring the in-flight gate (8), marking every eligible planned row (8), and reading a seeded plan row's registration stamp as a completion -- which SURVIVED on the first attempt, exposing a real blind spot in the start-time coverage. The missing case (a logged row whose predecessor is an unclaimed plan row) was added and the mutation now fails. L-112-1's point is that only a planted violation separates a gate that finds nothing from one that checks nothing.\n\n(5) THE CROSS-LANGUAGE PARITY WINDOW IS BOUNDED AND SELF-CLOSING. The TypeScript mirror is Session 2, so for one session Python has two fields the extension does not. Rather than repeat the `isHere` mistake -- a field the corpus PINNED for one language, which let the two drift for a whole set -- the split is declared (`DERIVED_ROW_FIELDS` beside `SHARED_ROW_FIELDS`) and `test_the_derived_fields_are_inert_on_every_corpus_case` PROVES the fields are unobservable through every corpus case, because the corpus models no `session-state.json` and no entry `dateTime`. That same test is the trigger that closes the window: the inputs Session 2 must add to pin the derivation across both languages are exactly the inputs that make it fail.\n\nVerification: VERIFIED on both discovery lenses in both rounds, 0 blocking findings. Round 1's two nits were accepted and fixed (the plan-less state carve-out lost the first row's start time; bookkeeping records were acting as step completions in the start-time chain), each with its own falsifier, and round 2 re-stamped the result clean. Round 2's remaining nit -- a logged entry's `dateTime` is read as a completion even when its status is not `complete` -- is recorded as an adjudicated-minor residual owned by Session 2, which authors the mirror and can adopt a stricter rule in both languages at once rather than splitting one decision across two verification rounds.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "ai_router/session_checklist.py",
+    "ai_router/session_projection.py",
+    "ai_router/tests/test_session_checklist.py",
+    "ai_router/tests/test_session_projection.py",
+    "ai_router/tests/test_step_row_parity.py",
+    "ai_router/tests/test_plan_seeding.py",
+    "docs/session-progress-schema.md",
+    "docs/session-sets/127-the-active-step-shows-in-progress/s1-conventions.md",
+    "docs/session-sets/127-the-active-step-shows-in-progress/decisions.jsonl",
+    "docs/session-sets/127-the-active-step-shows-in-progress/activity-log.json",
+    "docs/session-sets/127-the-active-step-shows-in-progress/checklist-posts.jsonl",
+    "docs/session-sets/127-the-active-step-shows-in-progress/test-runs.jsonl",
+    "docs/session-sets/127-the-active-step-shows-in-progress/disposition.json"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 mirrors this session's two derivations into tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts and must reproduce them rule-for-rule, including the four guards that keep the active step from being the removed `<- here` marker and the deliberate asymmetry in the start-time chain (an unclaimed plan row breaks it; a bookkeeping row is transparent to it). It also inherits two open items this session deliberately left it: extending the shared parity corpus with the session-state and dateTime inputs that will make `test_the_derived_fields_are_inert_on_every_corpus_case` fail and force `isActive`/`startedAt` into the compared field set, and adjudicating the round-2 residual about non-`complete` statuses being read as completions -- a rule question that is cheaper to settle once, in both languages, than to split across two verification rounds. Keeping the same orchestrator keeps that derivation's reasoning in context; a switch would have to re-derive four guards and an asymmetry from the docstrings."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-112-1",
+    "L-069-1",
+    "L-064-9"
+  ]
+}

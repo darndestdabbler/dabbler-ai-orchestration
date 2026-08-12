@@ -1,0 +1,1 @@
+VERIFIED — I tried to break the derivation and projection paths against the stated invariants: state-file gating, record-wins behavior, unknown-status posture, projection serialization, and close-gate/display-only impact. I found no Critical/Major defect that would block this session.

@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "The qualified verdict",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-11T18:33:52.194725-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-11T20:58:17.265078-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

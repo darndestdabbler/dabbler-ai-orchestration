@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-11T18:31:20.046966-04:00",
+  "generatedAt": "2026-08-11T20:58:17.268843-04:00",
   "sessionSetDir": "123-verify-type-and-startup-simplification",
   "inputs": {
-    "activity-log.json": "7b1e33747e58772be368b5c9b2889214d631a8bedc53c1a432ff9161065b171b",
-    "session-state.json": "a2b63b52bd749a76fc1f65c05e894da724d49dc0e0686a1f20f99ec56871f9c0",
+    "activity-log.json": "28cbcf6b34409eb6ea907504f2430d15cfe6e51b6c1b7fd21e65c7cebfc6e81a",
+    "session-state.json": "7a8ef854c93d47d9155e637a26dde3921a387044dab9b50935d4034adfc64c3e",
     "spec.md": "61a51e9f329e8358eb5ba88264eade65e6830fa19f7be9e2823d34f81f9d73ab"
   },
   "orphanEntries": 0,
@@ -80,16 +80,67 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Step 3.5: appended Session 2 ai-assignment.md block (what the session actually was, the operator stop and its ruling, the one class every finding belonged to, why the pre-verification falsifiers missed it, the irony-budget overage, and next-orchestrator / next-set recommendations authored directly under the temporary verification-only policy window).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "check-the-precondition-and-warn-without",
+          "description": "Shipped check_direct_api_precondition() and providers_with_keys() in ai_router/verification.py. It compares the providers whose api_key_env actually resolves against the EFFECTIVE provider from orchestrator_identity (resolved in route() via resolve_session_orchestrator_identity), never a configured seat label. It never raises and never blocks: an unresolvable input reports applies=False, which keeps the cross-provider exclusion, so the fail direction is always verify-normally. Scope is the project committed verify type == DIRECT_API only -- a Copilot seat keeps its fail-closed ProvenanceUnavailable contract and an UNCOMMITTED environment default cannot relax anything (Session 1s suggestion-vs-answer rule). route() warns on stderr and yields the orchestrator exclusion only on that one degraded path; the permission is derived inside route() rather than accepted as an argument, so I-084-S1-3 (a caller-supplied list that omits the orchestrator) stays closed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "carry-the-limitation-on-the-verdict",
+          "description": "classify_verification_qualification() is the single mechanism that decides whether a verdict is qualified; every writer calls it rather than comparing providers itself. The qualification travels on the three router-owned verdict records, omit-null: the stamped metrics row (complete_stamp, from the provider that actually answered), the sN-issues.json envelope (verificationQualification), and disposition.json (verification_qualification, actively REMOVED when a later unqualified round supersedes a qualified one). validate_stamped_row check 5 now enforces a bijection -- a same-provider row passes only if it declares the qualification, and a cross-provider row declaring it is refused -- so a weaker verdict can never be read as corroborated, nor the flag become decorative. disposition.py validates the closed vocabulary and fails closed on an unknown token. Deliberately NOT written to session-state.json: the design docs open question 2 reserved the Explorer surfacing call, and operator decision P4 locked no orchestrator info in the Explorer (journaled).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "ship-the-falsifier-both-ways-a",
+          "description": "ai_router/tests/test_qualified_verdict.py: 9 test functions (12 collected cases), landing Sessions 1-2 exactly on the specs 25-function irony budget (S1 shipped 16). Both directions are PLANTED, not read: a declared same-provider row corroborates a close (VALID and CARRIES the flag); an undeclared same-provider row is refused (the Set 084 F2 guarantee intact); a CROSS-provider row wearing the flag is refused (the half a one-way check would miss -- without it the flag could be attached unconditionally and would distinguish nothing); an unknown token is refused (closed vocabulary). Scope guards plant the harshest input, no keys at all, against COPILOT_CLI / unresolved / a case-folded look-alike, and drive the route boundary itself: a project with no committed file but AI_ORCHESTRATION_VERIFY_TYPE=DIRECT_API must NOT relax the exclusion, or one exported variable would silently weaken every verdict on that machine. Verified by probe that the same boundary returns degraded=True once the file is committed. The ordinary cross-provider row is deliberately not re-tested -- every stamped fixture in five existing suites is one.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "full-pytest-at-close-after-freeze",
+          "description": "Verification took four rounds: discovery fan-out (4 Major), supplementary (1 Major), remediation-review cycle 1 (5 fix verdicts accepted, 1 new in-hunk Major), remediation-review cycle 2 VERIFIED with 6 fix verdicts accepted and no findings -- inside the enforced bounds (2 discovery passes, 2 remediation-review cycles), no operator authorization needed. Every finding was accepted; none disputed. The common shape was that the machinery was correct and UNREACHABLE: _init() died at config load before the precondition could run, verify_session re-imposed the exclusion route() had just lifted, the qualification was dropped between complete_stamp and the metrics row the close gate reads, the disposition JSON Schema (additionalProperties:false) rejected the field, and disabling a keyless provider left its MODELS selectable so a pinned keyless verifier still died at dispatch. The reachability falsifier caught a NameError (sys unimported in __init__.py) that would have crashed every degraded run -- found by driving the branch, not by reading it (L-112-1). Code frozen after the VERIFIED verdict, then full pytest ran once: 3967 passed, 9 skipped in 522s, recorded via run_of_record (digest b94dd9168bf5).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 5
       },
       "current": [],
       "remaining": []

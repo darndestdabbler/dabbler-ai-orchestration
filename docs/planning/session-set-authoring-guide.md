@@ -743,6 +743,17 @@ prerequisites.
   page and assert on rendered content, skipping the actual UI entry
   point. Those tests pass even when the entry point is broken; they
   do not satisfy `requiresE2E: true`.
+- **An echo pass scoped to descriptions when a mechanism was retired.**
+  When one session **retires** a mechanism and a later session is planned
+  as "fix every echo", the later session's scope must enumerate the
+  retired mechanism's **writers**, not only its **descriptions**. Set 124
+  scoped its echo session to operator-facing *strings*; the strings turned
+  out to be describing a write that the retiring session had turned into a
+  hard refusal, so a *successful* setup command bricked the project it had
+  just configured. Grep the retired symbol across **every** language in the
+  repo — the sibling writer is rarely in the language the retirement
+  happened in (`L-069-1`). A spec that names only doc paths in its
+  **Touches** line has already made this mistake.
 
 ---
 

@@ -127,16 +127,13 @@ see **Engine-specific bootstrap** at the end of this file.)
 
 ## What verifies this project (pointer)
 
-`project-verify-type.txt` at the repo root is the single source of truth,
-**gitignored** machine/project state (Set 124): `DIRECT_API` or
-`COPILOT_CLI`, with `transport.profile` **derived** from it, so it outranks
-the `transport.profile` shipped in `router-config.yaml`.
-`ai_router/local-overrides.yaml` may no longer carry a `transport.profile`
-at all — Set 124 S2 retired it, and a stale key is refused at config load
-with the replacement command.
-`python -m ai_router.verify_type` (`--set` / `--confirm`; exit 3 = setup
-required) is the one entry point. Set 123 S3 retired the setup webview; the
-extension contributes none. Canonical:
+`project-verify-type.txt` at the repo root is the single source of truth —
+**gitignored** machine/project state (Set 124), `DIRECT_API` or
+`COPILOT_CLI`, with `transport.profile` **derived** from it. Set 124 S2
+retired `transport.profile` as a `local-overrides.yaml` key; a stale one is
+refused at load. `python -m ai_router.verify_type` (`--set` / `--confirm`;
+exit 3 = setup required) is the one entry point and the one writer — it adds
+the gitignore rule itself. Canonical:
 [`docs/planning/verify-type-resolution.md`](docs/planning/verify-type-resolution.md).
 
 ## Delegation Discipline (pointer)

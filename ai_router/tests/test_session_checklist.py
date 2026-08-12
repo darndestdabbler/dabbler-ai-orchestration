@@ -177,6 +177,69 @@ class TestBuildRows:
         assert len(rows) == 2
         assert [r.description for r in rows] == ["first", "second"]
 
+    def test_a_gate_policy_record_is_not_a_step_row(self, tmp_path):
+        """Set 128 S1, from an operator report against this very set.
+
+        A ``path_aware_critique`` record is written at REGISTRATION and
+        rendered here with a done glyph, so the checklist and the Work
+        Explorer both said a stage that runs once at the END of a set had
+        already happened, minutes after the session began: *"why would
+        the path-aware critique occur so early?"*. It is a record ABOUT
+        the session, it stays in the ledger the close gates read, and it
+        is not a step.
+        """
+        set_dir = _write_set(
+            tmp_path,
+            [
+                dict(
+                    _entry(1, "session-002/path-aware-critique", "complete"),
+                    kind="path_aware_critique",
+                ),
+                _entry(1, "register", "complete"),
+            ],
+        )
+        assert _keys_of(sc.build_rows(set_dir, 2)) == ["register"]
+
+    @pytest.mark.parametrize(
+        "kind",
+        [
+            "path_aware_critique",
+            "contract_gate",
+            "dual_surface_mode",
+            "suggestion_disposition",
+        ],
+    )
+    def test_every_bookkeeping_kind_is_excluded_not_just_the_reported_one(
+        self, tmp_path, kind
+    ):
+        """L-069-1: a bug is a bug CLASS, so fix every sibling site.
+
+        ``path_aware_critique`` is merely the kind the operator saw,
+        because 50 sets carry one. The other three are the same shape and
+        would land the same way the next time a set arms them.
+        """
+        set_dir = _write_set(
+            tmp_path,
+            [
+                _entry(1, "work", "complete"),
+                dict(_entry(2, f"policy-{kind}", "complete"), kind=kind),
+            ],
+        )
+        assert _keys_of(sc.build_rows(set_dir, 2)) == ["work"]
+
+    def test_a_session_of_only_policy_records_renders_no_steps(self, tmp_path):
+        """An empty step list is the honest answer, not a list of non-steps."""
+        set_dir = _write_set(
+            tmp_path,
+            [
+                dict(
+                    _entry(1, "session-002/path-aware-critique", "complete"),
+                    kind="path_aware_critique",
+                ),
+            ],
+        )
+        assert sc.build_rows(set_dir, 2) == []
+
 
 class TestTheDerivedActiveStep:
     """Set 127 S1: the middle frame, derived rather than written.
@@ -470,12 +533,14 @@ class TestTheDerivedStartTime:
 
         ``path_aware_critique`` / ``contract_gate`` / ``dual_surface_mode``
         / ``suggestion_disposition`` entries are written by machinery,
-        usually at registration, and they RENDER as rows (Set 111 S4) —
-        so a start-time rule keyed on "not a planned row" would both give
-        one a start of its own and let its timestamp act as the previous
-        step's completion for the row below it. Neither is true: it is a
-        record about the session, not a step, which is the same reason it
-        may not claim a planned row.
+        usually at registration. Set 128 S1 stopped rendering them as
+        steps — a ``complete`` glyph on the path-aware critique minutes
+        after registration says a stage ran that runs once at the END of
+        a set — and the timestamp rule is what makes the removal safe
+        rather than merely tidy: dropping the row without excluding the
+        record from the start-time chain would date ``build`` at 09:06,
+        the moment a policy was recorded, instead of 09:05, when the
+        previous step actually finished.
         """
         set_dir = _write_set(
             tmp_path,
@@ -495,12 +560,9 @@ class TestTheDerivedStartTime:
             started_at="2026-01-01T09:00:00-05:00",
         )
         rows = sc.build_rows(set_dir, 2)
-        assert _keys_of(rows) == [
-            "register", "session-001/path-aware-critique", "build",
-        ]
+        assert _keys_of(rows) == ["register", "build"]
         assert [r.started_at for r in rows] == [
             "2026-01-01T09:00:00-05:00",
-            None,
             "2026-01-01T09:05:00-05:00",
         ]
 

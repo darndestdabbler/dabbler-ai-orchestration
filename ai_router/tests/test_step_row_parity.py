@@ -328,7 +328,7 @@ def test_the_corpus_covers_the_cases_the_tree_depends_on():
         "plan-partly-executed-ordinal",
         "identity-beats-ordinal",
         "plan-moved-under-the-session",
-        "bookkeeping-cannot-claim-a-planned-row",
+        "bookkeeping-is-not-a-step-and-does-not-render",
         "legacy-set-with-no-seeded-plan",
         "repeated-key-collapses-to-the-latest-at-the-first-position",
         "anonymous-steps-are-not-collapsed",

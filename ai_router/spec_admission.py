@@ -1,4 +1,4 @@
-"""Authoring-time session-size admission test (Set 111 S4).
+"""Authoring-time session admission test: size (Set 111 S4) and shape (Set 128 S1).
 
 **Who uses this:** a spec author, before a set starts —
 ``python -m ai_router.spec_admission --spec docs/session-sets/<slug>/spec.md``.
@@ -33,9 +33,21 @@ spec step count     n  median min   p90 min  > 2 h
 
 Crossing from 5 steps to 6 **doubles** the median session (42 -> 84 min),
 triples the p90 (110 -> 386 min), and nearly triples the share of sessions
-that run past two hours (10% -> 28%). So the default cap is
-:data:`DEFAULT_MAX_STEPS` = 5, and it is a tripwire the author answers at
-authoring time.
+that run past two hours (10% -> 28%).
+
+**Re-baselined by Set 128 S1 — read the table before comparing numbers.**
+That measurement was taken on specs whose declared steps *already
+absorbed the ceremony*: Set 127 S1 spent three of its six declared steps
+on register / verify / close, so a historical "5 declared" was roughly
+**3-4 real work steps**. Under the step skeleton below, ``4 + N``
+declared steps contain only ``N`` work steps, so the old bands do not
+transfer and the cap could not be carried over unexamined. The operator
+ratified **N = 3 work steps** on 2026-08-12, the value that holds the
+measured 42-minute median once the ceremony is subtracted (N = 4 was
+their own opening suggestion and was rejected as a deliberate loosening
+rather than a re-count). So :data:`DEFAULT_MAX_STEPS` = **7** — four
+baked-in ceremony steps plus three authored ones — and it is a tripwire
+the author answers at authoring time.
 
 What this check does NOT claim
 ------------------------------
@@ -54,11 +66,65 @@ exceed the cap records it in the spec with an explicit
 ``sessionSizeException:`` line naming the session number and the reason
 (see :func:`parse_size_exceptions`) — the exception is *declared in the
 spec*, so it survives review, rather than being argued at hour three.
+
+The step SHAPE, beside the step count (Set 128 S1)
+---------------------------------------------------
+Counting steps never noticed *what* a step said, so a spec could compress
+three canonical stages into one numbered instruction in the wrong internal
+order — and one did. Set 127 Session 2 declared
+
+    5. Full pytest and the Layer 3 run recorded as runs of record; verify; close.
+
+and the orchestrator followed the spec's letter over the ordering policy
+that outranks it, spending a 752-second pytest run and a 350-second
+Playwright run that a blocking verification finding immediately staled.
+Set 112 S3 had already done the same thing into 15 runs and 186 minutes.
+The policy was never in doubt; the **shape a spec may declare its steps
+in** is what let a retired ordering be re-encoded in prose, where nothing
+could check it.
+
+So every session declares ``Register`` + its authored work + a fixed
+three-step tail:
+
+============  ===============================================  =========
+position      step                                             baked in?
+============  ===============================================  =========
+1             Register                                         yes
+2 ... N+1     the session's actual work                        no
+-3            Cross-provider verification                      yes
+-2            Required portion of the full test suite          yes
+-1            Close-out                                        yes
+============  ===============================================  =========
+
+:func:`check_step_shape` recognises those four by **intent**, not by exact
+prose — an author who writes "Close out" must not fail on a hyphen — and
+it requires each tail step to name exactly one of them, which is what
+makes the compressed shape above unwriteable.
+
+Scope boundary: the compression rule reads the **tail region** only. A
+work step that merely *describes* verification and a full suite (this
+module's own set spec has one) is prose, not ceremony; a work step that
+*orders* an early full suite is an A2 ordering concern owned by Set 128
+Session 2, not a shape concern.
+
+Requires restructuring, or an informational note
+------------------------------------------------
+Operator ratification, 2026-08-12 (journalled in Set 128's
+``decisions.jsonl``): the shape is **blocking** for a set that has not
+started — where restructuring is a text edit and the sessions have yet to
+be run — and an **informational note** for every set already started,
+complete, or cancelled. The note is deliberately not a warning: those
+specs were authored at a different time under a different approach, and
+nothing about them is wrong. "Not started" is read from the set's
+``session-state.json``, the repo's single source of truth for set
+progress; a spec with no state file beside it has never been registered
+and is the primary authoring-time case.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -73,9 +139,20 @@ except ImportError:  # pragma: no cover - direct-script fallback
     except ImportError:  # pragma: no cover
         load_config = None  # type: ignore[assignment]
 
+try:
+    from .progress import canonicalize_status  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover - direct-script fallback
+    try:
+        from progress import canonicalize_status  # type: ignore[no-redef]
+    except ImportError:  # pragma: no cover
+        canonicalize_status = None  # type: ignore[assignment]
 
-# Locked default (see module docstring for the measurement behind it).
-DEFAULT_MAX_STEPS = 5
+
+# Locked default (see module docstring for the measurement behind it):
+# 4 baked-in ceremony steps + WORK_STEP_BUDGET authored ones.
+WORK_STEP_BUDGET = 3
+CEREMONY_STEPS = 4
+DEFAULT_MAX_STEPS = CEREMONY_STEPS + WORK_STEP_BUDGET
 
 # A session heading in a spec: "### Session 2 of 4: Title".
 _SESSION_HEAD_RE = re.compile(
@@ -102,6 +179,73 @@ _EXCEPTION_RE = re.compile(
 )
 
 
+# --- The step skeleton (Set 128 S1) --------------------------------------
+
+# The four baked-in steps are recognised by INTENT, not by exact prose.
+# Matching a fixed sentence would fail an author who writes "Close out"
+# instead of "Close-out" while still passing one who writes the retired
+# compressed ordering in different words - exactly backwards. Each intent
+# is a family of the phrasings this repo's 45 specs actually use.
+REGISTER = "register"
+VERIFICATION = "cross-provider verification"
+FULL_SUITE = "required portion of the full test suite"
+CLOSE_OUT = "close-out"
+
+_INTENT_RE: Dict[str, Tuple[re.Pattern[str], ...]] = {
+    REGISTER: (
+        re.compile(r"\bregist(?:er|ers|ered|ering|ration)\b", re.IGNORECASE),
+    ),
+    VERIFICATION: (
+        re.compile(r"\bcross[-\s]?provider\b", re.IGNORECASE),
+        re.compile(r"\bverif(?:y|ies|ied|ying|ication)\b", re.IGNORECASE),
+        re.compile(r"\bpath[-\s]?aware\s+critique\b", re.IGNORECASE),
+    ),
+    FULL_SUITE: (
+        # ``suites?`` and ``tests?``: round 1 found the singular-only forms
+        # let "Run the full suites, then cross-provider verification" past
+        # the compression rule -- and this set's own spec calls the bad
+        # shape "full suites; verify; close".
+        re.compile(r"\bfull\b[^.;]{0,40}?\bsuites?\b", re.IGNORECASE),
+        re.compile(r"\bfull\s+(?:pytest|playwright|tests?)\b", re.IGNORECASE),
+        re.compile(r"\brequired\s+portion\b", re.IGNORECASE),
+        re.compile(r"\bruns?\s+of\s+record\b", re.IGNORECASE),
+        # "all tests" / "every test" / "the whole suite" are the ordinary
+        # ways an engine says the same obligation (round 1, finding 2).
+        re.compile(r"\ball\s+(?:the\s+)?tests?\b", re.IGNORECASE),
+        re.compile(r"\bevery\s+(?:test|suite)\b", re.IGNORECASE),
+        re.compile(r"\b(?:whole|entire)\s+(?:test\s+)?suites?\b", re.IGNORECASE),
+    ),
+    CLOSE_OUT: (
+        # "close-out", "close out", "closeout", "closing out".
+        re.compile(r"\bclos(?:e|ing)[-\s]?out\b", re.IGNORECASE),
+        # A BARE "close" only where it stands as the instruction itself --
+        # at the end of the step or before punctuation, which is how the
+        # Set 127 S2 shape wrote it ("...; verify; close."). Round 2 found
+        # that an unqualified \bclose\b also matched "Close the tracking
+        # issue.", so an arbitrary final work step satisfied the skeleton
+        # and a spec with NO close-out step passed.
+        re.compile(r"\bclose\b\s*(?:[.;,)\]]|$)", re.IGNORECASE),
+        re.compile(
+            r"\bclos(?:e|es|ing)\s+(?:the\s+|this\s+)?(?:session|set)\b",
+            re.IGNORECASE,
+        ),
+        re.compile(r"\bclose_session\b", re.IGNORECASE),
+    ),
+}
+
+# The tail, in the order it must appear, counted from the end.
+TAIL_INTENTS: Tuple[str, ...] = (VERIFICATION, FULL_SUITE, CLOSE_OUT)
+
+# Set statuses that mean the set has already been registered. Anything
+# else - including a missing state file - means the sessions have not run
+# and restructuring is still a text edit.
+_STARTED_STATUSES = frozenset({"in-progress", "complete", "cancelled"})
+
+# Sentinel for "resolve the set status from disk", so an explicit
+# ``set_status=None`` can still mean "there is no state file".
+_AUTO = object()
+
+
 @dataclass(frozen=True)
 class SessionPlan:
     """One session's parsed plan.
@@ -122,6 +266,145 @@ class SessionPlan:
     steps: Tuple[str, ...] = ()
 
 
+@dataclass(frozen=True)
+class ShapeFinding:
+    """One departure from the step skeleton, in one session.
+
+    ``position`` is the step's 1-based position as the author numbered it
+    (0 when the finding is about the session as a whole), and ``problem``
+    is the sentence an author reads. Both are carried rather than a code,
+    because the point of the check is that the author can fix the spec
+    without reading this module.
+    """
+
+    session_number: int
+    position: int
+    problem: str
+
+    def to_dict(self) -> dict:
+        return {
+            "session_number": self.session_number,
+            "position": self.position,
+            "problem": self.problem,
+        }
+
+
+def intents_named(step_text: str) -> Tuple[str, ...]:
+    """Return every skeleton intent *step_text* names, in a stable order.
+
+    A step naming more than one tail intent is the compression this check
+    exists to make unwriteable; returning the whole set (rather than a
+    first match) is what lets the caller say so.
+    """
+    return tuple(
+        intent
+        for intent in (REGISTER, VERIFICATION, FULL_SUITE, CLOSE_OUT)
+        if any(p.search(step_text) for p in _INTENT_RE[intent])
+    )
+
+
+def _describe(intents: Sequence[str]) -> str:
+    return " + ".join(intents) if intents else "no recognisable ceremony step"
+
+
+def check_step_shape(plan: SessionPlan) -> List[ShapeFinding]:
+    """Return every way *plan*'s steps depart from the skeleton.
+
+    The first step registers; the last three are cross-provider
+    verification, then the required portion of the full test suite, then
+    close-out, each naming exactly one of those intents. Anything in
+    between is the session's authored work and is not inspected — a work
+    step that *describes* verification is prose, not ceremony.
+    """
+    findings: List[ShapeFinding] = []
+    steps = plan.steps
+    if len(steps) < CEREMONY_STEPS:
+        findings.append(
+            ShapeFinding(
+                plan.number,
+                0,
+                f"declares {len(steps)} step(s); the skeleton needs at least "
+                f"{CEREMONY_STEPS} (Register, then the "
+                "verification / full-suite / close-out tail)",
+            )
+        )
+        return findings
+
+    if REGISTER not in intents_named(steps[0]):
+        findings.append(
+            ShapeFinding(
+                plan.number,
+                1,
+                "step 1 must be Register, and this one does not register",
+            )
+        )
+
+    tail_start = len(steps) - len(TAIL_INTENTS)
+    for offset, expected in enumerate(TAIL_INTENTS):
+        position = tail_start + offset + 1
+        named = intents_named(steps[tail_start + offset])
+        tail_named = [i for i in named if i in TAIL_INTENTS]
+        if expected not in tail_named:
+            findings.append(
+                ShapeFinding(
+                    plan.number,
+                    position,
+                    f"step {position} must be '{expected}'; it names "
+                    f"{_describe(tail_named)}",
+                )
+            )
+        elif len(tail_named) > 1:
+            others = [i for i in tail_named if i != expected]
+            findings.append(
+                ShapeFinding(
+                    plan.number,
+                    position,
+                    f"step {position} compresses '{expected}' together with "
+                    f"{_describe(others)} into one instruction; each tail "
+                    "step declares exactly one stage, in any words, so its "
+                    "ordering is checkable rather than stated in prose",
+                )
+            )
+    return findings
+
+
+def resolve_set_status(spec_path: str) -> Optional[str]:
+    """Return the set's ``session-state.json`` status, or None.
+
+    None means no state file beside the spec, i.e. the set has never been
+    registered — the primary authoring-time case, and the one the shape
+    check blocks. An unreadable or malformed state file resolves to
+    ``"in-progress"``: the file exists, and only ``start_session`` creates
+    it, so its presence is itself evidence the set was registered. Reading
+    a corrupt file as "never started" would turn a state-file bug into a
+    blocking finding against work already in flight.
+
+    The status is passed through :func:`progress.canonicalize_status`
+    rather than compared raw. This repo already canonicalizes ``done`` and
+    ``completed`` to ``complete`` on read, because hand-written files
+    carrying a past-participle token are a drift that has happened before;
+    a second, stricter notion of "what status means" here would read such a
+    set as never started and demand restructuring of a spec whose sessions
+    are closed (round 1). One canonicalizer, used everywhere (L-069-1).
+    """
+    state_path = os.path.join(os.path.dirname(spec_path), "session-state.json")
+    if not os.path.isfile(state_path):
+        return None
+    try:
+        with open(state_path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return "in-progress"
+    if not isinstance(data, dict):
+        return "in-progress"
+    status = data.get("status")
+    if not isinstance(status, str):
+        return "in-progress"
+    if canonicalize_status is None:  # pragma: no cover - import fallback
+        return status
+    return canonicalize_status(status)
+
+
 @dataclass
 class SpecAdmission:
     """The admission verdict for one spec."""
@@ -134,11 +417,36 @@ class SpecAdmission:
     violations: List[SessionPlan] = field(default_factory=list)
     # Sessions over the cap that DO carry a declared exception.
     excepted: List[SessionPlan] = field(default_factory=list)
+    # Set 128 S1: how each session's steps depart from the skeleton, and
+    # whether that blocks. ``set_status`` is the set's own
+    # ``session-state.json`` status, or None when it has no state file.
+    shape_findings: List[ShapeFinding] = field(default_factory=list)
+    set_status: Optional[str] = None
     error: Optional[str] = None
 
     @property
+    def set_started(self) -> bool:
+        """True when the set has been registered at least once.
+
+        A started set's spec earns an informational note rather than a
+        restructuring requirement: its sessions were planned under the
+        approach of their time, and rewriting step text a closed session
+        already executed changes nothing that will ever run.
+        """
+        return self.set_status in _STARTED_STATUSES
+
+    @property
+    def restructuring_required(self) -> List[ShapeFinding]:
+        """Shape findings that block, i.e. those on an unstarted set."""
+        return [] if self.set_started else list(self.shape_findings)
+
+    @property
     def passed(self) -> bool:
-        return self.error is None and not self.violations
+        return (
+            self.error is None
+            and not self.violations
+            and not self.restructuring_required
+        )
 
 
 def _strip_fenced_blocks(text: str) -> str:
@@ -243,9 +551,22 @@ def parse_session_plans(text: str) -> List[SessionPlan]:
     return plans
 
 
-def check_spec(spec_path: str, max_steps: int = DEFAULT_MAX_STEPS) -> SpecAdmission:
-    """Run the admission test against one ``spec.md``."""
+def check_spec(
+    spec_path: str,
+    max_steps: int = DEFAULT_MAX_STEPS,
+    set_status: object = _AUTO,
+) -> SpecAdmission:
+    """Run the admission test against one ``spec.md``.
+
+    *set_status* is the set's ``session-state.json`` status and decides
+    whether a shape departure requires restructuring or is only reported;
+    it is resolved from disk unless a caller passes it explicitly (None
+    meaning "no state file", i.e. never registered).
+    """
     result = SpecAdmission(spec_path=spec_path, max_steps=max_steps)
+    result.set_status = (
+        resolve_set_status(spec_path) if set_status is _AUTO else set_status
+    )  # type: ignore[assignment]
     try:
         with open(spec_path, "r", encoding="utf-8") as fh:
             text = fh.read()
@@ -263,6 +584,7 @@ def check_spec(spec_path: str, max_steps: int = DEFAULT_MAX_STEPS) -> SpecAdmiss
         return result
 
     for plan in result.sessions:
+        result.shape_findings.extend(check_step_shape(plan))
         if plan.step_count <= max_steps:
             continue
         if plan.number in result.exceptions:
@@ -314,10 +636,13 @@ def format_report(result: SpecAdmission) -> str:
     if result.error:
         return f"[!] {rel}\n    {_ascii_safe(result.error)}"
 
+    shaped = {f.session_number for f in result.shape_findings}
     lines.append(f"{rel}  (cap: {result.max_steps} steps/session)")
     for plan in result.sessions:
         if plan.step_count > result.max_steps:
             mark = "[x]" if plan.number in result.exceptions else "[!]"
+        elif plan.number in shaped and not result.set_started:
+            mark = "[!]"
         else:
             mark = "[ok]"
         title = _ascii_safe(plan.title)[:52]
@@ -335,6 +660,26 @@ def format_report(result: SpecAdmission) -> str:
             f"  OVER CAP: session(s) {nums}. Split at authoring, or declare "
             f"'sessionSizeException: <N> - <reason>' in the spec."
         )
+    if result.shape_findings and result.set_started:
+        # Not a warning. The operator's ruling (Set 128 S1): these specs
+        # were authored at a different time under a different approach,
+        # and nothing about them is wrong - so the note says what is true
+        # and stops there.
+        lines.append(
+            "  note: authored before the step skeleton (Set 128); the "
+            "skeleton applies to sets that have not started."
+        )
+    elif result.shape_findings:
+        lines.append(
+            "  REQUIRES RESTRUCTURING: every session declares Register, its "
+            "work, then cross-provider verification, the required portion "
+            "of the full test suite, and close-out."
+        )
+        for finding in result.shape_findings:
+            lines.append(
+                f"       Session {finding.session_number}: "
+                f"{_ascii_safe(finding.problem)}"
+            )
     return "\n".join(lines)
 
 
@@ -429,16 +774,23 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
 
     if args.all:
         # Report only the specs that have something to say, so the
-        # all-specs sweep stays readable.
-        noisy = [r for r in results if r.violations or r.excepted or r.error]
+        # all-specs sweep stays readable. An informational shape note on
+        # an already-started set is not something to say.
+        noisy = [
+            r
+            for r in results
+            if r.violations or r.excepted or r.error or r.restructuring_required
+        ]
         for r in noisy:
             print(format_report(r))
             print()
         clean = len(results) - len(noisy)
+        restructure = sum(1 for r in results if r.restructuring_required)
         print(
             f"{len(results)} spec(s) checked; {clean} clean, "
             f"{sum(len(r.violations) for r in results)} session(s) over cap "
-            f"without an exception."
+            f"without an exception, {restructure} unstarted spec(s) requiring "
+            f"restructuring."
         )
     else:
         for r in results:
@@ -458,15 +810,26 @@ if __name__ == "__main__":  # pragma: no cover
 
 
 __all__ = [
+    "CEREMONY_STEPS",
+    "CLOSE_OUT",
     "DEFAULT_MAX_STEPS",
+    "FULL_SUITE",
+    "REGISTER",
+    "TAIL_INTENTS",
+    "VERIFICATION",
+    "WORK_STEP_BUDGET",
     "SessionPlan",
+    "ShapeFinding",
     "SpecAdmission",
     "check_spec",
+    "check_step_shape",
     "format_report",
+    "intents_named",
     "load_max_steps",
     "parse_session_plans",
     "parse_size_exceptions",
     "parse_step_texts",
+    "resolve_set_status",
     "main",
     "run",
 ]

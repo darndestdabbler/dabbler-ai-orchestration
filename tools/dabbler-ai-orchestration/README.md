@@ -270,7 +270,7 @@ Sign-up links and a full prerequisites checklist live in the
   step is logged `in-progress`, `blocked` or `failed`, the record answers
   and the derivation stands down.
 - **The in-flight session shows what still stands between it and close.**
-  Expand it and, under its steps, a **Close-out** row summarises the
+  Expand it and, under its steps, a **Close-out readiness** row summarises the
   obligations `close_session` will check (`1 blocking, 3 advisory`, or
   `nothing outstanding`) and expands to one row each, with the
   predicate's own remediation on hover. The panel reads a file rather

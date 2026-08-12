@@ -1,0 +1,70 @@
+{
+  "status": "completed",
+  "summary": "Set 128 Session 1 of 3 ships Component B: the SHAPE a spec may declare its steps in. Component A -- the ordering rules themselves -- is Session 2, and Set 118's re-authoring is Session 3.\n\n(1) WHY A SHAPE AND NOT A PARAGRAPH. The canonical order (targeted tests -> verify -> remediate -> full suites -> close) already lived in the constitution and was violated anyway, because nothing checked the shape a spec declared its steps in. Set 127 Session 2 compressed three canonical stages into one numbered instruction in the wrong internal order -- `5. Full pytest and the Layer 3 run recorded as runs of record; verify; close.` -- and the orchestrator followed the spec's letter over the policy that outranks it: a 752-second pytest run and a 350-second Playwright run, both taken before a verification round that returned a blocking finding, so both were staled by the remediation that followed. Set 112 S3 had done the same into 15 runs and 186 minutes. Session 1 of that same spec got the ordering right, so this was never ignorance of the policy -- it was compression, three stages inside one step whose ordering is stated in a sentence where nothing can check it.\n\n(2) WHAT SHIPPED. `spec_admission.check_step_shape()` sits beside the count check and reads the step texts the module already parses (no second parser -- L-069-1). Every session declares Register + its authored work + a fixed three-step tail (cross-provider verification -> required portion of the full test suite -> close-out), each tail step naming exactly one stage. The four are recognised by INTENT, not exact prose: 'Close out' and 'Close-out' both pass, and a tail step naming two stages in EITHER internal order is refused as a compression -- which is what makes the Set 127 S2 shape unwriteable in any wording. Scope stops at the tail by design: a work step that DESCRIBES verification is prose (this set's own spec has one, and scanning work steps would fail the very spec that ships the check), and a work step that ORDERS an early full suite is an A2 ordering concern owned by Session 2.\n\n(3) TWO OPERATOR RATIFICATIONS, JOURNALLED BEFORE ANY IMPLEMENTATION. (a) The work-step budget N = 3, so `authoring.max_steps_per_session` is re-baselined 5 -> 7 (4 ceremony + 3 work). The operator's own opening suggestion of N = 4 was put beside it and REJECTED as a deliberate loosening rather than a re-count; carrying 5 over unchanged was rejected too, because the same integer would silently have meant a looser real budget. The Set 111 S4 measurement was taken on specs whose declared steps already absorbed the ceremony, so the old bands do not transfer -- the authoring guide now carries that table WITH the re-reading beside it, so a future author compares N to 3 rather than 7 to 5. (b) The shape is BLOCKING for a set that has not started (no `session-state.json`, or status `not-started`) and an INFORMATIONAL NOTE for one already started, complete or cancelled. Two operator wording rulings are part of it and are load-bearing: the blocking verdict is called 'requires restructuring', never 'refused'; and the note is explicitly NOT a warning -- 'It was a different time and a different approach. Leave it at that.' 360 of 363 planned sessions in the corpus do not conform and none will be rewritten; 4 unstarted specs (113, 118, 121, 122) fail on day one, which is the point (L-112-1: a gate nothing can fail proves nothing).\n\n(4) THE OPERATOR REDIRECTED SCOPE MID-SESSION, AND THE RECORD SHOULD SHOW IT. At Step 5 the operator posted a screenshot of the Work Explorer with two defects. I recommended recording them as residuals for a follow-up set; that was OVERRULED -- 'we need to stop creating set after set to just deal with issues arising from sets from today' -- and both were fixed here. (i) A gate-policy record (`path_aware_critique`) is written at REGISTRATION and was rendered in the step list as a `complete` row, so both the CLI checklist and the Explorer said the path-aware critique -- a stage that runs once at the END of a set -- had finished minutes after the session began. Pre-existing since Set 066 and present in 50 sets; visible now only because 128 is the first set since 117 to arm the flag. Fixed by rendering only steps (`is_logged_step`), in Python and in the TypeScript mirror, with the parity corpus updated in both directions and falsifiers for ALL FOUR bookkeeping kinds rather than the one reported (L-069-1). The record itself is untouched in `activity-log.json`, where the close gates read it. (ii) Two rows named `Close-out` under one session -- this one IS caused by this session, since the skeleton mandates a step of that name and the obligations group row already carried it. Renamed `Close-out readiness` via a named constant, because the label is looked up by text in four files.\n\n(5) VERIFICATION FOUND FOUR REAL MAJORS AND ALL FOUR WERE RECOGNISER GAPS. Round 1 (discovery, 2-lens fan-out, gpt-5.5): the FULL_SUITE recogniser ended in `\\bsuite\\b`, which does not match 'full suites' -- the exact plural this set's own spec uses to describe the malformation -- and matched nothing for 'all tests'; and `resolve_set_status` compared raw status strings, bypassing `progress.canonicalize_status`, so a state file carrying the `completed`/`done` alias this repo explicitly canonicalizes would have read as NEVER STARTED and demanded restructuring of a spec whose sessions are closed. Round 2 (supplementary, run BEFORE remediating): an unqualified bare `close` let 'Close the tracking issue.' satisfy the close-out stage, so a spec declaring NO close-out passed the gate that exists to require one -- a false all-clear, which the conventions block names Critical/Major by construction. All four accepted and fixed once. Round 3 (remediation-review on the fix delta): VERIFIED, 4 fixes accepted, 0 rejected, 0 findings.\n\n(6) FALSIFIERS, PROVEN TO BITE. 20 test functions / 33 cases in `test_spec_admission_shape.py`, weighted to the negative direction, planting the malformation rather than reading the regex (L-112-1): the Set 127 S2 step VERBATIM, the same compression reversed, a tail out of order, a missing tail step, work after close-out, a session that never registers, fewer steps than the ceremony, five ordinary full-suite phrasings, and three bare-`close` false friends. A mutation probe gutting `check_step_shape` failed 12 of the then-19 cases; a second targeted mutation restoring the raw-status read failed the alias criterion. Both probes were reverted and verified byte-for-byte clean. Structurally, this set's own three sessions pass their own check with zero shape findings.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "ai_router/spec_admission.py",
+    "ai_router/session_checklist.py",
+    "ai_router/router-config.yaml",
+    "ai_router/CHANGELOG.md",
+    "ai_router/tests/test_spec_admission_shape.py",
+    "ai_router/tests/test_spec_admission.py",
+    "ai_router/tests/test_session_checklist.py",
+    "ai_router/tests/test_plan_seeding.py",
+    "ai_router/tests/test_step_row_parity.py",
+    "ai_router/tests/fixtures/session-step-parity.json",
+    "docs/planning/session-set-authoring-guide.md",
+    "tools/dabbler-ai-orchestration/src/providers/sessionStepModel.ts",
+    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionStepModel.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/README.md",
+    "docs/session-sets/128-session-step-skeleton-and-test-ordering/s1-conventions.md",
+    "docs/session-sets/128-session-step-skeleton-and-test-ordering/s1-remediation-round-1.md",
+    "docs/session-sets/128-session-step-skeleton-and-test-ordering/s1-remediation-round-2.md",
+    "docs/session-sets/128-session-step-skeleton-and-test-ordering/decisions.jsonl"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 writes A1-A4 into `docs/session-constitution.md` and the authoring guide and encodes the A4 diff classifier, so it must hold the context this session built: which ordering rules the shape check already enforces versus which are still prose, why the compression rule deliberately reads the tail region only (an A2 violation in a WORK step is Session 2's to answer, and this session's scope-boundary test pins that handoff), and the exact wording the operator ratified. It also carries an operator-attested verification-reduction (A4.1/A4.2) that must be journalled BEFORE any implementation, the same way this session's two ratifications were -- `decision_journal` refuses to write it otherwise. Same seat and effort is the right default: the work is documentation plus one classifier over `run_of_record`'s existing surface digests, not a new architecture. Verification must keep routing to a different effective provider than anthropic; gpt-5.5 returned four real Majors here and none were noise. NOTE FOR SESSION 2: the constitution is at 100% of its 4,000-token preload ceiling, so writing A1-A3 into it requires removing prose to pay for it -- ceilings ratchet down only, and raising one is operator-only."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-112-1",
+    "L-069-1",
+    "L-079-1",
+    "L-064-9"
+  ],
+  "checklist": {
+    "status": "partial",
+    "note": "Four transitions left a record with no post inside their own window: operator-stop (value-trade-off), test-run-recorded (pytest), test-run-recorded (mocha), and last-logged-step. The gate is ADVISORY (Set 116 S3 ruling) and is NOT waived here -- the omission is recorded rather than excused. The two test-run-recorded misses are the same structural shape Set 127 S3 fixed for verification rounds: three expensive suites were run and recorded back-to-back, machine-driven, and each recording opens a window that closes when the next lands seconds later. `run_of_record record` could post the checklist itself from the line after its ledger append, exactly as `verify_session` now does. Offered as an observation for Step 9 or a later session, NOT as scope taken here.",
+    "attestation": null
+  },
+  "residuals": [
+    {
+      "item": "Three unstarted specs (113-narrated-video-walkthroughs, 121-guidance-becomes-executable, 122-module-lifecycle-to-python) now report REQUIRES RESTRUCTURING.",
+      "owner": "the orchestrator that starts each of those sets",
+      "note": "Set 118's re-authoring is Session 3 of this set and is scheduled. The other three are a text edit each, cheapest at their own start, and nothing blocks editing them earlier. `spec_admission --all --check` therefore exits 1 today, which is exactly why this session did NOT wire it into CI: doing so before those specs are re-authored would red the pipeline on purpose."
+    },
+    {
+      "item": "`docs/planning/session-step-skeleton-and-verification-cost.md` still says the cap is 'currently 5' and is still marked 'diagnosed, not fixed'.",
+      "owner": "Set 128 Session 3",
+      "note": "Retiring that note is Session 3 Step 3 by name. Recorded here so a reader does not mistake the stale sentence for a missed echo (L-065-1)."
+    },
+    {
+      "item": "The spec's configuration block declares `requiresE2E: false` with the rationale 'Layer 3 is untouched. The extension is not a surface of this set', which the operator's mid-session redirection made false.",
+      "owner": "Step 9, Session 3",
+      "note": "The flag was obeyed rather than re-litigated mid-session, per the constitution. It cost nothing: `requiresE2E` governs whether an E2E PROCEDURE is required, while what a session owes in test runs is decided by `covers`-by-path -- so the Playwright suite was correctly owed, and was run and recorded. Surfaced so the rationale line can be corrected."
+    }
+  ]
+}

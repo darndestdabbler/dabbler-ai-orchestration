@@ -285,7 +285,8 @@ export function sessionFlightFacts(
  * carries one (`plan-step`, `path_aware_critique`, `contract_gate`,
  * `dual_surface_mode`, `suggestion_disposition`) is a record ABOUT the
  * session — several of them written at registration, before any work
- * exists. Such an entry renders, but it may not CLAIM a planned row.
+ * exists. Such an entry may not CLAIM a planned row, and since Set 128 S1
+ * it is not a row at all.
  */
 /**
  * Python's `str(x or "")`, exactly.
@@ -326,7 +327,8 @@ function pyStr(value: unknown): string {
  * carries one (`plan-step`, `path_aware_critique`, `contract_gate`,
  * `dual_surface_mode`, `suggestion_disposition`) is a record ABOUT the
  * session — several of them written at registration, before any work
- * exists. Such an entry renders, but it may not CLAIM a planned row.
+ * exists. Such an entry may not CLAIM a planned row, and since Set 128 S1
+ * it is not a row at all: a step list renders steps.
  *
  * `Array.isArray` is excluded explicitly: `typeof [] === "object"` in
  * JavaScript, so an array would otherwise read as a keyless — and
@@ -862,6 +864,15 @@ export function planMatchesSpec(
  * before. Nothing about which rows exist, or what the ledger says they say,
  * changes.
  *
+ * Set 128 S1 removes one class of row that never was a step. A gate-policy
+ * record (`path_aware_critique`, `contract_gate`, `dual_surface_mode`,
+ * `suggestion_disposition`) is machinery's record ABOUT the session,
+ * written at registration before any work exists, and it rendered here as
+ * a `complete` row in the step list — putting a done glyph on a stage that
+ * runs once at the END of a set. The step list now renders only steps
+ * ({@link isLoggedStep}), the same predicate that already decided such an
+ * entry may not CLAIM a planned row.
+ *
  * Mirrors `session_checklist.build_rows`.
  */
 export function buildStepRows(
@@ -880,10 +891,12 @@ export function buildStepRows(
   if (mine.length === 0) return [];
 
   const plan = collapseByStepKey(mine.filter((e) => e.kind === PLAN_STEP_KIND));
-  // Everything that is not a plan row still RENDERS — a bookkeeping record
-  // is part of the session's record. What it may not do is CLAIM a planned
-  // row, which `reconcile` enforces via `isLoggedStep`.
-  const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
+  // A step list renders steps. An entry carrying a `kind` other than
+  // `plan-step` is a gate-policy or bookkeeping record ABOUT the session,
+  // and showing it here put a `complete` glyph on a stage that had not run
+  // (Set 128 S1). `isLoggedStep` already refused it a planned row; it now
+  // also decides whether it is a row at all, so the two cannot diverge.
+  const real = collapseByStepKey(mine.filter((e) => isLoggedStep(e)));
 
   const evidence =
     plan.length === 0

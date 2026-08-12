@@ -224,12 +224,14 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await expandTreeRow(pane, "Fixture session 1");
 
     // One row on the surface the operator watches, summarizing what still
-    // stands between here and close.
-    const group = treeRow(pane, "Close-out");
+    // stands between here and close. Named `Close-out readiness` since Set
+    // 128 S1, because every session now declares a step called `Close-out`
+    // and two rows of the same name under one session read as a duplicate.
+    const group = treeRow(pane, "Close-out readiness");
     await expect(group).toBeVisible();
     await expect(group).toContainText("blocking");
 
-    await expandTreeRow(pane, "Close-out");
+    await expandTreeRow(pane, "Close-out readiness");
 
     // The obligations themselves, named as the close names them. A
     // mid-session preflight always has an unmet UAT/disposition row and a

@@ -20,6 +20,7 @@ import { ActionSupports, ROW_ACTIONS } from "../../providers/ActionRegistry";
 import { VisibleModule } from "../../providers/SessionSetsModel";
 import * as treeModel from "../../providers/workExplorerTreeModel";
 import {
+  CLOSE_OUT_GROUP_LABEL,
   MODULE_TOKEN,
   NODE_TOKEN,
   actionToken,
@@ -1135,9 +1136,21 @@ suite("Set 115 S4 — the close-out obligations under the in-flight session", ()
 
   test("the group row summarizes unmet obligations by blocking-ness", () => {
     const d = closeOutDescriptor(closeOut(liveSet()));
-    assert.strictEqual(d.label, "Close-out");
+    assert.strictEqual(d.label, "Close-out readiness");
     assert.strictEqual(d.description, "1 blocking, 1 advisory");
     assert.strictEqual(d.collapsible, "collapsed");
+  });
+
+  test("the group row is not named after the close-out STEP", () => {
+    // Set 128 S1 made a step literally named `Close-out` part of the
+    // skeleton every session declares, so a group row called `Close-out`
+    // put two identically-named rows under one session and the operator
+    // reported them as a duplicate. The two answer different questions:
+    // the step says whether close-out has been executed, this row says
+    // what still stands in its way.
+    const d = closeOutDescriptor(closeOut(liveSet()));
+    assert.notStrictEqual(d.label, "Close-out");
+    assert.strictEqual(d.label, CLOSE_OUT_GROUP_LABEL);
   });
 
   test("a fresh projection whose CLOSE IS SETTLED is the only way to read done", () => {

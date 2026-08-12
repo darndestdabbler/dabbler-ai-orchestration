@@ -1,10 +1,14 @@
-"""Tests for the authoring-time session-size admission test (Set 111 S4).
+"""Tests for the authoring-time session admission test.
 
-Covers the parser (what counts as a step), the exception mechanism, the
-config loader's fail-safe behaviour, and the CLI's exit codes.
+Covers the size check (Set 111 S4) — the parser (what counts as a step),
+the exception mechanism, the config loader's fail-safe behaviour, and the
+CLI's exit codes. The step-SHAPE check (Set 128 S1) and its falsifiers
+live in ``test_spec_admission_shape.py``.
 """
 
 from __future__ import annotations
+
+import json
 
 import pytest
 
@@ -33,9 +37,21 @@ def _session(n: int, total: int, title: str, steps: int) -> str:
 
 
 def _write(tmp_path, *sessions: str, extra: str = "") -> str:
+    """Write a spec whose set is already COMPLETE.
+
+    Set 128 S1 made the step shape part of the same verdict, but only for
+    sets that have not started. These tests are about the step COUNT, so
+    the fixture set is complete: the shape is then an informational note
+    and cannot decide a size assertion. The shape dimension is isolated
+    the same way in ``test_spec_admission_shape.py``.
+    """
     path = tmp_path / "spec.md"
     path.write_text(
         SPEC_HEAD + "\n".join(sessions) + extra, encoding="utf-8"
+    )
+    (tmp_path / "session-state.json").write_text(
+        json.dumps({"schemaVersion": 4, "status": "complete"}),
+        encoding="utf-8",
     )
     return str(path)
 

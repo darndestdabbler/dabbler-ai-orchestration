@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "8e0cc80a1437cdcd802be846d5bd3f9c07331b42",
+  "fixedTree": "8fc70602d51a0194c3974094f756669cfa846abb",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T23:15:29.659922+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The full-suite intent recognizer misses the plural phrase “full suites,” letting a compressed verification/full-suite tail step pass. - **Category:** Correctness - **Severity:** Major - **Evidence ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "An unstarted spec whose verification-tail step says “Run the full suites, then cross-provider verification” must fail with a compression/restructuring finding, while a standalone full-suite tail step phrased “Full suites.” is accepted as the full-suite stage.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** Full-suite intent misses common “all tests” wording, so a compressed full-suite + verification instruction can pass. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_rout ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec('import importlib.util\\nimport sys\\nspec = importlib.util.spec_from_file_location(\\\"sa\\\", \\\"ai_router/spec_admission.py\\\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\\\"sa\\\"] = sa\\nspec.loader.exec_module(sa)\\nplan = sa.SessionPlan(1, \\\"x\\\", 5, (\\\"Register.\\\", \\\"Work.\\\", \\\"Run all tests, then verify with a different provider.\\\", \\\"Required portion of the full test suite.\\\", \\\"Close-out.\\\"))\\nraise SystemExit(0 if sa.check_step_shape(plan) else 1)')\"",
+      "criterionSha256": "1534f92a7068408ebd3ce5f3f973b915f6d9b0dd726e67d28f3480312ffe688d",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec('import importlib.util\\nimport sys\\nspec = importlib.util.spec_from_file_location(\"sa\", \"ai_router/spec_admission.py\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\"sa\"] = sa\\nspec.loader.exec_module(sa)\\nplan = sa.SessionPlan(1, \"x\", 5, (\"Register.\", \"Work.\", \"Run all tests, then verify with a different provider.\", \"Required portion of the full test suite.\", \"Close-out.\"))\\nraise SystemExit(0 if sa.check_step_shape(plan) else 1)')"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec('import importlib.util/nimport sys/nspec = importlib.util.spec_from_file_location(\"sa\", \"ai_router/spec_admission.py\")/nsa = importlib.util.module_from_spec(spec)/nsys.modules[\"sa\"] = sa/nspec.loader.exec_module(sa)/nplan = sa.SessionPlan(1, \"x\", 5, (\"Register.\", \"Work.\", \"Run all tests, then verify with a different provider.\", \"Required portion of the full test suite.\", \"Close-out.\"))/nraise SystemExit(0 if sa.check_step_shape(plan) else 1)')"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 0,
+        "output": ""
+      },
+      "fixed": {
+        "exitCode": 0,
+        "outputChars": 0,
+        "output": ""
+      },
+      "baselinePassed": false,
+      "fixedPassed": true,
+      "outcome": "auto-closed",
+      "reason": "baseline discrimination holds: the unchanged criterion FAILS on the pre-fix tree and PASSES on the fixed tree"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** `resolve_set_status()` ignores the repo’s canonical status aliases and can block already-started/complete sets as “unstarted.” - **Category:** Correctness - **Severity:** Major - **Evidence paths:* ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec('import importlib.util\\nimport json\\nimport pathlib\\nimport sys\\nimport tempfile\\nspec = importlib.util.spec_from_file_location(\\\"sa\\\", \\\"ai_router/spec_admission.py\\\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\\\"sa\\\"] = sa\\nspec.loader.exec_module(sa)\\nwith tempfile.TemporaryDirectory() as d:\\n    root = pathlib.Path(d)\\n    (root / \\\"spec.md\\\").write_text(\\\"# X\\\\n\\\\n## Sessions\\\\n\\\\n### Session 1 of 1: X\\\\n\\\\n1. Register.\\\\n2. Do work.\\\\n3. Close-out.\\\\n\\\", encoding=\\\"utf-8\\\")\\n    (root / \\\"session-state.json\\\").write_text(json.dumps({\\\"schemaVersion\\\": 4, \\\"status\\\": \\\"completed\\\"}), encoding=\\\"utf-8\\\")\\n    result = sa.check_spec(str(root / \\\"spec.md\\\"), max_steps=7)\\n    raise SystemExit(0 if result.set_started and result.passed else 1)')\"",
+      "criterionSha256": "5a1eaca4849b7c431c2538b19b587b2bbb662f5a9149e65ddde447b7d829135f",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec('import importlib.util\\nimport json\\nimport pathlib\\nimport sys\\nimport tempfile\\nspec = importlib.util.spec_from_file_location(\"sa\", \"ai_router/spec_admission.py\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\"sa\"] = sa\\nspec.loader.exec_module(sa)\\nwith tempfile.TemporaryDirectory() as d:\\n    root = pathlib.Path(d)\\n    (root / \"spec.md\").write_text(\"# X\\n\\n## Sessions\\n\\n### Session 1 of 1: X\\n\\n1. Register.\\n2. Do work.\\n3. Close-out.\\n\", encoding=\"utf-8\")\\n    (root / \"session-state.json\").write_text(json.dumps({\"schemaVersion\": 4, \"status\": \"completed\"}), encoding=\"utf-8\")\\n    result = sa.check_spec(str(root / \"spec.md\"), max_steps=7)\\n    raise SystemExit(0 if result.set_started and result.passed else 1)')"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec('import importlib.util/nimport json/nimport pathlib/nimport sys/nimport tempfile/nspec = importlib.util.spec_from_file_location(\"sa\", \"ai_router/spec_admission.py\")/nsa = importlib.util.module_from_spec(spec)/nsys.modules[\"sa\"] = sa/nspec.loader.exec_module(sa)/nwith tempfile.TemporaryDirectory() as d:/n    root = pathlib.Path(d)/n    (root / \"spec.md\").write_text(\"# X/n/n## Sessions/n/n### Session 1 of 1: X/n/n1. Register./n2. Do work./n3. Close-out./n\", encoding=\"utf-8\")/n    (root / \"session-state.json\").write_text(json.dumps({\"schemaVersion\": 4, \"status\": \"completed\"}), encoding=\"utf-8\")/n    result = sa.check_spec(str(root / \"spec.md\"), max_steps=7)/n    raise SystemExit(0 if result.set_started and result.passed else 1)')"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 1731,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util\\nimport json\\nimport pathlib\\nimport sys\\nimport tempfile\\nspec = importlib.util.spec_from_file_location(\"sa\", \"ai_router/spec_admission.py\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\"sa\"] = sa\\nspec.loader.exec_module(sa)\\nwith tempfile.TemporaryDirectory() as d:\\n    root = pathlib.Path(d)\\n    (root / \"spec.md\").write_text(\"# X\\n\\n## Sessions\\n\\n### Session 1 of 1: X\\n\\n1. Register.\\n2. Do work.\\n3. Close-out.\\n\", encoding=\"utf-8\")\\n    (root / \"session-state.json\").write_text(json.dumps({\"schemaVersion\": 4, \"status\": \"completed\"}), encoding=\"utf-8\")\\n    result = sa.check_spec(str(root / \"spec.md\"), max_steps=7)\\n    raise SystemExit(0 if result.set_started and result.passed else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 12\n    (root / \"spec.md\").write_text(\"# X\n                                  ^\nSyntaxError: unterminated string literal (detected at line 12)\n"
+      },
+      "fixed": {
+        "exitCode": 1,
+        "outputChars": 1731,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util\\nimport json\\nimport pathlib\\nimport sys\\nimport tempfile\\nspec = importlib.util.spec_from_file_location(\"sa\", \"ai_router/spec_admission.py\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\"sa\"] = sa\\nspec.loader.exec_module(sa)\\nwith tempfile.TemporaryDirectory() as d:\\n    root = pathlib.Path(d)\\n    (root / \"spec.md\").write_text(\"# X\\n\\n## Sessions\\n\\n### Session 1 of 1: X\\n\\n1. Register.\\n2. Do work.\\n3. Close-out.\\n\", encoding=\"utf-8\")\\n    (root / \"session-state.json\").write_text(json.dumps({\"schemaVersion\": 4, \"status\": \"completed\"}), encoding=\"utf-8\")\\n    result = sa.check_spec(str(root / \"spec.md\"), max_steps=7)\\n    raise SystemExit(0 if result.set_started and result.passed else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 12\n    (root / \"spec.md\").write_text(\"# X\n                                  ^\nSyntaxError: unterminated string literal (detected at line 12)\n"
+      },
+      "baselinePassed": false,
+      "fixedPassed": false,
+      "outcome": "still-failing",
+      "reason": "the criterion still FAILS on the fixed tree: the fix does not satisfy the verifier's own acceptance condition"
+    }
+  ]
+}

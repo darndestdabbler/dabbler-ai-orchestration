@@ -175,14 +175,69 @@ The `NNN-` prefix is a per-repo monotonic counter:
 
 Each session is one orchestrator conversation.
 
-### The session-size cap (Set 111 S4)
+### The step skeleton (Set 128 S1)
+
+**Every session declares the same four ceremony steps, in the same
+places.** They are not the session's work; they are what every session
+owes regardless of what it does.
+
+| position | step | baked in? |
+| :--- | :--- | :--- |
+| 1 | **Register** | yes |
+| 2 … N+1 | the session's actual work | no — authored per session |
+| −3 | **Cross-provider verification** (session verification, plus the path-aware critique when armed) | yes |
+| −2 | **Required portion of the full test suite** | yes |
+| −1 | **Close-out** | yes |
+
+The wording of the second-to-last step is the operator's, and it is
+deliberate over a more precise alternative: *"`full (test) suite` is
+often used by AI engines"*. The word **required** carries the fact that
+`covers` is by path and not every session owes every suite; renaming the
+step into something no engine recognises would trade a legible
+instruction for a pedantic one.
+
+**Why a shape and not a paragraph.** The canonical order — targeted tests
+→ verify → remediate → full suites → close — already existed in
+`session-constitution.md` and was violated anyway, because a spec can
+compress three stages into one numbered instruction where nothing can
+check the ordering. Set 127 Session 2 declared
+
+```
+5. Full pytest and the Layer 3 run recorded as runs of record; verify; close.
+```
+
+and the orchestrator followed the spec's letter over the policy that
+outranks it: a 752-second pytest run and a 350-second Playwright run,
+both taken before a verification round that returned a blocking finding,
+so both were staled by the remediation that followed. Set 112 S3 had done
+the same into 15 runs and 186 minutes. Steps are now checked for
+**shape** beside **count**, by the same command.
+
+`spec_admission` recognises the four by **intent**, not by exact prose —
+write "Close out" or "Close-out", "Verify with a different provider" or
+"Cross-provider verification". What it refuses is a tail step that names
+more than one stage, in either internal order. Its scope stops at the
+tail: a work step that *describes* verification is prose, and a work step
+that *orders* an early full suite is an ordering question owned by the
+constitution, not by the parser.
+
+**Requires restructuring, or an informational note.** Operator
+ratification, 2026-08-12: the shape is **blocking** for a set that has
+not started — where restructuring is a text edit and no session has run
+yet — and an **informational note** for a set already started, complete,
+or cancelled. Those specs were authored at a different time under a
+different approach; nothing about them is wrong and none of them will be
+rewritten. "Not started" is read from the set's `session-state.json`.
+
+### The session-size cap (Set 111 S4, re-baselined by Set 128 S1)
 
 **The operator target is 15–20 minutes of work per session**, plus 5–20
 minutes of verification scaled to risk. Sets 047–074 already met it
 (24 min work median), so this is a **regression to fix, not a stretch
 goal** — by Sets 106–110 the median session had reached 115 minutes.
 
-**A session declares at most 5 top-level steps.** That number is
+**A session declares at most 7 top-level steps: the 4 baked-in ceremony
+steps plus N = 3 authored work steps.** The underlying number is
 measured, not asserted. Across the 172 schema-v4 sessions in this repo
 carrying both a parseable spec plan and start/complete timestamps:
 
@@ -195,8 +250,21 @@ carrying both a parseable spec plan and start/complete timestamps:
 Crossing from 5 steps to 6 **doubles** the median, triples the p90, and
 nearly triples the share of sessions that run past two hours.
 
-Check it before the set starts — the whole point is that an oversized
-session is split at authoring, not discovered at hour three:
+**Read that table with the re-baselining beside it — 7 is not a
+loosening of 5, because the number counts something else now.** The
+measurement was taken on specs whose declared steps *already absorbed the
+ceremony*: Set 127 S1 spent three of its six declared steps on register /
+verify / close, so a historical "5 declared" meant roughly **3–4 real
+work steps**. Under the skeleton, `4 + N` declared steps contain only `N`
+work steps, so the old bands do not transfer and the cap could not be
+carried across unexamined. **N = 3 is the value that holds the measured
+42-minute median**, and the operator ratified it on 2026-08-12 —
+rejecting their own opening suggestion of N = 4 as a deliberate loosening
+rather than an artifact of re-counting. Do not compare a new spec's "7"
+to the old "5"; compare its **N** to 3.
+
+Check it before the set starts — the whole point is that an oversized or
+mis-shaped session is fixed at authoring, not discovered at hour three:
 
 ```bash
 python -m ai_router.spec_admission --spec docs/session-sets/<slug>/spec.md
@@ -217,7 +285,8 @@ independent and none can move to a later session because there is none.
 ```
 
 An exception with no stated reason is not honoured — it is
-indistinguishable from a typo. The cap itself lives in
+indistinguishable from a typo. The exception covers the **count** only; a
+session cannot except itself out of the skeleton. The cap itself lives in
 `ai_router/router-config.yaml` under `authoring.max_steps_per_session`.
 
 ### Other sizing signals
@@ -682,8 +751,12 @@ uatScope: none
 ### Session 1 of N: <Title>
 
 **Steps:**
-1. ...
-2. ...
+1. Register.
+2. <work step 1>
+3. <work step 2 — at most 3 work steps; see the step skeleton above>
+4. Cross-provider verification.
+5. Required portion of the full test suite.
+6. Close-out.
 
 **Creates:** `<paths>`
 **Touches:** `<paths>`

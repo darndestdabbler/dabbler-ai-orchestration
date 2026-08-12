@@ -899,6 +899,16 @@ export const VERDICT_WOULD_CLOSE = "would-close";
 export const VERDICT_UNDECIDED = "undecided-backstop-would-route";
 
 /**
+ * The close-out group row's label.
+ *
+ * Named rather than inlined because the Playwright specs and the unit
+ * tests both look the row up by text, and Set 128 S1 changed it once
+ * already: a string repeated in four files is a rename waiting to go
+ * half-done.
+ */
+export const CLOSE_OUT_GROUP_LABEL = "Close-out readiness";
+
+/**
  * The group row's one line of text.
  *
  * A state other than `fresh` is said FIRST and is never omitted, because
@@ -1021,12 +1031,21 @@ function closeOutTooltip(node: CloseOutNode): string {
  * A LEAF when there is nothing under it — an absent or unreadable
  * projection has no obligation rows, and a twisty that opens onto nothing
  * is the dead affordance every other level in this tree refuses.
+ *
+ * The label is `Close-out readiness`, not `Close-out`, since Set 128 S1.
+ * That set made a step literally named **Close-out** part of the skeleton
+ * every session declares, so the bare label put two rows called
+ * `Close-out` side by side under the same session — one a pending plan
+ * step, one this obligations summary — and the operator read them as a
+ * duplicate. *Readiness* is what this row actually answers: what still
+ * stands between here and close, which is a different question from
+ * whether the close-out step has been executed.
  */
 export function closeOutDescriptor(node: CloseOutNode): RowDescriptor {
   const p = node.obligations;
   return {
     id: `closeout:${node.set.name}/${node.session.number}`,
-    label: "Close-out",
+    label: CLOSE_OUT_GROUP_LABEL,
     description: closeOutSummary(p),
     tooltip: closeOutTooltip(node),
     icon: { kind: "file", slug: ICON_FILES[closeOutGlyph(p)] },

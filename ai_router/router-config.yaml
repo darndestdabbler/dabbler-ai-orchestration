@@ -1243,9 +1243,10 @@ output:
   # deleted it with the cost_report module it named.
   verbose: false               # detailed logging of each API call
 
-# --- Authoring-time admission tests (Set 111 S4) ---
-# Checks a spec author runs BEFORE a set starts, so an oversized session is
-# split at authoring rather than discovered at hour three.
+# --- Authoring-time admission tests (Set 111 S4; shape added by Set 128 S1) ---
+# Checks a spec author runs BEFORE a set starts, so an oversized or
+# mis-shaped session is fixed at authoring rather than discovered at hour
+# three.
 #
 # max_steps_per_session is MEASURED, not asserted. Across the 172 schema-v4
 # sessions in this repo carrying both a parseable spec plan and start/complete
@@ -1253,6 +1254,19 @@ output:
 # (42 -> 84 min), triples the p90 (110 -> 386 min), and nearly triples the
 # share running past two hours (10% -> 28%). The operator target is 15-20 min
 # of work per session plus 5-20 min of verification scaled to risk.
+#
+# RE-BASELINED to 7 by Set 128 S1 - the number now COUNTS SOMETHING ELSE, so
+# do not compare it to the old bands. Every session declares four baked-in
+# ceremony steps (Register, then cross-provider verification / required
+# portion of the full test suite / close-out) plus N authored work steps.
+# The measurement above was taken on specs whose declared steps ALREADY
+# ABSORBED that ceremony - Set 127 S1 spent three of its six on it - so a
+# historical "5 declared" was roughly 3-4 real work steps. 7 = 4 ceremony + 3
+# work, and N = 3 is the value that holds the measured 42-minute median. The
+# operator ratified N = 3 on 2026-08-12, rejecting their own opening
+# suggestion of N = 4 as a deliberate loosening rather than a re-count
+# (journalled in docs/session-sets/128-.../decisions.jsonl). Raising this
+# number loosens the real budget; it is not bookkeeping.
 #
 # Known limit, stated so a green result is not over-read: step count predicts
 # the MEDIAN, not the TAIL. The longest sessions on record (591/562/544/509
@@ -1262,7 +1276,7 @@ output:
 #   sessionSizeException: 4 - terminal ceremony session; steps are independent
 # so the justification survives review instead of being argued at hour three.
 authoring:
-  max_steps_per_session: 5
+  max_steps_per_session: 7
 
 # --- Guidance lifecycle (Set 064) ---
 # Token ceilings for the always-loaded guidance files and the disuse

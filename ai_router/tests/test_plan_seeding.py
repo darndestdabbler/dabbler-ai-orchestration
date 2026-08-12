@@ -436,6 +436,13 @@ class TestReconciliation:
         entries are written by machinery at set start and carry
         ``stepNumber: 1``. Letting one claim planned step 1 would mark a
         step done that nobody did.
+
+        Set 128 S1 goes further: such an entry is not a row at all. It was
+        rendered as an extra ``complete`` step, so the panel showed the
+        path-aware critique — a stage that runs once at the END of a set —
+        finished minutes after registration. Both halves are asserted
+        here, because "it did not claim the planned row" was true the
+        whole time the display was still wrong.
         """
         set_dir = self._seeded(tmp_path)
         SessionLog(set_dir).append_entry(
@@ -460,7 +467,7 @@ class TestReconciliation:
         assert rows[0].status == "pending"
         assert rows[0].box == "[~]"
         assert rows[0].is_planned is True
-        assert rows[-1].step_key == "session-001/path-aware-critique"
+        assert "session-001/path-aware-critique" not in [r.step_key for r in rows]
 
     def test_an_inserted_step_cannot_evict_a_planned_row(self, tmp_path):
         """Round 1, supplementary: the mid-flight insertion cascade.

@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The full-suite intent recognizer misses the plural phrase “full suites,” letting a compressed verification/full-suite tail step pass.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/spec_admission.py:186-203, ai_router/spec_admission.py:280-338, docs/session-sets/128-session-step-skeleton-and-test-ordering/spec.md:149-156`\n  - **Failure scenario:** A future unstarted spec writes step 3 as “Run the full suites, then cross-provider verification,” followed by a separate valid full-suite step and close-out. That is probable because this set’s own spec describes the bad shape as “full suites; verify; close,” but `_INTENT_RE[FULL_SUITE]` only matches singular `suite`, `full pytest/playwright/test`, `required portion`, or `runs of record`; the verification-tail step names only verification to the checker, so no compression finding is emitted.\n  - **Acceptance criterion:** JUDGMENT - An unstarted spec whose verification-tail step says “Run the full suites, then cross-provider verification” must fail with a compression/restructuring finding, while a standalone full-suite tail step phrased “Full suites.” is accepted as the full-suite stage.\n  - **Details:** Violation: the plan requires the checker to catch a step that “compresses verification and the full suite into one instruction, in any order,” “whatever words the author chooses.” Impact: this is the exact cost-staling failure the session exists to prevent, so a reasonable reviewer should not merge a recognizer that gives that shape a false all-clear. Evidence: the code’s full-suite patterns omit plural `suites`, and compression is only reported when `intents_named()` returns more than one tail intent.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A future unstarted spec writes step 3 as “Run the full suites, then cross-provider verification,” followed by a separate valid full-suite step and close-out. That is probable because this set’s own spec describes the bad shape as “full suites; verify; close,” but `_INTENT_RE[FULL_SUITE]` only matches singular `suite`, `full pytest/playwright/test`, `required portion`, or `runs of record`; the verification-tail step names only verification to the checker, so no compression finding is emitted.",
+      "evidencePaths": [
+        "ai_router/spec_admission.py",
+        "docs/session-sets/128-session-step-skeleton-and-test-ordering/spec.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "An unstarted spec whose verification-tail step says “Run the full suites, then cross-provider verification” must fail with a compression/restructuring finding, while a standalone full-suite tail step phrased “Full suites.” is accepted as the full-suite stage."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** Full-suite intent misses common “all tests” wording, so a compressed full-suite + verification instruction can pass.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/spec_admission.py:186`, `ai_router/spec_admission.py:312`, `ai_router/tests/test_spec_admission_shape.py:108`, `docs/session-sets/128-session-step-skeleton-and-test-ordering/spec.md:149`\n  - **Failure scenario:** A future unstarted spec writes the verification tail step as “Run all tests, then verify with a different provider,” followed by the normal full-suite and close-out tail steps. “All tests” is probable AI/operator prose for the full-suite obligation, but `_INTENT_RE[FULL_SUITE]` does not recognize it, so `check_step_shape()` sees only verification and emits no compression finding.\n  - **Acceptance criterion:** `python -c \"exec('import importlib.util\\nimport sys\\nspec = importlib.util.spec_from_file_location(\\\"sa\\\", \\\"ai_router/spec_admission.py\\\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\\\"sa\\\"] = sa\\nspec.loader.exec_module(sa)\\nplan = sa.SessionPlan(1, \\\"x\\\", 5, (\\\"Register.\\\", \\\"Work.\\\", \\\"Run all tests, then verify with a different provider.\\\", \\\"Required portion of the full test suite.\\\", \\\"Close-out.\\\"))\\nraise SystemExit(0 if sa.check_step_shape(plan) else 1)')\"`\n  - **Acceptance expectation:** exit 0\n  - **Details:** Violation: the spec says “A spec must never again be able to declare a step that compresses verification and the full suite into one instruction, in any order.” Impact: this recreates the stale expensive-suite failure the set exists to prevent, with a false all-clear from the checker. Evidence: the full-suite regex covers “full … suite,” “full pytest/playwright/test,” “required portion,” and “runs of record,” but not “all tests”; the compression logic only fires when both intents are recognized.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A future unstarted spec writes the verification tail step as “Run all tests, then verify with a different provider,” followed by the normal full-suite and close-out tail steps. “All tests” is probable AI/operator prose for the full-suite obligation, but `_INTENT_RE[FULL_SUITE]` does not recognize it, so `check_step_shape()` sees only verification and emits no compression finding.",
+      "evidencePaths": [
+        "ai_router/spec_admission.py",
+        "ai_router/tests/test_spec_admission_shape.py",
+        "docs/session-sets/128-session-step-skeleton-and-test-ordering/spec.md"
+      ],
+      "acceptance": {
+        "kind": "executable",
+        "command": "python -c \"exec('import importlib.util\\nimport sys\\nspec = importlib.util.spec_from_file_location(\\\"sa\\\", \\\"ai_router/spec_admission.py\\\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\\\"sa\\\"] = sa\\nspec.loader.exec_module(sa)\\nplan = sa.SessionPlan(1, \\\"x\\\", 5, (\\\"Register.\\\", \\\"Work.\\\", \\\"Run all tests, then verify with a different provider.\\\", \\\"Required portion of the full test suite.\\\", \\\"Close-out.\\\"))\\nraise SystemExit(0 if sa.check_step_shape(plan) else 1)')\"",
+        "expectedExitCode": 0
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    },
+    {
+      "description": "** `resolve_set_status()` ignores the repo’s canonical status aliases and can block already-started/complete sets as “unstarted.”\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/spec_admission.py:341`, `ai_router/spec_admission.py:385`, `ai_router/progress.py:92`, `docs/session-state-schema.md:76`\n  - **Failure scenario:** A historical or consumer-repo set has `session-state.json` with top-level `status: \"completed\"` or `\"done\"`—aliases the repo explicitly canonicalizes on read because this drift has happened before. The new checker returns that raw string, `set_started` is false, and an old non-skeleton spec becomes `REQUIRES RESTRUCTURING` instead of the ratified informational note.\n  - **Acceptance criterion:** `python -c \"exec('import importlib.util\\nimport json\\nimport pathlib\\nimport sys\\nimport tempfile\\nspec = importlib.util.spec_from_file_location(\\\"sa\\\", \\\"ai_router/spec_admission.py\\\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\\\"sa\\\"] = sa\\nspec.loader.exec_module(sa)\\nwith tempfile.TemporaryDirectory() as d:\\n    root = pathlib.Path(d)\\n    (root / \\\"spec.md\\\").write_text(\\\"# X\\\\n\\\\n## Sessions\\\\n\\\\n### Session 1 of 1: X\\\\n\\\\n1. Register.\\\\n2. Do work.\\\\n3. Close-out.\\\\n\\\", encoding=\\\"utf-8\\\")\\n    (root / \\\"session-state.json\\\").write_text(json.dumps({\\\"schemaVersion\\\": 4, \\\"status\\\": \\\"completed\\\"}), encoding=\\\"utf-8\\\")\\n    result = sa.check_spec(str(root / \\\"spec.md\\\"), max_steps=7)\\n    raise SystemExit(0 if result.set_started and result.passed else 1)')\"`\n  - **Acceptance expectation:** exit 0\n  - **Details:** Violation: the ratified behavior is “an informational note for every set already started, complete, or cancelled,” while the reader contract canonicalizes `completed`/`done` to `complete`. Impact: a corpus sweep can produce blocking restructuring findings against already-finished sets, overturning the operator’s ruling. Evidence: `resolve_set_status()` returns any string verbatim, while `set_started` accepts only exact canonical tokens.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A historical or consumer-repo set has `session-state.json` with top-level `status: \"completed\"` or `\"done\"`—aliases the repo explicitly canonicalizes on read because this drift has happened before. The new checker returns that raw string, `set_started` is false, and an old non-skeleton spec becomes `REQUIRES RESTRUCTURING` instead of the ratified informational note.",
+      "evidencePaths": [
+        "ai_router/spec_admission.py",
+        "ai_router/progress.py",
+        "docs/session-state-schema.md"
+      ],
+      "acceptance": {
+        "kind": "executable",
+        "command": "python -c \"exec('import importlib.util\\nimport json\\nimport pathlib\\nimport sys\\nimport tempfile\\nspec = importlib.util.spec_from_file_location(\\\"sa\\\", \\\"ai_router/spec_admission.py\\\")\\nsa = importlib.util.module_from_spec(spec)\\nsys.modules[\\\"sa\\\"] = sa\\nspec.loader.exec_module(sa)\\nwith tempfile.TemporaryDirectory() as d:\\n    root = pathlib.Path(d)\\n    (root / \\\"spec.md\\\").write_text(\\\"# X\\\\n\\\\n## Sessions\\\\n\\\\n### Session 1 of 1: X\\\\n\\\\n1. Register.\\\\n2. Do work.\\\\n3. Close-out.\\\\n\\\", encoding=\\\"utf-8\\\")\\n    (root / \\\"session-state.json\\\").write_text(json.dumps({\\\"schemaVersion\\\": 4, \\\"status\\\": \\\"completed\\\"}), encoding=\\\"utf-8\\\")\\n    result = sa.check_spec(str(root / \\\"spec.md\\\"), max_steps=7)\\n    raise SystemExit(0 if result.set_started and result.passed else 1)')\"",
+        "expectedExitCode": 0
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "8e0cc80a1437cdcd802be846d5bd3f9c07331b42"
+}

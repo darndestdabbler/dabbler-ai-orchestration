@@ -376,8 +376,8 @@
       ]
     },
     {
-      "name": "bookkeeping-cannot-claim-a-planned-row",
-      "why": "An entry carrying a `kind` is machinery's record ABOUT the session — several are written at registration, before any work exists. It RENDERS (it is part of the record and Set 111 S4 showed it) but it may not mark a planned step done. Without this rule a set with pathAwareCritique configured would show step 1 as complete before the session started.",
+      "name": "bookkeeping-is-not-a-step-and-does-not-render",
+      "why": "An entry carrying a `kind` is machinery's record ABOUT the session - several are written at registration, before any work exists. It may not mark a planned step done, and since Set 128 S1 it is not a row at all: a step list renders steps. Rendering it put a `complete` glyph on the path-aware critique - a stage that runs once at the END of a set - minutes after registration, and the operator read it exactly that way. Without this rule a set with pathAwareCritique configured shows a finished stage that has not run.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 2: The forward view\n\n1. Register.\n2. Build it.\n\n**Creates:** the thing\n",
       "expectedSpecSteps": [
@@ -426,15 +426,6 @@
           "description": "Build it.",
           "status": "pending",
           "isPlanned": true,
-          "isActive": false,
-          "startedAt": null
-        },
-        {
-          "stepNumber": 1,
-          "stepKey": "path-aware-critique-policy",
-          "description": "Recorded pathAwareCritique: advisory.",
-          "status": "complete",
-          "isPlanned": false,
           "isActive": false,
           "startedAt": null
         }
@@ -1365,7 +1356,7 @@
     },
     {
       "name": "a-bookkeeping-record-is-transparent-to-the-start-time-chain",
-      "why": "A `path_aware_critique` / `contract_gate` / `dual_surface_mode` / `suggestion_disposition` entry carries a dateTime and renders as a row, but it is a record ABOUT the session written by machinery — which is already why it may not claim a planned row. It must not receive a start of its own, and it must not act as the previous STEP's completion for the row below it: the second step here starts when the first step finished (09:12), not when the policy record was written (10:00). Driven through the plan-less path so the bookkeeping row sits BETWEEN two steps, which is the only place the transparency is observable.",
+      "why": "A `path_aware_critique` / `contract_gate` / `dual_surface_mode` / `suggestion_disposition` entry carries a dateTime, but it is a record ABOUT the session written by machinery - which is why it may not claim a planned row and, since Set 128 S1, is not rendered as a step at all. It must also not act as the previous STEP's completion for the row below it: the second step here starts when the first step finished (09:12), not when the policy record was written (10:00). Driven through the plan-less path with the bookkeeping entry BETWEEN two steps, which is the only place the transparency is observable - if it were merely dropped from the list without being excluded from the chain, step 2 would start at 10:00.",
       "sessionNumber": 1,
       "specMarkdown": "# Fixture spec\n\n### Session 1 of 1: No plan seeded\n\nProse only.\n",
       "expectedSpecSteps": [],
@@ -1418,15 +1409,6 @@
           "isPlanned": false,
           "isActive": false,
           "startedAt": "2026-08-10T09:00:00-04:00"
-        },
-        {
-          "stepNumber": null,
-          "stepKey": "path-aware-critique-policy",
-          "description": "pathAwareCritique: none",
-          "status": "complete",
-          "isPlanned": false,
-          "isActive": false,
-          "startedAt": null
         },
         {
           "stepNumber": 2,

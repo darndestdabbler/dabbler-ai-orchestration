@@ -782,6 +782,19 @@ def build_rows(
     set with no plan gets its start times and a planned set gets both.
     Nothing about which rows exist, or what the ledger says they say,
     changes.
+
+    Set 128 S1 removes one class of row that never was a step. A
+    gate-policy record (``path_aware_critique``, ``contract_gate``,
+    ``dual_surface_mode``, ``suggestion_disposition``) is machinery's
+    record ABOUT the session, written at registration before any work
+    exists, and it was rendered here as a ``complete`` row in the step
+    list. The operator read exactly what it said: *"why would the
+    path-aware critique occur so early?"* — a stage that runs once at the
+    END of a set, shown with a done glyph minutes after registration. It
+    is real, it is already in the ledger the close gates read, and it is
+    not a step; the step list now renders only steps
+    (:func:`is_logged_step`), which is the same predicate that already
+    decided such an entry may not CLAIM a planned row.
     """
     log = read_activity_log(session_set_dir)
     if log is None:
@@ -800,13 +813,14 @@ def build_rows(
     plan = _collapse_by_step_key(
         [e for e in mine if e.get("kind") == PLAN_STEP_KIND]
     )
-    # Everything that is not a plan row still RENDERS -- a bookkeeping
-    # record is part of the session's record and Set 111 S4 showed it.
-    # What it may not do is CLAIM a planned row, which :func:`_reconcile`
-    # enforces with :func:`is_logged_step`.
-    real = _collapse_by_step_key(
-        [e for e in mine if e.get("kind") != PLAN_STEP_KIND]
-    )
+    # A step list renders steps. An entry carrying a `kind` other than
+    # `plan-step` is a gate-policy or bookkeeping record ABOUT the
+    # session -- written by machinery at registration, before any work
+    # exists -- and showing it here put a `complete` glyph on a stage
+    # that had not run (Set 128 S1). `is_logged_step` is the predicate
+    # that already refused it a planned row; it now also decides whether
+    # it is a row at all, so the two answers cannot diverge.
+    real = _collapse_by_step_key([e for e in mine if is_logged_step(e)])
     if not plan:
         evidence = [_evidence(e, is_planned=False) for e in real]
     else:

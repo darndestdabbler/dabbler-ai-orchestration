@@ -10147,7 +10147,7 @@ function buildStepRows(entries, sessionNumber, specSteps, flight = NOT_IN_FLIGHT
   if (mine.length === 0)
     return [];
   const plan = collapseByStepKey(mine.filter((e) => e.kind === PLAN_STEP_KIND));
-  const real = collapseByStepKey(mine.filter((e) => e.kind !== PLAN_STEP_KIND));
+  const real = collapseByStepKey(mine.filter((e) => isLoggedStep(e)));
   const evidence = plan.length === 0 ? real.map((entry) => evidenceOf(entry, false)) : reconcile(plan, real, planMatchesSpec(plan, specSteps));
   return deriveProgress(evidence, flight);
 }
@@ -22491,6 +22491,7 @@ function obligationCounts(projection) {
 }
 var VERDICT_WOULD_CLOSE = "would-close";
 var VERDICT_UNDECIDED = "undecided-backstop-would-route";
+var CLOSE_OUT_GROUP_LABEL = "Close-out readiness";
 function closeOutSummary(projection) {
   const { state } = projection;
   if (state === "absent")
@@ -22572,7 +22573,7 @@ function closeOutDescriptor(node) {
   const p2 = node.obligations;
   return {
     id: `closeout:${node.set.name}/${node.session.number}`,
-    label: "Close-out",
+    label: CLOSE_OUT_GROUP_LABEL,
     description: closeOutSummary(p2),
     tooltip: closeOutTooltip(node),
     icon: { kind: "file", slug: ICON_FILES[closeOutGlyph(p2)] },

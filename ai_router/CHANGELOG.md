@@ -9,6 +9,81 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > below. Recorded here so the release walk has an explicit router-side
 > notation, not just the extension changelog's cross-reference.
 
+## [Unreleased] — the shape a session declares (Set 128)
+
+### Added
+
+- **(Set 128 S1) A spec can no longer declare its steps in the shape that
+  produced two verification-ordering incidents.** The canonical order —
+  targeted tests → verify → remediate → full suites → close — already lived
+  in `session-constitution.md`, and was violated anyway, because nothing
+  checked the shape a spec declared its steps in. Set 127 Session 2 compressed
+  three canonical stages into one numbered instruction in the wrong internal
+  order (`5. Full pytest and the Layer 3 run recorded as runs of record;
+  verify; close.`), and the orchestrator followed the spec's letter over the
+  policy that outranks it: a 752-second pytest run and a 350-second Playwright
+  run, both taken before a verification round that returned a blocking
+  finding, so both were staled by the remediation that followed. Set 112 S3
+  had done the same into 15 runs and 186 minutes.
+
+  `spec_admission.check_step_shape()` now checks the **shape** beside the
+  **count**, reading the step texts it already parses. Every session declares
+  `Register` + its authored work + a fixed three-step tail (cross-provider
+  verification → required portion of the full test suite → close-out), and a
+  tail step that names more than one of those stages — in **either** internal
+  order — is refused as a compression. The four are recognised by **intent**,
+  not exact prose: "Close out" and "Close-out" both pass, and rewording cannot
+  slip the retired ordering through. Scope stops at the tail: a work step that
+  *describes* verification is prose, and a work step that *orders* an early
+  full suite is an ordering question owned by the constitution.
+
+  **Requires restructuring, or an informational note** (operator ratification,
+  2026-08-12): blocking for a set that has not started — no `session-state.json`,
+  or status `not-started`, where restructuring is still a text edit — and an
+  informational note for a set already started, complete, or cancelled. Those
+  specs were authored at a different time under a different approach; nothing
+  about them is wrong and none will be rewritten. Four unstarted specs fail on
+  day one, which is the point: a gate nothing can fail proves nothing
+  (`L-112-1`). Shipped with 12 falsifiers that plant the malformation —
+  including the Set 127 S2 step verbatim — rather than read the regexes; a
+  mutation probe gutting the checker fails 12 of its 19 cases.
+
+### Fixed
+
+- **(Set 128 S1) `session_checklist.build_rows` no longer renders a
+  gate-policy record as a step.** A `path_aware_critique` /
+  `contract_gate` / `dual_surface_mode` / `suggestion_disposition` entry
+  is written at **registration**, before any work exists, and rendered as
+  a `complete` row in the step list — so both the CLI checklist and the
+  Work Explorer said the path-aware critique, a stage that runs once at
+  the **end of a set**, had already finished minutes after the session
+  began. The operator reported it from a live session. The step list now
+  renders only steps, using `is_logged_step` — the same predicate that
+  already refused such an entry a planned row, so the two answers cannot
+  diverge — and the record stays untouched in `activity-log.json`, where
+  the close gates read it. The start-time chain already treated the
+  record as transparent, which is what makes the removal safe rather than
+  merely tidy: the step below it is still dated from the previous
+  **step's** completion, not from when a policy was recorded. Mirrored in
+  `sessionStepModel.ts` with the parity corpus updated in both
+  directions, and falsified for all four kinds (L-069-1: the reported
+  kind is the one 50 sets happen to carry; the others are the same bug).
+
+### Changed
+
+- **(Set 128 S1) `authoring.max_steps_per_session` re-baselined 5 → 7, and the  number now counts something else.** Under the skeleton a session declares
+  four baked-in ceremony steps plus `N` authored work steps, and the operator
+  ratified **N = 3** — rejecting their own opening suggestion of N = 4 as a
+  deliberate loosening rather than an artifact of re-counting. The Set 111 S4
+  measurement (172 schema-v4 sessions: 1–5 declared steps ran a 42-min median,
+  6–8 ran 84 with a 386-min p90) was taken on specs whose declared steps
+  *already absorbed* the ceremony — Set 127 S1 spent three of six on it — so a
+  historical "5 declared" was roughly 3–4 real work steps and the old bands do
+  not transfer. 7 is not a loosening of 5; compare a spec's **N** to 3, not its
+  total to 5. `DEFAULT_MAX_STEPS` is now derived as `CEREMONY_STEPS +
+  WORK_STEP_BUDGET` so the two cannot drift, and the authoring guide carries
+  the table with the re-reading beside it.
+
 ## [Unreleased] — the active step, and the round that posts itself (Set 127)
 
 ### Added

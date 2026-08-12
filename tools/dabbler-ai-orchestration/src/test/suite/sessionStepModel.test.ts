@@ -395,6 +395,69 @@ suite("Set 114 S3 — the row-builder primitives", () => {
     );
   });
 
+  test("a gate-policy record is not a step row (Set 128 S1)", () => {
+    // The operator's report: a `path_aware_critique` record written at
+    // REGISTRATION rendered with a done glyph in the step list, so the
+    // panel said a stage that runs once at the END of a set had already
+    // happened — minutes after the session began. A step list renders
+    // steps; the record stays in the ledger the close gates read.
+    const entries = [
+      { sessionNumber: 1, stepNumber: 1, stepKey: "register", status: "complete" },
+      {
+        sessionNumber: 1,
+        stepNumber: 1,
+        stepKey: "session-001/path-aware-critique",
+        status: "complete",
+        kind: "path_aware_critique",
+      },
+    ];
+    assert.deepStrictEqual(
+      buildStepRows(entries, 1, []).map((r) => r.stepKey),
+      ["register"],
+    );
+  });
+
+  test("EVERY bookkeeping kind is excluded, not just the one that was reported", () => {
+    // L-069-1: a bug is a bug CLASS. `path_aware_critique` is the kind the
+    // operator happened to see, because it is the one 50 sets carry; the
+    // other three are the same shape and would land the same way the next
+    // time a set arms them.
+    for (const kind of [
+      "path_aware_critique",
+      "contract_gate",
+      "dual_surface_mode",
+      "suggestion_disposition",
+    ]) {
+      const rows = buildStepRows(
+        [
+          { sessionNumber: 1, stepKey: "work", status: "complete" },
+          { sessionNumber: 1, stepKey: `policy-${kind}`, status: "complete", kind },
+        ],
+        1,
+        [],
+      );
+      assert.deepStrictEqual(rows.map((r) => r.stepKey), ["work"], kind);
+    }
+  });
+
+  test("a session whose ONLY entries are policy records renders no steps", () => {
+    // The honest answer is an empty step list, not a list of things that
+    // are not steps.
+    const rows = buildStepRows(
+      [
+        {
+          sessionNumber: 1,
+          stepKey: "session-001/path-aware-critique",
+          status: "complete",
+          kind: "path_aware_critique",
+        },
+      ],
+      1,
+      [],
+    );
+    assert.deepStrictEqual(rows, []);
+  });
+
   test("collapse keeps the latest entry at the first position", () => {
     const collapsed = collapseByStepKey([
       { stepKey: "a", status: "in-progress" },

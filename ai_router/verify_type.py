@@ -45,6 +45,18 @@ confirmed it and the file exists, the machine default is a suggestion, and a
 suggestion that silently re-routed every dispatch would be the same
 action-at-a-distance the file exists to eliminate.
 
+**The bar is BOTH, so a half-finished setup says so** (Set 126 S1). The
+design's own bar is that setup is finished when the environment variable is
+set *and* the project file carries the same value. Branch 1 always captured
+``env_value`` and never compared it, so a project with no environment half and
+a project whose environment half *contradicts* the file both printed the same
+confident ``[x]``. :attr:`VerifyTypeResolution.env_agreement` names that
+comparison -- ``agrees`` / ``missing`` / ``disagrees`` -- and :func:`describe`
+reports it. It is **narration, not dispatch**: the file still wins silently,
+``resolved`` still means only "the project file answered", and **no exit code
+moves** (spec authoring decision 2 -- making the bar enforceable is a separate,
+breaking decision owned by whoever can survey the callers of exit 3).
+
 Reuse, not reinvention (spec Session 1 step 4 audit): seat readiness stays in
 :mod:`ai_router.copilot_preflight`, transport diagnosis in
 :mod:`ai_router.transport_diagnostics`, effective-provider identity in
@@ -113,6 +125,30 @@ VERIFY_TYPE_BY_PROFILE: dict[str, str] = {
 SOURCE_PROJECT_FILE = "project-file"
 SOURCE_ENVIRONMENT = "environment"
 SOURCE_UNRESOLVED = "unresolved"
+
+# --- Agreement between the two halves of setup -----------------------------
+#
+# Set 126 S1. The states a resolved project's environment half can be in,
+# relative to the file that actually decides. ``not-applicable`` is a real
+# answer, not a null: on branches 2 and 3 the project file has not answered,
+# so there is no pair to compare and reporting a disagreement would be
+# inventing one.
+
+ENV_AGREEMENT_AGREES = "agrees"
+ENV_AGREEMENT_MISSING = "missing"
+ENV_AGREEMENT_DISAGREES = "disagrees"
+ENV_AGREEMENT_NOT_APPLICABLE = "not-applicable"
+
+#: Every state :attr:`VerifyTypeResolution.env_agreement` can return. Exported
+#: so a caller can branch exhaustively instead of matching strings by eye.
+ENV_AGREEMENT_STATES: frozenset[str] = frozenset(
+    {
+        ENV_AGREEMENT_AGREES,
+        ENV_AGREEMENT_MISSING,
+        ENV_AGREEMENT_DISAGREES,
+        ENV_AGREEMENT_NOT_APPLICABLE,
+    }
+)
 
 # --- Derivation sources (what decided transport.profile) -------------------
 
@@ -359,11 +395,16 @@ class VerifyTypeResolution:
 
     @property
     def resolved(self) -> bool:
-        """True only when setup is finished: the project file exists and is valid.
+        """True when the project file answered: it exists and is valid.
 
-        A branch-2 suggestion is deliberately *not* resolved. The design's own
-        bar is that setup is finished when both the environment variable is
-        set and the project file carries the same value.
+        **Not the same as "setup is finished".** The design's bar is that
+        BOTH halves carry the same value, and Set 126 S1 gave that its own
+        state -- :attr:`env_agreement` -- precisely because this property
+        cannot express it: a project whose environment half is missing or
+        contradicts the file is ``resolved`` and still unfinished. What this
+        property answers is the narrower question dispatch asks, "is there a
+        value to read", which is why a branch-2 suggestion is deliberately
+        not resolved -- nothing has been written yet.
 
         Set 124 S1 retired the old name for this, ``committed``. The file is
         machine/project state and is gitignored, so "committed" named
@@ -387,12 +428,49 @@ class VerifyTypeResolution:
             return None
         return PROFILE_BY_VERIFY_TYPE[self.verify_type]
 
+    @property
+    def env_agreement(self) -> str:
+        """How the environment half compares to the file that decides.
+
+        The comparison the record never made (Set 126 S1). One of
+        :data:`ENV_AGREEMENT_STATES`:
+
+        - ``agrees`` -- both halves carry the same value: setup is finished
+          by the design's own bar.
+        - ``missing`` -- the file answered but ``$AI_ORCHESTRATION_VERIFY_TYPE``
+          is unset (or blank, which branch 2 already treats as unset, so
+          treating it as set here would make the two disagree about the same
+          string).
+        - ``disagrees`` -- both halves are present and they do not match.
+          An *invalid* environment value lands here too, and deliberately:
+          the bar is "carrying the same value", which an unparseable value
+          does not do. Raising instead would put an exception in a narration
+          path, and branch 1's contract is that it never interrogates the
+          environment to decide anything.
+        - ``not-applicable`` -- nothing is resolved from the project file, so
+          there is no pair to compare (branches 2 and 3).
+
+        Never raises, and never affects dispatch: ``transport_profile`` and
+        ``resolved`` are computed without it.
+        """
+        if not self.resolved:
+            return ENV_AGREEMENT_NOT_APPLICABLE
+        declared = (self.env_value or "").strip()
+        if not declared:
+            return ENV_AGREEMENT_MISSING
+        return (
+            ENV_AGREEMENT_AGREES
+            if declared == self.verify_type
+            else ENV_AGREEMENT_DISAGREES
+        )
+
     def to_dict(self) -> dict:
         return {
             "verify_type": self.verify_type,
             "source": self.source,
             "project_file": str(self.project_file) if self.project_file else None,
             "env_value": self.env_value,
+            "env_agreement": self.env_agreement,
             "resolved": self.resolved,
             "needs_confirmation": self.needs_confirmation,
             "needs_setup": self.needs_setup,
@@ -565,14 +643,61 @@ def guided_setup_instructions(project_root: Optional[Path | str] = None) -> str:
     )
 
 
+def env_half_note(resolution: VerifyTypeResolution) -> Optional[str]:
+    """The operator-facing line for a half-finished setup, or ``None``.
+
+    ``None`` is the no-nag case: a setup whose two halves agree, and every
+    branch where there is no pair to compare, print exactly what they printed
+    before Set 126. The note is indented to sit under :func:`describe`'s
+    first line.
+
+    **The note itself is ASCII-only**, including the environment's own value,
+    which is rendered through :func:`ascii` because it is arbitrary machine
+    state and a non-ASCII byte in it would otherwise crash this print on a
+    Windows ``cp1252`` console (L-079-1). That guarantee is this note's, not
+    :func:`describe`'s as a whole: describe's first line echoes the project
+    *path*, which has always been able to carry non-ASCII on a checkout whose
+    directory name does, and re-encoding an operator's own path is a
+    different (pre-existing, out-of-scope) question.
+    """
+    agreement = resolution.env_agreement
+    if agreement == ENV_AGREEMENT_MISSING:
+        return (
+            f"    [!] setup is HALF-FINISHED: ${ENV_VAR} is not set.\n"
+            f"        Dispatch is unaffected -- {PROJECT_FILE_NAME} is what\n"
+            "        decides -- but setup is finished only when BOTH halves\n"
+            "        carry the same value. A terminal opened before the\n"
+            "        variable was set keeps its old environment until it is\n"
+            "        restarted."
+        )
+    if agreement == ENV_AGREEMENT_DISAGREES:
+        declared = ascii((resolution.env_value or "").strip())
+        return (
+            "    [!] the two halves of setup DISAGREE:\n"
+            f"          {PROJECT_FILE_NAME} says {resolution.verify_type}\n"
+            f"          ${ENV_VAR} says {declared}\n"
+            f"        Dispatch uses the FILE: {resolution.verify_type} "
+            f"(transport.profile\n"
+            f"        {resolution.transport_profile}). The environment half is "
+            "a machine\n"
+            "        default this project overrides, so fix whichever of the\n"
+            "        two is wrong."
+        )
+    return None
+
+
 def describe(resolution: VerifyTypeResolution) -> str:
     """One ASCII-only paragraph describing a resolution, for a terminal."""
     if resolution.source == SOURCE_PROJECT_FILE:
-        return (
+        lines = [
             f"[x] verify type: {resolution.verify_type} "
-            f"(from {resolution.project_file})\n"
-            f"    transport.profile derives to: {resolution.transport_profile}"
-        )
+            f"(from {resolution.project_file})",
+            f"    transport.profile derives to: {resolution.transport_profile}",
+        ]
+        note = env_half_note(resolution)
+        if note is not None:
+            lines.append(note)
+        return "\n".join(lines)
     if resolution.source == SOURCE_ENVIRONMENT:
         return (
             f"[~] verify type: {resolution.verify_type} "

@@ -63,6 +63,17 @@ the key works before declaring setup complete.**
 - `AI_ORCHESTRATION_VERIFY_TYPE` is set in the environment, and
 - `project-verify-type.txt` exists, in the place the bootstrap files name, carrying the same value.
 
+**Set 126 S1 made that bar visible.** The resolution record carries
+`env_agreement` — `agrees`, `missing`, `disagrees`, or `not-applicable`
+when the project file has not answered — and `python -m
+ai_router.verify_type` reports a missing or contradicting environment half
+instead of printing the same confident `[x]` a finished setup gets. A
+disagreement names **both** values and states that dispatch uses the file.
+It is narration only: the file still wins silently, `resolved` still means
+"the project file answered", and **no exit code moved** — making the bar
+*enforceable* is a separate, breaking decision (Set 126 authoring decision
+2, journalled in that set's `decisions.jsonl`).
+
 ## The `DIRECT_API` precondition, and the warning that is not a block
 
 When the resolved type is `DIRECT_API`, at least one provider must have

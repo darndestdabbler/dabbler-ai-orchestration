@@ -1,0 +1,1 @@
+{"event": "round-completed", "sessionNumber": 1, "verificationRound": 1, "phase": "discovery", "source": "verify_session_cli", "verdict": "VERIFIED", "blocking": false, "endedLoop": true, "recordedAt": "2026-08-12T10:46:13.360155-04:00", "discoveryBaselineTree": "dfa2ed14082bc222fe201767bf0b0581bcd629f8"}

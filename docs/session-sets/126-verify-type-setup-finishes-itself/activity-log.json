@@ -1,0 +1,92 @@
+{
+  "sessionSetName": "126-verify-type-setup-finishes-itself",
+  "createdDate": "2026-08-12T10:31:11.891470-04:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T10:31:11.891118-04:00",
+      "description": "Register. Journal the two authoring decisions above to `decisions.jsonl`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "name-the-agreement-state-on-the",
+      "dateTime": "2026-08-12T10:31:11.891118-04:00",
+      "description": "**Name the agreement state on the resolution record.** `env_value` is already captured on branch 1; add the comparison the record never made, so a caller can distinguish *agrees*, *missing*, and *disagrees* without re-reading the environment itself. Put it on `to_dict()` so the `--json` consumers see it too. `resolved` keeps its current meaning \u2014 the project file answered \u2014 and the exit code is untouched (authoring decision 2).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "report-it-in-describe",
+      "dateTime": "2026-08-12T10:31:11.891118-04:00",
+      "description": "**Report it in `describe()`.** A resolved project whose env half is missing, or whose env half contradicts the file, must say so in the operator's terminal instead of printing a bare `[x]`. A disagreement must name **both values** and state which one dispatch actually uses (the file), because an operator who cannot see which side won cannot tell whether the fix is to change the file or the environment.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T10:31:11.891118-04:00",
+      "description": "**Falsify in both directions** (`L-112-1`). The rule fires: file-only, and file-vs-env-contradiction, are each reported. The rule does **not** fire indiscriminately: a project where both halves agree still prints the clean `[x]` with no nag, branch-2 and branch-3 output are unchanged, and **the exit code is the same in every one of these cases** \u2014 pin that explicitly, since exit-code drift is the one way this display change could break a caller.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-the",
+      "dateTime": "2026-08-12T10:31:11.891118-04:00",
+      "description": "Full pytest at close after the last edit; verify; close.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T10:33:05.873139-04:00",
+      "description": "Registered Set 126 Session 1 (github-copilot / claude-opus-5 / anthropic); journaled both authoring decisions to decisions.jsonl citing spec.md as origin; posted session-start checklist.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "name-the-agreement-state-on-the",
+      "dateTime": "2026-08-12T10:37:32.152975-04:00",
+      "description": "Added the agreement state the record never had: ENV_AGREEMENT_AGREES/MISSING/DISAGREES/NOT_APPLICABLE + ENV_AGREEMENT_STATES, and VerifyTypeResolution.env_agreement comparing the captured env_value against the file that decides. Published on to_dict() for --json consumers. Never raises (an invalid env value is a disagreement, not an exception, so narration cannot throw); resolved/transport_profile/exit codes untouched.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "report-it-in-describe",
+      "dateTime": "2026-08-12T10:37:32.154307-04:00",
+      "description": "describe() branch 1 now appends env_half_note(): a HALF-FINISHED line when the env half is missing (naming the restart-your-terminal caveat), and a DISAGREE block naming BOTH values and stating that dispatch uses the FILE. Agreeing halves and branches 2/3 print exactly what they printed before. Env value rendered through ascii() so arbitrary machine state cannot crash a cp1252 console (L-079-1). Dogfooded live on this seat in all three states: exit 0 in every one.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-12T10:40:46.615045-04:00",
+      "description": "Added 8 falsifiers (irony budget exactly). FIRES: file-only reports HALF-FINISHED naming the restart caveat; a contradiction names both values and that dispatch uses the FILE; an invalid env value is a disagreement, not an exception in a display path. DOES NOT FIRE: agreeing halves assert the EXACT two-line output (not merely no-[!]); a blank var is missing, not disagreeing (branch 2 already treats blank as unset); branches 2/3 keep [~]/[ ] narration and not-applicable. STRUCTURAL: exit code identical across every agreement state (0 resolved incl. disagreeing, 3 for both unresolved branches) and env_agreement is total, published on to_dict, and ASCII/cp1252-safe for arbitrary env values. Targeted run: 54 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "full-pytest-at-close-after-the",
+      "dateTime": "2026-08-12T10:56:55.376802-04:00",
+      "description": "Verification round 1 (phase=discovery, fan-out 2, lenses spec-conformance + failure-scenario) returned VERIFIED from gpt-5.5 on both calls, anthropic excluded as the orchestrator effective provider; 0 blocking findings. Both verifiers independently raised the same nit: VerifyTypeResolution.resolved still documented itself as True only when setup is finished, which THIS session makes false. Fixed, plus the second nit scoping the ASCII claim to env_half_note (describe first line echoes the project path, pre-existing). Full pytest AFTER that last edit: 4014 passed, 9 skipped in 506s; recorded as the run of record.",
+      "status": "complete"
+    }
+  ]
+}

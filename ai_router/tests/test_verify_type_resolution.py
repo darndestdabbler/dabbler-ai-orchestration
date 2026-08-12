@@ -701,3 +701,237 @@ def test_an_unwritable_gitignore_warns_but_still_records_the_answer(
     err = capsys.readouterr().err
     assert vt.GITIGNORE_RULE in err
     assert "by hand" in err
+
+
+# ---------------------------------------------------------------------------
+# Set 126 S1 -- setup reports its own second half.
+#
+# The design's bar is that setup is finished when BOTH the environment
+# variable and the project file carry the same value. Branch 1 captured
+# ``env_value`` from the start and never compared it, so "file only" and
+# "file CONTRADICTED by the environment" printed the same confident [x].
+#
+# Both directions (L-112-1). The rule FIRES on a missing half and on a
+# disagreeing half. It does NOT fire indiscriminately: agreeing halves keep
+# the clean [x] with no nag, branches 2 and 3 are byte-identical to before,
+# and -- the one way a display change could break a caller -- **no exit code
+# moves in any of these cases**, which is pinned explicitly below.
+# ---------------------------------------------------------------------------
+
+
+def test_a_file_only_setup_reports_its_missing_second_half(project, monkeypatch):
+    """FIRES (defect 2, half one): the file answered, the environment did not.
+
+    Before Set 126 this was indistinguishable from a finished setup -- the
+    state the design's own bar calls unfinished printed the same bare [x]."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+
+    resolution = vt.resolve_verify_type()
+
+    assert resolution.resolved is True
+    assert resolution.env_agreement == vt.ENV_AGREEMENT_MISSING
+    assert resolution.to_dict()["env_agreement"] == vt.ENV_AGREEMENT_MISSING
+
+    text = vt.describe(resolution)
+    assert "[!]" in text
+    assert "HALF-FINISHED" in text
+    assert vt.ENV_VAR in text
+    # The false-alarm case an operator WILL hit: the variable was set, but
+    # this terminal predates it. Saying so is what stops a correct setup
+    # being re-done.
+    assert "restarted" in text
+    # ...without ever suggesting dispatch is broken. It is not.
+    assert "Dispatch is unaffected" in text
+
+
+def test_a_disagreeing_env_half_names_both_values_and_the_winner(
+    project, monkeypatch
+):
+    """FIRES (defect 2, half two): both halves present, contradicting.
+
+    An operator who cannot see WHICH side won cannot tell whether the fix is
+    to change the file or the environment, so the report must name both
+    values and state that the file is what dispatch uses."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    monkeypatch.setenv(vt.ENV_VAR, vt.DIRECT_API)
+
+    resolution = vt.resolve_verify_type()
+
+    assert resolution.env_agreement == vt.ENV_AGREEMENT_DISAGREES
+    # The file still wins SILENTLY for dispatch -- narration changed, the
+    # resolution order did not (standing decision 5).
+    assert resolution.verify_type == vt.COPILOT_CLI
+    assert resolution.transport_profile == "copilot-cli"
+
+    text = vt.describe(resolution)
+    assert "DISAGREE" in text
+    assert vt.COPILOT_CLI in text and vt.DIRECT_API in text
+    assert vt.PROJECT_FILE_NAME in text and vt.ENV_VAR in text
+    assert "Dispatch uses the FILE" in text
+
+
+def test_an_invalid_env_half_is_a_disagreement_not_an_exception(
+    project, monkeypatch
+):
+    """FIRES, and stays a narration path: a typo'd environment value does not
+    carry the same value as the file, so it disagrees.
+
+    Raising here would put an exception in a *display* path and would break
+    branch 1's contract that the file answers without the environment being
+    able to decide anything. ``parse_verify_type`` still raises where the
+    value is being *used* (branch 2); this is where it is being reported."""
+    vt.write_project_verify_type(project, vt.DIRECT_API)
+    monkeypatch.setenv(vt.ENV_VAR, "DIRECT-API")  # the hyphen typo
+
+    resolution = vt.resolve_verify_type()
+
+    assert resolution.resolved is True
+    assert resolution.verify_type == vt.DIRECT_API
+    assert resolution.env_agreement == vt.ENV_AGREEMENT_DISAGREES
+    assert "DIRECT-API" in vt.describe(resolution)
+
+
+def test_agreeing_halves_print_the_clean_check_with_no_nag(project, monkeypatch):
+    """DOES NOT FIRE: a finished setup gains nothing at all.
+
+    Asserted as the EXACT two lines, not merely "no [!]": a nag that only
+    grew quieter would still be a nag on every session of every correctly
+    configured project."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    monkeypatch.setenv(vt.ENV_VAR, vt.COPILOT_CLI)
+
+    resolution = vt.resolve_verify_type()
+
+    assert resolution.env_agreement == vt.ENV_AGREEMENT_AGREES
+    assert vt.env_half_note(resolution) is None
+    lines = vt.describe(resolution).splitlines()
+    assert lines == [
+        f"[x] verify type: {vt.COPILOT_CLI} "
+        f"(from {project / vt.PROJECT_FILE_NAME})",
+        "    transport.profile derives to: copilot-cli",
+    ]
+
+
+def test_a_blank_env_half_is_missing_not_disagreeing(project, monkeypatch):
+    """DOES NOT FIRE as a disagreement: branch 2 already treats a blank
+    variable as unset (``raw_env.strip()``), so reporting the same string as
+    a *contradicting value* would make the two halves of this module
+    disagree about what "set" means -- and would tell the operator to go fix
+    a value that is not there."""
+    vt.write_project_verify_type(project, vt.DIRECT_API)
+    monkeypatch.setenv(vt.ENV_VAR, "   ")
+
+    resolution = vt.resolve_verify_type()
+
+    assert resolution.env_agreement == vt.ENV_AGREEMENT_MISSING
+    assert "DISAGREE" not in vt.describe(resolution)
+
+
+def test_branch_2_and_branch_3_narration_are_untouched(project, monkeypatch):
+    """DOES NOT FIRE where there is no pair to compare.
+
+    On branch 2 the environment IS the answer and no file has spoken; on
+    branch 3 neither has. A comparison in either place would be inventing a
+    disagreement out of a single value."""
+    monkeypatch.setenv(vt.ENV_VAR, vt.COPILOT_CLI)
+    branch_2 = vt.resolve_verify_type()
+    assert branch_2.source == vt.SOURCE_ENVIRONMENT
+    assert branch_2.env_agreement == vt.ENV_AGREEMENT_NOT_APPLICABLE
+    text_2 = vt.describe(branch_2)
+    assert "[~]" in text_2 and "[!]" not in text_2
+    assert "--confirm" in text_2
+
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+    branch_3 = vt.resolve_verify_type()
+    assert branch_3.source == vt.SOURCE_UNRESOLVED
+    assert branch_3.env_agreement == vt.ENV_AGREEMENT_NOT_APPLICABLE
+    text_3 = vt.describe(branch_3)
+    assert "[ ] verify type: unresolved" in text_3
+    assert "[!]" not in text_3
+
+
+def test_the_exit_code_is_identical_in_every_agreement_state(
+    project, monkeypatch, capsys
+):
+    """The one way this display change could break a caller.
+
+    Exit 3 is consumed as "guided setup required", and this repo's own seat
+    is currently in exactly the half-configured state that would start
+    failing. Authoring decision 2: the new information arrives as output, not
+    as a failure. Every resolved state exits 0 -- including the disagreeing
+    one -- and the two unresolved branches keep exit 3."""
+    assert vt.main([]) == vt.EXIT_SETUP_REQUIRED  # branch 3
+    monkeypatch.setenv(vt.ENV_VAR, vt.COPILOT_CLI)
+    assert vt.main([]) == vt.EXIT_SETUP_REQUIRED  # branch 2
+
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    for value, expected in (
+        (vt.COPILOT_CLI, vt.ENV_AGREEMENT_AGREES),
+        (vt.DIRECT_API, vt.ENV_AGREEMENT_DISAGREES),
+        ("garbage", vt.ENV_AGREEMENT_DISAGREES),
+    ):
+        monkeypatch.setenv(vt.ENV_VAR, value)
+        assert vt.resolve_verify_type().env_agreement == expected
+        assert vt.main([]) == vt.EXIT_OK, value
+        assert vt.main(["--json"]) == vt.EXIT_OK, value
+
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+    assert vt.resolve_verify_type().env_agreement == vt.ENV_AGREEMENT_MISSING
+    assert vt.main([]) == vt.EXIT_OK
+    capsys.readouterr()
+
+
+def test_env_agreement_is_total_ascii_and_published(project, monkeypatch):
+    """STRUCTURAL, beside the textual assertions above (L-112-1).
+
+    Three properties that hold however the narration is worded: the state is
+    always one the vocabulary names (a caller can branch exhaustively), it is
+    on ``to_dict()`` so ``--json`` consumers see it, and the NOTE this session
+    adds is ASCII-only -- including the environment's own value, which is
+    arbitrary machine state that would otherwise crash this print on a
+    Windows cp1252 console (L-079-1).
+
+    The whole-``describe`` encode below is an end-to-end companion, not a
+    wider claim: describe's first line echoes the project path, which can
+    carry non-ASCII on a checkout whose directory name does. That is
+    pre-existing and outside this session's scope, so the path is asserted
+    ASCII by construction first."""
+    vt.write_project_verify_type(project, vt.COPILOT_CLI)
+    assert str(project).isascii()  # the premise of the describe() check below
+
+    for value in (
+        None,
+        "",
+        "   ",
+        vt.COPILOT_CLI,
+        vt.DIRECT_API,
+        " COPILOT_CLI ",
+        "copilot_cli",
+        "cafe\u0301 \u2014 not a verify type",
+    ):
+        if value is None:
+            monkeypatch.delenv(vt.ENV_VAR, raising=False)
+        else:
+            monkeypatch.setenv(vt.ENV_VAR, value)
+
+        resolution = vt.resolve_verify_type()
+        agreement = resolution.env_agreement
+
+        assert agreement in vt.ENV_AGREEMENT_STATES, value
+        assert resolution.to_dict()["env_agreement"] == agreement
+        # Dispatch never moves, whatever the environment says.
+        assert resolution.transport_profile == "copilot-cli"
+        note = vt.env_half_note(resolution)
+        assert note is None or note.isascii(), value
+        text = vt.describe(resolution)
+        assert text.isascii(), value
+        text.encode("cp1252")
+
+    # ...and the state is a real answer everywhere, not just on branch 1.
+    monkeypatch.delenv(vt.ENV_VAR, raising=False)
+    (project / vt.PROJECT_FILE_NAME).unlink()
+    assert (
+        vt.resolve_verify_type().env_agreement
+        in vt.ENV_AGREEMENT_STATES
+    )

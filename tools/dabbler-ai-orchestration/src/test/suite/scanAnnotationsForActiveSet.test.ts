@@ -300,7 +300,7 @@ suite("scanAnnotationsForActiveSet — end-to-end dedup flow", () => {
       // dedup
       const { deduplicateAnnotations } =
         // late require to avoid top-level vscode pulls in other tests
-        require("../../configEditor/annotationParser");
+        require("../../utils/annotationParser");
       const fresh = deduplicateAnnotations(round2, existing);
       assert.strictEqual(fresh.length, 0);
     } finally {
@@ -323,7 +323,7 @@ suite("scanAnnotationsForActiveSet — end-to-end dedup flow", () => {
         '# @dabbler:outsource-review("first")\n' +
         '# @dabbler:outsource-review("second")\n';
       const round2 = scanFilesForAnnotations(["/ws/x.py"], root, now, reader);
-      const { deduplicateAnnotations } = require("../../configEditor/annotationParser");
+      const { deduplicateAnnotations } = require("../../utils/annotationParser");
       const fresh = deduplicateAnnotations(round2, loadExistingQueueEntries(dir));
       assert.strictEqual(fresh.length, 1);
       assert.strictEqual(fresh[0].reason, "second");

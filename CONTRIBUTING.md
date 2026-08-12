@@ -157,8 +157,8 @@ and opens the Dabbler view for you (see the authoring guide). Two modes:
 ```bash
 cd tools/dabbler-ai-orchestration
 npm run walk                 # the fixture project, with session sets
-npm run walk -- --empty      # a project with NO sets -- the only state
-                             # that shows the Getting Started form
+npm run walk -- --empty      # a project with NO sets -- the first-run
+                             # window a new adopter actually opens
 ```
 
 `npm run make-uat-workspace` still generates the copy without launching

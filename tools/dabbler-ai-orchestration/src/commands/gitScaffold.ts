@@ -30,7 +30,7 @@ import {
   spawnDetached,
   writeCopilotSeatStatusMarker,
 } from "../utils/copilotSeatSetup";
-import { providerKeyPresent } from "../utils/gettingStartedDetection";
+import { providerKeyPresent } from "../utils/providerKey";
 import {
   describeMissingPython,
   probePythonPresence,

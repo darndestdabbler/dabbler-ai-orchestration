@@ -1,9 +1,17 @@
 // Set 059 — regression test for the operator-found 0.28.0 defect:
 // `activate()` returned early when no workspace folder was open, leaving the
-// webview view provider AND every command unregistered (Session Sets view
+// view provider AND every command unregistered (the Dabbler view
 // hung; "Set up a new project" / "Get Started" silently no-op'd) in exactly
 // the case those commands exist for. This test drives the REAL activate() with
 // no folder and asserts the bootstrap surface still registers.
+//
+// Set 123 S3: the surface that must survive a folder-less activation is the
+// native `TreeView` — the webview this file used to capture is deleted. The
+// regression is unchanged in substance (activation must not bail early), so
+// the assertions follow the surface rather than retiring with it: a tree that
+// is never created hangs exactly like a webview provider that never
+// registered, and `getChildren` must answer rather than throw when there is
+// no folder to scan.
 
 import * as assert from "assert";
 import * as path from "path";
@@ -32,12 +40,12 @@ function fakeContext(): vscode.ExtensionContext {
 
 suite("activation — no workspace folder open (Set 059 regression)", () => {
   let registered: string[];
-  let providerRegistered: boolean;
+  let treeCreated: boolean;
   let origRegisterCommand: typeof vscode.commands.registerCommand;
-  let origRegisterProvider: typeof vscode.window.registerWebviewViewProvider;
+  let origCreateTreeView: typeof vscode.window.createTreeView;
   let origFolders: readonly vscode.WorkspaceFolder[] | undefined;
   let activated: vscode.ExtensionContext[];
-  let capturedProvider: vscode.WebviewViewProvider | undefined;
+  let capturedTreeProvider: vscode.TreeDataProvider<unknown> | undefined;
   let executed: string[];
   let origExecuteCommand: typeof vscode.commands.executeCommand;
 
@@ -51,12 +59,12 @@ suite("activation — no workspace folder open (Set 059 regression)", () => {
 
   setup(() => {
     registered = [];
-    providerRegistered = false;
+    treeCreated = false;
     activated = [];
-    capturedProvider = undefined;
+    capturedTreeProvider = undefined;
     executed = [];
     origRegisterCommand = vscode.commands.registerCommand;
-    origRegisterProvider = vscode.window.registerWebviewViewProvider;
+    origCreateTreeView = vscode.window.createTreeView;
     origExecuteCommand = vscode.commands.executeCommand;
     origFolders = vscode.workspace.workspaceFolders;
 
@@ -68,12 +76,14 @@ suite("activation — no workspace folder open (Set 059 regression)", () => {
       registered.push(id);
       return { dispose() {} };
     };
-    (vscode.window as { registerWebviewViewProvider: unknown }).registerWebviewViewProvider =
-      (_id: string, provider: vscode.WebviewViewProvider) => {
-        providerRegistered = true;
-        capturedProvider = provider;
-        return { dispose() {} };
-      };
+    (vscode.window as { createTreeView: unknown }).createTreeView = (
+      _id: string,
+      opts: { treeDataProvider: vscode.TreeDataProvider<unknown> },
+    ) => {
+      treeCreated = true;
+      capturedTreeProvider = opts.treeDataProvider;
+      return { dispose() {}, message: "" };
+    };
     (vscode.commands as { executeCommand: unknown }).executeCommand = (cmd: string) => {
       executed.push(cmd);
       return Promise.resolve(undefined);
@@ -95,16 +105,15 @@ suite("activation — no workspace folder open (Set 059 regression)", () => {
       }
     }
     (vscode.commands as { registerCommand: unknown }).registerCommand = origRegisterCommand;
-    (vscode.window as { registerWebviewViewProvider: unknown }).registerWebviewViewProvider =
-      origRegisterProvider;
+    (vscode.window as { createTreeView: unknown }).createTreeView = origCreateTreeView;
     (vscode.workspace as { workspaceFolders: unknown }).workspaceFolders = origFolders;
   });
 
-  test("registers the Session Sets view provider even with no folder", () => {
+  test("creates the Work Explorer tree even with no folder", () => {
     activateTracked();
     assert.ok(
-      providerRegistered,
-      "the webview view provider must register so the view does not hang",
+      treeCreated,
+      "the tree view must be created so the Dabbler view does not hang",
     );
   });
 
@@ -130,47 +139,23 @@ suite("activation — no workspace folder open (Set 059 regression)", () => {
     );
   });
 
-  test("the registered view renders (no folder) instead of hanging", () => {
+  test("the created tree serves roots (no folder) instead of hanging", async () => {
     activateTracked();
-    assert.ok(capturedProvider, "provider should have been captured at registration");
+    assert.ok(capturedTreeProvider, "provider should have been captured at createTreeView");
 
-    // Resolve the view the way VS Code would, with a minimal fake WebviewView,
-    // and assert it produces real HTML synchronously — proving the empty-state
-    // view renders rather than throwing / hanging when no folder is open.
-    let html = "";
-    const fakeWebviewView = {
-      webview: {
-        options: {},
-        cspSource: "vscode-resource:",
-        asWebviewUri: (u: vscode.Uri) => u,
-        onDidReceiveMessage: () => ({ dispose() {} }),
-        postMessage: () => Promise.resolve(true),
-        set html(v: string) {
-          html = v;
-        },
-        get html() {
-          return html;
-        },
-      },
-      onDidDispose: () => ({ dispose() {} }),
-    } as unknown as vscode.WebviewView;
-
-    assert.doesNotThrow(() =>
-      capturedProvider!.resolveWebviewView(
-        fakeWebviewView,
-        {} as vscode.WebviewViewResolveContext,
-        {} as vscode.CancellationToken,
-      ),
-    );
-    assert.ok(html.includes("<!DOCTYPE html"), "the view must render an HTML shell, not hang");
+    // Ask for roots the way VS Code would. With no folder there is nothing to
+    // scan, so the correct answer is an EMPTY list — the failure this guards
+    // is a throw or a hang, either of which leaves the view spinning forever.
+    const roots = await capturedTreeProvider!.getChildren(undefined);
+    assert.ok(Array.isArray(roots), "getChildren must return a list, not throw");
   });
 
-  test("does NOT auto-open the Get Started wizard in a fresh no-folder window", () => {
+  test("does NOT auto-open the Get Started doc in a fresh no-folder window", () => {
     activateTracked();
     // Onboarding auto-`getStarted` is reserved for an opened workspace; in a
     // bare no-folder window it must stay quiet (workspaceState does not persist
-    // there, so otherwise it would pop on every launch). The view's Getting
-    // Started surface and the Command Palette remain the entry points.
+    // there, so otherwise it would pop on every launch). The Command Palette
+    // remains the entry point.
     assert.ok(
       !executed.includes("dabbler.getStarted"),
       `onboarding should not auto-fire getStarted with no folder; executed: ${executed.join(", ")}`,

@@ -704,50 +704,6 @@ export async function launchVSCode(
   }
 }
 
-/**
- * Activate the Dabbler activity-bar view container and wait for the
- * Session Sets webview tree to render. Returns a FrameLocator into
- * the webview's inner content frame so callers can chain treeitem
- * queries off it.
- *
- * Set 029 Session 4 pivot: the Session Sets view is now a webview
- * (CustomSessionSetsView), not a native TreeDataProvider. VS Code
- * wraps webview content in a two-level iframe stack: an outer
- * sandboxing iframe and an inner content iframe. Both must be
- * traversed before locating the `role="tree"` element rendered by
- * the webview's client.js.
- */
-export async function openSessionSetsView(
-  page: Page,
-): Promise<import("@playwright/test").FrameLocator> {
-  const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="AI Work Explorer"]',
-  );
-  await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
-  await activityIcon.click();
-  // The webview shell lives inside `iframe.webview` (outer sandbox)
-  // → `iframe#active-frame` (inner content). The role="tree" element
-  // is rendered by client.js into <main id="root"> in the inner
-  // frame. Disambiguate by the extensionId baked into the iframe src:
-  // VS Code hosts ALL webview iframes in one shared overlay container
-  // (NOT inside the side-bar part's DOM), and on empty workspaces the
-  // Set 060 Getting Started instructions doc opens as a markdown
-  // preview — a second `iframe.webview.ready` (extensionId
-  // vscode.markdown-language-features) that breaks an unscoped
-  // strict-mode locator.
-  const outer = page.frameLocator(
-    'iframe.webview.ready[src*="dabbler-ai-orchestration"]',
-  );
-  // Target the content iframe by id: the webview host page keeps an
-  // old and a new inner iframe alive transiently while (re)loading
-  // content, so a bare `iframe` locator can strict-mode-violate on
-  // fast runs (observed on the macOS CI runner).
-  const inner = outer.frameLocator("iframe#active-frame");
-  // Wait for the view to render (client.js has received the first
-  // rowsSnapshot).
-  await inner.locator("#root").waitFor({ state: "attached", timeout: 30_000 });
-  return inner;
-}
 
 /**
  * Trigger the refresh command — equivalent to clicking the
@@ -855,7 +811,7 @@ export function stampModule(h: FixtureHandle, moduleSlug: string): void {
  */
 export async function openDabblerContainer(page: Page): Promise<void> {
   const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="AI Work Explorer"]',
+    '.activitybar .action-label[aria-label*="AI Orch"]',
   );
   await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
   await activityIcon.click();

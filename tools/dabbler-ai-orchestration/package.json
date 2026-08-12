@@ -1,7 +1,7 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Getting Started form (the onboarding entry point), Work Explorer, and cost dashboard for the Dabbler AI-led workflow.",
+  "description": "Work Explorer for the Dabbler AI-led workflow: session sets, modules and session plans in a native tree, plus the git and scaffolding commands the workflow runs on.",
   "version": "0.51.0",
   "publisher": "DarndestDabbler",
   "private": true,
@@ -45,7 +45,7 @@
       "activitybar": [
         {
           "id": "dabblerSessionSetsContainer",
-          "title": "AI Work Explorer",
+          "title": "AI Orch",
           "icon": "media/activity-bar-icon.svg"
         }
       ]
@@ -53,16 +53,9 @@
     "views": {
       "dabblerSessionSetsContainer": [
         {
-          "type": "webview",
-          "id": "dabblerSessionSets",
-          "name": "Setup & Status",
-          "contextualTitle": "AI Work Explorer",
-          "when": "dabblerSessionSets.setupNeeded"
-        },
-        {
           "id": "dabblerWorkExplorerTree",
           "name": "Work Explorer",
-          "contextualTitle": "AI Work Explorer"
+          "contextualTitle": "AI Orch"
         }
       ]
     },
@@ -172,11 +165,6 @@
         "icon": "$(beaker)"
       },
       {
-        "command": "dabbler.importPlan",
-        "title": "Import Project Plan",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabbler.newModule",
         "title": "New Module",
         "category": "Dabbler",
@@ -210,16 +198,6 @@
         "icon": "$(list-tree)"
       },
       {
-        "command": "dabbler.generateSessionSetPrompt",
-        "title": "Generate Session-Set Prompt",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.generateParallelSessionSetPrompt",
-        "title": "Generate Parallel Session-Set Prompt (advanced)",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabbler.copyModuleDecompositionPrompt",
         "title": "Copy Module Decomposition Prompt",
         "category": "Dabbler"
@@ -229,12 +207,6 @@
         "title": "Troubleshoot",
         "category": "Dabbler",
         "icon": "$(debug)"
-      },
-      {
-        "command": "dabbler.showCostDashboard",
-        "title": "Show Cost Dashboard",
-        "category": "Dabbler",
-        "icon": "$(graph)"
       },
       {
         "command": "dabblerSessionSets.cancel",
@@ -263,12 +235,6 @@
         "title": "Set Up Copilot Seat",
         "category": "Dabbler",
         "icon": "$(github)"
-      },
-      {
-        "command": "dabbler.openConfigEditor",
-        "title": "Open Dabbler Config Editor",
-        "category": "Dabbler",
-        "icon": "$(settings-gear)"
       },
       {
         "command": "dabbler.flagDecisionForReview",
@@ -335,10 +301,6 @@
           "when": "dabblerSessionSets.e2eSupportActive"
         },
         {
-          "command": "dabbler.showCostDashboard",
-          "when": "dabblerSessionSets.routesCost"
-        },
-        {
           "command": "dabblerWorkExplorer.activateSet",
           "when": "false"
         },
@@ -356,11 +318,6 @@
           "command": "dabblerSessionSets.refresh",
           "when": "view == dabblerWorkExplorerTree",
           "group": "navigation@1"
-        },
-        {
-          "command": "dabbler.showCostDashboard",
-          "when": "view == dabblerWorkExplorerTree && dabblerSessionSets.routesCost",
-          "group": "navigation@2"
         },
         {
           "command": "dabbler.getStarted",

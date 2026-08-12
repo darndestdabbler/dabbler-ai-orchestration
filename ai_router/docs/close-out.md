@@ -675,8 +675,9 @@ The close-out turn prints no cost report. `cost_report` was deleted in Set 119 S
 in the package called it, and on the Copilot CLI transport every routed
 call records `billed_usage_unavailable: true` with `cost_usd: 0.0`, so
 the report it produced was zeros. `python -m ai_router.report` still
-reads `router-metrics.jsonl` for a governance summary, and the
-extension's cost dashboard is unchanged.
+reads `router-metrics.jsonl` for a governance summary, and that file is
+unchanged. (Set 123 S3 deleted the extension's cost dashboard, which
+rendered the same data; `python -m ai_router.report` is the surface now.)
 
 ---
 
@@ -1117,7 +1118,7 @@ Symptoms:
   final session but the ledger has no closeout event for it).
 - `--repair` walks emit a "state says closed but no closeout event
   for session N" drift message (drift case 1 in Section 5).
-- The cost dashboard misses session `N`'s spend because the
+- `python -m ai_router.report` misses session `N`'s spend because the
   router never recorded the calls.
 
 Telltale signs in the file itself: hand-typed timestamps with

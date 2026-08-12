@@ -19,7 +19,14 @@
 //   npm run compile && npx tsc --outDir out
 //   node scripts/capture-readme-shots.js
 //
-// Writes media/work-explorer-modules.png and media/getting-started.png.
+// Writes media/work-explorer-modules.png.
+//
+// Set 123 S3: the Getting Started capture is GONE with the form it shot. The
+// setup webview is deleted -- a project's verify type is resolved in the
+// terminal by `python -m ai_router.verify_type` -- so there is no form to
+// photograph, and `media/getting-started.png` is removed rather than left in
+// the README pointing at a surface that no longer exists. The Work Explorer
+// hero shot is unaffected: the tree is the whole extension now.
 
 const fs = require("fs");
 const path = require("path");
@@ -64,19 +71,11 @@ async function shootLocator(page, locator, outFile) {
 /**
  * Collapse a named workbench pane, if it is present and open.
  *
- * Two uses here, both about giving the shot's subject the whole sidebar:
- *
- * - Collapsing **Setup & Status** for the tree shot. On a healthy repo that
- *   pane is absent entirely -- the presence rule is one of this release's
- *   headline behaviours -- but this capture runs on a machine with no provider
- *   API keys, so `dabblerSessionSets.setupNeeded` is true and it renders a "no
- *   provider API key was found" warning. Honest, and completely wrong for a
- *   Marketplace hero image. The harness deliberately strips DABBLER_* from the
- *   Electron environment via an allowlist the Layer 3 run of record depends on,
- *   so that is not something to edit at release time.
- * - Collapsing **Work Explorer** for the Getting Started shot, so the webview
- *   is tall enough to show the form the README's alt text promises instead of
- *   cutting it off below the fold.
+ * Set 123 S3: both former callers were about hiding the OTHER pane, and there
+ * is no other pane -- the container contributes the Work Explorer tree and
+ * nothing else. Kept because it is harmless and self-guarding (it no-ops when
+ * the named pane is absent), and because a second view is the kind of thing
+ * that comes back.
  */
 async function collapsePane(page, title) {
   const header = page.locator(".pane-header").filter({ hasText: title }).first();
@@ -119,7 +118,6 @@ async function captureWorkExplorer() {
 
     launch = await H.launchVSCode(base.repo_root);
     const pane = await H.openWorkExplorerTree(launch.page);
-    await collapsePane(launch.page, "Setup & Status");
     // Walk all four levels open: module -> status bucket -> session set ->
     // sessions. The fourth level is this release's headline addition, so the
     // hero image should actually show it rather than stopping at set rows.
@@ -136,40 +134,8 @@ async function captureWorkExplorer() {
   }
 }
 
-async function captureGettingStarted() {
-  console.log("[2/2] Getting Started, empty workspace");
-  const tmp = H.makeTmpDir("dabbler-readme-gs");
-  let launch;
-  try {
-    // A genuinely empty folder: no docs/, no sets, so the Setup & Status
-    // webview is the surface that renders (its `when` clause is satisfied).
-    const empty = path.join(tmp, "new-project");
-    fs.mkdirSync(empty, { recursive: true });
-
-    launch = await H.launchVSCode(empty);
-    const frame = await H.openSessionSetsView(launch.page);
-    // Give the webview the whole sidebar, or the form sits below the fold and
-    // the shot shows only the System Status warnings above it.
-    await collapsePane(launch.page, "Work Explorer");
-    const title = frame.locator(".gs-title").first();
-    await title.waitFor({ state: "visible", timeout: 30_000 });
-    await title.scrollIntoViewIfNeeded();
-    await launch.page.waitForTimeout(600);
-    // Here the webview IS the subject, so the whole sidebar is the frame.
-    await shootLocator(
-      launch.page,
-      launch.page.locator(".part.sidebar"),
-      path.join(MEDIA, "getting-started.png"),
-    );
-  } finally {
-    if (launch) await H.closeVSCode(launch).catch(() => {});
-    H.cleanupTmpDir(tmp);
-  }
-}
-
 (async () => {
   await captureWorkExplorer();
-  await captureGettingStarted();
   console.log("done");
 })().catch((err) => {
   console.error("capture failed:", err);

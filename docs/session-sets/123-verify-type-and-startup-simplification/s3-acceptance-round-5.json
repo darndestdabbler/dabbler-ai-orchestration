@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 5,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "cedf0317d528845673476cd2e36e318a6a76f49d",
+  "fixedTree": "6fad658f30791894fee18bf67e9d7924669d1c7b",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T07:24:00.429073+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The extension-local README still directs users to the retired Getting Started form for provider setup. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orc ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The extension-local README’s provider/setup section no longer says a Getting Started form configures or asks provider setup, and instead points to the surviving setup flow.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

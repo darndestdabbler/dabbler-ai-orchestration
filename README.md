@@ -134,43 +134,51 @@ palette.
 
 ---
 
-## For new projects: the Getting Started form
+## For new projects: set up in two commands
 
 If you're starting a new project — greenfield, or an existing local
-project that hasn't yet adopted the workflow — the recommended
-starting point is **`Dabbler: Get Started`** from the command palette.
-The Work Explorer's Getting Started form asks one setup question —
-**provider access**: direct `DABBLER_*` API keys (the default) or a
-GitHub Copilot CLI seat that routes calls through your Copilot
-subscription with no provider keys. Your pick persists through a window
-reload. Environment faults surface in a persistent **System Status
-strip** above the form (and above the Work Explorer tree), visible
-only when a fault exists: a missing Python interpreter, a missing
-provider API key on the direct-API option, or a missing `copilot`
-CLI with the Copilot seat option selected. The form also runs the
-verification **budget / NTE step** (saved to
-`ai_router/budget.yaml` —
-[schema](docs/budget-yaml-schema.md); prerequisites are checked before
-any write, so a missing one fails with a friendly explainer and
-leaves nothing behind) — and performs a one-click project scaffold: the
-`.venv` with the router package, the AI-agent instruction files, and
-the `docs/session-sets/` home. With the Copilot seat option, Build
-also runs the seat's catalog check and enables the seat profile only
-when the seat confirms two distinct provider families — validated so
-far only on a single personal seat (the same seat Set 078's evidence
-came from); multi-seat and enterprise-seat model availability are not
-yet validated, and an enterprise-managed seat may expose only one
-provider family and fail the two-provider check even when the guided
-flow itself succeeds — the form reports that honestly instead of
-leaving a silently broken router. (Running the Copilot seat also needs a
-one-time per-machine setup — install the `copilot` CLI, log in to your
-tenant, run the auth-preflight — walked through in
+project that hasn't yet adopted the workflow — run
+**`Dabbler: Set Up New Project`** from the command palette. It is
+non-interactive: it scaffolds the `.venv` with the router package, the
+AI-agent instruction files, and the `docs/session-sets/` home,
+checking prerequisites before any write so a missing one fails with a
+friendly explainer and leaves nothing behind.
+
+Then answer the one setup question — **what verifies this project** — in
+the terminal, once, and commit it:
+
+```
+python -m ai_router.verify_type --set DIRECT_API     # or COPILOT_CLI
+```
+
+`DIRECT_API` means direct `DABBLER_*` provider API keys; `COPILOT_CLI`
+means a GitHub Copilot CLI seat that routes calls through your Copilot
+subscription with no provider keys. The answer lands in
+`project-verify-type.txt` at the repo root, and the router **derives**
+`transport.profile` from it — so a project's committed choice is not
+overridden by whichever machine it is checked out on, and there is no
+second place for that fact to be recorded differently. `python -m
+ai_router.verify_type` with no flags prints what the project currently
+resolves to, or the guided setup if it has not chosen yet.
+
+On the Copilot path, **`Dabbler: Set Up Copilot Seat`** runs the seat's
+catalog check and enables the seat profile only when the seat confirms
+two distinct provider families — validated so far only on a single
+personal seat (the same seat Set 078's evidence came from); multi-seat
+and enterprise-seat model availability are not yet validated, and an
+enterprise-managed seat may expose only one provider family and fail the
+two-provider check even when the guided flow itself succeeds — it
+reports that honestly instead of leaving a silently broken router.
+(Running the Copilot seat also needs a one-time per-machine setup —
+install the `copilot` CLI, log in to your tenant, run the auth-preflight
+— walked through in
 [docs/copilot-seat-setup-checklist.md](docs/copilot-seat-setup-checklist.md);
 an unauthenticated seat is blocked at session start rather than silently
-faking verification.) The form's optional second section, **Define
-modules**, creates `docs/modules.yaml` on demand (explicit action only)
+faking verification.) **`Dabbler: Open modules.yaml`** creates
+`docs/modules.yaml` on demand (explicit action only)
 so the Work Explorer can group session sets by module — with a copyable
-AI prompt that fills it in. Drafting `docs/planning/project-plan.md` and
+AI prompt (**`Dabbler: Copy Module Decomposition Prompt`**) that fills it
+in. Drafting `docs/planning/project-plan.md` and
 decomposing it into session sets now happen from the **per-module row
 actions** in the tree (and the Command Palette), one click from the
 module they belong to. The four-tier budget mapping is documented in

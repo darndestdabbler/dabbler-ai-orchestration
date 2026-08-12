@@ -99,7 +99,7 @@ function checkHighCost(): void {
   ch.appendLine("  Sonnet 4.x → ~$0.10–0.50 per session (good quality, moderate cost)");
   ch.appendLine("  Haiku 4.x  → ~$0.01–0.05 per session (fast, lowest cost)");
   ch.appendLine("");
-  ch.appendLine("Run 'Dabbler: Show Cost Dashboard' to see cumulative totals and a daily chart.");
+  ch.appendLine("Run 'python -m ai_router.report' for cumulative totals and a full spend report.");
   ch.appendLine("Set effort=low in spec.md Session Set Configuration to reduce token spend.");
   ch.show();
 }

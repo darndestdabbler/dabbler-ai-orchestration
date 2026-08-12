@@ -37,8 +37,6 @@ import {
   scaffoldNewModule,
 } from "../../utils/moduleAuthoring";
 import { readSessionSets } from "../../utils/fileSystem";
-import { buildPlanningPrompt } from "../../wizard/planImport";
-import { buildSessionGenPrompt } from "../../wizard/sessionGenPrompt";
 import {
   BootstrapContext,
   TemplateBundle,
@@ -499,35 +497,6 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
     assert.ok(/^module: default\b/m.test(spec));
   });
 
-  test("session-gen prompt without a module target carries NO module stamp or instruction of any kind", () => {
-    // Verification round 1, finding 2: rejecting only `module: default`
-    // would stay green if a writer started synthesizing some OTHER stamp
-    // (`module: Unassigned`, ...) for pseudo-module authoring. The
-    // pseudo-target prompt must contain no `module:` stamp at all — and
-    // no module wording for the planner to act on.
-    const prompt = buildSessionGenPrompt(bundle, {});
-    assert.ok(!prompt.includes("module:"), "no module: stamp or instruction anywhere");
-    assert.ok(!/\bmodule\b/i.test(prompt), "no module-targeting language at all");
-  });
-
-  test("session-gen prompt stamps exactly the picked slug, nothing synthesized", () => {
-    const prompt = buildSessionGenPrompt(bundle, {
-      module: { slug: "greeter", planPath: "docs/modules/greeter/project-plan.md" },
-    });
-    assert.ok(prompt.includes("module: greeter"));
-    const stamps = prompt.match(/module: [a-z0-9-]+/g) ?? [];
-    assert.ok(
-      stamps.every((s) => s === "module: greeter"),
-      `every module: stamp is the picked slug, got: ${stamps.join(", ")}`,
-    );
-  });
-
-  test("planning prompt for the pseudo-module (module null) carries no module wording at all", () => {
-    const prompt = buildPlanningPrompt(null, "docs/planning/project-plan.md");
-    assert.ok(!/\bmodules?\b/i.test(prompt), "no module wording on the pseudo path");
-    assert.ok(!prompt.includes("module:"));
-  });
-
   test("pickModuleForAuthoring resolves `none` (no stamp) for absent, valid-empty, and template manifests — the pseudo-module writes nothing", async () => {
     const ui = {
       showQuickPick: async () => {
@@ -553,11 +522,16 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
     }
   });
 
-  test("provenance, pseudo path: a `none` resolution feeds every writer a null target and NO writer emits any module stamp", async () => {
-    // Verification round 1, finding 2: couple the picker to the writers
+  test("provenance, pseudo path: a `none` resolution feeds the writer a null target and emits no module stamp", async () => {
+    // Verification round 1, finding 2: couple the picker to the writer
     // so the guard proves provenance instead of assuming it. An absent
-    // manifest resolves `none` -> each writer receives null/undefined ->
-    // zero module output on every path.
+    // manifest resolves `none` -> the writer receives null/undefined ->
+    // zero module output.
+    //
+    // Set 123 S3: writers 2 and 3 (the session-gen prompt and the planning
+    // prompt) went with `wizard/`. The bootstrap spec render is the only
+    // remaining writer that can emit a `module:` line at all, so it is the
+    // only one this provenance pin can couple to.
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-guard-pseudo-"));
     try {
       const ui = {
@@ -570,23 +544,15 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
       const pick = await pickModuleForAuthoring(root, ui);
       assert.strictEqual(pick.kind, "none");
       assert.strictEqual(pick.entry, null);
-      // Writer 1: the bootstrap spec render ({{MODULE_LINE}}).
+      // The bootstrap spec render ({{MODULE_LINE}}).
       const spec = renderSpec(bundle, bootstrapCtx(pick.entry ?? undefined));
       assert.ok(!/^module:/m.test(spec));
-      // Writer 2: the session-gen prompt (the copySessionSetGenPrompt
-      // call site maps a null entry onto an undefined module option).
-      const moduleOpt = pick.entry ? { slug: "unreachable", planPath: "x" } : undefined;
-      const prompt = buildSessionGenPrompt(bundle, { module: moduleOpt });
-      assert.ok(!prompt.includes("module:"));
-      // Writer 3: the planning prompt.
-      const plan = buildPlanningPrompt(pick.entry, "docs/planning/project-plan.md");
-      assert.ok(!/\bmodules?\b/i.test(plan));
     } finally {
       fs.rmSync(root, { recursive: true });
     }
   });
 
-  test("provenance, declared-`default` path: the picker returns the manifest entry and every writer stamps exactly that slug", async () => {
+  test("provenance, declared-`default` path: the picker returns the manifest entry and the writer stamps exactly that slug", async () => {
     // The ONLY sanctioned route to a `module: default` stamp: an
     // operator-declared literal `default` manifest entry, auto-picked.
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-guard-default-"));
@@ -609,36 +575,16 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
       const entry = pick.entry!;
       assert.strictEqual(entry.slug, "default", "the slug came from the manifest");
       assert.strictEqual(notices.length, 1, "the auto-pick is operator-visible");
-      // Writer 1: bootstrap spec render stamps the picked slug.
+      // The bootstrap spec render stamps the picked slug, and nothing else:
+      // every `module:` line in the rendered spec is the slug the picker
+      // returned, so a synthesized stamp cannot hide beside a legitimate one.
       const spec = renderSpec(bundle, bootstrapCtx(entry.slug));
       assert.ok(/^module: default\b/m.test(spec));
-      // Writer 2: session-gen prompt stamps only the picked slug.
-      const prompt = buildSessionGenPrompt(bundle, {
-        module: { slug: entry.slug, planPath: "docs/modules/default/project-plan.md" },
-      });
-      const stamps = prompt.match(/module: [a-z0-9-]+/g) ?? [];
+      const stamps = spec.match(/^module: [a-z0-9-]+/gm) ?? [];
       assert.ok(stamps.length > 0);
-      assert.ok(stamps.every((s) => s === "module: default"));
-      // Writer 3: the planning prompt. This writer emits a PLAN-authoring
-      // prompt (a markdown project plan), never SessionSet spec
-      // frontmatter — the only writers that emit a `module:` spec line
-      // are the bootstrap render and the session-gen prompt, both pinned
-      // above (verification round 3 adjudication: a frontmatter-stamp pin
-      // cannot exist on a path that has no frontmatter). What this path
-      // DOES guarantee for a picked declared entry is pinned exactly:
-      // the module-scoping note naming the picked slug verbatim, the
-      // module's own plan path as the save destination, and no
-      // frontmatter-stamp instruction of any kind.
-      const plan = buildPlanningPrompt(entry, "docs/modules/default/project-plan.md");
-      assert.ok(plan.includes('the "Declared Default" module (`default`)'));
       assert.ok(
-        plan.includes("This plan covers ONLY the default module"),
-        "the scoping note names the picked slug verbatim",
-      );
-      assert.ok(plan.includes("save as docs/modules/default/project-plan.md"));
-      assert.ok(
-        !plan.includes("module:"),
-        "a plan prompt never instructs a spec frontmatter stamp",
+        stamps.every((s: string) => s === "module: default"),
+        `every module: stamp is the picked slug, got: ${stamps.join(", ")}`,
       );
     } finally {
       fs.rmSync(root, { recursive: true });
@@ -812,23 +758,18 @@ suite("Set 092 S1 — visible-module renderer assembly", () => {
   test("no surface recomputes the model outside the shared assembly", () => {
     // Set 110 S3: this test used to scan `client.js` for the webview's
     // module-rendering expressions (`mod.title || mod.slug || "Default"`,
-    // `moduleWarningText(mod.warning)`). The webview renders no modules any
-    // more, so scanning it for those would assert a coincidence.
+    // `moduleWarningText(mod.warning)`). Set 123 S3 deleted that client
+    // outright, so the scan now has exactly one renderer to police.
     //
-    // What the test was really protecting is the invariant that no RENDERER
-    // re-derives the module model — that is how two surfaces drift. So it is
-    // re-expressed against the surfaces that exist: the tree model owns the
-    // display strings, and neither it nor the webview client may reach for
-    // the raw computation.
+    // What the test protects is the invariant that no RENDERER re-derives the
+    // module model — that is how two surfaces drift. With one surface left it
+    // reads as belt-and-braces, and it is kept precisely because the cheapest
+    // way for drift to come back is a second renderer re-deriving the model
+    // rather than consuming the assembly.
     const treeModel = fs.readFileSync(
       path.join(extRoot, "src", "providers", "workExplorerTreeModel.ts"),
       "utf8",
     );
-    const client = fs.readFileSync(
-      path.join(extRoot, "media", "session-sets-tree", "client.js"),
-      "utf8",
-    );
-    assert.ok(!client.includes("computeVisibleModules"));
     assert.ok(!treeModel.includes("computeVisibleModules("));
     // The display name is read from the assembled model, never re-derived
     // from slug/title fallbacks at the render site.

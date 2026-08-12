@@ -33,9 +33,10 @@ hold Copilot subscriptions and no provider keys. Either way you need reach to
 > keyless population without giving verification up. History:
 > [`docs/concepts/tier-model.md`](concepts/tier-model.md).
 
-The extension's Getting Started form (**`Dabbler: Get Started`** in VS Code)
-walks you through the setup interactively — the provider-access choice, the
-verification budget step, and the project scaffold. **Build** also declares
+Run **`Dabbler: Set Up New Project`** in VS Code to scaffold, then
+**`python -m ai_router.verify_type --set DIRECT_API`** (or `COPILOT_CLI`) to
+commit what verifies the project; **`Dabbler: Get Started`** opens the
+step-by-step companion doc. The scaffold also declares
 a `default` module with two starter sets already scaffolded —
 `001-default-plan` (create or import your project plan) and
 `002-default-decomposition` (turn that plan into your real work sets) — the
@@ -51,7 +52,10 @@ python -m venv .venv
 .venv/Scripts/pip install dabbler-ai-router   # POSIX: .venv/bin/pip install ...
 ```
 
-The scaffold also writes `ai_router/router-config.yaml` (and `budget.yaml`).
+The scaffold also writes `ai_router/router-config.yaml`. Hand-author
+`ai_router/budget.yaml` per
+[`docs/budget-yaml-schema.md`](budget-yaml-schema.md) — the scaffold has no
+budget input and writes no budget file.
 
 > **Without VS Code:** the manual path is the two commands above, then
 > copy `router-config.yaml` out of the installed `ai_router`
@@ -62,22 +66,16 @@ The scaffold also writes `ai_router/router-config.yaml` (and `budget.yaml`).
 
 ## Configuring your project
 
-After `pip install dabbler-ai-router` and the Getting Started form's scaffold (or the manual setup above), your project has `ai_router/router-config.yaml` and `ai_router/budget.yaml`. To tune them visually:
+After `pip install dabbler-ai-router` and `Dabbler: Set Up New Project` (or the manual setup above), your project has `ai_router/router-config.yaml`. **`ai_router/budget.yaml` you author yourself** — the palette scaffold has no budget input and deliberately writes no file, so a project with no `budget.yaml` has not declared a verification budget yet. **Edit both as YAML** — Set 123 retired the visual config editor along with every other webview in the extension.
 
-**VS Code command:** `Dabbler: Open Dabbler Config Editor`
-
-The editor opens a panel with six sections:
-
-| Section | What you configure |
+| File | What it holds |
 |---|---|
-| Routing & Verification | Outsourcing mode (disabled / whenever-helpful / always); verification method |
-| Budget | Spending threshold, scope (project-lifetime / monthly), warn-at percent |
-| Providers | Enable/disable providers; display labels; API-key env-var names |
-| Significance flagging | Annotation style; honor-annotations toggle; flag-decision command |
-| Notifications | Pushover toggle; API-key / user-key env-var names; test-notification button |
-| Local overrides summary | Read-only view of `local-overrides.yaml` (gitignored, per-machine settings) |
+| `ai_router/router-config.yaml` | Outsourcing mode, verification settings, providers and their API-key env-var names, significance flagging, Pushover notifications. Committed. |
+| `ai_router/budget.yaml` | Spending threshold, scope (project-lifetime / monthly), warn-at percent. Committed. |
+| `ai_router/local-overrides.yaml` | Per-machine settings — **gitignored**. Anything that differs between your machine and a teammate's belongs here. |
+| `project-verify-type.txt` | **What verifies this project**, `DIRECT_API` or `COPILOT_CLI`. Committed, at the repo root, and the router *derives* `transport.profile` from it — so this file outranks a `transport.profile` set in either of the two above. Write it with `python -m ai_router.verify_type --set <VALUE>`; read what a project currently resolves to with the same command and no flags. |
 
-Changes to provider API keys and Pushover credentials belong in `local-overrides.yaml` (per-machine, gitignored). The editor's shared/local toggle on each field controls which file is written. The Getting Started form in the Work Explorer (`Dabbler: Get Started`) is the recommended first-time setup path; the config editor is the recommended surface for ongoing tuning.
+Provider API keys and Pushover credentials are environment variables, not config values; the config files only name the variables to read.
 
 ---
 
@@ -209,13 +207,13 @@ decision stay human. Setup and the raw commands each action runs:
 | `docs/session-constitution.md` | The per-session operating doc: happy path, authority rules, on-demand pointer table (Set 085) |
 | `docs/ai-led-session-workflow.md` | On-demand execution reference: full procedure (Steps 0–10), rules, config reference |
 | `docs/planning/session-set-authoring-guide.md` | How to write a spec; flag semantics; anti-patterns |
-| `docs/budget-yaml-schema.md` | Canonical contract for `ai_router/budget.yaml` (the budget step's output) |
+| `docs/budget-yaml-schema.md` | Canonical contract for `ai_router/budget.yaml` (hand-authored) |
 | `docs/disposition-schema.md` | Schema for `disposition.json` (required at session close) |
 | `ai_router/__init__.py` | `route()` — the public routing entry point |
 | `ai_router/close_session.py` | Close-out gate: runs deterministic checks, flips state |
 | `ai_router/session_state.py` | Lifecycle snapshot (`session-state.json`) + events ledger |
 | `ai_router/router-config.yaml` | Model selection, task types, tier mapping |
-| `tools/dabbler-ai-orchestration/` | VS Code extension (Work Explorer, Cost Dashboard) |
+| `tools/dabbler-ai-orchestration/` | VS Code extension (Work Explorer) |
 
 ---
 
@@ -225,11 +223,14 @@ decision stay human. Setup and the raw commands each action runs:
 
 **Setup checklist** — before you run any session, confirm:
 
-- [ ] **Project configured** — run the extension's Getting Started form
-  (`Dabbler: Get Started`), whose budget step writes
-  `ai_router/budget.yaml`, or manually create `ai_router/router-config.yaml`
-  and `ai_router/budget.yaml` (see [`docs/budget-yaml-schema.md`](budget-yaml-schema.md)).
-  The form is the recommended path.
+- [ ] **Project configured** — run `Dabbler: Set Up New Project`, which
+  scaffolds `ai_router/router-config.yaml`, then **hand-author
+  `ai_router/budget.yaml`** (see
+  [`docs/budget-yaml-schema.md`](budget-yaml-schema.md)) — the palette
+  scaffold has no budget input and writes no budget file — and commit what
+  verifies the project with `python -m ai_router.verify_type --set <VALUE>`.
+  Without VS Code, create both YAML files by hand and run the same
+  `verify_type` command.
 - [ ] **Pick your transport, then set only what it needs.** There are two
   supported populations and neither is a degraded version of the other:
   - **Direct APIs** — set `DABBLER_ANTHROPIC_API_KEY`,
@@ -322,5 +323,5 @@ and say:
 - **Releasing, hotfixing, rolling back:**
   [`docs/tutorials/release-and-recovery.md`](tutorials/release-and-recovery.md).
 - **Writing a spec:** [`docs/planning/session-set-authoring-guide.md`](planning/session-set-authoring-guide.md).
-- **Setting up a new project:** the extension's Getting Started form (`Dabbler: Get Started`); without VS Code, the manual-setup note under [One tier, one verification story](#one-tier-one-verification-story) above.
+- **Setting up a new project:** `Dabbler: Set Up New Project`, then `python -m ai_router.verify_type --set <VALUE>`; without VS Code, the manual-setup note under [One tier, one verification story](#one-tier-one-verification-story) above.
 - **UAT checklists, outsource-last, adjudication, advanced flags:** Reference section of the workflow doc — only read what applies to your set's configuration.

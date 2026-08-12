@@ -133,6 +133,36 @@ reads `PUSHOVER_API_KEY` / `PUSHOVER_USER_KEY` from the environment or the
 Windows User environment. (The provider API keys must be available first —
 see **Engine-specific bootstrap** at the end of this file.)
 
+## What verifies this project
+
+`project-verify-type.txt` **at the repo root** is the single source of
+truth, committed on purpose: it is project configuration, not machine
+state, so it does not change with whichever machine the repo is checked
+out on. It holds exactly one value, `DIRECT_API` or `COPILOT_CLI`, and
+`transport.profile` is **derived** from it — the file outranks both the
+tracked `ai_router/router-config.yaml` and a seat-local
+`ai_router/local-overrides.yaml`, so the two can never disagree.
+
+Resolution is one entry point, in the terminal you are already in:
+
+```
+.venv/Scripts/python.exe -m ai_router.verify_type          # what am I?
+.venv/Scripts/python.exe -m ai_router.verify_type --set COPILOT_CLI
+.venv/Scripts/python.exe -m ai_router.verify_type --confirm
+```
+
+Exit 0 = resolved, 2 = a declared value is invalid, 3 = setup required.
+The order is: the project file wins silently; else
+`AI_ORCHESTRATION_VERIFY_TYPE` is a **suggestion** that changes nothing
+until `--confirm` commits it; else the command prints the guided setup.
+An invalid value in either place is reported, never guessed at. Commit
+the file — an uncommitted answer is not the project's answer.
+
+Set 123 S3 retired the setup webview that used to ask these questions,
+along with the config editor and cost dashboard panels; the extension
+contributes no webview at all now. Canonical rule:
+[`docs/planning/verify-type-resolution.md`](docs/planning/verify-type-resolution.md).
+
 ## Delegation Discipline (pointer)
 
 110-112: orchestrator owns implementation/architecture; route

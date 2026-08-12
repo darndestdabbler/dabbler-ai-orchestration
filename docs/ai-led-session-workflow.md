@@ -114,9 +114,10 @@ Orchestrator (Claude / Codex / Gemini)
 > verify, only how much it will spend doing so.
 
 Every project declares an API-verification **budget
-threshold** at project setup — the Getting Started form's
-budget step (or a hand-authored file; see
-`docs/budget-yaml-schema.md`). The threshold is recorded in
+threshold** at project setup — a hand-authored
+`ai_router/budget.yaml` (see `docs/budget-yaml-schema.md`; the
+extension's Getting Started budget step that used to write it was
+retired with the webview in Set 123 S3). The threshold is recorded in
 `ai_router/budget.yaml` and governs which verification path the
 project uses. Two tiers, with two sub-options under the zero tier:
 
@@ -127,9 +128,8 @@ project uses. Two tiers, with two sub-options under the zero tier:
 
 The threshold and the chosen verification method are persisted in
 `ai_router/budget.yaml` (see `docs/budget-yaml-schema.md` for the
-canonical schema). The Getting Started form writes this file once at
-scaffold time; the operator can edit it anytime to change tier or
-method.
+canonical schema). The operator authors it and can edit it anytime to
+change tier or method.
 
 **Compatibility rule for missing fields.** Older or hand-authored
 `budget.yaml` files may omit fields added after their creation or use
@@ -209,8 +209,9 @@ does **not** ship automated pre-call enforcement (warnings,
 block-on-exceed). Operators monitor spend manually with:
 
 - `python -m ai_router.report --since YYYY-MM-DD` — governance summary.
-- The `Dabbler: Show cost dashboard` extension command — live spend
-  view.
+  (Set 123 S3 deleted the `Dabbler: Show Cost Dashboard` extension command
+  with every other webview; `router-metrics.jsonl` is unchanged and this
+  report reads it.)
 
 > **`python -m ai_router.cost_report` no longer exists** (deleted in Set 119 S3 as unreachable). Nothing in
 > the package called it, and on the Copilot CLI transport every routed
@@ -366,8 +367,8 @@ that lives alongside `session-state.json` and `session-events.jsonl`
 in the session-set folder.
 
 **1. The command — `Dabbler: Flag Decision for Cross-Provider Review`.**
-Invoke from the command palette (or the "Run command now..." button
-in the config editor's Significance flagging section). Prompts for a
+Invoke from the command palette (the config editor that also offered it
+was deleted in Set 123 S3). Prompts for a
 one-line reason; appends one JSON line:
 
 ```json
@@ -440,9 +441,12 @@ machinery's internal granularity and is not a substitute for `status`.
 **File invariant — `session-state.json` exists in every session-set
 folder.** Three writers converge on this:
 
-1. The extension's "Generate Session-Set Prompt" flow instructs the AI
-   to scaffold the file alongside `spec.md` with `status:
-   "not-started"`. The full not-started shape is in
+1. Session-set authoring scaffolds the file alongside `spec.md` with
+   `status: "not-started"` — the decomposition prompt instructs the AI to
+   write it. (Set 123 S3 retired the extension's "Generate Session-Set
+   Prompt" command that used to carry that instruction; the obligation is
+   unchanged and now rides the module-decomposition prompt and the
+   authoring guide.) The full not-started shape is in
    `docs/session-state-schema-example.md`.
 2. `register_session_start()` overwrites the file at Step 1 of each
    session, flipping `status` to `in-progress` and populating
@@ -2346,8 +2350,8 @@ ledger (`session-events.jsonl`) stays authoritative. Hand-authoring
 `session-state.json` to declare a session complete without running
 the gate produces mixed-mode drift: the snapshot says complete but
 the ledger has no `closeout_succeeded` event for that session, the
-cost dashboard misses the session's spend, and consumers (the Session
-Set Explorer extension v0.13.11+) downgrade the bucket to In Progress
+spend report misses the session's cost, and consumers (the Work
+Explorer extension) downgrade the bucket to In Progress
 because the ledger is the authoritative signal. Recovery for an
 already-drifted set: see
 `ai_router/docs/close-out.md` § "Mixed-mode drift" — run

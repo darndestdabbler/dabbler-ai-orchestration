@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "11b23b7ec815b5056f55923fdfa357af65c71136",
+  "fixedTree": "37d078c89d69202e316a3fd1636fa460b2bfceac",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T02:35:33.331245+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `Dabbler: Open Module Plan` is still contributed and shown on module rows, but its implementation was deleted with `wizard/planImport.ts`. - **Category:** Correctness - **Severity:** Major - **Evid ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "From both a declared-module row and the pseudo-module row, invoking Dabbler: Open Module Plan must call a registered command and open the correct plan file or the existing missing-plan import prompt, not command-not-found.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `Dabbler: Open Module Plan` is still exposed but no longer registered. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/package.json:189,340,3 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The extension registers a surviving implementation for dabbler.openModulePlan during activation, and tree-row/palette invocations open the targeted module or repo-level plan without importing deleted wizard code.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** Live onboarding/reference docs still direct users to retired setup/config/prompt surfaces. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/quick-start.md:36-80,228-23 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "All live, non-historical docs and consumer templates stop instructing users to use retired webview/config-editor/dashboard/wizard/prompt surfaces and instead name the current terminal verify_type, setup command, native-tree, and surviving palette-command workflow.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

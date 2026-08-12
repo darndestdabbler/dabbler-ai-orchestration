@@ -1,11 +1,16 @@
 // Set 079 Session 2 — Layer-2 tests for the Copilot seat-setup wrapper
-// (src/utils/copilotSeatSetup.ts) and the Build action's seat-profile
-// rider narrowing (gettingStartedActions.ts). Pins the spec's happy path
+// (src/utils/copilotSeatSetup.ts). Pins the spec's happy path
 // (sequencing inputs, pinned argv, parse-not-exit-code, the anchored
 // transport.profile template render) and the critique-M1 hygiene
 // (cancel/teardown kill the child and restore the lockfile snapshot).
 // Cases generated via routed test-generation (gemini-pro) and adapted
 // (platform-safe label paths; typed action-message helper).
+//
+// Set 123 S3: the "Build action's seat-profile rider narrowing" suite went
+// with `gettingStartedActions.ts` and the Getting Started webview form that
+// posted the rider. Nothing posts a `transportProfile` message any more —
+// the seat is set up by the `Dabbler: Set Up Copilot Seat` command, and the
+// project's verify type is resolved by `python -m ai_router.verify_type`.
 
 import * as assert from "assert";
 import * as path from "path";
@@ -44,11 +49,6 @@ import {
   writeCopilotSeatStatusMarker,
   writeConfigAtomically,
 } from "../../utils/copilotSeatSetup";
-import {
-  asTransportProfileRider,
-  resolveTransportProfile,
-} from "../../commands/gettingStartedActions";
-import { GettingStartedActionMsg } from "../../types/sessionSetsWebviewProtocol";
 
 // --- Fakes (hand-rolled; the suite convention — no sinon) ---
 
@@ -880,53 +880,6 @@ suite("copilotSeatSetup", () => {
     });
   });
 
-  suite("gettingStartedActions — seat-profile rider narrowing", () => {
-    suite("asTransportProfileRider", () => {
-      test("undefined / null narrow to undefined (caller applies the default)", () => {
-        assert.strictEqual(asTransportProfileRider(undefined), undefined);
-        assert.strictEqual(asTransportProfileRider(null), undefined);
-      });
-
-      test("recognized values narrow case-insensitively", () => {
-        assert.strictEqual(asTransportProfileRider("api"), "api");
-        assert.strictEqual(asTransportProfileRider("API"), "api");
-        assert.strictEqual(asTransportProfileRider("copilot-cli"), "copilot-cli");
-        assert.strictEqual(asTransportProfileRider("COPILOT-CLI"), "copilot-cli");
-      });
-
-      test("present-but-unrecognized values throw (fail-loud)", () => {
-        assert.throws(() => asTransportProfileRider("invalid"));
-        assert.throws(() => asTransportProfileRider(123));
-        assert.throws(() => asTransportProfileRider({}));
-      });
-    });
-
-    suite("resolveTransportProfile", () => {
-      const msg = (tp?: unknown): GettingStartedActionMsg => ({
-        type: "gettingStartedAction",
-        action: "build-structure",
-        transportProfile: tp as GettingStartedActionMsg["transportProfile"],
-      });
-
-      test('defaults to "api" when the rider is absent', () => {
-        assert.strictEqual(resolveTransportProfile(msg(undefined)), "api");
-        assert.strictEqual(resolveTransportProfile(msg(null)), "api");
-      });
-
-      test("passes a present rider through narrowed", () => {
-        assert.strictEqual(
-          resolveTransportProfile(msg("copilot-cli")),
-          "copilot-cli",
-        );
-        assert.strictEqual(resolveTransportProfile(msg("api")), "api");
-      });
-
-      test("throws on a malformed rider", () => {
-        assert.throws(() => resolveTransportProfile(msg("invalid")));
-      });
-    });
-  });
-
   // --- Session 3: the failure matrix (honest failure UX, atomic config
   // write, kill strategy). Cases generated via routed test-generation
   // (gemini-pro) and adapted (composer copy re-grounded against the real
@@ -1093,10 +1046,15 @@ suite("copilotSeatSetup", () => {
           assert.ok(!msg.message.includes(rerunHint));
         });
 
-        test("keys present: affirms api keeps running, gives hand-edit guidance", () => {
+        test("keys present: affirms the keys keep working, gives hand-edit guidance", () => {
           const msg = describeSeatSetupOutcome(outcome, true, rerunHint);
           assert.strictEqual(msg.level, "warning");
-          assert.match(msg.message, /api profile with the DABBLER_\* key/);
+          // Set 123 S3: the old pin was /api profile with the DABBLER_\* key/,
+          // which asserted an EFFECTIVE profile this code cannot know — the
+          // committed project-verify-type.txt decides it. What stays true, and
+          // is what the operator needs, is that the keys are still usable.
+          assert.match(msg.message, /DABBLER_\* key\(s\) already set/);
+          assert.match(msg.message, /project-verify-type\.txt resolves to/);
           assert.doesNotMatch(msg.message, /not yet functional/);
           assert.match(msg.message, /no re-probe is needed/);
           assert.ok(!msg.message.includes(rerunHint));

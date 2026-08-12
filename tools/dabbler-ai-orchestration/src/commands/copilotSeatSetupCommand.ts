@@ -49,8 +49,8 @@ async function runSetUpCopilotSeat(
   const venvPath = path.join(root, ".venv");
   if (!fs.existsSync(venvPath)) {
     vscode.window.showErrorMessage(
-      "No .venv found in this workspace — run \"Build project structure\" " +
-        "(Getting Started form) or \"Dabbler: Install ai-router\" first, " +
+      "No .venv found in this workspace — run \"Dabbler: Set Up New Project\" " +
+        "or \"Dabbler: Install ai-router\" first, " +
         "then re-run this command.",
     );
     return;

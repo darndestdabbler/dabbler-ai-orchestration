@@ -102,7 +102,7 @@ export function renderBudgetYaml(opts: {
   setAt: string;
 }): string {
   return [
-    "# Project verification budget — written by the Dabbler Getting Started form.",
+    "# Project verification budget — see docs/budget-yaml-schema.md.",
     "# Used by the workflow for spend reporting and threshold monitoring.",
     `threshold_usd: ${opts.thresholdUsd}`,
     "scope: per-project",

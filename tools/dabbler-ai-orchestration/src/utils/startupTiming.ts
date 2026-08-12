@@ -13,15 +13,15 @@
 //
 // WHAT IT DELIBERATELY DOES NOT DO. It does not try to observe FIRST
 // PAINT. The host cannot see when a row becomes visible; only the
-// renderer can, and asking the renderer would mean instrumenting a
-// webview Session 3 deletes. Layer 3 already observes paint end-to-end
-// by waiting on the DOM (`real-host-baseline.spec.ts`), which is both
-// more honest and implementation-agnostic — the same harness can time
-// the webview's first row and the native tree's first row through the
-// same protocol. So: the host buckets are measured here, first paint
-// stays measured there, and neither claims to be the other.
+// renderer can. So the host buckets are measured here and first paint is
+// observed by Layer 3 waiting on the DOM; neither claims to be the other.
 //
-// COST WHEN UNUSED. Six `Date.now()` calls and a small object. The file
+// SET 123 S3. The `resolveWebviewView()` bucket is GONE with the webview
+// it timed. Its two marks and the `webviewResolveMs` duration are removed
+// rather than left null forever: an instrument that can never take a
+// reading is not a measurement, it is a claim that one is being taken.
+//
+// COST WHEN UNUSED. Four `Date.now()` calls and a small object. The file
 // write happens only when `DABBLER_STARTUP_TIMING_PATH` is set, which
 // is how the harness harvests without driving the UI — Session 1 lost
 // two real-host attempts to a flaky command palette, and a measurement
@@ -42,8 +42,6 @@ export interface StartupMarks {
   moduleLoadedAt: number | null;
   activateStart: number | null;
   activateEnd: number | null;
-  webviewResolveStart: number | null;
-  webviewResolveEnd: number | null;
   /** First `getChildren(undefined)` served by the native tree — i.e. VS Code asked for roots. */
   treeFirstChildrenServed: number | null;
   /** How many root modules that first call returned; 0 is a legitimate answer, not a failure. */
@@ -52,7 +50,6 @@ export interface StartupMarks {
 
 export interface StartupDurations {
   activateMs: number | null;
-  webviewResolveMs: number | null;
   /**
    * `activate()` end -> the tree's first root request.
    *
@@ -76,8 +73,6 @@ const marks: StartupMarks = {
   moduleLoadedAt: null,
   activateStart: null,
   activateEnd: null,
-  webviewResolveStart: null,
-  webviewResolveEnd: null,
   treeFirstChildrenServed: null,
   treeFirstChildrenCount: null,
 };
@@ -98,26 +93,6 @@ export function markActivateStart(): void {
 
 export function markActivateEnd(): void {
   marks.activateEnd = Date.now();
-  emitIfRequested();
-}
-
-/**
- * FIRST resolve only. A `WebviewView` is re-resolved whenever the view is
- * recreated (hide, re-expand, window reload), and a later resolve would
- * silently replace the startup figure Session 4 is going to quote —
- * first-wins is the same rule `markFirstChildrenServed` follows, and
- * these two were inconsistent until verification round 1 pointed it out.
- */
-export function markWebviewResolveStart(): void {
-  if (marks.webviewResolveStart !== null) return;
-  marks.webviewResolveStart = Date.now();
-}
-
-export function markWebviewResolveEnd(): void {
-  // Guard on the END mark, not the start: a start with no end means the
-  // first resolve is still in flight and this IS its end.
-  if (marks.webviewResolveEnd !== null) return;
-  marks.webviewResolveEnd = Date.now();
   emitIfRequested();
 }
 
@@ -146,8 +121,6 @@ export function readStartupMarks(): StartupMarks {
 export function resetStartupMarksForTests(): void {
   marks.activateStart = null;
   marks.activateEnd = null;
-  marks.webviewResolveStart = null;
-  marks.webviewResolveEnd = null;
   marks.treeFirstChildrenServed = null;
   marks.treeFirstChildrenCount = null;
 }
@@ -158,8 +131,7 @@ const delta = (from: number | null, to: number | null): number | null =>
 export function startupDurations(m: StartupMarks = marks): StartupDurations {
   return {
     activateMs: delta(m.activateStart, m.activateEnd),
-    webviewResolveMs: delta(m.webviewResolveStart, m.webviewResolveEnd),
-    activateEndToTreeRootsMs: delta(m.activateEnd, m.treeFirstChildrenServed),
+      activateEndToTreeRootsMs: delta(m.activateEnd, m.treeFirstChildrenServed),
   };
 }
 

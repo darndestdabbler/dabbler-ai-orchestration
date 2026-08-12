@@ -380,14 +380,17 @@ suite("moduleAuthoring — ensureModulesManifest (Set 094)", () => {
     // Add-module, and Session 2's copy-decomposition command) — not asserted here.
     // Set 110 S3: the passive set GREW. The native `TreeDataProvider` and
     // the shared module assembly both run on a passive open, so both join
-    // the boundary; `SetupStatusView.ts` replaces the deleted
-    // `CustomSessionSetsView.ts`.
+    // the boundary. Set 123 S3: `SetupStatusView.ts` and `systemStatus.ts`
+    // leave the list because they no longer exist — the webview that hosted
+    // the passive snapshot builders is deleted, and the tree provider plus
+    // the shared assembly are now the whole passive path. The boundary is
+    // unchanged; only the set of files that can violate it shrank.
     const srcDir = path.resolve(process.cwd(), "src");
     const passivePaths = [
-      path.join(srcDir, "providers", "SetupStatusView.ts"),
       path.join(srcDir, "providers", "WorkExplorerTreeProvider.ts"),
+      path.join(srcDir, "providers", "workExplorerTreeModel.ts"),
       path.join(srcDir, "providers", "moduleAssembly.ts"),
-      path.join(srcDir, "providers", "systemStatus.ts"),
+      path.join(srcDir, "providers", "SessionSetsModel.ts"),
       path.join(srcDir, "extension.ts"),
     ];
     for (const file of passivePaths) {

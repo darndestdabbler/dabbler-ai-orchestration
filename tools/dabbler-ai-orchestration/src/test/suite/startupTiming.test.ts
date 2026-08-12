@@ -24,8 +24,6 @@ import {
   markActivateEnd,
   markActivateStart,
   markFirstChildrenServed,
-  markWebviewResolveEnd,
-  markWebviewResolveStart,
   readStartupMarks,
   resetStartupMarksForTests,
   startupDurations,
@@ -49,13 +47,10 @@ suite("Set 110 S2 — startup timing marks", () => {
       moduleLoadedAt: 1000,
       activateStart: 1000,
       activateEnd: null,
-      webviewResolveStart: null,
-      webviewResolveEnd: null,
       treeFirstChildrenServed: null,
       treeFirstChildrenCount: null,
     });
     assert.strictEqual(d.activateMs, null);
-    assert.strictEqual(d.webviewResolveMs, null);
     assert.strictEqual(d.activateEndToTreeRootsMs, null);
   });
 
@@ -65,13 +60,10 @@ suite("Set 110 S2 — startup timing marks", () => {
       moduleLoadedAt: 900,
       activateStart: 1000,
       activateEnd: 1350,
-      webviewResolveStart: 1400,
-      webviewResolveEnd: 1401,
       treeFirstChildrenServed: 1600,
       treeFirstChildrenCount: 3,
     });
     assert.strictEqual(d.activateMs, 350);
-    assert.strictEqual(d.webviewResolveMs, 1);
     assert.strictEqual(d.activateEndToTreeRootsMs, 250);
   });
 
@@ -102,21 +94,6 @@ suite("Set 110 S2 — startup timing marks", () => {
     assert.strictEqual(typeof marks.treeFirstChildrenServed, "number");
     assert.strictEqual(marks.treeFirstChildrenCount, 0);
   });
-
-  test("the webview resolve marks are ALSO first-wins", () => {
-    // A WebviewView is re-resolved on hide/re-expand and on window
-    // reload. Without this guard a later resolve would silently replace
-    // the startup figure Session 4 quotes.
-    resetStartupMarksForTests();
-    markWebviewResolveStart();
-    markWebviewResolveEnd();
-    const first = readStartupMarks();
-    markWebviewResolveStart();
-    markWebviewResolveEnd();
-    const second = readStartupMarks();
-    assert.strictEqual(second.webviewResolveStart, first.webviewResolveStart);
-    assert.strictEqual(second.webviewResolveEnd, first.webviewResolveEnd);
-  });
 });
 
 suite("Set 110 S2 — startup timing emission", () => {
@@ -144,11 +121,12 @@ suite("Set 110 S2 — startup timing emission", () => {
     const target = path.join(dir, "nested", "timing.json");
     process.env.DABBLER_STARTUP_TIMING_PATH = target;
     try {
-      // The resolve marks are first-wins now, so an earlier test having
-      // set them would make these calls no-ops and write nothing.
+      // `markActivateEnd` is an emitting mark, so it is what drives the
+      // write. Reset first: the emit path is only interesting on a run
+      // where the marks it serializes were actually taken here.
       resetStartupMarksForTests();
-      markWebviewResolveStart();
-      markWebviewResolveEnd();
+      markActivateStart();
+      markActivateEnd();
       assert.ok(fs.existsSync(target), "no timing file written");
       const payload = JSON.parse(fs.readFileSync(target, "utf-8"));
       assert.ok(payload.marks);
@@ -157,7 +135,7 @@ suite("Set 110 S2 — startup timing emission", () => {
       // reader treating these host buckets as an end-to-end first-paint
       // number, which is the over-claim S1 had to withdraw.
       assert.ok(String(payload.note).includes("First paint is NOT here"));
-      assert.strictEqual(typeof payload.durations.webviewResolveMs, "number");
+      assert.strictEqual(typeof payload.durations.activateMs, "number");
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

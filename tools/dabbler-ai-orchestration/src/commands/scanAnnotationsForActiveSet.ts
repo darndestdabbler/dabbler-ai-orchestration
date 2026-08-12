@@ -14,8 +14,8 @@ import * as path from "path";
 import {
   Annotation,
   deduplicateAnnotations,
-} from "../configEditor/annotationParser";
-import { readYamlFile } from "../configEditor/yamlReadWrite";
+} from "../utils/annotationParser";
+import { readYamlFile } from "../utils/yamlReadWrite";
 import { readAllSessionSets } from "../utils/fileSystem";
 import {
   QUEUE_FILENAME,

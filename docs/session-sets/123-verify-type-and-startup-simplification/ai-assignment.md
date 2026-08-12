@@ -136,3 +136,97 @@ Session 3's step 2 is the true cold-start dogfood (`L-079-3`) and it should
 pay close attention to the config change this session made: a keyless
 provider is now disabled rather than fatal, which is precisely the
 condition a fresh project will be in.
+
+---
+
+## Session 3 — Delete the webview
+
+**Orchestrator:** github-copilot / anthropic / claude-opus-5 / high.
+
+*(Assignment rationale recorded at Step 3.5; the retrospective half —
+what verification caught and the next-set recommendation — is appended at
+close, when there is something true to say.)*
+
+**Why this session sits here.** It is the subtraction half of the set and
+it is deliberately last: Sessions 1-2 built the replacement setup path and
+proved it, so the deletion is only earned if the true cold start
+(`L-079-3`, step 2) reaches a committed `project-verify-type.txt`
+through the terminal without the webview. The work is deletion, a
+`package.json` manifest edit, a caption rename, a bootstrap-file update
+in lockstep across three engine files, and a rewrite of the one end-to-end
+first-run Layer 3 spec. All of that is implementation, documentation and
+test authoring, which the temporary verification-only policy window
+assigns to the active orchestrator; only `session-verification` is
+routed, and it stays cross-provider by registry exclusion on
+`claude-opus-5`.
+
+**Continuity was the stated reason to keep the seat.** Session 2's
+disposition asked for live knowledge of what the resolver guarantees and
+where setup now lives, plus the config change it shipped — a keyless
+provider is now disabled rather than fatal — because that is exactly the
+state a fresh project is in during the cold-start walk. Confirmed at
+registration: the seat resolves `transport.profile: copilot-cli` with no
+provider keys present, which is the degraded-but-legal shape Session 2
+made survivable.
+
+**What the session actually was.** Deletion, and then the deletion's blast
+radius. The subtraction itself was the easy half: three directories, a
+webview provider, its media bundle, 21 test files. The work was everything
+that pointed at them -- a `require()` string `tsc` cannot see, a
+`readFileSync` of a deleted asset, a golden fixture rendered from a
+template, a runtime toast naming a command that no longer exists, and a
+manifest that kept advertising a command whose registration had gone.
+
+**The scope error, and why it was the operator's call.** The spec named three
+directories as "the Getting Started / setup webview". Two of the three
+claims were false and the real target was unnamed: `wizard/` makes zero
+webview API calls, `configEditor/` backs a surviving command, and the actual
+setup webview -- the thing the whole set exists to replace -- is ~2,459 lines
+the spec never mentions but which the 8 retired Layer 3 scenarios drive. The
+spec's letter would have left the setup webview alive while deleting three
+unrelated palette commands. Scoping is normally mine; this one was not,
+because it decides whether working product features exist. Briefed, ruled,
+journaled with `authority: human`.
+
+**What verification caught that I did not.** `registerPlanImportCommand`
+registered TWO commands. I read the import, matched it to
+`dabbler.importPlan`, and deleted the file -- taking
+`dabbler.openModulePlan`, the Work Explorer's `Open Plan` row action, with
+it. Nothing local failed: the whole import went, so `tsc` saw no dangling
+reference; the menu-parity suite checks menu -> contributes, not contributes
+-> registration; no Layer 3 spec clicks Open Plan. Both discovery lenses found
+it independently, which is the argument for fan-out in one line.
+
+The irony is worth recording. My own conventions block asked the verifier to
+check "did anything surviving lose its backing?" -- and that is exactly what I
+had done. **Naming a risk is not the same as being immune to it**, and the
+guard I shipped in remediation (every contributed command must have a
+registration, falsified both ways) is what turns the naming into something
+mechanical.
+
+**The mistake that cost an extra round.** I authored the extension CHANGELOG
+entry *after* the VERIFIED verdict. The CHANGELOG is in-scope work, so it
+staled the evidence stamp, and with the round budget spent the close needed
+the operator. Cheap to fix, entirely avoidable, and the rule it violates is
+plainly written: freeze everything, then verify.
+
+**On the irony budget.** The spec asked Session 3 to be net negative and to
+add no tests. It ships **one** new test function -- the contributed-command
+guard -- against a session that removes 8 Layer 3 scenarios and 21 test
+files. I judged that a defect which reached a cross-provider verifier, on the
+main module workflow, earns a permanent falsifier rather than a note.
+
+**Next orchestrator: none needed -- the set is complete.** Sessions 1-3 all
+VERIFIED, and Session 3 is terminal.
+
+**Next set: the queue is unchanged, but two things are now owed.** First, the
+extension carries a substantial `[Unreleased]` entry and the Marketplace
+push is still gated on the Set 112 deferral; whoever cuts that release
+assigns the version and folds these notes in. Second, and more useful to a
+future set: `docs/planning/verify-type-resolution.md` still contains the
+measurement that sent this session wrong ("The webview surface is **3,576
+lines** (`configEditor/` 2,671 + `wizard/` 583 + `dashboard/` 322)").
+It is a design doc, not a session record, and it is now describing directories
+that do not exist. Set 118 (test retirement and coupling budget) or any set
+touching that doc should correct it rather than inherit it -- which is the
+same `L-064-8` failure this session hit twice.

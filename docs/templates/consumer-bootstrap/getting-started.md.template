@@ -1,18 +1,20 @@
 # Getting Started
 
 > Step-by-step instructions for setting up a Dabbler AI-led-workflow
-> project. The interactive controls live in the **Work Explorer**'s
-> two-section Getting Started form (the Dabbler icon in the Activity
-> Bar) — this document is the static companion that explains each
-> step. The copy is the operator's teaching text (Set 060 D8; re-cut
-> for the module-first Work Explorer in Set 095).
+> project. The commands live in the **Command Palette** and in your
+> terminal; the **Work Explorer** (the Dabbler icon in the Activity Bar)
+> shows the work once it exists. The copy is the operator's teaching
+> text (Set 060 D8; re-cut for the module-first Work Explorer in Set
+> 095, and again in Set 123 when setup moved out of a form and into the
+> terminal).
 
 ## 1. Scaffold Project Structure
 
 To get the project started, the AI orchestration extension needs to
 download some Python scripts and markdown files and create some
-folders. First answer the form's one question — **how the router
-reaches your AI providers** — then click **Build project structure**.
+folders. Run **`Dabbler: Set Up New Project`** from the Command Palette.
+It asks nothing — it just builds — and you answer the one real question,
+**how the router reaches your AI providers**, in step 2.
 
 The workflow uses an AI router to "outsource" work via AI APIs, and it
 needs access to more than one AI provider family so the Step 6
@@ -20,20 +22,20 @@ verification command can send work done under one provider to a
 different one.
 
 There are two ways to give the router that access. The default is
-**direct provider API keys**: you have an account with at least one
-provider (it should be a different provider from the one that runs
-your sessions) and your provider-issued keys are stored in
+**direct provider API keys** (`DIRECT_API`): you have an account with at
+least one provider (it should be a different provider from the one that
+runs your sessions) and your provider-issued keys are stored in
 Dabbler-named environment variables (`DABBLER_ANTHROPIC_API_KEY`,
 `DABBLER_OPENAI_API_KEY`, or `DABBLER_GEMINI_API_KEY`). These are the
 same keys you get from Anthropic, Google, or OpenAI; only the
 environment variable names are Dabbler-prefixed to avoid collisions
 with provider-owned tools. The alternative, for users whose only AI
 access is a GitHub Copilot subscription, is the **GitHub Copilot CLI
-seat** option in the form: calls run through the `copilot`
+seat** (`COPILOT_CLI`): calls run through the `copilot`
 command-line tool instead, and no provider API keys are needed — but
-the GitHub Copilot CLI must be installed on your machine. When you
-pick the Copilot option, the Build step configures and checks the
-seat automatically: it confirms the seat can dispatch models from at
+the GitHub Copilot CLI must be installed on your machine. On that path,
+run **`Dabbler: Set Up Copilot Seat`**, which configures and checks the
+seat: it confirms the seat can dispatch models from at
 least two different provider families, and tells you honestly if it
 cannot (some enterprise-managed seats expose only one). One thing to
 know when running sessions on a Copilot seat: because a seat can relay
@@ -46,6 +48,29 @@ Copilot seat, work through the one-time per-machine setup checklist
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/copilot-seat-setup-checklist.md>
 — an unauthenticated seat is blocked at session start rather than
 silently faking verification.
+
+## 1a. Say What Verifies This Project
+
+Tell the project which of the two you picked. This is one command,
+answered once, and **committed** — it is project configuration, not
+machine state, so it stays true no matter whose machine the repo is
+checked out on:
+
+```
+python -m ai_router.verify_type                 # prints the guided setup
+python -m ai_router.verify_type --set DIRECT_API
+```
+
+That writes `project-verify-type.txt` at the repo root holding exactly
+`DIRECT_API` or `COPILOT_CLI`. Commit it. The router **derives** its
+transport from that file, so there is no second place to configure and
+nothing that can disagree with it. If your machine already sets
+`AI_ORCHESTRATION_VERIFY_TYPE`, the command offers that value as a
+suggestion and `python -m ai_router.verify_type --confirm` commits it;
+until you confirm, a machine default changes nothing about how this
+project dispatches. A value that is neither of the two is reported as an
+error rather than guessed at.
+
 
 **What Build gives you.** Building the project structure also
 declares a `default` module in `docs/modules.yaml` with two starter
@@ -69,13 +94,12 @@ You have three ways to declare a module:
 - **From the tree:** hover a module's row and click **Add Module…** — it
   appends the manifest entry and scaffolds that module's own plan and
   decomposition sets, ready to run.
-- **From the form:** re-open it any time with **`Dabbler: Get Started`**
-  (Command Palette). Its second section, **Define modules (optional)**,
-  has **Open modules.yaml** (creates the file from a commented template
-  on that explicit click — never just because you opened the repo — and
-  opens it to edit) and **Copy AI decomposition prompt** (a ready-made
-  prompt that has your AI assistant fill the whole manifest in for you,
-  handy for declaring several modules at once with their code paths).
+- **From the Command Palette:** **`Dabbler: Open modules.yaml`** creates the
+  file from a commented template on that explicit click — never just because
+  you opened the repo — and opens it to edit; **`Dabbler: Copy Module
+  Decomposition Prompt`** gives you a ready-made prompt that has your AI
+  assistant fill the whole manifest in for you, handy for declaring several
+  modules at once with their code paths.
 - **By hand / by asking your AI** — edit `docs/modules.yaml` directly.
 
 Solo or single-area projects can skip this entirely — rename **Default**
@@ -107,9 +131,8 @@ do.
 
 You do not start from scratch: Build already scaffolded the Default
 module's two starter sets, and running them *is* how you create your
-plan and your first real work sets. Because those sets now exist, the
-Work Explorer shows its **tree** (the Getting Started form only shows
-while a repo has no session sets — re-open it any time with
+plan and your first real work sets. Those sets appear straight away in
+the Work Explorer **tree** (re-open these instructions any time with
 **`Dabbler: Get Started`**). Under the **Default** module you will see:
 
 1. **`001-default-plan`** (a `plan` set) — run it first. It **creates or
@@ -136,9 +159,9 @@ Note that the AI orchestration does support parallel session sets
 sets use git worktrees: each parallel set works in its own worktree
 and is merged back to the main branch when the sets complete. The
 normal decomposition keeps sets sequential via `prerequisites:`; when
-you deliberately want a parallel decomposition, use the
-**`Dabbler: Generate Parallel Session-Set Prompt (advanced)`**
-command from the Command Palette.
+you deliberately want a parallel decomposition, ask your AI assistant
+for a parallel decomposition explicitly and have it set the
+`prerequisites:` accordingly.
 
 The mechanical git around that loop is automated, confirm-gated, and
 works on both GitHub and Azure DevOps: **`Dabbler: Open PR for this

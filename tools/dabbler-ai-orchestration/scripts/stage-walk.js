@@ -74,13 +74,15 @@ function parseArgs(argv) {
   return out;
 }
 
-// Set 112 S3: the Getting Started form renders ONLY while a workspace has
-// no materialized session set (SetupStatusView.buildGettingStarted keys the
-// getting-started -> list flip on `hasAnySets`). The default fixture
-// workspace ships four sets, so it can never show the form — which meant
-// the onboarding surface, the one surface a walk is most obviously for,
-// was the one surface the stager could not stage. Set 112 had to walk
-// exactly that: the form's tier fork is gone. Hence `--empty`.
+// `--empty` stages the FIRST-RUN window: a real project folder with no
+// session sets yet. Set 112 S3 added it because the Getting Started form
+// rendered only in that state and the default four-set fixture could never
+// show it. Set 123 S3 deleted the form — setup is `Dabbler: Set Up New
+// Project` plus `python -m ai_router.verify_type` in the terminal now — but
+// the mode is KEPT: the empty workspace is still the surface a new adopter
+// opens first, and it is still the one the four-set fixture cannot stage.
+// What an operator judges here is the empty Work Explorer and the
+// palette-driven setup path, not a form.
 //
 // It is a real project directory, not a bare temp folder: an untitled
 // window and a folder window are different surfaces, and the operator

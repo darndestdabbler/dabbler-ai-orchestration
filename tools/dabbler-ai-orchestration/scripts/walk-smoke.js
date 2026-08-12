@@ -22,8 +22,8 @@
 // Extra arguments are passed straight through to the stager, so a walk mode
 // can be proven rather than assumed:
 //
-//   npm run walk:smoke -- --empty      (Set 112 S3: the empty-project window
-//                                       that shows the Getting Started form)
+//   npm run walk:smoke -- --empty      (the first-run window: a real project
+//                                       folder with no session sets yet)
 //
 // Output is ASCII-only (Windows cp1252 console lesson, L-079-1).
 

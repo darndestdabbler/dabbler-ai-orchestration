@@ -137,7 +137,12 @@ function main(): void {
       }
     }
   };
-  walk(path.join(MEDIA, "session-sets-tree"));
+  // Set 123 S3: `media/session-sets-tree/` (the webview client, its two HTML
+  // builders and tree.css) is deleted with the webview. There are no
+  // script/style assets left to weigh, so the walk is skipped rather than
+  // pointed at a directory that does not exist — an ENOENT here would read
+  // as a broken harness rather than as the asset budget going to zero.
+  if (fs.existsSync(MEDIA)) walk(MEDIA);
 
   const payload = {
     generatedBy: "scripts/activation-harness.ts (Set 110 S1, round-4 remedy)",

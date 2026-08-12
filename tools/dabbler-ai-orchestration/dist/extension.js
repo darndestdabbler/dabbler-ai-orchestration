@@ -107,17 +107,17 @@ var require_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    function visit_(key, node, visitor, path43) {
-      const ctrl = callVisitor(key, node, visitor, path43);
+    function visit_(key, node, visitor, path37) {
+      const ctrl = callVisitor(key, node, visitor, path37);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path43, ctrl);
-        return visit_(key, ctrl, visitor, path43);
+        replaceNode(key, path37, ctrl);
+        return visit_(key, ctrl, visitor, path37);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path43 = Object.freeze(path43.concat(node));
+          path37 = Object.freeze(path37.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = visit_(i2, node.items[i2], visitor, path43);
+            const ci = visit_(i2, node.items[i2], visitor, path37);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -128,13 +128,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path43 = Object.freeze(path43.concat(node));
-          const ck = visit_("key", node.key, visitor, path43);
+          path37 = Object.freeze(path37.concat(node));
+          const ck = visit_("key", node.key, visitor, path37);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = visit_("value", node.value, visitor, path43);
+          const cv = visit_("value", node.value, visitor, path37);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -155,17 +155,17 @@ var require_visit = __commonJS({
     visitAsync.BREAK = BREAK;
     visitAsync.SKIP = SKIP;
     visitAsync.REMOVE = REMOVE;
-    async function visitAsync_(key, node, visitor, path43) {
-      const ctrl = await callVisitor(key, node, visitor, path43);
+    async function visitAsync_(key, node, visitor, path37) {
+      const ctrl = await callVisitor(key, node, visitor, path37);
       if (identity.isNode(ctrl) || identity.isPair(ctrl)) {
-        replaceNode(key, path43, ctrl);
-        return visitAsync_(key, ctrl, visitor, path43);
+        replaceNode(key, path37, ctrl);
+        return visitAsync_(key, ctrl, visitor, path37);
       }
       if (typeof ctrl !== "symbol") {
         if (identity.isCollection(node)) {
-          path43 = Object.freeze(path43.concat(node));
+          path37 = Object.freeze(path37.concat(node));
           for (let i2 = 0; i2 < node.items.length; ++i2) {
-            const ci = await visitAsync_(i2, node.items[i2], visitor, path43);
+            const ci = await visitAsync_(i2, node.items[i2], visitor, path37);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -176,13 +176,13 @@ var require_visit = __commonJS({
             }
           }
         } else if (identity.isPair(node)) {
-          path43 = Object.freeze(path43.concat(node));
-          const ck = await visitAsync_("key", node.key, visitor, path43);
+          path37 = Object.freeze(path37.concat(node));
+          const ck = await visitAsync_("key", node.key, visitor, path37);
           if (ck === BREAK)
             return BREAK;
           else if (ck === REMOVE)
             node.key = null;
-          const cv = await visitAsync_("value", node.value, visitor, path43);
+          const cv = await visitAsync_("value", node.value, visitor, path37);
           if (cv === BREAK)
             return BREAK;
           else if (cv === REMOVE)
@@ -209,23 +209,23 @@ var require_visit = __commonJS({
       }
       return visitor;
     }
-    function callVisitor(key, node, visitor, path43) {
+    function callVisitor(key, node, visitor, path37) {
       if (typeof visitor === "function")
-        return visitor(key, node, path43);
+        return visitor(key, node, path37);
       if (identity.isMap(node))
-        return visitor.Map?.(key, node, path43);
+        return visitor.Map?.(key, node, path37);
       if (identity.isSeq(node))
-        return visitor.Seq?.(key, node, path43);
+        return visitor.Seq?.(key, node, path37);
       if (identity.isPair(node))
-        return visitor.Pair?.(key, node, path43);
+        return visitor.Pair?.(key, node, path37);
       if (identity.isScalar(node))
-        return visitor.Scalar?.(key, node, path43);
+        return visitor.Scalar?.(key, node, path37);
       if (identity.isAlias(node))
-        return visitor.Alias?.(key, node, path43);
+        return visitor.Alias?.(key, node, path37);
       return void 0;
     }
-    function replaceNode(key, path43, node) {
-      const parent = path43[path43.length - 1];
+    function replaceNode(key, path37, node) {
+      const parent = path37[path37.length - 1];
       if (identity.isCollection(parent)) {
         parent.items[key] = node;
       } else if (identity.isPair(parent)) {
@@ -835,10 +835,10 @@ var require_Collection = __commonJS({
     var createNode = require_createNode();
     var identity = require_identity();
     var Node = require_Node();
-    function collectionFromPath(schema, path43, value) {
+    function collectionFromPath(schema, path37, value) {
       let v = value;
-      for (let i2 = path43.length - 1; i2 >= 0; --i2) {
-        const k2 = path43[i2];
+      for (let i2 = path37.length - 1; i2 >= 0; --i2) {
+        const k2 = path37[i2];
         if (typeof k2 === "number" && Number.isInteger(k2) && k2 >= 0) {
           const a = [];
           a[k2] = v;
@@ -857,7 +857,7 @@ var require_Collection = __commonJS({
         sourceObjects: /* @__PURE__ */ new Map()
       });
     }
-    var isEmptyPath = (path43) => path43 == null || typeof path43 === "object" && !!path43[Symbol.iterator]().next().done;
+    var isEmptyPath = (path37) => path37 == null || typeof path37 === "object" && !!path37[Symbol.iterator]().next().done;
     var Collection = class extends Node.NodeBase {
       constructor(type, schema) {
         super(type);
@@ -887,11 +887,11 @@ var require_Collection = __commonJS({
        * be a Pair instance or a `{ key, value }` object, which may not have a key
        * that already exists in the map.
        */
-      addIn(path43, value) {
-        if (isEmptyPath(path43))
+      addIn(path37, value) {
+        if (isEmptyPath(path37))
           this.add(value);
         else {
-          const [key, ...rest] = path43;
+          const [key, ...rest] = path37;
           const node = this.get(key, true);
           if (identity.isCollection(node))
             node.addIn(rest, value);
@@ -905,8 +905,8 @@ var require_Collection = __commonJS({
        * Removes a value from the collection.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path43) {
-        const [key, ...rest] = path43;
+      deleteIn(path37) {
+        const [key, ...rest] = path37;
         if (rest.length === 0)
           return this.delete(key);
         const node = this.get(key, true);
@@ -920,8 +920,8 @@ var require_Collection = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path43, keepScalar) {
-        const [key, ...rest] = path43;
+      getIn(path37, keepScalar) {
+        const [key, ...rest] = path37;
         const node = this.get(key, true);
         if (rest.length === 0)
           return !keepScalar && identity.isScalar(node) ? node.value : node;
@@ -939,8 +939,8 @@ var require_Collection = __commonJS({
       /**
        * Checks if the collection includes a value with the key `key`.
        */
-      hasIn(path43) {
-        const [key, ...rest] = path43;
+      hasIn(path37) {
+        const [key, ...rest] = path37;
         if (rest.length === 0)
           return this.has(key);
         const node = this.get(key, true);
@@ -950,8 +950,8 @@ var require_Collection = __commonJS({
        * Sets a value in this collection. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path43, value) {
-        const [key, ...rest] = path43;
+      setIn(path37, value) {
+        const [key, ...rest] = path37;
         if (rest.length === 0) {
           this.set(key, value);
         } else {
@@ -3403,7 +3403,7 @@ var require_Document = __commonJS({
     var applyReviver = require_applyReviver();
     var createNode = require_createNode();
     var directives = require_directives();
-    var Document4 = class _Document {
+    var Document2 = class _Document {
       constructor(value, replacer, options) {
         this.commentBefore = null;
         this.comment = null;
@@ -3466,9 +3466,9 @@ var require_Document = __commonJS({
           this.contents.add(value);
       }
       /** Adds a value to the document. */
-      addIn(path43, value) {
+      addIn(path37, value) {
         if (assertCollection(this.contents))
-          this.contents.addIn(path43, value);
+          this.contents.addIn(path37, value);
       }
       /**
        * Create a new `Alias` node, ensuring that the target `node` has the required anchor.
@@ -3543,14 +3543,14 @@ var require_Document = __commonJS({
        * Removes a value from the document.
        * @returns `true` if the item was found and removed.
        */
-      deleteIn(path43) {
-        if (Collection.isEmptyPath(path43)) {
+      deleteIn(path37) {
+        if (Collection.isEmptyPath(path37)) {
           if (this.contents == null)
             return false;
           this.contents = null;
           return true;
         }
-        return assertCollection(this.contents) ? this.contents.deleteIn(path43) : false;
+        return assertCollection(this.contents) ? this.contents.deleteIn(path37) : false;
       }
       /**
        * Returns item at `key`, or `undefined` if not found. By default unwraps
@@ -3565,10 +3565,10 @@ var require_Document = __commonJS({
        * scalar values from their surrounding node; to disable set `keepScalar` to
        * `true` (collections are always returned intact).
        */
-      getIn(path43, keepScalar) {
-        if (Collection.isEmptyPath(path43))
+      getIn(path37, keepScalar) {
+        if (Collection.isEmptyPath(path37))
           return !keepScalar && identity.isScalar(this.contents) ? this.contents.value : this.contents;
-        return identity.isCollection(this.contents) ? this.contents.getIn(path43, keepScalar) : void 0;
+        return identity.isCollection(this.contents) ? this.contents.getIn(path37, keepScalar) : void 0;
       }
       /**
        * Checks if the document includes a value with the key `key`.
@@ -3579,10 +3579,10 @@ var require_Document = __commonJS({
       /**
        * Checks if the document includes a value at `path`.
        */
-      hasIn(path43) {
-        if (Collection.isEmptyPath(path43))
+      hasIn(path37) {
+        if (Collection.isEmptyPath(path37))
           return this.contents !== void 0;
-        return identity.isCollection(this.contents) ? this.contents.hasIn(path43) : false;
+        return identity.isCollection(this.contents) ? this.contents.hasIn(path37) : false;
       }
       /**
        * Sets a value in this document. For `!!set`, `value` needs to be a
@@ -3599,13 +3599,13 @@ var require_Document = __commonJS({
        * Sets a value in this document. For `!!set`, `value` needs to be a
        * boolean to add/remove the item from the set.
        */
-      setIn(path43, value) {
-        if (Collection.isEmptyPath(path43)) {
+      setIn(path37, value) {
+        if (Collection.isEmptyPath(path37)) {
           this.contents = value;
         } else if (this.contents == null) {
-          this.contents = Collection.collectionFromPath(this.schema, Array.from(path43), value);
+          this.contents = Collection.collectionFromPath(this.schema, Array.from(path37), value);
         } else if (assertCollection(this.contents)) {
-          this.contents.setIn(path43, value);
+          this.contents.setIn(path37, value);
         }
       }
       /**
@@ -3693,7 +3693,7 @@ var require_Document = __commonJS({
         return true;
       throw new Error("Expected a YAML collection as document contents");
     }
-    exports2.Document = Document4;
+    exports2.Document = Document2;
   }
 });
 
@@ -5053,13 +5053,13 @@ var require_compose_node = __commonJS({
 var require_compose_doc = __commonJS({
   "node_modules/yaml/dist/compose/compose-doc.js"(exports2) {
     "use strict";
-    var Document4 = require_Document();
+    var Document2 = require_Document();
     var composeNode = require_compose_node();
     var resolveEnd = require_resolve_end();
     var resolveProps = require_resolve_props();
     function composeDoc(options, directives, { offset, start, value, end }, onError2) {
       const opts = Object.assign({ _directives: directives }, options);
-      const doc = new Document4.Document(void 0, opts);
+      const doc = new Document2.Document(void 0, opts);
       const ctx = {
         atKey: false,
         atRoot: true,
@@ -5098,7 +5098,7 @@ var require_composer = __commonJS({
     "use strict";
     var node_process = require("process");
     var directives = require_directives();
-    var Document4 = require_Document();
+    var Document2 = require_Document();
     var errors = require_errors();
     var identity = require_identity();
     var composeDoc = require_compose_doc();
@@ -5287,7 +5287,7 @@ ${end.comment}` : end.comment;
           this.doc = null;
         } else if (forceDoc) {
           const opts = Object.assign({ _directives: this.directives }, this.options);
-          const doc = new Document4.Document(void 0, opts);
+          const doc = new Document2.Document(void 0, opts);
           if (this.atDirectives)
             this.onError(endOffset, "MISSING_CHAR", "Missing directives-end indicator line");
           doc.range = [0, endOffset, endOffset];
@@ -5343,10 +5343,10 @@ var require_cst_scalar = __commonJS({
         case "|":
         case ">": {
           const he = source.indexOf("\n");
-          const head2 = source.substring(0, he);
+          const head = source.substring(0, he);
           const body = source.substring(he + 1) + "\n";
           const props = [
-            { type: "block-scalar-header", offset, indent, source: head2 }
+            { type: "block-scalar-header", offset, indent, source: head }
           ];
           if (!addEndtoBlockProps(props, end))
             props.push({ type: "newline", offset: -1, indent, source: "\n" });
@@ -5406,19 +5406,19 @@ var require_cst_scalar = __commonJS({
     }
     function setBlockScalarValue(token, source) {
       const he = source.indexOf("\n");
-      const head2 = source.substring(0, he);
+      const head = source.substring(0, he);
       const body = source.substring(he + 1) + "\n";
       if (token.type === "block-scalar") {
         const header = token.props[0];
         if (header.type !== "block-scalar-header")
           throw new Error("Invalid block scalar header");
-        header.source = head2;
+        header.source = head;
         token.source = body;
       } else {
         const { offset } = token;
         const indent = "indent" in token ? token.indent : -1;
         const props = [
-          { type: "block-scalar-header", offset, indent, source: head2 }
+          { type: "block-scalar-header", offset, indent, source: head }
         ];
         if (!addEndtoBlockProps(props, "end" in token ? token.end : void 0))
           props.push({ type: "newline", offset: -1, indent, source: "\n" });
@@ -5561,9 +5561,9 @@ var require_cst_visit = __commonJS({
     visit.BREAK = BREAK;
     visit.SKIP = SKIP;
     visit.REMOVE = REMOVE;
-    visit.itemAtPath = (cst, path43) => {
+    visit.itemAtPath = (cst, path37) => {
       let item = cst;
-      for (const [field, index] of path43) {
+      for (const [field, index] of path37) {
         const tok = item?.[field];
         if (tok && "items" in tok) {
           item = tok.items[index];
@@ -5572,23 +5572,23 @@ var require_cst_visit = __commonJS({
       }
       return item;
     };
-    visit.parentCollection = (cst, path43) => {
-      const parent = visit.itemAtPath(cst, path43.slice(0, -1));
-      const field = path43[path43.length - 1][0];
+    visit.parentCollection = (cst, path37) => {
+      const parent = visit.itemAtPath(cst, path37.slice(0, -1));
+      const field = path37[path37.length - 1][0];
       const coll = parent?.[field];
       if (coll && "items" in coll)
         return coll;
       throw new Error("Parent collection not found");
     };
-    function _visit(path43, item, visitor) {
-      let ctrl = visitor(item, path43);
+    function _visit(path37, item, visitor) {
+      let ctrl = visitor(item, path37);
       if (typeof ctrl === "symbol")
         return ctrl;
       for (const field of ["key", "value"]) {
         const token = item[field];
         if (token && "items" in token) {
           for (let i2 = 0; i2 < token.items.length; ++i2) {
-            const ci = _visit(Object.freeze(path43.concat([[field, i2]])), token.items[i2], visitor);
+            const ci = _visit(Object.freeze(path37.concat([[field, i2]])), token.items[i2], visitor);
             if (typeof ci === "number")
               i2 = ci - 1;
             else if (ci === BREAK)
@@ -5599,10 +5599,10 @@ var require_cst_visit = __commonJS({
             }
           }
           if (typeof ctrl === "function" && field === "key")
-            ctrl = ctrl(item, path43);
+            ctrl = ctrl(item, path37);
         }
       }
-      return typeof ctrl === "function" ? ctrl(item, path43) : ctrl;
+      return typeof ctrl === "function" ? ctrl(item, path37) : ctrl;
     }
     exports2.visit = visit;
   }
@@ -6899,14 +6899,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs37 = this.flowScalar(this.type);
+              const fs29 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs37, sep: [] });
+                map.items.push({ start, key: fs29, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs37);
+                this.stack.push(fs29);
               } else {
-                Object.assign(it, { key: fs37, sep: [] });
+                Object.assign(it, { key: fs29, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7034,13 +7034,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs37 = this.flowScalar(this.type);
+              const fs29 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs37, sep: [] });
+                fc.items.push({ start: [], key: fs29, sep: [] });
               else if (it.sep)
-                this.stack.push(fs37);
+                this.stack.push(fs29);
               else
-                Object.assign(it, { key: fs37, sep: [] });
+                Object.assign(it, { key: fs29, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -7203,7 +7203,7 @@ var require_public_api = __commonJS({
   "node_modules/yaml/dist/public-api.js"(exports2) {
     "use strict";
     var composer = require_composer();
-    var Document4 = require_Document();
+    var Document2 = require_Document();
     var errors = require_errors();
     var log = require_log();
     var identity = require_identity();
@@ -7228,7 +7228,7 @@ var require_public_api = __commonJS({
         return docs;
       return Object.assign([], { empty: true }, composer$1.streamInfo());
     }
-    function parseDocument2(source, options = {}) {
+    function parseDocument(source, options = {}) {
       const { lineCounter: lineCounter2, prettyErrors } = parseOptions(options);
       const parser$1 = new parser4.Parser(lineCounter2?.addNewLine);
       const composer$1 = new composer.Composer(options);
@@ -7247,14 +7247,14 @@ var require_public_api = __commonJS({
       }
       return doc;
     }
-    function parse4(src, reviver, options) {
+    function parse3(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
       } else if (options === void 0 && reviver && typeof reviver === "object") {
         options = reviver;
       }
-      const doc = parseDocument2(src, options);
+      const doc = parseDocument(src, options);
       if (!doc)
         return null;
       doc.warnings.forEach((warning) => log.warn(doc.options.logLevel, warning));
@@ -7286,11 +7286,11 @@ var require_public_api = __commonJS({
       }
       if (identity.isDocument(value) && !_replacer)
         return value.toString(options);
-      return new Document4.Document(value, _replacer, options).toString(options);
+      return new Document2.Document(value, _replacer, options).toString(options);
     }
-    exports2.parse = parse4;
+    exports2.parse = parse3;
     exports2.parseAllDocuments = parseAllDocuments;
-    exports2.parseDocument = parseDocument2;
+    exports2.parseDocument = parseDocument;
     exports2.stringify = stringify;
   }
 });
@@ -7300,7 +7300,7 @@ var require_dist = __commonJS({
   "node_modules/yaml/dist/index.js"(exports2) {
     "use strict";
     var composer = require_composer();
-    var Document4 = require_Document();
+    var Document2 = require_Document();
     var Schema = require_Schema();
     var errors = require_errors();
     var Alias = require_Alias();
@@ -7316,7 +7316,7 @@ var require_dist = __commonJS({
     var publicApi = require_public_api();
     var visit = require_visit();
     exports2.Composer = composer.Composer;
-    exports2.Document = Document4.Document;
+    exports2.Document = Document2.Document;
     exports2.Schema = Schema.Schema;
     exports2.YAMLError = errors.YAMLError;
     exports2.YAMLParseError = errors.YAMLParseError;
@@ -7360,7 +7360,7 @@ var require_ms = __commonJS({
       options = options || {};
       var type = typeof val;
       if (type === "string" && val.length > 0) {
-        return parse4(val);
+        return parse3(val);
       } else if (type === "number" && isFinite(val)) {
         return options.long ? fmtLong(val) : fmtShort(val);
       }
@@ -7368,7 +7368,7 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse4(str) {
+    function parse3(str) {
       str = String(str);
       if (str.length > 100) {
         return;
@@ -7466,7 +7466,7 @@ var require_ms = __commonJS({
 // node_modules/debug/src/common.js
 var require_common = __commonJS({
   "node_modules/debug/src/common.js"(exports2, module2) {
-    function setup(env10) {
+    function setup(env8) {
       createDebug.debug = createDebug;
       createDebug.default = createDebug;
       createDebug.coerce = coerce;
@@ -7475,8 +7475,8 @@ var require_common = __commonJS({
       createDebug.enabled = enabled;
       createDebug.humanize = require_ms();
       createDebug.destroy = destroy;
-      Object.keys(env10).forEach((key) => {
-        createDebug[key] = env10[key];
+      Object.keys(env8).forEach((key) => {
+        createDebug[key] = env8[key];
       });
       createDebug.names = [];
       createDebug.skips = [];
@@ -7830,20 +7830,20 @@ var require_supports_color = __commonJS({
     var os4 = require("os");
     var tty = require("tty");
     var hasFlag = require_has_flag();
-    var { env: env10 } = process;
+    var { env: env8 } = process;
     var forceColor;
     if (hasFlag("no-color") || hasFlag("no-colors") || hasFlag("color=false") || hasFlag("color=never")) {
       forceColor = 0;
     } else if (hasFlag("color") || hasFlag("colors") || hasFlag("color=true") || hasFlag("color=always")) {
       forceColor = 1;
     }
-    if ("FORCE_COLOR" in env10) {
-      if (env10.FORCE_COLOR === "true") {
+    if ("FORCE_COLOR" in env8) {
+      if (env8.FORCE_COLOR === "true") {
         forceColor = 1;
-      } else if (env10.FORCE_COLOR === "false") {
+      } else if (env8.FORCE_COLOR === "false") {
         forceColor = 0;
       } else {
-        forceColor = env10.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env10.FORCE_COLOR, 10), 3);
+        forceColor = env8.FORCE_COLOR.length === 0 ? 1 : Math.min(parseInt(env8.FORCE_COLOR, 10), 3);
       }
     }
     function translateLevel(level) {
@@ -7871,7 +7871,7 @@ var require_supports_color = __commonJS({
         return 0;
       }
       const min = forceColor || 0;
-      if (env10.TERM === "dumb") {
+      if (env8.TERM === "dumb") {
         return min;
       }
       if (process.platform === "win32") {
@@ -7881,34 +7881,34 @@ var require_supports_color = __commonJS({
         }
         return 1;
       }
-      if ("CI" in env10) {
-        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env10) || env10.CI_NAME === "codeship") {
+      if ("CI" in env8) {
+        if (["TRAVIS", "CIRCLECI", "APPVEYOR", "GITLAB_CI", "GITHUB_ACTIONS", "BUILDKITE"].some((sign) => sign in env8) || env8.CI_NAME === "codeship") {
           return 1;
         }
         return min;
       }
-      if ("TEAMCITY_VERSION" in env10) {
-        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env10.TEAMCITY_VERSION) ? 1 : 0;
+      if ("TEAMCITY_VERSION" in env8) {
+        return /^(9\.(0*[1-9]\d*)\.|\d{2,}\.)/.test(env8.TEAMCITY_VERSION) ? 1 : 0;
       }
-      if (env10.COLORTERM === "truecolor") {
+      if (env8.COLORTERM === "truecolor") {
         return 3;
       }
-      if ("TERM_PROGRAM" in env10) {
-        const version = parseInt((env10.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
-        switch (env10.TERM_PROGRAM) {
+      if ("TERM_PROGRAM" in env8) {
+        const version = parseInt((env8.TERM_PROGRAM_VERSION || "").split(".")[0], 10);
+        switch (env8.TERM_PROGRAM) {
           case "iTerm.app":
             return version >= 3 ? 3 : 2;
           case "Apple_Terminal":
             return 2;
         }
       }
-      if (/-256(color)?$/i.test(env10.TERM)) {
+      if (/-256(color)?$/i.test(env8.TERM)) {
         return 2;
       }
-      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env10.TERM)) {
+      if (/^screen|^xterm|^vt100|^vt220|^rxvt|color|ansi|cygwin|linux/i.test(env8.TERM)) {
         return 1;
       }
-      if ("COLORTERM" in env10) {
+      if ("COLORTERM" in env8) {
         return 1;
       }
       return min;
@@ -8121,10 +8121,10 @@ var require_src2 = __commonJS({
     var fs_1 = require("fs");
     var debug_1 = __importDefault(require_src());
     var log = debug_1.default("@kwsites/file-exists");
-    function check(path43, isFile, isDirectory) {
-      log(`checking %s`, path43);
+    function check(path37, isFile, isDirectory) {
+      log(`checking %s`, path37);
       try {
-        const stat = fs_1.statSync(path43);
+        const stat = fs_1.statSync(path37);
         if (stat.isFile() && isFile) {
           log(`[OK] path represents a file`);
           return true;
@@ -8144,8 +8144,8 @@ var require_src2 = __commonJS({
         throw e;
       }
     }
-    function exists2(path43, type = exports2.READABLE) {
-      return check(path43, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
+    function exists2(path37, type = exports2.READABLE) {
+      return check(path37, (type & exports2.FILE) > 0, (type & exports2.FOLDER) > 0);
     }
     exports2.exists = exists2;
     exports2.FILE = 1;
@@ -8210,6470 +8210,6 @@ var require_dist3 = __commonJS({
   }
 });
 
-// node_modules/ajv/dist/compile/codegen/code.js
-var require_code = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/code.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.regexpCode = exports2.getEsmExportName = exports2.getProperty = exports2.safeStringify = exports2.stringify = exports2.strConcat = exports2.addCodeArg = exports2.str = exports2._ = exports2.nil = exports2._Code = exports2.Name = exports2.IDENTIFIER = exports2._CodeOrName = void 0;
-    var _CodeOrName = class {
-    };
-    exports2._CodeOrName = _CodeOrName;
-    exports2.IDENTIFIER = /^[a-z$_][a-z$_0-9]*$/i;
-    var Name = class extends _CodeOrName {
-      constructor(s) {
-        super();
-        if (!exports2.IDENTIFIER.test(s))
-          throw new Error("CodeGen: name must be a valid identifier");
-        this.str = s;
-      }
-      toString() {
-        return this.str;
-      }
-      emptyStr() {
-        return false;
-      }
-      get names() {
-        return { [this.str]: 1 };
-      }
-    };
-    exports2.Name = Name;
-    var _Code = class extends _CodeOrName {
-      constructor(code) {
-        super();
-        this._items = typeof code === "string" ? [code] : code;
-      }
-      toString() {
-        return this.str;
-      }
-      emptyStr() {
-        if (this._items.length > 1)
-          return false;
-        const item = this._items[0];
-        return item === "" || item === '""';
-      }
-      get str() {
-        var _a2;
-        return (_a2 = this._str) !== null && _a2 !== void 0 ? _a2 : this._str = this._items.reduce((s, c3) => `${s}${c3}`, "");
-      }
-      get names() {
-        var _a2;
-        return (_a2 = this._names) !== null && _a2 !== void 0 ? _a2 : this._names = this._items.reduce((names, c3) => {
-          if (c3 instanceof Name)
-            names[c3.str] = (names[c3.str] || 0) + 1;
-          return names;
-        }, {});
-      }
-    };
-    exports2._Code = _Code;
-    exports2.nil = new _Code("");
-    function _2(strs, ...args) {
-      const code = [strs[0]];
-      let i2 = 0;
-      while (i2 < args.length) {
-        addCodeArg(code, args[i2]);
-        code.push(strs[++i2]);
-      }
-      return new _Code(code);
-    }
-    exports2._ = _2;
-    var plus = new _Code("+");
-    function str(strs, ...args) {
-      const expr = [safeStringify(strs[0])];
-      let i2 = 0;
-      while (i2 < args.length) {
-        expr.push(plus);
-        addCodeArg(expr, args[i2]);
-        expr.push(plus, safeStringify(strs[++i2]));
-      }
-      optimize(expr);
-      return new _Code(expr);
-    }
-    exports2.str = str;
-    function addCodeArg(code, arg) {
-      if (arg instanceof _Code)
-        code.push(...arg._items);
-      else if (arg instanceof Name)
-        code.push(arg);
-      else
-        code.push(interpolate(arg));
-    }
-    exports2.addCodeArg = addCodeArg;
-    function optimize(expr) {
-      let i2 = 1;
-      while (i2 < expr.length - 1) {
-        if (expr[i2] === plus) {
-          const res = mergeExprItems(expr[i2 - 1], expr[i2 + 1]);
-          if (res !== void 0) {
-            expr.splice(i2 - 1, 3, res);
-            continue;
-          }
-          expr[i2++] = "+";
-        }
-        i2++;
-      }
-    }
-    function mergeExprItems(a, b2) {
-      if (b2 === '""')
-        return a;
-      if (a === '""')
-        return b2;
-      if (typeof a == "string") {
-        if (b2 instanceof Name || a[a.length - 1] !== '"')
-          return;
-        if (typeof b2 != "string")
-          return `${a.slice(0, -1)}${b2}"`;
-        if (b2[0] === '"')
-          return a.slice(0, -1) + b2.slice(1);
-        return;
-      }
-      if (typeof b2 == "string" && b2[0] === '"' && !(a instanceof Name))
-        return `"${a}${b2.slice(1)}`;
-      return;
-    }
-    function strConcat(c1, c22) {
-      return c22.emptyStr() ? c1 : c1.emptyStr() ? c22 : str`${c1}${c22}`;
-    }
-    exports2.strConcat = strConcat;
-    function interpolate(x2) {
-      return typeof x2 == "number" || typeof x2 == "boolean" || x2 === null ? x2 : safeStringify(Array.isArray(x2) ? x2.join(",") : x2);
-    }
-    function stringify(x2) {
-      return new _Code(safeStringify(x2));
-    }
-    exports2.stringify = stringify;
-    function safeStringify(x2) {
-      return JSON.stringify(x2).replace(/\u2028/g, "\\u2028").replace(/\u2029/g, "\\u2029");
-    }
-    exports2.safeStringify = safeStringify;
-    function getProperty(key) {
-      return typeof key == "string" && exports2.IDENTIFIER.test(key) ? new _Code(`.${key}`) : _2`[${key}]`;
-    }
-    exports2.getProperty = getProperty;
-    function getEsmExportName(key) {
-      if (typeof key == "string" && exports2.IDENTIFIER.test(key)) {
-        return new _Code(`${key}`);
-      }
-      throw new Error(`CodeGen: invalid export name: ${key}, use explicit $id name mapping`);
-    }
-    exports2.getEsmExportName = getEsmExportName;
-    function regexpCode(rx) {
-      return new _Code(rx.toString());
-    }
-    exports2.regexpCode = regexpCode;
-  }
-});
-
-// node_modules/ajv/dist/compile/codegen/scope.js
-var require_scope = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/scope.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.ValueScope = exports2.ValueScopeName = exports2.Scope = exports2.varKinds = exports2.UsedValueState = void 0;
-    var code_1 = require_code();
-    var ValueError = class extends Error {
-      constructor(name) {
-        super(`CodeGen: "code" for ${name} not defined`);
-        this.value = name.value;
-      }
-    };
-    var UsedValueState;
-    (function(UsedValueState2) {
-      UsedValueState2[UsedValueState2["Started"] = 0] = "Started";
-      UsedValueState2[UsedValueState2["Completed"] = 1] = "Completed";
-    })(UsedValueState || (exports2.UsedValueState = UsedValueState = {}));
-    exports2.varKinds = {
-      const: new code_1.Name("const"),
-      let: new code_1.Name("let"),
-      var: new code_1.Name("var")
-    };
-    var Scope = class {
-      constructor({ prefixes, parent } = {}) {
-        this._names = {};
-        this._prefixes = prefixes;
-        this._parent = parent;
-      }
-      toName(nameOrPrefix) {
-        return nameOrPrefix instanceof code_1.Name ? nameOrPrefix : this.name(nameOrPrefix);
-      }
-      name(prefix) {
-        return new code_1.Name(this._newName(prefix));
-      }
-      _newName(prefix) {
-        const ng = this._names[prefix] || this._nameGroup(prefix);
-        return `${prefix}${ng.index++}`;
-      }
-      _nameGroup(prefix) {
-        var _a2, _b;
-        if (((_b = (_a2 = this._parent) === null || _a2 === void 0 ? void 0 : _a2._prefixes) === null || _b === void 0 ? void 0 : _b.has(prefix)) || this._prefixes && !this._prefixes.has(prefix)) {
-          throw new Error(`CodeGen: prefix "${prefix}" is not allowed in this scope`);
-        }
-        return this._names[prefix] = { prefix, index: 0 };
-      }
-    };
-    exports2.Scope = Scope;
-    var ValueScopeName = class extends code_1.Name {
-      constructor(prefix, nameStr) {
-        super(nameStr);
-        this.prefix = prefix;
-      }
-      setValue(value, { property, itemIndex }) {
-        this.value = value;
-        this.scopePath = (0, code_1._)`.${new code_1.Name(property)}[${itemIndex}]`;
-      }
-    };
-    exports2.ValueScopeName = ValueScopeName;
-    var line = (0, code_1._)`\n`;
-    var ValueScope = class extends Scope {
-      constructor(opts) {
-        super(opts);
-        this._values = {};
-        this._scope = opts.scope;
-        this.opts = { ...opts, _n: opts.lines ? line : code_1.nil };
-      }
-      get() {
-        return this._scope;
-      }
-      name(prefix) {
-        return new ValueScopeName(prefix, this._newName(prefix));
-      }
-      value(nameOrPrefix, value) {
-        var _a2;
-        if (value.ref === void 0)
-          throw new Error("CodeGen: ref must be passed in value");
-        const name = this.toName(nameOrPrefix);
-        const { prefix } = name;
-        const valueKey = (_a2 = value.key) !== null && _a2 !== void 0 ? _a2 : value.ref;
-        let vs = this._values[prefix];
-        if (vs) {
-          const _name = vs.get(valueKey);
-          if (_name)
-            return _name;
-        } else {
-          vs = this._values[prefix] = /* @__PURE__ */ new Map();
-        }
-        vs.set(valueKey, name);
-        const s = this._scope[prefix] || (this._scope[prefix] = []);
-        const itemIndex = s.length;
-        s[itemIndex] = value.ref;
-        name.setValue(value, { property: prefix, itemIndex });
-        return name;
-      }
-      getValue(prefix, keyOrRef) {
-        const vs = this._values[prefix];
-        if (!vs)
-          return;
-        return vs.get(keyOrRef);
-      }
-      scopeRefs(scopeName, values = this._values) {
-        return this._reduceValues(values, (name) => {
-          if (name.scopePath === void 0)
-            throw new Error(`CodeGen: name "${name}" has no value`);
-          return (0, code_1._)`${scopeName}${name.scopePath}`;
-        });
-      }
-      scopeCode(values = this._values, usedValues, getCode) {
-        return this._reduceValues(values, (name) => {
-          if (name.value === void 0)
-            throw new Error(`CodeGen: name "${name}" has no value`);
-          return name.value.code;
-        }, usedValues, getCode);
-      }
-      _reduceValues(values, valueCode, usedValues = {}, getCode) {
-        let code = code_1.nil;
-        for (const prefix in values) {
-          const vs = values[prefix];
-          if (!vs)
-            continue;
-          const nameSet = usedValues[prefix] = usedValues[prefix] || /* @__PURE__ */ new Map();
-          vs.forEach((name) => {
-            if (nameSet.has(name))
-              return;
-            nameSet.set(name, UsedValueState.Started);
-            let c3 = valueCode(name);
-            if (c3) {
-              const def = this.opts.es5 ? exports2.varKinds.var : exports2.varKinds.const;
-              code = (0, code_1._)`${code}${def} ${name} = ${c3};${this.opts._n}`;
-            } else if (c3 = getCode === null || getCode === void 0 ? void 0 : getCode(name)) {
-              code = (0, code_1._)`${code}${c3}${this.opts._n}`;
-            } else {
-              throw new ValueError(name);
-            }
-            nameSet.set(name, UsedValueState.Completed);
-          });
-        }
-        return code;
-      }
-    };
-    exports2.ValueScope = ValueScope;
-  }
-});
-
-// node_modules/ajv/dist/compile/codegen/index.js
-var require_codegen = __commonJS({
-  "node_modules/ajv/dist/compile/codegen/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.or = exports2.and = exports2.not = exports2.CodeGen = exports2.operators = exports2.varKinds = exports2.ValueScopeName = exports2.ValueScope = exports2.Scope = exports2.Name = exports2.regexpCode = exports2.stringify = exports2.getProperty = exports2.nil = exports2.strConcat = exports2.str = exports2._ = void 0;
-    var code_1 = require_code();
-    var scope_1 = require_scope();
-    var code_2 = require_code();
-    Object.defineProperty(exports2, "_", { enumerable: true, get: function() {
-      return code_2._;
-    } });
-    Object.defineProperty(exports2, "str", { enumerable: true, get: function() {
-      return code_2.str;
-    } });
-    Object.defineProperty(exports2, "strConcat", { enumerable: true, get: function() {
-      return code_2.strConcat;
-    } });
-    Object.defineProperty(exports2, "nil", { enumerable: true, get: function() {
-      return code_2.nil;
-    } });
-    Object.defineProperty(exports2, "getProperty", { enumerable: true, get: function() {
-      return code_2.getProperty;
-    } });
-    Object.defineProperty(exports2, "stringify", { enumerable: true, get: function() {
-      return code_2.stringify;
-    } });
-    Object.defineProperty(exports2, "regexpCode", { enumerable: true, get: function() {
-      return code_2.regexpCode;
-    } });
-    Object.defineProperty(exports2, "Name", { enumerable: true, get: function() {
-      return code_2.Name;
-    } });
-    var scope_2 = require_scope();
-    Object.defineProperty(exports2, "Scope", { enumerable: true, get: function() {
-      return scope_2.Scope;
-    } });
-    Object.defineProperty(exports2, "ValueScope", { enumerable: true, get: function() {
-      return scope_2.ValueScope;
-    } });
-    Object.defineProperty(exports2, "ValueScopeName", { enumerable: true, get: function() {
-      return scope_2.ValueScopeName;
-    } });
-    Object.defineProperty(exports2, "varKinds", { enumerable: true, get: function() {
-      return scope_2.varKinds;
-    } });
-    exports2.operators = {
-      GT: new code_1._Code(">"),
-      GTE: new code_1._Code(">="),
-      LT: new code_1._Code("<"),
-      LTE: new code_1._Code("<="),
-      EQ: new code_1._Code("==="),
-      NEQ: new code_1._Code("!=="),
-      NOT: new code_1._Code("!"),
-      OR: new code_1._Code("||"),
-      AND: new code_1._Code("&&"),
-      ADD: new code_1._Code("+")
-    };
-    var Node = class {
-      optimizeNodes() {
-        return this;
-      }
-      optimizeNames(_names, _constants) {
-        return this;
-      }
-    };
-    var Def = class extends Node {
-      constructor(varKind, name, rhs) {
-        super();
-        this.varKind = varKind;
-        this.name = name;
-        this.rhs = rhs;
-      }
-      render({ es5, _n }) {
-        const varKind = es5 ? scope_1.varKinds.var : this.varKind;
-        const rhs = this.rhs === void 0 ? "" : ` = ${this.rhs}`;
-        return `${varKind} ${this.name}${rhs};` + _n;
-      }
-      optimizeNames(names, constants) {
-        if (!names[this.name.str])
-          return;
-        if (this.rhs)
-          this.rhs = optimizeExpr(this.rhs, names, constants);
-        return this;
-      }
-      get names() {
-        return this.rhs instanceof code_1._CodeOrName ? this.rhs.names : {};
-      }
-    };
-    var Assign = class extends Node {
-      constructor(lhs, rhs, sideEffects) {
-        super();
-        this.lhs = lhs;
-        this.rhs = rhs;
-        this.sideEffects = sideEffects;
-      }
-      render({ _n }) {
-        return `${this.lhs} = ${this.rhs};` + _n;
-      }
-      optimizeNames(names, constants) {
-        if (this.lhs instanceof code_1.Name && !names[this.lhs.str] && !this.sideEffects)
-          return;
-        this.rhs = optimizeExpr(this.rhs, names, constants);
-        return this;
-      }
-      get names() {
-        const names = this.lhs instanceof code_1.Name ? {} : { ...this.lhs.names };
-        return addExprNames(names, this.rhs);
-      }
-    };
-    var AssignOp = class extends Assign {
-      constructor(lhs, op, rhs, sideEffects) {
-        super(lhs, rhs, sideEffects);
-        this.op = op;
-      }
-      render({ _n }) {
-        return `${this.lhs} ${this.op}= ${this.rhs};` + _n;
-      }
-    };
-    var Label = class extends Node {
-      constructor(label) {
-        super();
-        this.label = label;
-        this.names = {};
-      }
-      render({ _n }) {
-        return `${this.label}:` + _n;
-      }
-    };
-    var Break = class extends Node {
-      constructor(label) {
-        super();
-        this.label = label;
-        this.names = {};
-      }
-      render({ _n }) {
-        const label = this.label ? ` ${this.label}` : "";
-        return `break${label};` + _n;
-      }
-    };
-    var Throw = class extends Node {
-      constructor(error) {
-        super();
-        this.error = error;
-      }
-      render({ _n }) {
-        return `throw ${this.error};` + _n;
-      }
-      get names() {
-        return this.error.names;
-      }
-    };
-    var AnyCode = class extends Node {
-      constructor(code) {
-        super();
-        this.code = code;
-      }
-      render({ _n }) {
-        return `${this.code};` + _n;
-      }
-      optimizeNodes() {
-        return `${this.code}` ? this : void 0;
-      }
-      optimizeNames(names, constants) {
-        this.code = optimizeExpr(this.code, names, constants);
-        return this;
-      }
-      get names() {
-        return this.code instanceof code_1._CodeOrName ? this.code.names : {};
-      }
-    };
-    var ParentNode = class extends Node {
-      constructor(nodes = []) {
-        super();
-        this.nodes = nodes;
-      }
-      render(opts) {
-        return this.nodes.reduce((code, n) => code + n.render(opts), "");
-      }
-      optimizeNodes() {
-        const { nodes } = this;
-        let i2 = nodes.length;
-        while (i2--) {
-          const n = nodes[i2].optimizeNodes();
-          if (Array.isArray(n))
-            nodes.splice(i2, 1, ...n);
-          else if (n)
-            nodes[i2] = n;
-          else
-            nodes.splice(i2, 1);
-        }
-        return nodes.length > 0 ? this : void 0;
-      }
-      optimizeNames(names, constants) {
-        const { nodes } = this;
-        let i2 = nodes.length;
-        while (i2--) {
-          const n = nodes[i2];
-          if (n.optimizeNames(names, constants))
-            continue;
-          subtractNames(names, n.names);
-          nodes.splice(i2, 1);
-        }
-        return nodes.length > 0 ? this : void 0;
-      }
-      get names() {
-        return this.nodes.reduce((names, n) => addNames(names, n.names), {});
-      }
-    };
-    var BlockNode = class extends ParentNode {
-      render(opts) {
-        return "{" + opts._n + super.render(opts) + "}" + opts._n;
-      }
-    };
-    var Root = class extends ParentNode {
-    };
-    var Else = class extends BlockNode {
-    };
-    Else.kind = "else";
-    var If = class _If extends BlockNode {
-      constructor(condition, nodes) {
-        super(nodes);
-        this.condition = condition;
-      }
-      render(opts) {
-        let code = `if(${this.condition})` + super.render(opts);
-        if (this.else)
-          code += "else " + this.else.render(opts);
-        return code;
-      }
-      optimizeNodes() {
-        super.optimizeNodes();
-        const cond = this.condition;
-        if (cond === true)
-          return this.nodes;
-        let e = this.else;
-        if (e) {
-          const ns = e.optimizeNodes();
-          e = this.else = Array.isArray(ns) ? new Else(ns) : ns;
-        }
-        if (e) {
-          if (cond === false)
-            return e instanceof _If ? e : e.nodes;
-          if (this.nodes.length)
-            return this;
-          return new _If(not(cond), e instanceof _If ? [e] : e.nodes);
-        }
-        if (cond === false || !this.nodes.length)
-          return void 0;
-        return this;
-      }
-      optimizeNames(names, constants) {
-        var _a2;
-        this.else = (_a2 = this.else) === null || _a2 === void 0 ? void 0 : _a2.optimizeNames(names, constants);
-        if (!(super.optimizeNames(names, constants) || this.else))
-          return;
-        this.condition = optimizeExpr(this.condition, names, constants);
-        return this;
-      }
-      get names() {
-        const names = super.names;
-        addExprNames(names, this.condition);
-        if (this.else)
-          addNames(names, this.else.names);
-        return names;
-      }
-    };
-    If.kind = "if";
-    var For = class extends BlockNode {
-    };
-    For.kind = "for";
-    var ForLoop = class extends For {
-      constructor(iteration) {
-        super();
-        this.iteration = iteration;
-      }
-      render(opts) {
-        return `for(${this.iteration})` + super.render(opts);
-      }
-      optimizeNames(names, constants) {
-        if (!super.optimizeNames(names, constants))
-          return;
-        this.iteration = optimizeExpr(this.iteration, names, constants);
-        return this;
-      }
-      get names() {
-        return addNames(super.names, this.iteration.names);
-      }
-    };
-    var ForRange = class extends For {
-      constructor(varKind, name, from, to) {
-        super();
-        this.varKind = varKind;
-        this.name = name;
-        this.from = from;
-        this.to = to;
-      }
-      render(opts) {
-        const varKind = opts.es5 ? scope_1.varKinds.var : this.varKind;
-        const { name, from, to } = this;
-        return `for(${varKind} ${name}=${from}; ${name}<${to}; ${name}++)` + super.render(opts);
-      }
-      get names() {
-        const names = addExprNames(super.names, this.from);
-        return addExprNames(names, this.to);
-      }
-    };
-    var ForIter = class extends For {
-      constructor(loop, varKind, name, iterable) {
-        super();
-        this.loop = loop;
-        this.varKind = varKind;
-        this.name = name;
-        this.iterable = iterable;
-      }
-      render(opts) {
-        return `for(${this.varKind} ${this.name} ${this.loop} ${this.iterable})` + super.render(opts);
-      }
-      optimizeNames(names, constants) {
-        if (!super.optimizeNames(names, constants))
-          return;
-        this.iterable = optimizeExpr(this.iterable, names, constants);
-        return this;
-      }
-      get names() {
-        return addNames(super.names, this.iterable.names);
-      }
-    };
-    var Func = class extends BlockNode {
-      constructor(name, args, async) {
-        super();
-        this.name = name;
-        this.args = args;
-        this.async = async;
-      }
-      render(opts) {
-        const _async = this.async ? "async " : "";
-        return `${_async}function ${this.name}(${this.args})` + super.render(opts);
-      }
-    };
-    Func.kind = "func";
-    var Return = class extends ParentNode {
-      render(opts) {
-        return "return " + super.render(opts);
-      }
-    };
-    Return.kind = "return";
-    var Try = class extends BlockNode {
-      render(opts) {
-        let code = "try" + super.render(opts);
-        if (this.catch)
-          code += this.catch.render(opts);
-        if (this.finally)
-          code += this.finally.render(opts);
-        return code;
-      }
-      optimizeNodes() {
-        var _a2, _b;
-        super.optimizeNodes();
-        (_a2 = this.catch) === null || _a2 === void 0 ? void 0 : _a2.optimizeNodes();
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNodes();
-        return this;
-      }
-      optimizeNames(names, constants) {
-        var _a2, _b;
-        super.optimizeNames(names, constants);
-        (_a2 = this.catch) === null || _a2 === void 0 ? void 0 : _a2.optimizeNames(names, constants);
-        (_b = this.finally) === null || _b === void 0 ? void 0 : _b.optimizeNames(names, constants);
-        return this;
-      }
-      get names() {
-        const names = super.names;
-        if (this.catch)
-          addNames(names, this.catch.names);
-        if (this.finally)
-          addNames(names, this.finally.names);
-        return names;
-      }
-    };
-    var Catch = class extends BlockNode {
-      constructor(error) {
-        super();
-        this.error = error;
-      }
-      render(opts) {
-        return `catch(${this.error})` + super.render(opts);
-      }
-    };
-    Catch.kind = "catch";
-    var Finally = class extends BlockNode {
-      render(opts) {
-        return "finally" + super.render(opts);
-      }
-    };
-    Finally.kind = "finally";
-    var CodeGen = class {
-      constructor(extScope, opts = {}) {
-        this._values = {};
-        this._blockStarts = [];
-        this._constants = {};
-        this.opts = { ...opts, _n: opts.lines ? "\n" : "" };
-        this._extScope = extScope;
-        this._scope = new scope_1.Scope({ parent: extScope });
-        this._nodes = [new Root()];
-      }
-      toString() {
-        return this._root.render(this.opts);
-      }
-      // returns unique name in the internal scope
-      name(prefix) {
-        return this._scope.name(prefix);
-      }
-      // reserves unique name in the external scope
-      scopeName(prefix) {
-        return this._extScope.name(prefix);
-      }
-      // reserves unique name in the external scope and assigns value to it
-      scopeValue(prefixOrName, value) {
-        const name = this._extScope.value(prefixOrName, value);
-        const vs = this._values[name.prefix] || (this._values[name.prefix] = /* @__PURE__ */ new Set());
-        vs.add(name);
-        return name;
-      }
-      getScopeValue(prefix, keyOrRef) {
-        return this._extScope.getValue(prefix, keyOrRef);
-      }
-      // return code that assigns values in the external scope to the names that are used internally
-      // (same names that were returned by gen.scopeName or gen.scopeValue)
-      scopeRefs(scopeName) {
-        return this._extScope.scopeRefs(scopeName, this._values);
-      }
-      scopeCode() {
-        return this._extScope.scopeCode(this._values);
-      }
-      _def(varKind, nameOrPrefix, rhs, constant) {
-        const name = this._scope.toName(nameOrPrefix);
-        if (rhs !== void 0 && constant)
-          this._constants[name.str] = rhs;
-        this._leafNode(new Def(varKind, name, rhs));
-        return name;
-      }
-      // `const` declaration (`var` in es5 mode)
-      const(nameOrPrefix, rhs, _constant) {
-        return this._def(scope_1.varKinds.const, nameOrPrefix, rhs, _constant);
-      }
-      // `let` declaration with optional assignment (`var` in es5 mode)
-      let(nameOrPrefix, rhs, _constant) {
-        return this._def(scope_1.varKinds.let, nameOrPrefix, rhs, _constant);
-      }
-      // `var` declaration with optional assignment
-      var(nameOrPrefix, rhs, _constant) {
-        return this._def(scope_1.varKinds.var, nameOrPrefix, rhs, _constant);
-      }
-      // assignment code
-      assign(lhs, rhs, sideEffects) {
-        return this._leafNode(new Assign(lhs, rhs, sideEffects));
-      }
-      // `+=` code
-      add(lhs, rhs) {
-        return this._leafNode(new AssignOp(lhs, exports2.operators.ADD, rhs));
-      }
-      // appends passed SafeExpr to code or executes Block
-      code(c3) {
-        if (typeof c3 == "function")
-          c3();
-        else if (c3 !== code_1.nil)
-          this._leafNode(new AnyCode(c3));
-        return this;
-      }
-      // returns code for object literal for the passed argument list of key-value pairs
-      object(...keyValues) {
-        const code = ["{"];
-        for (const [key, value] of keyValues) {
-          if (code.length > 1)
-            code.push(",");
-          code.push(key);
-          if (key !== value || this.opts.es5) {
-            code.push(":");
-            (0, code_1.addCodeArg)(code, value);
-          }
-        }
-        code.push("}");
-        return new code_1._Code(code);
-      }
-      // `if` clause (or statement if `thenBody` and, optionally, `elseBody` are passed)
-      if(condition, thenBody, elseBody) {
-        this._blockNode(new If(condition));
-        if (thenBody && elseBody) {
-          this.code(thenBody).else().code(elseBody).endIf();
-        } else if (thenBody) {
-          this.code(thenBody).endIf();
-        } else if (elseBody) {
-          throw new Error('CodeGen: "else" body without "then" body');
-        }
-        return this;
-      }
-      // `else if` clause - invalid without `if` or after `else` clauses
-      elseIf(condition) {
-        return this._elseNode(new If(condition));
-      }
-      // `else` clause - only valid after `if` or `else if` clauses
-      else() {
-        return this._elseNode(new Else());
-      }
-      // end `if` statement (needed if gen.if was used only with condition)
-      endIf() {
-        return this._endBlockNode(If, Else);
-      }
-      _for(node, forBody) {
-        this._blockNode(node);
-        if (forBody)
-          this.code(forBody).endFor();
-        return this;
-      }
-      // a generic `for` clause (or statement if `forBody` is passed)
-      for(iteration, forBody) {
-        return this._for(new ForLoop(iteration), forBody);
-      }
-      // `for` statement for a range of values
-      forRange(nameOrPrefix, from, to, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.let) {
-        const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForRange(varKind, name, from, to), () => forBody(name));
-      }
-      // `for-of` statement (in es5 mode replace with a normal for loop)
-      forOf(nameOrPrefix, iterable, forBody, varKind = scope_1.varKinds.const) {
-        const name = this._scope.toName(nameOrPrefix);
-        if (this.opts.es5) {
-          const arr = iterable instanceof code_1.Name ? iterable : this.var("_arr", iterable);
-          return this.forRange("_i", 0, (0, code_1._)`${arr}.length`, (i2) => {
-            this.var(name, (0, code_1._)`${arr}[${i2}]`);
-            forBody(name);
-          });
-        }
-        return this._for(new ForIter("of", varKind, name, iterable), () => forBody(name));
-      }
-      // `for-in` statement.
-      // With option `ownProperties` replaced with a `for-of` loop for object keys
-      forIn(nameOrPrefix, obj, forBody, varKind = this.opts.es5 ? scope_1.varKinds.var : scope_1.varKinds.const) {
-        if (this.opts.ownProperties) {
-          return this.forOf(nameOrPrefix, (0, code_1._)`Object.keys(${obj})`, forBody);
-        }
-        const name = this._scope.toName(nameOrPrefix);
-        return this._for(new ForIter("in", varKind, name, obj), () => forBody(name));
-      }
-      // end `for` loop
-      endFor() {
-        return this._endBlockNode(For);
-      }
-      // `label` statement
-      label(label) {
-        return this._leafNode(new Label(label));
-      }
-      // `break` statement
-      break(label) {
-        return this._leafNode(new Break(label));
-      }
-      // `return` statement
-      return(value) {
-        const node = new Return();
-        this._blockNode(node);
-        this.code(value);
-        if (node.nodes.length !== 1)
-          throw new Error('CodeGen: "return" should have one node');
-        return this._endBlockNode(Return);
-      }
-      // `try` statement
-      try(tryBody, catchCode, finallyCode) {
-        if (!catchCode && !finallyCode)
-          throw new Error('CodeGen: "try" without "catch" and "finally"');
-        const node = new Try();
-        this._blockNode(node);
-        this.code(tryBody);
-        if (catchCode) {
-          const error = this.name("e");
-          this._currNode = node.catch = new Catch(error);
-          catchCode(error);
-        }
-        if (finallyCode) {
-          this._currNode = node.finally = new Finally();
-          this.code(finallyCode);
-        }
-        return this._endBlockNode(Catch, Finally);
-      }
-      // `throw` statement
-      throw(error) {
-        return this._leafNode(new Throw(error));
-      }
-      // start self-balancing block
-      block(body, nodeCount) {
-        this._blockStarts.push(this._nodes.length);
-        if (body)
-          this.code(body).endBlock(nodeCount);
-        return this;
-      }
-      // end the current self-balancing block
-      endBlock(nodeCount) {
-        const len = this._blockStarts.pop();
-        if (len === void 0)
-          throw new Error("CodeGen: not in self-balancing block");
-        const toClose = this._nodes.length - len;
-        if (toClose < 0 || nodeCount !== void 0 && toClose !== nodeCount) {
-          throw new Error(`CodeGen: wrong number of nodes: ${toClose} vs ${nodeCount} expected`);
-        }
-        this._nodes.length = len;
-        return this;
-      }
-      // `function` heading (or definition if funcBody is passed)
-      func(name, args = code_1.nil, async, funcBody) {
-        this._blockNode(new Func(name, args, async));
-        if (funcBody)
-          this.code(funcBody).endFunc();
-        return this;
-      }
-      // end function definition
-      endFunc() {
-        return this._endBlockNode(Func);
-      }
-      optimize(n = 1) {
-        while (n-- > 0) {
-          this._root.optimizeNodes();
-          this._root.optimizeNames(this._root.names, this._constants);
-        }
-      }
-      _leafNode(node) {
-        this._currNode.nodes.push(node);
-        return this;
-      }
-      _blockNode(node) {
-        this._currNode.nodes.push(node);
-        this._nodes.push(node);
-      }
-      _endBlockNode(N1, N2) {
-        const n = this._currNode;
-        if (n instanceof N1 || N2 && n instanceof N2) {
-          this._nodes.pop();
-          return this;
-        }
-        throw new Error(`CodeGen: not in block "${N2 ? `${N1.kind}/${N2.kind}` : N1.kind}"`);
-      }
-      _elseNode(node) {
-        const n = this._currNode;
-        if (!(n instanceof If)) {
-          throw new Error('CodeGen: "else" without "if"');
-        }
-        this._currNode = n.else = node;
-        return this;
-      }
-      get _root() {
-        return this._nodes[0];
-      }
-      get _currNode() {
-        const ns = this._nodes;
-        return ns[ns.length - 1];
-      }
-      set _currNode(node) {
-        const ns = this._nodes;
-        ns[ns.length - 1] = node;
-      }
-    };
-    exports2.CodeGen = CodeGen;
-    function addNames(names, from) {
-      for (const n in from)
-        names[n] = (names[n] || 0) + (from[n] || 0);
-      return names;
-    }
-    function addExprNames(names, from) {
-      return from instanceof code_1._CodeOrName ? addNames(names, from.names) : names;
-    }
-    function optimizeExpr(expr, names, constants) {
-      if (expr instanceof code_1.Name)
-        return replaceName(expr);
-      if (!canOptimize(expr))
-        return expr;
-      return new code_1._Code(expr._items.reduce((items, c3) => {
-        if (c3 instanceof code_1.Name)
-          c3 = replaceName(c3);
-        if (c3 instanceof code_1._Code)
-          items.push(...c3._items);
-        else
-          items.push(c3);
-        return items;
-      }, []));
-      function replaceName(n) {
-        const c3 = constants[n.str];
-        if (c3 === void 0 || names[n.str] !== 1)
-          return n;
-        delete names[n.str];
-        return c3;
-      }
-      function canOptimize(e) {
-        return e instanceof code_1._Code && e._items.some((c3) => c3 instanceof code_1.Name && names[c3.str] === 1 && constants[c3.str] !== void 0);
-      }
-    }
-    function subtractNames(names, from) {
-      for (const n in from)
-        names[n] = (names[n] || 0) - (from[n] || 0);
-    }
-    function not(x2) {
-      return typeof x2 == "boolean" || typeof x2 == "number" || x2 === null ? !x2 : (0, code_1._)`!${par(x2)}`;
-    }
-    exports2.not = not;
-    var andCode = mappend(exports2.operators.AND);
-    function and(...args) {
-      return args.reduce(andCode);
-    }
-    exports2.and = and;
-    var orCode = mappend(exports2.operators.OR);
-    function or(...args) {
-      return args.reduce(orCode);
-    }
-    exports2.or = or;
-    function mappend(op) {
-      return (x2, y2) => x2 === code_1.nil ? y2 : y2 === code_1.nil ? x2 : (0, code_1._)`${par(x2)} ${op} ${par(y2)}`;
-    }
-    function par(x2) {
-      return x2 instanceof code_1.Name ? x2 : (0, code_1._)`(${x2})`;
-    }
-  }
-});
-
-// node_modules/ajv/dist/compile/util.js
-var require_util = __commonJS({
-  "node_modules/ajv/dist/compile/util.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.checkStrictMode = exports2.getErrorPath = exports2.Type = exports2.useFunc = exports2.setEvaluated = exports2.evaluatedPropsToName = exports2.mergeEvaluated = exports2.eachItem = exports2.unescapeJsonPointer = exports2.escapeJsonPointer = exports2.escapeFragment = exports2.unescapeFragment = exports2.schemaRefOrVal = exports2.schemaHasRulesButRef = exports2.schemaHasRules = exports2.checkUnknownRules = exports2.alwaysValidSchema = exports2.toHash = void 0;
-    var codegen_1 = require_codegen();
-    var code_1 = require_code();
-    function toHash(arr) {
-      const hash = {};
-      for (const item of arr)
-        hash[item] = true;
-      return hash;
-    }
-    exports2.toHash = toHash;
-    function alwaysValidSchema(it, schema) {
-      if (typeof schema == "boolean")
-        return schema;
-      if (Object.keys(schema).length === 0)
-        return true;
-      checkUnknownRules(it, schema);
-      return !schemaHasRules(schema, it.self.RULES.all);
-    }
-    exports2.alwaysValidSchema = alwaysValidSchema;
-    function checkUnknownRules(it, schema = it.schema) {
-      const { opts, self } = it;
-      if (!opts.strictSchema)
-        return;
-      if (typeof schema === "boolean")
-        return;
-      const rules = self.RULES.keywords;
-      for (const key in schema) {
-        if (!rules[key])
-          checkStrictMode(it, `unknown keyword: "${key}"`);
-      }
-    }
-    exports2.checkUnknownRules = checkUnknownRules;
-    function schemaHasRules(schema, rules) {
-      if (typeof schema == "boolean")
-        return !schema;
-      for (const key in schema)
-        if (rules[key])
-          return true;
-      return false;
-    }
-    exports2.schemaHasRules = schemaHasRules;
-    function schemaHasRulesButRef(schema, RULES) {
-      if (typeof schema == "boolean")
-        return !schema;
-      for (const key in schema)
-        if (key !== "$ref" && RULES.all[key])
-          return true;
-      return false;
-    }
-    exports2.schemaHasRulesButRef = schemaHasRulesButRef;
-    function schemaRefOrVal({ topSchemaRef, schemaPath }, schema, keyword, $data) {
-      if (!$data) {
-        if (typeof schema == "number" || typeof schema == "boolean")
-          return schema;
-        if (typeof schema == "string")
-          return (0, codegen_1._)`${schema}`;
-      }
-      return (0, codegen_1._)`${topSchemaRef}${schemaPath}${(0, codegen_1.getProperty)(keyword)}`;
-    }
-    exports2.schemaRefOrVal = schemaRefOrVal;
-    function unescapeFragment(str) {
-      return unescapeJsonPointer(decodeURIComponent(str));
-    }
-    exports2.unescapeFragment = unescapeFragment;
-    function escapeFragment(str) {
-      return encodeURIComponent(escapeJsonPointer(str));
-    }
-    exports2.escapeFragment = escapeFragment;
-    function escapeJsonPointer(str) {
-      if (typeof str == "number")
-        return `${str}`;
-      return str.replace(/~/g, "~0").replace(/\//g, "~1");
-    }
-    exports2.escapeJsonPointer = escapeJsonPointer;
-    function unescapeJsonPointer(str) {
-      return str.replace(/~1/g, "/").replace(/~0/g, "~");
-    }
-    exports2.unescapeJsonPointer = unescapeJsonPointer;
-    function eachItem(xs, f) {
-      if (Array.isArray(xs)) {
-        for (const x2 of xs)
-          f(x2);
-      } else {
-        f(xs);
-      }
-    }
-    exports2.eachItem = eachItem;
-    function makeMergeEvaluated({ mergeNames, mergeToName, mergeValues, resultToName }) {
-      return (gen, from, to, toName) => {
-        const res = to === void 0 ? from : to instanceof codegen_1.Name ? (from instanceof codegen_1.Name ? mergeNames(gen, from, to) : mergeToName(gen, from, to), to) : from instanceof codegen_1.Name ? (mergeToName(gen, to, from), from) : mergeValues(from, to);
-        return toName === codegen_1.Name && !(res instanceof codegen_1.Name) ? resultToName(gen, res) : res;
-      };
-    }
-    exports2.mergeEvaluated = {
-      props: makeMergeEvaluated({
-        mergeNames: (gen, from, to) => gen.if((0, codegen_1._)`${to} !== true && ${from} !== undefined`, () => {
-          gen.if((0, codegen_1._)`${from} === true`, () => gen.assign(to, true), () => gen.assign(to, (0, codegen_1._)`${to} || {}`).code((0, codegen_1._)`Object.assign(${to}, ${from})`));
-        }),
-        mergeToName: (gen, from, to) => gen.if((0, codegen_1._)`${to} !== true`, () => {
-          if (from === true) {
-            gen.assign(to, true);
-          } else {
-            gen.assign(to, (0, codegen_1._)`${to} || {}`);
-            setEvaluated(gen, to, from);
-          }
-        }),
-        mergeValues: (from, to) => from === true ? true : { ...from, ...to },
-        resultToName: evaluatedPropsToName
-      }),
-      items: makeMergeEvaluated({
-        mergeNames: (gen, from, to) => gen.if((0, codegen_1._)`${to} !== true && ${from} !== undefined`, () => gen.assign(to, (0, codegen_1._)`${from} === true ? true : ${to} > ${from} ? ${to} : ${from}`)),
-        mergeToName: (gen, from, to) => gen.if((0, codegen_1._)`${to} !== true`, () => gen.assign(to, from === true ? true : (0, codegen_1._)`${to} > ${from} ? ${to} : ${from}`)),
-        mergeValues: (from, to) => from === true ? true : Math.max(from, to),
-        resultToName: (gen, items) => gen.var("items", items)
-      })
-    };
-    function evaluatedPropsToName(gen, ps) {
-      if (ps === true)
-        return gen.var("props", true);
-      const props = gen.var("props", (0, codegen_1._)`{}`);
-      if (ps !== void 0)
-        setEvaluated(gen, props, ps);
-      return props;
-    }
-    exports2.evaluatedPropsToName = evaluatedPropsToName;
-    function setEvaluated(gen, props, ps) {
-      Object.keys(ps).forEach((p2) => gen.assign((0, codegen_1._)`${props}${(0, codegen_1.getProperty)(p2)}`, true));
-    }
-    exports2.setEvaluated = setEvaluated;
-    var snippets = {};
-    function useFunc(gen, f) {
-      return gen.scopeValue("func", {
-        ref: f,
-        code: snippets[f.code] || (snippets[f.code] = new code_1._Code(f.code))
-      });
-    }
-    exports2.useFunc = useFunc;
-    var Type;
-    (function(Type2) {
-      Type2[Type2["Num"] = 0] = "Num";
-      Type2[Type2["Str"] = 1] = "Str";
-    })(Type || (exports2.Type = Type = {}));
-    function getErrorPath(dataProp, dataPropType, jsPropertySyntax) {
-      if (dataProp instanceof codegen_1.Name) {
-        const isNumber = dataPropType === Type.Num;
-        return jsPropertySyntax ? isNumber ? (0, codegen_1._)`"[" + ${dataProp} + "]"` : (0, codegen_1._)`"['" + ${dataProp} + "']"` : isNumber ? (0, codegen_1._)`"/" + ${dataProp}` : (0, codegen_1._)`"/" + ${dataProp}.replace(/~/g, "~0").replace(/\\//g, "~1")`;
-      }
-      return jsPropertySyntax ? (0, codegen_1.getProperty)(dataProp).toString() : "/" + escapeJsonPointer(dataProp);
-    }
-    exports2.getErrorPath = getErrorPath;
-    function checkStrictMode(it, msg, mode = it.opts.strictSchema) {
-      if (!mode)
-        return;
-      msg = `strict mode: ${msg}`;
-      if (mode === true)
-        throw new Error(msg);
-      it.self.logger.warn(msg);
-    }
-    exports2.checkStrictMode = checkStrictMode;
-  }
-});
-
-// node_modules/ajv/dist/compile/names.js
-var require_names = __commonJS({
-  "node_modules/ajv/dist/compile/names.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var names = {
-      // validation function arguments
-      data: new codegen_1.Name("data"),
-      // data passed to validation function
-      // args passed from referencing schema
-      valCxt: new codegen_1.Name("valCxt"),
-      // validation/data context - should not be used directly, it is destructured to the names below
-      instancePath: new codegen_1.Name("instancePath"),
-      parentData: new codegen_1.Name("parentData"),
-      parentDataProperty: new codegen_1.Name("parentDataProperty"),
-      rootData: new codegen_1.Name("rootData"),
-      // root data - same as the data passed to the first/top validation function
-      dynamicAnchors: new codegen_1.Name("dynamicAnchors"),
-      // used to support recursiveRef and dynamicRef
-      // function scoped variables
-      vErrors: new codegen_1.Name("vErrors"),
-      // null or array of validation errors
-      errors: new codegen_1.Name("errors"),
-      // counter of validation errors
-      this: new codegen_1.Name("this"),
-      // "globals"
-      self: new codegen_1.Name("self"),
-      scope: new codegen_1.Name("scope"),
-      // JTD serialize/parse name for JSON string and position
-      json: new codegen_1.Name("json"),
-      jsonPos: new codegen_1.Name("jsonPos"),
-      jsonLen: new codegen_1.Name("jsonLen"),
-      jsonPart: new codegen_1.Name("jsonPart")
-    };
-    exports2.default = names;
-  }
-});
-
-// node_modules/ajv/dist/compile/errors.js
-var require_errors2 = __commonJS({
-  "node_modules/ajv/dist/compile/errors.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.extendErrors = exports2.resetErrorsCount = exports2.reportExtraError = exports2.reportError = exports2.keyword$DataError = exports2.keywordError = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var names_1 = require_names();
-    exports2.keywordError = {
-      message: ({ keyword }) => (0, codegen_1.str)`must pass "${keyword}" keyword validation`
-    };
-    exports2.keyword$DataError = {
-      message: ({ keyword, schemaType }) => schemaType ? (0, codegen_1.str)`"${keyword}" keyword must be ${schemaType} ($data)` : (0, codegen_1.str)`"${keyword}" keyword is invalid ($data)`
-    };
-    function reportError(cxt, error = exports2.keywordError, errorPaths, overrideAllErrors) {
-      const { it } = cxt;
-      const { gen, compositeRule, allErrors } = it;
-      const errObj = errorObjectCode(cxt, error, errorPaths);
-      if (overrideAllErrors !== null && overrideAllErrors !== void 0 ? overrideAllErrors : compositeRule || allErrors) {
-        addError(gen, errObj);
-      } else {
-        returnErrors(it, (0, codegen_1._)`[${errObj}]`);
-      }
-    }
-    exports2.reportError = reportError;
-    function reportExtraError(cxt, error = exports2.keywordError, errorPaths) {
-      const { it } = cxt;
-      const { gen, compositeRule, allErrors } = it;
-      const errObj = errorObjectCode(cxt, error, errorPaths);
-      addError(gen, errObj);
-      if (!(compositeRule || allErrors)) {
-        returnErrors(it, names_1.default.vErrors);
-      }
-    }
-    exports2.reportExtraError = reportExtraError;
-    function resetErrorsCount(gen, errsCount) {
-      gen.assign(names_1.default.errors, errsCount);
-      gen.if((0, codegen_1._)`${names_1.default.vErrors} !== null`, () => gen.if(errsCount, () => gen.assign((0, codegen_1._)`${names_1.default.vErrors}.length`, errsCount), () => gen.assign(names_1.default.vErrors, null)));
-    }
-    exports2.resetErrorsCount = resetErrorsCount;
-    function extendErrors({ gen, keyword, schemaValue, data, errsCount, it }) {
-      if (errsCount === void 0)
-        throw new Error("ajv implementation error");
-      const err = gen.name("err");
-      gen.forRange("i", errsCount, names_1.default.errors, (i2) => {
-        gen.const(err, (0, codegen_1._)`${names_1.default.vErrors}[${i2}]`);
-        gen.if((0, codegen_1._)`${err}.instancePath === undefined`, () => gen.assign((0, codegen_1._)`${err}.instancePath`, (0, codegen_1.strConcat)(names_1.default.instancePath, it.errorPath)));
-        gen.assign((0, codegen_1._)`${err}.schemaPath`, (0, codegen_1.str)`${it.errSchemaPath}/${keyword}`);
-        if (it.opts.verbose) {
-          gen.assign((0, codegen_1._)`${err}.schema`, schemaValue);
-          gen.assign((0, codegen_1._)`${err}.data`, data);
-        }
-      });
-    }
-    exports2.extendErrors = extendErrors;
-    function addError(gen, errObj) {
-      const err = gen.const("err", errObj);
-      gen.if((0, codegen_1._)`${names_1.default.vErrors} === null`, () => gen.assign(names_1.default.vErrors, (0, codegen_1._)`[${err}]`), (0, codegen_1._)`${names_1.default.vErrors}.push(${err})`);
-      gen.code((0, codegen_1._)`${names_1.default.errors}++`);
-    }
-    function returnErrors(it, errs) {
-      const { gen, validateName, schemaEnv } = it;
-      if (schemaEnv.$async) {
-        gen.throw((0, codegen_1._)`new ${it.ValidationError}(${errs})`);
-      } else {
-        gen.assign((0, codegen_1._)`${validateName}.errors`, errs);
-        gen.return(false);
-      }
-    }
-    var E2 = {
-      keyword: new codegen_1.Name("keyword"),
-      schemaPath: new codegen_1.Name("schemaPath"),
-      // also used in JTD errors
-      params: new codegen_1.Name("params"),
-      propertyName: new codegen_1.Name("propertyName"),
-      message: new codegen_1.Name("message"),
-      schema: new codegen_1.Name("schema"),
-      parentSchema: new codegen_1.Name("parentSchema")
-    };
-    function errorObjectCode(cxt, error, errorPaths) {
-      const { createErrors } = cxt.it;
-      if (createErrors === false)
-        return (0, codegen_1._)`{}`;
-      return errorObject(cxt, error, errorPaths);
-    }
-    function errorObject(cxt, error, errorPaths = {}) {
-      const { gen, it } = cxt;
-      const keyValues = [
-        errorInstancePath(it, errorPaths),
-        errorSchemaPath(cxt, errorPaths)
-      ];
-      extraErrorProps(cxt, error, keyValues);
-      return gen.object(...keyValues);
-    }
-    function errorInstancePath({ errorPath }, { instancePath }) {
-      const instPath = instancePath ? (0, codegen_1.str)`${errorPath}${(0, util_1.getErrorPath)(instancePath, util_1.Type.Str)}` : errorPath;
-      return [names_1.default.instancePath, (0, codegen_1.strConcat)(names_1.default.instancePath, instPath)];
-    }
-    function errorSchemaPath({ keyword, it: { errSchemaPath } }, { schemaPath, parentSchema }) {
-      let schPath = parentSchema ? errSchemaPath : (0, codegen_1.str)`${errSchemaPath}/${keyword}`;
-      if (schemaPath) {
-        schPath = (0, codegen_1.str)`${schPath}${(0, util_1.getErrorPath)(schemaPath, util_1.Type.Str)}`;
-      }
-      return [E2.schemaPath, schPath];
-    }
-    function extraErrorProps(cxt, { params, message }, keyValues) {
-      const { keyword, data, schemaValue, it } = cxt;
-      const { opts, propertyName, topSchemaRef, schemaPath } = it;
-      keyValues.push([E2.keyword, keyword], [E2.params, typeof params == "function" ? params(cxt) : params || (0, codegen_1._)`{}`]);
-      if (opts.messages) {
-        keyValues.push([E2.message, typeof message == "function" ? message(cxt) : message]);
-      }
-      if (opts.verbose) {
-        keyValues.push([E2.schema, schemaValue], [E2.parentSchema, (0, codegen_1._)`${topSchemaRef}${schemaPath}`], [names_1.default.data, data]);
-      }
-      if (propertyName)
-        keyValues.push([E2.propertyName, propertyName]);
-    }
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/boolSchema.js
-var require_boolSchema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/boolSchema.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.boolOrEmptySchema = exports2.topBoolOrEmptySchema = void 0;
-    var errors_1 = require_errors2();
-    var codegen_1 = require_codegen();
-    var names_1 = require_names();
-    var boolError = {
-      message: "boolean schema is false"
-    };
-    function topBoolOrEmptySchema(it) {
-      const { gen, schema, validateName } = it;
-      if (schema === false) {
-        falseSchemaError(it, false);
-      } else if (typeof schema == "object" && schema.$async === true) {
-        gen.return(names_1.default.data);
-      } else {
-        gen.assign((0, codegen_1._)`${validateName}.errors`, null);
-        gen.return(true);
-      }
-    }
-    exports2.topBoolOrEmptySchema = topBoolOrEmptySchema;
-    function boolOrEmptySchema(it, valid) {
-      const { gen, schema } = it;
-      if (schema === false) {
-        gen.var(valid, false);
-        falseSchemaError(it);
-      } else {
-        gen.var(valid, true);
-      }
-    }
-    exports2.boolOrEmptySchema = boolOrEmptySchema;
-    function falseSchemaError(it, overrideAllErrors) {
-      const { gen, data } = it;
-      const cxt = {
-        gen,
-        keyword: "false schema",
-        data,
-        schema: false,
-        schemaCode: false,
-        schemaValue: false,
-        params: {},
-        it
-      };
-      (0, errors_1.reportError)(cxt, boolError, void 0, overrideAllErrors);
-    }
-  }
-});
-
-// node_modules/ajv/dist/compile/rules.js
-var require_rules = __commonJS({
-  "node_modules/ajv/dist/compile/rules.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.getRules = exports2.isJSONType = void 0;
-    var _jsonTypes = ["string", "number", "integer", "boolean", "null", "object", "array"];
-    var jsonTypes = new Set(_jsonTypes);
-    function isJSONType(x2) {
-      return typeof x2 == "string" && jsonTypes.has(x2);
-    }
-    exports2.isJSONType = isJSONType;
-    function getRules() {
-      const groups = {
-        number: { type: "number", rules: [] },
-        string: { type: "string", rules: [] },
-        array: { type: "array", rules: [] },
-        object: { type: "object", rules: [] }
-      };
-      return {
-        types: { ...groups, integer: true, boolean: true, null: true },
-        rules: [{ rules: [] }, groups.number, groups.string, groups.array, groups.object],
-        post: { rules: [] },
-        all: {},
-        keywords: {}
-      };
-    }
-    exports2.getRules = getRules;
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/applicability.js
-var require_applicability = __commonJS({
-  "node_modules/ajv/dist/compile/validate/applicability.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.shouldUseRule = exports2.shouldUseGroup = exports2.schemaHasRulesForType = void 0;
-    function schemaHasRulesForType({ schema, self }, type) {
-      const group = self.RULES.types[type];
-      return group && group !== true && shouldUseGroup(schema, group);
-    }
-    exports2.schemaHasRulesForType = schemaHasRulesForType;
-    function shouldUseGroup(schema, group) {
-      return group.rules.some((rule) => shouldUseRule(schema, rule));
-    }
-    exports2.shouldUseGroup = shouldUseGroup;
-    function shouldUseRule(schema, rule) {
-      var _a2;
-      return schema[rule.keyword] !== void 0 || ((_a2 = rule.definition.implements) === null || _a2 === void 0 ? void 0 : _a2.some((kwd) => schema[kwd] !== void 0));
-    }
-    exports2.shouldUseRule = shouldUseRule;
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/dataType.js
-var require_dataType = __commonJS({
-  "node_modules/ajv/dist/compile/validate/dataType.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.reportTypeError = exports2.checkDataTypes = exports2.checkDataType = exports2.coerceAndCheckDataType = exports2.getJSONTypes = exports2.getSchemaTypes = exports2.DataType = void 0;
-    var rules_1 = require_rules();
-    var applicability_1 = require_applicability();
-    var errors_1 = require_errors2();
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var DataType;
-    (function(DataType2) {
-      DataType2[DataType2["Correct"] = 0] = "Correct";
-      DataType2[DataType2["Wrong"] = 1] = "Wrong";
-    })(DataType || (exports2.DataType = DataType = {}));
-    function getSchemaTypes(schema) {
-      const types = getJSONTypes(schema.type);
-      const hasNull = types.includes("null");
-      if (hasNull) {
-        if (schema.nullable === false)
-          throw new Error("type: null contradicts nullable: false");
-      } else {
-        if (!types.length && schema.nullable !== void 0) {
-          throw new Error('"nullable" cannot be used without "type"');
-        }
-        if (schema.nullable === true)
-          types.push("null");
-      }
-      return types;
-    }
-    exports2.getSchemaTypes = getSchemaTypes;
-    function getJSONTypes(ts) {
-      const types = Array.isArray(ts) ? ts : ts ? [ts] : [];
-      if (types.every(rules_1.isJSONType))
-        return types;
-      throw new Error("type must be JSONType or JSONType[]: " + types.join(","));
-    }
-    exports2.getJSONTypes = getJSONTypes;
-    function coerceAndCheckDataType(it, types) {
-      const { gen, data, opts } = it;
-      const coerceTo = coerceToTypes(types, opts.coerceTypes);
-      const checkTypes = types.length > 0 && !(coerceTo.length === 0 && types.length === 1 && (0, applicability_1.schemaHasRulesForType)(it, types[0]));
-      if (checkTypes) {
-        const wrongType = checkDataTypes(types, data, opts.strictNumbers, DataType.Wrong);
-        gen.if(wrongType, () => {
-          if (coerceTo.length)
-            coerceData(it, types, coerceTo);
-          else
-            reportTypeError(it);
-        });
-      }
-      return checkTypes;
-    }
-    exports2.coerceAndCheckDataType = coerceAndCheckDataType;
-    var COERCIBLE = /* @__PURE__ */ new Set(["string", "number", "integer", "boolean", "null"]);
-    function coerceToTypes(types, coerceTypes) {
-      return coerceTypes ? types.filter((t2) => COERCIBLE.has(t2) || coerceTypes === "array" && t2 === "array") : [];
-    }
-    function coerceData(it, types, coerceTo) {
-      const { gen, data, opts } = it;
-      const dataType = gen.let("dataType", (0, codegen_1._)`typeof ${data}`);
-      const coerced = gen.let("coerced", (0, codegen_1._)`undefined`);
-      if (opts.coerceTypes === "array") {
-        gen.if((0, codegen_1._)`${dataType} == 'object' && Array.isArray(${data}) && ${data}.length == 1`, () => gen.assign(data, (0, codegen_1._)`${data}[0]`).assign(dataType, (0, codegen_1._)`typeof ${data}`).if(checkDataTypes(types, data, opts.strictNumbers), () => gen.assign(coerced, data)));
-      }
-      gen.if((0, codegen_1._)`${coerced} !== undefined`);
-      for (const t2 of coerceTo) {
-        if (COERCIBLE.has(t2) || t2 === "array" && opts.coerceTypes === "array") {
-          coerceSpecificType(t2);
-        }
-      }
-      gen.else();
-      reportTypeError(it);
-      gen.endIf();
-      gen.if((0, codegen_1._)`${coerced} !== undefined`, () => {
-        gen.assign(data, coerced);
-        assignParentData(it, coerced);
-      });
-      function coerceSpecificType(t2) {
-        switch (t2) {
-          case "string":
-            gen.elseIf((0, codegen_1._)`${dataType} == "number" || ${dataType} == "boolean"`).assign(coerced, (0, codegen_1._)`"" + ${data}`).elseIf((0, codegen_1._)`${data} === null`).assign(coerced, (0, codegen_1._)`""`);
-            return;
-          case "number":
-            gen.elseIf((0, codegen_1._)`${dataType} == "boolean" || ${data} === null
-              || (${dataType} == "string" && ${data} && ${data} == +${data})`).assign(coerced, (0, codegen_1._)`+${data}`);
-            return;
-          case "integer":
-            gen.elseIf((0, codegen_1._)`${dataType} === "boolean" || ${data} === null
-              || (${dataType} === "string" && ${data} && ${data} == +${data} && !(${data} % 1))`).assign(coerced, (0, codegen_1._)`+${data}`);
-            return;
-          case "boolean":
-            gen.elseIf((0, codegen_1._)`${data} === "false" || ${data} === 0 || ${data} === null`).assign(coerced, false).elseIf((0, codegen_1._)`${data} === "true" || ${data} === 1`).assign(coerced, true);
-            return;
-          case "null":
-            gen.elseIf((0, codegen_1._)`${data} === "" || ${data} === 0 || ${data} === false`);
-            gen.assign(coerced, null);
-            return;
-          case "array":
-            gen.elseIf((0, codegen_1._)`${dataType} === "string" || ${dataType} === "number"
-              || ${dataType} === "boolean" || ${data} === null`).assign(coerced, (0, codegen_1._)`[${data}]`);
-        }
-      }
-    }
-    function assignParentData({ gen, parentData, parentDataProperty }, expr) {
-      gen.if((0, codegen_1._)`${parentData} !== undefined`, () => gen.assign((0, codegen_1._)`${parentData}[${parentDataProperty}]`, expr));
-    }
-    function checkDataType(dataType, data, strictNums, correct = DataType.Correct) {
-      const EQ = correct === DataType.Correct ? codegen_1.operators.EQ : codegen_1.operators.NEQ;
-      let cond;
-      switch (dataType) {
-        case "null":
-          return (0, codegen_1._)`${data} ${EQ} null`;
-        case "array":
-          cond = (0, codegen_1._)`Array.isArray(${data})`;
-          break;
-        case "object":
-          cond = (0, codegen_1._)`${data} && typeof ${data} == "object" && !Array.isArray(${data})`;
-          break;
-        case "integer":
-          cond = numCond((0, codegen_1._)`!(${data} % 1) && !isNaN(${data})`);
-          break;
-        case "number":
-          cond = numCond();
-          break;
-        default:
-          return (0, codegen_1._)`typeof ${data} ${EQ} ${dataType}`;
-      }
-      return correct === DataType.Correct ? cond : (0, codegen_1.not)(cond);
-      function numCond(_cond = codegen_1.nil) {
-        return (0, codegen_1.and)((0, codegen_1._)`typeof ${data} == "number"`, _cond, strictNums ? (0, codegen_1._)`isFinite(${data})` : codegen_1.nil);
-      }
-    }
-    exports2.checkDataType = checkDataType;
-    function checkDataTypes(dataTypes, data, strictNums, correct) {
-      if (dataTypes.length === 1) {
-        return checkDataType(dataTypes[0], data, strictNums, correct);
-      }
-      let cond;
-      const types = (0, util_1.toHash)(dataTypes);
-      if (types.array && types.object) {
-        const notObj = (0, codegen_1._)`typeof ${data} != "object"`;
-        cond = types.null ? notObj : (0, codegen_1._)`!${data} || ${notObj}`;
-        delete types.null;
-        delete types.array;
-        delete types.object;
-      } else {
-        cond = codegen_1.nil;
-      }
-      if (types.number)
-        delete types.integer;
-      for (const t2 in types)
-        cond = (0, codegen_1.and)(cond, checkDataType(t2, data, strictNums, correct));
-      return cond;
-    }
-    exports2.checkDataTypes = checkDataTypes;
-    var typeError = {
-      message: ({ schema }) => `must be ${schema}`,
-      params: ({ schema, schemaValue }) => typeof schema == "string" ? (0, codegen_1._)`{type: ${schema}}` : (0, codegen_1._)`{type: ${schemaValue}}`
-    };
-    function reportTypeError(it) {
-      const cxt = getTypeErrorContext(it);
-      (0, errors_1.reportError)(cxt, typeError);
-    }
-    exports2.reportTypeError = reportTypeError;
-    function getTypeErrorContext(it) {
-      const { gen, data, schema } = it;
-      const schemaCode = (0, util_1.schemaRefOrVal)(it, schema, "type");
-      return {
-        gen,
-        keyword: "type",
-        data,
-        schema: schema.type,
-        schemaCode,
-        schemaValue: schemaCode,
-        parentSchema: schema,
-        params: {},
-        it
-      };
-    }
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/defaults.js
-var require_defaults = __commonJS({
-  "node_modules/ajv/dist/compile/validate/defaults.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.assignDefaults = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    function assignDefaults(it, ty) {
-      const { properties, items } = it.schema;
-      if (ty === "object" && properties) {
-        for (const key in properties) {
-          assignDefault(it, key, properties[key].default);
-        }
-      } else if (ty === "array" && Array.isArray(items)) {
-        items.forEach((sch, i2) => assignDefault(it, i2, sch.default));
-      }
-    }
-    exports2.assignDefaults = assignDefaults;
-    function assignDefault(it, prop, defaultValue) {
-      const { gen, compositeRule, data, opts } = it;
-      if (defaultValue === void 0)
-        return;
-      const childData = (0, codegen_1._)`${data}${(0, codegen_1.getProperty)(prop)}`;
-      if (compositeRule) {
-        (0, util_1.checkStrictMode)(it, `default is ignored for: ${childData}`);
-        return;
-      }
-      let condition = (0, codegen_1._)`${childData} === undefined`;
-      if (opts.useDefaults === "empty") {
-        condition = (0, codegen_1._)`${condition} || ${childData} === null || ${childData} === ""`;
-      }
-      gen.if(condition, (0, codegen_1._)`${childData} = ${(0, codegen_1.stringify)(defaultValue)}`);
-    }
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/code.js
-var require_code2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/code.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.validateUnion = exports2.validateArray = exports2.usePattern = exports2.callValidateCode = exports2.schemaProperties = exports2.allSchemaProperties = exports2.noPropertyInData = exports2.propertyInData = exports2.isOwnProperty = exports2.hasPropFunc = exports2.reportMissingProp = exports2.checkMissingProp = exports2.checkReportMissingProp = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var names_1 = require_names();
-    var util_2 = require_util();
-    function checkReportMissingProp(cxt, prop) {
-      const { gen, data, it } = cxt;
-      gen.if(noPropertyInData(gen, data, prop, it.opts.ownProperties), () => {
-        cxt.setParams({ missingProperty: (0, codegen_1._)`${prop}` }, true);
-        cxt.error();
-      });
-    }
-    exports2.checkReportMissingProp = checkReportMissingProp;
-    function checkMissingProp({ gen, data, it: { opts } }, properties, missing) {
-      return (0, codegen_1.or)(...properties.map((prop) => (0, codegen_1.and)(noPropertyInData(gen, data, prop, opts.ownProperties), (0, codegen_1._)`${missing} = ${prop}`)));
-    }
-    exports2.checkMissingProp = checkMissingProp;
-    function reportMissingProp(cxt, missing) {
-      cxt.setParams({ missingProperty: missing }, true);
-      cxt.error();
-    }
-    exports2.reportMissingProp = reportMissingProp;
-    function hasPropFunc(gen) {
-      return gen.scopeValue("func", {
-        // eslint-disable-next-line @typescript-eslint/unbound-method
-        ref: Object.prototype.hasOwnProperty,
-        code: (0, codegen_1._)`Object.prototype.hasOwnProperty`
-      });
-    }
-    exports2.hasPropFunc = hasPropFunc;
-    function isOwnProperty(gen, data, property) {
-      return (0, codegen_1._)`${hasPropFunc(gen)}.call(${data}, ${property})`;
-    }
-    exports2.isOwnProperty = isOwnProperty;
-    function propertyInData(gen, data, property, ownProperties) {
-      const cond = (0, codegen_1._)`${data}${(0, codegen_1.getProperty)(property)} !== undefined`;
-      return ownProperties ? (0, codegen_1._)`${cond} && ${isOwnProperty(gen, data, property)}` : cond;
-    }
-    exports2.propertyInData = propertyInData;
-    function noPropertyInData(gen, data, property, ownProperties) {
-      const cond = (0, codegen_1._)`${data}${(0, codegen_1.getProperty)(property)} === undefined`;
-      return ownProperties ? (0, codegen_1.or)(cond, (0, codegen_1.not)(isOwnProperty(gen, data, property))) : cond;
-    }
-    exports2.noPropertyInData = noPropertyInData;
-    function allSchemaProperties(schemaMap) {
-      return schemaMap ? Object.keys(schemaMap).filter((p2) => p2 !== "__proto__") : [];
-    }
-    exports2.allSchemaProperties = allSchemaProperties;
-    function schemaProperties(it, schemaMap) {
-      return allSchemaProperties(schemaMap).filter((p2) => !(0, util_1.alwaysValidSchema)(it, schemaMap[p2]));
-    }
-    exports2.schemaProperties = schemaProperties;
-    function callValidateCode({ schemaCode, data, it: { gen, topSchemaRef, schemaPath, errorPath }, it }, func, context, passSchema) {
-      const dataAndSchema = passSchema ? (0, codegen_1._)`${schemaCode}, ${data}, ${topSchemaRef}${schemaPath}` : data;
-      const valCxt = [
-        [names_1.default.instancePath, (0, codegen_1.strConcat)(names_1.default.instancePath, errorPath)],
-        [names_1.default.parentData, it.parentData],
-        [names_1.default.parentDataProperty, it.parentDataProperty],
-        [names_1.default.rootData, names_1.default.rootData]
-      ];
-      if (it.opts.dynamicRef)
-        valCxt.push([names_1.default.dynamicAnchors, names_1.default.dynamicAnchors]);
-      const args = (0, codegen_1._)`${dataAndSchema}, ${gen.object(...valCxt)}`;
-      return context !== codegen_1.nil ? (0, codegen_1._)`${func}.call(${context}, ${args})` : (0, codegen_1._)`${func}(${args})`;
-    }
-    exports2.callValidateCode = callValidateCode;
-    var newRegExp = (0, codegen_1._)`new RegExp`;
-    function usePattern({ gen, it: { opts } }, pattern) {
-      const u = opts.unicodeRegExp ? "u" : "";
-      const { regExp } = opts.code;
-      const rx = regExp(pattern, u);
-      return gen.scopeValue("pattern", {
-        key: rx.toString(),
-        ref: rx,
-        code: (0, codegen_1._)`${regExp.code === "new RegExp" ? newRegExp : (0, util_2.useFunc)(gen, regExp)}(${pattern}, ${u})`
-      });
-    }
-    exports2.usePattern = usePattern;
-    function validateArray(cxt) {
-      const { gen, data, keyword, it } = cxt;
-      const valid = gen.name("valid");
-      if (it.allErrors) {
-        const validArr = gen.let("valid", true);
-        validateItems(() => gen.assign(validArr, false));
-        return validArr;
-      }
-      gen.var(valid, true);
-      validateItems(() => gen.break());
-      return valid;
-      function validateItems(notValid) {
-        const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-        gen.forRange("i", 0, len, (i2) => {
-          cxt.subschema({
-            keyword,
-            dataProp: i2,
-            dataPropType: util_1.Type.Num
-          }, valid);
-          gen.if((0, codegen_1.not)(valid), notValid);
-        });
-      }
-    }
-    exports2.validateArray = validateArray;
-    function validateUnion(cxt) {
-      const { gen, schema, keyword, it } = cxt;
-      if (!Array.isArray(schema))
-        throw new Error("ajv implementation error");
-      const alwaysValid = schema.some((sch) => (0, util_1.alwaysValidSchema)(it, sch));
-      if (alwaysValid && !it.opts.unevaluated)
-        return;
-      const valid = gen.let("valid", false);
-      const schValid = gen.name("_valid");
-      gen.block(() => schema.forEach((_sch, i2) => {
-        const schCxt = cxt.subschema({
-          keyword,
-          schemaProp: i2,
-          compositeRule: true
-        }, schValid);
-        gen.assign(valid, (0, codegen_1._)`${valid} || ${schValid}`);
-        const merged = cxt.mergeValidEvaluated(schCxt, schValid);
-        if (!merged)
-          gen.if((0, codegen_1.not)(valid));
-      }));
-      cxt.result(valid, () => cxt.reset(), () => cxt.error(true));
-    }
-    exports2.validateUnion = validateUnion;
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/keyword.js
-var require_keyword = __commonJS({
-  "node_modules/ajv/dist/compile/validate/keyword.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.validateKeywordUsage = exports2.validSchemaType = exports2.funcKeywordCode = exports2.macroKeywordCode = void 0;
-    var codegen_1 = require_codegen();
-    var names_1 = require_names();
-    var code_1 = require_code2();
-    var errors_1 = require_errors2();
-    function macroKeywordCode(cxt, def) {
-      const { gen, keyword, schema, parentSchema, it } = cxt;
-      const macroSchema = def.macro.call(it.self, schema, parentSchema, it);
-      const schemaRef = useKeyword(gen, keyword, macroSchema);
-      if (it.opts.validateSchema !== false)
-        it.self.validateSchema(macroSchema, true);
-      const valid = gen.name("valid");
-      cxt.subschema({
-        schema: macroSchema,
-        schemaPath: codegen_1.nil,
-        errSchemaPath: `${it.errSchemaPath}/${keyword}`,
-        topSchemaRef: schemaRef,
-        compositeRule: true
-      }, valid);
-      cxt.pass(valid, () => cxt.error(true));
-    }
-    exports2.macroKeywordCode = macroKeywordCode;
-    function funcKeywordCode(cxt, def) {
-      var _a2;
-      const { gen, keyword, schema, parentSchema, $data, it } = cxt;
-      checkAsyncKeyword(it, def);
-      const validate = !$data && def.compile ? def.compile.call(it.self, schema, parentSchema, it) : def.validate;
-      const validateRef = useKeyword(gen, keyword, validate);
-      const valid = gen.let("valid");
-      cxt.block$data(valid, validateKeyword);
-      cxt.ok((_a2 = def.valid) !== null && _a2 !== void 0 ? _a2 : valid);
-      function validateKeyword() {
-        if (def.errors === false) {
-          assignValid();
-          if (def.modifying)
-            modifyData(cxt);
-          reportErrs(() => cxt.error());
-        } else {
-          const ruleErrs = def.async ? validateAsync() : validateSync();
-          if (def.modifying)
-            modifyData(cxt);
-          reportErrs(() => addErrs(cxt, ruleErrs));
-        }
-      }
-      function validateAsync() {
-        const ruleErrs = gen.let("ruleErrs", null);
-        gen.try(() => assignValid((0, codegen_1._)`await `), (e) => gen.assign(valid, false).if((0, codegen_1._)`${e} instanceof ${it.ValidationError}`, () => gen.assign(ruleErrs, (0, codegen_1._)`${e}.errors`), () => gen.throw(e)));
-        return ruleErrs;
-      }
-      function validateSync() {
-        const validateErrs = (0, codegen_1._)`${validateRef}.errors`;
-        gen.assign(validateErrs, null);
-        assignValid(codegen_1.nil);
-        return validateErrs;
-      }
-      function assignValid(_await = def.async ? (0, codegen_1._)`await ` : codegen_1.nil) {
-        const passCxt = it.opts.passContext ? names_1.default.this : names_1.default.self;
-        const passSchema = !("compile" in def && !$data || def.schema === false);
-        gen.assign(valid, (0, codegen_1._)`${_await}${(0, code_1.callValidateCode)(cxt, validateRef, passCxt, passSchema)}`, def.modifying);
-      }
-      function reportErrs(errors) {
-        var _a3;
-        gen.if((0, codegen_1.not)((_a3 = def.valid) !== null && _a3 !== void 0 ? _a3 : valid), errors);
-      }
-    }
-    exports2.funcKeywordCode = funcKeywordCode;
-    function modifyData(cxt) {
-      const { gen, data, it } = cxt;
-      gen.if(it.parentData, () => gen.assign(data, (0, codegen_1._)`${it.parentData}[${it.parentDataProperty}]`));
-    }
-    function addErrs(cxt, errs) {
-      const { gen } = cxt;
-      gen.if((0, codegen_1._)`Array.isArray(${errs})`, () => {
-        gen.assign(names_1.default.vErrors, (0, codegen_1._)`${names_1.default.vErrors} === null ? ${errs} : ${names_1.default.vErrors}.concat(${errs})`).assign(names_1.default.errors, (0, codegen_1._)`${names_1.default.vErrors}.length`);
-        (0, errors_1.extendErrors)(cxt);
-      }, () => cxt.error());
-    }
-    function checkAsyncKeyword({ schemaEnv }, def) {
-      if (def.async && !schemaEnv.$async)
-        throw new Error("async keyword in sync schema");
-    }
-    function useKeyword(gen, keyword, result) {
-      if (result === void 0)
-        throw new Error(`keyword "${keyword}" failed to compile`);
-      return gen.scopeValue("keyword", typeof result == "function" ? { ref: result } : { ref: result, code: (0, codegen_1.stringify)(result) });
-    }
-    function validSchemaType(schema, schemaType, allowUndefined = false) {
-      return !schemaType.length || schemaType.some((st) => st === "array" ? Array.isArray(schema) : st === "object" ? schema && typeof schema == "object" && !Array.isArray(schema) : typeof schema == st || allowUndefined && typeof schema == "undefined");
-    }
-    exports2.validSchemaType = validSchemaType;
-    function validateKeywordUsage({ schema, opts, self, errSchemaPath }, def, keyword) {
-      if (Array.isArray(def.keyword) ? !def.keyword.includes(keyword) : def.keyword !== keyword) {
-        throw new Error("ajv implementation error");
-      }
-      const deps = def.dependencies;
-      if (deps === null || deps === void 0 ? void 0 : deps.some((kwd) => !Object.prototype.hasOwnProperty.call(schema, kwd))) {
-        throw new Error(`parent schema must have dependencies of ${keyword}: ${deps.join(",")}`);
-      }
-      if (def.validateSchema) {
-        const valid = def.validateSchema(schema[keyword]);
-        if (!valid) {
-          const msg = `keyword "${keyword}" value is invalid at path "${errSchemaPath}": ` + self.errorsText(def.validateSchema.errors);
-          if (opts.validateSchema === "log")
-            self.logger.error(msg);
-          else
-            throw new Error(msg);
-        }
-      }
-    }
-    exports2.validateKeywordUsage = validateKeywordUsage;
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/subschema.js
-var require_subschema = __commonJS({
-  "node_modules/ajv/dist/compile/validate/subschema.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.extendSubschemaMode = exports2.extendSubschemaData = exports2.getSubschema = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    function getSubschema(it, { keyword, schemaProp, schema, schemaPath, errSchemaPath, topSchemaRef }) {
-      if (keyword !== void 0 && schema !== void 0) {
-        throw new Error('both "keyword" and "schema" passed, only one allowed');
-      }
-      if (keyword !== void 0) {
-        const sch = it.schema[keyword];
-        return schemaProp === void 0 ? {
-          schema: sch,
-          schemaPath: (0, codegen_1._)`${it.schemaPath}${(0, codegen_1.getProperty)(keyword)}`,
-          errSchemaPath: `${it.errSchemaPath}/${keyword}`
-        } : {
-          schema: sch[schemaProp],
-          schemaPath: (0, codegen_1._)`${it.schemaPath}${(0, codegen_1.getProperty)(keyword)}${(0, codegen_1.getProperty)(schemaProp)}`,
-          errSchemaPath: `${it.errSchemaPath}/${keyword}/${(0, util_1.escapeFragment)(schemaProp)}`
-        };
-      }
-      if (schema !== void 0) {
-        if (schemaPath === void 0 || errSchemaPath === void 0 || topSchemaRef === void 0) {
-          throw new Error('"schemaPath", "errSchemaPath" and "topSchemaRef" are required with "schema"');
-        }
-        return {
-          schema,
-          schemaPath,
-          topSchemaRef,
-          errSchemaPath
-        };
-      }
-      throw new Error('either "keyword" or "schema" must be passed');
-    }
-    exports2.getSubschema = getSubschema;
-    function extendSubschemaData(subschema, it, { dataProp, dataPropType: dpType, data, dataTypes, propertyName }) {
-      if (data !== void 0 && dataProp !== void 0) {
-        throw new Error('both "data" and "dataProp" passed, only one allowed');
-      }
-      const { gen } = it;
-      if (dataProp !== void 0) {
-        const { errorPath, dataPathArr, opts } = it;
-        const nextData = gen.let("data", (0, codegen_1._)`${it.data}${(0, codegen_1.getProperty)(dataProp)}`, true);
-        dataContextProps(nextData);
-        subschema.errorPath = (0, codegen_1.str)`${errorPath}${(0, util_1.getErrorPath)(dataProp, dpType, opts.jsPropertySyntax)}`;
-        subschema.parentDataProperty = (0, codegen_1._)`${dataProp}`;
-        subschema.dataPathArr = [...dataPathArr, subschema.parentDataProperty];
-      }
-      if (data !== void 0) {
-        const nextData = data instanceof codegen_1.Name ? data : gen.let("data", data, true);
-        dataContextProps(nextData);
-        if (propertyName !== void 0)
-          subschema.propertyName = propertyName;
-      }
-      if (dataTypes)
-        subschema.dataTypes = dataTypes;
-      function dataContextProps(_nextData) {
-        subschema.data = _nextData;
-        subschema.dataLevel = it.dataLevel + 1;
-        subschema.dataTypes = [];
-        it.definedProperties = /* @__PURE__ */ new Set();
-        subschema.parentData = it.data;
-        subschema.dataNames = [...it.dataNames, _nextData];
-      }
-    }
-    exports2.extendSubschemaData = extendSubschemaData;
-    function extendSubschemaMode(subschema, { jtdDiscriminator, jtdMetadata, compositeRule, createErrors, allErrors }) {
-      if (compositeRule !== void 0)
-        subschema.compositeRule = compositeRule;
-      if (createErrors !== void 0)
-        subschema.createErrors = createErrors;
-      if (allErrors !== void 0)
-        subschema.allErrors = allErrors;
-      subschema.jtdDiscriminator = jtdDiscriminator;
-      subschema.jtdMetadata = jtdMetadata;
-    }
-    exports2.extendSubschemaMode = extendSubschemaMode;
-  }
-});
-
-// node_modules/fast-deep-equal/index.js
-var require_fast_deep_equal = __commonJS({
-  "node_modules/fast-deep-equal/index.js"(exports2, module2) {
-    "use strict";
-    module2.exports = function equal(a, b2) {
-      if (a === b2)
-        return true;
-      if (a && b2 && typeof a == "object" && typeof b2 == "object") {
-        if (a.constructor !== b2.constructor)
-          return false;
-        var length, i2, keys;
-        if (Array.isArray(a)) {
-          length = a.length;
-          if (length != b2.length)
-            return false;
-          for (i2 = length; i2-- !== 0; )
-            if (!equal(a[i2], b2[i2]))
-              return false;
-          return true;
-        }
-        if (a.constructor === RegExp)
-          return a.source === b2.source && a.flags === b2.flags;
-        if (a.valueOf !== Object.prototype.valueOf)
-          return a.valueOf() === b2.valueOf();
-        if (a.toString !== Object.prototype.toString)
-          return a.toString() === b2.toString();
-        keys = Object.keys(a);
-        length = keys.length;
-        if (length !== Object.keys(b2).length)
-          return false;
-        for (i2 = length; i2-- !== 0; )
-          if (!Object.prototype.hasOwnProperty.call(b2, keys[i2]))
-            return false;
-        for (i2 = length; i2-- !== 0; ) {
-          var key = keys[i2];
-          if (!equal(a[key], b2[key]))
-            return false;
-        }
-        return true;
-      }
-      return a !== a && b2 !== b2;
-    };
-  }
-});
-
-// node_modules/json-schema-traverse/index.js
-var require_json_schema_traverse = __commonJS({
-  "node_modules/json-schema-traverse/index.js"(exports2, module2) {
-    "use strict";
-    var traverse = module2.exports = function(schema, opts, cb) {
-      if (typeof opts == "function") {
-        cb = opts;
-        opts = {};
-      }
-      cb = opts.cb || cb;
-      var pre = typeof cb == "function" ? cb : cb.pre || function() {
-      };
-      var post = cb.post || function() {
-      };
-      _traverse(opts, pre, post, schema, "", schema);
-    };
-    traverse.keywords = {
-      additionalItems: true,
-      items: true,
-      contains: true,
-      additionalProperties: true,
-      propertyNames: true,
-      not: true,
-      if: true,
-      then: true,
-      else: true
-    };
-    traverse.arrayKeywords = {
-      items: true,
-      allOf: true,
-      anyOf: true,
-      oneOf: true
-    };
-    traverse.propsKeywords = {
-      $defs: true,
-      definitions: true,
-      properties: true,
-      patternProperties: true,
-      dependencies: true
-    };
-    traverse.skipKeywords = {
-      default: true,
-      enum: true,
-      const: true,
-      required: true,
-      maximum: true,
-      minimum: true,
-      exclusiveMaximum: true,
-      exclusiveMinimum: true,
-      multipleOf: true,
-      maxLength: true,
-      minLength: true,
-      pattern: true,
-      format: true,
-      maxItems: true,
-      minItems: true,
-      uniqueItems: true,
-      maxProperties: true,
-      minProperties: true
-    };
-    function _traverse(opts, pre, post, schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex) {
-      if (schema && typeof schema == "object" && !Array.isArray(schema)) {
-        pre(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
-        for (var key in schema) {
-          var sch = schema[key];
-          if (Array.isArray(sch)) {
-            if (key in traverse.arrayKeywords) {
-              for (var i2 = 0; i2 < sch.length; i2++)
-                _traverse(opts, pre, post, sch[i2], jsonPtr + "/" + key + "/" + i2, rootSchema, jsonPtr, key, schema, i2);
-            }
-          } else if (key in traverse.propsKeywords) {
-            if (sch && typeof sch == "object") {
-              for (var prop in sch)
-                _traverse(opts, pre, post, sch[prop], jsonPtr + "/" + key + "/" + escapeJsonPtr(prop), rootSchema, jsonPtr, key, schema, prop);
-            }
-          } else if (key in traverse.keywords || opts.allKeys && !(key in traverse.skipKeywords)) {
-            _traverse(opts, pre, post, sch, jsonPtr + "/" + key, rootSchema, jsonPtr, key, schema);
-          }
-        }
-        post(schema, jsonPtr, rootSchema, parentJsonPtr, parentKeyword, parentSchema, keyIndex);
-      }
-    }
-    function escapeJsonPtr(str) {
-      return str.replace(/~/g, "~0").replace(/\//g, "~1");
-    }
-  }
-});
-
-// node_modules/ajv/dist/compile/resolve.js
-var require_resolve = __commonJS({
-  "node_modules/ajv/dist/compile/resolve.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.getSchemaRefs = exports2.resolveUrl = exports2.normalizeId = exports2._getFullPath = exports2.getFullPath = exports2.inlineRef = void 0;
-    var util_1 = require_util();
-    var equal = require_fast_deep_equal();
-    var traverse = require_json_schema_traverse();
-    var SIMPLE_INLINED = /* @__PURE__ */ new Set([
-      "type",
-      "format",
-      "pattern",
-      "maxLength",
-      "minLength",
-      "maxProperties",
-      "minProperties",
-      "maxItems",
-      "minItems",
-      "maximum",
-      "minimum",
-      "uniqueItems",
-      "multipleOf",
-      "required",
-      "enum",
-      "const"
-    ]);
-    function inlineRef(schema, limit = true) {
-      if (typeof schema == "boolean")
-        return true;
-      if (limit === true)
-        return !hasRef(schema);
-      if (!limit)
-        return false;
-      return countKeys(schema) <= limit;
-    }
-    exports2.inlineRef = inlineRef;
-    var REF_KEYWORDS = /* @__PURE__ */ new Set([
-      "$ref",
-      "$recursiveRef",
-      "$recursiveAnchor",
-      "$dynamicRef",
-      "$dynamicAnchor"
-    ]);
-    function hasRef(schema) {
-      for (const key in schema) {
-        if (REF_KEYWORDS.has(key))
-          return true;
-        const sch = schema[key];
-        if (Array.isArray(sch) && sch.some(hasRef))
-          return true;
-        if (typeof sch == "object" && hasRef(sch))
-          return true;
-      }
-      return false;
-    }
-    function countKeys(schema) {
-      let count = 0;
-      for (const key in schema) {
-        if (key === "$ref")
-          return Infinity;
-        count++;
-        if (SIMPLE_INLINED.has(key))
-          continue;
-        if (typeof schema[key] == "object") {
-          (0, util_1.eachItem)(schema[key], (sch) => count += countKeys(sch));
-        }
-        if (count === Infinity)
-          return Infinity;
-      }
-      return count;
-    }
-    function getFullPath(resolver, id = "", normalize2) {
-      if (normalize2 !== false)
-        id = normalizeId(id);
-      const p2 = resolver.parse(id);
-      return _getFullPath(resolver, p2);
-    }
-    exports2.getFullPath = getFullPath;
-    function _getFullPath(resolver, p2) {
-      const serialized = resolver.serialize(p2);
-      return serialized.split("#")[0] + "#";
-    }
-    exports2._getFullPath = _getFullPath;
-    var TRAILING_SLASH_HASH = /#\/?$/;
-    function normalizeId(id) {
-      return id ? id.replace(TRAILING_SLASH_HASH, "") : "";
-    }
-    exports2.normalizeId = normalizeId;
-    function resolveUrl(resolver, baseId, id) {
-      id = normalizeId(id);
-      return resolver.resolve(baseId, id);
-    }
-    exports2.resolveUrl = resolveUrl;
-    var ANCHOR = /^[a-z_][-a-z0-9._]*$/i;
-    function getSchemaRefs(schema, baseId) {
-      if (typeof schema == "boolean")
-        return {};
-      const { schemaId, uriResolver } = this.opts;
-      const schId = normalizeId(schema[schemaId] || baseId);
-      const baseIds = { "": schId };
-      const pathPrefix = getFullPath(uriResolver, schId, false);
-      const localRefs = {};
-      const schemaRefs = /* @__PURE__ */ new Set();
-      traverse(schema, { allKeys: true }, (sch, jsonPtr, _2, parentJsonPtr) => {
-        if (parentJsonPtr === void 0)
-          return;
-        const fullPath = pathPrefix + jsonPtr;
-        let innerBaseId = baseIds[parentJsonPtr];
-        if (typeof sch[schemaId] == "string")
-          innerBaseId = addRef.call(this, sch[schemaId]);
-        addAnchor.call(this, sch.$anchor);
-        addAnchor.call(this, sch.$dynamicAnchor);
-        baseIds[jsonPtr] = innerBaseId;
-        function addRef(ref) {
-          const _resolve = this.opts.uriResolver.resolve;
-          ref = normalizeId(innerBaseId ? _resolve(innerBaseId, ref) : ref);
-          if (schemaRefs.has(ref))
-            throw ambiguos(ref);
-          schemaRefs.add(ref);
-          let schOrRef = this.refs[ref];
-          if (typeof schOrRef == "string")
-            schOrRef = this.refs[schOrRef];
-          if (typeof schOrRef == "object") {
-            checkAmbiguosRef(sch, schOrRef.schema, ref);
-          } else if (ref !== normalizeId(fullPath)) {
-            if (ref[0] === "#") {
-              checkAmbiguosRef(sch, localRefs[ref], ref);
-              localRefs[ref] = sch;
-            } else {
-              this.refs[ref] = fullPath;
-            }
-          }
-          return ref;
-        }
-        function addAnchor(anchor) {
-          if (typeof anchor == "string") {
-            if (!ANCHOR.test(anchor))
-              throw new Error(`invalid anchor "${anchor}"`);
-            addRef.call(this, `#${anchor}`);
-          }
-        }
-      });
-      return localRefs;
-      function checkAmbiguosRef(sch1, sch2, ref) {
-        if (sch2 !== void 0 && !equal(sch1, sch2))
-          throw ambiguos(ref);
-      }
-      function ambiguos(ref) {
-        return new Error(`reference "${ref}" resolves to more than one schema`);
-      }
-    }
-    exports2.getSchemaRefs = getSchemaRefs;
-  }
-});
-
-// node_modules/ajv/dist/compile/validate/index.js
-var require_validate = __commonJS({
-  "node_modules/ajv/dist/compile/validate/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.getData = exports2.KeywordCxt = exports2.validateFunctionCode = void 0;
-    var boolSchema_1 = require_boolSchema();
-    var dataType_1 = require_dataType();
-    var applicability_1 = require_applicability();
-    var dataType_2 = require_dataType();
-    var defaults_1 = require_defaults();
-    var keyword_1 = require_keyword();
-    var subschema_1 = require_subschema();
-    var codegen_1 = require_codegen();
-    var names_1 = require_names();
-    var resolve_1 = require_resolve();
-    var util_1 = require_util();
-    var errors_1 = require_errors2();
-    function validateFunctionCode(it) {
-      if (isSchemaObj(it)) {
-        checkKeywords(it);
-        if (schemaCxtHasRules(it)) {
-          topSchemaObjCode(it);
-          return;
-        }
-      }
-      validateFunction(it, () => (0, boolSchema_1.topBoolOrEmptySchema)(it));
-    }
-    exports2.validateFunctionCode = validateFunctionCode;
-    function validateFunction({ gen, validateName, schema, schemaEnv, opts }, body) {
-      if (opts.code.es5) {
-        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${names_1.default.valCxt}`, schemaEnv.$async, () => {
-          gen.code((0, codegen_1._)`"use strict"; ${funcSourceUrl(schema, opts)}`);
-          destructureValCxtES5(gen, opts);
-          gen.code(body);
-        });
-      } else {
-        gen.func(validateName, (0, codegen_1._)`${names_1.default.data}, ${destructureValCxt(opts)}`, schemaEnv.$async, () => gen.code(funcSourceUrl(schema, opts)).code(body));
-      }
-    }
-    function destructureValCxt(opts) {
-      return (0, codegen_1._)`{${names_1.default.instancePath}="", ${names_1.default.parentData}, ${names_1.default.parentDataProperty}, ${names_1.default.rootData}=${names_1.default.data}${opts.dynamicRef ? (0, codegen_1._)`, ${names_1.default.dynamicAnchors}={}` : codegen_1.nil}}={}`;
-    }
-    function destructureValCxtES5(gen, opts) {
-      gen.if(names_1.default.valCxt, () => {
-        gen.var(names_1.default.instancePath, (0, codegen_1._)`${names_1.default.valCxt}.${names_1.default.instancePath}`);
-        gen.var(names_1.default.parentData, (0, codegen_1._)`${names_1.default.valCxt}.${names_1.default.parentData}`);
-        gen.var(names_1.default.parentDataProperty, (0, codegen_1._)`${names_1.default.valCxt}.${names_1.default.parentDataProperty}`);
-        gen.var(names_1.default.rootData, (0, codegen_1._)`${names_1.default.valCxt}.${names_1.default.rootData}`);
-        if (opts.dynamicRef)
-          gen.var(names_1.default.dynamicAnchors, (0, codegen_1._)`${names_1.default.valCxt}.${names_1.default.dynamicAnchors}`);
-      }, () => {
-        gen.var(names_1.default.instancePath, (0, codegen_1._)`""`);
-        gen.var(names_1.default.parentData, (0, codegen_1._)`undefined`);
-        gen.var(names_1.default.parentDataProperty, (0, codegen_1._)`undefined`);
-        gen.var(names_1.default.rootData, names_1.default.data);
-        if (opts.dynamicRef)
-          gen.var(names_1.default.dynamicAnchors, (0, codegen_1._)`{}`);
-      });
-    }
-    function topSchemaObjCode(it) {
-      const { schema, opts, gen } = it;
-      validateFunction(it, () => {
-        if (opts.$comment && schema.$comment)
-          commentKeyword(it);
-        checkNoDefault(it);
-        gen.let(names_1.default.vErrors, null);
-        gen.let(names_1.default.errors, 0);
-        if (opts.unevaluated)
-          resetEvaluated(it);
-        typeAndKeywords(it);
-        returnResults(it);
-      });
-      return;
-    }
-    function resetEvaluated(it) {
-      const { gen, validateName } = it;
-      it.evaluated = gen.const("evaluated", (0, codegen_1._)`${validateName}.evaluated`);
-      gen.if((0, codegen_1._)`${it.evaluated}.dynamicProps`, () => gen.assign((0, codegen_1._)`${it.evaluated}.props`, (0, codegen_1._)`undefined`));
-      gen.if((0, codegen_1._)`${it.evaluated}.dynamicItems`, () => gen.assign((0, codegen_1._)`${it.evaluated}.items`, (0, codegen_1._)`undefined`));
-    }
-    function funcSourceUrl(schema, opts) {
-      const schId = typeof schema == "object" && schema[opts.schemaId];
-      return schId && (opts.code.source || opts.code.process) ? (0, codegen_1._)`/*# sourceURL=${schId} */` : codegen_1.nil;
-    }
-    function subschemaCode(it, valid) {
-      if (isSchemaObj(it)) {
-        checkKeywords(it);
-        if (schemaCxtHasRules(it)) {
-          subSchemaObjCode(it, valid);
-          return;
-        }
-      }
-      (0, boolSchema_1.boolOrEmptySchema)(it, valid);
-    }
-    function schemaCxtHasRules({ schema, self }) {
-      if (typeof schema == "boolean")
-        return !schema;
-      for (const key in schema)
-        if (self.RULES.all[key])
-          return true;
-      return false;
-    }
-    function isSchemaObj(it) {
-      return typeof it.schema != "boolean";
-    }
-    function subSchemaObjCode(it, valid) {
-      const { schema, gen, opts } = it;
-      if (opts.$comment && schema.$comment)
-        commentKeyword(it);
-      updateContext(it);
-      checkAsyncSchema(it);
-      const errsCount = gen.const("_errs", names_1.default.errors);
-      typeAndKeywords(it, errsCount);
-      gen.var(valid, (0, codegen_1._)`${errsCount} === ${names_1.default.errors}`);
-    }
-    function checkKeywords(it) {
-      (0, util_1.checkUnknownRules)(it);
-      checkRefsAndKeywords(it);
-    }
-    function typeAndKeywords(it, errsCount) {
-      if (it.opts.jtd)
-        return schemaKeywords(it, [], false, errsCount);
-      const types = (0, dataType_1.getSchemaTypes)(it.schema);
-      const checkedTypes = (0, dataType_1.coerceAndCheckDataType)(it, types);
-      schemaKeywords(it, types, !checkedTypes, errsCount);
-    }
-    function checkRefsAndKeywords(it) {
-      const { schema, errSchemaPath, opts, self } = it;
-      if (schema.$ref && opts.ignoreKeywordsWithRef && (0, util_1.schemaHasRulesButRef)(schema, self.RULES)) {
-        self.logger.warn(`$ref: keywords ignored in schema at path "${errSchemaPath}"`);
-      }
-    }
-    function checkNoDefault(it) {
-      const { schema, opts } = it;
-      if (schema.default !== void 0 && opts.useDefaults && opts.strictSchema) {
-        (0, util_1.checkStrictMode)(it, "default is ignored in the schema root");
-      }
-    }
-    function updateContext(it) {
-      const schId = it.schema[it.opts.schemaId];
-      if (schId)
-        it.baseId = (0, resolve_1.resolveUrl)(it.opts.uriResolver, it.baseId, schId);
-    }
-    function checkAsyncSchema(it) {
-      if (it.schema.$async && !it.schemaEnv.$async)
-        throw new Error("async schema in sync schema");
-    }
-    function commentKeyword({ gen, schemaEnv, schema, errSchemaPath, opts }) {
-      const msg = schema.$comment;
-      if (opts.$comment === true) {
-        gen.code((0, codegen_1._)`${names_1.default.self}.logger.log(${msg})`);
-      } else if (typeof opts.$comment == "function") {
-        const schemaPath = (0, codegen_1.str)`${errSchemaPath}/$comment`;
-        const rootName = gen.scopeValue("root", { ref: schemaEnv.root });
-        gen.code((0, codegen_1._)`${names_1.default.self}.opts.$comment(${msg}, ${schemaPath}, ${rootName}.schema)`);
-      }
-    }
-    function returnResults(it) {
-      const { gen, schemaEnv, validateName, ValidationError, opts } = it;
-      if (schemaEnv.$async) {
-        gen.if((0, codegen_1._)`${names_1.default.errors} === 0`, () => gen.return(names_1.default.data), () => gen.throw((0, codegen_1._)`new ${ValidationError}(${names_1.default.vErrors})`));
-      } else {
-        gen.assign((0, codegen_1._)`${validateName}.errors`, names_1.default.vErrors);
-        if (opts.unevaluated)
-          assignEvaluated(it);
-        gen.return((0, codegen_1._)`${names_1.default.errors} === 0`);
-      }
-    }
-    function assignEvaluated({ gen, evaluated, props, items }) {
-      if (props instanceof codegen_1.Name)
-        gen.assign((0, codegen_1._)`${evaluated}.props`, props);
-      if (items instanceof codegen_1.Name)
-        gen.assign((0, codegen_1._)`${evaluated}.items`, items);
-    }
-    function schemaKeywords(it, types, typeErrors, errsCount) {
-      const { gen, schema, data, allErrors, opts, self } = it;
-      const { RULES } = self;
-      if (schema.$ref && (opts.ignoreKeywordsWithRef || !(0, util_1.schemaHasRulesButRef)(schema, RULES))) {
-        gen.block(() => keywordCode(it, "$ref", RULES.all.$ref.definition));
-        return;
-      }
-      if (!opts.jtd)
-        checkStrictTypes(it, types);
-      gen.block(() => {
-        for (const group of RULES.rules)
-          groupKeywords(group);
-        groupKeywords(RULES.post);
-      });
-      function groupKeywords(group) {
-        if (!(0, applicability_1.shouldUseGroup)(schema, group))
-          return;
-        if (group.type) {
-          gen.if((0, dataType_2.checkDataType)(group.type, data, opts.strictNumbers));
-          iterateKeywords(it, group);
-          if (types.length === 1 && types[0] === group.type && typeErrors) {
-            gen.else();
-            (0, dataType_2.reportTypeError)(it);
-          }
-          gen.endIf();
-        } else {
-          iterateKeywords(it, group);
-        }
-        if (!allErrors)
-          gen.if((0, codegen_1._)`${names_1.default.errors} === ${errsCount || 0}`);
-      }
-    }
-    function iterateKeywords(it, group) {
-      const { gen, schema, opts: { useDefaults } } = it;
-      if (useDefaults)
-        (0, defaults_1.assignDefaults)(it, group.type);
-      gen.block(() => {
-        for (const rule of group.rules) {
-          if ((0, applicability_1.shouldUseRule)(schema, rule)) {
-            keywordCode(it, rule.keyword, rule.definition, group.type);
-          }
-        }
-      });
-    }
-    function checkStrictTypes(it, types) {
-      if (it.schemaEnv.meta || !it.opts.strictTypes)
-        return;
-      checkContextTypes(it, types);
-      if (!it.opts.allowUnionTypes)
-        checkMultipleTypes(it, types);
-      checkKeywordTypes(it, it.dataTypes);
-    }
-    function checkContextTypes(it, types) {
-      if (!types.length)
-        return;
-      if (!it.dataTypes.length) {
-        it.dataTypes = types;
-        return;
-      }
-      types.forEach((t2) => {
-        if (!includesType(it.dataTypes, t2)) {
-          strictTypesError(it, `type "${t2}" not allowed by context "${it.dataTypes.join(",")}"`);
-        }
-      });
-      narrowSchemaTypes(it, types);
-    }
-    function checkMultipleTypes(it, ts) {
-      if (ts.length > 1 && !(ts.length === 2 && ts.includes("null"))) {
-        strictTypesError(it, "use allowUnionTypes to allow union type keyword");
-      }
-    }
-    function checkKeywordTypes(it, ts) {
-      const rules = it.self.RULES.all;
-      for (const keyword in rules) {
-        const rule = rules[keyword];
-        if (typeof rule == "object" && (0, applicability_1.shouldUseRule)(it.schema, rule)) {
-          const { type } = rule.definition;
-          if (type.length && !type.some((t2) => hasApplicableType(ts, t2))) {
-            strictTypesError(it, `missing type "${type.join(",")}" for keyword "${keyword}"`);
-          }
-        }
-      }
-    }
-    function hasApplicableType(schTs, kwdT) {
-      return schTs.includes(kwdT) || kwdT === "number" && schTs.includes("integer");
-    }
-    function includesType(ts, t2) {
-      return ts.includes(t2) || t2 === "integer" && ts.includes("number");
-    }
-    function narrowSchemaTypes(it, withTypes) {
-      const ts = [];
-      for (const t2 of it.dataTypes) {
-        if (includesType(withTypes, t2))
-          ts.push(t2);
-        else if (withTypes.includes("integer") && t2 === "number")
-          ts.push("integer");
-      }
-      it.dataTypes = ts;
-    }
-    function strictTypesError(it, msg) {
-      const schemaPath = it.schemaEnv.baseId + it.errSchemaPath;
-      msg += ` at "${schemaPath}" (strictTypes)`;
-      (0, util_1.checkStrictMode)(it, msg, it.opts.strictTypes);
-    }
-    var KeywordCxt = class {
-      constructor(it, def, keyword) {
-        (0, keyword_1.validateKeywordUsage)(it, def, keyword);
-        this.gen = it.gen;
-        this.allErrors = it.allErrors;
-        this.keyword = keyword;
-        this.data = it.data;
-        this.schema = it.schema[keyword];
-        this.$data = def.$data && it.opts.$data && this.schema && this.schema.$data;
-        this.schemaValue = (0, util_1.schemaRefOrVal)(it, this.schema, keyword, this.$data);
-        this.schemaType = def.schemaType;
-        this.parentSchema = it.schema;
-        this.params = {};
-        this.it = it;
-        this.def = def;
-        if (this.$data) {
-          this.schemaCode = it.gen.const("vSchema", getData(this.$data, it));
-        } else {
-          this.schemaCode = this.schemaValue;
-          if (!(0, keyword_1.validSchemaType)(this.schema, def.schemaType, def.allowUndefined)) {
-            throw new Error(`${keyword} value must be ${JSON.stringify(def.schemaType)}`);
-          }
-        }
-        if ("code" in def ? def.trackErrors : def.errors !== false) {
-          this.errsCount = it.gen.const("_errs", names_1.default.errors);
-        }
-      }
-      result(condition, successAction, failAction) {
-        this.failResult((0, codegen_1.not)(condition), successAction, failAction);
-      }
-      failResult(condition, successAction, failAction) {
-        this.gen.if(condition);
-        if (failAction)
-          failAction();
-        else
-          this.error();
-        if (successAction) {
-          this.gen.else();
-          successAction();
-          if (this.allErrors)
-            this.gen.endIf();
-        } else {
-          if (this.allErrors)
-            this.gen.endIf();
-          else
-            this.gen.else();
-        }
-      }
-      pass(condition, failAction) {
-        this.failResult((0, codegen_1.not)(condition), void 0, failAction);
-      }
-      fail(condition) {
-        if (condition === void 0) {
-          this.error();
-          if (!this.allErrors)
-            this.gen.if(false);
-          return;
-        }
-        this.gen.if(condition);
-        this.error();
-        if (this.allErrors)
-          this.gen.endIf();
-        else
-          this.gen.else();
-      }
-      fail$data(condition) {
-        if (!this.$data)
-          return this.fail(condition);
-        const { schemaCode } = this;
-        this.fail((0, codegen_1._)`${schemaCode} !== undefined && (${(0, codegen_1.or)(this.invalid$data(), condition)})`);
-      }
-      error(append2, errorParams, errorPaths) {
-        if (errorParams) {
-          this.setParams(errorParams);
-          this._error(append2, errorPaths);
-          this.setParams({});
-          return;
-        }
-        this._error(append2, errorPaths);
-      }
-      _error(append2, errorPaths) {
-        ;
-        (append2 ? errors_1.reportExtraError : errors_1.reportError)(this, this.def.error, errorPaths);
-      }
-      $dataError() {
-        (0, errors_1.reportError)(this, this.def.$dataError || errors_1.keyword$DataError);
-      }
-      reset() {
-        if (this.errsCount === void 0)
-          throw new Error('add "trackErrors" to keyword definition');
-        (0, errors_1.resetErrorsCount)(this.gen, this.errsCount);
-      }
-      ok(cond) {
-        if (!this.allErrors)
-          this.gen.if(cond);
-      }
-      setParams(obj, assign) {
-        if (assign)
-          Object.assign(this.params, obj);
-        else
-          this.params = obj;
-      }
-      block$data(valid, codeBlock, $dataValid = codegen_1.nil) {
-        this.gen.block(() => {
-          this.check$data(valid, $dataValid);
-          codeBlock();
-        });
-      }
-      check$data(valid = codegen_1.nil, $dataValid = codegen_1.nil) {
-        if (!this.$data)
-          return;
-        const { gen, schemaCode, schemaType, def } = this;
-        gen.if((0, codegen_1.or)((0, codegen_1._)`${schemaCode} === undefined`, $dataValid));
-        if (valid !== codegen_1.nil)
-          gen.assign(valid, true);
-        if (schemaType.length || def.validateSchema) {
-          gen.elseIf(this.invalid$data());
-          this.$dataError();
-          if (valid !== codegen_1.nil)
-            gen.assign(valid, false);
-        }
-        gen.else();
-      }
-      invalid$data() {
-        const { gen, schemaCode, schemaType, def, it } = this;
-        return (0, codegen_1.or)(wrong$DataType(), invalid$DataSchema());
-        function wrong$DataType() {
-          if (schemaType.length) {
-            if (!(schemaCode instanceof codegen_1.Name))
-              throw new Error("ajv implementation error");
-            const st = Array.isArray(schemaType) ? schemaType : [schemaType];
-            return (0, codegen_1._)`${(0, dataType_2.checkDataTypes)(st, schemaCode, it.opts.strictNumbers, dataType_2.DataType.Wrong)}`;
-          }
-          return codegen_1.nil;
-        }
-        function invalid$DataSchema() {
-          if (def.validateSchema) {
-            const validateSchemaRef = gen.scopeValue("validate$data", { ref: def.validateSchema });
-            return (0, codegen_1._)`!${validateSchemaRef}(${schemaCode})`;
-          }
-          return codegen_1.nil;
-        }
-      }
-      subschema(appl, valid) {
-        const subschema = (0, subschema_1.getSubschema)(this.it, appl);
-        (0, subschema_1.extendSubschemaData)(subschema, this.it, appl);
-        (0, subschema_1.extendSubschemaMode)(subschema, appl);
-        const nextContext = { ...this.it, ...subschema, items: void 0, props: void 0 };
-        subschemaCode(nextContext, valid);
-        return nextContext;
-      }
-      mergeEvaluated(schemaCxt, toName) {
-        const { it, gen } = this;
-        if (!it.opts.unevaluated)
-          return;
-        if (it.props !== true && schemaCxt.props !== void 0) {
-          it.props = util_1.mergeEvaluated.props(gen, schemaCxt.props, it.props, toName);
-        }
-        if (it.items !== true && schemaCxt.items !== void 0) {
-          it.items = util_1.mergeEvaluated.items(gen, schemaCxt.items, it.items, toName);
-        }
-      }
-      mergeValidEvaluated(schemaCxt, valid) {
-        const { it, gen } = this;
-        if (it.opts.unevaluated && (it.props !== true || it.items !== true)) {
-          gen.if(valid, () => this.mergeEvaluated(schemaCxt, codegen_1.Name));
-          return true;
-        }
-      }
-    };
-    exports2.KeywordCxt = KeywordCxt;
-    function keywordCode(it, keyword, def, ruleType) {
-      const cxt = new KeywordCxt(it, def, keyword);
-      if ("code" in def) {
-        def.code(cxt, ruleType);
-      } else if (cxt.$data && def.validate) {
-        (0, keyword_1.funcKeywordCode)(cxt, def);
-      } else if ("macro" in def) {
-        (0, keyword_1.macroKeywordCode)(cxt, def);
-      } else if (def.compile || def.validate) {
-        (0, keyword_1.funcKeywordCode)(cxt, def);
-      }
-    }
-    var JSON_POINTER = /^\/(?:[^~]|~0|~1)*$/;
-    var RELATIVE_JSON_POINTER = /^([0-9]+)(#|\/(?:[^~]|~0|~1)*)?$/;
-    function getData($data, { dataLevel, dataNames, dataPathArr }) {
-      let jsonPointer;
-      let data;
-      if ($data === "")
-        return names_1.default.rootData;
-      if ($data[0] === "/") {
-        if (!JSON_POINTER.test($data))
-          throw new Error(`Invalid JSON-pointer: ${$data}`);
-        jsonPointer = $data;
-        data = names_1.default.rootData;
-      } else {
-        const matches = RELATIVE_JSON_POINTER.exec($data);
-        if (!matches)
-          throw new Error(`Invalid JSON-pointer: ${$data}`);
-        const up = +matches[1];
-        jsonPointer = matches[2];
-        if (jsonPointer === "#") {
-          if (up >= dataLevel)
-            throw new Error(errorMsg("property/index", up));
-          return dataPathArr[dataLevel - up];
-        }
-        if (up > dataLevel)
-          throw new Error(errorMsg("data", up));
-        data = dataNames[dataLevel - up];
-        if (!jsonPointer)
-          return data;
-      }
-      let expr = data;
-      const segments = jsonPointer.split("/");
-      for (const segment of segments) {
-        if (segment) {
-          data = (0, codegen_1._)`${data}${(0, codegen_1.getProperty)((0, util_1.unescapeJsonPointer)(segment))}`;
-          expr = (0, codegen_1._)`${expr} && ${data}`;
-        }
-      }
-      return expr;
-      function errorMsg(pointerType, up) {
-        return `Cannot access ${pointerType} ${up} levels up, current level is ${dataLevel}`;
-      }
-    }
-    exports2.getData = getData;
-  }
-});
-
-// node_modules/ajv/dist/runtime/validation_error.js
-var require_validation_error = __commonJS({
-  "node_modules/ajv/dist/runtime/validation_error.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var ValidationError = class extends Error {
-      constructor(errors) {
-        super("validation failed");
-        this.errors = errors;
-        this.ajv = this.validation = true;
-      }
-    };
-    exports2.default = ValidationError;
-  }
-});
-
-// node_modules/ajv/dist/compile/ref_error.js
-var require_ref_error = __commonJS({
-  "node_modules/ajv/dist/compile/ref_error.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var resolve_1 = require_resolve();
-    var MissingRefError = class extends Error {
-      constructor(resolver, baseId, ref, msg) {
-        super(msg || `can't resolve reference ${ref} from id ${baseId}`);
-        this.missingRef = (0, resolve_1.resolveUrl)(resolver, baseId, ref);
-        this.missingSchema = (0, resolve_1.normalizeId)((0, resolve_1.getFullPath)(resolver, this.missingRef));
-      }
-    };
-    exports2.default = MissingRefError;
-  }
-});
-
-// node_modules/ajv/dist/compile/index.js
-var require_compile = __commonJS({
-  "node_modules/ajv/dist/compile/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.resolveSchema = exports2.getCompilingSchema = exports2.resolveRef = exports2.compileSchema = exports2.SchemaEnv = void 0;
-    var codegen_1 = require_codegen();
-    var validation_error_1 = require_validation_error();
-    var names_1 = require_names();
-    var resolve_1 = require_resolve();
-    var util_1 = require_util();
-    var validate_1 = require_validate();
-    var SchemaEnv = class {
-      constructor(env10) {
-        var _a2;
-        this.refs = {};
-        this.dynamicAnchors = {};
-        let schema;
-        if (typeof env10.schema == "object")
-          schema = env10.schema;
-        this.schema = env10.schema;
-        this.schemaId = env10.schemaId;
-        this.root = env10.root || this;
-        this.baseId = (_a2 = env10.baseId) !== null && _a2 !== void 0 ? _a2 : (0, resolve_1.normalizeId)(schema === null || schema === void 0 ? void 0 : schema[env10.schemaId || "$id"]);
-        this.schemaPath = env10.schemaPath;
-        this.localRefs = env10.localRefs;
-        this.meta = env10.meta;
-        this.$async = schema === null || schema === void 0 ? void 0 : schema.$async;
-        this.refs = {};
-      }
-    };
-    exports2.SchemaEnv = SchemaEnv;
-    function compileSchema(sch) {
-      const _sch = getCompilingSchema.call(this, sch);
-      if (_sch)
-        return _sch;
-      const rootId = (0, resolve_1.getFullPath)(this.opts.uriResolver, sch.root.baseId);
-      const { es5, lines } = this.opts.code;
-      const { ownProperties } = this.opts;
-      const gen = new codegen_1.CodeGen(this.scope, { es5, lines, ownProperties });
-      let _ValidationError;
-      if (sch.$async) {
-        _ValidationError = gen.scopeValue("Error", {
-          ref: validation_error_1.default,
-          code: (0, codegen_1._)`require("ajv/dist/runtime/validation_error").default`
-        });
-      }
-      const validateName = gen.scopeName("validate");
-      sch.validateName = validateName;
-      const schemaCxt = {
-        gen,
-        allErrors: this.opts.allErrors,
-        data: names_1.default.data,
-        parentData: names_1.default.parentData,
-        parentDataProperty: names_1.default.parentDataProperty,
-        dataNames: [names_1.default.data],
-        dataPathArr: [codegen_1.nil],
-        // TODO can its length be used as dataLevel if nil is removed?
-        dataLevel: 0,
-        dataTypes: [],
-        definedProperties: /* @__PURE__ */ new Set(),
-        topSchemaRef: gen.scopeValue("schema", this.opts.code.source === true ? { ref: sch.schema, code: (0, codegen_1.stringify)(sch.schema) } : { ref: sch.schema }),
-        validateName,
-        ValidationError: _ValidationError,
-        schema: sch.schema,
-        schemaEnv: sch,
-        rootId,
-        baseId: sch.baseId || rootId,
-        schemaPath: codegen_1.nil,
-        errSchemaPath: sch.schemaPath || (this.opts.jtd ? "" : "#"),
-        errorPath: (0, codegen_1._)`""`,
-        opts: this.opts,
-        self: this
-      };
-      let sourceCode;
-      try {
-        this._compilations.add(sch);
-        (0, validate_1.validateFunctionCode)(schemaCxt);
-        gen.optimize(this.opts.code.optimize);
-        const validateCode = gen.toString();
-        sourceCode = `${gen.scopeRefs(names_1.default.scope)}return ${validateCode}`;
-        if (this.opts.code.process)
-          sourceCode = this.opts.code.process(sourceCode, sch);
-        const makeValidate = new Function(`${names_1.default.self}`, `${names_1.default.scope}`, sourceCode);
-        const validate = makeValidate(this, this.scope.get());
-        this.scope.value(validateName, { ref: validate });
-        validate.errors = null;
-        validate.schema = sch.schema;
-        validate.schemaEnv = sch;
-        if (sch.$async)
-          validate.$async = true;
-        if (this.opts.code.source === true) {
-          validate.source = { validateName, validateCode, scopeValues: gen._values };
-        }
-        if (this.opts.unevaluated) {
-          const { props, items } = schemaCxt;
-          validate.evaluated = {
-            props: props instanceof codegen_1.Name ? void 0 : props,
-            items: items instanceof codegen_1.Name ? void 0 : items,
-            dynamicProps: props instanceof codegen_1.Name,
-            dynamicItems: items instanceof codegen_1.Name
-          };
-          if (validate.source)
-            validate.source.evaluated = (0, codegen_1.stringify)(validate.evaluated);
-        }
-        sch.validate = validate;
-        return sch;
-      } catch (e) {
-        delete sch.validate;
-        delete sch.validateName;
-        if (sourceCode)
-          this.logger.error("Error compiling schema, function code:", sourceCode);
-        throw e;
-      } finally {
-        this._compilations.delete(sch);
-      }
-    }
-    exports2.compileSchema = compileSchema;
-    function resolveRef(root, baseId, ref) {
-      var _a2;
-      ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, ref);
-      const schOrFunc = root.refs[ref];
-      if (schOrFunc)
-        return schOrFunc;
-      let _sch = resolve7.call(this, root, ref);
-      if (_sch === void 0) {
-        const schema = (_a2 = root.localRefs) === null || _a2 === void 0 ? void 0 : _a2[ref];
-        const { schemaId } = this.opts;
-        if (schema)
-          _sch = new SchemaEnv({ schema, schemaId, root, baseId });
-      }
-      if (_sch === void 0)
-        return;
-      return root.refs[ref] = inlineOrCompile.call(this, _sch);
-    }
-    exports2.resolveRef = resolveRef;
-    function inlineOrCompile(sch) {
-      if ((0, resolve_1.inlineRef)(sch.schema, this.opts.inlineRefs))
-        return sch.schema;
-      return sch.validate ? sch : compileSchema.call(this, sch);
-    }
-    function getCompilingSchema(schEnv) {
-      for (const sch of this._compilations) {
-        if (sameSchemaEnv(sch, schEnv))
-          return sch;
-      }
-    }
-    exports2.getCompilingSchema = getCompilingSchema;
-    function sameSchemaEnv(s1, s2) {
-      return s1.schema === s2.schema && s1.root === s2.root && s1.baseId === s2.baseId;
-    }
-    function resolve7(root, ref) {
-      let sch;
-      while (typeof (sch = this.refs[ref]) == "string")
-        ref = sch;
-      return sch || this.schemas[ref] || resolveSchema.call(this, root, ref);
-    }
-    function resolveSchema(root, ref) {
-      const p2 = this.opts.uriResolver.parse(ref);
-      const refPath = (0, resolve_1._getFullPath)(this.opts.uriResolver, p2);
-      let baseId = (0, resolve_1.getFullPath)(this.opts.uriResolver, root.baseId, void 0);
-      if (Object.keys(root.schema).length > 0 && refPath === baseId) {
-        return getJsonPointer.call(this, p2, root);
-      }
-      const id = (0, resolve_1.normalizeId)(refPath);
-      const schOrRef = this.refs[id] || this.schemas[id];
-      if (typeof schOrRef == "string") {
-        const sch = resolveSchema.call(this, root, schOrRef);
-        if (typeof (sch === null || sch === void 0 ? void 0 : sch.schema) !== "object")
-          return;
-        return getJsonPointer.call(this, p2, sch);
-      }
-      if (typeof (schOrRef === null || schOrRef === void 0 ? void 0 : schOrRef.schema) !== "object")
-        return;
-      if (!schOrRef.validate)
-        compileSchema.call(this, schOrRef);
-      if (id === (0, resolve_1.normalizeId)(ref)) {
-        const { schema } = schOrRef;
-        const { schemaId } = this.opts;
-        const schId = schema[schemaId];
-        if (schId)
-          baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
-        return new SchemaEnv({ schema, schemaId, root, baseId });
-      }
-      return getJsonPointer.call(this, p2, schOrRef);
-    }
-    exports2.resolveSchema = resolveSchema;
-    var PREVENT_SCOPE_CHANGE = /* @__PURE__ */ new Set([
-      "properties",
-      "patternProperties",
-      "enum",
-      "dependencies",
-      "definitions"
-    ]);
-    function getJsonPointer(parsedRef, { baseId, schema, root }) {
-      var _a2;
-      if (((_a2 = parsedRef.fragment) === null || _a2 === void 0 ? void 0 : _a2[0]) !== "/")
-        return;
-      for (const part of parsedRef.fragment.slice(1).split("/")) {
-        if (typeof schema === "boolean")
-          return;
-        const partSchema = schema[(0, util_1.unescapeFragment)(part)];
-        if (partSchema === void 0)
-          return;
-        schema = partSchema;
-        const schId = typeof schema === "object" && schema[this.opts.schemaId];
-        if (!PREVENT_SCOPE_CHANGE.has(part) && schId) {
-          baseId = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schId);
-        }
-      }
-      let env10;
-      if (typeof schema != "boolean" && schema.$ref && !(0, util_1.schemaHasRulesButRef)(schema, this.RULES)) {
-        const $ref = (0, resolve_1.resolveUrl)(this.opts.uriResolver, baseId, schema.$ref);
-        env10 = resolveSchema.call(this, root, $ref);
-      }
-      const { schemaId } = this.opts;
-      env10 = env10 || new SchemaEnv({ schema, schemaId, root, baseId });
-      if (env10.schema !== env10.root.schema)
-        return env10;
-      return void 0;
-    }
-  }
-});
-
-// node_modules/ajv/dist/refs/data.json
-var require_data = __commonJS({
-  "node_modules/ajv/dist/refs/data.json"(exports2, module2) {
-    module2.exports = {
-      $id: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#",
-      description: "Meta-schema for $data reference (JSON AnySchema extension proposal)",
-      type: "object",
-      required: ["$data"],
-      properties: {
-        $data: {
-          type: "string",
-          anyOf: [{ format: "relative-json-pointer" }, { format: "json-pointer" }]
-        }
-      },
-      additionalProperties: false
-    };
-  }
-});
-
-// node_modules/fast-uri/lib/utils.js
-var require_utils = __commonJS({
-  "node_modules/fast-uri/lib/utils.js"(exports2, module2) {
-    "use strict";
-    var isUUID = RegExp.prototype.test.bind(/^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/iu);
-    var isIPv4 = RegExp.prototype.test.bind(/^(?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)$/u);
-    function stringArrayToHexStripped(input) {
-      let acc = "";
-      let code = 0;
-      let i2 = 0;
-      for (i2 = 0; i2 < input.length; i2++) {
-        code = input[i2].charCodeAt(0);
-        if (code === 48) {
-          continue;
-        }
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
-          return "";
-        }
-        acc += input[i2];
-        break;
-      }
-      for (i2 += 1; i2 < input.length; i2++) {
-        code = input[i2].charCodeAt(0);
-        if (!(code >= 48 && code <= 57 || code >= 65 && code <= 70 || code >= 97 && code <= 102)) {
-          return "";
-        }
-        acc += input[i2];
-      }
-      return acc;
-    }
-    var nonSimpleDomain = RegExp.prototype.test.bind(/[^!"$&'()*+,\-.;=_`a-z{}~]/u);
-    function consumeIsZone(buffer) {
-      buffer.length = 0;
-      return true;
-    }
-    function consumeHextets(buffer, address, output) {
-      if (buffer.length) {
-        const hex = stringArrayToHexStripped(buffer);
-        if (hex !== "") {
-          address.push(hex);
-        } else {
-          output.error = true;
-          return false;
-        }
-        buffer.length = 0;
-      }
-      return true;
-    }
-    function getIPV6(input) {
-      let tokenCount = 0;
-      const output = { error: false, address: "", zone: "" };
-      const address = [];
-      const buffer = [];
-      let endipv6Encountered = false;
-      let endIpv6 = false;
-      let consume = consumeHextets;
-      for (let i2 = 0; i2 < input.length; i2++) {
-        const cursor = input[i2];
-        if (cursor === "[" || cursor === "]") {
-          continue;
-        }
-        if (cursor === ":") {
-          if (endipv6Encountered === true) {
-            endIpv6 = true;
-          }
-          if (!consume(buffer, address, output)) {
-            break;
-          }
-          if (++tokenCount > 7) {
-            output.error = true;
-            break;
-          }
-          if (i2 > 0 && input[i2 - 1] === ":") {
-            endipv6Encountered = true;
-          }
-          address.push(":");
-          continue;
-        } else if (cursor === "%") {
-          if (!consume(buffer, address, output)) {
-            break;
-          }
-          consume = consumeIsZone;
-        } else {
-          buffer.push(cursor);
-          continue;
-        }
-      }
-      if (buffer.length) {
-        if (consume === consumeIsZone) {
-          output.zone = buffer.join("");
-        } else if (endIpv6) {
-          address.push(buffer.join(""));
-        } else {
-          address.push(stringArrayToHexStripped(buffer));
-        }
-      }
-      output.address = address.join("");
-      return output;
-    }
-    function normalizeIPv6(host) {
-      if (findToken(host, ":") < 2) {
-        return { host, isIPV6: false };
-      }
-      const ipv6 = getIPV6(host);
-      if (!ipv6.error) {
-        let newHost = ipv6.address;
-        let escapedHost = ipv6.address;
-        if (ipv6.zone) {
-          newHost += "%" + ipv6.zone;
-          escapedHost += "%25" + ipv6.zone;
-        }
-        return { host: newHost, isIPV6: true, escapedHost };
-      } else {
-        return { host, isIPV6: false };
-      }
-    }
-    function findToken(str, token) {
-      let ind = 0;
-      for (let i2 = 0; i2 < str.length; i2++) {
-        if (str[i2] === token)
-          ind++;
-      }
-      return ind;
-    }
-    function removeDotSegments(path43) {
-      let input = path43;
-      const output = [];
-      let nextSlash = -1;
-      let len = 0;
-      while (len = input.length) {
-        if (len === 1) {
-          if (input === ".") {
-            break;
-          } else if (input === "/") {
-            output.push("/");
-            break;
-          } else {
-            output.push(input);
-            break;
-          }
-        } else if (len === 2) {
-          if (input[0] === ".") {
-            if (input[1] === ".") {
-              break;
-            } else if (input[1] === "/") {
-              input = input.slice(2);
-              continue;
-            }
-          } else if (input[0] === "/") {
-            if (input[1] === "." || input[1] === "/") {
-              output.push("/");
-              break;
-            }
-          }
-        } else if (len === 3) {
-          if (input === "/..") {
-            if (output.length !== 0) {
-              output.pop();
-            }
-            output.push("/");
-            break;
-          }
-        }
-        if (input[0] === ".") {
-          if (input[1] === ".") {
-            if (input[2] === "/") {
-              input = input.slice(3);
-              continue;
-            }
-          } else if (input[1] === "/") {
-            input = input.slice(2);
-            continue;
-          }
-        } else if (input[0] === "/") {
-          if (input[1] === ".") {
-            if (input[2] === "/") {
-              input = input.slice(2);
-              continue;
-            } else if (input[2] === ".") {
-              if (input[3] === "/") {
-                input = input.slice(3);
-                if (output.length !== 0) {
-                  output.pop();
-                }
-                continue;
-              }
-            }
-          }
-        }
-        if ((nextSlash = input.indexOf("/", 1)) === -1) {
-          output.push(input);
-          break;
-        } else {
-          output.push(input.slice(0, nextSlash));
-          input = input.slice(nextSlash);
-        }
-      }
-      return output.join("");
-    }
-    function normalizeComponentEncoding(component, esc2) {
-      const func = esc2 !== true ? escape : unescape;
-      if (component.scheme !== void 0) {
-        component.scheme = func(component.scheme);
-      }
-      if (component.userinfo !== void 0) {
-        component.userinfo = func(component.userinfo);
-      }
-      if (component.host !== void 0) {
-        component.host = func(component.host);
-      }
-      if (component.path !== void 0) {
-        component.path = func(component.path);
-      }
-      if (component.query !== void 0) {
-        component.query = func(component.query);
-      }
-      if (component.fragment !== void 0) {
-        component.fragment = func(component.fragment);
-      }
-      return component;
-    }
-    function recomposeAuthority(component) {
-      const uriTokens = [];
-      if (component.userinfo !== void 0) {
-        uriTokens.push(component.userinfo);
-        uriTokens.push("@");
-      }
-      if (component.host !== void 0) {
-        let host = unescape(component.host);
-        if (!isIPv4(host)) {
-          const ipV6res = normalizeIPv6(host);
-          if (ipV6res.isIPV6 === true) {
-            host = `[${ipV6res.escapedHost}]`;
-          } else {
-            host = component.host;
-          }
-        }
-        uriTokens.push(host);
-      }
-      if (typeof component.port === "number" || typeof component.port === "string") {
-        uriTokens.push(":");
-        uriTokens.push(String(component.port));
-      }
-      return uriTokens.length ? uriTokens.join("") : void 0;
-    }
-    module2.exports = {
-      nonSimpleDomain,
-      recomposeAuthority,
-      normalizeComponentEncoding,
-      removeDotSegments,
-      isIPv4,
-      isUUID,
-      normalizeIPv6,
-      stringArrayToHexStripped
-    };
-  }
-});
-
-// node_modules/fast-uri/lib/schemes.js
-var require_schemes = __commonJS({
-  "node_modules/fast-uri/lib/schemes.js"(exports2, module2) {
-    "use strict";
-    var { isUUID } = require_utils();
-    var URN_REG = /([\da-z][\d\-a-z]{0,31}):((?:[\w!$'()*+,\-.:;=@]|%[\da-f]{2})+)/iu;
-    var supportedSchemeNames = (
-      /** @type {const} */
-      [
-        "http",
-        "https",
-        "ws",
-        "wss",
-        "urn",
-        "urn:uuid"
-      ]
-    );
-    function isValidSchemeName(name) {
-      return supportedSchemeNames.indexOf(
-        /** @type {*} */
-        name
-      ) !== -1;
-    }
-    function wsIsSecure(wsComponent) {
-      if (wsComponent.secure === true) {
-        return true;
-      } else if (wsComponent.secure === false) {
-        return false;
-      } else if (wsComponent.scheme) {
-        return wsComponent.scheme.length === 3 && (wsComponent.scheme[0] === "w" || wsComponent.scheme[0] === "W") && (wsComponent.scheme[1] === "s" || wsComponent.scheme[1] === "S") && (wsComponent.scheme[2] === "s" || wsComponent.scheme[2] === "S");
-      } else {
-        return false;
-      }
-    }
-    function httpParse(component) {
-      if (!component.host) {
-        component.error = component.error || "HTTP URIs must have a host.";
-      }
-      return component;
-    }
-    function httpSerialize(component) {
-      const secure = String(component.scheme).toLowerCase() === "https";
-      if (component.port === (secure ? 443 : 80) || component.port === "") {
-        component.port = void 0;
-      }
-      if (!component.path) {
-        component.path = "/";
-      }
-      return component;
-    }
-    function wsParse(wsComponent) {
-      wsComponent.secure = wsIsSecure(wsComponent);
-      wsComponent.resourceName = (wsComponent.path || "/") + (wsComponent.query ? "?" + wsComponent.query : "");
-      wsComponent.path = void 0;
-      wsComponent.query = void 0;
-      return wsComponent;
-    }
-    function wsSerialize(wsComponent) {
-      if (wsComponent.port === (wsIsSecure(wsComponent) ? 443 : 80) || wsComponent.port === "") {
-        wsComponent.port = void 0;
-      }
-      if (typeof wsComponent.secure === "boolean") {
-        wsComponent.scheme = wsComponent.secure ? "wss" : "ws";
-        wsComponent.secure = void 0;
-      }
-      if (wsComponent.resourceName) {
-        const [path43, query] = wsComponent.resourceName.split("?");
-        wsComponent.path = path43 && path43 !== "/" ? path43 : void 0;
-        wsComponent.query = query;
-        wsComponent.resourceName = void 0;
-      }
-      wsComponent.fragment = void 0;
-      return wsComponent;
-    }
-    function urnParse(urnComponent, options) {
-      if (!urnComponent.path) {
-        urnComponent.error = "URN can not be parsed";
-        return urnComponent;
-      }
-      const matches = urnComponent.path.match(URN_REG);
-      if (matches) {
-        const scheme = options.scheme || urnComponent.scheme || "urn";
-        urnComponent.nid = matches[1].toLowerCase();
-        urnComponent.nss = matches[2];
-        const urnScheme = `${scheme}:${options.nid || urnComponent.nid}`;
-        const schemeHandler = getSchemeHandler(urnScheme);
-        urnComponent.path = void 0;
-        if (schemeHandler) {
-          urnComponent = schemeHandler.parse(urnComponent, options);
-        }
-      } else {
-        urnComponent.error = urnComponent.error || "URN can not be parsed.";
-      }
-      return urnComponent;
-    }
-    function urnSerialize(urnComponent, options) {
-      if (urnComponent.nid === void 0) {
-        throw new Error("URN without nid cannot be serialized");
-      }
-      const scheme = options.scheme || urnComponent.scheme || "urn";
-      const nid = urnComponent.nid.toLowerCase();
-      const urnScheme = `${scheme}:${options.nid || nid}`;
-      const schemeHandler = getSchemeHandler(urnScheme);
-      if (schemeHandler) {
-        urnComponent = schemeHandler.serialize(urnComponent, options);
-      }
-      const uriComponent = urnComponent;
-      const nss = urnComponent.nss;
-      uriComponent.path = `${nid || options.nid}:${nss}`;
-      options.skipEscape = true;
-      return uriComponent;
-    }
-    function urnuuidParse(urnComponent, options) {
-      const uuidComponent = urnComponent;
-      uuidComponent.uuid = uuidComponent.nss;
-      uuidComponent.nss = void 0;
-      if (!options.tolerant && (!uuidComponent.uuid || !isUUID(uuidComponent.uuid))) {
-        uuidComponent.error = uuidComponent.error || "UUID is not valid.";
-      }
-      return uuidComponent;
-    }
-    function urnuuidSerialize(uuidComponent) {
-      const urnComponent = uuidComponent;
-      urnComponent.nss = (uuidComponent.uuid || "").toLowerCase();
-      return urnComponent;
-    }
-    var http = (
-      /** @type {SchemeHandler} */
-      {
-        scheme: "http",
-        domainHost: true,
-        parse: httpParse,
-        serialize: httpSerialize
-      }
-    );
-    var https = (
-      /** @type {SchemeHandler} */
-      {
-        scheme: "https",
-        domainHost: http.domainHost,
-        parse: httpParse,
-        serialize: httpSerialize
-      }
-    );
-    var ws = (
-      /** @type {SchemeHandler} */
-      {
-        scheme: "ws",
-        domainHost: true,
-        parse: wsParse,
-        serialize: wsSerialize
-      }
-    );
-    var wss = (
-      /** @type {SchemeHandler} */
-      {
-        scheme: "wss",
-        domainHost: ws.domainHost,
-        parse: ws.parse,
-        serialize: ws.serialize
-      }
-    );
-    var urn = (
-      /** @type {SchemeHandler} */
-      {
-        scheme: "urn",
-        parse: urnParse,
-        serialize: urnSerialize,
-        skipNormalize: true
-      }
-    );
-    var urnuuid = (
-      /** @type {SchemeHandler} */
-      {
-        scheme: "urn:uuid",
-        parse: urnuuidParse,
-        serialize: urnuuidSerialize,
-        skipNormalize: true
-      }
-    );
-    var SCHEMES = (
-      /** @type {Record<SchemeName, SchemeHandler>} */
-      {
-        http,
-        https,
-        ws,
-        wss,
-        urn,
-        "urn:uuid": urnuuid
-      }
-    );
-    Object.setPrototypeOf(SCHEMES, null);
-    function getSchemeHandler(scheme) {
-      return scheme && (SCHEMES[
-        /** @type {SchemeName} */
-        scheme
-      ] || SCHEMES[
-        /** @type {SchemeName} */
-        scheme.toLowerCase()
-      ]) || void 0;
-    }
-    module2.exports = {
-      wsIsSecure,
-      SCHEMES,
-      isValidSchemeName,
-      getSchemeHandler
-    };
-  }
-});
-
-// node_modules/fast-uri/index.js
-var require_fast_uri = __commonJS({
-  "node_modules/fast-uri/index.js"(exports2, module2) {
-    "use strict";
-    var { normalizeIPv6, removeDotSegments, recomposeAuthority, normalizeComponentEncoding, isIPv4, nonSimpleDomain } = require_utils();
-    var { SCHEMES, getSchemeHandler } = require_schemes();
-    function normalize2(uri, options) {
-      if (typeof uri === "string") {
-        uri = /** @type {T} */
-        serialize(parse4(uri, options), options);
-      } else if (typeof uri === "object") {
-        uri = /** @type {T} */
-        parse4(serialize(uri, options), options);
-      }
-      return uri;
-    }
-    function resolve7(baseURI, relativeURI, options) {
-      const schemelessOptions = options ? Object.assign({ scheme: "null" }, options) : { scheme: "null" };
-      const resolved = resolveComponent(parse4(baseURI, schemelessOptions), parse4(relativeURI, schemelessOptions), schemelessOptions, true);
-      schemelessOptions.skipEscape = true;
-      return serialize(resolved, schemelessOptions);
-    }
-    function resolveComponent(base, relative6, options, skipNormalization) {
-      const target = {};
-      if (!skipNormalization) {
-        base = parse4(serialize(base, options), options);
-        relative6 = parse4(serialize(relative6, options), options);
-      }
-      options = options || {};
-      if (!options.tolerant && relative6.scheme) {
-        target.scheme = relative6.scheme;
-        target.userinfo = relative6.userinfo;
-        target.host = relative6.host;
-        target.port = relative6.port;
-        target.path = removeDotSegments(relative6.path || "");
-        target.query = relative6.query;
-      } else {
-        if (relative6.userinfo !== void 0 || relative6.host !== void 0 || relative6.port !== void 0) {
-          target.userinfo = relative6.userinfo;
-          target.host = relative6.host;
-          target.port = relative6.port;
-          target.path = removeDotSegments(relative6.path || "");
-          target.query = relative6.query;
-        } else {
-          if (!relative6.path) {
-            target.path = base.path;
-            if (relative6.query !== void 0) {
-              target.query = relative6.query;
-            } else {
-              target.query = base.query;
-            }
-          } else {
-            if (relative6.path[0] === "/") {
-              target.path = removeDotSegments(relative6.path);
-            } else {
-              if ((base.userinfo !== void 0 || base.host !== void 0 || base.port !== void 0) && !base.path) {
-                target.path = "/" + relative6.path;
-              } else if (!base.path) {
-                target.path = relative6.path;
-              } else {
-                target.path = base.path.slice(0, base.path.lastIndexOf("/") + 1) + relative6.path;
-              }
-              target.path = removeDotSegments(target.path);
-            }
-            target.query = relative6.query;
-          }
-          target.userinfo = base.userinfo;
-          target.host = base.host;
-          target.port = base.port;
-        }
-        target.scheme = base.scheme;
-      }
-      target.fragment = relative6.fragment;
-      return target;
-    }
-    function equal(uriA, uriB, options) {
-      if (typeof uriA === "string") {
-        uriA = unescape(uriA);
-        uriA = serialize(normalizeComponentEncoding(parse4(uriA, options), true), { ...options, skipEscape: true });
-      } else if (typeof uriA === "object") {
-        uriA = serialize(normalizeComponentEncoding(uriA, true), { ...options, skipEscape: true });
-      }
-      if (typeof uriB === "string") {
-        uriB = unescape(uriB);
-        uriB = serialize(normalizeComponentEncoding(parse4(uriB, options), true), { ...options, skipEscape: true });
-      } else if (typeof uriB === "object") {
-        uriB = serialize(normalizeComponentEncoding(uriB, true), { ...options, skipEscape: true });
-      }
-      return uriA.toLowerCase() === uriB.toLowerCase();
-    }
-    function serialize(cmpts, opts) {
-      const component = {
-        host: cmpts.host,
-        scheme: cmpts.scheme,
-        userinfo: cmpts.userinfo,
-        port: cmpts.port,
-        path: cmpts.path,
-        query: cmpts.query,
-        nid: cmpts.nid,
-        nss: cmpts.nss,
-        uuid: cmpts.uuid,
-        fragment: cmpts.fragment,
-        reference: cmpts.reference,
-        resourceName: cmpts.resourceName,
-        secure: cmpts.secure,
-        error: ""
-      };
-      const options = Object.assign({}, opts);
-      const uriTokens = [];
-      const schemeHandler = getSchemeHandler(options.scheme || component.scheme);
-      if (schemeHandler && schemeHandler.serialize)
-        schemeHandler.serialize(component, options);
-      if (component.path !== void 0) {
-        if (!options.skipEscape) {
-          component.path = escape(component.path);
-          if (component.scheme !== void 0) {
-            component.path = component.path.split("%3A").join(":");
-          }
-        } else {
-          component.path = unescape(component.path);
-        }
-      }
-      if (options.reference !== "suffix" && component.scheme) {
-        uriTokens.push(component.scheme, ":");
-      }
-      const authority = recomposeAuthority(component);
-      if (authority !== void 0) {
-        if (options.reference !== "suffix") {
-          uriTokens.push("//");
-        }
-        uriTokens.push(authority);
-        if (component.path && component.path[0] !== "/") {
-          uriTokens.push("/");
-        }
-      }
-      if (component.path !== void 0) {
-        let s = component.path;
-        if (!options.absolutePath && (!schemeHandler || !schemeHandler.absolutePath)) {
-          s = removeDotSegments(s);
-        }
-        if (authority === void 0 && s[0] === "/" && s[1] === "/") {
-          s = "/%2F" + s.slice(2);
-        }
-        uriTokens.push(s);
-      }
-      if (component.query !== void 0) {
-        uriTokens.push("?", component.query);
-      }
-      if (component.fragment !== void 0) {
-        uriTokens.push("#", component.fragment);
-      }
-      return uriTokens.join("");
-    }
-    var URI_PARSE = /^(?:([^#/:?]+):)?(?:\/\/((?:([^#/?@]*)@)?(\[[^#/?\]]+\]|[^#/:?]*)(?::(\d*))?))?([^#?]*)(?:\?([^#]*))?(?:#((?:.|[\n\r])*))?/u;
-    function parse4(uri, opts) {
-      const options = Object.assign({}, opts);
-      const parsed = {
-        scheme: void 0,
-        userinfo: void 0,
-        host: "",
-        port: void 0,
-        path: "",
-        query: void 0,
-        fragment: void 0
-      };
-      let isIP = false;
-      if (options.reference === "suffix") {
-        if (options.scheme) {
-          uri = options.scheme + ":" + uri;
-        } else {
-          uri = "//" + uri;
-        }
-      }
-      const matches = uri.match(URI_PARSE);
-      if (matches) {
-        parsed.scheme = matches[1];
-        parsed.userinfo = matches[3];
-        parsed.host = matches[4];
-        parsed.port = parseInt(matches[5], 10);
-        parsed.path = matches[6] || "";
-        parsed.query = matches[7];
-        parsed.fragment = matches[8];
-        if (isNaN(parsed.port)) {
-          parsed.port = matches[5];
-        }
-        if (parsed.host) {
-          const ipv4result = isIPv4(parsed.host);
-          if (ipv4result === false) {
-            const ipv6result = normalizeIPv6(parsed.host);
-            parsed.host = ipv6result.host.toLowerCase();
-            isIP = ipv6result.isIPV6;
-          } else {
-            isIP = true;
-          }
-        }
-        if (parsed.scheme === void 0 && parsed.userinfo === void 0 && parsed.host === void 0 && parsed.port === void 0 && parsed.query === void 0 && !parsed.path) {
-          parsed.reference = "same-document";
-        } else if (parsed.scheme === void 0) {
-          parsed.reference = "relative";
-        } else if (parsed.fragment === void 0) {
-          parsed.reference = "absolute";
-        } else {
-          parsed.reference = "uri";
-        }
-        if (options.reference && options.reference !== "suffix" && options.reference !== parsed.reference) {
-          parsed.error = parsed.error || "URI is not a " + options.reference + " reference.";
-        }
-        const schemeHandler = getSchemeHandler(options.scheme || parsed.scheme);
-        if (!options.unicodeSupport && (!schemeHandler || !schemeHandler.unicodeSupport)) {
-          if (parsed.host && (options.domainHost || schemeHandler && schemeHandler.domainHost) && isIP === false && nonSimpleDomain(parsed.host)) {
-            try {
-              parsed.host = URL.domainToASCII(parsed.host.toLowerCase());
-            } catch (e) {
-              parsed.error = parsed.error || "Host's domain name can not be converted to ASCII: " + e;
-            }
-          }
-        }
-        if (!schemeHandler || schemeHandler && !schemeHandler.skipNormalize) {
-          if (uri.indexOf("%") !== -1) {
-            if (parsed.scheme !== void 0) {
-              parsed.scheme = unescape(parsed.scheme);
-            }
-            if (parsed.host !== void 0) {
-              parsed.host = unescape(parsed.host);
-            }
-          }
-          if (parsed.path) {
-            parsed.path = escape(unescape(parsed.path));
-          }
-          if (parsed.fragment) {
-            parsed.fragment = encodeURI(decodeURIComponent(parsed.fragment));
-          }
-        }
-        if (schemeHandler && schemeHandler.parse) {
-          schemeHandler.parse(parsed, options);
-        }
-      } else {
-        parsed.error = parsed.error || "URI can not be parsed.";
-      }
-      return parsed;
-    }
-    var fastUri = {
-      SCHEMES,
-      normalize: normalize2,
-      resolve: resolve7,
-      resolveComponent,
-      equal,
-      serialize,
-      parse: parse4
-    };
-    module2.exports = fastUri;
-    module2.exports.default = fastUri;
-    module2.exports.fastUri = fastUri;
-  }
-});
-
-// node_modules/ajv/dist/runtime/uri.js
-var require_uri = __commonJS({
-  "node_modules/ajv/dist/runtime/uri.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var uri = require_fast_uri();
-    uri.code = 'require("ajv/dist/runtime/uri").default';
-    exports2.default = uri;
-  }
-});
-
-// node_modules/ajv/dist/core.js
-var require_core = __commonJS({
-  "node_modules/ajv/dist/core.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.CodeGen = exports2.Name = exports2.nil = exports2.stringify = exports2.str = exports2._ = exports2.KeywordCxt = void 0;
-    var validate_1 = require_validate();
-    Object.defineProperty(exports2, "KeywordCxt", { enumerable: true, get: function() {
-      return validate_1.KeywordCxt;
-    } });
-    var codegen_1 = require_codegen();
-    Object.defineProperty(exports2, "_", { enumerable: true, get: function() {
-      return codegen_1._;
-    } });
-    Object.defineProperty(exports2, "str", { enumerable: true, get: function() {
-      return codegen_1.str;
-    } });
-    Object.defineProperty(exports2, "stringify", { enumerable: true, get: function() {
-      return codegen_1.stringify;
-    } });
-    Object.defineProperty(exports2, "nil", { enumerable: true, get: function() {
-      return codegen_1.nil;
-    } });
-    Object.defineProperty(exports2, "Name", { enumerable: true, get: function() {
-      return codegen_1.Name;
-    } });
-    Object.defineProperty(exports2, "CodeGen", { enumerable: true, get: function() {
-      return codegen_1.CodeGen;
-    } });
-    var validation_error_1 = require_validation_error();
-    var ref_error_1 = require_ref_error();
-    var rules_1 = require_rules();
-    var compile_1 = require_compile();
-    var codegen_2 = require_codegen();
-    var resolve_1 = require_resolve();
-    var dataType_1 = require_dataType();
-    var util_1 = require_util();
-    var $dataRefSchema = require_data();
-    var uri_1 = require_uri();
-    var defaultRegExp = (str, flags) => new RegExp(str, flags);
-    defaultRegExp.code = "new RegExp";
-    var META_IGNORE_OPTIONS = ["removeAdditional", "useDefaults", "coerceTypes"];
-    var EXT_SCOPE_NAMES = /* @__PURE__ */ new Set([
-      "validate",
-      "serialize",
-      "parse",
-      "wrapper",
-      "root",
-      "schema",
-      "keyword",
-      "pattern",
-      "formats",
-      "validate$data",
-      "func",
-      "obj",
-      "Error"
-    ]);
-    var removedOptions = {
-      errorDataPath: "",
-      format: "`validateFormats: false` can be used instead.",
-      nullable: '"nullable" keyword is supported by default.',
-      jsonPointers: "Deprecated jsPropertySyntax can be used instead.",
-      extendRefs: "Deprecated ignoreKeywordsWithRef can be used instead.",
-      missingRefs: "Pass empty schema with $id that should be ignored to ajv.addSchema.",
-      processCode: "Use option `code: {process: (code, schemaEnv: object) => string}`",
-      sourceCode: "Use option `code: {source: true}`",
-      strictDefaults: "It is default now, see option `strict`.",
-      strictKeywords: "It is default now, see option `strict`.",
-      uniqueItems: '"uniqueItems" keyword is always validated.',
-      unknownFormats: "Disable strict mode or pass `true` to `ajv.addFormat` (or `formats` option).",
-      cache: "Map is used as cache, schema object as key.",
-      serialize: "Map is used as cache, schema object as key.",
-      ajvErrors: "It is default now."
-    };
-    var deprecatedOptions = {
-      ignoreKeywordsWithRef: "",
-      jsPropertySyntax: "",
-      unicode: '"minLength"/"maxLength" account for unicode characters by default.'
-    };
-    var MAX_EXPRESSION = 200;
-    function requiredOptions(o2) {
-      var _a2, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q, _r, _s, _t, _u, _v, _w, _x, _y, _z, _0;
-      const s = o2.strict;
-      const _optz = (_a2 = o2.code) === null || _a2 === void 0 ? void 0 : _a2.optimize;
-      const optimize = _optz === true || _optz === void 0 ? 1 : _optz || 0;
-      const regExp = (_c = (_b = o2.code) === null || _b === void 0 ? void 0 : _b.regExp) !== null && _c !== void 0 ? _c : defaultRegExp;
-      const uriResolver = (_d = o2.uriResolver) !== null && _d !== void 0 ? _d : uri_1.default;
-      return {
-        strictSchema: (_f = (_e = o2.strictSchema) !== null && _e !== void 0 ? _e : s) !== null && _f !== void 0 ? _f : true,
-        strictNumbers: (_h = (_g = o2.strictNumbers) !== null && _g !== void 0 ? _g : s) !== null && _h !== void 0 ? _h : true,
-        strictTypes: (_k = (_j = o2.strictTypes) !== null && _j !== void 0 ? _j : s) !== null && _k !== void 0 ? _k : "log",
-        strictTuples: (_m = (_l = o2.strictTuples) !== null && _l !== void 0 ? _l : s) !== null && _m !== void 0 ? _m : "log",
-        strictRequired: (_p = (_o = o2.strictRequired) !== null && _o !== void 0 ? _o : s) !== null && _p !== void 0 ? _p : false,
-        code: o2.code ? { ...o2.code, optimize, regExp } : { optimize, regExp },
-        loopRequired: (_q = o2.loopRequired) !== null && _q !== void 0 ? _q : MAX_EXPRESSION,
-        loopEnum: (_r = o2.loopEnum) !== null && _r !== void 0 ? _r : MAX_EXPRESSION,
-        meta: (_s = o2.meta) !== null && _s !== void 0 ? _s : true,
-        messages: (_t = o2.messages) !== null && _t !== void 0 ? _t : true,
-        inlineRefs: (_u = o2.inlineRefs) !== null && _u !== void 0 ? _u : true,
-        schemaId: (_v = o2.schemaId) !== null && _v !== void 0 ? _v : "$id",
-        addUsedSchema: (_w = o2.addUsedSchema) !== null && _w !== void 0 ? _w : true,
-        validateSchema: (_x = o2.validateSchema) !== null && _x !== void 0 ? _x : true,
-        validateFormats: (_y = o2.validateFormats) !== null && _y !== void 0 ? _y : true,
-        unicodeRegExp: (_z = o2.unicodeRegExp) !== null && _z !== void 0 ? _z : true,
-        int32range: (_0 = o2.int32range) !== null && _0 !== void 0 ? _0 : true,
-        uriResolver
-      };
-    }
-    var Ajv2 = class {
-      constructor(opts = {}) {
-        this.schemas = {};
-        this.refs = {};
-        this.formats = /* @__PURE__ */ Object.create(null);
-        this._compilations = /* @__PURE__ */ new Set();
-        this._loading = {};
-        this._cache = /* @__PURE__ */ new Map();
-        opts = this.opts = { ...opts, ...requiredOptions(opts) };
-        const { es5, lines } = this.opts.code;
-        this.scope = new codegen_2.ValueScope({ scope: {}, prefixes: EXT_SCOPE_NAMES, es5, lines });
-        this.logger = getLogger(opts.logger);
-        const formatOpt = opts.validateFormats;
-        opts.validateFormats = false;
-        this.RULES = (0, rules_1.getRules)();
-        checkOptions.call(this, removedOptions, opts, "NOT SUPPORTED");
-        checkOptions.call(this, deprecatedOptions, opts, "DEPRECATED", "warn");
-        this._metaOpts = getMetaSchemaOptions.call(this);
-        if (opts.formats)
-          addInitialFormats.call(this);
-        this._addVocabularies();
-        this._addDefaultMetaSchema();
-        if (opts.keywords)
-          addInitialKeywords.call(this, opts.keywords);
-        if (typeof opts.meta == "object")
-          this.addMetaSchema(opts.meta);
-        addInitialSchemas.call(this);
-        opts.validateFormats = formatOpt;
-      }
-      _addVocabularies() {
-        this.addKeyword("$async");
-      }
-      _addDefaultMetaSchema() {
-        const { $data, meta, schemaId } = this.opts;
-        let _dataRefSchema = $dataRefSchema;
-        if (schemaId === "id") {
-          _dataRefSchema = { ...$dataRefSchema };
-          _dataRefSchema.id = _dataRefSchema.$id;
-          delete _dataRefSchema.$id;
-        }
-        if (meta && $data)
-          this.addMetaSchema(_dataRefSchema, _dataRefSchema[schemaId], false);
-      }
-      defaultMeta() {
-        const { meta, schemaId } = this.opts;
-        return this.opts.defaultMeta = typeof meta == "object" ? meta[schemaId] || meta : void 0;
-      }
-      validate(schemaKeyRef, data) {
-        let v;
-        if (typeof schemaKeyRef == "string") {
-          v = this.getSchema(schemaKeyRef);
-          if (!v)
-            throw new Error(`no schema with key or ref "${schemaKeyRef}"`);
-        } else {
-          v = this.compile(schemaKeyRef);
-        }
-        const valid = v(data);
-        if (!("$async" in v))
-          this.errors = v.errors;
-        return valid;
-      }
-      compile(schema, _meta) {
-        const sch = this._addSchema(schema, _meta);
-        return sch.validate || this._compileSchemaEnv(sch);
-      }
-      compileAsync(schema, meta) {
-        if (typeof this.opts.loadSchema != "function") {
-          throw new Error("options.loadSchema should be a function");
-        }
-        const { loadSchema } = this.opts;
-        return runCompileAsync.call(this, schema, meta);
-        async function runCompileAsync(_schema, _meta) {
-          await loadMetaSchema.call(this, _schema.$schema);
-          const sch = this._addSchema(_schema, _meta);
-          return sch.validate || _compileAsync.call(this, sch);
-        }
-        async function loadMetaSchema($ref) {
-          if ($ref && !this.getSchema($ref)) {
-            await runCompileAsync.call(this, { $ref }, true);
-          }
-        }
-        async function _compileAsync(sch) {
-          try {
-            return this._compileSchemaEnv(sch);
-          } catch (e) {
-            if (!(e instanceof ref_error_1.default))
-              throw e;
-            checkLoaded.call(this, e);
-            await loadMissingSchema.call(this, e.missingSchema);
-            return _compileAsync.call(this, sch);
-          }
-        }
-        function checkLoaded({ missingSchema: ref, missingRef }) {
-          if (this.refs[ref]) {
-            throw new Error(`AnySchema ${ref} is loaded but ${missingRef} cannot be resolved`);
-          }
-        }
-        async function loadMissingSchema(ref) {
-          const _schema = await _loadSchema.call(this, ref);
-          if (!this.refs[ref])
-            await loadMetaSchema.call(this, _schema.$schema);
-          if (!this.refs[ref])
-            this.addSchema(_schema, ref, meta);
-        }
-        async function _loadSchema(ref) {
-          const p2 = this._loading[ref];
-          if (p2)
-            return p2;
-          try {
-            return await (this._loading[ref] = loadSchema(ref));
-          } finally {
-            delete this._loading[ref];
-          }
-        }
-      }
-      // Adds schema to the instance
-      addSchema(schema, key, _meta, _validateSchema = this.opts.validateSchema) {
-        if (Array.isArray(schema)) {
-          for (const sch of schema)
-            this.addSchema(sch, void 0, _meta, _validateSchema);
-          return this;
-        }
-        let id;
-        if (typeof schema === "object") {
-          const { schemaId } = this.opts;
-          id = schema[schemaId];
-          if (id !== void 0 && typeof id != "string") {
-            throw new Error(`schema ${schemaId} must be string`);
-          }
-        }
-        key = (0, resolve_1.normalizeId)(key || id);
-        this._checkUnique(key);
-        this.schemas[key] = this._addSchema(schema, _meta, key, _validateSchema, true);
-        return this;
-      }
-      // Add schema that will be used to validate other schemas
-      // options in META_IGNORE_OPTIONS are alway set to false
-      addMetaSchema(schema, key, _validateSchema = this.opts.validateSchema) {
-        this.addSchema(schema, key, true, _validateSchema);
-        return this;
-      }
-      //  Validate schema against its meta-schema
-      validateSchema(schema, throwOrLogError) {
-        if (typeof schema == "boolean")
-          return true;
-        let $schema;
-        $schema = schema.$schema;
-        if ($schema !== void 0 && typeof $schema != "string") {
-          throw new Error("$schema must be a string");
-        }
-        $schema = $schema || this.opts.defaultMeta || this.defaultMeta();
-        if (!$schema) {
-          this.logger.warn("meta-schema not available");
-          this.errors = null;
-          return true;
-        }
-        const valid = this.validate($schema, schema);
-        if (!valid && throwOrLogError) {
-          const message = "schema is invalid: " + this.errorsText();
-          if (this.opts.validateSchema === "log")
-            this.logger.error(message);
-          else
-            throw new Error(message);
-        }
-        return valid;
-      }
-      // Get compiled schema by `key` or `ref`.
-      // (`key` that was passed to `addSchema` or full schema reference - `schema.$id` or resolved id)
-      getSchema(keyRef) {
-        let sch;
-        while (typeof (sch = getSchEnv.call(this, keyRef)) == "string")
-          keyRef = sch;
-        if (sch === void 0) {
-          const { schemaId } = this.opts;
-          const root = new compile_1.SchemaEnv({ schema: {}, schemaId });
-          sch = compile_1.resolveSchema.call(this, root, keyRef);
-          if (!sch)
-            return;
-          this.refs[keyRef] = sch;
-        }
-        return sch.validate || this._compileSchemaEnv(sch);
-      }
-      // Remove cached schema(s).
-      // If no parameter is passed all schemas but meta-schemas are removed.
-      // If RegExp is passed all schemas with key/id matching pattern but meta-schemas are removed.
-      // Even if schema is referenced by other schemas it still can be removed as other schemas have local references.
-      removeSchema(schemaKeyRef) {
-        if (schemaKeyRef instanceof RegExp) {
-          this._removeAllSchemas(this.schemas, schemaKeyRef);
-          this._removeAllSchemas(this.refs, schemaKeyRef);
-          return this;
-        }
-        switch (typeof schemaKeyRef) {
-          case "undefined":
-            this._removeAllSchemas(this.schemas);
-            this._removeAllSchemas(this.refs);
-            this._cache.clear();
-            return this;
-          case "string": {
-            const sch = getSchEnv.call(this, schemaKeyRef);
-            if (typeof sch == "object")
-              this._cache.delete(sch.schema);
-            delete this.schemas[schemaKeyRef];
-            delete this.refs[schemaKeyRef];
-            return this;
-          }
-          case "object": {
-            const cacheKey = schemaKeyRef;
-            this._cache.delete(cacheKey);
-            let id = schemaKeyRef[this.opts.schemaId];
-            if (id) {
-              id = (0, resolve_1.normalizeId)(id);
-              delete this.schemas[id];
-              delete this.refs[id];
-            }
-            return this;
-          }
-          default:
-            throw new Error("ajv.removeSchema: invalid parameter");
-        }
-      }
-      // add "vocabulary" - a collection of keywords
-      addVocabulary(definitions) {
-        for (const def of definitions)
-          this.addKeyword(def);
-        return this;
-      }
-      addKeyword(kwdOrDef, def) {
-        let keyword;
-        if (typeof kwdOrDef == "string") {
-          keyword = kwdOrDef;
-          if (typeof def == "object") {
-            this.logger.warn("these parameters are deprecated, see docs for addKeyword");
-            def.keyword = keyword;
-          }
-        } else if (typeof kwdOrDef == "object" && def === void 0) {
-          def = kwdOrDef;
-          keyword = def.keyword;
-          if (Array.isArray(keyword) && !keyword.length) {
-            throw new Error("addKeywords: keyword must be string or non-empty array");
-          }
-        } else {
-          throw new Error("invalid addKeywords parameters");
-        }
-        checkKeyword.call(this, keyword, def);
-        if (!def) {
-          (0, util_1.eachItem)(keyword, (kwd) => addRule.call(this, kwd));
-          return this;
-        }
-        keywordMetaschema.call(this, def);
-        const definition = {
-          ...def,
-          type: (0, dataType_1.getJSONTypes)(def.type),
-          schemaType: (0, dataType_1.getJSONTypes)(def.schemaType)
-        };
-        (0, util_1.eachItem)(keyword, definition.type.length === 0 ? (k2) => addRule.call(this, k2, definition) : (k2) => definition.type.forEach((t2) => addRule.call(this, k2, definition, t2)));
-        return this;
-      }
-      getKeyword(keyword) {
-        const rule = this.RULES.all[keyword];
-        return typeof rule == "object" ? rule.definition : !!rule;
-      }
-      // Remove keyword
-      removeKeyword(keyword) {
-        const { RULES } = this;
-        delete RULES.keywords[keyword];
-        delete RULES.all[keyword];
-        for (const group of RULES.rules) {
-          const i2 = group.rules.findIndex((rule) => rule.keyword === keyword);
-          if (i2 >= 0)
-            group.rules.splice(i2, 1);
-        }
-        return this;
-      }
-      // Add format
-      addFormat(name, format) {
-        if (typeof format == "string")
-          format = new RegExp(format);
-        this.formats[name] = format;
-        return this;
-      }
-      errorsText(errors = this.errors, { separator = ", ", dataVar = "data" } = {}) {
-        if (!errors || errors.length === 0)
-          return "No errors";
-        return errors.map((e) => `${dataVar}${e.instancePath} ${e.message}`).reduce((text, msg) => text + separator + msg);
-      }
-      $dataMetaSchema(metaSchema, keywordsJsonPointers) {
-        const rules = this.RULES.all;
-        metaSchema = JSON.parse(JSON.stringify(metaSchema));
-        for (const jsonPointer of keywordsJsonPointers) {
-          const segments = jsonPointer.split("/").slice(1);
-          let keywords = metaSchema;
-          for (const seg of segments)
-            keywords = keywords[seg];
-          for (const key in rules) {
-            const rule = rules[key];
-            if (typeof rule != "object")
-              continue;
-            const { $data } = rule.definition;
-            const schema = keywords[key];
-            if ($data && schema)
-              keywords[key] = schemaOrData(schema);
-          }
-        }
-        return metaSchema;
-      }
-      _removeAllSchemas(schemas, regex) {
-        for (const keyRef in schemas) {
-          const sch = schemas[keyRef];
-          if (!regex || regex.test(keyRef)) {
-            if (typeof sch == "string") {
-              delete schemas[keyRef];
-            } else if (sch && !sch.meta) {
-              this._cache.delete(sch.schema);
-              delete schemas[keyRef];
-            }
-          }
-        }
-      }
-      _addSchema(schema, meta, baseId, validateSchema = this.opts.validateSchema, addSchema = this.opts.addUsedSchema) {
-        let id;
-        const { schemaId } = this.opts;
-        if (typeof schema == "object") {
-          id = schema[schemaId];
-        } else {
-          if (this.opts.jtd)
-            throw new Error("schema must be object");
-          else if (typeof schema != "boolean")
-            throw new Error("schema must be object or boolean");
-        }
-        let sch = this._cache.get(schema);
-        if (sch !== void 0)
-          return sch;
-        baseId = (0, resolve_1.normalizeId)(id || baseId);
-        const localRefs = resolve_1.getSchemaRefs.call(this, schema, baseId);
-        sch = new compile_1.SchemaEnv({ schema, schemaId, meta, baseId, localRefs });
-        this._cache.set(sch.schema, sch);
-        if (addSchema && !baseId.startsWith("#")) {
-          if (baseId)
-            this._checkUnique(baseId);
-          this.refs[baseId] = sch;
-        }
-        if (validateSchema)
-          this.validateSchema(schema, true);
-        return sch;
-      }
-      _checkUnique(id) {
-        if (this.schemas[id] || this.refs[id]) {
-          throw new Error(`schema with key or id "${id}" already exists`);
-        }
-      }
-      _compileSchemaEnv(sch) {
-        if (sch.meta)
-          this._compileMetaSchema(sch);
-        else
-          compile_1.compileSchema.call(this, sch);
-        if (!sch.validate)
-          throw new Error("ajv implementation error");
-        return sch.validate;
-      }
-      _compileMetaSchema(sch) {
-        const currentOpts = this.opts;
-        this.opts = this._metaOpts;
-        try {
-          compile_1.compileSchema.call(this, sch);
-        } finally {
-          this.opts = currentOpts;
-        }
-      }
-    };
-    Ajv2.ValidationError = validation_error_1.default;
-    Ajv2.MissingRefError = ref_error_1.default;
-    exports2.default = Ajv2;
-    function checkOptions(checkOpts, options, msg, log = "error") {
-      for (const key in checkOpts) {
-        const opt = key;
-        if (opt in options)
-          this.logger[log](`${msg}: option ${key}. ${checkOpts[opt]}`);
-      }
-    }
-    function getSchEnv(keyRef) {
-      keyRef = (0, resolve_1.normalizeId)(keyRef);
-      return this.schemas[keyRef] || this.refs[keyRef];
-    }
-    function addInitialSchemas() {
-      const optsSchemas = this.opts.schemas;
-      if (!optsSchemas)
-        return;
-      if (Array.isArray(optsSchemas))
-        this.addSchema(optsSchemas);
-      else
-        for (const key in optsSchemas)
-          this.addSchema(optsSchemas[key], key);
-    }
-    function addInitialFormats() {
-      for (const name in this.opts.formats) {
-        const format = this.opts.formats[name];
-        if (format)
-          this.addFormat(name, format);
-      }
-    }
-    function addInitialKeywords(defs) {
-      if (Array.isArray(defs)) {
-        this.addVocabulary(defs);
-        return;
-      }
-      this.logger.warn("keywords option as map is deprecated, pass array");
-      for (const keyword in defs) {
-        const def = defs[keyword];
-        if (!def.keyword)
-          def.keyword = keyword;
-        this.addKeyword(def);
-      }
-    }
-    function getMetaSchemaOptions() {
-      const metaOpts = { ...this.opts };
-      for (const opt of META_IGNORE_OPTIONS)
-        delete metaOpts[opt];
-      return metaOpts;
-    }
-    var noLogs = { log() {
-    }, warn() {
-    }, error() {
-    } };
-    function getLogger(logger) {
-      if (logger === false)
-        return noLogs;
-      if (logger === void 0)
-        return console;
-      if (logger.log && logger.warn && logger.error)
-        return logger;
-      throw new Error("logger must implement log, warn and error methods");
-    }
-    var KEYWORD_NAME = /^[a-z_$][a-z0-9_$:-]*$/i;
-    function checkKeyword(keyword, def) {
-      const { RULES } = this;
-      (0, util_1.eachItem)(keyword, (kwd) => {
-        if (RULES.keywords[kwd])
-          throw new Error(`Keyword ${kwd} is already defined`);
-        if (!KEYWORD_NAME.test(kwd))
-          throw new Error(`Keyword ${kwd} has invalid name`);
-      });
-      if (!def)
-        return;
-      if (def.$data && !("code" in def || "validate" in def)) {
-        throw new Error('$data keyword must have "code" or "validate" function');
-      }
-    }
-    function addRule(keyword, definition, dataType) {
-      var _a2;
-      const post = definition === null || definition === void 0 ? void 0 : definition.post;
-      if (dataType && post)
-        throw new Error('keyword with "post" flag cannot have "type"');
-      const { RULES } = this;
-      let ruleGroup = post ? RULES.post : RULES.rules.find(({ type: t2 }) => t2 === dataType);
-      if (!ruleGroup) {
-        ruleGroup = { type: dataType, rules: [] };
-        RULES.rules.push(ruleGroup);
-      }
-      RULES.keywords[keyword] = true;
-      if (!definition)
-        return;
-      const rule = {
-        keyword,
-        definition: {
-          ...definition,
-          type: (0, dataType_1.getJSONTypes)(definition.type),
-          schemaType: (0, dataType_1.getJSONTypes)(definition.schemaType)
-        }
-      };
-      if (definition.before)
-        addBeforeRule.call(this, ruleGroup, rule, definition.before);
-      else
-        ruleGroup.rules.push(rule);
-      RULES.all[keyword] = rule;
-      (_a2 = definition.implements) === null || _a2 === void 0 ? void 0 : _a2.forEach((kwd) => this.addKeyword(kwd));
-    }
-    function addBeforeRule(ruleGroup, rule, before) {
-      const i2 = ruleGroup.rules.findIndex((_rule) => _rule.keyword === before);
-      if (i2 >= 0) {
-        ruleGroup.rules.splice(i2, 0, rule);
-      } else {
-        ruleGroup.rules.push(rule);
-        this.logger.warn(`rule ${before} is not defined`);
-      }
-    }
-    function keywordMetaschema(def) {
-      let { metaSchema } = def;
-      if (metaSchema === void 0)
-        return;
-      if (def.$data && this.opts.$data)
-        metaSchema = schemaOrData(metaSchema);
-      def.validateSchema = this.compile(metaSchema, true);
-    }
-    var $dataRef = {
-      $ref: "https://raw.githubusercontent.com/ajv-validator/ajv/master/lib/refs/data.json#"
-    };
-    function schemaOrData(schema) {
-      return { anyOf: [schema, $dataRef] };
-    }
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/core/id.js
-var require_id = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/id.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var def = {
-      keyword: "id",
-      code() {
-        throw new Error('NOT SUPPORTED: keyword "id", use "$id" for schema ID');
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/core/ref.js
-var require_ref = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/ref.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.callRef = exports2.getValidate = void 0;
-    var ref_error_1 = require_ref_error();
-    var code_1 = require_code2();
-    var codegen_1 = require_codegen();
-    var names_1 = require_names();
-    var compile_1 = require_compile();
-    var util_1 = require_util();
-    var def = {
-      keyword: "$ref",
-      schemaType: "string",
-      code(cxt) {
-        const { gen, schema: $ref, it } = cxt;
-        const { baseId, schemaEnv: env10, validateName, opts, self } = it;
-        const { root } = env10;
-        if (($ref === "#" || $ref === "#/") && baseId === root.baseId)
-          return callRootRef();
-        const schOrEnv = compile_1.resolveRef.call(self, root, baseId, $ref);
-        if (schOrEnv === void 0)
-          throw new ref_error_1.default(it.opts.uriResolver, baseId, $ref);
-        if (schOrEnv instanceof compile_1.SchemaEnv)
-          return callValidate(schOrEnv);
-        return inlineRefSchema(schOrEnv);
-        function callRootRef() {
-          if (env10 === root)
-            return callRef(cxt, validateName, env10, env10.$async);
-          const rootName = gen.scopeValue("root", { ref: root });
-          return callRef(cxt, (0, codegen_1._)`${rootName}.validate`, root, root.$async);
-        }
-        function callValidate(sch) {
-          const v = getValidate(cxt, sch);
-          callRef(cxt, v, sch, sch.$async);
-        }
-        function inlineRefSchema(sch) {
-          const schName = gen.scopeValue("schema", opts.code.source === true ? { ref: sch, code: (0, codegen_1.stringify)(sch) } : { ref: sch });
-          const valid = gen.name("valid");
-          const schCxt = cxt.subschema({
-            schema: sch,
-            dataTypes: [],
-            schemaPath: codegen_1.nil,
-            topSchemaRef: schName,
-            errSchemaPath: $ref
-          }, valid);
-          cxt.mergeEvaluated(schCxt);
-          cxt.ok(valid);
-        }
-      }
-    };
-    function getValidate(cxt, sch) {
-      const { gen } = cxt;
-      return sch.validate ? gen.scopeValue("validate", { ref: sch.validate }) : (0, codegen_1._)`${gen.scopeValue("wrapper", { ref: sch })}.validate`;
-    }
-    exports2.getValidate = getValidate;
-    function callRef(cxt, v, sch, $async) {
-      const { gen, it } = cxt;
-      const { allErrors, schemaEnv: env10, opts } = it;
-      const passCxt = opts.passContext ? names_1.default.this : codegen_1.nil;
-      if ($async)
-        callAsyncRef();
-      else
-        callSyncRef();
-      function callAsyncRef() {
-        if (!env10.$async)
-          throw new Error("async schema referenced by sync schema");
-        const valid = gen.let("valid");
-        gen.try(() => {
-          gen.code((0, codegen_1._)`await ${(0, code_1.callValidateCode)(cxt, v, passCxt)}`);
-          addEvaluatedFrom(v);
-          if (!allErrors)
-            gen.assign(valid, true);
-        }, (e) => {
-          gen.if((0, codegen_1._)`!(${e} instanceof ${it.ValidationError})`, () => gen.throw(e));
-          addErrorsFrom(e);
-          if (!allErrors)
-            gen.assign(valid, false);
-        });
-        cxt.ok(valid);
-      }
-      function callSyncRef() {
-        cxt.result((0, code_1.callValidateCode)(cxt, v, passCxt), () => addEvaluatedFrom(v), () => addErrorsFrom(v));
-      }
-      function addErrorsFrom(source) {
-        const errs = (0, codegen_1._)`${source}.errors`;
-        gen.assign(names_1.default.vErrors, (0, codegen_1._)`${names_1.default.vErrors} === null ? ${errs} : ${names_1.default.vErrors}.concat(${errs})`);
-        gen.assign(names_1.default.errors, (0, codegen_1._)`${names_1.default.vErrors}.length`);
-      }
-      function addEvaluatedFrom(source) {
-        var _a2;
-        if (!it.opts.unevaluated)
-          return;
-        const schEvaluated = (_a2 = sch === null || sch === void 0 ? void 0 : sch.validate) === null || _a2 === void 0 ? void 0 : _a2.evaluated;
-        if (it.props !== true) {
-          if (schEvaluated && !schEvaluated.dynamicProps) {
-            if (schEvaluated.props !== void 0) {
-              it.props = util_1.mergeEvaluated.props(gen, schEvaluated.props, it.props);
-            }
-          } else {
-            const props = gen.var("props", (0, codegen_1._)`${source}.evaluated.props`);
-            it.props = util_1.mergeEvaluated.props(gen, props, it.props, codegen_1.Name);
-          }
-        }
-        if (it.items !== true) {
-          if (schEvaluated && !schEvaluated.dynamicItems) {
-            if (schEvaluated.items !== void 0) {
-              it.items = util_1.mergeEvaluated.items(gen, schEvaluated.items, it.items);
-            }
-          } else {
-            const items = gen.var("items", (0, codegen_1._)`${source}.evaluated.items`);
-            it.items = util_1.mergeEvaluated.items(gen, items, it.items, codegen_1.Name);
-          }
-        }
-      }
-    }
-    exports2.callRef = callRef;
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/core/index.js
-var require_core2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/core/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var id_1 = require_id();
-    var ref_1 = require_ref();
-    var core = [
-      "$schema",
-      "$id",
-      "$defs",
-      "$vocabulary",
-      { keyword: "$comment" },
-      "definitions",
-      id_1.default,
-      ref_1.default
-    ];
-    exports2.default = core;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/limitNumber.js
-var require_limitNumber = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitNumber.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var ops = codegen_1.operators;
-    var KWDs = {
-      maximum: { okStr: "<=", ok: ops.LTE, fail: ops.GT },
-      minimum: { okStr: ">=", ok: ops.GTE, fail: ops.LT },
-      exclusiveMaximum: { okStr: "<", ok: ops.LT, fail: ops.GTE },
-      exclusiveMinimum: { okStr: ">", ok: ops.GT, fail: ops.LTE }
-    };
-    var error = {
-      message: ({ keyword, schemaCode }) => (0, codegen_1.str)`must be ${KWDs[keyword].okStr} ${schemaCode}`,
-      params: ({ keyword, schemaCode }) => (0, codegen_1._)`{comparison: ${KWDs[keyword].okStr}, limit: ${schemaCode}}`
-    };
-    var def = {
-      keyword: Object.keys(KWDs),
-      type: "number",
-      schemaType: "number",
-      $data: true,
-      error,
-      code(cxt) {
-        const { keyword, data, schemaCode } = cxt;
-        cxt.fail$data((0, codegen_1._)`${data} ${KWDs[keyword].fail} ${schemaCode} || isNaN(${data})`);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/multipleOf.js
-var require_multipleOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/multipleOf.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var error = {
-      message: ({ schemaCode }) => (0, codegen_1.str)`must be multiple of ${schemaCode}`,
-      params: ({ schemaCode }) => (0, codegen_1._)`{multipleOf: ${schemaCode}}`
-    };
-    var def = {
-      keyword: "multipleOf",
-      type: "number",
-      schemaType: "number",
-      $data: true,
-      error,
-      code(cxt) {
-        const { gen, data, schemaCode, it } = cxt;
-        const prec = it.opts.multipleOfPrecision;
-        const res = gen.let("res");
-        const invalid = prec ? (0, codegen_1._)`Math.abs(Math.round(${res}) - ${res}) > 1e-${prec}` : (0, codegen_1._)`${res} !== parseInt(${res})`;
-        cxt.fail$data((0, codegen_1._)`(${schemaCode} === 0 || (${res} = ${data}/${schemaCode}, ${invalid}))`);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/runtime/ucs2length.js
-var require_ucs2length = __commonJS({
-  "node_modules/ajv/dist/runtime/ucs2length.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    function ucs2length(str) {
-      const len = str.length;
-      let length = 0;
-      let pos = 0;
-      let value;
-      while (pos < len) {
-        length++;
-        value = str.charCodeAt(pos++);
-        if (value >= 55296 && value <= 56319 && pos < len) {
-          value = str.charCodeAt(pos);
-          if ((value & 64512) === 56320)
-            pos++;
-        }
-      }
-      return length;
-    }
-    exports2.default = ucs2length;
-    ucs2length.code = 'require("ajv/dist/runtime/ucs2length").default';
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/limitLength.js
-var require_limitLength = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitLength.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var ucs2length_1 = require_ucs2length();
-    var error = {
-      message({ keyword, schemaCode }) {
-        const comp = keyword === "maxLength" ? "more" : "fewer";
-        return (0, codegen_1.str)`must NOT have ${comp} than ${schemaCode} characters`;
-      },
-      params: ({ schemaCode }) => (0, codegen_1._)`{limit: ${schemaCode}}`
-    };
-    var def = {
-      keyword: ["maxLength", "minLength"],
-      type: "string",
-      schemaType: "number",
-      $data: true,
-      error,
-      code(cxt) {
-        const { keyword, data, schemaCode, it } = cxt;
-        const op = keyword === "maxLength" ? codegen_1.operators.GT : codegen_1.operators.LT;
-        const len = it.opts.unicode === false ? (0, codegen_1._)`${data}.length` : (0, codegen_1._)`${(0, util_1.useFunc)(cxt.gen, ucs2length_1.default)}(${data})`;
-        cxt.fail$data((0, codegen_1._)`${len} ${op} ${schemaCode}`);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/pattern.js
-var require_pattern = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/pattern.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var code_1 = require_code2();
-    var util_1 = require_util();
-    var codegen_1 = require_codegen();
-    var error = {
-      message: ({ schemaCode }) => (0, codegen_1.str)`must match pattern "${schemaCode}"`,
-      params: ({ schemaCode }) => (0, codegen_1._)`{pattern: ${schemaCode}}`
-    };
-    var def = {
-      keyword: "pattern",
-      type: "string",
-      schemaType: "string",
-      $data: true,
-      error,
-      code(cxt) {
-        const { gen, data, $data, schema, schemaCode, it } = cxt;
-        const u = it.opts.unicodeRegExp ? "u" : "";
-        if ($data) {
-          const { regExp } = it.opts.code;
-          const regExpCode = regExp.code === "new RegExp" ? (0, codegen_1._)`new RegExp` : (0, util_1.useFunc)(gen, regExp);
-          const valid = gen.let("valid");
-          gen.try(() => gen.assign(valid, (0, codegen_1._)`${regExpCode}(${schemaCode}, ${u}).test(${data})`), () => gen.assign(valid, false));
-          cxt.fail$data((0, codegen_1._)`!${valid}`);
-        } else {
-          const regExp = (0, code_1.usePattern)(cxt, schema);
-          cxt.fail$data((0, codegen_1._)`!${regExp}.test(${data})`);
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/limitProperties.js
-var require_limitProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitProperties.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var error = {
-      message({ keyword, schemaCode }) {
-        const comp = keyword === "maxProperties" ? "more" : "fewer";
-        return (0, codegen_1.str)`must NOT have ${comp} than ${schemaCode} properties`;
-      },
-      params: ({ schemaCode }) => (0, codegen_1._)`{limit: ${schemaCode}}`
-    };
-    var def = {
-      keyword: ["maxProperties", "minProperties"],
-      type: "object",
-      schemaType: "number",
-      $data: true,
-      error,
-      code(cxt) {
-        const { keyword, data, schemaCode } = cxt;
-        const op = keyword === "maxProperties" ? codegen_1.operators.GT : codegen_1.operators.LT;
-        cxt.fail$data((0, codegen_1._)`Object.keys(${data}).length ${op} ${schemaCode}`);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/required.js
-var require_required = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/required.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var code_1 = require_code2();
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var error = {
-      message: ({ params: { missingProperty } }) => (0, codegen_1.str)`must have required property '${missingProperty}'`,
-      params: ({ params: { missingProperty } }) => (0, codegen_1._)`{missingProperty: ${missingProperty}}`
-    };
-    var def = {
-      keyword: "required",
-      type: "object",
-      schemaType: "array",
-      $data: true,
-      error,
-      code(cxt) {
-        const { gen, schema, schemaCode, data, $data, it } = cxt;
-        const { opts } = it;
-        if (!$data && schema.length === 0)
-          return;
-        const useLoop = schema.length >= opts.loopRequired;
-        if (it.allErrors)
-          allErrorsMode();
-        else
-          exitOnErrorMode();
-        if (opts.strictRequired) {
-          const props = cxt.parentSchema.properties;
-          const { definedProperties } = cxt.it;
-          for (const requiredKey of schema) {
-            if ((props === null || props === void 0 ? void 0 : props[requiredKey]) === void 0 && !definedProperties.has(requiredKey)) {
-              const schemaPath = it.schemaEnv.baseId + it.errSchemaPath;
-              const msg = `required property "${requiredKey}" is not defined at "${schemaPath}" (strictRequired)`;
-              (0, util_1.checkStrictMode)(it, msg, it.opts.strictRequired);
-            }
-          }
-        }
-        function allErrorsMode() {
-          if (useLoop || $data) {
-            cxt.block$data(codegen_1.nil, loopAllRequired);
-          } else {
-            for (const prop of schema) {
-              (0, code_1.checkReportMissingProp)(cxt, prop);
-            }
-          }
-        }
-        function exitOnErrorMode() {
-          const missing = gen.let("missing");
-          if (useLoop || $data) {
-            const valid = gen.let("valid", true);
-            cxt.block$data(valid, () => loopUntilMissing(missing, valid));
-            cxt.ok(valid);
-          } else {
-            gen.if((0, code_1.checkMissingProp)(cxt, schema, missing));
-            (0, code_1.reportMissingProp)(cxt, missing);
-            gen.else();
-          }
-        }
-        function loopAllRequired() {
-          gen.forOf("prop", schemaCode, (prop) => {
-            cxt.setParams({ missingProperty: prop });
-            gen.if((0, code_1.noPropertyInData)(gen, data, prop, opts.ownProperties), () => cxt.error());
-          });
-        }
-        function loopUntilMissing(missing, valid) {
-          cxt.setParams({ missingProperty: missing });
-          gen.forOf(missing, schemaCode, () => {
-            gen.assign(valid, (0, code_1.propertyInData)(gen, data, missing, opts.ownProperties));
-            gen.if((0, codegen_1.not)(valid), () => {
-              cxt.error();
-              gen.break();
-            });
-          }, codegen_1.nil);
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/limitItems.js
-var require_limitItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/limitItems.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var error = {
-      message({ keyword, schemaCode }) {
-        const comp = keyword === "maxItems" ? "more" : "fewer";
-        return (0, codegen_1.str)`must NOT have ${comp} than ${schemaCode} items`;
-      },
-      params: ({ schemaCode }) => (0, codegen_1._)`{limit: ${schemaCode}}`
-    };
-    var def = {
-      keyword: ["maxItems", "minItems"],
-      type: "array",
-      schemaType: "number",
-      $data: true,
-      error,
-      code(cxt) {
-        const { keyword, data, schemaCode } = cxt;
-        const op = keyword === "maxItems" ? codegen_1.operators.GT : codegen_1.operators.LT;
-        cxt.fail$data((0, codegen_1._)`${data}.length ${op} ${schemaCode}`);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/runtime/equal.js
-var require_equal = __commonJS({
-  "node_modules/ajv/dist/runtime/equal.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var equal = require_fast_deep_equal();
-    equal.code = 'require("ajv/dist/runtime/equal").default';
-    exports2.default = equal;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/uniqueItems.js
-var require_uniqueItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/uniqueItems.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var dataType_1 = require_dataType();
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var equal_1 = require_equal();
-    var error = {
-      message: ({ params: { i: i2, j: j2 } }) => (0, codegen_1.str)`must NOT have duplicate items (items ## ${j2} and ${i2} are identical)`,
-      params: ({ params: { i: i2, j: j2 } }) => (0, codegen_1._)`{i: ${i2}, j: ${j2}}`
-    };
-    var def = {
-      keyword: "uniqueItems",
-      type: "array",
-      schemaType: "boolean",
-      $data: true,
-      error,
-      code(cxt) {
-        const { gen, data, $data, schema, parentSchema, schemaCode, it } = cxt;
-        if (!$data && !schema)
-          return;
-        const valid = gen.let("valid");
-        const itemTypes = parentSchema.items ? (0, dataType_1.getSchemaTypes)(parentSchema.items) : [];
-        cxt.block$data(valid, validateUniqueItems, (0, codegen_1._)`${schemaCode} === false`);
-        cxt.ok(valid);
-        function validateUniqueItems() {
-          const i2 = gen.let("i", (0, codegen_1._)`${data}.length`);
-          const j2 = gen.let("j");
-          cxt.setParams({ i: i2, j: j2 });
-          gen.assign(valid, true);
-          gen.if((0, codegen_1._)`${i2} > 1`, () => (canOptimize() ? loopN : loopN2)(i2, j2));
-        }
-        function canOptimize() {
-          return itemTypes.length > 0 && !itemTypes.some((t2) => t2 === "object" || t2 === "array");
-        }
-        function loopN(i2, j2) {
-          const item = gen.name("item");
-          const wrongType = (0, dataType_1.checkDataTypes)(itemTypes, item, it.opts.strictNumbers, dataType_1.DataType.Wrong);
-          const indices = gen.const("indices", (0, codegen_1._)`{}`);
-          gen.for((0, codegen_1._)`;${i2}--;`, () => {
-            gen.let(item, (0, codegen_1._)`${data}[${i2}]`);
-            gen.if(wrongType, (0, codegen_1._)`continue`);
-            if (itemTypes.length > 1)
-              gen.if((0, codegen_1._)`typeof ${item} == "string"`, (0, codegen_1._)`${item} += "_"`);
-            gen.if((0, codegen_1._)`typeof ${indices}[${item}] == "number"`, () => {
-              gen.assign(j2, (0, codegen_1._)`${indices}[${item}]`);
-              cxt.error();
-              gen.assign(valid, false).break();
-            }).code((0, codegen_1._)`${indices}[${item}] = ${i2}`);
-          });
-        }
-        function loopN2(i2, j2) {
-          const eql = (0, util_1.useFunc)(gen, equal_1.default);
-          const outer = gen.name("outer");
-          gen.label(outer).for((0, codegen_1._)`;${i2}--;`, () => gen.for((0, codegen_1._)`${j2} = ${i2}; ${j2}--;`, () => gen.if((0, codegen_1._)`${eql}(${data}[${i2}], ${data}[${j2}])`, () => {
-            cxt.error();
-            gen.assign(valid, false).break(outer);
-          })));
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/const.js
-var require_const = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/const.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var equal_1 = require_equal();
-    var error = {
-      message: "must be equal to constant",
-      params: ({ schemaCode }) => (0, codegen_1._)`{allowedValue: ${schemaCode}}`
-    };
-    var def = {
-      keyword: "const",
-      $data: true,
-      error,
-      code(cxt) {
-        const { gen, data, $data, schemaCode, schema } = cxt;
-        if ($data || schema && typeof schema == "object") {
-          cxt.fail$data((0, codegen_1._)`!${(0, util_1.useFunc)(gen, equal_1.default)}(${data}, ${schemaCode})`);
-        } else {
-          cxt.fail((0, codegen_1._)`${schema} !== ${data}`);
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/enum.js
-var require_enum = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/enum.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var equal_1 = require_equal();
-    var error = {
-      message: "must be equal to one of the allowed values",
-      params: ({ schemaCode }) => (0, codegen_1._)`{allowedValues: ${schemaCode}}`
-    };
-    var def = {
-      keyword: "enum",
-      schemaType: "array",
-      $data: true,
-      error,
-      code(cxt) {
-        const { gen, data, $data, schema, schemaCode, it } = cxt;
-        if (!$data && schema.length === 0)
-          throw new Error("enum must have non-empty array");
-        const useLoop = schema.length >= it.opts.loopEnum;
-        let eql;
-        const getEql = () => eql !== null && eql !== void 0 ? eql : eql = (0, util_1.useFunc)(gen, equal_1.default);
-        let valid;
-        if (useLoop || $data) {
-          valid = gen.let("valid");
-          cxt.block$data(valid, loopEnum);
-        } else {
-          if (!Array.isArray(schema))
-            throw new Error("ajv implementation error");
-          const vSchema = gen.const("vSchema", schemaCode);
-          valid = (0, codegen_1.or)(...schema.map((_x, i2) => equalCode(vSchema, i2)));
-        }
-        cxt.pass(valid);
-        function loopEnum() {
-          gen.assign(valid, false);
-          gen.forOf("v", schemaCode, (v) => gen.if((0, codegen_1._)`${getEql()}(${data}, ${v})`, () => gen.assign(valid, true).break()));
-        }
-        function equalCode(vSchema, i2) {
-          const sch = schema[i2];
-          return typeof sch === "object" && sch !== null ? (0, codegen_1._)`${getEql()}(${data}, ${vSchema}[${i2}])` : (0, codegen_1._)`${data} === ${sch}`;
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/validation/index.js
-var require_validation = __commonJS({
-  "node_modules/ajv/dist/vocabularies/validation/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var limitNumber_1 = require_limitNumber();
-    var multipleOf_1 = require_multipleOf();
-    var limitLength_1 = require_limitLength();
-    var pattern_1 = require_pattern();
-    var limitProperties_1 = require_limitProperties();
-    var required_1 = require_required();
-    var limitItems_1 = require_limitItems();
-    var uniqueItems_1 = require_uniqueItems();
-    var const_1 = require_const();
-    var enum_1 = require_enum();
-    var validation = [
-      // number
-      limitNumber_1.default,
-      multipleOf_1.default,
-      // string
-      limitLength_1.default,
-      pattern_1.default,
-      // object
-      limitProperties_1.default,
-      required_1.default,
-      // array
-      limitItems_1.default,
-      uniqueItems_1.default,
-      // any
-      { keyword: "type", schemaType: ["string", "array"] },
-      { keyword: "nullable", schemaType: "boolean" },
-      const_1.default,
-      enum_1.default
-    ];
-    exports2.default = validation;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/additionalItems.js
-var require_additionalItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalItems.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.validateAdditionalItems = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var error = {
-      message: ({ params: { len } }) => (0, codegen_1.str)`must NOT have more than ${len} items`,
-      params: ({ params: { len } }) => (0, codegen_1._)`{limit: ${len}}`
-    };
-    var def = {
-      keyword: "additionalItems",
-      type: "array",
-      schemaType: ["boolean", "object"],
-      before: "uniqueItems",
-      error,
-      code(cxt) {
-        const { parentSchema, it } = cxt;
-        const { items } = parentSchema;
-        if (!Array.isArray(items)) {
-          (0, util_1.checkStrictMode)(it, '"additionalItems" is ignored when "items" is not an array of schemas');
-          return;
-        }
-        validateAdditionalItems(cxt, items);
-      }
-    };
-    function validateAdditionalItems(cxt, items) {
-      const { gen, schema, data, keyword, it } = cxt;
-      it.items = true;
-      const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-      if (schema === false) {
-        cxt.setParams({ len: items.length });
-        cxt.pass((0, codegen_1._)`${len} <= ${items.length}`);
-      } else if (typeof schema == "object" && !(0, util_1.alwaysValidSchema)(it, schema)) {
-        const valid = gen.var("valid", (0, codegen_1._)`${len} <= ${items.length}`);
-        gen.if((0, codegen_1.not)(valid), () => validateItems(valid));
-        cxt.ok(valid);
-      }
-      function validateItems(valid) {
-        gen.forRange("i", items.length, len, (i2) => {
-          cxt.subschema({ keyword, dataProp: i2, dataPropType: util_1.Type.Num }, valid);
-          if (!it.allErrors)
-            gen.if((0, codegen_1.not)(valid), () => gen.break());
-        });
-      }
-    }
-    exports2.validateAdditionalItems = validateAdditionalItems;
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/items.js
-var require_items = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.validateTuple = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var code_1 = require_code2();
-    var def = {
-      keyword: "items",
-      type: "array",
-      schemaType: ["object", "array", "boolean"],
-      before: "uniqueItems",
-      code(cxt) {
-        const { schema, it } = cxt;
-        if (Array.isArray(schema))
-          return validateTuple(cxt, "additionalItems", schema);
-        it.items = true;
-        if ((0, util_1.alwaysValidSchema)(it, schema))
-          return;
-        cxt.ok((0, code_1.validateArray)(cxt));
-      }
-    };
-    function validateTuple(cxt, extraItems, schArr = cxt.schema) {
-      const { gen, parentSchema, data, keyword, it } = cxt;
-      checkStrictTuple(parentSchema);
-      if (it.opts.unevaluated && schArr.length && it.items !== true) {
-        it.items = util_1.mergeEvaluated.items(gen, schArr.length, it.items);
-      }
-      const valid = gen.name("valid");
-      const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-      schArr.forEach((sch, i2) => {
-        if ((0, util_1.alwaysValidSchema)(it, sch))
-          return;
-        gen.if((0, codegen_1._)`${len} > ${i2}`, () => cxt.subschema({
-          keyword,
-          schemaProp: i2,
-          dataProp: i2
-        }, valid));
-        cxt.ok(valid);
-      });
-      function checkStrictTuple(sch) {
-        const { opts, errSchemaPath } = it;
-        const l = schArr.length;
-        const fullTuple = l === sch.minItems && (l === sch.maxItems || sch[extraItems] === false);
-        if (opts.strictTuples && !fullTuple) {
-          const msg = `"${keyword}" is ${l}-tuple, but minItems or maxItems/${extraItems} are not specified or different at path "${errSchemaPath}"`;
-          (0, util_1.checkStrictMode)(it, msg, opts.strictTuples);
-        }
-      }
-    }
-    exports2.validateTuple = validateTuple;
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/prefixItems.js
-var require_prefixItems = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/prefixItems.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var items_1 = require_items();
-    var def = {
-      keyword: "prefixItems",
-      type: "array",
-      schemaType: ["array"],
-      before: "uniqueItems",
-      code: (cxt) => (0, items_1.validateTuple)(cxt, "items")
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/items2020.js
-var require_items2020 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/items2020.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var code_1 = require_code2();
-    var additionalItems_1 = require_additionalItems();
-    var error = {
-      message: ({ params: { len } }) => (0, codegen_1.str)`must NOT have more than ${len} items`,
-      params: ({ params: { len } }) => (0, codegen_1._)`{limit: ${len}}`
-    };
-    var def = {
-      keyword: "items",
-      type: "array",
-      schemaType: ["object", "boolean"],
-      before: "uniqueItems",
-      error,
-      code(cxt) {
-        const { schema, parentSchema, it } = cxt;
-        const { prefixItems } = parentSchema;
-        it.items = true;
-        if ((0, util_1.alwaysValidSchema)(it, schema))
-          return;
-        if (prefixItems)
-          (0, additionalItems_1.validateAdditionalItems)(cxt, prefixItems);
-        else
-          cxt.ok((0, code_1.validateArray)(cxt));
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/contains.js
-var require_contains = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/contains.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var error = {
-      message: ({ params: { min, max } }) => max === void 0 ? (0, codegen_1.str)`must contain at least ${min} valid item(s)` : (0, codegen_1.str)`must contain at least ${min} and no more than ${max} valid item(s)`,
-      params: ({ params: { min, max } }) => max === void 0 ? (0, codegen_1._)`{minContains: ${min}}` : (0, codegen_1._)`{minContains: ${min}, maxContains: ${max}}`
-    };
-    var def = {
-      keyword: "contains",
-      type: "array",
-      schemaType: ["object", "boolean"],
-      before: "uniqueItems",
-      trackErrors: true,
-      error,
-      code(cxt) {
-        const { gen, schema, parentSchema, data, it } = cxt;
-        let min;
-        let max;
-        const { minContains, maxContains } = parentSchema;
-        if (it.opts.next) {
-          min = minContains === void 0 ? 1 : minContains;
-          max = maxContains;
-        } else {
-          min = 1;
-        }
-        const len = gen.const("len", (0, codegen_1._)`${data}.length`);
-        cxt.setParams({ min, max });
-        if (max === void 0 && min === 0) {
-          (0, util_1.checkStrictMode)(it, `"minContains" == 0 without "maxContains": "contains" keyword ignored`);
-          return;
-        }
-        if (max !== void 0 && min > max) {
-          (0, util_1.checkStrictMode)(it, `"minContains" > "maxContains" is always invalid`);
-          cxt.fail();
-          return;
-        }
-        if ((0, util_1.alwaysValidSchema)(it, schema)) {
-          let cond = (0, codegen_1._)`${len} >= ${min}`;
-          if (max !== void 0)
-            cond = (0, codegen_1._)`${cond} && ${len} <= ${max}`;
-          cxt.pass(cond);
-          return;
-        }
-        it.items = true;
-        const valid = gen.name("valid");
-        if (max === void 0 && min === 1) {
-          validateItems(valid, () => gen.if(valid, () => gen.break()));
-        } else if (min === 0) {
-          gen.let(valid, true);
-          if (max !== void 0)
-            gen.if((0, codegen_1._)`${data}.length > 0`, validateItemsWithCount);
-        } else {
-          gen.let(valid, false);
-          validateItemsWithCount();
-        }
-        cxt.result(valid, () => cxt.reset());
-        function validateItemsWithCount() {
-          const schValid = gen.name("_valid");
-          const count = gen.let("count", 0);
-          validateItems(schValid, () => gen.if(schValid, () => checkLimits(count)));
-        }
-        function validateItems(_valid, block) {
-          gen.forRange("i", 0, len, (i2) => {
-            cxt.subschema({
-              keyword: "contains",
-              dataProp: i2,
-              dataPropType: util_1.Type.Num,
-              compositeRule: true
-            }, _valid);
-            block();
-          });
-        }
-        function checkLimits(count) {
-          gen.code((0, codegen_1._)`${count}++`);
-          if (max === void 0) {
-            gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true).break());
-          } else {
-            gen.if((0, codegen_1._)`${count} > ${max}`, () => gen.assign(valid, false).break());
-            if (min === 1)
-              gen.assign(valid, true);
-            else
-              gen.if((0, codegen_1._)`${count} >= ${min}`, () => gen.assign(valid, true));
-          }
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/dependencies.js
-var require_dependencies = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/dependencies.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.validateSchemaDeps = exports2.validatePropertyDeps = exports2.error = void 0;
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var code_1 = require_code2();
-    exports2.error = {
-      message: ({ params: { property, depsCount, deps } }) => {
-        const property_ies = depsCount === 1 ? "property" : "properties";
-        return (0, codegen_1.str)`must have ${property_ies} ${deps} when property ${property} is present`;
-      },
-      params: ({ params: { property, depsCount, deps, missingProperty } }) => (0, codegen_1._)`{property: ${property},
-    missingProperty: ${missingProperty},
-    depsCount: ${depsCount},
-    deps: ${deps}}`
-      // TODO change to reference
-    };
-    var def = {
-      keyword: "dependencies",
-      type: "object",
-      schemaType: "object",
-      error: exports2.error,
-      code(cxt) {
-        const [propDeps, schDeps] = splitDependencies(cxt);
-        validatePropertyDeps(cxt, propDeps);
-        validateSchemaDeps(cxt, schDeps);
-      }
-    };
-    function splitDependencies({ schema }) {
-      const propertyDeps = {};
-      const schemaDeps = {};
-      for (const key in schema) {
-        if (key === "__proto__")
-          continue;
-        const deps = Array.isArray(schema[key]) ? propertyDeps : schemaDeps;
-        deps[key] = schema[key];
-      }
-      return [propertyDeps, schemaDeps];
-    }
-    function validatePropertyDeps(cxt, propertyDeps = cxt.schema) {
-      const { gen, data, it } = cxt;
-      if (Object.keys(propertyDeps).length === 0)
-        return;
-      const missing = gen.let("missing");
-      for (const prop in propertyDeps) {
-        const deps = propertyDeps[prop];
-        if (deps.length === 0)
-          continue;
-        const hasProperty = (0, code_1.propertyInData)(gen, data, prop, it.opts.ownProperties);
-        cxt.setParams({
-          property: prop,
-          depsCount: deps.length,
-          deps: deps.join(", ")
-        });
-        if (it.allErrors) {
-          gen.if(hasProperty, () => {
-            for (const depProp of deps) {
-              (0, code_1.checkReportMissingProp)(cxt, depProp);
-            }
-          });
-        } else {
-          gen.if((0, codegen_1._)`${hasProperty} && (${(0, code_1.checkMissingProp)(cxt, deps, missing)})`);
-          (0, code_1.reportMissingProp)(cxt, missing);
-          gen.else();
-        }
-      }
-    }
-    exports2.validatePropertyDeps = validatePropertyDeps;
-    function validateSchemaDeps(cxt, schemaDeps = cxt.schema) {
-      const { gen, data, keyword, it } = cxt;
-      const valid = gen.name("valid");
-      for (const prop in schemaDeps) {
-        if ((0, util_1.alwaysValidSchema)(it, schemaDeps[prop]))
-          continue;
-        gen.if(
-          (0, code_1.propertyInData)(gen, data, prop, it.opts.ownProperties),
-          () => {
-            const schCxt = cxt.subschema({ keyword, schemaProp: prop }, valid);
-            cxt.mergeValidEvaluated(schCxt, valid);
-          },
-          () => gen.var(valid, true)
-          // TODO var
-        );
-        cxt.ok(valid);
-      }
-    }
-    exports2.validateSchemaDeps = validateSchemaDeps;
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/propertyNames.js
-var require_propertyNames = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/propertyNames.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var error = {
-      message: "property name must be valid",
-      params: ({ params }) => (0, codegen_1._)`{propertyName: ${params.propertyName}}`
-    };
-    var def = {
-      keyword: "propertyNames",
-      type: "object",
-      schemaType: ["object", "boolean"],
-      error,
-      code(cxt) {
-        const { gen, schema, data, it } = cxt;
-        if ((0, util_1.alwaysValidSchema)(it, schema))
-          return;
-        const valid = gen.name("valid");
-        gen.forIn("key", data, (key) => {
-          cxt.setParams({ propertyName: key });
-          cxt.subschema({
-            keyword: "propertyNames",
-            data: key,
-            dataTypes: ["string"],
-            propertyName: key,
-            compositeRule: true
-          }, valid);
-          gen.if((0, codegen_1.not)(valid), () => {
-            cxt.error(true);
-            if (!it.allErrors)
-              gen.break();
-          });
-        });
-        cxt.ok(valid);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js
-var require_additionalProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/additionalProperties.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var code_1 = require_code2();
-    var codegen_1 = require_codegen();
-    var names_1 = require_names();
-    var util_1 = require_util();
-    var error = {
-      message: "must NOT have additional properties",
-      params: ({ params }) => (0, codegen_1._)`{additionalProperty: ${params.additionalProperty}}`
-    };
-    var def = {
-      keyword: "additionalProperties",
-      type: ["object"],
-      schemaType: ["boolean", "object"],
-      allowUndefined: true,
-      trackErrors: true,
-      error,
-      code(cxt) {
-        const { gen, schema, parentSchema, data, errsCount, it } = cxt;
-        if (!errsCount)
-          throw new Error("ajv implementation error");
-        const { allErrors, opts } = it;
-        it.props = true;
-        if (opts.removeAdditional !== "all" && (0, util_1.alwaysValidSchema)(it, schema))
-          return;
-        const props = (0, code_1.allSchemaProperties)(parentSchema.properties);
-        const patProps = (0, code_1.allSchemaProperties)(parentSchema.patternProperties);
-        checkAdditionalProperties();
-        cxt.ok((0, codegen_1._)`${errsCount} === ${names_1.default.errors}`);
-        function checkAdditionalProperties() {
-          gen.forIn("key", data, (key) => {
-            if (!props.length && !patProps.length)
-              additionalPropertyCode(key);
-            else
-              gen.if(isAdditional(key), () => additionalPropertyCode(key));
-          });
-        }
-        function isAdditional(key) {
-          let definedProp;
-          if (props.length > 8) {
-            const propsSchema = (0, util_1.schemaRefOrVal)(it, parentSchema.properties, "properties");
-            definedProp = (0, code_1.isOwnProperty)(gen, propsSchema, key);
-          } else if (props.length) {
-            definedProp = (0, codegen_1.or)(...props.map((p2) => (0, codegen_1._)`${key} === ${p2}`));
-          } else {
-            definedProp = codegen_1.nil;
-          }
-          if (patProps.length) {
-            definedProp = (0, codegen_1.or)(definedProp, ...patProps.map((p2) => (0, codegen_1._)`${(0, code_1.usePattern)(cxt, p2)}.test(${key})`));
-          }
-          return (0, codegen_1.not)(definedProp);
-        }
-        function deleteAdditional(key) {
-          gen.code((0, codegen_1._)`delete ${data}[${key}]`);
-        }
-        function additionalPropertyCode(key) {
-          if (opts.removeAdditional === "all" || opts.removeAdditional && schema === false) {
-            deleteAdditional(key);
-            return;
-          }
-          if (schema === false) {
-            cxt.setParams({ additionalProperty: key });
-            cxt.error();
-            if (!allErrors)
-              gen.break();
-            return;
-          }
-          if (typeof schema == "object" && !(0, util_1.alwaysValidSchema)(it, schema)) {
-            const valid = gen.name("valid");
-            if (opts.removeAdditional === "failing") {
-              applyAdditionalSchema(key, valid, false);
-              gen.if((0, codegen_1.not)(valid), () => {
-                cxt.reset();
-                deleteAdditional(key);
-              });
-            } else {
-              applyAdditionalSchema(key, valid);
-              if (!allErrors)
-                gen.if((0, codegen_1.not)(valid), () => gen.break());
-            }
-          }
-        }
-        function applyAdditionalSchema(key, valid, errors) {
-          const subschema = {
-            keyword: "additionalProperties",
-            dataProp: key,
-            dataPropType: util_1.Type.Str
-          };
-          if (errors === false) {
-            Object.assign(subschema, {
-              compositeRule: true,
-              createErrors: false,
-              allErrors: false
-            });
-          }
-          cxt.subschema(subschema, valid);
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/properties.js
-var require_properties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/properties.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var validate_1 = require_validate();
-    var code_1 = require_code2();
-    var util_1 = require_util();
-    var additionalProperties_1 = require_additionalProperties();
-    var def = {
-      keyword: "properties",
-      type: "object",
-      schemaType: "object",
-      code(cxt) {
-        const { gen, schema, parentSchema, data, it } = cxt;
-        if (it.opts.removeAdditional === "all" && parentSchema.additionalProperties === void 0) {
-          additionalProperties_1.default.code(new validate_1.KeywordCxt(it, additionalProperties_1.default, "additionalProperties"));
-        }
-        const allProps = (0, code_1.allSchemaProperties)(schema);
-        for (const prop of allProps) {
-          it.definedProperties.add(prop);
-        }
-        if (it.opts.unevaluated && allProps.length && it.props !== true) {
-          it.props = util_1.mergeEvaluated.props(gen, (0, util_1.toHash)(allProps), it.props);
-        }
-        const properties = allProps.filter((p2) => !(0, util_1.alwaysValidSchema)(it, schema[p2]));
-        if (properties.length === 0)
-          return;
-        const valid = gen.name("valid");
-        for (const prop of properties) {
-          if (hasDefault(prop)) {
-            applyPropertySchema(prop);
-          } else {
-            gen.if((0, code_1.propertyInData)(gen, data, prop, it.opts.ownProperties));
-            applyPropertySchema(prop);
-            if (!it.allErrors)
-              gen.else().var(valid, true);
-            gen.endIf();
-          }
-          cxt.it.definedProperties.add(prop);
-          cxt.ok(valid);
-        }
-        function hasDefault(prop) {
-          return it.opts.useDefaults && !it.compositeRule && schema[prop].default !== void 0;
-        }
-        function applyPropertySchema(prop) {
-          cxt.subschema({
-            keyword: "properties",
-            schemaProp: prop,
-            dataProp: prop
-          }, valid);
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/patternProperties.js
-var require_patternProperties = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/patternProperties.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var code_1 = require_code2();
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var util_2 = require_util();
-    var def = {
-      keyword: "patternProperties",
-      type: "object",
-      schemaType: "object",
-      code(cxt) {
-        const { gen, schema, data, parentSchema, it } = cxt;
-        const { opts } = it;
-        const patterns = (0, code_1.allSchemaProperties)(schema);
-        const alwaysValidPatterns = patterns.filter((p2) => (0, util_1.alwaysValidSchema)(it, schema[p2]));
-        if (patterns.length === 0 || alwaysValidPatterns.length === patterns.length && (!it.opts.unevaluated || it.props === true)) {
-          return;
-        }
-        const checkProperties = opts.strictSchema && !opts.allowMatchingProperties && parentSchema.properties;
-        const valid = gen.name("valid");
-        if (it.props !== true && !(it.props instanceof codegen_1.Name)) {
-          it.props = (0, util_2.evaluatedPropsToName)(gen, it.props);
-        }
-        const { props } = it;
-        validatePatternProperties();
-        function validatePatternProperties() {
-          for (const pat of patterns) {
-            if (checkProperties)
-              checkMatchingProperties(pat);
-            if (it.allErrors) {
-              validateProperties(pat);
-            } else {
-              gen.var(valid, true);
-              validateProperties(pat);
-              gen.if(valid);
-            }
-          }
-        }
-        function checkMatchingProperties(pat) {
-          for (const prop in checkProperties) {
-            if (new RegExp(pat).test(prop)) {
-              (0, util_1.checkStrictMode)(it, `property ${prop} matches pattern ${pat} (use allowMatchingProperties)`);
-            }
-          }
-        }
-        function validateProperties(pat) {
-          gen.forIn("key", data, (key) => {
-            gen.if((0, codegen_1._)`${(0, code_1.usePattern)(cxt, pat)}.test(${key})`, () => {
-              const alwaysValid = alwaysValidPatterns.includes(pat);
-              if (!alwaysValid) {
-                cxt.subschema({
-                  keyword: "patternProperties",
-                  schemaProp: pat,
-                  dataProp: key,
-                  dataPropType: util_2.Type.Str
-                }, valid);
-              }
-              if (it.opts.unevaluated && props !== true) {
-                gen.assign((0, codegen_1._)`${props}[${key}]`, true);
-              } else if (!alwaysValid && !it.allErrors) {
-                gen.if((0, codegen_1.not)(valid), () => gen.break());
-              }
-            });
-          });
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/not.js
-var require_not = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/not.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var util_1 = require_util();
-    var def = {
-      keyword: "not",
-      schemaType: ["object", "boolean"],
-      trackErrors: true,
-      code(cxt) {
-        const { gen, schema, it } = cxt;
-        if ((0, util_1.alwaysValidSchema)(it, schema)) {
-          cxt.fail();
-          return;
-        }
-        const valid = gen.name("valid");
-        cxt.subschema({
-          keyword: "not",
-          compositeRule: true,
-          createErrors: false,
-          allErrors: false
-        }, valid);
-        cxt.failResult(valid, () => cxt.reset(), () => cxt.error());
-      },
-      error: { message: "must NOT be valid" }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/anyOf.js
-var require_anyOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/anyOf.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var code_1 = require_code2();
-    var def = {
-      keyword: "anyOf",
-      schemaType: "array",
-      trackErrors: true,
-      code: code_1.validateUnion,
-      error: { message: "must match a schema in anyOf" }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/oneOf.js
-var require_oneOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/oneOf.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var error = {
-      message: "must match exactly one schema in oneOf",
-      params: ({ params }) => (0, codegen_1._)`{passingSchemas: ${params.passing}}`
-    };
-    var def = {
-      keyword: "oneOf",
-      schemaType: "array",
-      trackErrors: true,
-      error,
-      code(cxt) {
-        const { gen, schema, parentSchema, it } = cxt;
-        if (!Array.isArray(schema))
-          throw new Error("ajv implementation error");
-        if (it.opts.discriminator && parentSchema.discriminator)
-          return;
-        const schArr = schema;
-        const valid = gen.let("valid", false);
-        const passing = gen.let("passing", null);
-        const schValid = gen.name("_valid");
-        cxt.setParams({ passing });
-        gen.block(validateOneOf);
-        cxt.result(valid, () => cxt.reset(), () => cxt.error(true));
-        function validateOneOf() {
-          schArr.forEach((sch, i2) => {
-            let schCxt;
-            if ((0, util_1.alwaysValidSchema)(it, sch)) {
-              gen.var(schValid, true);
-            } else {
-              schCxt = cxt.subschema({
-                keyword: "oneOf",
-                schemaProp: i2,
-                compositeRule: true
-              }, schValid);
-            }
-            if (i2 > 0) {
-              gen.if((0, codegen_1._)`${schValid} && ${valid}`).assign(valid, false).assign(passing, (0, codegen_1._)`[${passing}, ${i2}]`).else();
-            }
-            gen.if(schValid, () => {
-              gen.assign(valid, true);
-              gen.assign(passing, i2);
-              if (schCxt)
-                cxt.mergeEvaluated(schCxt, codegen_1.Name);
-            });
-          });
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/allOf.js
-var require_allOf = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/allOf.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var util_1 = require_util();
-    var def = {
-      keyword: "allOf",
-      schemaType: "array",
-      code(cxt) {
-        const { gen, schema, it } = cxt;
-        if (!Array.isArray(schema))
-          throw new Error("ajv implementation error");
-        const valid = gen.name("valid");
-        schema.forEach((sch, i2) => {
-          if ((0, util_1.alwaysValidSchema)(it, sch))
-            return;
-          const schCxt = cxt.subschema({ keyword: "allOf", schemaProp: i2 }, valid);
-          cxt.ok(valid);
-          cxt.mergeEvaluated(schCxt);
-        });
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/if.js
-var require_if = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/if.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var util_1 = require_util();
-    var error = {
-      message: ({ params }) => (0, codegen_1.str)`must match "${params.ifClause}" schema`,
-      params: ({ params }) => (0, codegen_1._)`{failingKeyword: ${params.ifClause}}`
-    };
-    var def = {
-      keyword: "if",
-      schemaType: ["object", "boolean"],
-      trackErrors: true,
-      error,
-      code(cxt) {
-        const { gen, parentSchema, it } = cxt;
-        if (parentSchema.then === void 0 && parentSchema.else === void 0) {
-          (0, util_1.checkStrictMode)(it, '"if" without "then" and "else" is ignored');
-        }
-        const hasThen = hasSchema(it, "then");
-        const hasElse = hasSchema(it, "else");
-        if (!hasThen && !hasElse)
-          return;
-        const valid = gen.let("valid", true);
-        const schValid = gen.name("_valid");
-        validateIf();
-        cxt.reset();
-        if (hasThen && hasElse) {
-          const ifClause = gen.let("ifClause");
-          cxt.setParams({ ifClause });
-          gen.if(schValid, validateClause("then", ifClause), validateClause("else", ifClause));
-        } else if (hasThen) {
-          gen.if(schValid, validateClause("then"));
-        } else {
-          gen.if((0, codegen_1.not)(schValid), validateClause("else"));
-        }
-        cxt.pass(valid, () => cxt.error(true));
-        function validateIf() {
-          const schCxt = cxt.subschema({
-            keyword: "if",
-            compositeRule: true,
-            createErrors: false,
-            allErrors: false
-          }, schValid);
-          cxt.mergeEvaluated(schCxt);
-        }
-        function validateClause(keyword, ifClause) {
-          return () => {
-            const schCxt = cxt.subschema({ keyword }, schValid);
-            gen.assign(valid, schValid);
-            cxt.mergeValidEvaluated(schCxt, valid);
-            if (ifClause)
-              gen.assign(ifClause, (0, codegen_1._)`${keyword}`);
-            else
-              cxt.setParams({ ifClause: keyword });
-          };
-        }
-      }
-    };
-    function hasSchema(it, keyword) {
-      const schema = it.schema[keyword];
-      return schema !== void 0 && !(0, util_1.alwaysValidSchema)(it, schema);
-    }
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/thenElse.js
-var require_thenElse = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/thenElse.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var util_1 = require_util();
-    var def = {
-      keyword: ["then", "else"],
-      schemaType: ["object", "boolean"],
-      code({ keyword, parentSchema, it }) {
-        if (parentSchema.if === void 0)
-          (0, util_1.checkStrictMode)(it, `"${keyword}" without "if" is ignored`);
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/applicator/index.js
-var require_applicator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/applicator/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var additionalItems_1 = require_additionalItems();
-    var prefixItems_1 = require_prefixItems();
-    var items_1 = require_items();
-    var items2020_1 = require_items2020();
-    var contains_1 = require_contains();
-    var dependencies_1 = require_dependencies();
-    var propertyNames_1 = require_propertyNames();
-    var additionalProperties_1 = require_additionalProperties();
-    var properties_1 = require_properties();
-    var patternProperties_1 = require_patternProperties();
-    var not_1 = require_not();
-    var anyOf_1 = require_anyOf();
-    var oneOf_1 = require_oneOf();
-    var allOf_1 = require_allOf();
-    var if_1 = require_if();
-    var thenElse_1 = require_thenElse();
-    function getApplicator(draft2020 = false) {
-      const applicator = [
-        // any
-        not_1.default,
-        anyOf_1.default,
-        oneOf_1.default,
-        allOf_1.default,
-        if_1.default,
-        thenElse_1.default,
-        // object
-        propertyNames_1.default,
-        additionalProperties_1.default,
-        dependencies_1.default,
-        properties_1.default,
-        patternProperties_1.default
-      ];
-      if (draft2020)
-        applicator.push(prefixItems_1.default, items2020_1.default);
-      else
-        applicator.push(additionalItems_1.default, items_1.default);
-      applicator.push(contains_1.default);
-      return applicator;
-    }
-    exports2.default = getApplicator;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/format/format.js
-var require_format = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/format.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var error = {
-      message: ({ schemaCode }) => (0, codegen_1.str)`must match format "${schemaCode}"`,
-      params: ({ schemaCode }) => (0, codegen_1._)`{format: ${schemaCode}}`
-    };
-    var def = {
-      keyword: "format",
-      type: ["number", "string"],
-      schemaType: "string",
-      $data: true,
-      error,
-      code(cxt, ruleType) {
-        const { gen, data, $data, schema, schemaCode, it } = cxt;
-        const { opts, errSchemaPath, schemaEnv, self } = it;
-        if (!opts.validateFormats)
-          return;
-        if ($data)
-          validate$DataFormat();
-        else
-          validateFormat();
-        function validate$DataFormat() {
-          const fmts = gen.scopeValue("formats", {
-            ref: self.formats,
-            code: opts.code.formats
-          });
-          const fDef = gen.const("fDef", (0, codegen_1._)`${fmts}[${schemaCode}]`);
-          const fType = gen.let("fType");
-          const format = gen.let("format");
-          gen.if((0, codegen_1._)`typeof ${fDef} == "object" && !(${fDef} instanceof RegExp)`, () => gen.assign(fType, (0, codegen_1._)`${fDef}.type || "string"`).assign(format, (0, codegen_1._)`${fDef}.validate`), () => gen.assign(fType, (0, codegen_1._)`"string"`).assign(format, fDef));
-          cxt.fail$data((0, codegen_1.or)(unknownFmt(), invalidFmt()));
-          function unknownFmt() {
-            if (opts.strictSchema === false)
-              return codegen_1.nil;
-            return (0, codegen_1._)`${schemaCode} && !${format}`;
-          }
-          function invalidFmt() {
-            const callFormat = schemaEnv.$async ? (0, codegen_1._)`(${fDef}.async ? await ${format}(${data}) : ${format}(${data}))` : (0, codegen_1._)`${format}(${data})`;
-            const validData = (0, codegen_1._)`(typeof ${format} == "function" ? ${callFormat} : ${format}.test(${data}))`;
-            return (0, codegen_1._)`${format} && ${format} !== true && ${fType} === ${ruleType} && !${validData}`;
-          }
-        }
-        function validateFormat() {
-          const formatDef = self.formats[schema];
-          if (!formatDef) {
-            unknownFormat();
-            return;
-          }
-          if (formatDef === true)
-            return;
-          const [fmtType, format, fmtRef] = getFormat(formatDef);
-          if (fmtType === ruleType)
-            cxt.pass(validCondition());
-          function unknownFormat() {
-            if (opts.strictSchema === false) {
-              self.logger.warn(unknownMsg());
-              return;
-            }
-            throw new Error(unknownMsg());
-            function unknownMsg() {
-              return `unknown format "${schema}" ignored in schema at path "${errSchemaPath}"`;
-            }
-          }
-          function getFormat(fmtDef) {
-            const code = fmtDef instanceof RegExp ? (0, codegen_1.regexpCode)(fmtDef) : opts.code.formats ? (0, codegen_1._)`${opts.code.formats}${(0, codegen_1.getProperty)(schema)}` : void 0;
-            const fmt = gen.scopeValue("formats", { key: schema, ref: fmtDef, code });
-            if (typeof fmtDef == "object" && !(fmtDef instanceof RegExp)) {
-              return [fmtDef.type || "string", fmtDef.validate, (0, codegen_1._)`${fmt}.validate`];
-            }
-            return ["string", fmtDef, fmt];
-          }
-          function validCondition() {
-            if (typeof formatDef == "object" && !(formatDef instanceof RegExp) && formatDef.async) {
-              if (!schemaEnv.$async)
-                throw new Error("async format in sync schema");
-              return (0, codegen_1._)`await ${fmtRef}(${data})`;
-            }
-            return typeof format == "function" ? (0, codegen_1._)`${fmtRef}(${data})` : (0, codegen_1._)`${fmtRef}.test(${data})`;
-          }
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/format/index.js
-var require_format2 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/format/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var format_1 = require_format();
-    var format = [format_1.default];
-    exports2.default = format;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/metadata.js
-var require_metadata = __commonJS({
-  "node_modules/ajv/dist/vocabularies/metadata.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.contentVocabulary = exports2.metadataVocabulary = void 0;
-    exports2.metadataVocabulary = [
-      "title",
-      "description",
-      "default",
-      "deprecated",
-      "readOnly",
-      "writeOnly",
-      "examples"
-    ];
-    exports2.contentVocabulary = [
-      "contentMediaType",
-      "contentEncoding",
-      "contentSchema"
-    ];
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/draft7.js
-var require_draft7 = __commonJS({
-  "node_modules/ajv/dist/vocabularies/draft7.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var core_1 = require_core2();
-    var validation_1 = require_validation();
-    var applicator_1 = require_applicator();
-    var format_1 = require_format2();
-    var metadata_1 = require_metadata();
-    var draft7Vocabularies = [
-      core_1.default,
-      validation_1.default,
-      (0, applicator_1.default)(),
-      format_1.default,
-      metadata_1.metadataVocabulary,
-      metadata_1.contentVocabulary
-    ];
-    exports2.default = draft7Vocabularies;
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/discriminator/types.js
-var require_types = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/types.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.DiscrError = void 0;
-    var DiscrError;
-    (function(DiscrError2) {
-      DiscrError2["Tag"] = "tag";
-      DiscrError2["Mapping"] = "mapping";
-    })(DiscrError || (exports2.DiscrError = DiscrError = {}));
-  }
-});
-
-// node_modules/ajv/dist/vocabularies/discriminator/index.js
-var require_discriminator = __commonJS({
-  "node_modules/ajv/dist/vocabularies/discriminator/index.js"(exports2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    var codegen_1 = require_codegen();
-    var types_1 = require_types();
-    var compile_1 = require_compile();
-    var ref_error_1 = require_ref_error();
-    var util_1 = require_util();
-    var error = {
-      message: ({ params: { discrError, tagName } }) => discrError === types_1.DiscrError.Tag ? `tag "${tagName}" must be string` : `value of tag "${tagName}" must be in oneOf`,
-      params: ({ params: { discrError, tag, tagName } }) => (0, codegen_1._)`{error: ${discrError}, tag: ${tagName}, tagValue: ${tag}}`
-    };
-    var def = {
-      keyword: "discriminator",
-      type: "object",
-      schemaType: "object",
-      error,
-      code(cxt) {
-        const { gen, data, schema, parentSchema, it } = cxt;
-        const { oneOf } = parentSchema;
-        if (!it.opts.discriminator) {
-          throw new Error("discriminator: requires discriminator option");
-        }
-        const tagName = schema.propertyName;
-        if (typeof tagName != "string")
-          throw new Error("discriminator: requires propertyName");
-        if (schema.mapping)
-          throw new Error("discriminator: mapping is not supported");
-        if (!oneOf)
-          throw new Error("discriminator: requires oneOf keyword");
-        const valid = gen.let("valid", false);
-        const tag = gen.const("tag", (0, codegen_1._)`${data}${(0, codegen_1.getProperty)(tagName)}`);
-        gen.if((0, codegen_1._)`typeof ${tag} == "string"`, () => validateMapping(), () => cxt.error(false, { discrError: types_1.DiscrError.Tag, tag, tagName }));
-        cxt.ok(valid);
-        function validateMapping() {
-          const mapping = getMapping();
-          gen.if(false);
-          for (const tagValue in mapping) {
-            gen.elseIf((0, codegen_1._)`${tag} === ${tagValue}`);
-            gen.assign(valid, applyTagSchema(mapping[tagValue]));
-          }
-          gen.else();
-          cxt.error(false, { discrError: types_1.DiscrError.Mapping, tag, tagName });
-          gen.endIf();
-        }
-        function applyTagSchema(schemaProp) {
-          const _valid = gen.name("valid");
-          const schCxt = cxt.subschema({ keyword: "oneOf", schemaProp }, _valid);
-          cxt.mergeEvaluated(schCxt, codegen_1.Name);
-          return _valid;
-        }
-        function getMapping() {
-          var _a2;
-          const oneOfMapping = {};
-          const topRequired = hasRequired(parentSchema);
-          let tagRequired = true;
-          for (let i2 = 0; i2 < oneOf.length; i2++) {
-            let sch = oneOf[i2];
-            if ((sch === null || sch === void 0 ? void 0 : sch.$ref) && !(0, util_1.schemaHasRulesButRef)(sch, it.self.RULES)) {
-              const ref = sch.$ref;
-              sch = compile_1.resolveRef.call(it.self, it.schemaEnv.root, it.baseId, ref);
-              if (sch instanceof compile_1.SchemaEnv)
-                sch = sch.schema;
-              if (sch === void 0)
-                throw new ref_error_1.default(it.opts.uriResolver, it.baseId, ref);
-            }
-            const propSch = (_a2 = sch === null || sch === void 0 ? void 0 : sch.properties) === null || _a2 === void 0 ? void 0 : _a2[tagName];
-            if (typeof propSch != "object") {
-              throw new Error(`discriminator: oneOf subschemas (or referenced schemas) must have "properties/${tagName}"`);
-            }
-            tagRequired = tagRequired && (topRequired || hasRequired(sch));
-            addMappings(propSch, i2);
-          }
-          if (!tagRequired)
-            throw new Error(`discriminator: "${tagName}" must be required`);
-          return oneOfMapping;
-          function hasRequired({ required }) {
-            return Array.isArray(required) && required.includes(tagName);
-          }
-          function addMappings(sch, i2) {
-            if (sch.const) {
-              addMapping(sch.const, i2);
-            } else if (sch.enum) {
-              for (const tagValue of sch.enum) {
-                addMapping(tagValue, i2);
-              }
-            } else {
-              throw new Error(`discriminator: "properties/${tagName}" must have "const" or "enum"`);
-            }
-          }
-          function addMapping(tagValue, i2) {
-            if (typeof tagValue != "string" || tagValue in oneOfMapping) {
-              throw new Error(`discriminator: "${tagName}" values must be unique strings`);
-            }
-            oneOfMapping[tagValue] = i2;
-          }
-        }
-      }
-    };
-    exports2.default = def;
-  }
-});
-
-// node_modules/ajv/dist/refs/json-schema-draft-07.json
-var require_json_schema_draft_07 = __commonJS({
-  "node_modules/ajv/dist/refs/json-schema-draft-07.json"(exports2, module2) {
-    module2.exports = {
-      $schema: "http://json-schema.org/draft-07/schema#",
-      $id: "http://json-schema.org/draft-07/schema#",
-      title: "Core schema meta-schema",
-      definitions: {
-        schemaArray: {
-          type: "array",
-          minItems: 1,
-          items: { $ref: "#" }
-        },
-        nonNegativeInteger: {
-          type: "integer",
-          minimum: 0
-        },
-        nonNegativeIntegerDefault0: {
-          allOf: [{ $ref: "#/definitions/nonNegativeInteger" }, { default: 0 }]
-        },
-        simpleTypes: {
-          enum: ["array", "boolean", "integer", "null", "number", "object", "string"]
-        },
-        stringArray: {
-          type: "array",
-          items: { type: "string" },
-          uniqueItems: true,
-          default: []
-        }
-      },
-      type: ["object", "boolean"],
-      properties: {
-        $id: {
-          type: "string",
-          format: "uri-reference"
-        },
-        $schema: {
-          type: "string",
-          format: "uri"
-        },
-        $ref: {
-          type: "string",
-          format: "uri-reference"
-        },
-        $comment: {
-          type: "string"
-        },
-        title: {
-          type: "string"
-        },
-        description: {
-          type: "string"
-        },
-        default: true,
-        readOnly: {
-          type: "boolean",
-          default: false
-        },
-        examples: {
-          type: "array",
-          items: true
-        },
-        multipleOf: {
-          type: "number",
-          exclusiveMinimum: 0
-        },
-        maximum: {
-          type: "number"
-        },
-        exclusiveMaximum: {
-          type: "number"
-        },
-        minimum: {
-          type: "number"
-        },
-        exclusiveMinimum: {
-          type: "number"
-        },
-        maxLength: { $ref: "#/definitions/nonNegativeInteger" },
-        minLength: { $ref: "#/definitions/nonNegativeIntegerDefault0" },
-        pattern: {
-          type: "string",
-          format: "regex"
-        },
-        additionalItems: { $ref: "#" },
-        items: {
-          anyOf: [{ $ref: "#" }, { $ref: "#/definitions/schemaArray" }],
-          default: true
-        },
-        maxItems: { $ref: "#/definitions/nonNegativeInteger" },
-        minItems: { $ref: "#/definitions/nonNegativeIntegerDefault0" },
-        uniqueItems: {
-          type: "boolean",
-          default: false
-        },
-        contains: { $ref: "#" },
-        maxProperties: { $ref: "#/definitions/nonNegativeInteger" },
-        minProperties: { $ref: "#/definitions/nonNegativeIntegerDefault0" },
-        required: { $ref: "#/definitions/stringArray" },
-        additionalProperties: { $ref: "#" },
-        definitions: {
-          type: "object",
-          additionalProperties: { $ref: "#" },
-          default: {}
-        },
-        properties: {
-          type: "object",
-          additionalProperties: { $ref: "#" },
-          default: {}
-        },
-        patternProperties: {
-          type: "object",
-          additionalProperties: { $ref: "#" },
-          propertyNames: { format: "regex" },
-          default: {}
-        },
-        dependencies: {
-          type: "object",
-          additionalProperties: {
-            anyOf: [{ $ref: "#" }, { $ref: "#/definitions/stringArray" }]
-          }
-        },
-        propertyNames: { $ref: "#" },
-        const: true,
-        enum: {
-          type: "array",
-          items: true,
-          minItems: 1,
-          uniqueItems: true
-        },
-        type: {
-          anyOf: [
-            { $ref: "#/definitions/simpleTypes" },
-            {
-              type: "array",
-              items: { $ref: "#/definitions/simpleTypes" },
-              minItems: 1,
-              uniqueItems: true
-            }
-          ]
-        },
-        format: { type: "string" },
-        contentMediaType: { type: "string" },
-        contentEncoding: { type: "string" },
-        if: { $ref: "#" },
-        then: { $ref: "#" },
-        else: { $ref: "#" },
-        allOf: { $ref: "#/definitions/schemaArray" },
-        anyOf: { $ref: "#/definitions/schemaArray" },
-        oneOf: { $ref: "#/definitions/schemaArray" },
-        not: { $ref: "#" }
-      },
-      default: true
-    };
-  }
-});
-
-// node_modules/ajv/dist/ajv.js
-var require_ajv = __commonJS({
-  "node_modules/ajv/dist/ajv.js"(exports2, module2) {
-    "use strict";
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.MissingRefError = exports2.ValidationError = exports2.CodeGen = exports2.Name = exports2.nil = exports2.stringify = exports2.str = exports2._ = exports2.KeywordCxt = exports2.Ajv = void 0;
-    var core_1 = require_core();
-    var draft7_1 = require_draft7();
-    var discriminator_1 = require_discriminator();
-    var draft7MetaSchema = require_json_schema_draft_07();
-    var META_SUPPORT_DATA = ["/properties"];
-    var META_SCHEMA_ID = "http://json-schema.org/draft-07/schema";
-    var Ajv2 = class extends core_1.default {
-      _addVocabularies() {
-        super._addVocabularies();
-        draft7_1.default.forEach((v) => this.addVocabulary(v));
-        if (this.opts.discriminator)
-          this.addKeyword(discriminator_1.default);
-      }
-      _addDefaultMetaSchema() {
-        super._addDefaultMetaSchema();
-        if (!this.opts.meta)
-          return;
-        const metaSchema = this.opts.$data ? this.$dataMetaSchema(draft7MetaSchema, META_SUPPORT_DATA) : draft7MetaSchema;
-        this.addMetaSchema(metaSchema, META_SCHEMA_ID, false);
-        this.refs["http://json-schema.org/schema"] = META_SCHEMA_ID;
-      }
-      defaultMeta() {
-        return this.opts.defaultMeta = super.defaultMeta() || (this.getSchema(META_SCHEMA_ID) ? META_SCHEMA_ID : void 0);
-      }
-    };
-    exports2.Ajv = Ajv2;
-    module2.exports = exports2 = Ajv2;
-    module2.exports.Ajv = Ajv2;
-    Object.defineProperty(exports2, "__esModule", { value: true });
-    exports2.default = Ajv2;
-    var validate_1 = require_validate();
-    Object.defineProperty(exports2, "KeywordCxt", { enumerable: true, get: function() {
-      return validate_1.KeywordCxt;
-    } });
-    var codegen_1 = require_codegen();
-    Object.defineProperty(exports2, "_", { enumerable: true, get: function() {
-      return codegen_1._;
-    } });
-    Object.defineProperty(exports2, "str", { enumerable: true, get: function() {
-      return codegen_1.str;
-    } });
-    Object.defineProperty(exports2, "stringify", { enumerable: true, get: function() {
-      return codegen_1.stringify;
-    } });
-    Object.defineProperty(exports2, "nil", { enumerable: true, get: function() {
-      return codegen_1.nil;
-    } });
-    Object.defineProperty(exports2, "Name", { enumerable: true, get: function() {
-      return codegen_1.Name;
-    } });
-    Object.defineProperty(exports2, "CodeGen", { enumerable: true, get: function() {
-      return codegen_1.CodeGen;
-    } });
-    var validation_error_1 = require_validation_error();
-    Object.defineProperty(exports2, "ValidationError", { enumerable: true, get: function() {
-      return validation_error_1.default;
-    } });
-    var ref_error_1 = require_ref_error();
-    Object.defineProperty(exports2, "MissingRefError", { enumerable: true, get: function() {
-      return ref_error_1.default;
-    } });
-  }
-});
-
 // src/extension.ts
 var extension_exports = {};
 __export(extension_exports, {
@@ -14681,51 +8217,16 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode42 = __toESM(require("vscode"));
-var fs36 = __toESM(require("fs"));
-var path42 = __toESM(require("path"));
+var vscode35 = __toESM(require("vscode"));
+var fs28 = __toESM(require("fs"));
+var path36 = __toESM(require("path"));
 
-// src/providers/SetupStatusView.ts
-var crypto4 = __toESM(require("crypto"));
-var vscode11 = __toESM(require("vscode"));
-
-// src/utils/fileSystem.ts
+// src/commands/migrateSet.ts
 var vscode = __toESM(require("vscode"));
-var crypto = __toESM(require("crypto"));
-var fs4 = __toESM(require("fs"));
-var path4 = __toESM(require("path"));
-var YAML = __toESM(require_dist());
 
-// src/utils/git.ts
-var cp = __toESM(require("child_process"));
-var path = __toESM(require("path"));
-function listGitWorktrees(cwd) {
-  let out;
-  try {
-    out = cp.execFileSync("git", ["worktree", "list", "--porcelain"], {
-      cwd,
-      encoding: "utf8",
-      windowsHide: true,
-      maxBuffer: 1024 * 1024,
-      timeout: 5e3
-    });
-  } catch {
-    return [];
-  }
-  const paths = [];
-  for (const line of out.split(/\r?\n/)) {
-    if (line.startsWith("worktree ")) {
-      const wt = line.slice("worktree ".length).trim();
-      if (wt)
-        paths.push(path.resolve(wt));
-    }
-  }
-  return paths;
-}
-
-// src/utils/sessionState.ts
+// src/utils/migrateSessionState.ts
 var fs2 = __toESM(require("fs"));
-var path2 = __toESM(require("path"));
+var path = __toESM(require("path"));
 
 // src/utils/progress.ts
 var fs = __toESM(require("fs"));
@@ -15215,9 +8716,818 @@ function parseSessions(raw) {
   return out;
 }
 
-// src/utils/sessionState.ts
-var SCHEMA_VERSION = SCHEMA_VERSION_V4;
+// src/utils/migrateSessionState.ts
 var SESSION_STATE_FILENAME = "session-state.json";
+function isStrictPositiveInt2(v) {
+  return typeof v === "number" && Number.isInteger(v) && v > 0 && !Number.isNaN(v);
+}
+function stripLegacyCompleted(raw, total) {
+  if (!Array.isArray(raw))
+    return [];
+  const seen = /* @__PURE__ */ new Set();
+  const out = [];
+  for (const n of raw) {
+    if (isStrictPositiveInt2(n) && n >= 1 && n <= total && !seen.has(n)) {
+      out.push(n);
+      seen.add(n);
+    }
+  }
+  out.sort((a, b2) => a - b2);
+  return out;
+}
+function resolveTotal(state, specTitles) {
+  const candidates = [];
+  if (isStrictPositiveInt2(state.totalSessions))
+    candidates.push(state.totalSessions);
+  if (specTitles.size > 0)
+    candidates.push(Math.max(...specTitles.keys()));
+  if (isStrictPositiveInt2(state.currentSession))
+    candidates.push(state.currentSession);
+  if (Array.isArray(state.completedSessions)) {
+    for (const n of state.completedSessions) {
+      if (isStrictPositiveInt2(n))
+        candidates.push(n);
+    }
+  }
+  return candidates.length > 0 ? Math.max(...candidates) : 0;
+}
+function resolveLifecycleState(topStatus, raw) {
+  if (topStatus === SESSION_STATUS_COMPLETE)
+    return LIFECYCLE_STATE_CLOSED;
+  if (topStatus === "cancelled") {
+    return typeof raw === "string" && raw.length > 0 ? raw : LIFECYCLE_STATE_CLOSED;
+  }
+  if (topStatus === SESSION_STATUS_IN_PROGRESS) {
+    return typeof raw === "string" && raw.length > 0 ? raw : LIFECYCLE_STATE_WORK_IN_PROGRESS;
+  }
+  return typeof raw === "string" ? raw : null;
+}
+function buildV3Sessions(state, specTitles, total, useGenericTitles) {
+  const topStatus = canonicalizeStatus(state.status);
+  const lifecycle = state.lifecycleState;
+  const currentInt = isStrictPositiveInt2(state.currentSession) ? state.currentSession : null;
+  const legacyTotalInt = isStrictPositiveInt2(state.totalSessions) ? state.totalSessions : null;
+  const closedSignal = topStatus === SESSION_STATUS_COMPLETE && (lifecycle === LIFECYCLE_STATE_CLOSED || legacyTotalInt !== null && currentInt !== null && currentInt >= legacyTotalInt);
+  const completedLegacy = stripLegacyCompleted(state.completedSessions, total);
+  const completedSet = closedSignal ? new Set(Array.from({ length: total }, (_2, i2) => i2 + 1)) : new Set(completedLegacy);
+  let inProgressNumber = null;
+  if (topStatus === SESSION_STATUS_IN_PROGRESS && currentInt !== null && currentInt >= 1 && currentInt <= total && !completedSet.has(currentInt)) {
+    inProgressNumber = currentInt;
+  }
+  const sessions = [];
+  for (let n = 1; n <= total; n++) {
+    const title = useGenericTitles || !specTitles.has(n) ? `Session ${n}` : specTitles.get(n);
+    let status;
+    if (inProgressNumber !== null && n === inProgressNumber) {
+      status = SESSION_STATUS_IN_PROGRESS;
+    } else if (completedSet.has(n)) {
+      status = SESSION_STATUS_COMPLETE;
+    } else {
+      status = SESSION_STATUS_NOT_STARTED;
+    }
+    sessions.push({ number: n, title, status });
+  }
+  return sessions;
+}
+function deriveLegacyTriple(sessions) {
+  let current = null;
+  const completed = [];
+  for (const s of sessions) {
+    if (s.status === SESSION_STATUS_IN_PROGRESS) {
+      current = s.number;
+    } else if (s.status === SESSION_STATUS_COMPLETE) {
+      completed.push(s.number);
+    }
+  }
+  completed.sort((a, b2) => a - b2);
+  return { current, total: sessions.length, completed };
+}
+function atomicWriteJson(filePath, data) {
+  const dir = path.dirname(filePath);
+  const base = path.basename(filePath);
+  const tmp = path.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
+  const fd = fs2.openSync(tmp, "w");
+  try {
+    fs2.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs2.fsyncSync(fd);
+  } finally {
+    fs2.closeSync(fd);
+  }
+  fs2.renameSync(tmp, filePath);
+}
+function migrateOneSet(setDir, options = {}) {
+  const strategy = options.strategy ?? "regex";
+  const dryRun = options.dryRun ?? false;
+  const statePath = path.join(setDir, SESSION_STATE_FILENAME);
+  if (!fs2.existsSync(statePath)) {
+    return {
+      setDir,
+      action: "skipped-no-state",
+      reason: `${SESSION_STATE_FILENAME} not found`
+    };
+  }
+  let raw;
+  try {
+    raw = fs2.readFileSync(statePath, "utf-8");
+  } catch (exc) {
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `failed to read: ${msg}`,
+      error: msg
+    };
+  }
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch (exc) {
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `failed to parse: ${msg}`,
+      error: msg
+    };
+  }
+  if (state === null || typeof state !== "object" || Array.isArray(state)) {
+    const t2 = Array.isArray(state) ? "array" : typeof state;
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `top-level JSON is ${t2}, expected object`
+    };
+  }
+  const stateObj = state;
+  const schemaVersion = stateObj.schemaVersion;
+  if (typeof schemaVersion === "number" && schemaVersion > SCHEMA_VERSION_V3) {
+    return {
+      setDir,
+      action: "skipped-future-schema",
+      reason: `schemaVersion=${schemaVersion} is newer than this migrator (v${SCHEMA_VERSION_V3}); refusing to downgrade. Upgrade the migrator or hand-edit the file.`
+    };
+  }
+  if (schemaVersion === SCHEMA_VERSION_V3) {
+    if (Array.isArray(stateObj.sessions)) {
+      return {
+        setDir,
+        action: "skipped-v3",
+        reason: "already v3 (sessions[] present)"
+      };
+    }
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a v2 file. Hand-repair or restore from git."
+    };
+  }
+  const specMdPath = path.join(setDir, "spec.md");
+  const specTitlesArr = extractSessionTitlesFromSpec(specMdPath);
+  const specTitles = new Map(
+    specTitlesArr.map((t2) => [t2.number, t2.title])
+  );
+  const total = resolveTotal(stateObj, specTitles);
+  if (total < 1) {
+    return {
+      setDir,
+      action: "would-violate",
+      reason: "cannot determine totalSessions: no spec.md headings, no legacy totalSessions, no completedSessions, no currentSession"
+    };
+  }
+  const sessions = buildV3Sessions(
+    stateObj,
+    specTitles,
+    total,
+    strategy === "generic"
+  );
+  const topStatusRaw = stateObj.status;
+  const topStatus = canonicalizeStatus(topStatusRaw);
+  const lifecycleState = resolveLifecycleState(topStatus, stateObj.lifecycleState);
+  try {
+    validateInvariants(sessions, topStatus, lifecycleState);
+  } catch (exc) {
+    if (exc instanceof SessionStateInvariantError) {
+      return {
+        setDir,
+        action: "would-violate",
+        reason: exc.message,
+        error: exc.message
+      };
+    }
+    throw exc;
+  }
+  const { current, total: derivedTotal, completed } = deriveLegacyTriple(sessions);
+  const out = { ...stateObj };
+  out.schemaVersion = SCHEMA_VERSION_V3;
+  out.sessions = sessions;
+  if (topStatus !== null && topStatus !== topStatusRaw) {
+    out.status = topStatus;
+  }
+  if (lifecycleState !== null || "lifecycleState" in out) {
+    out.lifecycleState = lifecycleState;
+  }
+  out.currentSession = current;
+  out.totalSessions = derivedTotal;
+  out.completedSessions = completed;
+  if (!dryRun) {
+    atomicWriteJson(statePath, out);
+  }
+  return {
+    setDir,
+    action: "migrated",
+    reason: `migrated using ${strategy} strategy`
+  };
+}
+
+// src/commands/migrateSet.ts
+var STRATEGY_CHOICES = [
+  {
+    label: "$(symbol-text)  Use spec.md headings",
+    description: "Regex extraction \xB7 deterministic \xB7 zero cost",
+    detail: "Reads `### Session K of N: <title>` headings from spec.md. Recommended for normal session sets.",
+    strategy: "regex"
+  },
+  {
+    label: "$(symbol-numeric)  Use generic labels",
+    description: "Fallback \xB7 'Session 1', 'Session 2', \u2026",
+    detail: "Use when spec.md is intentionally missing or you want neutral, stable labels independent of heading drift.",
+    strategy: "generic"
+  }
+];
+function registerMigrateSetCommand(context, deps) {
+  context.subscriptions.push(
+    vscode.commands.registerCommand(
+      "dabblerSessionSets.migrate",
+      async (treeItem) => {
+        const set = treeItem?.set;
+        if (!set) {
+          vscode.window.showErrorMessage(
+            "Migrate to v3 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
+          );
+          return;
+        }
+        if (!set.needsMigration) {
+          vscode.window.showInformationMessage(
+            `${set.name} is already on schema v3 \u2014 nothing to migrate.`
+          );
+          return;
+        }
+        const choice = await vscode.window.showQuickPick(STRATEGY_CHOICES, {
+          title: `Migrate ${set.name} to v3 schema`,
+          placeHolder: "Choose how session titles should be derived",
+          ignoreFocusOut: true
+        });
+        if (!choice)
+          return;
+        await runMigrator(set, choice.strategy, deps);
+      }
+    )
+  );
+}
+async function runMigrator(set, strategy, deps) {
+  await vscode.window.withProgress(
+    {
+      location: vscode.ProgressLocation.Notification,
+      title: `Migrating ${set.name} to v3 schema (${strategy})\u2026`,
+      cancellable: false
+    },
+    async () => {
+      let result;
+      try {
+        result = migrateOneSet(set.dir, { strategy });
+      } catch (exc) {
+        const msg = exc instanceof Error ? exc.message : String(exc);
+        vscode.window.showErrorMessage(
+          `Migration of ${set.name} failed with an unexpected error: ${msg}`
+        );
+        return;
+      }
+      handleMigrationResult(set, strategy, result, deps);
+    }
+  );
+}
+function handleMigrationResult(set, strategy, result, deps) {
+  if (result.action === "migrated") {
+    vscode.window.showInformationMessage(
+      `${set.name} migrated to v3 schema (${strategy}). The tree will refresh shortly; the (needs migration) badge clears on the next read.`
+    );
+    deps.refreshView();
+    return;
+  }
+  if (result.action === "skipped-v3") {
+    vscode.window.showInformationMessage(
+      `${set.name} is already v3 \u2014 no changes written.`
+    );
+    deps.refreshView();
+    return;
+  }
+  if (result.action === "would-violate") {
+    vscode.window.showWarningMessage(
+      `Migration of ${set.name} stopped: the resulting v3 file would violate schema invariants. Reason: ${result.reason}. Try the other strategy (regex \u2194 generic) or hand-repair the state file before retrying.`
+    );
+    return;
+  }
+  vscode.window.showWarningMessage(
+    `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
+  );
+}
+
+// src/commands/migrateSetV4.ts
+var vscode2 = __toESM(require("vscode"));
+
+// src/utils/migrateSessionStateV4.ts
+var fs3 = __toESM(require("fs"));
+var path2 = __toESM(require("path"));
+var SESSION_STATE_FILENAME2 = "session-state.json";
+var BACKUP_FILENAME = "session-state.v3.bak.json";
+var SWEEP_BACKUP_FILENAME = "session-state.pre-049-sweep.bak.json";
+var RETIRED_ORCHESTRATOR_KEYS = [
+  "chatSessionId",
+  "checkedOutAt",
+  "lastActivityAt"
+];
+var V4_TOP_LEVEL_DROPPED_KEYS = [
+  "lifecycleState",
+  "currentSession",
+  "totalSessions",
+  "completedSessions",
+  "startedAt",
+  "completedAt",
+  "orchestrator",
+  "verificationVerdict"
+];
+var V4_TOP_LEVEL_PRESERVED_KEYS = [
+  "schemaVersion",
+  "sessionSetName",
+  "status",
+  "sessions"
+];
+var V4_TOP_LEVEL_PASSTHROUGH_KEYS = [
+  "preCancelStatus",
+  "forceClosed"
+];
+function stripRetiredOrchestratorKeys(block) {
+  if (block === null || typeof block !== "object" || Array.isArray(block)) {
+    return [block, false];
+  }
+  const obj = block;
+  let changed = false;
+  const out = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (RETIRED_ORCHESTRATOR_KEYS.includes(key)) {
+      changed = true;
+      continue;
+    }
+    out[key] = value;
+  }
+  return [out, changed];
+}
+function sweepOrchestratorBlocks(state) {
+  let changed = false;
+  let newState = state;
+  const topOrch = state.orchestrator;
+  if (topOrch !== null && typeof topOrch === "object" && !Array.isArray(topOrch)) {
+    const [swept, topChanged] = stripRetiredOrchestratorKeys(topOrch);
+    if (topChanged) {
+      newState = { ...state };
+      newState.orchestrator = swept;
+      changed = true;
+    }
+  }
+  const sessions = state.sessions;
+  if (Array.isArray(sessions)) {
+    const newSessions = [];
+    let sessionsChanged = false;
+    for (const entry of sessions) {
+      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+        newSessions.push(entry);
+        continue;
+      }
+      const entryObj = entry;
+      const [swept, entryChanged] = stripRetiredOrchestratorKeys(
+        entryObj.orchestrator
+      );
+      if (entryChanged) {
+        newSessions.push({ ...entryObj, orchestrator: swept });
+        sessionsChanged = true;
+      } else {
+        newSessions.push(entry);
+      }
+    }
+    if (sessionsChanged) {
+      if (newState === state) {
+        newState = { ...state };
+      }
+      newState.sessions = newSessions;
+      changed = true;
+    }
+  }
+  return [newState, changed];
+}
+function buildV4OnDiskShape(normalized, original) {
+  const out = {};
+  for (const key of V4_TOP_LEVEL_PRESERVED_KEYS) {
+    if (key === "schemaVersion") {
+      out[key] = SCHEMA_VERSION_V4;
+    } else if (key === "status") {
+      const canon = canonicalizeStatus(
+        normalized.status ?? null
+      );
+      out[key] = canon ?? normalized.status ?? null;
+    } else if (key === "sessions") {
+      out[key] = normalized.sessions ?? [];
+    } else {
+      out[key] = normalized[key] ?? null;
+    }
+  }
+  for (const key of V4_TOP_LEVEL_PASSTHROUGH_KEYS) {
+    if (key in original) {
+      out[key] = original[key];
+    }
+  }
+  for (const key of V4_TOP_LEVEL_DROPPED_KEYS) {
+    delete out[key];
+  }
+  return out;
+}
+function atomicWriteJson2(filePath, data) {
+  const dir = path2.dirname(filePath);
+  const base = path2.basename(filePath);
+  const tmp = path2.join(
+    dir,
+    `.${base}.tmp.${process.pid}.${Date.now()}`
+  );
+  const fd = fs3.openSync(tmp, "w");
+  try {
+    fs3.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
+    fs3.fsyncSync(fd);
+  } finally {
+    fs3.closeSync(fd);
+  }
+  try {
+    fs3.renameSync(tmp, filePath);
+  } catch (exc) {
+    try {
+      fs3.unlinkSync(tmp);
+    } catch {
+    }
+    throw exc;
+  }
+}
+function atomicCopyJson(src, dst) {
+  const raw = JSON.parse(fs3.readFileSync(src, "utf-8"));
+  atomicWriteJson2(dst, raw);
+}
+function migrateOneSetV4(setDir, options = {}) {
+  const dryRun = options.dryRun ?? false;
+  const statePath = path2.join(setDir, SESSION_STATE_FILENAME2);
+  const backupPath = path2.join(setDir, BACKUP_FILENAME);
+  if (!fs3.existsSync(statePath)) {
+    return {
+      setDir,
+      action: "skipped-no-state",
+      reason: `${SESSION_STATE_FILENAME2} not found`
+    };
+  }
+  let raw;
+  try {
+    raw = fs3.readFileSync(statePath, "utf-8");
+  } catch (exc) {
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `failed to read: ${msg}`,
+      error: msg
+    };
+  }
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch (exc) {
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `failed to parse: ${msg}`,
+      error: msg
+    };
+  }
+  if (state === null || typeof state !== "object" || Array.isArray(state)) {
+    const t2 = Array.isArray(state) ? "array" : typeof state;
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `top-level JSON is ${t2}, expected object`
+    };
+  }
+  const stateObj = state;
+  const schemaVersion = stateObj.schemaVersion;
+  if (typeof schemaVersion === "number" && schemaVersion > SCHEMA_VERSION_V4) {
+    return {
+      setDir,
+      action: "skipped-future-schema",
+      reason: `schemaVersion=${schemaVersion} is newer than this migrator (v${SCHEMA_VERSION_V4}); refusing to downgrade. Upgrade the migrator or hand-edit the file.`,
+      before: state
+    };
+  }
+  if (typeof schemaVersion === "number" && schemaVersion >= SCHEMA_VERSION_V4) {
+    const [sweptState, swept] = sweepOrchestratorBlocks(stateObj);
+    if (!swept) {
+      return {
+        setDir,
+        action: "skipped-v4",
+        reason: `already v4 (schemaVersion=${schemaVersion})`,
+        before: state,
+        after: state
+      };
+    }
+    if (dryRun) {
+      return {
+        setDir,
+        action: "swept-orchestrator",
+        reason: `v4 \u2192 v4 (orchestrator-block sweep: stripping ${RETIRED_ORCHESTRATOR_KEYS.join(", ")}; dry-run, no write performed)`,
+        before: state,
+        after: sweptState
+      };
+    }
+    const sweepBackupPath = path2.join(setDir, SWEEP_BACKUP_FILENAME);
+    try {
+      atomicCopyJson(statePath, sweepBackupPath);
+    } catch (exc) {
+      const msg = exc instanceof Error ? exc.message : String(exc);
+      return {
+        setDir,
+        action: "failed-backup",
+        reason: `could not write backup at ${sweepBackupPath}: ${msg}`,
+        error: msg,
+        before: state
+      };
+    }
+    try {
+      atomicWriteJson2(statePath, sweptState);
+    } catch (exc) {
+      const msg = exc instanceof Error ? exc.message : String(exc);
+      return {
+        setDir,
+        action: "failed-backup",
+        reason: `backup written at ${sweepBackupPath} but state-file write failed: ${msg}. Restore the backup via the rollback procedure at docs/v3-to-v4-rollback-procedure.md.`,
+        error: msg,
+        before: state,
+        backupPath: sweepBackupPath
+      };
+    }
+    return {
+      setDir,
+      action: "swept-orchestrator",
+      reason: `v4 \u2192 v4 (orchestrator-block sweep: stripped ${RETIRED_ORCHESTRATOR_KEYS.join(", ")})`,
+      before: state,
+      after: sweptState,
+      backupPath: sweepBackupPath
+    };
+  }
+  if (!(typeof schemaVersion === "number" && schemaVersion === SCHEMA_VERSION_V3)) {
+    return {
+      setDir,
+      action: "skipped-not-v3",
+      reason: `schemaVersion=${JSON.stringify(schemaVersion)} is not v${SCHEMA_VERSION_V3}; the v3\u2192v4 migrator only operates on v3 input. Right-click the row and run "Migrate to v3 schema" first, then re-run "Migrate to v4 schema".`,
+      before: state
+    };
+  }
+  if (!Array.isArray(stateObj.sessions)) {
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a downgrade candidate. Hand-repair or restore from git, then re-run.",
+      before: state
+    };
+  }
+  const specMdPath = path2.join(setDir, "spec.md");
+  let normalized;
+  try {
+    normalized = normalizeToV4Shape(stateObj, specMdPath);
+  } catch (exc) {
+    if (exc instanceof SessionStateInvariantError) {
+      return {
+        setDir,
+        action: "would-violate",
+        reason: exc.message,
+        error: exc.message,
+        before: state
+      };
+    }
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "skipped-malformed",
+      reason: `normalizeToV4Shape rejected the input: ${msg}`,
+      error: msg,
+      before: state
+    };
+  }
+  try {
+    getProgress(normalized);
+  } catch (exc) {
+    if (exc instanceof SessionStateInvariantError) {
+      return {
+        setDir,
+        action: "would-violate",
+        reason: exc.message,
+        error: exc.message,
+        before: state
+      };
+    }
+    throw exc;
+  }
+  let newState = buildV4OnDiskShape(normalized, stateObj);
+  const [sweptNewState] = sweepOrchestratorBlocks(newState);
+  newState = sweptNewState;
+  if (dryRun) {
+    return {
+      setDir,
+      action: "migrated",
+      reason: "v3 \u2192 v4 (dry-run; no write performed)",
+      before: state,
+      after: newState
+    };
+  }
+  try {
+    atomicCopyJson(statePath, backupPath);
+  } catch (exc) {
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "failed-backup",
+      reason: `could not write backup at ${backupPath}: ${msg}`,
+      error: msg,
+      before: state
+    };
+  }
+  try {
+    atomicWriteJson2(statePath, newState);
+  } catch (exc) {
+    const msg = exc instanceof Error ? exc.message : String(exc);
+    return {
+      setDir,
+      action: "failed-backup",
+      reason: `backup written at ${backupPath} but state-file write failed: ${msg}. Restore the backup via the rollback procedure at docs/v3-to-v4-rollback-procedure.md.`,
+      error: msg,
+      before: state,
+      backupPath
+    };
+  }
+  return {
+    setDir,
+    action: "migrated",
+    reason: "v3 \u2192 v4",
+    before: state,
+    after: newState,
+    backupPath
+  };
+}
+
+// src/commands/migrateSetV4.ts
+function registerMigrateSetV4Command(context, deps) {
+  context.subscriptions.push(
+    vscode2.commands.registerCommand(
+      "dabblerSessionSets.migrateToV4",
+      async (treeItem) => {
+        const set = treeItem?.set;
+        if (!set) {
+          vscode2.window.showErrorMessage(
+            "Migrate to v4 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
+          );
+          return;
+        }
+        if (set.migrationTargetSchemaVersion !== 4) {
+          if (set.migrationTargetSchemaVersion === 3) {
+            vscode2.window.showInformationMessage(
+              `${set.name} is at v1/v2 (or broken v3) \u2014 run "Migrate to v3 schema" first, then re-run this command.`
+            );
+          } else {
+            vscode2.window.showInformationMessage(
+              `${set.name} is already on schema v4 \u2014 nothing to migrate.`
+            );
+          }
+          return;
+        }
+        const confirm = await vscode2.window.showInformationMessage(
+          `Migrate ${set.name} to v4 schema? This will rewrite session-state.json in v4 shape and write a backup at session-state.v3.bak.json alongside it for rollback.`,
+          { modal: true },
+          "Migrate"
+        );
+        if (confirm !== "Migrate")
+          return;
+        await runMigratorV4(set, deps);
+      }
+    )
+  );
+}
+async function runMigratorV4(set, deps) {
+  await vscode2.window.withProgress(
+    {
+      location: vscode2.ProgressLocation.Notification,
+      title: `Migrating ${set.name} to v4 schema\u2026`,
+      cancellable: false
+    },
+    async () => {
+      let result;
+      try {
+        result = migrateOneSetV4(set.dir, { dryRun: false });
+      } catch (exc) {
+        const msg = exc instanceof Error ? exc.message : String(exc);
+        vscode2.window.showErrorMessage(
+          `Migration of ${set.name} to v4 failed with an unexpected error: ${msg}`
+        );
+        return;
+      }
+      handleMigrationResultV4(set, result, deps);
+    }
+  );
+}
+function handleMigrationResultV4(set, result, deps) {
+  if (result.action === "migrated") {
+    vscode2.window.showInformationMessage(
+      `${set.name} migrated to v4 schema. Backup at session-state.v3.bak.json. The tree will refresh shortly; the (needs migration) badge clears on the next read.`
+    );
+    deps.refreshView();
+    return;
+  }
+  if (result.action === "skipped-v4") {
+    vscode2.window.showInformationMessage(
+      `${set.name} is already v4 \u2014 no changes written.`
+    );
+    deps.refreshView();
+    return;
+  }
+  if (result.action === "skipped-not-v3") {
+    vscode2.window.showWarningMessage(
+      `Migration of ${set.name} to v4 was skipped: ${result.reason}`
+    );
+    return;
+  }
+  if (result.action === "would-violate") {
+    vscode2.window.showWarningMessage(
+      `Migration of ${set.name} stopped: the resulting v4 file would violate schema invariants. Reason: ${result.reason}. Hand-repair the state file before retrying.`
+    );
+    return;
+  }
+  if (result.action === "failed-backup") {
+    if (result.backupPath) {
+      vscode2.window.showErrorMessage(
+        `Migration of ${set.name} failed AFTER backup was written at ${result.backupPath}. ${result.reason} See docs/v3-to-v4-rollback-procedure.md to restore.`
+      );
+    } else {
+      vscode2.window.showErrorMessage(
+        `Migration of ${set.name} could not write its backup: ${result.reason}. The state file was not modified \u2014 fix the filesystem issue (permissions / disk space) and re-run. No rollback needed.`
+      );
+    }
+    return;
+  }
+  vscode2.window.showWarningMessage(
+    `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
+  );
+}
+
+// src/utils/fileSystem.ts
+var vscode3 = __toESM(require("vscode"));
+var crypto = __toESM(require("crypto"));
+var fs6 = __toESM(require("fs"));
+var path6 = __toESM(require("path"));
+var YAML = __toESM(require_dist());
+
+// src/utils/git.ts
+var cp = __toESM(require("child_process"));
+var path3 = __toESM(require("path"));
+function listGitWorktrees(cwd) {
+  let out;
+  try {
+    out = cp.execFileSync("git", ["worktree", "list", "--porcelain"], {
+      cwd,
+      encoding: "utf8",
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+      timeout: 5e3
+    });
+  } catch {
+    return [];
+  }
+  const paths = [];
+  for (const line of out.split(/\r?\n/)) {
+    if (line.startsWith("worktree ")) {
+      const wt = line.slice("worktree ".length).trim();
+      if (wt)
+        paths.push(path3.resolve(wt));
+    }
+  }
+  return paths;
+}
+
+// src/utils/sessionState.ts
+var fs4 = __toESM(require("fs"));
+var path4 = __toESM(require("path"));
+var SCHEMA_VERSION = SCHEMA_VERSION_V4;
+var SESSION_STATE_FILENAME3 = "session-state.json";
 function buildSessions(totalSessions, topStatus, specTitles) {
   if (totalSessions === null || totalSessions <= 0)
     return void 0;
@@ -15265,10 +9575,10 @@ function totalSessionsFromSpecText(text, specTitles) {
   return maxN > 0 ? maxN : null;
 }
 function readSpecOnce(sessionSetDir) {
-  const specPath = path2.join(sessionSetDir, "spec.md");
+  const specPath = path4.join(sessionSetDir, "spec.md");
   let text;
   try {
-    text = fs2.readFileSync(specPath, "utf8");
+    text = fs4.readFileSync(specPath, "utf8");
   } catch {
     return { titles: /* @__PURE__ */ new Map(), total: null };
   }
@@ -15280,7 +9590,7 @@ function notStartedPayload(sessionSetDir) {
   const sessions = buildSessions(total, "not-started", titles);
   const base = {
     schemaVersion: SCHEMA_VERSION,
-    sessionSetName: path2.basename(sessionSetDir.replace(/[\\/]+$/, "")),
+    sessionSetName: path4.basename(sessionSetDir.replace(/[\\/]+$/, "")),
     status: "not-started"
   };
   if (sessions !== void 0) {
@@ -15289,8 +9599,8 @@ function notStartedPayload(sessionSetDir) {
   return base;
 }
 function inferStateInMemory(sessionSetDir) {
-  const changelogPath = path2.join(sessionSetDir, "change-log.md");
-  if (fs2.existsSync(changelogPath)) {
+  const changelogPath = path4.join(sessionSetDir, "change-log.md");
+  if (fs4.existsSync(changelogPath)) {
     const base = notStartedPayload(sessionSetDir);
     if (!Array.isArray(base.sessions)) {
       return base;
@@ -15302,12 +9612,12 @@ function inferStateInMemory(sessionSetDir) {
     }
     return base;
   }
-  const activityPath = path2.join(sessionSetDir, "activity-log.json");
-  if (fs2.existsSync(activityPath)) {
+  const activityPath = path4.join(sessionSetDir, "activity-log.json");
+  if (fs4.existsSync(activityPath)) {
     let entries = null;
     let readable = true;
     try {
-      const data = JSON.parse(fs2.readFileSync(activityPath, "utf8"));
+      const data = JSON.parse(fs4.readFileSync(activityPath, "utf8"));
       if (Array.isArray(data)) {
         entries = data;
       } else if (data && typeof data === "object" && Array.isArray(data.entries)) {
@@ -15343,7 +9653,7 @@ function inferStateInMemory(sessionSetDir) {
   return notStartedPayload(sessionSetDir);
 }
 function loadCanonicalStatus(filePath) {
-  const raw = fs2.readFileSync(filePath, "utf8");
+  const raw = fs4.readFileSync(filePath, "utf8");
   const parsed = JSON.parse(raw);
   if (typeof parsed !== "object" || parsed === null) {
     throw new Error(
@@ -15359,8 +9669,8 @@ function loadCanonicalStatus(filePath) {
   return canonicalizeStatus2(status);
 }
 function readStatus(sessionSetDir) {
-  const filePath = path2.join(sessionSetDir, SESSION_STATE_FILENAME);
-  if (fs2.existsSync(filePath)) {
+  const filePath = path4.join(sessionSetDir, SESSION_STATE_FILENAME3);
+  if (fs4.existsSync(filePath)) {
     return loadCanonicalStatus(filePath);
   }
   const inferred = inferStateInMemory(sessionSetDir).status;
@@ -15368,12 +9678,12 @@ function readStatus(sessionSetDir) {
 }
 
 // src/utils/cancelLifecycle.ts
-var fs3 = __toESM(require("fs"));
-var path3 = __toESM(require("path"));
+var fs5 = __toESM(require("fs"));
+var path5 = __toESM(require("path"));
 var CANCELLED_FILENAME = "CANCELLED.md";
 var RESTORED_FILENAME = "RESTORED.md";
-var SESSION_STATE_FILENAME2 = "session-state.json";
-var V4_TOP_LEVEL_DROPPED_KEYS = [
+var SESSION_STATE_FILENAME4 = "session-state.json";
+var V4_TOP_LEVEL_DROPPED_KEYS2 = [
   "lifecycleState",
   "currentSession",
   "totalSessions",
@@ -15399,7 +9709,7 @@ function formatLocalIsoSeconds(d) {
   return `${yyyy}-${mm}-${dd}T${HH}:${MM}:${SS}${sign}${offH}:${offM}`;
 }
 function isCancelled(sessionSetDir) {
-  return fs3.existsSync(path3.join(sessionSetDir, CANCELLED_FILENAME));
+  return fs5.existsSync(path5.join(sessionSetDir, CANCELLED_FILENAME));
 }
 function readCancellationState(sessionSetDir) {
   const state = readSessionState(sessionSetDir);
@@ -15410,25 +9720,25 @@ function readCancellationState(sessionSetDir) {
   }
   if (state.status === "cancelled")
     return "cancelled";
-  if (fs3.existsSync(path3.join(sessionSetDir, RESTORED_FILENAME))) {
+  if (fs5.existsSync(path5.join(sessionSetDir, RESTORED_FILENAME))) {
     return "restored";
   }
   return "active";
 }
 function atomicWriteFile(filePath, content) {
-  const directory = path3.dirname(filePath);
-  const base = path3.basename(filePath);
-  const tmpPath = path3.join(
+  const directory = path5.dirname(filePath);
+  const base = path5.basename(filePath);
+  const tmpPath = path5.join(
     directory,
     `.${base}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`
   );
   try {
-    fs3.writeFileSync(tmpPath, content, { encoding: "utf8" });
-    fs3.renameSync(tmpPath, filePath);
+    fs5.writeFileSync(tmpPath, content, { encoding: "utf8" });
+    fs5.renameSync(tmpPath, filePath);
   } catch (err) {
-    if (fs3.existsSync(tmpPath)) {
+    if (fs5.existsSync(tmpPath)) {
       try {
-        fs3.unlinkSync(tmpPath);
+        fs5.unlinkSync(tmpPath);
       } catch {
       }
     }
@@ -15456,11 +9766,11 @@ ${newEntry}${afterHeader}`;
 ${newEntry}${existing}`;
 }
 function readSessionState(sessionSetDir) {
-  const statePath = path3.join(sessionSetDir, SESSION_STATE_FILENAME2);
-  if (!fs3.existsSync(statePath))
+  const statePath = path5.join(sessionSetDir, SESSION_STATE_FILENAME4);
+  if (!fs5.existsSync(statePath))
     return null;
   try {
-    const raw = fs3.readFileSync(statePath, "utf8");
+    const raw = fs5.readFileSync(statePath, "utf8");
     const parsed = JSON.parse(raw);
     if (typeof parsed === "object" && parsed !== null) {
       return parsed;
@@ -15470,11 +9780,11 @@ function readSessionState(sessionSetDir) {
   return null;
 }
 function writeSessionState(sessionSetDir, state) {
-  const statePath = path3.join(sessionSetDir, SESSION_STATE_FILENAME2);
+  const statePath = path5.join(sessionSetDir, SESSION_STATE_FILENAME4);
   atomicWriteFile(statePath, JSON.stringify(state, null, 2) + "\n");
 }
 function toV4OnDiskShape(state, sessionSetDir) {
-  const specMdPath = path3.join(sessionSetDir, "spec.md");
+  const specMdPath = path5.join(sessionSetDir, "spec.md");
   let normalized;
   try {
     normalized = normalizeToV4Shape(
@@ -15489,7 +9799,7 @@ function toV4OnDiskShape(state, sessionSetDir) {
   }
   const out = {
     schemaVersion: SCHEMA_VERSION_V4,
-    sessionSetName: normalized.sessionSetName ?? state.sessionSetName ?? path3.basename(sessionSetDir.replace(/[\\/]+$/, "")),
+    sessionSetName: normalized.sessionSetName ?? state.sessionSetName ?? path5.basename(sessionSetDir.replace(/[\\/]+$/, "")),
     status: normalized.status ?? state.status
   };
   const inputHasSessions = Array.isArray(state.sessions);
@@ -15512,7 +9822,7 @@ function toV4OnDiskShape(state, sessionSetDir) {
       out[passthroughKey] = state[passthroughKey];
     }
   }
-  for (const key of V4_TOP_LEVEL_DROPPED_KEYS) {
+  for (const key of V4_TOP_LEVEL_DROPPED_KEYS2) {
     if (isPlanless && (key === "orchestrator" || key === "startedAt")) {
       continue;
     }
@@ -15521,21 +9831,21 @@ function toV4OnDiskShape(state, sessionSetDir) {
   return out;
 }
 function inferStatusFromFiles(sessionSetDir) {
-  if (fs3.existsSync(path3.join(sessionSetDir, "change-log.md"))) {
+  if (fs5.existsSync(path5.join(sessionSetDir, "change-log.md"))) {
     return "complete";
   }
-  if (fs3.existsSync(path3.join(sessionSetDir, "activity-log.json"))) {
+  if (fs5.existsSync(path5.join(sessionSetDir, "activity-log.json"))) {
     return "in-progress";
   }
   return "not-started";
 }
 async function cancelSessionSet(sessionSetDir, reason = "") {
-  const cancelledPath = path3.join(sessionSetDir, CANCELLED_FILENAME);
-  const restoredPath = path3.join(sessionSetDir, RESTORED_FILENAME);
-  if (fs3.existsSync(restoredPath) && !fs3.existsSync(cancelledPath)) {
-    fs3.renameSync(restoredPath, cancelledPath);
+  const cancelledPath = path5.join(sessionSetDir, CANCELLED_FILENAME);
+  const restoredPath = path5.join(sessionSetDir, RESTORED_FILENAME);
+  if (fs5.existsSync(restoredPath) && !fs5.existsSync(cancelledPath)) {
+    fs5.renameSync(restoredPath, cancelledPath);
   }
-  const existing = fs3.existsSync(cancelledPath) ? fs3.readFileSync(cancelledPath, "utf8") : null;
+  const existing = fs5.existsSync(cancelledPath) ? fs5.readFileSync(cancelledPath, "utf8") : null;
   const updated = prependEntry(existing, "Cancelled", reason, formatLocalIsoSeconds(/* @__PURE__ */ new Date()));
   atomicWriteFile(cancelledPath, updated);
   const state = readSessionState(sessionSetDir);
@@ -15549,14 +9859,14 @@ async function cancelSessionSet(sessionSetDir, reason = "") {
   }
 }
 async function restoreSessionSet(sessionSetDir, reason = "") {
-  const cancelledPath = path3.join(sessionSetDir, CANCELLED_FILENAME);
-  const restoredPath = path3.join(sessionSetDir, RESTORED_FILENAME);
-  if (!fs3.existsSync(cancelledPath)) {
+  const cancelledPath = path5.join(sessionSetDir, CANCELLED_FILENAME);
+  const restoredPath = path5.join(sessionSetDir, RESTORED_FILENAME);
+  if (!fs5.existsSync(cancelledPath)) {
     throw new Error(
       `restoreSessionSet: ${cancelledPath} does not exist; nothing to restore`
     );
   }
-  const existing = fs3.readFileSync(cancelledPath, "utf8");
+  const existing = fs5.readFileSync(cancelledPath, "utf8");
   const updated = prependEntry(existing, "Restored", reason, formatLocalIsoSeconds(/* @__PURE__ */ new Date()));
   atomicWriteFile(restoredPath, updated);
   const state = readSessionState(sessionSetDir);
@@ -15571,7 +9881,7 @@ async function restoreSessionSet(sessionSetDir, reason = "") {
     writeSessionState(sessionSetDir, v4State);
   }
   try {
-    fs3.unlinkSync(cancelledPath);
+    fs5.unlinkSync(cancelledPath);
   } catch {
   }
 }
@@ -15771,20 +10081,20 @@ function stepRowLabel(row) {
 }
 
 // src/utils/fileSystem.ts
-var SESSION_SETS_REL = path4.join("docs", "session-sets");
-var MODULES_MANIFEST_REL = path4.join("docs", "modules.yaml");
+var SESSION_SETS_REL = path6.join("docs", "session-sets");
+var MODULES_MANIFEST_REL = path6.join("docs", "modules.yaml");
 var PLAYWRIGHT_REL_DEFAULT = "tests";
 function listSessionSetDirNames(root) {
-  const dir = path4.join(root, SESSION_SETS_REL);
-  if (!fs4.existsSync(dir))
+  const dir = path6.join(root, SESSION_SETS_REL);
+  if (!fs6.existsSync(dir))
     return [];
-  return fs4.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith("_")).map((e) => e.name).sort();
+  return fs6.readdirSync(dir, { withFileTypes: true }).filter((e) => e.isDirectory() && !e.name.startsWith("_")).map((e) => e.name).sort();
 }
 var NODE_EXCLUSIVE_WRITE_OPS = {
-  lstat: (p2) => void fs4.lstatSync(p2),
-  writeExclusive: (p2, data) => fs4.writeFileSync(p2, data, { encoding: "utf8", flag: "wx" }),
-  link: (from, to) => fs4.linkSync(from, to),
-  remove: (p2) => fs4.rmSync(p2, { force: true })
+  lstat: (p2) => void fs6.lstatSync(p2),
+  writeExclusive: (p2, data) => fs6.writeFileSync(p2, data, { encoding: "utf8", flag: "wx" }),
+  link: (from, to) => fs6.linkSync(from, to),
+  remove: (p2) => fs6.rmSync(p2, { force: true })
 };
 var LINK_UNSUPPORTED_CODES = /* @__PURE__ */ new Set([
   "ENOTSUP",
@@ -15837,7 +10147,7 @@ function discoverRootsWithFamilies() {
   const order = [];
   const canonicalKey = (p2) => {
     try {
-      return fs4.realpathSync.native(p2);
+      return fs6.realpathSync.native(p2);
     } catch {
       return p2;
     }
@@ -15845,15 +10155,15 @@ function discoverRootsWithFamilies() {
   const add = (p2, familyId) => {
     if (!p2)
       return;
-    const canonical = path4.resolve(p2);
+    const canonical = path6.resolve(p2);
     const key = canonicalKey(canonical);
-    if (seen.has(key) || !fs4.existsSync(canonical))
+    if (seen.has(key) || !fs6.existsSync(canonical))
       return;
     seen.set(key, canonical);
     order.push({ dir: canonical, familyId });
   };
-  const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => {
-    const folderPath = path4.resolve(f.uri.fsPath);
+  const folders = (vscode3.workspace.workspaceFolders ?? []).map((f) => {
+    const folderPath = path6.resolve(f.uri.fsPath);
     const worktrees = listGitWorktrees(folderPath);
     const familyId = canonicalKey(
       worktrees.length > 0 ? worktrees[0] : folderPath
@@ -15874,11 +10184,11 @@ function discoverRoots() {
   return discoverRootsWithFamilies().map((r2) => r2.dir);
 }
 function isMidSetComplete(statePath) {
-  if (!fs4.existsSync(statePath))
+  if (!fs6.existsSync(statePath))
     return false;
   let sd;
   try {
-    sd = JSON.parse(fs4.readFileSync(statePath, "utf8"));
+    sd = JSON.parse(fs6.readFileSync(statePath, "utf8"));
   } catch {
     return false;
   }
@@ -15886,13 +10196,13 @@ function isMidSetComplete(statePath) {
     return false;
   let stateForProgress = sd;
   if (sd.sessions === void 0 && (!Array.isArray(sd.completedSessions) || sd.completedSessions.length === 0)) {
-    const eventsPath = path4.join(path4.dirname(statePath), "session-events.jsonl");
+    const eventsPath = path6.join(path6.dirname(statePath), "session-events.jsonl");
     const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
     if (ledgerSessions.length > 0) {
       stateForProgress = { ...sd, completedSessions: ledgerSessions };
     }
   }
-  const specPath = path4.join(path4.dirname(statePath), "spec.md");
+  const specPath = path6.join(path6.dirname(statePath), "spec.md");
   try {
     readProgress(stateForProgress, specPath);
     return false;
@@ -15904,11 +10214,11 @@ function isMidSetComplete(statePath) {
   }
 }
 function readClosedSessionsFromLedger(eventsPath) {
-  if (!fs4.existsSync(eventsPath))
+  if (!fs6.existsSync(eventsPath))
     return [];
   let text;
   try {
-    text = fs4.readFileSync(eventsPath, "utf8");
+    text = fs6.readFileSync(eventsPath, "utf8");
   } catch {
     return [];
   }
@@ -15928,11 +10238,11 @@ function readClosedSessionsFromLedger(eventsPath) {
   return [...seen].sort((a, b2) => a - b2);
 }
 function countDistinctCloseoutSessions(eventsPath) {
-  if (!fs4.existsSync(eventsPath))
+  if (!fs6.existsSync(eventsPath))
     return 0;
   let text;
   try {
-    text = fs4.readFileSync(eventsPath, "utf8");
+    text = fs6.readFileSync(eventsPath, "utf8");
   } catch {
     return 0;
   }
@@ -15993,11 +10303,11 @@ function parseSessionSetConfig(specPath) {
     uatScope: "none",
     module: null
   };
-  if (!fs4.existsSync(specPath))
+  if (!fs6.existsSync(specPath))
     return config;
   let text;
   try {
-    text = fs4.readFileSync(specPath, "utf8");
+    text = fs6.readFileSync(specPath, "utf8");
   } catch {
     return config;
   }
@@ -16044,11 +10354,11 @@ function parseSessionSetConfig(specPath) {
   return config;
 }
 function parsePrerequisites(specPath) {
-  if (!fs4.existsSync(specPath))
+  if (!fs6.existsSync(specPath))
     return null;
   let text;
   try {
-    text = fs4.readFileSync(specPath, "utf8");
+    text = fs6.readFileSync(specPath, "utf8");
   } catch {
     return null;
   }
@@ -16106,15 +10416,15 @@ function parsePrerequisites(specPath) {
   return out;
 }
 function readModulesManifest(root) {
-  const manifestPath = path4.join(root, MODULES_MANIFEST_REL);
+  const manifestPath = path6.join(root, MODULES_MANIFEST_REL);
   let text;
   try {
-    text = fs4.readFileSync(manifestPath, "utf8");
+    text = fs6.readFileSync(manifestPath, "utf8");
   } catch (e) {
     if (e.code === "ENOENT") {
       let entryExists = false;
       try {
-        fs4.lstatSync(manifestPath);
+        fs6.lstatSync(manifestPath);
         entryExists = true;
       } catch {
       }
@@ -16180,11 +10490,11 @@ function readModulesManifest(root) {
   return out;
 }
 function parseUatChecklist(checklistPath) {
-  if (!fs4.existsSync(checklistPath))
+  if (!fs6.existsSync(checklistPath))
     return null;
   let data;
   try {
-    data = JSON.parse(fs4.readFileSync(checklistPath, "utf8"));
+    data = JSON.parse(fs6.readFileSync(checklistPath, "utf8"));
   } catch {
     return null;
   }
@@ -16229,7 +10539,7 @@ function buildStepLedger(state, currentSession, entries, specPath) {
     return null;
   let specSteps = [];
   try {
-    specSteps = parseSpecSteps(fs4.readFileSync(specPath, "utf8"), currentSession);
+    specSteps = parseSpecSteps(fs6.readFileSync(specPath, "utf8"), currentSession);
   } catch {
   }
   return {
@@ -16245,7 +10555,7 @@ function buildStepLedger(state, currentSession, entries, specPath) {
     specSteps
   };
 }
-var CLOSE_OBLIGATIONS_REL = path4.join(
+var CLOSE_OBLIGATIONS_REL = path6.join(
   ".dabbler",
   "close-obligations.json"
 );
@@ -16254,20 +10564,20 @@ function digestSetDirectory(dir) {
   const digests = {};
   let names;
   try {
-    names = fs4.readdirSync(dir);
+    names = fs6.readdirSync(dir);
   } catch {
     return digests;
   }
   for (const name of names) {
-    const full = path4.join(dir, name);
+    const full = path6.join(dir, name);
     try {
-      if (!fs4.statSync(full).isFile())
+      if (!fs6.statSync(full).isFile())
         continue;
     } catch {
       continue;
     }
     try {
-      digests[name] = crypto.createHash("sha256").update(fs4.readFileSync(full)).digest("hex");
+      digests[name] = crypto.createHash("sha256").update(fs6.readFileSync(full)).digest("hex");
     } catch {
       digests[name] = null;
     }
@@ -16322,10 +10632,10 @@ function readCloseObligations(dir, state) {
     generatedAt: null,
     obligations: []
   });
-  const file = path4.join(dir, CLOSE_OBLIGATIONS_REL);
+  const file = path6.join(dir, CLOSE_OBLIGATIONS_REL);
   let raw;
   try {
-    raw = fs4.readFileSync(file, "utf8");
+    raw = fs6.readFileSync(file, "utf8");
   } catch (err) {
     const code = err?.code;
     return empty(code === "ENOENT" ? "absent" : "unreadable");
@@ -16367,24 +10677,24 @@ function readCloseObligations(dir, state) {
   };
 }
 function readSessionSets(root) {
-  const sessionSetsDir = path4.join(root, SESSION_SETS_REL);
-  if (!fs4.existsSync(sessionSetsDir))
+  const sessionSetsDir = path6.join(root, SESSION_SETS_REL);
+  if (!fs6.existsSync(sessionSetsDir))
     return [];
-  const entries = fs4.readdirSync(sessionSetsDir, { withFileTypes: true });
+  const entries = fs6.readdirSync(sessionSetsDir, { withFileTypes: true });
   const sets = [];
   const modulesManifest = readModulesManifest(root);
   for (const entry of entries) {
     if (!entry.isDirectory() || entry.name.startsWith("_"))
       continue;
-    const dir = path4.join(sessionSetsDir, entry.name);
-    const specPath = path4.join(dir, "spec.md");
-    if (!fs4.existsSync(specPath))
+    const dir = path6.join(sessionSetsDir, entry.name);
+    const specPath = path6.join(dir, "spec.md");
+    if (!fs6.existsSync(specPath))
       continue;
-    const activityPath = path4.join(dir, "activity-log.json");
-    const changeLogPath = path4.join(dir, "change-log.md");
-    const statePath = path4.join(dir, "session-state.json");
-    const aiAssignmentPath = path4.join(dir, "ai-assignment.md");
-    const uatChecklistPath = path4.join(dir, `${entry.name}-uat-checklist.json`);
+    const activityPath = path6.join(dir, "activity-log.json");
+    const changeLogPath = path6.join(dir, "change-log.md");
+    const statePath = path6.join(dir, "session-state.json");
+    const aiAssignmentPath = path6.join(dir, "ai-assignment.md");
+    const uatChecklistPath = path6.join(dir, `${entry.name}-uat-checklist.json`);
     let state;
     let inferredState = null;
     const cancellation = readCancellationState(dir);
@@ -16396,7 +10706,7 @@ function readSessionSets(root) {
       );
       state = "cancelled";
     } else {
-      if (!fs4.existsSync(statePath)) {
+      if (!fs6.existsSync(statePath)) {
         inferredState = inferStateInMemory(dir);
         const raw = inferredState.status;
         state = typeof raw === "string" ? canonicalizeStatus(raw) : "not-started";
@@ -16423,10 +10733,10 @@ function readSessionSets(root) {
     let ledgerSessions = null;
     let schemaVersionOnDisk = null;
     let rawStepEntries = null;
-    const eventsPath = path4.join(dir, "session-events.jsonl");
-    if (fs4.existsSync(activityPath)) {
+    const eventsPath = path6.join(dir, "session-events.jsonl");
+    if (fs6.existsSync(activityPath)) {
       try {
-        const data = JSON.parse(fs4.readFileSync(activityPath, "utf8"));
+        const data = JSON.parse(fs6.readFileSync(activityPath, "utf8"));
         if (typeof data.totalSessions === "number")
           totalSessions = data.totalSessions;
         for (const e of data.entries ?? []) {
@@ -16441,7 +10751,7 @@ function readSessionSets(root) {
     }
     {
       try {
-        const rawSd = fs4.existsSync(statePath) ? JSON.parse(fs4.readFileSync(statePath, "utf8")) : inferredState ?? inferStateInMemory(dir);
+        const rawSd = fs6.existsSync(statePath) ? JSON.parse(fs6.readFileSync(statePath, "utf8")) : inferredState ?? inferStateInMemory(dir);
         if (rawSd && typeof rawSd === "object" && !Array.isArray(rawSd)) {
           const sv = rawSd.schemaVersion;
           schemaVersionOnDisk = typeof sv === "number" ? sv : null;
@@ -16612,7 +10922,7 @@ function readSessionSets(root) {
       {}
     );
     console.log(
-      `[dabbler-ai-orchestration] readSessionSets(${path4.basename(root)}): ${sets.length} set(s) \u2014 complete=${counts.complete ?? 0}, in-progress=${counts["in-progress"] ?? 0}, not-started=${counts["not-started"] ?? 0}, cancelled=${counts.cancelled ?? 0}`
+      `[dabbler-ai-orchestration] readSessionSets(${path6.basename(root)}): ${sets.length} set(s) \u2014 complete=${counts.complete ?? 0}, in-progress=${counts["in-progress"] ?? 0}, not-started=${counts["not-started"] ?? 0}, cancelled=${counts.cancelled ?? 0}`
     );
   }
   return sets;
@@ -16662,7 +10972,7 @@ function readAllSessionSetsWithDiagnostics() {
   const byName = /* @__PURE__ */ new Map();
   for (const root of discoverRootsWithFamilies()) {
     for (const set of readSessionSets(root.dir)) {
-      const relPath = path4.relative(root.dir, set.dir).split(path4.sep).join("/");
+      const relPath = path6.relative(root.dir, set.dir).split(path6.sep).join("/");
       const candidate = {
         set,
         familyId: root.familyId,
@@ -16733,1351 +11043,729 @@ function readAllSessionSets() {
   return readAllSessionSetsWithDiagnostics().sets;
 }
 
-// src/providers/systemStatus.ts
-var import_module = require("module");
-var path10 = __toESM(require("path"));
+// src/commands/openFile.ts
 var vscode4 = __toESM(require("vscode"));
-
-// src/utils/gettingStartedDetection.ts
-var fs5 = __toESM(require("fs"));
-var path5 = __toESM(require("path"));
-var ENGINE_FILES = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
-function routerInstalled(root, fsi) {
-  const venvDir = path5.join(root, ".venv");
-  if (!fsi.isDirectory(venvDir))
-    return false;
-  const siteCandidates = [
-    // Windows venv
-    path5.join(venvDir, "Lib", "site-packages")
-  ];
-  const libDir = path5.join(venvDir, "lib");
-  if (fsi.isDirectory(libDir)) {
-    for (const entry of fsi.readdir(libDir)) {
-      siteCandidates.push(path5.join(libDir, entry, "site-packages"));
-    }
-  }
-  return siteCandidates.some((sp) => fsi.isDirectory(path5.join(sp, "ai_router")));
-}
-function fileExists(p2, fsi) {
-  return fsi.exists(p2) && !fsi.isDirectory(p2);
-}
-function engineFilesPresent(root, fsi) {
-  return ENGINE_FILES.every((f) => fileExists(path5.join(root, f), fsi));
-}
-function detectCompletion(root, fsi) {
-  return {
-    structureBuilt: routerInstalled(root, fsi) && engineFilesPresent(root, fsi)
-  };
-}
-var PROVIDER_KEY_VARS = [
-  "DABBLER_ANTHROPIC_API_KEY",
-  "DABBLER_OPENAI_API_KEY",
-  "DABBLER_GEMINI_API_KEY"
-];
-function providerKeyPresent(env10) {
-  return PROVIDER_KEY_VARS.some((k2) => {
-    const v = env10[k2];
-    return typeof v === "string" && v.trim().length > 0;
-  });
-}
-function selectExplorerMode(hasFolder, hasAnySets) {
-  if (!hasFolder)
-    return "no-folder";
-  return hasAnySets ? "list" : "getting-started";
-}
-function computeGettingStarted(hasFolder, root, hasAnySets, fsi, resolveTransportProfileSeed) {
-  const mode = selectExplorerMode(hasFolder, hasAnySets);
-  const completion = mode === "getting-started" && root ? detectCompletion(root, fsi) : { structureBuilt: false };
-  const transportProfileSeed = mode === "getting-started" && root && resolveTransportProfileSeed ? resolveTransportProfileSeed(root) : null;
-  const rootId = mode === "getting-started" && root ? root : null;
-  return {
-    mode,
-    ...completion,
-    rootId,
-    transportProfileSeed
-  };
-}
-var nodeDetectionFs = {
-  exists(p2) {
-    try {
-      return fs5.existsSync(p2);
-    } catch {
-      return false;
-    }
-  },
-  isDirectory(p2) {
-    try {
-      return fs5.statSync(p2).isDirectory();
-    } catch {
-      return false;
-    }
-  },
-  readdir(p2) {
-    try {
-      return fs5.readdirSync(p2);
-    } catch {
-      return [];
-    }
-  }
-};
-
-// src/utils/pythonInterpreter.ts
-var fs6 = __toESM(require("fs"));
-var path6 = __toESM(require("path"));
-var vscode2 = __toESM(require("vscode"));
-var realExists = (p2) => {
-  try {
-    return fs6.statSync(p2).isFile();
-  } catch {
-    return false;
-  }
-};
-function venvInterpreterCandidate(workspaceRoot2) {
-  return process.platform === "win32" ? path6.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path6.join(workspaceRoot2, ".venv", "bin", "python");
-}
-function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2 = realExists) {
-  if (!workspaceRoot2)
-    return null;
-  const venvRoot = path6.join(workspaceRoot2, ".venv");
-  if (!fileExists2(path6.join(venvRoot, "pyvenv.cfg")))
-    return null;
-  const interp = venvInterpreterCandidate(workspaceRoot2);
-  return fileExists2(interp) ? interp : null;
-}
-function explicitPythonPathSetting() {
-  const inspected = vscode2.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
-  if (!inspected)
-    return void 0;
-  const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
-  const trimmed2 = (value ?? "").trim();
-  return trimmed2 === "" ? void 0 : trimmed2;
-}
-function normalizeExplicit(value, workspaceRoot2) {
-  if (path6.isAbsolute(value))
-    return value;
-  if (value.includes(path6.sep) || value.includes("/")) {
-    return path6.resolve(workspaceRoot2, value);
-  }
-  return value;
-}
-function resolveExplicitPythonPath(workspaceRoot2) {
-  const explicit = explicitPythonPathSetting();
-  return explicit ? normalizeExplicit(explicit, workspaceRoot2) : "python";
-}
-function resolvePythonInterpreter(workspaceRoot2, fileExists2 = realExists) {
-  const explicit = explicitPythonPathSetting();
-  if (explicit)
-    return normalizeExplicit(explicit, workspaceRoot2);
-  return detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2) ?? "python";
-}
-function findCommandOnPath(cmd, env10 = process.env, fileExists2 = realExists, platform = process.platform) {
-  const rawPath = env10.PATH ?? env10.Path ?? "";
-  if (!rawPath)
-    return null;
-  const isWin = platform === "win32";
-  const p2 = isWin ? path6.win32 : path6.posix;
-  const delimiter = isWin ? ";" : ":";
-  for (const dir of rawPath.split(delimiter)) {
-    const entry = dir.trim();
-    if (!entry)
-      continue;
-    if (isWin && /\\Microsoft\\WindowsApps\\?$/i.test(entry))
-      continue;
-    const candidates = isWin ? /\.[^\\/.]+$/.test(cmd) ? [p2.join(entry, cmd)] : [p2.join(entry, `${cmd}.exe`)] : [p2.join(entry, cmd)];
-    for (const candidate of candidates) {
-      if (fileExists2(candidate))
-        return candidate;
-    }
-  }
-  return null;
-}
-function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env10 = process.env, fileExists2 = realExists, platform = process.platform) {
-  const p2 = platform === "win32" ? path6.win32 : path6.posix;
-  if (explicitSetting) {
-    const normalized = normalizeExplicit(explicitSetting, workspaceRoot2);
-    if (p2.isAbsolute(normalized)) {
-      return fileExists2(normalized) ? normalized : null;
-    }
-    return findCommandOnPath(normalized, env10, fileExists2, platform) !== null ? normalized : null;
-  }
-  const commands33 = platform === "win32" ? ["python"] : ["python3", "python"];
-  for (const cmd of commands33) {
-    if (findCommandOnPath(cmd, env10, fileExists2, platform) !== null)
-      return cmd;
-  }
-  return null;
-}
-function resolveScaffoldBootstrapPython(workspaceRoot2, fileExists2 = realExists) {
-  return resolveBootstrapPythonCore(
-    explicitPythonPathSetting(),
-    workspaceRoot2,
-    process.env,
-    fileExists2
-  );
-}
-function probePythonPresenceCore(explicitSetting, workspaceRoot2, env10 = process.env, fileExists2 = realExists, platform = process.platform) {
-  if (explicitSetting) {
-    return resolveBootstrapPythonCore(
-      explicitSetting,
-      workspaceRoot2,
-      env10,
-      fileExists2,
-      platform
-    ) !== null;
-  }
-  if (detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists2) !== null) {
-    return true;
-  }
-  return resolveBootstrapPythonCore(
-    void 0,
-    workspaceRoot2,
-    env10,
-    fileExists2,
-    platform
-  ) !== null;
-}
-function probePythonPresence(workspaceRoot2, fileExists2 = realExists) {
-  return probePythonPresenceCore(
-    explicitPythonPathSetting(),
-    workspaceRoot2,
-    process.env,
-    fileExists2
-  );
-}
-function describeMissingPython(actionLabel) {
-  return `${actionLabel} needs a Python interpreter, but none was found \u2014 no Python is installed, or it is not on PATH. This is a missing Python installation, NOT an extension or API-key problem. Install Python from https://www.python.org/downloads/ (tick "Add python.exe to PATH"; avoid the Microsoft Store build), or point the 'dabblerSessionSets.pythonPath' setting at an installed interpreter, then reload the VS Code window and try again.`;
-}
-
-// src/utils/copilotCli.ts
 var fs7 = __toESM(require("fs"));
 var path7 = __toESM(require("path"));
-var vscode3 = __toESM(require("vscode"));
-var COPILOT_CLI_COMMAND = "copilot";
-var realExists2 = (p2) => {
-  try {
-    return fs7.statSync(p2).isFile();
-  } catch {
-    return false;
+
+// src/providers/specSectionLocator.ts
+function lineAt(text, offset) {
+  let line = 0;
+  for (let i2 = 0; i2 < offset && i2 < text.length; i2 += 1) {
+    if (text[i2] === "\n")
+      line += 1;
   }
-};
-function explicitCopilotCliPathSetting() {
-  const inspected = vscode3.workspace.getConfiguration("dabblerSessionSets").inspect("copilotCliPath");
-  if (!inspected)
-    return void 0;
-  const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
-  const trimmed2 = (value ?? "").trim();
-  return trimmed2 === "" ? void 0 : trimmed2;
+  return line;
 }
-function probeCopilotCliPresenceCore(explicitSetting, workspaceRoot2, env10 = process.env, fileExists2, platform = process.platform) {
-  const p2 = platform === "win32" ? path7.win32 : path7.posix;
-  if (explicitSetting) {
-    if (p2.isAbsolute(explicitSetting))
-      return fileExists2(explicitSetting);
-    if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
-      return fileExists2(p2.resolve(workspaceRoot2, explicitSetting));
-    }
-    return findCommandOnPath(explicitSetting, env10, fileExists2, platform) !== null;
+function locateSessionSection(specText, sessionNumber) {
+  if (typeof specText !== "string" || specText === "")
+    return null;
+  if (!Number.isInteger(sessionNumber))
+    return null;
+  const body = stripFencedBlocks(specText);
+  const heads = scanSessionHeads(body);
+  const index = heads.findIndex((head) => head.number === sessionNumber);
+  if (index === -1)
+    return null;
+  const originalLines = specText.split("\n");
+  const lastLine = originalLines.length - 1;
+  const startLine = Math.min(lineAt(body, heads[index].headStart), lastLine);
+  let endLine = index + 1 < heads.length ? Math.max(lineAt(body, heads[index + 1].headStart) - 1, startLine) : lastLine;
+  while (endLine > startLine && (originalLines[endLine] ?? "").trim() === "") {
+    endLine -= 1;
   }
-  return findCommandOnPath(COPILOT_CLI_COMMAND, env10, fileExists2, platform) !== null;
-}
-function probeCopilotCliPresence(workspaceRoot2, fileExists2 = realExists2) {
-  return probeCopilotCliPresenceCore(
-    explicitCopilotCliPathSetting(),
-    workspaceRoot2,
-    process.env,
-    fileExists2,
-    process.platform
-  );
-}
-function resolveCopilotCliBinaryCore(explicitSetting, workspaceRoot2, platform = process.platform) {
-  if (!explicitSetting)
-    return void 0;
-  const p2 = platform === "win32" ? path7.win32 : path7.posix;
-  if (p2.isAbsolute(explicitSetting))
-    return explicitSetting;
-  if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
-    return p2.resolve(workspaceRoot2, explicitSetting);
-  }
-  return explicitSetting;
-}
-function resolveCopilotCliBinary(workspaceRoot2) {
-  return resolveCopilotCliBinaryCore(
-    explicitCopilotCliPathSetting(),
-    workspaceRoot2,
-    process.platform
-  );
+  return { startLine, endLine };
 }
 
-// src/utils/copilotSeatSetup.ts
-var crypto2 = __toESM(require("crypto"));
-var fs8 = __toESM(require("fs"));
-var os = __toESM(require("os"));
-var path9 = __toESM(require("path"));
-
-// src/utils/aiRouterInstall.ts
-var path8 = __toESM(require("path"));
-var PYPI_PACKAGE_NAME = "dabbler-ai-router";
-var REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
-var ROUTER_CONFIG_REL = path8.posix.join("ai_router", "router-config.yaml");
-var LOCAL_OVERRIDES_REL = path8.posix.join("ai_router", "local-overrides.yaml");
-var INSTALL_METHOD_REL = path8.posix.join(".dabbler", "install-method");
-var GITHUB_CHECKOUT_REL = path8.posix.join(".dabbler", "ai-router-src");
-var DEFAULT_GITHUB_REF = "<latest released tag>";
-var RELEASE_TAG_RE = /^v(\d+)\.(\d+)\.(\d+)$/;
-function isAiRouterNotInstalled(stderr) {
-  if (!stderr)
-    return false;
-  if (/ModuleNotFoundError:\s*No module named ['"]ai_router['"]/.test(stderr))
-    return true;
-  if (/Error while finding module specification for ['"]ai_router\./.test(stderr) && /No module named ['"]ai_router['"]/.test(stderr)) {
-    return true;
-  }
-  if (/No module named ['"]?ai_router\.[\w.]+['"]?/.test(stderr))
-    return true;
-  return false;
-}
-function describeAiRouterImportFailure(pythonPath, hint) {
-  const venvHint = process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
-  return `ai_router could not be imported by the interpreter '${pythonPath}'. This is an interpreter / installation problem \u2014 NOT missing API keys. Point the 'dabblerSessionSets.pythonPath' setting at your workspace venv (e.g. ${venvHint}), or install the router into that interpreter: ${pythonPath} -m pip install dabbler-ai-router.` + (hint ? ` (${hint})` : "");
-}
-async function installAiRouter(deps) {
-  return doInstall(deps, { mode: "install" });
-}
-async function updateAiRouter(deps) {
-  return doInstall(deps, { mode: "update" });
-}
-async function doInstall(deps, opts) {
-  const report = deps.reportProgress ?? (() => {
-  });
-  let priorSource = null;
-  if (opts.mode === "update") {
-    priorSource = readInstallMethodMarker(deps);
-  }
-  const defaultSource = priorSource ?? "pypi";
-  const source = await deps.prompts.pickSource(defaultSource);
-  if (!source) {
-    return {
-      ok: false,
-      message: "Install cancelled (no source chosen).",
-      source: null,
-      venvPath: null,
-      routerConfigPreserved: false
-    };
-  }
-  const venvResult = await ensureVenv(deps);
-  if (!venvResult.ok) {
-    return {
-      ok: false,
-      message: venvResult.message,
-      source,
-      venvPath: null,
-      routerConfigPreserved: false
-    };
-  }
-  const venvPath = venvResult.venvPath;
-  if (source === "pypi") {
-    return await runPyPiInstall(deps, { venvPath, mode: opts.mode, report });
-  }
-  return await runGitHubInstall(deps, { venvPath, report });
-}
-async function ensureVenv(deps) {
-  const fromPythonPath = deriveVenvFromPythonPath(deps.pythonPath);
-  if (fromPythonPath && deps.fileOps.exists(fromPythonPath) && deps.fileOps.exists(path8.join(fromPythonPath, "pyvenv.cfg"))) {
-    return {
-      ok: true,
-      venvPath: fromPythonPath,
-      message: `Using venv from configured pythonPath: ${fromPythonPath}`
-    };
-  }
-  const candidate = findExistingVenv(deps);
-  if (candidate) {
-    return { ok: true, venvPath: candidate, message: `Using existing venv at ${candidate}` };
-  }
-  const target = path8.join(deps.workspaceRoot, ".venv");
-  const create = await deps.prompts.confirmCreateVenv(target);
-  if (!create) {
-    return {
-      ok: false,
-      message: "No venv found at .venv/ or venv/. Install cancelled \u2014 create a venv first or accept the prompt to create .venv.",
-      venvPath: null
-    };
-  }
-  const venvShaped = deriveVenvFromPythonPath(deps.pythonPath) !== null;
-  const interpreterExists = path8.isAbsolute(deps.pythonPath) ? deps.fileOps.exists(deps.pythonPath) : true;
-  const bootstrap = venvShaped && !interpreterExists ? "python" : deps.pythonPath;
-  const result = await deps.spawner(bootstrap, ["-m", "venv", target], {
-    cwd: deps.workspaceRoot,
-    timeoutMs: 6e4
-  });
-  if (result.exitCode !== 0) {
-    return {
-      ok: false,
-      message: `Failed to create venv at ${target} (using bootstrap '${bootstrap}'): ${oneLine(result.stderr || result.stdout) || `exit ${result.exitCode}`}`,
-      venvPath: null
-    };
-  }
-  return { ok: true, venvPath: target, message: `Created venv at ${target}` };
-}
-function findExistingVenv(deps) {
-  for (const rel of [".venv", "venv"]) {
-    const abs = path8.join(deps.workspaceRoot, rel);
-    if (deps.fileOps.exists(abs))
-      return abs;
-  }
-  return null;
-}
-function deriveVenvFromPythonPath(pythonPath) {
-  if (!pythonPath || !path8.isAbsolute(pythonPath))
-    return null;
-  const parent = path8.basename(path8.dirname(pythonPath));
-  if (parent === "Scripts" || parent === "bin") {
-    return path8.dirname(path8.dirname(pythonPath));
-  }
-  return null;
-}
-function venvPython(venvPath) {
-  const candidates = process.platform === "win32" ? [path8.join(venvPath, "Scripts", "python.exe"), path8.join(venvPath, "Scripts", "python")] : [path8.join(venvPath, "bin", "python"), path8.join(venvPath, "bin", "python3")];
-  return candidates[0];
-}
-async function runPyPiInstall(deps, opts) {
-  opts.report(
-    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from PyPI\u2026` : `Installing ${PYPI_PACKAGE_NAME} from PyPI\u2026`
-  );
-  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", PYPI_PACKAGE_NAME] : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
-  const venvPy = venvPython(opts.venvPath);
-  const result = await deps.spawner(venvPy, pipArgs, {
-    cwd: deps.workspaceRoot,
-    timeoutMs: 3e5
-  });
-  if (result.exitCode !== 0) {
-    return {
-      ok: false,
-      message: `pip install failed: ${oneLine(result.stderr || result.stdout) || `exit ${result.exitCode}`}`,
-      source: "pypi",
-      venvPath: opts.venvPath,
-      routerConfigPreserved: false
-    };
-  }
-  let materialized = false;
-  let seedFailed = false;
-  const workspaceConfig = path8.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
-  if (!deps.fileOps.exists(workspaceConfig)) {
-    const seed = await readBundledRouterConfig(deps, venvPy);
-    if (seed !== null) {
-      try {
-        deps.fileOps.mkdirp(path8.dirname(workspaceConfig));
-        deps.fileOps.writeFile(workspaceConfig, seed);
-        materialized = true;
-      } catch {
-        seedFailed = true;
-      }
-    } else {
-      seedFailed = true;
-    }
-  }
-  writeInstallMethodMarker(deps, "pypi");
-  const seedNote = materialized ? " Seeded ai_router/router-config.yaml from the installed package." : seedFailed ? ` Could not seed ai_router/router-config.yaml from the installed package \u2014 run "Dabbler: Install ai-router" again, or copy the file from the venv's site-packages/ai_router/ by hand.` : "";
-  return {
-    ok: true,
-    message: opts.mode === "update" ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${seedNote}` : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${seedNote}`,
-    source: "pypi",
-    venvPath: opts.venvPath,
-    routerConfigPreserved: materialized
-  };
-}
-var READ_BUNDLED_ROUTER_CONFIG_CODE = "from importlib.resources import files; p = files('ai_router').joinpath('router-config.yaml'); import sys; sys.stdout.buffer.write(p.read_bytes())";
-async function readBundledRouterConfig(deps, venvPy) {
-  const result = await deps.spawner(venvPy, ["-c", READ_BUNDLED_ROUTER_CONFIG_CODE], {
-    cwd: deps.workspaceRoot,
-    timeoutMs: 3e4
-  });
-  if (result.exitCode !== 0 || !result.stdout)
-    return null;
-  return result.stdout;
-}
-async function resolveLatestReleaseTag(deps) {
-  const repo = deps.repoUrl ?? REPO_URL;
-  const result = await deps.spawner(
-    "git",
-    ["ls-remote", "--tags", "--refs", repo],
-    { cwd: deps.workspaceRoot, timeoutMs: 6e4 }
-  );
-  if (result.exitCode !== 0)
-    return null;
-  const tags = [];
-  for (const line of result.stdout.split(/\r?\n/)) {
-    const m = /^[0-9a-f]+\s+refs\/tags\/(.+)$/.exec(line.trim());
-    if (!m)
-      continue;
-    const tag = m[1];
-    const sm = RELEASE_TAG_RE.exec(tag);
-    if (!sm)
-      continue;
-    tags.push({
-      raw: tag,
-      sortable: [Number(sm[1]), Number(sm[2]), Number(sm[3])]
-    });
-  }
-  if (tags.length === 0)
-    return null;
-  tags.sort((a, b2) => {
-    for (let i2 = 0; i2 < 3; i2++) {
-      if (a.sortable[i2] !== b2.sortable[i2])
-        return b2.sortable[i2] - a.sortable[i2];
-    }
-    return 0;
-  });
-  return tags[0].raw;
-}
-async function runGitHubInstall(deps, opts) {
-  const userRef = await deps.prompts.promptGitHubRef(DEFAULT_GITHUB_REF);
-  if (userRef === void 0) {
-    return {
-      ok: false,
-      message: "Install cancelled (no GitHub ref chosen).",
-      source: "github",
-      venvPath: opts.venvPath,
-      routerConfigPreserved: false,
-      resolvedRef: null
-    };
-  }
-  const explicitRef = userRef.trim() === "" || userRef === DEFAULT_GITHUB_REF ? null : userRef;
-  let refToUse = explicitRef;
-  if (refToUse === null) {
-    opts.report("Resolving latest released tag\u2026");
-    refToUse = await resolveLatestReleaseTag(deps);
-    if (refToUse === null) {
-      return {
-        ok: false,
-        message: "Could not resolve the latest released tag from the remote. Re-run and supply a tag/branch explicitly.",
-        source: "github",
-        venvPath: opts.venvPath,
-        routerConfigPreserved: false,
-        resolvedRef: null
-      };
-    }
-  }
-  const routerConfigAbs = path8.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
-  let stashedConfig = null;
-  if (deps.fileOps.exists(routerConfigAbs)) {
-    stashedConfig = deps.fileOps.readFile(routerConfigAbs);
-  }
-  let preserved = false;
-  let lastRestoreError = null;
-  const restoreStash = () => {
-    if (stashedConfig === null)
-      return true;
-    if (preserved)
-      return true;
-    try {
-      deps.fileOps.writeFile(routerConfigAbs, stashedConfig);
-      preserved = true;
-      lastRestoreError = null;
-      return true;
-    } catch (err) {
-      lastRestoreError = err instanceof Error ? err.message : String(err);
-      return false;
-    }
-  };
-  const finalize = (outcome) => {
-    if (stashedConfig !== null && !preserved) {
-      return {
-        ...outcome,
-        ok: false,
-        message: `Failed to restore operator-tuned ai_router/router-config.yaml after install (${lastRestoreError ?? "unknown error"}). The install changes have been applied but your tuned config was not put back. Check the workspace's ai_router/router-config.yaml before continuing.`,
-        routerConfigPreserved: false
-      };
-    }
-    return outcome;
-  };
-  const repo = deps.repoUrl ?? REPO_URL;
-  opts.report(`Sparse-cloning ${repo}\u2026`);
-  const tmp = deps.fileOps.mkdtemp("dabbler-ai-router-install-");
-  try {
-    const cloneArgs = ["clone", "--depth", "1", "--filter=blob:none", "--sparse"];
-    cloneArgs.push("--branch", refToUse);
-    cloneArgs.push(repo, tmp);
-    const cloneResult = await deps.spawner("git", cloneArgs, {
-      cwd: deps.workspaceRoot,
-      timeoutMs: 3e5
-    });
-    if (cloneResult.exitCode !== 0) {
-      restoreStash();
-      return finalize({
-        ok: false,
-        message: `git clone failed: ${oneLine(cloneResult.stderr || cloneResult.stdout) || `exit ${cloneResult.exitCode}`}`,
-        source: "github",
-        venvPath: opts.venvPath,
-        routerConfigPreserved: preserved,
-        resolvedRef: refToUse
-      });
-    }
-    opts.report("Configuring sparse-checkout\u2026");
-    const sparseResult = await deps.spawner(
-      "git",
-      ["-C", tmp, "sparse-checkout", "set", "ai_router", "pyproject.toml"],
-      { cwd: deps.workspaceRoot, timeoutMs: 6e4 }
+// src/commands/openFile.ts
+function openIfExists(filePath, label, reveal) {
+  if (!filePath || !fs7.existsSync(filePath)) {
+    vscode4.window.showInformationMessage(
+      `${label} does not exist yet: ${filePath ? path7.basename(filePath) : "<unknown>"}`
     );
-    if (sparseResult.exitCode !== 0) {
-      restoreStash();
-      return finalize({
-        ok: false,
-        message: `git sparse-checkout failed: ${oneLine(sparseResult.stderr || sparseResult.stdout) || `exit ${sparseResult.exitCode}`}`,
-        source: "github",
-        venvPath: opts.venvPath,
-        routerConfigPreserved: preserved,
-        resolvedRef: refToUse
-      });
-    }
-    const stableSrc = path8.join(deps.workspaceRoot, GITHUB_CHECKOUT_REL);
-    const dstAiRouter = path8.join(deps.workspaceRoot, "ai_router");
-    opts.report("Copying sparse-checkout into the workspace\u2026");
-    try {
-      deps.fileOps.removeRecursive(stableSrc);
-      deps.fileOps.copyDir(tmp, stableSrc);
-      deps.fileOps.removeRecursive(dstAiRouter);
-      deps.fileOps.copyDir(path8.join(stableSrc, "ai_router"), dstAiRouter);
-    } catch (err) {
-      restoreStash();
-      return finalize({
-        ok: false,
-        message: `Failed to copy ai_router/ into the workspace: ${err instanceof Error ? err.message : String(err)}`,
-        source: "github",
-        venvPath: opts.venvPath,
-        routerConfigPreserved: preserved,
-        resolvedRef: refToUse
-      });
-    }
-    restoreStash();
-    opts.report("Installing the sparse-checked-out tree (editable)\u2026");
-    const pipResult = await deps.spawner(
-      venvPython(opts.venvPath),
-      ["-m", "pip", "install", "-e", stableSrc],
-      { cwd: deps.workspaceRoot, timeoutMs: 3e5 }
-    );
-    if (pipResult.exitCode !== 0) {
-      return finalize({
-        ok: false,
-        message: `pip install -e <sparse-checkout> failed: ${oneLine(pipResult.stderr || pipResult.stdout) || `exit ${pipResult.exitCode}`}`,
-        source: "github",
-        venvPath: opts.venvPath,
-        routerConfigPreserved: preserved,
-        resolvedRef: refToUse
-      });
-    }
-    writeInstallMethodMarker(deps, "github");
-    return finalize({
-      ok: true,
-      message: `Installed ai_router from GitHub (${refToUse})${preserved ? " \u2014 preserved existing router-config.yaml" : ""}.`,
-      source: "github",
-      venvPath: opts.venvPath,
-      routerConfigPreserved: preserved,
-      resolvedRef: refToUse
-    });
-  } finally {
-    restoreStash();
-    try {
-      deps.fileOps.removeRecursive(tmp);
-    } catch {
-    }
-  }
-}
-function readInstallMethodMarker(deps) {
-  const markerAbs = path8.join(deps.workspaceRoot, INSTALL_METHOD_REL);
-  if (!deps.fileOps.exists(markerAbs))
-    return null;
-  const raw = deps.fileOps.readFile(markerAbs).trim();
-  if (raw === "pypi" || raw === "github")
-    return raw;
-  return null;
-}
-function writeInstallMethodMarker(deps, source) {
-  const markerAbs = path8.join(deps.workspaceRoot, INSTALL_METHOD_REL);
-  const markerDir = path8.dirname(markerAbs);
-  deps.fileOps.mkdirp(markerDir);
-  deps.fileOps.writeFile(markerAbs, `${source}
-`);
-}
-function oneLine(s) {
-  const trimmed2 = (s || "").trim();
-  if (!trimmed2)
-    return "";
-  const lastLines = trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
-  return lastLines;
-}
-
-// src/utils/copilotSeatSetup.ts
-var CATALOG_LOCKFILE_REL = path9.posix.join(
-  "ai_router",
-  "copilot-catalog.lock"
-);
-function deriveSeatId(hostname2, username) {
-  const canonical = `${hostname2.trim().toLowerCase()}|${username.trim().toLowerCase()}`;
-  const digest = crypto2.createHash("sha256").update(canonical, "utf8").digest("hex");
-  return `seat-${digest.slice(0, 12)}`;
-}
-function deriveSeatLabel(projectDir) {
-  const base = path9.basename(projectDir);
-  return base === "" ? "workspace" : base;
-}
-function currentUsername() {
-  try {
-    return os.userInfo().username;
-  } catch {
-    return process.env.USERNAME ?? process.env.USER ?? "user";
-  }
-}
-function buildRefreshArgs(seatId, seatLabel, explicitBinary) {
-  const args = [
-    "-m",
-    "ai_router.copilot_catalog",
-    "--refresh",
-    "--seat-id",
-    seatId,
-    "--seat-label",
-    seatLabel
-  ];
-  if (explicitBinary)
-    args.push("--binary", explicitBinary);
-  return args;
-}
-var REFRESH_SUMMARY_RE = /^Wrote (.+): (\d+)\/(\d+) models confirmed, providers=\[([^\]]*)\]\s*$/m;
-function parseRefreshStdout(stdout) {
-  const m = REFRESH_SUMMARY_RE.exec(stdout);
-  if (!m)
-    return null;
-  const providers = m[4].split(",").map((tok) => tok.trim().replace(/^'(.*)'$/, "$1")).filter((tok) => tok.length > 0);
-  return {
-    lockfilePath: m[1],
-    confirmed: Number(m[2]),
-    total: Number(m[3]),
-    providers
-  };
-}
-function locateTransportProfile(text) {
-  const blockMatch = /^transport:[ \t]*(?:#.*)?$/m.exec(text);
-  if (!blockMatch)
-    return null;
-  let lineStart = blockMatch.index + blockMatch[0].length;
-  while (lineStart < text.length && (text[lineStart] === "\r" || text[lineStart] === "\n")) {
-    if (text[lineStart] === "\n") {
-      lineStart += 1;
-      break;
-    }
-    lineStart += 1;
-  }
-  let childIndent = null;
-  while (lineStart < text.length) {
-    let lineEnd = text.indexOf("\n", lineStart);
-    if (lineEnd === -1)
-      lineEnd = text.length;
-    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
-    if (/^[^ \t\r\n#]/.test(line))
-      return null;
-    const content = /^([ \t]+)\S/.exec(line);
-    if (content && !/^[ \t]*#/.test(line)) {
-      const indent = content[1].length;
-      if (childIndent === null)
-        childIndent = indent;
-      if (indent === childIndent) {
-        const m = /^([ \t]+profile:[ \t]*)([^\s#]+)/.exec(line);
-        if (m) {
-          const valueStart = lineStart + m[1].length;
-          return {
-            valueStart,
-            valueEnd: valueStart + m[2].length,
-            value: m[2]
-          };
-        }
-      }
-    }
-    lineStart = lineEnd + 1;
-  }
-  return null;
-}
-function hasTopLevelTransportBlock(text) {
-  return /^transport:[ \t]*(?:#.*)?$/m.test(text);
-}
-function renderTransportProfile(configText, profile) {
-  const loc = locateTransportProfile(configText);
-  if (!loc) {
-    return {
-      ok: false,
-      reason: "no `transport:` block with a `profile:` field was found in local-overrides.yaml (the seeded template shape this write expects)"
-    };
-  }
-  if (loc.value === profile)
-    return { ok: true, text: configText, changed: false };
-  if (loc.value !== "api") {
-    return {
-      ok: false,
-      reason: `transport.profile is ${JSON.stringify(loc.value)} \u2014 not the seeded default \`api\`, so it looks operator-edited and will not be overwritten`
-    };
-  }
-  return {
-    ok: true,
-    changed: true,
-    text: configText.slice(0, loc.valueStart) + profile + configText.slice(loc.valueEnd)
-  };
-}
-var nodeSeedReadOps = {
-  exists(p2) {
-    try {
-      return fs8.existsSync(p2);
-    } catch {
-      return false;
-    }
-  },
-  readFile(p2) {
-    return fs8.readFileSync(p2, "utf8");
-  }
-};
-function readTransportProfile(root, ops = nodeSeedReadOps) {
-  const abs = path9.join(root, LOCAL_OVERRIDES_REL);
-  if (!ops.exists(abs))
-    return null;
-  let text;
-  try {
-    text = ops.readFile(abs);
-  } catch {
-    return null;
-  }
-  const loc = locateTransportProfile(text);
-  if (!loc)
-    return null;
-  return loc.value === "api" || loc.value === "copilot-cli" ? loc.value : null;
-}
-var SEAT_STATUS_MARKER_REL = path9.posix.join(
-  ".dabbler",
-  "copilot-seat-status"
-);
-function readCopilotSeatStatusMarker(root, ops = nodeSeedReadOps) {
-  const abs = path9.join(root, SEAT_STATUS_MARKER_REL);
-  if (!ops.exists(abs))
-    return null;
-  let text;
-  try {
-    text = ops.readFile(abs);
-  } catch {
-    return null;
-  }
-  return text.trim().toLowerCase() === "unconfirmed" ? "unconfirmed" : null;
-}
-function writeCopilotSeatStatusMarker(root, ops) {
-  ops.writeFile(path9.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
-}
-function clearCopilotSeatStatusMarker(root, ops) {
-  const abs = path9.join(root, SEAT_STATUS_MARKER_REL);
-  if (!ops.exists(abs))
-    return;
-  ops.removeRecursive(abs);
-}
-function deriveCopilotSeatChosenUnconfirmed(marker, durableProfile) {
-  return marker === "unconfirmed" && durableProfile !== "copilot-cli";
-}
-var DEFAULT_KILL_SETTLE_TIMEOUT_MS = 1e4;
-function runCatalogRefresh(deps) {
-  const lockfileAbs = path9.join(deps.projectDir, CATALOG_LOCKFILE_REL);
-  const existedBefore = deps.fileOps.exists(lockfileAbs);
-  let priorContent = null;
-  if (existedBefore) {
-    try {
-      priorContent = deps.fileOps.readFile(lockfileAbs);
-    } catch {
-      priorContent = null;
-    }
-  }
-  const restoreLockfile = () => {
-    try {
-      if (!existedBefore) {
-        deps.fileOps.removeRecursive(lockfileAbs);
-      } else if (priorContent !== null) {
-        deps.fileOps.writeFile(lockfileAbs, priorContent);
-      }
-    } catch {
-    }
-  };
-  return new Promise((resolve7) => {
-    let settled = false;
-    let stdout = "";
-    let stderr = "";
-    let cancelledBy = null;
-    let cancelReg = null;
-    let disposal = null;
-    let killSettleTimer = null;
-    const settle = (outcome) => {
-      if (settled)
-        return;
-      settled = true;
-      if (killSettleTimer)
-        clearTimeout(killSettleTimer);
-      cancelReg?.dispose();
-      disposal?.dispose();
-      resolve7(outcome);
-    };
-    if (deps.cancellation.isCancellationRequested) {
-      settle({ kind: "cancelled", by: "operator" });
-      return;
-    }
-    let child = null;
-    const killForCancel = (by) => {
-      if (settled || cancelledBy)
-        return;
-      cancelledBy = by;
-      try {
-        child?.kill();
-      } catch {
-      }
-      killSettleTimer = setTimeout(() => {
-        if (settled)
-          return;
-        restoreLockfile();
-        settle({ kind: "cancelled", by });
-      }, deps.killSettleTimeoutMs ?? DEFAULT_KILL_SETTLE_TIMEOUT_MS);
-    };
-    disposal = deps.registerDisposal(() => {
-      if (settled)
-        return;
-      cancelledBy = cancelledBy ?? "teardown";
-      try {
-        child?.kill();
-      } catch {
-      }
-      restoreLockfile();
-      settle({ kind: "cancelled", by: cancelledBy });
-    });
-    cancelReg = deps.cancellation.onCancellationRequested(
-      () => killForCancel("operator")
-    );
-    try {
-      child = deps.spawn(
-        deps.venvPythonPath,
-        buildRefreshArgs(deps.seatId, deps.seatLabel, deps.explicitBinary),
-        { cwd: deps.projectDir },
-        {
-          onStdout: (chunk) => {
-            stdout += chunk;
-          },
-          onStderr: (chunk) => {
-            stderr += chunk;
-          },
-          onError: (err) => {
-            restoreLockfile();
-            settle({ kind: "spawn-error", message: err.message });
-          },
-          onClose: (exitCode) => {
-            if (settled) {
-              if (cancelledBy === "teardown")
-                restoreLockfile();
-              return;
-            }
-            if (exitCode === 0) {
-              const summary = parseRefreshStdout(stdout);
-              if (summary) {
-                settle({ kind: "completed", summary, stdout, stderr });
-                return;
-              }
-            }
-            if (cancelledBy) {
-              restoreLockfile();
-              settle({ kind: "cancelled", by: cancelledBy });
-              return;
-            }
-            if (exitCode !== 0) {
-              restoreLockfile();
-              settle({ kind: "exit-error", exitCode, stdout, stderr });
-              return;
-            }
-            settle({ kind: "completed-unparseable", stdout, stderr });
-          }
-        }
-      );
-    } catch (err) {
-      restoreLockfile();
-      settle({
-        kind: "spawn-error",
-        message: err instanceof Error ? err.message : String(err)
-      });
-      return;
-    }
-  });
-}
-var GITIGNORE_REL = ".gitignore";
-var LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
-function isLocalOverridesIgnored(gitignoreText) {
-  const covering = /* @__PURE__ */ new Set([
-    LOCAL_OVERRIDES_REL,
-    `/${LOCAL_OVERRIDES_REL}`,
-    "local-overrides.yaml",
-    "**/local-overrides.yaml"
-  ]);
-  return gitignoreText.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")).some((line) => covering.has(line));
-}
-function ensureLocalOverridesIgnored(ops, projectDir) {
-  const abs = path9.join(projectDir, GITIGNORE_REL);
-  try {
-    const existing = ops.exists(abs) ? ops.readFile(abs) : "";
-    if (isLocalOverridesIgnored(existing))
-      return { ok: true, added: false };
-    const prefix = existing === "" || existing.endsWith("\n") ? existing : `${existing}
-`;
-    ops.writeFile(
-      abs,
-      `${prefix}
-# Per-machine router overrides (Copilot seat transport profile).
-# Machine-specific by design \u2014 committing it breaks API-key-only clones.
-${LOCAL_OVERRIDES_IGNORE_RULE}
-`
-    );
-    return { ok: true, added: true };
-  } catch (err) {
-    return {
-      ok: false,
-      reason: err instanceof Error ? err.message : String(err)
-    };
-  }
-}
-var CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
-function writeConfigAtomically(ops, configAbs, content) {
-  if (!ops.rename) {
-    ops.writeFile(configAbs, content);
     return;
   }
-  const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
-  ops.writeFile(tmpAbs, content);
+  const uri = vscode4.Uri.file(filePath);
+  if (!reveal) {
+    vscode4.commands.executeCommand("vscode.open", uri);
+    return;
+  }
+  void revealSection(uri, reveal);
+}
+async function revealSection(uri, range) {
   try {
-    ops.rename(tmpAbs, configAbs);
+    const editor = await vscode4.window.showTextDocument(uri);
+    const lastLine = Math.max(editor.document.lineCount - 1, 0);
+    const start = new vscode4.Position(Math.min(range.startLine, lastLine), 0);
+    const end = new vscode4.Position(Math.min(range.endLine, lastLine), 0);
+    editor.selection = new vscode4.Selection(start, start);
+    editor.revealRange(new vscode4.Range(start, end), vscode4.TextEditorRevealType.AtTop);
   } catch (err) {
-    try {
-      ops.removeRecursive(tmpAbs);
-    } catch {
-    }
-    throw err;
+    console.warn(`[Dabbler] reveal failed for ${uri.fsPath}; opening at the top`, err);
+    vscode4.commands.executeCommand("vscode.open", uri);
   }
 }
-function resolveKillStrategy(platform, pid) {
-  if (!pid)
-    return "plain";
-  return platform === "win32" ? "taskkill-tree" : "posix-group";
-}
-function spawnDetached(platform) {
-  return platform !== "win32";
-}
-function dispatchKill(platform, pid, fx) {
-  switch (resolveKillStrategy(platform, pid)) {
-    case "taskkill-tree":
-      try {
-        fx.taskkillTree(pid);
-        return;
-      } catch {
-        break;
-      }
-    case "posix-group":
-      try {
-        fx.signalGroup(pid);
-        return;
-      } catch {
-        break;
-      }
-    case "plain":
-      break;
+function sessionNumberOf(item) {
+  if (item === null || typeof item !== "object")
+    return void 0;
+  const node = item;
+  if (node.kind !== "session")
+    return void 0;
+  const number = node.session?.number;
+  if (typeof number !== "number" || !Number.isInteger(number) || number <= 0) {
+    return void 0;
   }
-  fx.plainKill();
+  return number;
 }
-function rerunRefreshHint() {
-  return 'run "Dabbler: Set Up Copilot Seat" from the Command Palette';
-}
-function describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) {
-  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunHint}`;
-  const keyless = "no DABBLER_* provider key is set, so the router is not yet functional";
-  const keyed = "the DABBLER_* provider key(s) already set keep the api profile working";
-  switch (outcome.kind) {
-    case "success":
-      return {
-        level: outcome.ignoreWarning ? "warning" : "info",
-        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/local-overrides.yaml.` + (outcome.ignoreWarning ? ` Warning: ${outcome.ignoreWarning}.` : "")
-      };
-    case "insufficient-providers": {
-      const cause = outcome.confirmed === 0 ? "No models responded at all \u2014 the Copilot CLI may be missing from PATH, not signed in, or blocked by policy. " : outcome.providers.length === 1 ? "This seat may expose only one provider family (an enterprise-managed seat can do this), in which case re-running will not change the result. " : "";
-      return {
-        level: "warning",
-        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so local-overrides.yaml keeps transport.profile: api. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
-      };
-    }
-    case "refresh-failed":
-      return {
-        level: "warning",
-        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. local-overrides.yaml keeps transport.profile: api, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. local-overrides.yaml keeps transport.profile: api, and ${keyless}. Fix the cause, then: ${rerun}`
-      };
-    case "cancelled":
-      return {
-        level: "warning",
-        message: "Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and local-overrides.yaml keeps transport.profile: api. " + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
-      };
-    case "config-write-failed":
-      return {
-        level: "warning",
-        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/local-overrides.yaml failed: ${outcome.detail}. Set \`profile: copilot-cli\` under the \`transport:\` block in that file by hand \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? "the router keeps running on the api profile with the DABBLER_* key(s) already set." : "the router is not yet functional (transport.profile is still api and no DABBLER_* provider key is set).")
-      };
-    default: {
-      const unreachable = outcome;
-      throw new Error(`unhandled seat-setup outcome: ${JSON.stringify(unreachable)}`);
-    }
+function specSectionTargetFor(specPath, sessionNumber) {
+  if (!specPath || sessionNumber === void 0)
+    return void 0;
+  let text;
+  try {
+    text = fs7.readFileSync(specPath, "utf-8");
+  } catch {
+    return void 0;
   }
+  return locateSessionSection(text, sessionNumber) ?? void 0;
 }
-function describeSkipInstallIncompleteHonesty(providerKeysPresent) {
-  return providerKeysPresent ? "The DABBLER_* provider key(s) already set will keep the api profile working once the install completes." : "No DABBLER_* provider key is set, so the router is not functional until the install completes and seat setup succeeds.";
-}
-function outputTail(s) {
-  const trimmed2 = (s || "").trim();
-  if (!trimmed2)
-    return "";
-  return trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
-}
-async function performCopilotSeatSetup(deps) {
-  const outcome = await runCatalogRefresh(deps);
-  switch (outcome.kind) {
-    case "cancelled":
-      return { kind: "cancelled", by: outcome.by };
-    case "spawn-error":
-      return {
-        kind: "refresh-failed",
-        detail: `the refresh subprocess could not start: ${outcome.message}`
-      };
-    case "exit-error":
-      return {
-        kind: "refresh-failed",
-        detail: `the refresh exited with code ${outcome.exitCode}` + (outputTail(outcome.stderr || outcome.stdout) ? `: ${outputTail(outcome.stderr || outcome.stdout)}` : "")
-      };
-    case "completed-unparseable":
-      return {
-        kind: "refresh-failed",
-        detail: "the refresh finished but its result line could not be parsed" + (outputTail(outcome.stdout) ? ` (last output: ${outputTail(outcome.stdout)})` : " (no output)")
-      };
-    case "completed": {
-      const distinct = Array.from(new Set(outcome.summary.providers)).sort();
-      const base = {
-        providers: distinct,
-        confirmed: outcome.summary.confirmed,
-        total: outcome.summary.total
-      };
-      if (distinct.length < 2) {
-        return { kind: "insufficient-providers", ...base };
-      }
-      const configAbs = path9.join(deps.projectDir, LOCAL_OVERRIDES_REL);
-      const ignored = ensureLocalOverridesIgnored(
-        deps.fileOps,
-        deps.projectDir
+async function openPrerequisiteSpec(set) {
+  const unsatisfied = set.unsatisfiedPrereqs ?? [];
+  if (unsatisfied.length === 0) {
+    vscode4.window.showInformationMessage(
+      `"${set.name}" has no unsatisfied prerequisites.`
+    );
+    return;
+  }
+  const allSets = readAllSessionSets();
+  const bySlug = new Map(allSets.map((s) => [s.name, s]));
+  const openTarget = (p2) => {
+    if (p2.targetState === "unknown") {
+      vscode4.window.showInformationMessage(
+        `Prerequisite "${p2.slug}" does not match any session set \u2014 check the slug in ${set.name}/spec.md.`
       );
-      const ignoreWarning = ignored.ok ? void 0 : `could not confirm ${LOCAL_OVERRIDES_REL} is git-ignored (${ignored.reason}) \u2014 add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing, or an API-key-only clone will inherit this machine's Copilot seat profile`;
-      const succeeded = () => ignoreWarning === void 0 ? { kind: "success", ...base } : { kind: "success", ...base, ignoreWarning };
-      if (!deps.fileOps.exists(configAbs)) {
-        writeConfigAtomically(
-          deps.fileOps,
-          configAbs,
-          "transport:\n  profile: copilot-cli\n"
-        );
-        return succeeded();
+      return;
+    }
+    openIfExists(bySlug.get(p2.slug)?.specPath, `Prerequisite spec (${p2.slug})`);
+  };
+  if (unsatisfied.length === 1) {
+    openTarget(unsatisfied[0]);
+    return;
+  }
+  const picked = await vscode4.window.showQuickPick(
+    unsatisfied.map((p2) => ({
+      label: p2.slug,
+      description: p2.targetState === "unknown" ? "unknown set \u2014 check the slug" : p2.targetState.replace("-", " "),
+      prereq: p2
+    })),
+    { placeHolder: `Prerequisites blocking "${set.name}"` }
+  );
+  if (picked)
+    openTarget(picked.prereq);
+}
+function findPlaywrightTests(set) {
+  const cfg = vscode4.workspace.getConfiguration("dabblerSessionSets");
+  const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
+  const playwrightDir = path7.join(set.root, testDirRel);
+  if (!fs7.existsSync(playwrightDir))
+    return [];
+  const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
+  const testRefs = set.uatSummary?.e2eRefs ?? [];
+  const candidates = /* @__PURE__ */ new Set();
+  const walk = (dir, depth) => {
+    if (depth > 4)
+      return;
+    let entries;
+    try {
+      entries = fs7.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      const p2 = path7.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
+          continue;
+        walk(p2, depth + 1);
+        continue;
       }
-      try {
-        const text = deps.fileOps.readFile(configAbs);
-        const loc = locateTransportProfile(text);
-        if (!loc) {
-          if (hasTopLevelTransportBlock(text)) {
-            const rendered2 = renderTransportProfile(text, "copilot-cli");
-            return {
-              kind: "config-write-failed",
-              providers: distinct,
-              detail: rendered2.ok ? "transport.profile could not be located for replacement" : rendered2.reason
-            };
+      if (!/\.(cs|ts|js)$/.test(e.name))
+        continue;
+      const lowerName = e.name.toLowerCase();
+      if (slugTokens.some((t2) => lowerName.includes(t2.toLowerCase()))) {
+        candidates.add(p2);
+        continue;
+      }
+      if (testRefs.length > 0) {
+        try {
+          const txt = fs7.readFileSync(p2, "utf8");
+          for (const ref of testRefs) {
+            const short = String(ref).split(".").pop();
+            if (short && txt.includes(short)) {
+              candidates.add(p2);
+              break;
+            }
           }
-          const newText = text + (text.endsWith("\n") ? "" : "\n") + "transport:\n  profile: copilot-cli\n";
-          writeConfigAtomically(deps.fileOps, configAbs, newText);
-          return succeeded();
+        } catch {
         }
-        const rendered = renderTransportProfile(text, "copilot-cli");
-        if (!rendered.ok) {
-          return {
-            kind: "config-write-failed",
-            providers: distinct,
-            detail: rendered.reason
-          };
-        }
-        if (rendered.changed) {
-          writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
-        }
-        return succeeded();
-      } catch (err) {
-        return {
-          kind: "config-write-failed",
-          providers: distinct,
-          detail: err instanceof Error ? err.message : String(err)
-        };
       }
     }
-  }
+  };
+  walk(playwrightDir, 0);
+  return Array.from(candidates).sort();
 }
-
-// src/providers/systemStatus.ts
-function buildSystemStatus(hasAnySets) {
-  const root = vscode4.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) {
-    return {
-      workspaceOpen: false,
-      workspaceInitialized: true,
-      providerKeyPresent: true,
-      pythonPresent: true,
-      copilotCliPresent: true,
-      transportProfile: "api",
-      copilotSeatChosenUnconfirmed: false,
-      copilotSeatRerunHint: "",
-      manifestFaults: []
-    };
-  }
-  const durableTransportProfile = readTransportProfile(root);
-  return {
-    workspaceOpen: true,
-    // Set 092 S2 (UAT Walk 4): a workspace that already has session sets is
-    // initialized by construction — the sets could not have been authored
-    // without a working setup — so `hasAnySets` alone clears the fault. The
-    // `structureBuilt` scaffold proxy is only consulted before the first set,
-    // where it is the right signal; it under-reports an editable
-    // `pip install -e .` (this repo), and that false negative must never
-    // surface a workspace-init fault on a working repo.
-    workspaceInitialized: hasAnySets || detectCompletion(root, nodeDetectionFs).structureBuilt,
-    providerKeyPresent: providerKeyPresent(process.env),
-    pythonPresent: probePythonPresence(root),
-    copilotCliPresent: probeCopilotCliPresence(root),
-    transportProfile: durableTransportProfile ?? "api",
-    copilotSeatChosenUnconfirmed: deriveCopilotSeatChosenUnconfirmed(
-      readCopilotSeatStatusMarker(root),
-      durableTransportProfile
+function registerOpenFileCommands(context) {
+  context.subscriptions.push(
+    // Set 115 S2: ONE `Open Spec`, two callers. A set row opens the file
+    // at the top exactly as before; a session row (`kind: "session"`)
+    // opens the same file positioned at its own `### Session N of M:`
+    // block. Adding a parallel command would have meant a second place
+    // for "which file is the spec" to be answered.
+    vscode4.commands.registerCommand(
+      "dabblerSessionSets.openSpec",
+      (item) => openIfExists(
+        item?.set?.specPath,
+        "Spec",
+        specSectionTargetFor(item?.set?.specPath, sessionNumberOf(item))
+      )
     ),
-    copilotSeatRerunHint: rerunRefreshHint(),
-    manifestFaults: []
-  };
-}
-var cachedRenderer;
-function statusRenderer(extensionPath) {
-  if (cachedRenderer !== void 0)
-    return cachedRenderer;
-  try {
-    const requireFromExtension = (0, import_module.createRequire)(
-      path10.join(extensionPath, "package.json")
-    );
-    cachedRenderer = requireFromExtension(
-      "./media/session-sets-tree/systemStatusHtml.js"
-    );
-  } catch (err) {
-    console.warn(
-      "[dabbler-ai-orchestration] could not load systemStatusHtml.js in the host; the Setup & Status view will be shown unconditionally.",
-      err
-    );
-    cachedRenderer = null;
-  }
-  return cachedRenderer;
-}
-function isSetupNeeded(extensionPath, hasAnySets) {
-  const status = buildSystemStatus(hasAnySets);
-  if (!status.workspaceOpen)
-    return true;
-  if (!hasAnySets)
-    return true;
-  const renderer = statusRenderer(extensionPath);
-  if (!renderer)
-    return true;
-  try {
-    return renderer.renderSystemStatus(status, {
-      transportProfile: status.transportProfile
-    }) !== "";
-  } catch (err) {
-    console.warn(
-      "[dabbler-ai-orchestration] systemStatusHtml.renderSystemStatus threw in the host; showing the Setup & Status view.",
-      err
-    );
-    return true;
-  }
+    vscode4.commands.registerCommand(
+      "dabblerSessionSets.openActivityLog",
+      (item) => openIfExists(item?.set?.activityPath, "Activity log")
+    ),
+    vscode4.commands.registerCommand(
+      "dabblerSessionSets.openChangeLog",
+      (item) => openIfExists(item?.set?.changeLogPath, "Change log")
+    ),
+    // Set 048 S3 (operator-locked L3): `Open AI Assignment` is fully
+    // removed. The `ai-assignment.md` file on disk continues to exist
+    // for any consumer that reads it directly; the menu / palette
+    // entry to open it does not.
+    vscode4.commands.registerCommand(
+      "dabblerSessionSets.openUatChecklist",
+      (item) => openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
+    ),
+    vscode4.commands.registerCommand(
+      "dabblerSessionSets.openSessionState",
+      (item) => openIfExists(item?.set?.statePath, "Session state")
+    ),
+    // Set 061 S2 (spec D3): blocked-marker companion. Tolerates a
+    // bare Command Palette invocation (no row context) with an
+    // informational no-op, matching the other openFile commands.
+    vscode4.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
+      if (!item?.set) {
+        vscode4.window.showInformationMessage(
+          "Open Prerequisite Spec is available from a session-set row's context menu."
+        );
+        return;
+      }
+      void openPrerequisiteSpec(item.set);
+    }),
+    vscode4.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
+      if (!item?.set)
+        return;
+      vscode4.commands.executeCommand("revealInExplorer", vscode4.Uri.file(item.set.dir));
+    }),
+    vscode4.commands.registerCommand(
+      "dabblerSessionSets.revealPlaywrightTests",
+      async (item) => {
+        if (!item?.set)
+          return;
+        const tests = findPlaywrightTests(item.set);
+        if (tests.length === 0) {
+          const cfg = vscode4.workspace.getConfiguration("dabblerSessionSets");
+          const dir = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT);
+          vscode4.window.showInformationMessage(
+            `No Playwright tests found for "${item.set.name}". Search root: ${dir}`
+          );
+          return;
+        }
+        if (tests.length === 1) {
+          vscode4.commands.executeCommand("vscode.open", vscode4.Uri.file(tests[0]));
+          return;
+        }
+        const picked = await vscode4.window.showQuickPick(
+          tests.map((p2) => ({
+            label: path7.basename(p2),
+            description: path7.relative(item.set.root, p2),
+            absolute: p2
+          })),
+          { placeHolder: `Playwright tests matching "${item.set.name}"` }
+        );
+        if (picked) {
+          vscode4.commands.executeCommand("vscode.open", vscode4.Uri.file(picked.absolute));
+        }
+      }
+    )
+  );
 }
 
-// src/utils/startupTiming.ts
-var fs9 = __toESM(require("fs"));
-var path11 = __toESM(require("path"));
-var marks = {
-  moduleLoadedAtUptimeMs: null,
-  moduleLoadedAt: null,
-  activateStart: null,
-  activateEnd: null,
-  webviewResolveStart: null,
-  webviewResolveEnd: null,
-  treeFirstChildrenServed: null,
-  treeFirstChildrenCount: null
+// src/commands/copyCommand.ts
+var vscode5 = __toESM(require("vscode"));
+async function copy(text, label) {
+  await vscode5.env.clipboard.writeText(text);
+  vscode5.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
+}
+var startCommandPresets = {
+  default: (slug) => `Start the next session of \`${slug}\`.`,
+  parallel: (slug) => `Start the next parallel session of \`${slug}\`.`
 };
-try {
-  marks.moduleLoadedAt = Date.now();
-  marks.moduleLoadedAtUptimeMs = Math.round(process.uptime() * 1e3);
-} catch {
+var presetLabels = {
+  default: "start next session",
+  parallel: "start next parallel session"
+};
+function registerCopyCommands(context) {
+  for (const [key, builder] of Object.entries(startCommandPresets)) {
+    context.subscriptions.push(
+      vscode5.commands.registerCommand(
+        `dabblerSessionSets.copyStartCommand.${key}`,
+        async (item) => {
+          if (!item?.set)
+            return;
+          await copy(builder(item.set.name), presetLabels[key]);
+        }
+      )
+    );
+  }
+  context.subscriptions.push(
+    vscode5.commands.registerCommand(
+      "dabblerSessionSets.copySlug",
+      async (item) => {
+        if (!item?.set)
+          return;
+        await copy(item.set.name, "slug");
+      }
+    )
+  );
 }
-function markActivateStart() {
-  marks.activateStart = Date.now();
-}
-function markActivateEnd() {
-  marks.activateEnd = Date.now();
-  emitIfRequested();
-}
-function markWebviewResolveStart() {
-  if (marks.webviewResolveStart !== null)
-    return;
-  marks.webviewResolveStart = Date.now();
-}
-function markWebviewResolveEnd() {
-  if (marks.webviewResolveEnd !== null)
-    return;
-  marks.webviewResolveEnd = Date.now();
-  emitIfRequested();
-}
-function markFirstChildrenServed(count) {
-  if (marks.treeFirstChildrenServed !== null)
-    return;
-  marks.treeFirstChildrenServed = Date.now();
-  marks.treeFirstChildrenCount = count;
-  emitIfRequested();
-}
-function readStartupMarks() {
-  return { ...marks };
-}
-var delta = (from, to) => from === null || to === null ? null : to - from;
-function startupDurations(m = marks) {
+
+// src/commands/copyPromptCommands.ts
+var vscode7 = __toESM(require("vscode"));
+
+// src/providers/rowMenuHelpers.ts
+function planLeftClickActivation(setName, state) {
+  const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
+  if (state !== "in-progress" && state !== "not-started") {
+    return { openCommand, clipboardWrite: null };
+  }
+  const sanitized = setName.replace(/`/g, "'");
   return {
-    activateMs: delta(m.activateStart, m.activateEnd),
-    webviewResolveMs: delta(m.webviewResolveStart, m.webviewResolveEnd),
-    activateEndToTreeRootsMs: delta(m.activateEnd, m.treeFirstChildrenServed)
+    openCommand,
+    clipboardWrite: {
+      text: `Start the next session of \`${sanitized}\`.`,
+      toast: `Copied: Start the next session of ${setName}`
+    }
   };
 }
-function emitIfRequested() {
-  const target = process.env.DABBLER_STARTUP_TIMING_PATH;
-  if (!target)
+function nextRunnableSessionNumber(sessions) {
+  const ordered = [...sessions ?? []].sort((a, b2) => a.number - b2.number);
+  let expected = 1;
+  for (const session of ordered) {
+    if (session.number !== expected)
+      return null;
+    expected += 1;
+    if (session.status === "complete" || session.status === "cancelled")
+      continue;
+    if (session.status === "in-progress" || session.status === "not-started") {
+      return session.number;
+    }
+    return null;
+  }
+  return null;
+}
+function sessionOffersRunPrompt(set, session) {
+  if (planLeftClickActivation(set.name, set.state).clipboardWrite === null) {
+    return false;
+  }
+  return nextRunnableSessionNumber(set.sessions) === session.number;
+}
+
+// src/commands/workExplorerTreeCommands.ts
+var vscode6 = __toESM(require("vscode"));
+function asSetNode(arg) {
+  if (arg === null || typeof arg !== "object")
+    return void 0;
+  const node = arg;
+  return node.kind === "set" && node.set ? node : void 0;
+}
+function asSessionNode(arg) {
+  if (arg === null || typeof arg !== "object")
+    return void 0;
+  const node = arg;
+  return node.kind === "session" && node.set && node.session ? node : void 0;
+}
+async function activateSetRow(arg) {
+  const node = asSetNode(arg);
+  if (!node)
     return;
-  const payload = {
-    marks: readStartupMarks(),
-    durations: startupDurations(),
-    note: "Host-side buckets only. First paint is NOT here \u2014 it is observed from the DOM by the Layer 3 harness, because the host cannot see when a row becomes visible."
-  };
+  const plan = planLeftClickActivation(node.set.name, node.set.state);
+  await vscode6.commands.executeCommand(plan.openCommand.commandId, node);
+  if (!plan.clipboardWrite)
+    return;
   try {
-    fs9.mkdirSync(path11.dirname(target), { recursive: true });
-    fs9.writeFileSync(target, JSON.stringify(payload, null, 2), { encoding: "utf-8" });
+    await vscode6.env.clipboard.writeText(plan.clipboardWrite.text);
+    vscode6.window.showInformationMessage(plan.clipboardWrite.toast);
   } catch (err) {
-    console.error(
-      `[dabbler-ai-orchestration] startup timing: could not write DABBLER_STARTUP_TIMING_PATH (${target}) \u2014 the harness will find no file, which must NOT be read as "startup was not instrumented".`,
+    console.warn(
+      `[WorkExplorerTree] left-click clipboard write failed for "${node.set.name}"`,
       err
     );
   }
 }
+async function activateSessionRow(arg) {
+  const node = asSessionNode(arg);
+  if (!node)
+    return;
+  await vscode6.commands.executeCommand("dabblerSessionSets.openSpec", node);
+}
+function registerWorkExplorerTreeCommands(context) {
+  context.subscriptions.push(
+    vscode6.commands.registerCommand(
+      "dabblerWorkExplorer.activateSet",
+      (arg) => activateSetRow(arg)
+    ),
+    vscode6.commands.registerCommand(
+      "dabblerWorkExplorer.activateSession",
+      (arg) => activateSessionRow(arg)
+    )
+  );
+}
 
-// src/commands/gettingStartedActions.ts
-var vscode9 = __toESM(require("vscode"));
+// src/utils/consumerBootstrap.ts
+var fs8 = __toESM(require("fs"));
+var path8 = __toESM(require("path"));
+var BUNDLE_FILES = {
+  specTemplate: "spec.md.template",
+  sessionStateTemplate: "session-state.json.template",
+  startHereTemplate: "start-here.md.template",
+  gettingStartedTemplate: "getting-started.md.template",
+  sharedBody: "engine-file.shared-body.md",
+  claudeTail: "engine-file.claude-tail.md",
+  agentsTail: "engine-file.agents-tail.md",
+  geminiTail: "engine-file.gemini-tail.md",
+  lessonsLearnedTemplate: "lessons-learned.md.template",
+  projectGuidanceTemplate: "project-guidance.md.template",
+  lessonsArchiveTemplate: "lessons-archive.md.template",
+  crossProviderVerificationTemplate: "cross-provider-verification.md.template",
+  codeownersTemplate: "CODEOWNERS.template",
+  monorepoCiTemplate: "monorepo-ci.yml.template",
+  azurePipelinesTemplate: "azure-pipelines.yml.template"
+};
+var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
+function resolveBundledTemplateDir(extensionPath) {
+  return path8.join(extensionPath, "dist", "templates", "consumer-bootstrap");
+}
+function loadTemplateBundle(bundleDir) {
+  const read = (name) => fs8.readFileSync(path8.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
+  return {
+    specTemplate: read(BUNDLE_FILES.specTemplate),
+    sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
+    startHereTemplate: read(BUNDLE_FILES.startHereTemplate),
+    gettingStartedTemplate: read(BUNDLE_FILES.gettingStartedTemplate),
+    sharedBody: read(BUNDLE_FILES.sharedBody),
+    claudeTail: read(BUNDLE_FILES.claudeTail),
+    agentsTail: read(BUNDLE_FILES.agentsTail),
+    geminiTail: read(BUNDLE_FILES.geminiTail),
+    lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
+    projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
+    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
+    crossProviderVerificationTemplate: read(
+      BUNDLE_FILES.crossProviderVerificationTemplate
+    ),
+    codeownersTemplate: read(BUNDLE_FILES.codeownersTemplate),
+    monorepoCiTemplate: read(BUNDLE_FILES.monorepoCiTemplate),
+    azurePipelinesTemplate: read(BUNDLE_FILES.azurePipelinesTemplate)
+  };
+}
+function padSessionNumber(n) {
+  return String(n).padStart(3, "0");
+}
+function assertPositiveSessionCount(totalSessions) {
+  if (!Number.isInteger(totalSessions) || totalSessions < 1) {
+    throw new Error(
+      `consumer-bootstrap: totalSessions must be a positive integer, got ${totalSessions}`
+    );
+  }
+}
+function moduleLine(ctx) {
+  if (!ctx.module)
+    return "";
+  return `module: ${ctx.module}                      # grouping only \u2014 set names stay globally unique
+`;
+}
+function tokenTable(ctx) {
+  return {
+    REPO_NAME: ctx.repoName,
+    SET_TITLE: ctx.setTitle,
+    PURPOSE: ctx.purpose,
+    SLUG: ctx.slug,
+    CREATED: ctx.created,
+    MODULE_LINE: moduleLine(ctx),
+    TOTAL_SESSIONS: String(ctx.totalSessions)
+  };
+}
+function substituteTokens(text, ctx) {
+  const table = tokenTable(ctx);
+  return text.replace(
+    /{{([A-Z_]+)}}/g,
+    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
+  );
+}
+function findUnsubstitutedTokens(rendered) {
+  const out = /* @__PURE__ */ new Set();
+  for (const m of rendered.matchAll(/{{[A-Z_]+}}/g))
+    out.add(m[0]);
+  return [...out];
+}
+function expandSpecSessions(specText, totalSessions) {
+  assertPositiveSessionCount(totalSessions);
+  specText = specText.replace(/\r\n/g, "\n");
+  const SESSIONS_HEADER = "## Sessions\n";
+  const DELIVERABLES_HEADER = "## End-of-set deliverables";
+  const SEP = "\n\n---\n\n";
+  const headerIdx = specText.indexOf(SESSIONS_HEADER);
+  const deliverablesIdx = specText.indexOf(DELIVERABLES_HEADER);
+  if (headerIdx === -1 || deliverablesIdx === -1 || deliverablesIdx < headerIdx) {
+    return specText;
+  }
+  const preamble = specText.slice(0, headerIdx + SESSIONS_HEADER.length);
+  const postamble = specText.slice(deliverablesIdx);
+  const region = specText.slice(headerIdx + SESSIONS_HEADER.length, deliverablesIdx);
+  const blockStart = region.indexOf("### Session 1 of");
+  if (blockStart === -1)
+    return specText;
+  const afterStart = region.slice(blockStart);
+  const sepIdx = afterStart.indexOf(SEP);
+  const unit = (sepIdx === -1 ? afterStart : afterStart.slice(0, sepIdx)).trimEnd();
+  const blocks = [];
+  for (let k2 = 1; k2 <= totalSessions; k2++) {
+    let block = unit.replace("### Session 1 of", `### Session ${k2} of`);
+    block = block.replace(/session-001\//g, `session-${padSessionNumber(k2)}/`);
+    blocks.push(block);
+  }
+  return `${preamble}
+${blocks.join(SEP)}${SEP}${postamble}`;
+}
+function expandSessionState(stateText, totalSessions) {
+  assertPositiveSessionCount(totalSessions);
+  const parsed = JSON.parse(stateText);
+  const unit = parsed.sessions[0];
+  parsed.sessions = [];
+  for (let k2 = 1; k2 <= totalSessions; k2++) {
+    parsed.sessions.push({
+      ...unit,
+      number: k2,
+      title: `Session ${k2}`,
+      status: "not-started",
+      startedAt: null,
+      completedAt: null,
+      orchestrator: null,
+      verificationVerdict: null
+    });
+  }
+  return JSON.stringify(parsed, null, 2) + "\n";
+}
+function renderEngineFile(sharedBody, tail, ctx) {
+  return substituteTokens(sharedBody, ctx) + "\n" + substituteTokens(tail, ctx);
+}
+function renderSpec(bundle, ctx) {
+  return expandSpecSessions(
+    substituteTokens(bundle.specTemplate, ctx),
+    ctx.totalSessions
+  );
+}
+function renderSessionState(bundle, ctx) {
+  return expandSessionState(
+    substituteTokens(bundle.sessionStateTemplate, ctx),
+    ctx.totalSessions
+  );
+}
+function renderStartHere(bundle, ctx) {
+  return substituteTokens(bundle.startHereTemplate, ctx);
+}
+function specRelPath(ctx) {
+  return path8.posix.join("docs", "session-sets", ctx.slug, "spec.md");
+}
+function sessionStateRelPath(ctx) {
+  return path8.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
+}
+var START_HERE_REL_PATH = path8.posix.join("docs", "dabbler", "start-here.md");
+var GETTING_STARTED_REL_PATH = path8.posix.join(
+  "docs",
+  "dabbler",
+  "getting-started.md"
+);
+var CROSS_PROVIDER_VERIFICATION_REL_PATH = path8.posix.join(
+  "docs",
+  "dabbler",
+  "cross-provider-verification.md"
+);
+function renderCrossProviderVerification(bundle, ctx) {
+  return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
+}
+var LESSONS_LEARNED_REL_PATH = path8.posix.join("docs", "planning", "lessons-learned.md");
+var PROJECT_GUIDANCE_REL_PATH = path8.posix.join("docs", "planning", "project-guidance.md");
+var LESSONS_ARCHIVE_REL_PATH = path8.posix.join("docs", "planning", "lessons-archive.md");
+var CODEOWNERS_REL_PATH = path8.posix.join(".github", "CODEOWNERS");
+var MONOREPO_CI_REL_PATH = path8.posix.join(
+  ".github",
+  "workflows",
+  "monorepo-ci.yml"
+);
+var AZURE_PIPELINES_REL_PATH = "azure-pipelines.yml";
+function guidanceFiles(bundle, ctx) {
+  return {
+    [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
+    [PROJECT_GUIDANCE_REL_PATH]: substituteTokens(bundle.projectGuidanceTemplate, ctx),
+    [LESSONS_ARCHIVE_REL_PATH]: substituteTokens(bundle.lessonsArchiveTemplate, ctx)
+  };
+}
+function renderConsumerBootstrap(bundle, ctx) {
+  const files = {
+    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
+    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
+    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
+    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
+    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the engine-facing verification doc the
+    // Evaluate pointer prompts reference.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx
+    ),
+    [specRelPath(ctx)]: renderSpec(bundle, ctx),
+    [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
+    // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
+    ...guidanceFiles(bundle, ctx),
+    // Set 087 S3 (ruling Q3): the module-ownership + monorepo-CI teaching
+    // templates (token-free; inert until adapted).
+    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
+    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
+    // Set 107 S1: the ADO half of the same teaching pair.
+    [AZURE_PIPELINES_REL_PATH]: bundle.azurePipelinesTemplate
+  };
+  const leftovers = /* @__PURE__ */ new Set();
+  for (const content of Object.values(files)) {
+    for (const t2 of findUnsubstitutedTokens(content))
+      leftovers.add(t2);
+  }
+  if (leftovers.size > 0) {
+    throw new Error(
+      `consumer-bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
+    );
+  }
+  return { files };
+}
+function renderStructureBootstrap(bundle, ctx) {
+  const files = {
+    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
+    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
+    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
+    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
+    // D8 (Set 060 S3): the static Getting Started teaching doc ships
+    // with the structure scaffold too, so the editor-open path can
+    // prefer the workspace copy once the structure is built.
+    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
+    // Set 077 S4 (Feature 3): the verification instruction doc is repo
+    // structure — the Lightweight review flow depends on it.
+    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
+      bundle,
+      ctx
+    ),
+    // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
+    // so a fresh repo built via "Build project structure" starts the
+    // lifecycle with docs/planning/ in place.
+    ...guidanceFiles(bundle, ctx),
+    // Set 087 S3 (ruling Q3): the ownership + CI teaching templates are
+    // repo structure too — a new project starts with them in place.
+    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
+    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
+    // Set 107 S1: the ADO half of the same teaching pair.
+    [AZURE_PIPELINES_REL_PATH]: bundle.azurePipelinesTemplate
+  };
+  const leftovers = /* @__PURE__ */ new Set();
+  for (const content of Object.values(files)) {
+    for (const t2 of findUnsubstitutedTokens(content))
+      leftovers.add(t2);
+  }
+  if (leftovers.size > 0) {
+    throw new Error(
+      `structure-only bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
+    );
+  }
+  return { files };
+}
+function structureOnlyContext(repoName, created) {
+  return {
+    repoName,
+    setTitle: "(no starter set \u2014 created via the Getting Started decomposition prompt)",
+    purpose: "(no starter set)",
+    slug: "000-placeholder-unused",
+    created,
+    totalSessions: 1
+  };
+}
+
+// src/commands/copyPromptCommands.ts
+function sanitizeSlugForPrompt(slug) {
+  return slug.replace(/`/g, "'");
+}
+function buildStartNextSessionPrompt(set) {
+  return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
+}
+function planSessionRunPrompt(set, session) {
+  if (!sessionOffersRunPrompt(set, session))
+    return null;
+  return {
+    text: buildStartNextSessionPrompt(set),
+    toast: `Copied: Start session ${session.number} of ${set.name}`
+  };
+}
+async function copyToClipboard(text, statusMessage) {
+  try {
+    await vscode7.env.clipboard.writeText(text);
+    vscode7.window.setStatusBarMessage(statusMessage, 4e3);
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    vscode7.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
+  }
+}
+function registerCopyPromptCommands(context) {
+  context.subscriptions.push(
+    vscode7.commands.registerCommand(
+      "dabbler.copyStartNextSessionPrompt",
+      async (item) => {
+        if (!item?.set)
+          return;
+        const prompt = buildStartNextSessionPrompt(item.set);
+        await copyToClipboard(
+          prompt,
+          `Copied: Start the next session of ${item.set.name}`
+        );
+      }
+    ),
+    // Set 115 S3: the session row's sibling. It re-checks the gate on
+    // dispatch rather than trusting the menu — `contextValue` is computed
+    // at render time, so a row that has been on screen since before a
+    // session closed would otherwise still copy a prompt for a set that
+    // has moved on. A refused invocation is silent: the entry the
+    // operator clicked simply should not have been there.
+    vscode7.commands.registerCommand(
+      "dabbler.copySessionRunPrompt",
+      async (arg) => {
+        const node = asSessionNode(arg);
+        if (!node)
+          return;
+        const plan = planSessionRunPrompt(node.set, node.session);
+        if (!plan)
+          return;
+        await copyToClipboard(plan.text, plan.toast);
+      }
+    )
+  );
+}
 
 // src/commands/gitScaffold.ts
-var vscode6 = __toESM(require("vscode"));
+var vscode11 = __toESM(require("vscode"));
 var cp3 = __toESM(require("child_process"));
 var os3 = __toESM(require("os"));
 var path16 = __toESM(require("path"));
@@ -18672,8 +12360,8 @@ function toLinesWithContent(input = "", trimmed2 = true, separator = "\n") {
 function forEachLineWithContent(input, callback) {
   return toLinesWithContent(input, true).map((line) => callback(line));
 }
-function folderExists(path43) {
-  return (0, import_file_exists.exists)(path43, import_file_exists.FOLDER);
+function folderExists(path37) {
+  return (0, import_file_exists.exists)(path37, import_file_exists.FOLDER);
 }
 function append(target, item) {
   if (Array.isArray(target)) {
@@ -18911,9 +12599,9 @@ var init_simple_git_options = __esm({
     };
   }
 });
-function appendTaskOptions(options, commands33 = []) {
+function appendTaskOptions(options, commands29 = []) {
   if (!filterPlainObject(options)) {
-    return commands33;
+    return commands29;
   }
   return Object.keys(options).reduce((commands210, key) => {
     const value = options[key];
@@ -18931,7 +12619,7 @@ function appendTaskOptions(options, commands33 = []) {
       commands210.push(key);
     }
     return commands210;
-  }, commands33);
+  }, commands29);
 }
 function getTrailingOptions(args, initialPrimitive = 0, objectOnly = false) {
   const command = [];
@@ -18977,7 +12665,7 @@ function parseStringResponse(result, parsers12, texts, trim = true) {
         }
         return lines[i2 + offset];
       };
-      parsers12.some(({ parse: parse4 }) => parse4(line, result));
+      parsers12.some(({ parse: parse3 }) => parse3(line, result));
     }
   });
   return result;
@@ -19061,29 +12749,29 @@ function checkIsRepoTask(action) {
     case "root":
       return checkIsRepoRootTask();
   }
-  const commands33 = ["rev-parse", "--is-inside-work-tree"];
+  const commands29 = ["rev-parse", "--is-inside-work-tree"];
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     onError,
     parser
   };
 }
 function checkIsRepoRootTask() {
-  const commands33 = ["rev-parse", "--git-dir"];
+  const commands29 = ["rev-parse", "--git-dir"];
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     onError,
-    parser(path43) {
-      return /^\.(git)?$/.test(path43.trim());
+    parser(path37) {
+      return /^\.(git)?$/.test(path37.trim());
     }
   };
 }
 function checkIsBareRepoTask() {
-  const commands33 = ["rev-parse", "--is-bare-repository"];
+  const commands29 = ["rev-parse", "--is-bare-repository"];
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     onError,
     parser
@@ -19173,18 +12861,18 @@ function configurationErrorTask(error) {
     }
   };
 }
-function straightThroughStringTask(commands33, trimmed2 = false) {
+function straightThroughStringTask(commands29, trimmed2 = false) {
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return trimmed2 ? String(text).trim() : text;
     }
   };
 }
-function straightThroughBufferTask(commands33) {
+function straightThroughBufferTask(commands29) {
   return {
-    commands: commands33,
+    commands: commands29,
     format: "buffer",
     parser(buffer) {
       return buffer;
@@ -19230,9 +12918,9 @@ function cleanWithOptionsTask(mode, customArgs) {
   return cleanTask(cleanMode, options);
 }
 function cleanTask(mode, customArgs) {
-  const commands33 = ["clean", `-${mode}`, ...customArgs];
+  const commands29 = ["clean", `-${mode}`, ...customArgs];
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return cleanSummaryParser(mode === "n", text);
@@ -19395,13 +13083,13 @@ function asConfigScope(scope, fallback) {
   return fallback;
 }
 function addConfigTask(key, value, append2, scope) {
-  const commands33 = ["config", `--${scope}`];
+  const commands29 = ["config", `--${scope}`];
   if (append2) {
-    commands33.push("--add");
+    commands29.push("--add");
   }
-  commands33.push(key, value);
+  commands29.push(key, value);
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return text;
@@ -19409,12 +13097,12 @@ function addConfigTask(key, value, append2, scope) {
   };
 }
 function getConfigTask(key, scope) {
-  const commands33 = ["config", "--null", "--show-origin", "--get-all", key];
+  const commands29 = ["config", "--null", "--show-origin", "--get-all", key];
   if (scope) {
-    commands33.splice(1, 0, `--${scope}`);
+    commands29.splice(1, 0, `--${scope}`);
   }
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return configGetParser(text, key);
@@ -19422,12 +13110,12 @@ function getConfigTask(key, scope) {
   };
 }
 function listConfigTask(scope) {
-  const commands33 = ["config", "--list", "--show-origin", "--null"];
+  const commands29 = ["config", "--list", "--show-origin", "--null"];
   if (scope) {
-    commands33.push(`--${scope}`);
+    commands29.push(`--${scope}`);
   }
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
       return configListParser(text);
@@ -19510,11 +13198,11 @@ function parseGrep(grep) {
   const paths = /* @__PURE__ */ new Set();
   const results = {};
   forEachLineWithContent(grep, (input) => {
-    const [path43, line, preview] = input.split(NULL);
-    paths.add(path43);
-    (results[path43] = results[path43] || []).push({
+    const [path37, line, preview] = input.split(NULL);
+    paths.add(path37);
+    (results[path37] = results[path37] || []).push({
       line: asNumber(line),
-      path: path43,
+      path: path37,
       preview
     });
   });
@@ -19539,10 +13227,10 @@ function grep_default() {
       if (typeof searchTerm === "string") {
         searchTerm = grepQueryBuilder().param(searchTerm);
       }
-      const commands33 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
+      const commands29 = ["grep", "--null", "-n", "--full-name", ...options, ...searchTerm];
       return this._runTask(
         {
-          commands: commands33,
+          commands: commands29,
           format: "utf-8",
           parser(stdOut) {
             return parseGrep(stdOut);
@@ -19591,12 +13279,12 @@ __export2(reset_exports, {
   resetTask: () => resetTask
 });
 function resetTask(mode, customArgs) {
-  const commands33 = ["reset"];
+  const commands29 = ["reset"];
   if (isValidResetMode(mode)) {
-    commands33.push(`--${mode}`);
+    commands29.push(`--${mode}`);
   }
-  commands33.push(...customArgs);
-  return straightThroughStringTask(commands33);
+  commands29.push(...customArgs);
+  return straightThroughStringTask(commands29);
 }
 function getResetMode(mode) {
   if (isValidResetMode(mode)) {
@@ -19765,10 +13453,10 @@ var init_tasks_pending_queue = __esm({
     };
   }
 });
-function pluginContext(task, commands33) {
+function pluginContext(task, commands29) {
   return {
     method: first(task.commands) || "",
-    commands: commands33
+    commands: commands29
   };
 }
 function onErrorReceived(target, logger) {
@@ -20069,11 +13757,11 @@ var init_change_working_directory = __esm({
   }
 });
 function checkoutTask(args) {
-  const commands33 = ["checkout", ...args];
-  if (commands33[1] === "-b" && commands33.includes("-B")) {
-    commands33[1] = remove(commands33, "-B");
+  const commands29 = ["checkout", ...args];
+  if (commands29[1] === "-b" && commands29.includes("-B")) {
+    commands29[1] = remove(commands29, "-B");
   }
-  return straightThroughStringTask(commands33);
+  return straightThroughStringTask(commands29);
 }
 function checkout_default() {
   return {
@@ -20205,7 +13893,7 @@ var init_parse_commit = __esm({
   }
 });
 function commitTask(message, files, customArgs) {
-  const commands33 = [
+  const commands29 = [
     "-c",
     "core.abbrev=40",
     "commit",
@@ -20214,7 +13902,7 @@ function commitTask(message, files, customArgs) {
     ...customArgs
   ];
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser: parseCommitResult
   };
@@ -20266,11 +13954,11 @@ var init_first_commit = __esm({
   }
 });
 function hashObjectTask(filePath, write) {
-  const commands33 = ["hash-object", filePath];
+  const commands29 = ["hash-object", filePath];
   if (write) {
-    commands33.push("-w");
+    commands29.push("-w");
   }
-  return straightThroughStringTask(commands33, true);
+  return straightThroughStringTask(commands29, true);
 }
 var init_hash_object = __esm({
   "src/lib/tasks/hash-object.ts"() {
@@ -20278,14 +13966,14 @@ var init_hash_object = __esm({
     init_task();
   }
 });
-function parseInit(bare, path43, text) {
+function parseInit(bare, path37, text) {
   const response = String(text).trim();
   let result;
   if (result = initResponseRegex.exec(response)) {
-    return new InitSummary(bare, path43, false, result[1]);
+    return new InitSummary(bare, path37, false, result[1]);
   }
   if (result = reInitResponseRegex.exec(response)) {
-    return new InitSummary(bare, path43, true, result[1]);
+    return new InitSummary(bare, path37, true, result[1]);
   }
   let gitDir = "";
   const tokens = response.split(" ");
@@ -20296,7 +13984,7 @@ function parseInit(bare, path43, text) {
       break;
     }
   }
-  return new InitSummary(bare, path43, /^re/i.test(response), gitDir);
+  return new InitSummary(bare, path37, /^re/i.test(response), gitDir);
 }
 var InitSummary;
 var initResponseRegex;
@@ -20305,9 +13993,9 @@ var init_InitSummary = __esm({
   "src/lib/responses/InitSummary.ts"() {
     "use strict";
     InitSummary = class {
-      constructor(bare, path43, existing, gitDir) {
+      constructor(bare, path37, existing, gitDir) {
         this.bare = bare;
-        this.path = path43;
+        this.path = path37;
         this.existing = existing;
         this.gitDir = gitDir;
       }
@@ -20319,16 +14007,16 @@ var init_InitSummary = __esm({
 function hasBareCommand(command) {
   return command.includes(bareCommand);
 }
-function initTask(bare = false, path43, customArgs) {
-  const commands33 = ["init", ...customArgs];
-  if (bare && !hasBareCommand(commands33)) {
-    commands33.splice(1, 0, bareCommand);
+function initTask(bare = false, path37, customArgs) {
+  const commands29 = ["init", ...customArgs];
+  if (bare && !hasBareCommand(commands29)) {
+    commands29.splice(1, 0, bareCommand);
   }
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(text) {
-      return parseInit(commands33.includes("--bare"), path43, text);
+      return parseInit(commands29.includes("--bare"), path37, text);
     }
   };
 }
@@ -20560,14 +14248,14 @@ __export2(diff_exports, {
 });
 function diffSummaryTask(customArgs) {
   let logFormat = logFormatFromCommand(customArgs);
-  const commands33 = ["diff"];
+  const commands29 = ["diff"];
   if (logFormat === "") {
     logFormat = "--stat";
-    commands33.push("--stat=4096");
+    commands29.push("--stat=4096");
   }
-  commands33.push(...customArgs);
-  return validateLogFormatConfig(commands33) || {
-    commands: commands33,
+  commands29.push(...customArgs);
+  return validateLogFormatConfig(commands29) || {
+    commands: commands29,
     format: "utf-8",
     parser: getDiffParser(logFormat)
   };
@@ -21085,18 +14773,18 @@ function pushTagsTask(ref = {}, customArgs) {
   return pushTask(ref, customArgs);
 }
 function pushTask(ref = {}, customArgs) {
-  const commands33 = ["push", ...customArgs];
+  const commands29 = ["push", ...customArgs];
   if (ref.branch) {
-    commands33.splice(1, 0, ref.branch);
+    commands29.splice(1, 0, ref.branch);
   }
   if (ref.remote) {
-    commands33.splice(1, 0, ref.remote);
+    commands29.splice(1, 0, ref.remote);
   }
-  remove(commands33, "-v");
-  append(commands33, "--verbose");
-  append(commands33, "--porcelain");
+  remove(commands29, "-v");
+  append(commands29, "--verbose");
+  append(commands29, "--porcelain");
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser: parsePushResult
   };
@@ -21111,19 +14799,19 @@ var init_push = __esm({
 function show_default() {
   return {
     showBuffer() {
-      const commands33 = ["show", ...getTrailingOptions(arguments, 1)];
-      if (!commands33.includes("--binary")) {
-        commands33.splice(1, 0, "--binary");
+      const commands29 = ["show", ...getTrailingOptions(arguments, 1)];
+      if (!commands29.includes("--binary")) {
+        commands29.splice(1, 0, "--binary");
       }
       return this._runTask(
-        straightThroughBufferTask(commands33),
+        straightThroughBufferTask(commands29),
         trailingFunctionArgument(arguments)
       );
     },
     show() {
-      const commands33 = ["show", ...getTrailingOptions(arguments, 1)];
+      const commands29 = ["show", ...getTrailingOptions(arguments, 1)];
       return this._runTask(
-        straightThroughStringTask(commands33),
+        straightThroughStringTask(commands29),
         trailingFunctionArgument(arguments)
       );
     }
@@ -21143,12 +14831,12 @@ var init_FileStatusSummary = __esm({
     "use strict";
     fromPathRegex = /^(.+)\0(.+)$/;
     FileStatusSummary = class {
-      constructor(path43, index, working_dir) {
-        this.path = path43;
+      constructor(path37, index, working_dir) {
+        this.path = path37;
         this.index = index;
         this.working_dir = working_dir;
         if (index === "R" || working_dir === "R") {
-          const detail = fromPathRegex.exec(path43) || [null, path43, path43];
+          const detail = fromPathRegex.exec(path37) || [null, path37, path37];
           this.from = detail[2] || "";
           this.path = detail[1] || "";
         }
@@ -21179,14 +14867,14 @@ function splitLine(result, lineStr) {
     default:
       return;
   }
-  function data(index, workingDir, path43) {
+  function data(index, workingDir, path37) {
     const raw = `${index}${workingDir}`;
     const handler = parsers6.get(raw);
     if (handler) {
-      handler(result, path43);
+      handler(result, path37);
     }
     if (raw !== "##" && raw !== "!!") {
-      result.files.push(new FileStatusSummary(path43, index, workingDir));
+      result.files.push(new FileStatusSummary(path37, index, workingDir));
     }
   }
 }
@@ -21333,7 +15021,7 @@ var init_StatusSummary = __esm({
   }
 });
 function statusTask(customArgs) {
-  const commands33 = [
+  const commands29 = [
     "status",
     "--porcelain",
     "-b",
@@ -21343,7 +15031,7 @@ function statusTask(customArgs) {
   ];
   return {
     format: "utf-8",
-    commands: commands33,
+    commands: commands29,
     parser(text) {
       return parseStatusSummary(text);
     }
@@ -21458,10 +15146,10 @@ var init_clone = __esm({
     init_task();
     init_utils();
     cloneTask = (repo, directory, customArgs) => {
-      const commands33 = ["clone", ...customArgs];
-      filterString(repo) && commands33.push(c(repo));
-      filterString(directory) && commands33.push(c(directory));
-      return straightThroughStringTask(commands33);
+      const commands29 = ["clone", ...customArgs];
+      filterString(repo) && commands29.push(c(repo));
+      filterString(directory) && commands29.push(c(directory));
+      return straightThroughStringTask(commands29);
     };
     cloneMirrorTask = (repo, directory, customArgs) => {
       append(customArgs, "--mirror");
@@ -21537,9 +15225,9 @@ var init_simple_git_api = __esm({
           next
         );
       }
-      hashObject(path43, write) {
+      hashObject(path37, write) {
         return this._runTask(
-          hashObjectTask(path43, write === true),
+          hashObjectTask(path37, write === true),
           trailingFunctionArgument(arguments)
         );
       }
@@ -21815,23 +15503,23 @@ __export2(branch_exports, {
   deleteBranchTask: () => deleteBranchTask,
   deleteBranchesTask: () => deleteBranchesTask
 });
-function containsDeleteBranchCommand(commands33) {
+function containsDeleteBranchCommand(commands29) {
   const deleteCommands = ["-d", "-D", "--delete"];
-  return commands33.some((command) => deleteCommands.includes(command));
+  return commands29.some((command) => deleteCommands.includes(command));
 }
 function branchTask(customArgs) {
   const isDelete = containsDeleteBranchCommand(customArgs);
   const isCurrentOnly = customArgs.includes("--show-current");
-  const commands33 = ["branch", ...customArgs];
-  if (commands33.length === 1) {
-    commands33.push("-a");
+  const commands29 = ["branch", ...customArgs];
+  if (commands29.length === 1) {
+    commands29.push("-a");
   }
-  if (!commands33.includes("-v")) {
-    commands33.splice(1, 0, "-v");
+  if (!commands29.includes("-v")) {
+    commands29.splice(1, 0, "-v");
   }
   return {
     format: "utf-8",
-    commands: commands33,
+    commands: commands29,
     parser(stdOut, stdErr) {
       if (isDelete) {
         return parseBranchDeletions(stdOut, stdErr).all[0];
@@ -21893,8 +15581,8 @@ var init_branch = __esm({
   }
 });
 function toPath(input) {
-  const path43 = input.trim().replace(/^["']|["']$/g, "");
-  return path43 && (0, import_node_path.normalize)(path43);
+  const path37 = input.trim().replace(/^["']|["']$/g, "");
+  return path37 && (0, import_node_path.normalize)(path37);
 }
 var parseCheckIgnore;
 var init_CheckIgnore = __esm({
@@ -21981,16 +15669,16 @@ function disallowedCommand(command) {
   return /^--upload-pack(=|$)/.test(command);
 }
 function fetchTask(remote, branch, customArgs) {
-  const commands33 = ["fetch", ...customArgs];
+  const commands29 = ["fetch", ...customArgs];
   if (remote && branch) {
-    commands33.push(remote, branch);
+    commands29.push(remote, branch);
   }
-  const banned = commands33.find(disallowedCommand);
+  const banned = commands29.find(disallowedCommand);
   if (banned) {
     return configurationErrorTask(`git.fetch: potential exploit argument blocked.`);
   }
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser: parseFetchResult
   };
@@ -22040,12 +15728,12 @@ __export2(pull_exports, {
   pullTask: () => pullTask
 });
 function pullTask(remote, branch, customArgs) {
-  const commands33 = ["pull", ...customArgs];
+  const commands29 = ["pull", ...customArgs];
   if (remote && branch) {
-    commands33.splice(1, 0, remote, branch);
+    commands29.splice(1, 0, remote, branch);
   }
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser(stdOut, stdErr) {
       return parsePullResult(stdOut, stdErr);
@@ -22111,29 +15799,29 @@ function addRemoteTask(remoteName, remoteRepo, customArgs) {
   return straightThroughStringTask(["remote", "add", ...customArgs, remoteName, remoteRepo]);
 }
 function getRemotesTask(verbose) {
-  const commands33 = ["remote"];
+  const commands29 = ["remote"];
   if (verbose) {
-    commands33.push("-v");
+    commands29.push("-v");
   }
   return {
-    commands: commands33,
+    commands: commands29,
     format: "utf-8",
     parser: verbose ? parseGetRemotesVerbose : parseGetRemotes
   };
 }
 function listRemotesTask(customArgs) {
-  const commands33 = [...customArgs];
-  if (commands33[0] !== "ls-remote") {
-    commands33.unshift("ls-remote");
+  const commands29 = [...customArgs];
+  if (commands29[0] !== "ls-remote") {
+    commands29.unshift("ls-remote");
   }
-  return straightThroughStringTask(commands33);
+  return straightThroughStringTask(commands29);
 }
 function remoteTask(customArgs) {
-  const commands33 = [...customArgs];
-  if (commands33[0] !== "remote") {
-    commands33.unshift("remote");
+  const commands29 = [...customArgs];
+  if (commands29[0] !== "remote") {
+    commands29.unshift("remote");
   }
-  return straightThroughStringTask(commands33);
+  return straightThroughStringTask(commands29);
 }
 function removeRemoteTask(remoteName) {
   return straightThroughStringTask(["remote", "remove", remoteName]);
@@ -22151,14 +15839,14 @@ __export2(stash_list_exports, {
 });
 function stashListTask(opt = {}, customArgs) {
   const options = parseLogOptions(opt);
-  const commands33 = ["stash", "list", ...options.commands, ...customArgs];
+  const commands29 = ["stash", "list", ...options.commands, ...customArgs];
   const parser4 = createListLogSummaryParser(
     options.splitter,
     options.fields,
-    logFormatFromCommand(commands33)
+    logFormatFromCommand(commands29)
   );
-  return validateLogFormatConfig(commands33) || {
-    commands: commands33,
+  return validateLogFormatConfig(commands29) || {
+    commands: commands29,
     format: "utf-8",
     parser: parser4
   };
@@ -22179,18 +15867,18 @@ __export2(sub_module_exports, {
   subModuleTask: () => subModuleTask,
   updateSubModuleTask: () => updateSubModuleTask
 });
-function addSubModuleTask(repo, path43) {
-  return subModuleTask(["add", repo, path43]);
+function addSubModuleTask(repo, path37) {
+  return subModuleTask(["add", repo, path37]);
 }
 function initSubModuleTask(customArgs) {
   return subModuleTask(["init", ...customArgs]);
 }
 function subModuleTask(customArgs) {
-  const commands33 = [...customArgs];
-  if (commands33[0] !== "submodule") {
-    commands33.unshift("submodule");
+  const commands29 = [...customArgs];
+  if (commands29[0] !== "submodule") {
+    commands29.unshift("submodule");
   }
-  return straightThroughStringTask(commands33);
+  return straightThroughStringTask(commands29);
 }
 function updateSubModuleTask(customArgs) {
   return subModuleTask(["update", ...customArgs]);
@@ -22475,9 +16163,9 @@ var require_git = __commonJS2({
     Git2.prototype.branchLocal = function(then) {
       return this._runTask(branchLocalTask2(), trailingFunctionArgument2(arguments));
     };
-    Git2.prototype.raw = function(commands33) {
-      const createRestCommands = !Array.isArray(commands33);
-      const command = [].slice.call(createRestCommands ? arguments : commands33, 0);
+    Git2.prototype.raw = function(commands29) {
+      const createRestCommands = !Array.isArray(commands29);
+      const command = [].slice.call(createRestCommands ? arguments : commands29, 0);
       for (let i2 = 0; i2 < command.length && createRestCommands; i2++) {
         if (!filterPrimitives2(command[i2])) {
           command.splice(i2, command.length - i2);
@@ -22494,8 +16182,8 @@ var require_git = __commonJS2({
       }
       return this._runTask(straightThroughStringTask2(command, this._trimmed), next);
     };
-    Git2.prototype.submoduleAdd = function(repo, path43, then) {
-      return this._runTask(addSubModuleTask2(repo, path43), trailingFunctionArgument2(arguments));
+    Git2.prototype.submoduleAdd = function(repo, path37, then) {
+      return this._runTask(addSubModuleTask2(repo, path37), trailingFunctionArgument2(arguments));
     };
     Git2.prototype.submoduleUpdate = function(args, then) {
       return this._runTask(
@@ -22612,9 +16300,9 @@ var require_git = __commonJS2({
       return this._runTask(task, trailingFunctionArgument2(arguments));
     };
     Git2.prototype.revparse = function() {
-      const commands33 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
+      const commands29 = ["rev-parse", ...getTrailingOptions2(arguments, true)];
       return this._runTask(
-        straightThroughStringTask2(commands33, true),
+        straightThroughStringTask2(commands29, true),
         trailingFunctionArgument2(arguments)
       );
     };
@@ -22715,8 +16403,8 @@ function abortPlugin(signal) {
 function blockUnsafeOperationsPlugin(options = {}) {
   return {
     type: "spawn.args",
-    action(args, { env: env10 }) {
-      for (const vulnerability of ne(args, env10)) {
+    action(args, { env: env8 }) {
+      for (const vulnerability of ne(args, env8)) {
         if (options[vulnerability.category] !== true) {
           throw new GitPluginError(void 0, "unsafe", vulnerability.message);
         }
@@ -23044,12 +16732,531 @@ function gitInstanceFactory(baseDir, options) {
 init_git_response_error();
 var esm_default = gitInstanceFactory;
 
+// src/utils/aiRouterInstall.ts
+var path9 = __toESM(require("path"));
+var PYPI_PACKAGE_NAME = "dabbler-ai-router";
+var REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
+var ROUTER_CONFIG_REL = path9.posix.join("ai_router", "router-config.yaml");
+var LOCAL_OVERRIDES_REL = path9.posix.join("ai_router", "local-overrides.yaml");
+var INSTALL_METHOD_REL = path9.posix.join(".dabbler", "install-method");
+var GITHUB_CHECKOUT_REL = path9.posix.join(".dabbler", "ai-router-src");
+var DEFAULT_GITHUB_REF = "<latest released tag>";
+var RELEASE_TAG_RE = /^v(\d+)\.(\d+)\.(\d+)$/;
+function isAiRouterNotInstalled(stderr) {
+  if (!stderr)
+    return false;
+  if (/ModuleNotFoundError:\s*No module named ['"]ai_router['"]/.test(stderr))
+    return true;
+  if (/Error while finding module specification for ['"]ai_router\./.test(stderr) && /No module named ['"]ai_router['"]/.test(stderr)) {
+    return true;
+  }
+  if (/No module named ['"]?ai_router\.[\w.]+['"]?/.test(stderr))
+    return true;
+  return false;
+}
+function describeAiRouterImportFailure(pythonPath, hint) {
+  const venvHint = process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
+  return `ai_router could not be imported by the interpreter '${pythonPath}'. This is an interpreter / installation problem \u2014 NOT missing API keys. Point the 'dabblerSessionSets.pythonPath' setting at your workspace venv (e.g. ${venvHint}), or install the router into that interpreter: ${pythonPath} -m pip install dabbler-ai-router.` + (hint ? ` (${hint})` : "");
+}
+async function installAiRouter(deps) {
+  return doInstall(deps, { mode: "install" });
+}
+async function updateAiRouter(deps) {
+  return doInstall(deps, { mode: "update" });
+}
+async function doInstall(deps, opts) {
+  const report = deps.reportProgress ?? (() => {
+  });
+  let priorSource = null;
+  if (opts.mode === "update") {
+    priorSource = readInstallMethodMarker(deps);
+  }
+  const defaultSource = priorSource ?? "pypi";
+  const source = await deps.prompts.pickSource(defaultSource);
+  if (!source) {
+    return {
+      ok: false,
+      message: "Install cancelled (no source chosen).",
+      source: null,
+      venvPath: null,
+      routerConfigPreserved: false
+    };
+  }
+  const venvResult = await ensureVenv(deps);
+  if (!venvResult.ok) {
+    return {
+      ok: false,
+      message: venvResult.message,
+      source,
+      venvPath: null,
+      routerConfigPreserved: false
+    };
+  }
+  const venvPath = venvResult.venvPath;
+  if (source === "pypi") {
+    return await runPyPiInstall(deps, { venvPath, mode: opts.mode, report });
+  }
+  return await runGitHubInstall(deps, { venvPath, report });
+}
+async function ensureVenv(deps) {
+  const fromPythonPath = deriveVenvFromPythonPath(deps.pythonPath);
+  if (fromPythonPath && deps.fileOps.exists(fromPythonPath) && deps.fileOps.exists(path9.join(fromPythonPath, "pyvenv.cfg"))) {
+    return {
+      ok: true,
+      venvPath: fromPythonPath,
+      message: `Using venv from configured pythonPath: ${fromPythonPath}`
+    };
+  }
+  const candidate = findExistingVenv(deps);
+  if (candidate) {
+    return { ok: true, venvPath: candidate, message: `Using existing venv at ${candidate}` };
+  }
+  const target = path9.join(deps.workspaceRoot, ".venv");
+  const create = await deps.prompts.confirmCreateVenv(target);
+  if (!create) {
+    return {
+      ok: false,
+      message: "No venv found at .venv/ or venv/. Install cancelled \u2014 create a venv first or accept the prompt to create .venv.",
+      venvPath: null
+    };
+  }
+  const venvShaped = deriveVenvFromPythonPath(deps.pythonPath) !== null;
+  const interpreterExists = path9.isAbsolute(deps.pythonPath) ? deps.fileOps.exists(deps.pythonPath) : true;
+  const bootstrap = venvShaped && !interpreterExists ? "python" : deps.pythonPath;
+  const result = await deps.spawner(bootstrap, ["-m", "venv", target], {
+    cwd: deps.workspaceRoot,
+    timeoutMs: 6e4
+  });
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      message: `Failed to create venv at ${target} (using bootstrap '${bootstrap}'): ${oneLine(result.stderr || result.stdout) || `exit ${result.exitCode}`}`,
+      venvPath: null
+    };
+  }
+  return { ok: true, venvPath: target, message: `Created venv at ${target}` };
+}
+function findExistingVenv(deps) {
+  for (const rel of [".venv", "venv"]) {
+    const abs = path9.join(deps.workspaceRoot, rel);
+    if (deps.fileOps.exists(abs))
+      return abs;
+  }
+  return null;
+}
+function deriveVenvFromPythonPath(pythonPath) {
+  if (!pythonPath || !path9.isAbsolute(pythonPath))
+    return null;
+  const parent = path9.basename(path9.dirname(pythonPath));
+  if (parent === "Scripts" || parent === "bin") {
+    return path9.dirname(path9.dirname(pythonPath));
+  }
+  return null;
+}
+function venvPython(venvPath) {
+  const candidates = process.platform === "win32" ? [path9.join(venvPath, "Scripts", "python.exe"), path9.join(venvPath, "Scripts", "python")] : [path9.join(venvPath, "bin", "python"), path9.join(venvPath, "bin", "python3")];
+  return candidates[0];
+}
+async function runPyPiInstall(deps, opts) {
+  opts.report(
+    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from PyPI\u2026` : `Installing ${PYPI_PACKAGE_NAME} from PyPI\u2026`
+  );
+  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", PYPI_PACKAGE_NAME] : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
+  const venvPy = venvPython(opts.venvPath);
+  const result = await deps.spawner(venvPy, pipArgs, {
+    cwd: deps.workspaceRoot,
+    timeoutMs: 3e5
+  });
+  if (result.exitCode !== 0) {
+    return {
+      ok: false,
+      message: `pip install failed: ${oneLine(result.stderr || result.stdout) || `exit ${result.exitCode}`}`,
+      source: "pypi",
+      venvPath: opts.venvPath,
+      routerConfigPreserved: false
+    };
+  }
+  let materialized = false;
+  let seedFailed = false;
+  const workspaceConfig = path9.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
+  if (!deps.fileOps.exists(workspaceConfig)) {
+    const seed = await readBundledRouterConfig(deps, venvPy);
+    if (seed !== null) {
+      try {
+        deps.fileOps.mkdirp(path9.dirname(workspaceConfig));
+        deps.fileOps.writeFile(workspaceConfig, seed);
+        materialized = true;
+      } catch {
+        seedFailed = true;
+      }
+    } else {
+      seedFailed = true;
+    }
+  }
+  writeInstallMethodMarker(deps, "pypi");
+  const seedNote = materialized ? " Seeded ai_router/router-config.yaml from the installed package." : seedFailed ? ` Could not seed ai_router/router-config.yaml from the installed package \u2014 run "Dabbler: Install ai-router" again, or copy the file from the venv's site-packages/ai_router/ by hand.` : "";
+  return {
+    ok: true,
+    message: opts.mode === "update" ? `Upgraded ${PYPI_PACKAGE_NAME} in ${opts.venvPath}.${seedNote}` : `Installed ${PYPI_PACKAGE_NAME} into ${opts.venvPath}.${seedNote}`,
+    source: "pypi",
+    venvPath: opts.venvPath,
+    routerConfigPreserved: materialized
+  };
+}
+var READ_BUNDLED_ROUTER_CONFIG_CODE = "from importlib.resources import files; p = files('ai_router').joinpath('router-config.yaml'); import sys; sys.stdout.buffer.write(p.read_bytes())";
+async function readBundledRouterConfig(deps, venvPy) {
+  const result = await deps.spawner(venvPy, ["-c", READ_BUNDLED_ROUTER_CONFIG_CODE], {
+    cwd: deps.workspaceRoot,
+    timeoutMs: 3e4
+  });
+  if (result.exitCode !== 0 || !result.stdout)
+    return null;
+  return result.stdout;
+}
+async function resolveLatestReleaseTag(deps) {
+  const repo = deps.repoUrl ?? REPO_URL;
+  const result = await deps.spawner(
+    "git",
+    ["ls-remote", "--tags", "--refs", repo],
+    { cwd: deps.workspaceRoot, timeoutMs: 6e4 }
+  );
+  if (result.exitCode !== 0)
+    return null;
+  const tags = [];
+  for (const line of result.stdout.split(/\r?\n/)) {
+    const m = /^[0-9a-f]+\s+refs\/tags\/(.+)$/.exec(line.trim());
+    if (!m)
+      continue;
+    const tag = m[1];
+    const sm = RELEASE_TAG_RE.exec(tag);
+    if (!sm)
+      continue;
+    tags.push({
+      raw: tag,
+      sortable: [Number(sm[1]), Number(sm[2]), Number(sm[3])]
+    });
+  }
+  if (tags.length === 0)
+    return null;
+  tags.sort((a, b2) => {
+    for (let i2 = 0; i2 < 3; i2++) {
+      if (a.sortable[i2] !== b2.sortable[i2])
+        return b2.sortable[i2] - a.sortable[i2];
+    }
+    return 0;
+  });
+  return tags[0].raw;
+}
+async function runGitHubInstall(deps, opts) {
+  const userRef = await deps.prompts.promptGitHubRef(DEFAULT_GITHUB_REF);
+  if (userRef === void 0) {
+    return {
+      ok: false,
+      message: "Install cancelled (no GitHub ref chosen).",
+      source: "github",
+      venvPath: opts.venvPath,
+      routerConfigPreserved: false,
+      resolvedRef: null
+    };
+  }
+  const explicitRef = userRef.trim() === "" || userRef === DEFAULT_GITHUB_REF ? null : userRef;
+  let refToUse = explicitRef;
+  if (refToUse === null) {
+    opts.report("Resolving latest released tag\u2026");
+    refToUse = await resolveLatestReleaseTag(deps);
+    if (refToUse === null) {
+      return {
+        ok: false,
+        message: "Could not resolve the latest released tag from the remote. Re-run and supply a tag/branch explicitly.",
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: false,
+        resolvedRef: null
+      };
+    }
+  }
+  const routerConfigAbs = path9.join(deps.workspaceRoot, ROUTER_CONFIG_REL);
+  let stashedConfig = null;
+  if (deps.fileOps.exists(routerConfigAbs)) {
+    stashedConfig = deps.fileOps.readFile(routerConfigAbs);
+  }
+  let preserved = false;
+  let lastRestoreError = null;
+  const restoreStash = () => {
+    if (stashedConfig === null)
+      return true;
+    if (preserved)
+      return true;
+    try {
+      deps.fileOps.writeFile(routerConfigAbs, stashedConfig);
+      preserved = true;
+      lastRestoreError = null;
+      return true;
+    } catch (err) {
+      lastRestoreError = err instanceof Error ? err.message : String(err);
+      return false;
+    }
+  };
+  const finalize = (outcome) => {
+    if (stashedConfig !== null && !preserved) {
+      return {
+        ...outcome,
+        ok: false,
+        message: `Failed to restore operator-tuned ai_router/router-config.yaml after install (${lastRestoreError ?? "unknown error"}). The install changes have been applied but your tuned config was not put back. Check the workspace's ai_router/router-config.yaml before continuing.`,
+        routerConfigPreserved: false
+      };
+    }
+    return outcome;
+  };
+  const repo = deps.repoUrl ?? REPO_URL;
+  opts.report(`Sparse-cloning ${repo}\u2026`);
+  const tmp = deps.fileOps.mkdtemp("dabbler-ai-router-install-");
+  try {
+    const cloneArgs = ["clone", "--depth", "1", "--filter=blob:none", "--sparse"];
+    cloneArgs.push("--branch", refToUse);
+    cloneArgs.push(repo, tmp);
+    const cloneResult = await deps.spawner("git", cloneArgs, {
+      cwd: deps.workspaceRoot,
+      timeoutMs: 3e5
+    });
+    if (cloneResult.exitCode !== 0) {
+      restoreStash();
+      return finalize({
+        ok: false,
+        message: `git clone failed: ${oneLine(cloneResult.stderr || cloneResult.stdout) || `exit ${cloneResult.exitCode}`}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    opts.report("Configuring sparse-checkout\u2026");
+    const sparseResult = await deps.spawner(
+      "git",
+      ["-C", tmp, "sparse-checkout", "set", "ai_router", "pyproject.toml"],
+      { cwd: deps.workspaceRoot, timeoutMs: 6e4 }
+    );
+    if (sparseResult.exitCode !== 0) {
+      restoreStash();
+      return finalize({
+        ok: false,
+        message: `git sparse-checkout failed: ${oneLine(sparseResult.stderr || sparseResult.stdout) || `exit ${sparseResult.exitCode}`}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    const stableSrc = path9.join(deps.workspaceRoot, GITHUB_CHECKOUT_REL);
+    const dstAiRouter = path9.join(deps.workspaceRoot, "ai_router");
+    opts.report("Copying sparse-checkout into the workspace\u2026");
+    try {
+      deps.fileOps.removeRecursive(stableSrc);
+      deps.fileOps.copyDir(tmp, stableSrc);
+      deps.fileOps.removeRecursive(dstAiRouter);
+      deps.fileOps.copyDir(path9.join(stableSrc, "ai_router"), dstAiRouter);
+    } catch (err) {
+      restoreStash();
+      return finalize({
+        ok: false,
+        message: `Failed to copy ai_router/ into the workspace: ${err instanceof Error ? err.message : String(err)}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    restoreStash();
+    opts.report("Installing the sparse-checked-out tree (editable)\u2026");
+    const pipResult = await deps.spawner(
+      venvPython(opts.venvPath),
+      ["-m", "pip", "install", "-e", stableSrc],
+      { cwd: deps.workspaceRoot, timeoutMs: 3e5 }
+    );
+    if (pipResult.exitCode !== 0) {
+      return finalize({
+        ok: false,
+        message: `pip install -e <sparse-checkout> failed: ${oneLine(pipResult.stderr || pipResult.stdout) || `exit ${pipResult.exitCode}`}`,
+        source: "github",
+        venvPath: opts.venvPath,
+        routerConfigPreserved: preserved,
+        resolvedRef: refToUse
+      });
+    }
+    writeInstallMethodMarker(deps, "github");
+    return finalize({
+      ok: true,
+      message: `Installed ai_router from GitHub (${refToUse})${preserved ? " \u2014 preserved existing router-config.yaml" : ""}.`,
+      source: "github",
+      venvPath: opts.venvPath,
+      routerConfigPreserved: preserved,
+      resolvedRef: refToUse
+    });
+  } finally {
+    restoreStash();
+    try {
+      deps.fileOps.removeRecursive(tmp);
+    } catch {
+    }
+  }
+}
+function readInstallMethodMarker(deps) {
+  const markerAbs = path9.join(deps.workspaceRoot, INSTALL_METHOD_REL);
+  if (!deps.fileOps.exists(markerAbs))
+    return null;
+  const raw = deps.fileOps.readFile(markerAbs).trim();
+  if (raw === "pypi" || raw === "github")
+    return raw;
+  return null;
+}
+function writeInstallMethodMarker(deps, source) {
+  const markerAbs = path9.join(deps.workspaceRoot, INSTALL_METHOD_REL);
+  const markerDir = path9.dirname(markerAbs);
+  deps.fileOps.mkdirp(markerDir);
+  deps.fileOps.writeFile(markerAbs, `${source}
+`);
+}
+function oneLine(s) {
+  const trimmed2 = (s || "").trim();
+  if (!trimmed2)
+    return "";
+  const lastLines = trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
+  return lastLines;
+}
+
 // src/commands/installAiRouterCommands.ts
 var cp2 = __toESM(require("child_process"));
 var fs10 = __toESM(require("fs"));
-var os2 = __toESM(require("os"));
-var path12 = __toESM(require("path"));
-var vscode5 = __toESM(require("vscode"));
+var os = __toESM(require("os"));
+var path11 = __toESM(require("path"));
+var vscode9 = __toESM(require("vscode"));
+
+// src/utils/pythonInterpreter.ts
+var fs9 = __toESM(require("fs"));
+var path10 = __toESM(require("path"));
+var vscode8 = __toESM(require("vscode"));
+var realExists = (p2) => {
+  try {
+    return fs9.statSync(p2).isFile();
+  } catch {
+    return false;
+  }
+};
+function venvInterpreterCandidate(workspaceRoot2) {
+  return process.platform === "win32" ? path10.join(workspaceRoot2, ".venv", "Scripts", "python.exe") : path10.join(workspaceRoot2, ".venv", "bin", "python");
+}
+function detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists = realExists) {
+  if (!workspaceRoot2)
+    return null;
+  const venvRoot = path10.join(workspaceRoot2, ".venv");
+  if (!fileExists(path10.join(venvRoot, "pyvenv.cfg")))
+    return null;
+  const interp = venvInterpreterCandidate(workspaceRoot2);
+  return fileExists(interp) ? interp : null;
+}
+function explicitPythonPathSetting() {
+  const inspected = vscode8.workspace.getConfiguration("dabblerSessionSets").inspect("pythonPath");
+  if (!inspected)
+    return void 0;
+  const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
+  const trimmed2 = (value ?? "").trim();
+  return trimmed2 === "" ? void 0 : trimmed2;
+}
+function normalizeExplicit(value, workspaceRoot2) {
+  if (path10.isAbsolute(value))
+    return value;
+  if (value.includes(path10.sep) || value.includes("/")) {
+    return path10.resolve(workspaceRoot2, value);
+  }
+  return value;
+}
+function resolveExplicitPythonPath(workspaceRoot2) {
+  const explicit = explicitPythonPathSetting();
+  return explicit ? normalizeExplicit(explicit, workspaceRoot2) : "python";
+}
+function resolvePythonInterpreter(workspaceRoot2, fileExists = realExists) {
+  const explicit = explicitPythonPathSetting();
+  if (explicit)
+    return normalizeExplicit(explicit, workspaceRoot2);
+  return detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists) ?? "python";
+}
+function findCommandOnPath(cmd, env8 = process.env, fileExists = realExists, platform = process.platform) {
+  const rawPath = env8.PATH ?? env8.Path ?? "";
+  if (!rawPath)
+    return null;
+  const isWin = platform === "win32";
+  const p2 = isWin ? path10.win32 : path10.posix;
+  const delimiter = isWin ? ";" : ":";
+  for (const dir of rawPath.split(delimiter)) {
+    const entry = dir.trim();
+    if (!entry)
+      continue;
+    if (isWin && /\\Microsoft\\WindowsApps\\?$/i.test(entry))
+      continue;
+    const candidates = isWin ? /\.[^\\/.]+$/.test(cmd) ? [p2.join(entry, cmd)] : [p2.join(entry, `${cmd}.exe`)] : [p2.join(entry, cmd)];
+    for (const candidate of candidates) {
+      if (fileExists(candidate))
+        return candidate;
+    }
+  }
+  return null;
+}
+function resolveBootstrapPythonCore(explicitSetting, workspaceRoot2, env8 = process.env, fileExists = realExists, platform = process.platform) {
+  const p2 = platform === "win32" ? path10.win32 : path10.posix;
+  if (explicitSetting) {
+    const normalized = normalizeExplicit(explicitSetting, workspaceRoot2);
+    if (p2.isAbsolute(normalized)) {
+      return fileExists(normalized) ? normalized : null;
+    }
+    return findCommandOnPath(normalized, env8, fileExists, platform) !== null ? normalized : null;
+  }
+  const commands29 = platform === "win32" ? ["python"] : ["python3", "python"];
+  for (const cmd of commands29) {
+    if (findCommandOnPath(cmd, env8, fileExists, platform) !== null)
+      return cmd;
+  }
+  return null;
+}
+function resolveScaffoldBootstrapPython(workspaceRoot2, fileExists = realExists) {
+  return resolveBootstrapPythonCore(
+    explicitPythonPathSetting(),
+    workspaceRoot2,
+    process.env,
+    fileExists
+  );
+}
+function probePythonPresenceCore(explicitSetting, workspaceRoot2, env8 = process.env, fileExists = realExists, platform = process.platform) {
+  if (explicitSetting) {
+    return resolveBootstrapPythonCore(
+      explicitSetting,
+      workspaceRoot2,
+      env8,
+      fileExists,
+      platform
+    ) !== null;
+  }
+  if (detectWorkspaceVenvInterpreter(workspaceRoot2, fileExists) !== null) {
+    return true;
+  }
+  return resolveBootstrapPythonCore(
+    void 0,
+    workspaceRoot2,
+    env8,
+    fileExists,
+    platform
+  ) !== null;
+}
+function probePythonPresence(workspaceRoot2, fileExists = realExists) {
+  return probePythonPresenceCore(
+    explicitPythonPathSetting(),
+    workspaceRoot2,
+    process.env,
+    fileExists
+  );
+}
+function describeMissingPython(actionLabel) {
+  return `${actionLabel} needs a Python interpreter, but none was found \u2014 no Python is installed, or it is not on PATH. This is a missing Python installation, NOT an extension or API-key problem. Install Python from https://www.python.org/downloads/ (tick "Add python.exe to PATH"; avoid the Microsoft Store build), or point the 'dabblerSessionSets.pythonPath' setting at an installed interpreter, then reload the VS Code window and try again.`;
+}
 
 // src/utils/utf8ChunkDecoder.ts
 var import_string_decoder = require("string_decoder");
@@ -23064,27 +17271,27 @@ function makeUtf8ChunkDecoder() {
 // src/commands/installAiRouterCommands.ts
 function registerInstallAiRouterCommands(context) {
   context.subscriptions.push(
-    vscode5.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
+    vscode9.commands.registerCommand("dabblerSessionSets.installAiRouter", async () => {
       await runInstallFlow("install");
     }),
-    vscode5.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
+    vscode9.commands.registerCommand("dabblerSessionSets.updateAiRouter", async () => {
       await runInstallFlow("update");
     })
   );
 }
 async function runInstallFlow(mode) {
-  const root = vscode5.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode5.window.showErrorMessage(
+    vscode9.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Install ai-router."
     );
     return;
   }
   const pythonPath = resolveExplicitPythonPath(root);
   const repoUrl = resolveAiRouterRepoUrl();
-  const outcome = await vscode5.window.withProgress(
+  const outcome = await vscode9.window.withProgress(
     {
-      location: vscode5.ProgressLocation.Notification,
+      location: vscode9.ProgressLocation.Notification,
       title: mode === "update" ? "Updating ai_router\u2026" : "Installing ai_router\u2026",
       cancellable: false
     },
@@ -23102,16 +17309,16 @@ async function runInstallFlow(mode) {
     }
   );
   if (!outcome.ok) {
-    vscode5.window.showErrorMessage(outcome.message);
+    vscode9.window.showErrorMessage(outcome.message);
     return;
   }
-  vscode5.window.showInformationMessage(outcome.message);
-  const routerConfig = path12.join(root, ROUTER_CONFIG_REL);
+  vscode9.window.showInformationMessage(outcome.message);
+  const routerConfig = path11.join(root, ROUTER_CONFIG_REL);
   if (fs10.existsSync(routerConfig)) {
     try {
-      const doc = await vscode5.workspace.openTextDocument(routerConfig);
-      await vscode5.window.showTextDocument(doc, { preview: false });
-      vscode5.window.showInformationMessage(
+      const doc = await vscode9.workspace.openTextDocument(routerConfig);
+      await vscode9.window.showTextDocument(doc, { preview: false });
+      vscode9.window.showInformationMessage(
         "Tune router-config.yaml for your project \u2014 per-task-type effort, the cost guard, and delegation.always_route_task_types live here."
       );
     } catch {
@@ -23119,7 +17326,7 @@ async function runInstallFlow(mode) {
   }
 }
 function resolveAiRouterRepoUrl() {
-  const cfg = vscode5.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode9.workspace.getConfiguration("dabblerSessionSets");
   const raw = (cfg.get("aiRouterRepoUrl") ?? "").trim();
   return raw === "" ? void 0 : raw;
 }
@@ -23188,7 +17395,7 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs10.mkdirSync(path12.dirname(p2), { recursive: true });
+      fs10.mkdirSync(path11.dirname(p2), { recursive: true });
       fs10.writeFileSync(p2, content, "utf8");
     },
     // Set 094: atomic, symlink-safe exclusive create (temp-write → hard-link
@@ -23203,7 +17410,7 @@ function makeFileOps() {
       if (fs10.existsSync(p2))
         fs10.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs10.mkdtempSync(path12.join(os2.tmpdir(), prefix)),
+    mkdtemp: (prefix) => fs10.mkdtempSync(path11.join(os.tmpdir(), prefix)),
     // Set 079 S3: same-directory atomic replace for the seat-setup config
     // write (fs.rename replaces an existing destination file on both NTFS
     // and POSIX filesystems).
@@ -23213,8 +17420,8 @@ function makeFileOps() {
 function copyDirSync(src, dst) {
   fs10.mkdirSync(dst, { recursive: true });
   for (const entry of fs10.readdirSync(src, { withFileTypes: true })) {
-    const s = path12.join(src, entry.name);
-    const d = path12.join(dst, entry.name);
+    const s = path11.join(src, entry.name);
+    const d = path11.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
@@ -23243,14 +17450,14 @@ function makePrompts() {
         }
       ];
       items.sort((a, b2) => a.value === defaultSource ? -1 : b2.value === defaultSource ? 1 : 0);
-      const picked = await vscode5.window.showQuickPick(items, {
+      const picked = await vscode9.window.showQuickPick(items, {
         placeHolder: "Choose how to install ai_router",
         ignoreFocusOut: true
       });
       return picked?.value;
     },
     confirmCreateVenv: async (venvAbsPath) => {
-      const choice = await vscode5.window.showInformationMessage(
+      const choice = await vscode9.window.showInformationMessage(
         `No venv found in this workspace. Create one at ${venvAbsPath}?`,
         { modal: true, detail: "ai_router needs a Python environment to install into. The recommended location is .venv at the workspace root." },
         "Create venv",
@@ -23259,7 +17466,7 @@ function makePrompts() {
       return choice === "Create venv";
     },
     promptGitHubRef: async (defaultRef) => {
-      const ref = await vscode5.window.showInputBox({
+      const ref = await vscode9.window.showInputBox({
         prompt: "Git ref for the sparse checkout (tag or branch). Leave blank for the latest released tag.",
         placeHolder: defaultRef,
         ignoreFocusOut: true
@@ -23269,279 +17476,521 @@ function makePrompts() {
   };
 }
 
-// src/utils/consumerBootstrap.ts
-var fs11 = __toESM(require("fs"));
+// src/utils/copilotCli.ts
+var path12 = __toESM(require("path"));
+var vscode10 = __toESM(require("vscode"));
+function explicitCopilotCliPathSetting() {
+  const inspected = vscode10.workspace.getConfiguration("dabblerSessionSets").inspect("copilotCliPath");
+  if (!inspected)
+    return void 0;
+  const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
+  const trimmed2 = (value ?? "").trim();
+  return trimmed2 === "" ? void 0 : trimmed2;
+}
+function resolveCopilotCliBinaryCore(explicitSetting, workspaceRoot2, platform = process.platform) {
+  if (!explicitSetting)
+    return void 0;
+  const p2 = platform === "win32" ? path12.win32 : path12.posix;
+  if (p2.isAbsolute(explicitSetting))
+    return explicitSetting;
+  if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
+    return p2.resolve(workspaceRoot2, explicitSetting);
+  }
+  return explicitSetting;
+}
+function resolveCopilotCliBinary(workspaceRoot2) {
+  return resolveCopilotCliBinaryCore(
+    explicitCopilotCliPathSetting(),
+    workspaceRoot2,
+    process.platform
+  );
+}
+
+// src/utils/copilotSeatSetup.ts
+var crypto2 = __toESM(require("crypto"));
+var os2 = __toESM(require("os"));
 var path13 = __toESM(require("path"));
-var BUNDLE_FILES = {
-  specTemplate: "spec.md.template",
-  sessionStateTemplate: "session-state.json.template",
-  startHereTemplate: "start-here.md.template",
-  gettingStartedTemplate: "getting-started.md.template",
-  sharedBody: "engine-file.shared-body.md",
-  claudeTail: "engine-file.claude-tail.md",
-  agentsTail: "engine-file.agents-tail.md",
-  geminiTail: "engine-file.gemini-tail.md",
-  lessonsLearnedTemplate: "lessons-learned.md.template",
-  projectGuidanceTemplate: "project-guidance.md.template",
-  lessonsArchiveTemplate: "lessons-archive.md.template",
-  crossProviderVerificationTemplate: "cross-provider-verification.md.template",
-  codeownersTemplate: "CODEOWNERS.template",
-  monorepoCiTemplate: "monorepo-ci.yml.template",
-  azurePipelinesTemplate: "azure-pipelines.yml.template"
-};
-var GETTING_STARTED_TEMPLATE_FILENAME = BUNDLE_FILES.gettingStartedTemplate;
-function resolveBundledTemplateDir(extensionPath) {
-  return path13.join(extensionPath, "dist", "templates", "consumer-bootstrap");
+var CATALOG_LOCKFILE_REL = path13.posix.join(
+  "ai_router",
+  "copilot-catalog.lock"
+);
+function deriveSeatId(hostname2, username) {
+  const canonical = `${hostname2.trim().toLowerCase()}|${username.trim().toLowerCase()}`;
+  const digest = crypto2.createHash("sha256").update(canonical, "utf8").digest("hex");
+  return `seat-${digest.slice(0, 12)}`;
 }
-function loadTemplateBundle(bundleDir) {
-  const read = (name) => fs11.readFileSync(path13.join(bundleDir, name), "utf8").replace(/\r\n/g, "\n");
+function deriveSeatLabel(projectDir) {
+  const base = path13.basename(projectDir);
+  return base === "" ? "workspace" : base;
+}
+function currentUsername() {
+  try {
+    return os2.userInfo().username;
+  } catch {
+    return process.env.USERNAME ?? process.env.USER ?? "user";
+  }
+}
+function buildRefreshArgs(seatId, seatLabel, explicitBinary) {
+  const args = [
+    "-m",
+    "ai_router.copilot_catalog",
+    "--refresh",
+    "--seat-id",
+    seatId,
+    "--seat-label",
+    seatLabel
+  ];
+  if (explicitBinary)
+    args.push("--binary", explicitBinary);
+  return args;
+}
+var REFRESH_SUMMARY_RE = /^Wrote (.+): (\d+)\/(\d+) models confirmed, providers=\[([^\]]*)\]\s*$/m;
+function parseRefreshStdout(stdout) {
+  const m = REFRESH_SUMMARY_RE.exec(stdout);
+  if (!m)
+    return null;
+  const providers = m[4].split(",").map((tok) => tok.trim().replace(/^'(.*)'$/, "$1")).filter((tok) => tok.length > 0);
   return {
-    specTemplate: read(BUNDLE_FILES.specTemplate),
-    sessionStateTemplate: read(BUNDLE_FILES.sessionStateTemplate),
-    startHereTemplate: read(BUNDLE_FILES.startHereTemplate),
-    gettingStartedTemplate: read(BUNDLE_FILES.gettingStartedTemplate),
-    sharedBody: read(BUNDLE_FILES.sharedBody),
-    claudeTail: read(BUNDLE_FILES.claudeTail),
-    agentsTail: read(BUNDLE_FILES.agentsTail),
-    geminiTail: read(BUNDLE_FILES.geminiTail),
-    lessonsLearnedTemplate: read(BUNDLE_FILES.lessonsLearnedTemplate),
-    projectGuidanceTemplate: read(BUNDLE_FILES.projectGuidanceTemplate),
-    lessonsArchiveTemplate: read(BUNDLE_FILES.lessonsArchiveTemplate),
-    crossProviderVerificationTemplate: read(
-      BUNDLE_FILES.crossProviderVerificationTemplate
-    ),
-    codeownersTemplate: read(BUNDLE_FILES.codeownersTemplate),
-    monorepoCiTemplate: read(BUNDLE_FILES.monorepoCiTemplate),
-    azurePipelinesTemplate: read(BUNDLE_FILES.azurePipelinesTemplate)
+    lockfilePath: m[1],
+    confirmed: Number(m[2]),
+    total: Number(m[3]),
+    providers
   };
 }
-function padSessionNumber(n) {
-  return String(n).padStart(3, "0");
-}
-function assertPositiveSessionCount(totalSessions) {
-  if (!Number.isInteger(totalSessions) || totalSessions < 1) {
-    throw new Error(
-      `consumer-bootstrap: totalSessions must be a positive integer, got ${totalSessions}`
-    );
+function locateTransportProfile(text) {
+  const blockMatch = /^transport:[ \t]*(?:#.*)?$/m.exec(text);
+  if (!blockMatch)
+    return null;
+  let lineStart = blockMatch.index + blockMatch[0].length;
+  while (lineStart < text.length && (text[lineStart] === "\r" || text[lineStart] === "\n")) {
+    if (text[lineStart] === "\n") {
+      lineStart += 1;
+      break;
+    }
+    lineStart += 1;
   }
+  let childIndent = null;
+  while (lineStart < text.length) {
+    let lineEnd = text.indexOf("\n", lineStart);
+    if (lineEnd === -1)
+      lineEnd = text.length;
+    const line = text.slice(lineStart, lineEnd).replace(/\r$/, "");
+    if (/^[^ \t\r\n#]/.test(line))
+      return null;
+    const content = /^([ \t]+)\S/.exec(line);
+    if (content && !/^[ \t]*#/.test(line)) {
+      const indent = content[1].length;
+      if (childIndent === null)
+        childIndent = indent;
+      if (indent === childIndent) {
+        const m = /^([ \t]+profile:[ \t]*)([^\s#]+)/.exec(line);
+        if (m) {
+          const valueStart = lineStart + m[1].length;
+          return {
+            valueStart,
+            valueEnd: valueStart + m[2].length,
+            value: m[2]
+          };
+        }
+      }
+    }
+    lineStart = lineEnd + 1;
+  }
+  return null;
 }
-function moduleLine(ctx) {
-  if (!ctx.module)
-    return "";
-  return `module: ${ctx.module}                      # grouping only \u2014 set names stay globally unique
-`;
+function hasTopLevelTransportBlock(text) {
+  return /^transport:[ \t]*(?:#.*)?$/m.test(text);
 }
-function tokenTable(ctx) {
+function renderTransportProfile(configText, profile) {
+  const loc = locateTransportProfile(configText);
+  if (!loc) {
+    return {
+      ok: false,
+      reason: "no `transport:` block with a `profile:` field was found in local-overrides.yaml (the seeded template shape this write expects)"
+    };
+  }
+  if (loc.value === profile)
+    return { ok: true, text: configText, changed: false };
+  if (loc.value !== "api") {
+    return {
+      ok: false,
+      reason: `transport.profile is ${JSON.stringify(loc.value)} \u2014 not the seeded default \`api\`, so it looks operator-edited and will not be overwritten`
+    };
+  }
   return {
-    REPO_NAME: ctx.repoName,
-    SET_TITLE: ctx.setTitle,
-    PURPOSE: ctx.purpose,
-    SLUG: ctx.slug,
-    CREATED: ctx.created,
-    MODULE_LINE: moduleLine(ctx),
-    TOTAL_SESSIONS: String(ctx.totalSessions)
+    ok: true,
+    changed: true,
+    text: configText.slice(0, loc.valueStart) + profile + configText.slice(loc.valueEnd)
   };
 }
-function substituteTokens(text, ctx) {
-  const table = tokenTable(ctx);
-  return text.replace(
-    /{{([A-Z_]+)}}/g,
-    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
-  );
+var SEAT_STATUS_MARKER_REL = path13.posix.join(
+  ".dabbler",
+  "copilot-seat-status"
+);
+function writeCopilotSeatStatusMarker(root, ops) {
+  ops.writeFile(path13.join(root, SEAT_STATUS_MARKER_REL), "unconfirmed\n");
 }
-function findUnsubstitutedTokens(rendered) {
-  const out = /* @__PURE__ */ new Set();
-  for (const m of rendered.matchAll(/{{[A-Z_]+}}/g))
-    out.add(m[0]);
-  return [...out];
+function clearCopilotSeatStatusMarker(root, ops) {
+  const abs = path13.join(root, SEAT_STATUS_MARKER_REL);
+  if (!ops.exists(abs))
+    return;
+  ops.removeRecursive(abs);
 }
-function expandSpecSessions(specText, totalSessions) {
-  assertPositiveSessionCount(totalSessions);
-  specText = specText.replace(/\r\n/g, "\n");
-  const SESSIONS_HEADER = "## Sessions\n";
-  const DELIVERABLES_HEADER = "## End-of-set deliverables";
-  const SEP = "\n\n---\n\n";
-  const headerIdx = specText.indexOf(SESSIONS_HEADER);
-  const deliverablesIdx = specText.indexOf(DELIVERABLES_HEADER);
-  if (headerIdx === -1 || deliverablesIdx === -1 || deliverablesIdx < headerIdx) {
-    return specText;
+var DEFAULT_KILL_SETTLE_TIMEOUT_MS = 1e4;
+function runCatalogRefresh(deps) {
+  const lockfileAbs = path13.join(deps.projectDir, CATALOG_LOCKFILE_REL);
+  const existedBefore = deps.fileOps.exists(lockfileAbs);
+  let priorContent = null;
+  if (existedBefore) {
+    try {
+      priorContent = deps.fileOps.readFile(lockfileAbs);
+    } catch {
+      priorContent = null;
+    }
   }
-  const preamble = specText.slice(0, headerIdx + SESSIONS_HEADER.length);
-  const postamble = specText.slice(deliverablesIdx);
-  const region = specText.slice(headerIdx + SESSIONS_HEADER.length, deliverablesIdx);
-  const blockStart = region.indexOf("### Session 1 of");
-  if (blockStart === -1)
-    return specText;
-  const afterStart = region.slice(blockStart);
-  const sepIdx = afterStart.indexOf(SEP);
-  const unit = (sepIdx === -1 ? afterStart : afterStart.slice(0, sepIdx)).trimEnd();
-  const blocks = [];
-  for (let k2 = 1; k2 <= totalSessions; k2++) {
-    let block = unit.replace("### Session 1 of", `### Session ${k2} of`);
-    block = block.replace(/session-001\//g, `session-${padSessionNumber(k2)}/`);
-    blocks.push(block);
-  }
-  return `${preamble}
-${blocks.join(SEP)}${SEP}${postamble}`;
-}
-function expandSessionState(stateText, totalSessions) {
-  assertPositiveSessionCount(totalSessions);
-  const parsed = JSON.parse(stateText);
-  const unit = parsed.sessions[0];
-  parsed.sessions = [];
-  for (let k2 = 1; k2 <= totalSessions; k2++) {
-    parsed.sessions.push({
-      ...unit,
-      number: k2,
-      title: `Session ${k2}`,
-      status: "not-started",
-      startedAt: null,
-      completedAt: null,
-      orchestrator: null,
-      verificationVerdict: null
+  const restoreLockfile = () => {
+    try {
+      if (!existedBefore) {
+        deps.fileOps.removeRecursive(lockfileAbs);
+      } else if (priorContent !== null) {
+        deps.fileOps.writeFile(lockfileAbs, priorContent);
+      }
+    } catch {
+    }
+  };
+  return new Promise((resolve7) => {
+    let settled = false;
+    let stdout = "";
+    let stderr = "";
+    let cancelledBy = null;
+    let cancelReg = null;
+    let disposal = null;
+    let killSettleTimer = null;
+    const settle = (outcome) => {
+      if (settled)
+        return;
+      settled = true;
+      if (killSettleTimer)
+        clearTimeout(killSettleTimer);
+      cancelReg?.dispose();
+      disposal?.dispose();
+      resolve7(outcome);
+    };
+    if (deps.cancellation.isCancellationRequested) {
+      settle({ kind: "cancelled", by: "operator" });
+      return;
+    }
+    let child = null;
+    const killForCancel = (by) => {
+      if (settled || cancelledBy)
+        return;
+      cancelledBy = by;
+      try {
+        child?.kill();
+      } catch {
+      }
+      killSettleTimer = setTimeout(() => {
+        if (settled)
+          return;
+        restoreLockfile();
+        settle({ kind: "cancelled", by });
+      }, deps.killSettleTimeoutMs ?? DEFAULT_KILL_SETTLE_TIMEOUT_MS);
+    };
+    disposal = deps.registerDisposal(() => {
+      if (settled)
+        return;
+      cancelledBy = cancelledBy ?? "teardown";
+      try {
+        child?.kill();
+      } catch {
+      }
+      restoreLockfile();
+      settle({ kind: "cancelled", by: cancelledBy });
     });
-  }
-  return JSON.stringify(parsed, null, 2) + "\n";
-}
-function renderEngineFile(sharedBody, tail, ctx) {
-  return substituteTokens(sharedBody, ctx) + "\n" + substituteTokens(tail, ctx);
-}
-function renderSpec(bundle, ctx) {
-  return expandSpecSessions(
-    substituteTokens(bundle.specTemplate, ctx),
-    ctx.totalSessions
-  );
-}
-function renderSessionState(bundle, ctx) {
-  return expandSessionState(
-    substituteTokens(bundle.sessionStateTemplate, ctx),
-    ctx.totalSessions
-  );
-}
-function renderStartHere(bundle, ctx) {
-  return substituteTokens(bundle.startHereTemplate, ctx);
-}
-function specRelPath(ctx) {
-  return path13.posix.join("docs", "session-sets", ctx.slug, "spec.md");
-}
-function sessionStateRelPath(ctx) {
-  return path13.posix.join("docs", "session-sets", ctx.slug, "session-state.json");
-}
-var START_HERE_REL_PATH = path13.posix.join("docs", "dabbler", "start-here.md");
-var GETTING_STARTED_REL_PATH = path13.posix.join(
-  "docs",
-  "dabbler",
-  "getting-started.md"
-);
-var CROSS_PROVIDER_VERIFICATION_REL_PATH = path13.posix.join(
-  "docs",
-  "dabbler",
-  "cross-provider-verification.md"
-);
-function renderCrossProviderVerification(bundle, ctx) {
-  return substituteTokens(bundle.crossProviderVerificationTemplate, ctx);
-}
-var LESSONS_LEARNED_REL_PATH = path13.posix.join("docs", "planning", "lessons-learned.md");
-var PROJECT_GUIDANCE_REL_PATH = path13.posix.join("docs", "planning", "project-guidance.md");
-var LESSONS_ARCHIVE_REL_PATH = path13.posix.join("docs", "planning", "lessons-archive.md");
-var CODEOWNERS_REL_PATH = path13.posix.join(".github", "CODEOWNERS");
-var MONOREPO_CI_REL_PATH = path13.posix.join(
-  ".github",
-  "workflows",
-  "monorepo-ci.yml"
-);
-var AZURE_PIPELINES_REL_PATH = "azure-pipelines.yml";
-function guidanceFiles(bundle, ctx) {
-  return {
-    [LESSONS_LEARNED_REL_PATH]: substituteTokens(bundle.lessonsLearnedTemplate, ctx),
-    [PROJECT_GUIDANCE_REL_PATH]: substituteTokens(bundle.projectGuidanceTemplate, ctx),
-    [LESSONS_ARCHIVE_REL_PATH]: substituteTokens(bundle.lessonsArchiveTemplate, ctx)
-  };
-}
-function renderConsumerBootstrap(bundle, ctx) {
-  const files = {
-    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
-    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
-    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
-    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
-    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
-    // Set 077 S4 (Feature 3): the engine-facing verification doc the
-    // Evaluate pointer prompts reference.
-    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
-      bundle,
-      ctx
-    ),
-    [specRelPath(ctx)]: renderSpec(bundle, ctx),
-    [sessionStateRelPath(ctx)]: renderSessionState(bundle, ctx),
-    // Set 064 (D7): the guidance-lifecycle starters under docs/planning/.
-    ...guidanceFiles(bundle, ctx),
-    // Set 087 S3 (ruling Q3): the module-ownership + monorepo-CI teaching
-    // templates (token-free; inert until adapted).
-    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
-    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
-    // Set 107 S1: the ADO half of the same teaching pair.
-    [AZURE_PIPELINES_REL_PATH]: bundle.azurePipelinesTemplate
-  };
-  const leftovers = /* @__PURE__ */ new Set();
-  for (const content of Object.values(files)) {
-    for (const t2 of findUnsubstitutedTokens(content))
-      leftovers.add(t2);
-  }
-  if (leftovers.size > 0) {
-    throw new Error(
-      `consumer-bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
+    cancelReg = deps.cancellation.onCancellationRequested(
+      () => killForCancel("operator")
     );
-  }
-  return { files };
+    try {
+      child = deps.spawn(
+        deps.venvPythonPath,
+        buildRefreshArgs(deps.seatId, deps.seatLabel, deps.explicitBinary),
+        { cwd: deps.projectDir },
+        {
+          onStdout: (chunk) => {
+            stdout += chunk;
+          },
+          onStderr: (chunk) => {
+            stderr += chunk;
+          },
+          onError: (err) => {
+            restoreLockfile();
+            settle({ kind: "spawn-error", message: err.message });
+          },
+          onClose: (exitCode) => {
+            if (settled) {
+              if (cancelledBy === "teardown")
+                restoreLockfile();
+              return;
+            }
+            if (exitCode === 0) {
+              const summary = parseRefreshStdout(stdout);
+              if (summary) {
+                settle({ kind: "completed", summary, stdout, stderr });
+                return;
+              }
+            }
+            if (cancelledBy) {
+              restoreLockfile();
+              settle({ kind: "cancelled", by: cancelledBy });
+              return;
+            }
+            if (exitCode !== 0) {
+              restoreLockfile();
+              settle({ kind: "exit-error", exitCode, stdout, stderr });
+              return;
+            }
+            settle({ kind: "completed-unparseable", stdout, stderr });
+          }
+        }
+      );
+    } catch (err) {
+      restoreLockfile();
+      settle({
+        kind: "spawn-error",
+        message: err instanceof Error ? err.message : String(err)
+      });
+      return;
+    }
+  });
 }
-function renderStructureBootstrap(bundle, ctx) {
-  const files = {
-    "CLAUDE.md": renderEngineFile(bundle.sharedBody, bundle.claudeTail, ctx),
-    "AGENTS.md": renderEngineFile(bundle.sharedBody, bundle.agentsTail, ctx),
-    "GEMINI.md": renderEngineFile(bundle.sharedBody, bundle.geminiTail, ctx),
-    [START_HERE_REL_PATH]: renderStartHere(bundle, ctx),
-    // D8 (Set 060 S3): the static Getting Started teaching doc ships
-    // with the structure scaffold too, so the editor-open path can
-    // prefer the workspace copy once the structure is built.
-    [GETTING_STARTED_REL_PATH]: bundle.gettingStartedTemplate,
-    // Set 077 S4 (Feature 3): the verification instruction doc is repo
-    // structure — the Lightweight review flow depends on it.
-    [CROSS_PROVIDER_VERIFICATION_REL_PATH]: renderCrossProviderVerification(
-      bundle,
-      ctx
-    ),
-    // Set 064 (D7): the guidance-lifecycle starters are repo structure too,
-    // so a fresh repo built via "Build project structure" starts the
-    // lifecycle with docs/planning/ in place.
-    ...guidanceFiles(bundle, ctx),
-    // Set 087 S3 (ruling Q3): the ownership + CI teaching templates are
-    // repo structure too — a new project starts with them in place.
-    [CODEOWNERS_REL_PATH]: bundle.codeownersTemplate,
-    [MONOREPO_CI_REL_PATH]: bundle.monorepoCiTemplate,
-    // Set 107 S1: the ADO half of the same teaching pair.
-    [AZURE_PIPELINES_REL_PATH]: bundle.azurePipelinesTemplate
-  };
-  const leftovers = /* @__PURE__ */ new Set();
-  for (const content of Object.values(files)) {
-    for (const t2 of findUnsubstitutedTokens(content))
-      leftovers.add(t2);
-  }
-  if (leftovers.size > 0) {
-    throw new Error(
-      `structure-only bootstrap render left unsubstituted token(s): ${[...leftovers].sort().join(", ")}`
+var GITIGNORE_REL = ".gitignore";
+var LOCAL_OVERRIDES_IGNORE_RULE = LOCAL_OVERRIDES_REL;
+function isLocalOverridesIgnored(gitignoreText) {
+  const covering = /* @__PURE__ */ new Set([
+    LOCAL_OVERRIDES_REL,
+    `/${LOCAL_OVERRIDES_REL}`,
+    "local-overrides.yaml",
+    "**/local-overrides.yaml"
+  ]);
+  return gitignoreText.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== "" && !line.startsWith("#")).some((line) => covering.has(line));
+}
+function ensureLocalOverridesIgnored(ops, projectDir) {
+  const abs = path13.join(projectDir, GITIGNORE_REL);
+  try {
+    const existing = ops.exists(abs) ? ops.readFile(abs) : "";
+    if (isLocalOverridesIgnored(existing))
+      return { ok: true, added: false };
+    const prefix = existing === "" || existing.endsWith("\n") ? existing : `${existing}
+`;
+    ops.writeFile(
+      abs,
+      `${prefix}
+# Per-machine router overrides (Copilot seat transport profile).
+# Machine-specific by design \u2014 committing it breaks API-key-only clones.
+${LOCAL_OVERRIDES_IGNORE_RULE}
+`
     );
+    return { ok: true, added: true };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: err instanceof Error ? err.message : String(err)
+    };
   }
-  return { files };
 }
-function structureOnlyContext(repoName, created) {
-  return {
-    repoName,
-    setTitle: "(no starter set \u2014 created via the Getting Started decomposition prompt)",
-    purpose: "(no starter set)",
-    slug: "000-placeholder-unused",
-    created,
-    totalSessions: 1
-  };
+var CONFIG_WRITE_TMP_SUFFIX = ".dabbler-seat-setup.tmp";
+function writeConfigAtomically(ops, configAbs, content) {
+  if (!ops.rename) {
+    ops.writeFile(configAbs, content);
+    return;
+  }
+  const tmpAbs = configAbs + CONFIG_WRITE_TMP_SUFFIX;
+  ops.writeFile(tmpAbs, content);
+  try {
+    ops.rename(tmpAbs, configAbs);
+  } catch (err) {
+    try {
+      ops.removeRecursive(tmpAbs);
+    } catch {
+    }
+    throw err;
+  }
+}
+function resolveKillStrategy(platform, pid) {
+  if (!pid)
+    return "plain";
+  return platform === "win32" ? "taskkill-tree" : "posix-group";
+}
+function spawnDetached(platform) {
+  return platform !== "win32";
+}
+function dispatchKill(platform, pid, fx) {
+  switch (resolveKillStrategy(platform, pid)) {
+    case "taskkill-tree":
+      try {
+        fx.taskkillTree(pid);
+        return;
+      } catch {
+        break;
+      }
+    case "posix-group":
+      try {
+        fx.signalGroup(pid);
+        return;
+      } catch {
+        break;
+      }
+    case "plain":
+      break;
+  }
+  fx.plainKill();
+}
+function rerunRefreshHint() {
+  return 'run "Dabbler: Set Up Copilot Seat" from the Command Palette';
+}
+function describeSeatSetupOutcome(outcome, providerKeysPresent, rerunHint) {
+  const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunHint}`;
+  const keyless = "no DABBLER_* provider key is set, so the router is not yet functional";
+  const keyed = "the DABBLER_* provider key(s) already set keep the api profile working wherever this project's committed verify type is DIRECT_API";
+  const notEnabled = "the copilot-cli seat profile was NOT enabled in ai_router/local-overrides.yaml (and project-verify-type.txt, not that file, decides this project's effective transport)";
+  switch (outcome.kind) {
+    case "success":
+      return {
+        level: outcome.ignoreWarning ? "warning" : "info",
+        message: `Copilot seat set up: ${outcome.confirmed}/${outcome.total} models confirmed (providers: ${outcome.providers.join(", ")}). transport.profile: copilot-cli written to ai_router/local-overrides.yaml.` + (outcome.ignoreWarning ? ` Warning: ${outcome.ignoreWarning}.` : "")
+      };
+    case "insufficient-providers": {
+      const cause = outcome.confirmed === 0 ? "No models responded at all \u2014 the Copilot CLI may be missing from PATH, not signed in, or blocked by policy. " : outcome.providers.length === 1 ? "This seat may expose only one provider family (an enterprise-managed seat can do this), in which case re-running will not change the result. " : "";
+      return {
+        level: "warning",
+        message: `Copilot seat setup completed, but only ${outcome.providers.length} distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) \u2014 routed dispatch would fail closed, so ${notEnabled}. ${cause}` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) + `The probe lockfile was kept for inspection at ai_router/copilot-catalog.lock. ${rerun}`
+      };
+    }
+    case "refresh-failed":
+      return {
+        level: "warning",
+        message: providerKeysPresent ? `Copilot seat setup failed: ${outcome.detail}. So ${notEnabled}, and ${keyed}. To use the Copilot seat instead, fix the cause first. ${rerun}` : `Scaffold completed, but the Copilot seat setup did not: ${outcome.detail}. So ${notEnabled}, and ${keyless}. Fix the cause, then: ${rerun}`
+      };
+    case "cancelled":
+      return {
+        level: "warning",
+        message: `Copilot seat setup was cancelled \u2014 the lockfile was restored to its pre-run state and ${notEnabled}. ` + (providerKeysPresent ? `Meanwhile ${keyed}. ` : `Note ${keyless} until seat setup completes. `) + rerun
+      };
+    case "config-write-failed":
+      return {
+        level: "warning",
+        message: `Copilot seat probe succeeded (providers: ${outcome.providers.join(", ")}) and the lockfile is in place, but writing transport.profile to ai_router/local-overrides.yaml failed: ${outcome.detail}. Set \`profile: copilot-cli\` under the \`transport:\` block in that file by hand \u2014 no re-probe is needed. Until then ` + (providerKeysPresent ? "the router keeps running on whatever profile project-verify-type.txt resolves to, with the DABBLER_* key(s) already set." : "the router is not yet functional (the seat profile is unwritten and no DABBLER_* provider key is set).")
+      };
+    default: {
+      const unreachable = outcome;
+      throw new Error(`unhandled seat-setup outcome: ${JSON.stringify(unreachable)}`);
+    }
+  }
+}
+function describeSkipInstallIncompleteHonesty(providerKeysPresent) {
+  return providerKeysPresent ? "The DABBLER_* provider key(s) already set will keep the api profile working once the install completes." : "No DABBLER_* provider key is set, so the router is not functional until the install completes and seat setup succeeds.";
+}
+function outputTail(s) {
+  const trimmed2 = (s || "").trim();
+  if (!trimmed2)
+    return "";
+  return trimmed2.split(/\r?\n/).filter(Boolean).slice(-2).join(" / ");
+}
+async function performCopilotSeatSetup(deps) {
+  const outcome = await runCatalogRefresh(deps);
+  switch (outcome.kind) {
+    case "cancelled":
+      return { kind: "cancelled", by: outcome.by };
+    case "spawn-error":
+      return {
+        kind: "refresh-failed",
+        detail: `the refresh subprocess could not start: ${outcome.message}`
+      };
+    case "exit-error":
+      return {
+        kind: "refresh-failed",
+        detail: `the refresh exited with code ${outcome.exitCode}` + (outputTail(outcome.stderr || outcome.stdout) ? `: ${outputTail(outcome.stderr || outcome.stdout)}` : "")
+      };
+    case "completed-unparseable":
+      return {
+        kind: "refresh-failed",
+        detail: "the refresh finished but its result line could not be parsed" + (outputTail(outcome.stdout) ? ` (last output: ${outputTail(outcome.stdout)})` : " (no output)")
+      };
+    case "completed": {
+      const distinct = Array.from(new Set(outcome.summary.providers)).sort();
+      const base = {
+        providers: distinct,
+        confirmed: outcome.summary.confirmed,
+        total: outcome.summary.total
+      };
+      if (distinct.length < 2) {
+        return { kind: "insufficient-providers", ...base };
+      }
+      const configAbs = path13.join(deps.projectDir, LOCAL_OVERRIDES_REL);
+      const ignored = ensureLocalOverridesIgnored(
+        deps.fileOps,
+        deps.projectDir
+      );
+      const ignoreWarning = ignored.ok ? void 0 : `could not confirm ${LOCAL_OVERRIDES_REL} is git-ignored (${ignored.reason}) \u2014 add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing, or an API-key-only clone will inherit this machine's Copilot seat profile`;
+      const succeeded = () => ignoreWarning === void 0 ? { kind: "success", ...base } : { kind: "success", ...base, ignoreWarning };
+      if (!deps.fileOps.exists(configAbs)) {
+        writeConfigAtomically(
+          deps.fileOps,
+          configAbs,
+          "transport:\n  profile: copilot-cli\n"
+        );
+        return succeeded();
+      }
+      try {
+        const text = deps.fileOps.readFile(configAbs);
+        const loc = locateTransportProfile(text);
+        if (!loc) {
+          if (hasTopLevelTransportBlock(text)) {
+            const rendered2 = renderTransportProfile(text, "copilot-cli");
+            return {
+              kind: "config-write-failed",
+              providers: distinct,
+              detail: rendered2.ok ? "transport.profile could not be located for replacement" : rendered2.reason
+            };
+          }
+          const newText = text + (text.endsWith("\n") ? "" : "\n") + "transport:\n  profile: copilot-cli\n";
+          writeConfigAtomically(deps.fileOps, configAbs, newText);
+          return succeeded();
+        }
+        const rendered = renderTransportProfile(text, "copilot-cli");
+        if (!rendered.ok) {
+          return {
+            kind: "config-write-failed",
+            providers: distinct,
+            detail: rendered.reason
+          };
+        }
+        if (rendered.changed) {
+          writeConfigAtomically(deps.fileOps, configAbs, rendered.text);
+        }
+        return succeeded();
+      } catch (err) {
+        return {
+          kind: "config-write-failed",
+          providers: distinct,
+          detail: err instanceof Error ? err.message : String(err)
+        };
+      }
+    }
+  }
+}
+
+// src/utils/providerKey.ts
+var PROVIDER_KEY_VARS = [
+  "DABBLER_ANTHROPIC_API_KEY",
+  "DABBLER_OPENAI_API_KEY",
+  "DABBLER_GEMINI_API_KEY"
+];
+function providerKeyPresent(env8) {
+  return PROVIDER_KEY_VARS.some((k2) => {
+    const v = env8[k2];
+    return typeof v === "string" && v.trim().length > 0;
+  });
 }
 
 // src/utils/budgetYaml.ts
@@ -23556,12 +18005,6 @@ function deriveBudgetMode(thresholdUsd) {
     return "middle-tier";
   return "ample-budget";
 }
-function asBudgetUsd(value) {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : void 0;
-}
-function asZeroBudgetMethod(value) {
-  return value === "manual-via-other-engine" || value === "skipped" ? value : void 0;
-}
 function resolveVerificationMethod(thresholdUsd, zeroMethod) {
   if (thresholdUsd > 0)
     return "api";
@@ -23575,7 +18018,7 @@ function localIsoTimestamp(d = /* @__PURE__ */ new Date()) {
 }
 function renderBudgetYaml(opts) {
   return [
-    "# Project verification budget \u2014 written by the Dabbler Getting Started form.",
+    "# Project verification budget \u2014 see docs/budget-yaml-schema.md.",
     "# Used by the workflow for spend reporting and threshold monitoring.",
     `threshold_usd: ${opts.thresholdUsd}`,
     "scope: per-project",
@@ -23609,7 +18052,7 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
 
 // src/utils/moduleAuthoring.ts
 var crypto3 = __toESM(require("crypto"));
-var fs12 = __toESM(require("fs"));
+var fs11 = __toESM(require("fs"));
 var path15 = __toESM(require("path"));
 var YAML2 = __toESM(require_dist());
 
@@ -23680,7 +18123,7 @@ function classifyModulesManifest(root) {
 }
 function manifestEntryExists(abs) {
   try {
-    fs12.lstatSync(abs);
+    fs11.lstatSync(abs);
     return true;
   } catch {
     return false;
@@ -23706,8 +18149,7 @@ var MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml \u2014 the module manife
 #
 # To have an AI assistant decompose this project into modules and fill this
 # file in, run the "Dabbler: Copy Module Decomposition Prompt" command
-# (Command Palette) \u2014 or the "Copy AI decomposition prompt" button in the
-# Getting Started form \u2014 then paste the copied prompt into your assistant.
+# (Command Palette) \u2014 then paste the copied prompt into your assistant.
 #
 # Renaming, deleting, splitting, or merging modules later (and adopting
 # modules in an older repo) is covered in the module reorganization guide:
@@ -23732,7 +18174,7 @@ var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
 modules: []
 `;
 var NODE_ENSURE_MANIFEST_IO = {
-  mkdirp: (dir) => fs12.mkdirSync(dir, { recursive: true }),
+  mkdirp: (dir) => fs11.mkdirSync(dir, { recursive: true }),
   writeFileExclusive: (abs, data) => writeFileExclusiveSync(abs, data)
 };
 function ensureModulesManifest(root, io = NODE_ENSURE_MANIFEST_IO) {
@@ -23803,7 +18245,7 @@ function scaffoldNewModule(root, rawSlug, rawTitle) {
   const planRel = defaultModulePlanPath(slug);
   const entryBlock = renderModuleManifestEntry(slug, title, planRel);
   const manifestCreated = classified.kind === "absent";
-  const sourceText = manifestCreated ? MODULES_YAML_TEMPLATE : fs12.readFileSync(manifestAbs, "utf8");
+  const sourceText = manifestCreated ? MODULES_YAML_TEMPLATE : fs11.readFileSync(manifestAbs, "utf8");
   let candidate = null;
   if (existing.length === 0) {
     for (const replaced of replaceEmptyModulesList(sourceText, entryBlock)) {
@@ -23831,14 +18273,14 @@ function scaffoldNewModule(root, rawSlug, rawTitle) {
   );
   const planAbs = path15.join(root, ...planRel.split("/"));
   let planCreated = false;
-  if (!fs12.existsSync(planAbs)) {
-    fs12.mkdirSync(path15.dirname(planAbs), { recursive: true });
-    fs12.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
+  if (!fs11.existsSync(planAbs)) {
+    fs11.mkdirSync(path15.dirname(planAbs), { recursive: true });
+    fs11.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
       encoding: "utf8"
     });
     planCreated = true;
   }
-  fs12.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
+  fs11.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
   return {
     manifestRel: MODULES_MANIFEST_DISPLAY,
     planRel,
@@ -24054,10 +18496,10 @@ function assertStampedTextValid(originalText, newText, slug) {
   }
 }
 var NODE_SPEC_IO = {
-  readFileSync: (p2) => fs12.readFileSync(p2, "utf8"),
-  writeFileSync: (p2, d) => fs12.writeFileSync(p2, d, { encoding: "utf8" }),
-  renameSync: (from, to) => fs12.renameSync(from, to),
-  rmSync: (p2) => fs12.rmSync(p2, { force: true })
+  readFileSync: (p2) => fs11.readFileSync(p2, "utf8"),
+  writeFileSync: (p2, d) => fs11.writeFileSync(p2, d, { encoding: "utf8" }),
+  renameSync: (from, to) => fs11.renameSync(from, to),
+  rmSync: (p2) => fs11.rmSync(p2, { force: true })
 };
 function assignLegacySetsToModule(root, targetSlug, sets, io = NODE_SPEC_IO) {
   const slug = (targetSlug ?? "").trim();
@@ -24449,15 +18891,15 @@ function assertRenamedManifestParses(originalEntries, candidateText, oldSlug, ex
   }
 }
 var NODE_RENAME_IO = {
-  readFileSync: (p2) => fs12.readFileSync(p2, "utf8"),
+  readFileSync: (p2) => fs11.readFileSync(p2, "utf8"),
   writeFileSync: (p2, data) => {
     const tmp = `${p2}.${process.pid}.${crypto3.randomBytes(6).toString("hex")}.dabbler-rename-tmp`;
     try {
-      fs12.writeFileSync(tmp, data, { encoding: "utf8" });
-      fs12.renameSync(tmp, p2);
+      fs11.writeFileSync(tmp, data, { encoding: "utf8" });
+      fs11.renameSync(tmp, p2);
     } catch (err) {
       try {
-        fs12.rmSync(tmp, { force: true });
+        fs11.rmSync(tmp, { force: true });
       } catch {
       }
       throw err;
@@ -24465,9 +18907,9 @@ var NODE_RENAME_IO = {
   }
 };
 function inferLegacyStatus(dir) {
-  if (fs12.existsSync(path15.join(dir, "change-log.md")))
+  if (fs11.existsSync(path15.join(dir, "change-log.md")))
     return "complete";
-  if (fs12.existsSync(path15.join(dir, "activity-log.json")))
+  if (fs11.existsSync(path15.join(dir, "activity-log.json")))
     return "in-progress";
   return "not-started";
 }
@@ -24667,12 +19109,12 @@ var EXECUTION_ARTIFACT_FILENAMES = [
   "RESTORED.md"
 ];
 function hasExecutionArtifacts(dir) {
-  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs12.existsSync(path15.join(dir, f)));
+  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs11.existsSync(path15.join(dir, f)));
 }
 function rawSessionSetStatus(dir) {
   let raw;
   try {
-    raw = fs12.readFileSync(path15.join(dir, "session-state.json"), "utf8");
+    raw = fs11.readFileSync(path15.join(dir, "session-state.json"), "utf8");
   } catch {
     return inferLegacyStatus(dir);
   }
@@ -24834,7 +19276,7 @@ async function deleteModule(root, slugRaw, io = NODE_RENAME_IO) {
   }
   for (const c3 of toRemove) {
     try {
-      fs12.rmSync(c3.dir, { recursive: true, force: true });
+      fs11.rmSync(c3.dir, { recursive: true, force: true });
       removed.push(c3.name);
     } catch (e) {
       return {
@@ -24869,14 +19311,14 @@ function resolveModuleLifecycleTemplatesDir() {
     path15.join(__dirname, "..", "..", "..", "..", "docs", "templates", "consumer-bootstrap")
   ];
   for (const c3 of candidates) {
-    if (fs12.existsSync(path15.join(c3, MODULE_PLAN_SET_TEMPLATE_FILENAME)))
+    if (fs11.existsSync(path15.join(c3, MODULE_PLAN_SET_TEMPLATE_FILENAME)))
       return c3;
   }
   return candidates[candidates.length - 1];
 }
 function loadModuleLifecycleTemplate(filename) {
   const dir = resolveModuleLifecycleTemplatesDir();
-  return fs12.readFileSync(path15.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
+  return fs11.readFileSync(path15.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
 }
 function substituteLifecycleTokens(text, table) {
   return text.replace(
@@ -24927,11 +19369,11 @@ function findExistingLifecycleSetSlug(dirNames, moduleSlug, kind) {
   return matches.length > 0 ? matches[0] : null;
 }
 function writeSpecSkipExisting(abs, text) {
-  if (fs12.existsSync(abs))
+  if (fs11.existsSync(abs))
     return false;
-  fs12.mkdirSync(path15.dirname(abs), { recursive: true });
-  fs12.writeFileSync(abs, text, { encoding: "utf8" });
-  if (fs12.readFileSync(abs, "utf8") !== text) {
+  fs11.mkdirSync(path15.dirname(abs), { recursive: true });
+  fs11.writeFileSync(abs, text, { encoding: "utf8" });
+  if (fs11.readFileSync(abs, "utf8") !== text) {
     throw new Error(`${abs} did not verify after writing (concurrent modification?).`);
   }
   return true;
@@ -25084,7 +19526,7 @@ function scaffoldDefaultModuleAndLifecycleSets(projectDir) {
   }
 }
 async function pickDirectory() {
-  const picked = await vscode6.window.showOpenDialog({
+  const picked = await vscode11.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -25099,16 +19541,16 @@ function isoDate() {
 }
 function registerGitScaffoldCommand(context) {
   context.subscriptions.push(
-    vscode6.commands.registerCommand("dabbler.setupNewProject", async () => {
-      const openRoot = vscode6.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode11.commands.registerCommand("dabbler.setupNewProject", async () => {
+      const openRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const projectDir = openRoot ?? await pickDirectory();
       if (!projectDir)
         return;
       await buildProjectStructureNoPrompt(context, projectDir);
       if (!openRoot) {
-        await vscode6.commands.executeCommand(
+        await vscode11.commands.executeCommand(
           "vscode.openFolder",
-          vscode6.Uri.file(projectDir)
+          vscode11.Uri.file(projectDir)
         );
       }
     })
@@ -25123,7 +19565,7 @@ function makeScaffoldInstallPrompts() {
 }
 async function buildProjectStructureNoPrompt(context, projectDir, budget, transportProfile, seams = {}) {
   if (!(seams.probePython ?? probePythonPresence)(projectDir)) {
-    vscode6.window.showErrorMessage(
+    vscode11.window.showErrorMessage(
       describeMissingPython("Build project structure")
     );
     return void 0;
@@ -25144,7 +19586,7 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
   try {
     bundle = seams.loadBundle ? seams.loadBundle() : loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
-    vscode6.window.showErrorMessage(
+    vscode11.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
     );
     return void 0;
@@ -25154,9 +19596,9 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
   const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
   const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython, scaffoldBudget) => {
     let installOutcome2 = null;
-    const scaffolded = await vscode6.window.withProgress(
+    const scaffolded = await vscode11.window.withProgress(
       {
-        location: vscode6.ProgressLocation.Notification,
+        location: vscode11.ProgressLocation.Notification,
         title: "Building project structure\u2026",
         cancellable: false
       },
@@ -25194,8 +19636,8 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
     projectDir
   ).note : "";
   const summary = `Project structure built: ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote + defaultModuleNote;
-  const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode6.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
   if (result.installOk) {
     showInfo(summary);
   } else {
@@ -25302,15 +19744,15 @@ function makeRefreshChildSpawner() {
   };
 }
 async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, seams = {}) {
-  const withProgress = seams.withProgress ?? vscode6.window.withProgress.bind(vscode6.window);
+  const withProgress = seams.withProgress ?? vscode11.window.withProgress.bind(vscode11.window);
   const perform = seams.perform ?? performCopilotSeatSetup;
-  const showInfo = seams.showInfo ?? ((m) => void vscode6.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode6.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
   const seatId = deriveSeatId(os3.hostname(), currentUsername());
   const seatLabel = deriveSeatLabel(projectDir);
   const outcome = await withProgress(
     {
-      location: vscode6.ProgressLocation.Notification,
+      location: vscode11.ProgressLocation.Notification,
       title: "Setting up the Copilot seat \u2014 probing the seat's models (about 1\u20132 minutes)\u2026",
       cancellable: true
     },
@@ -25324,7 +19766,7 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
       fileOps: makeFileOps(),
       cancellation: token,
       registerDisposal: (dispose) => {
-        const d = new vscode6.Disposable(dispose);
+        const d = new vscode11.Disposable(dispose);
         context.subscriptions.push(d);
         return {
           // S2 review Minor 4: also splice the Disposable back out of
@@ -25350,1765 +19792,15 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
   return outcome;
 }
 
-// src/commands/openModulesManifest.ts
-var vscode7 = __toESM(require("vscode"));
-var path17 = __toESM(require("path"));
-function defaultUi() {
-  return {
-    showInformationMessage: (m) => vscode7.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode7.window.showErrorMessage(m),
-    openFile: (absPath) => vscode7.commands.executeCommand("vscode.open", vscode7.Uri.file(absPath)),
-    workspaceRoot: () => vscode7.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
-}
-async function openModulesManifestFlow(ui = defaultUi()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  let created;
-  try {
-    created = ensureModulesManifest(root).created;
-  } catch (err) {
-    ui.showErrorMessage(
-      `Could not create ${MODULES_MANIFEST_DISPLAY}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  const abs = path17.join(root, MODULES_MANIFEST_REL);
-  try {
-    await ui.openFile(abs);
-  } catch (err) {
-    ui.showErrorMessage(
-      `Could not open ${MODULES_MANIFEST_DISPLAY}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  if (created) {
-    ui.showInformationMessage(
-      `Created ${MODULES_MANIFEST_DISPLAY}. Define your modules (or ask an AI assistant to decompose the project), then SAVE the file \u2014 the Work Explorer groups your session sets by module.`
-    );
-  }
-  return true;
-}
-function registerOpenModulesManifestCommand(context) {
-  context.subscriptions.push(
-    vscode7.commands.registerCommand("dabbler.openModulesManifest", async () => {
-      await openModulesManifestFlow();
-    })
-  );
-}
-
-// src/commands/copyModuleDecompositionPrompt.ts
-var vscode8 = __toESM(require("vscode"));
-var fs13 = __toESM(require("fs"));
-var path18 = __toESM(require("path"));
-function buildModuleDecompositionPrompt(planPresent) {
-  const planLine = planPresent ? `Read the repository directly \u2014 its folders and code, and the project plan at \`${LEGACY_ROOT_PLAN_REL}\` (read that file for the project's goals and scope). Nothing is inlined here.` : `Read the repository directly \u2014 its folders and code \u2014 to understand the project's areas of work. Nothing is inlined here (there is no \`${LEGACY_ROOT_PLAN_REL}\` yet).`;
-  return `Module-decomposition request (Dabbler module-organized project).
-
-Decompose THIS project into modules for the Dabbler AI-led workflow. A "module" groups related session sets by area of the project \u2014 a unit of work owned by ONE developer at a time (a developer may own several modules, but two developers should never work the same module concurrently; AI-speed changes make concurrent same-module work a constant merge-conflict source \u2014 size modules accordingly). ${planLine}
-
-Write your result into \`${MODULES_MANIFEST_DISPLAY}\` (already created from the canonical template): fill it in, preserving the header comments and the top-level \`modules:\` key, and replace the empty \`modules: []\` list with one block-style entry per module. Each entry:
-  - slug:      kebab-case machine identity, GLOBALLY UNIQUE across modules.
-  - title:     the display name the Work Explorer shows for the group.
-  - codeRoots: the repo-relative code paths this module owns ([] for an
-               integration module that only composes others).
-  - planPath:  the module's project plan, repo-relative (e.g.
-               docs/modules/<slug>/project-plan.md).
-  - touches:   integration modules ONLY \u2014 the slugs of the modules it
-               works across; owners of every touched module review its PRs.
-
-Hard invariants (do NOT violate):
-  - Session-set NAMES stay globally unique across ALL modules. \`module\` is a GROUPING attribute, never part of a set's identity \u2014 never rename a set to encode its module.
-  - Keep the file valid YAML matching the template's shape; do not rename or restructure the top-level \`modules:\` key.
-  - Every path is repo-relative and forward-slashed.
-
-If the project is a single area of work, one module (or none \u2014 leave \`modules: []\`) is correct; do not invent modules to fill the file. Save \`${MODULES_MANIFEST_DISPLAY}\` when done \u2014 the Work Explorer regroups your session sets as soon as you save.
-`;
-}
-function defaultUi2() {
-  return {
-    workspaceRoot: () => vscode8.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    // fs.existsSync never throws — swallows errors, returns false.
-    fileExists: (abs) => fs13.existsSync(abs),
-    copyToClipboard: (text) => vscode8.env.clipboard.writeText(text),
-    showInformationMessage: (m) => vscode8.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode8.window.showErrorMessage(m)
-  };
-}
-async function runCopyModuleDecompositionPromptFlow(ui = defaultUi2()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  let created;
-  try {
-    created = ensureModulesManifest(root).created;
-  } catch (err) {
-    ui.showErrorMessage(
-      `Could not create ${MODULES_MANIFEST_DISPLAY}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  const planPresent = ui.fileExists(
-    path18.join(root, ...LEGACY_ROOT_PLAN_REL.split("/"))
-  );
-  const prompt = buildModuleDecompositionPrompt(planPresent);
-  try {
-    await ui.copyToClipboard(prompt);
-  } catch (err) {
-    ui.showErrorMessage(
-      `Failed to copy to clipboard: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  ui.showInformationMessage(
-    created ? `Created ${MODULES_MANIFEST_DISPLAY} and copied the module-decomposition prompt. Paste it into your AI assistant; it fills in ${MODULES_MANIFEST_DISPLAY} \u2014 then SAVE the file.` : `Copied the module-decomposition prompt. Paste it into your AI assistant; it fills in ${MODULES_MANIFEST_DISPLAY} \u2014 then SAVE the file.`
-  );
-  return true;
-}
-function registerCopyModuleDecompositionPromptCommand(context) {
-  context.subscriptions.push(
-    vscode8.commands.registerCommand(
-      "dabbler.copyModuleDecompositionPrompt",
-      async () => {
-        await runCopyModuleDecompositionPromptFlow();
-      }
-    )
-  );
-}
-
-// src/commands/gettingStartedActions.ts
-function asTransportProfileRider(value) {
-  if (value === void 0 || value === null)
-    return void 0;
-  if (typeof value === "string") {
-    const v = value.toLowerCase();
-    if (v === "api" || v === "copilot-cli")
-      return v;
-  }
-  throw new Error(
-    `Unrecognized transportProfile value ${JSON.stringify(value)} \u2014 expected "api" or "copilot-cli".`
-  );
-}
-function resolveTransportProfile(msg) {
-  return asTransportProfileRider(msg.transportProfile) ?? "api";
-}
-function asBudgetChoice(msg, transportProfile) {
-  if (transportProfile === "copilot-cli")
-    return void 0;
-  const thresholdUsd = asBudgetUsd(msg.budgetUsd);
-  if (thresholdUsd === void 0)
-    return void 0;
-  if (thresholdUsd === 0) {
-    const zeroMethod = asZeroBudgetMethod(msg.zeroBudgetMethod);
-    return zeroMethod ? { thresholdUsd, zeroMethod } : void 0;
-  }
-  return { thresholdUsd };
-}
-async function routeGettingStartedAction(msg, handlers) {
-  switch (msg.action) {
-    case "open-folder":
-      await handlers.openFolder();
-      return true;
-    case "build-structure": {
-      let transportProfile;
-      try {
-        transportProfile = resolveTransportProfile(msg);
-      } catch (err) {
-        vscode9.window.showErrorMessage(
-          `Build project structure was rejected: ${err instanceof Error ? err.message : String(err)}`
-        );
-        console.warn(
-          `[gettingStarted] rejected build-structure with malformed rider: ${err instanceof Error ? err.message : String(err)}`
-        );
-        return false;
-      }
-      const budget = asBudgetChoice(msg, transportProfile);
-      if (transportProfile !== "copilot-cli" && !budget) {
-        console.warn(
-          "[gettingStarted] rejected build-structure without a valid budget rider"
-        );
-        return false;
-      }
-      await handlers.buildStructure(budget, transportProfile);
-      return true;
-    }
-    case "open-modules":
-      await handlers.openModules();
-      return true;
-    case "copy-decomposition-prompt":
-      await handlers.copyDecompositionPrompt();
-      return true;
-    default:
-      console.warn(
-        `[gettingStarted] ignored unknown form action "${String(msg?.action)}"`
-      );
-      return false;
-  }
-}
-function makeGettingStartedHandlers(context) {
-  return {
-    // D5 no-folder surface: open or create a project folder, then load
-    // it. vscode.openFolder reopens the window on that folder; the
-    // Getting Started form (now with build steps) renders there.
-    async openFolder() {
-      const picked = await vscode9.window.showOpenDialog({
-        canSelectFiles: false,
-        canSelectFolders: true,
-        canSelectMany: false,
-        openLabel: "Open project folder",
-        title: "Open or create a project folder"
-      });
-      if (!picked?.[0])
-        return;
-      await vscode9.commands.executeCommand("vscode.openFolder", picked[0]);
-    },
-    // Step 1: scaffold into the OPEN workspace folder (D5) with no
-    // prompts. Folder-picker fallback when none is open (spec S2 step 1)
-    // — pick, scaffold there, then open the folder so the form's live
-    // state tracks the scaffolded root. Set 063 S2 (D1): the narrowed
-    // budget pick rides through to the scaffold's budget.yaml write.
-    async buildStructure(budget, transportProfile) {
-      const openRoot = vscode9.workspace.workspaceFolders?.[0]?.uri.fsPath;
-      if (openRoot) {
-        await buildProjectStructureNoPrompt(
-          context,
-          openRoot,
-          budget,
-          transportProfile
-        );
-        return;
-      }
-      const picked = await vscode9.window.showOpenDialog({
-        canSelectFiles: false,
-        canSelectFolders: true,
-        canSelectMany: false,
-        openLabel: "Select project folder",
-        title: "Select the folder to build the project structure into"
-      });
-      if (!picked?.[0])
-        return;
-      const result = await buildProjectStructureNoPrompt(
-        context,
-        picked[0].fsPath,
-        budget,
-        transportProfile
-      );
-      if (!result)
-        return;
-      await vscode9.commands.executeCommand("vscode.openFolder", picked[0]);
-    },
-    // Set 094 (spec D1 + adjudication A): the Define-modules button —
-    // create docs/modules.yaml from the canonical template if it does not
-    // exist yet, then open it. Shares the flow the toolbar command drives.
-    async openModules() {
-      await openModulesManifestFlow();
-    },
-    // Set 094 S2 (spec D6 + adjudication A): the Define-modules "Copy AI
-    // decomposition prompt" button — ensure docs/modules.yaml from the
-    // canonical template (the fourth ensure-write site), then copy the
-    // module-decomposition prompt. Shares the flow the palette command
-    // (dabbler.copyModuleDecompositionPrompt) drives.
-    async copyDecompositionPrompt() {
-      await runCopyModuleDecompositionPromptFlow();
-    }
-  };
-}
-
-// src/commands/gettingStartedDoc.ts
-var vscode10 = __toESM(require("vscode"));
-var fs14 = __toESM(require("fs"));
-var path19 = __toESM(require("path"));
-function workspaceGettingStartedDoc(workspaceRoot2) {
-  if (!workspaceRoot2)
-    return void 0;
-  const abs = path19.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
-  try {
-    return fs14.statSync(abs).isFile() ? abs : void 0;
-  } catch {
-    return void 0;
-  }
-}
-function materializeBundledDoc(context) {
-  const src = path19.join(
-    resolveBundledTemplateDir(context.extensionPath),
-    GETTING_STARTED_TEMPLATE_FILENAME
-  );
-  const dstDir = context.globalStorageUri.fsPath;
-  fs14.mkdirSync(dstDir, { recursive: true });
-  const dst = path19.join(dstDir, "getting-started.md");
-  fs14.copyFileSync(src, dst);
-  return dst;
-}
-async function openGettingStartedDoc(context) {
-  try {
-    const root = vscode10.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const docPath = workspaceGettingStartedDoc(root) ?? materializeBundledDoc(context);
-    await vscode10.commands.executeCommand(
-      "markdown.showPreview",
-      vscode10.Uri.file(docPath)
-    );
-  } catch (err) {
-    console.warn("[gettingStarted] could not open the instructions doc", err);
-  }
-}
-function registerGetStartedCommand(context) {
-  context.subscriptions.push(
-    vscode10.commands.registerCommand("dabbler.getStarted", async () => {
-      try {
-        await vscode10.commands.executeCommand("dabblerSessionSets.focus");
-      } catch (err) {
-        console.warn("[gettingStarted] could not focus the Work Explorer view", err);
-      }
-      await openGettingStartedDoc(context);
-    })
-  );
-}
-
-// src/providers/SetupStatusView.ts
-var RENDER_DEBOUNCE_MS = 50;
-var SetupStatusView = class {
-  constructor(context, scanState, gettingStartedHandlers, openInstructions) {
-    this.context = context;
-    this.scanState = scanState;
-    this.version = 0;
-    this.cache = null;
-    // Set 060 Session 3 (D8): the static instructions doc auto-opens ONCE per
-    // extension session, the first time a snapshot ships a non-"list" Getting
-    // Started surface. One-shot so watcher ticks and post-action refreshes do
-    // not re-steal editor focus; `dabbler.getStarted` re-opens it any time.
-    this.instructionsOpened = false;
-    this.gettingStartedHandlers = gettingStartedHandlers ?? makeGettingStartedHandlers(context);
-    this.openInstructions = openInstructions ?? (() => openGettingStartedDoc(context));
-    this.context.subscriptions.push(
-      this.scanState.onDidChange(() => this.postScanState())
-    );
-  }
-  static {
-    /** Unchanged from the pre-110 webview — a user's saved layout keys on it. */
-    this.viewType = "dabblerSessionSets";
-  }
-  dispose() {
-    if (this.renderTimer) {
-      clearTimeout(this.renderTimer);
-      this.renderTimer = void 0;
-    }
-  }
-  refresh() {
-    this.cache = null;
-    this.scheduleRender();
-  }
-  resolveWebviewView(webviewView, _context, _token) {
-    markWebviewResolveStart();
-    this.view = webviewView;
-    const webview = webviewView.webview;
-    webview.options = {
-      enableScripts: true,
-      enableCommandUris: true,
-      localResourceRoots: [
-        vscode11.Uri.joinPath(this.context.extensionUri, "media")
-      ]
-    };
-    webview.onDidReceiveMessage((msg) => this.onMessage(msg));
-    webviewView.onDidDispose(() => {
-      this.view = void 0;
-    });
-    webview.html = this.renderShell();
-    markWebviewResolveEnd();
-  }
-  // ----- Message dispatch (webview -> host) -----
-  //
-  // Two messages, down from eight. Everything the tree needed is gone with
-  // the tree, and with it the `executeCommand` channel that had to be
-  // allowlisted.
-  onMessage(msg) {
-    if (!msg || typeof msg !== "object")
-      return;
-    const type = msg.type;
-    if (type === "ready") {
-      this.scheduleRender();
-      return;
-    }
-    if (type === "gettingStartedAction") {
-      void routeGettingStartedAction(
-        msg,
-        this.gettingStartedHandlers
-      ).then((handled) => {
-        if (handled)
-          this.refresh();
-      }).catch((err) => {
-        console.warn("[SetupStatusView] Getting Started action failed", err);
-        this.refresh();
-      });
-    }
-  }
-  // ----- Render scheduling + snapshot fire -----
-  scheduleRender() {
-    if (this.renderTimer)
-      clearTimeout(this.renderTimer);
-    this.renderTimer = setTimeout(() => this.postSnapshot(), RENDER_DEBOUNCE_MS);
-  }
-  postSnapshot() {
-    if (!this.view)
-      return;
-    this.version++;
-    if (!this.cache)
-      this.cache = readAllSessionSets();
-    const all = this.cache;
-    const payload = {
-      hasAnySets: all.length > 0,
-      gettingStarted: this.buildGettingStarted(all),
-      systemStatus: buildSystemStatus(all.length > 0)
-    };
-    if (payload.gettingStarted.mode !== "list" && !this.instructionsOpened) {
-      this.instructionsOpened = true;
-      void Promise.resolve(this.openInstructions()).catch(
-        (err) => console.warn("[SetupStatusView] instructions open failed", err)
-      );
-    }
-    const msg = {
-      type: "rowsSnapshot",
-      version: this.version,
-      scanState: this.toProtocolScanState(),
-      payload
-    };
-    this.view.webview.postMessage(msg);
-  }
-  postScanState() {
-    if (!this.view)
-      return;
-    this.version++;
-    const msg = {
-      type: "scanStateChanged",
-      version: this.version,
-      state: this.toProtocolScanState()
-    };
-    this.view.webview.postMessage(msg);
-    if (this.scanState.phase === "ready")
-      this.scheduleRender();
-  }
-  toProtocolScanState() {
-    return this.scanState.phase === "loading" ? "loading" : "ready";
-  }
-  // Set 060 Session 1 (spec D1/D3/D5): the dual-mode Getting Started
-  // payload. The mode derives from (is a folder open?, does any root carry a
-  // session set?). Completion detection runs only in "getting-started" mode,
-  // so the no-folder and list surfaces pay nothing for the fs probe.
-  //
-  // S1 verifier Issue 1 (dispositioned — intentional): the
-  // getting-started -> list flip keys on `hasAnySets` (a MATERIALIZED set,
-  // which `readAllSessionSets` only counts once `spec.md` is present), NOT on
-  // the looser "a NNN- directory exists" probe. Flipping on a bare directory
-  // would render an empty list. Do not consolidate these onto the bare-dir
-  // probe.
-  buildGettingStarted(all) {
-    const folders = vscode11.workspace.workspaceFolders ?? [];
-    return computeGettingStarted(
-      folders.length > 0,
-      folders[0]?.uri.fsPath,
-      all.length > 0,
-      nodeDetectionFs,
-      (root) => readTransportProfile(root)
-    );
-  }
-  // ----- Webview shell HTML -----
-  renderShell() {
-    if (!this.view)
-      return "";
-    const webview = this.view.webview;
-    const asset = (...parts) => webview.asWebviewUri(
-      vscode11.Uri.joinPath(this.context.extensionUri, ...parts)
-    );
-    const cssUri = asset("media", "session-sets-tree", "tree.css");
-    const jsUri = asset("media", "session-sets-tree", "client.js");
-    const gsHtmlUri = asset("media", "session-sets-tree", "gettingStartedHtml.js");
-    const statusHtmlUri = asset("media", "session-sets-tree", "systemStatusHtml.js");
-    const nonce = crypto4.randomBytes(16).toString("hex");
-    const csp = `default-src 'none'; style-src ${webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}';`;
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="${csp}">
-  <link rel="stylesheet" href="${cssUri}">
-  <title>Setup &amp; Status</title>
-</head>
-<body>
-  <main id="root" role="presentation"></main>
-  <script nonce="${nonce}" src="${gsHtmlUri}"></script>
-  <script nonce="${nonce}" src="${statusHtmlUri}"></script>
-  <script nonce="${nonce}" src="${jsUri}"></script>
-</body>
-</html>`;
-  }
-};
-
-// src/providers/scanState.ts
-var vscode12 = __toESM(require("vscode"));
-var ScanState = class {
-  constructor() {
-    this._phase = "idle";
-    this._emitter = new vscode12.EventEmitter();
-    /** Fires when the phase transitions. Listeners get the new phase. */
-    this.onDidChange = this._emitter.event;
-  }
-  get phase() {
-    return this._phase;
-  }
-  setLoading() {
-    this._setPhase("loading");
-  }
-  setReady() {
-    this._setPhase("ready");
-  }
-  _setPhase(next) {
-    if (this._phase === next)
-      return;
-    this._phase = next;
-    this._emitter.fire(next);
-  }
-  dispose() {
-    this._emitter.dispose();
-  }
-};
-
-// src/commands/migrateSet.ts
-var vscode13 = __toESM(require("vscode"));
-
-// src/utils/migrateSessionState.ts
-var fs15 = __toESM(require("fs"));
-var path20 = __toESM(require("path"));
-var SESSION_STATE_FILENAME3 = "session-state.json";
-function isStrictPositiveInt2(v) {
-  return typeof v === "number" && Number.isInteger(v) && v > 0 && !Number.isNaN(v);
-}
-function stripLegacyCompleted(raw, total) {
-  if (!Array.isArray(raw))
-    return [];
-  const seen = /* @__PURE__ */ new Set();
-  const out = [];
-  for (const n of raw) {
-    if (isStrictPositiveInt2(n) && n >= 1 && n <= total && !seen.has(n)) {
-      out.push(n);
-      seen.add(n);
-    }
-  }
-  out.sort((a, b2) => a - b2);
-  return out;
-}
-function resolveTotal(state, specTitles) {
-  const candidates = [];
-  if (isStrictPositiveInt2(state.totalSessions))
-    candidates.push(state.totalSessions);
-  if (specTitles.size > 0)
-    candidates.push(Math.max(...specTitles.keys()));
-  if (isStrictPositiveInt2(state.currentSession))
-    candidates.push(state.currentSession);
-  if (Array.isArray(state.completedSessions)) {
-    for (const n of state.completedSessions) {
-      if (isStrictPositiveInt2(n))
-        candidates.push(n);
-    }
-  }
-  return candidates.length > 0 ? Math.max(...candidates) : 0;
-}
-function resolveLifecycleState(topStatus, raw) {
-  if (topStatus === SESSION_STATUS_COMPLETE)
-    return LIFECYCLE_STATE_CLOSED;
-  if (topStatus === "cancelled") {
-    return typeof raw === "string" && raw.length > 0 ? raw : LIFECYCLE_STATE_CLOSED;
-  }
-  if (topStatus === SESSION_STATUS_IN_PROGRESS) {
-    return typeof raw === "string" && raw.length > 0 ? raw : LIFECYCLE_STATE_WORK_IN_PROGRESS;
-  }
-  return typeof raw === "string" ? raw : null;
-}
-function buildV3Sessions(state, specTitles, total, useGenericTitles) {
-  const topStatus = canonicalizeStatus(state.status);
-  const lifecycle = state.lifecycleState;
-  const currentInt = isStrictPositiveInt2(state.currentSession) ? state.currentSession : null;
-  const legacyTotalInt = isStrictPositiveInt2(state.totalSessions) ? state.totalSessions : null;
-  const closedSignal = topStatus === SESSION_STATUS_COMPLETE && (lifecycle === LIFECYCLE_STATE_CLOSED || legacyTotalInt !== null && currentInt !== null && currentInt >= legacyTotalInt);
-  const completedLegacy = stripLegacyCompleted(state.completedSessions, total);
-  const completedSet = closedSignal ? new Set(Array.from({ length: total }, (_2, i2) => i2 + 1)) : new Set(completedLegacy);
-  let inProgressNumber = null;
-  if (topStatus === SESSION_STATUS_IN_PROGRESS && currentInt !== null && currentInt >= 1 && currentInt <= total && !completedSet.has(currentInt)) {
-    inProgressNumber = currentInt;
-  }
-  const sessions = [];
-  for (let n = 1; n <= total; n++) {
-    const title = useGenericTitles || !specTitles.has(n) ? `Session ${n}` : specTitles.get(n);
-    let status;
-    if (inProgressNumber !== null && n === inProgressNumber) {
-      status = SESSION_STATUS_IN_PROGRESS;
-    } else if (completedSet.has(n)) {
-      status = SESSION_STATUS_COMPLETE;
-    } else {
-      status = SESSION_STATUS_NOT_STARTED;
-    }
-    sessions.push({ number: n, title, status });
-  }
-  return sessions;
-}
-function deriveLegacyTriple(sessions) {
-  let current = null;
-  const completed = [];
-  for (const s of sessions) {
-    if (s.status === SESSION_STATUS_IN_PROGRESS) {
-      current = s.number;
-    } else if (s.status === SESSION_STATUS_COMPLETE) {
-      completed.push(s.number);
-    }
-  }
-  completed.sort((a, b2) => a - b2);
-  return { current, total: sessions.length, completed };
-}
-function atomicWriteJson(filePath, data) {
-  const dir = path20.dirname(filePath);
-  const base = path20.basename(filePath);
-  const tmp = path20.join(dir, `${base}.tmp.${process.pid}.${Date.now()}`);
-  const fd = fs15.openSync(tmp, "w");
-  try {
-    fs15.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs15.fsyncSync(fd);
-  } finally {
-    fs15.closeSync(fd);
-  }
-  fs15.renameSync(tmp, filePath);
-}
-function migrateOneSet(setDir, options = {}) {
-  const strategy = options.strategy ?? "regex";
-  const dryRun = options.dryRun ?? false;
-  const statePath = path20.join(setDir, SESSION_STATE_FILENAME3);
-  if (!fs15.existsSync(statePath)) {
-    return {
-      setDir,
-      action: "skipped-no-state",
-      reason: `${SESSION_STATE_FILENAME3} not found`
-    };
-  }
-  let raw;
-  try {
-    raw = fs15.readFileSync(statePath, "utf-8");
-  } catch (exc) {
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `failed to read: ${msg}`,
-      error: msg
-    };
-  }
-  let state;
-  try {
-    state = JSON.parse(raw);
-  } catch (exc) {
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `failed to parse: ${msg}`,
-      error: msg
-    };
-  }
-  if (state === null || typeof state !== "object" || Array.isArray(state)) {
-    const t2 = Array.isArray(state) ? "array" : typeof state;
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `top-level JSON is ${t2}, expected object`
-    };
-  }
-  const stateObj = state;
-  const schemaVersion = stateObj.schemaVersion;
-  if (typeof schemaVersion === "number" && schemaVersion > SCHEMA_VERSION_V3) {
-    return {
-      setDir,
-      action: "skipped-future-schema",
-      reason: `schemaVersion=${schemaVersion} is newer than this migrator (v${SCHEMA_VERSION_V3}); refusing to downgrade. Upgrade the migrator or hand-edit the file.`
-    };
-  }
-  if (schemaVersion === SCHEMA_VERSION_V3) {
-    if (Array.isArray(stateObj.sessions)) {
-      return {
-        setDir,
-        action: "skipped-v3",
-        reason: "already v3 (sessions[] present)"
-      };
-    }
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a v2 file. Hand-repair or restore from git."
-    };
-  }
-  const specMdPath = path20.join(setDir, "spec.md");
-  const specTitlesArr = extractSessionTitlesFromSpec(specMdPath);
-  const specTitles = new Map(
-    specTitlesArr.map((t2) => [t2.number, t2.title])
-  );
-  const total = resolveTotal(stateObj, specTitles);
-  if (total < 1) {
-    return {
-      setDir,
-      action: "would-violate",
-      reason: "cannot determine totalSessions: no spec.md headings, no legacy totalSessions, no completedSessions, no currentSession"
-    };
-  }
-  const sessions = buildV3Sessions(
-    stateObj,
-    specTitles,
-    total,
-    strategy === "generic"
-  );
-  const topStatusRaw = stateObj.status;
-  const topStatus = canonicalizeStatus(topStatusRaw);
-  const lifecycleState = resolveLifecycleState(topStatus, stateObj.lifecycleState);
-  try {
-    validateInvariants(sessions, topStatus, lifecycleState);
-  } catch (exc) {
-    if (exc instanceof SessionStateInvariantError) {
-      return {
-        setDir,
-        action: "would-violate",
-        reason: exc.message,
-        error: exc.message
-      };
-    }
-    throw exc;
-  }
-  const { current, total: derivedTotal, completed } = deriveLegacyTriple(sessions);
-  const out = { ...stateObj };
-  out.schemaVersion = SCHEMA_VERSION_V3;
-  out.sessions = sessions;
-  if (topStatus !== null && topStatus !== topStatusRaw) {
-    out.status = topStatus;
-  }
-  if (lifecycleState !== null || "lifecycleState" in out) {
-    out.lifecycleState = lifecycleState;
-  }
-  out.currentSession = current;
-  out.totalSessions = derivedTotal;
-  out.completedSessions = completed;
-  if (!dryRun) {
-    atomicWriteJson(statePath, out);
-  }
-  return {
-    setDir,
-    action: "migrated",
-    reason: `migrated using ${strategy} strategy`
-  };
-}
-
-// src/commands/migrateSet.ts
-var STRATEGY_CHOICES = [
-  {
-    label: "$(symbol-text)  Use spec.md headings",
-    description: "Regex extraction \xB7 deterministic \xB7 zero cost",
-    detail: "Reads `### Session K of N: <title>` headings from spec.md. Recommended for normal session sets.",
-    strategy: "regex"
-  },
-  {
-    label: "$(symbol-numeric)  Use generic labels",
-    description: "Fallback \xB7 'Session 1', 'Session 2', \u2026",
-    detail: "Use when spec.md is intentionally missing or you want neutral, stable labels independent of heading drift.",
-    strategy: "generic"
-  }
-];
-function registerMigrateSetCommand(context, deps) {
-  context.subscriptions.push(
-    vscode13.commands.registerCommand(
-      "dabblerSessionSets.migrate",
-      async (treeItem) => {
-        const set = treeItem?.set;
-        if (!set) {
-          vscode13.window.showErrorMessage(
-            "Migrate to v3 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
-          );
-          return;
-        }
-        if (!set.needsMigration) {
-          vscode13.window.showInformationMessage(
-            `${set.name} is already on schema v3 \u2014 nothing to migrate.`
-          );
-          return;
-        }
-        const choice = await vscode13.window.showQuickPick(STRATEGY_CHOICES, {
-          title: `Migrate ${set.name} to v3 schema`,
-          placeHolder: "Choose how session titles should be derived",
-          ignoreFocusOut: true
-        });
-        if (!choice)
-          return;
-        await runMigrator(set, choice.strategy, deps);
-      }
-    )
-  );
-}
-async function runMigrator(set, strategy, deps) {
-  await vscode13.window.withProgress(
-    {
-      location: vscode13.ProgressLocation.Notification,
-      title: `Migrating ${set.name} to v3 schema (${strategy})\u2026`,
-      cancellable: false
-    },
-    async () => {
-      let result;
-      try {
-        result = migrateOneSet(set.dir, { strategy });
-      } catch (exc) {
-        const msg = exc instanceof Error ? exc.message : String(exc);
-        vscode13.window.showErrorMessage(
-          `Migration of ${set.name} failed with an unexpected error: ${msg}`
-        );
-        return;
-      }
-      handleMigrationResult(set, strategy, result, deps);
-    }
-  );
-}
-function handleMigrationResult(set, strategy, result, deps) {
-  if (result.action === "migrated") {
-    vscode13.window.showInformationMessage(
-      `${set.name} migrated to v3 schema (${strategy}). The tree will refresh shortly; the (needs migration) badge clears on the next read.`
-    );
-    deps.refreshView();
-    return;
-  }
-  if (result.action === "skipped-v3") {
-    vscode13.window.showInformationMessage(
-      `${set.name} is already v3 \u2014 no changes written.`
-    );
-    deps.refreshView();
-    return;
-  }
-  if (result.action === "would-violate") {
-    vscode13.window.showWarningMessage(
-      `Migration of ${set.name} stopped: the resulting v3 file would violate schema invariants. Reason: ${result.reason}. Try the other strategy (regex \u2194 generic) or hand-repair the state file before retrying.`
-    );
-    return;
-  }
-  vscode13.window.showWarningMessage(
-    `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
-  );
-}
-
-// src/commands/migrateSetV4.ts
-var vscode14 = __toESM(require("vscode"));
-
-// src/utils/migrateSessionStateV4.ts
-var fs16 = __toESM(require("fs"));
-var path21 = __toESM(require("path"));
-var SESSION_STATE_FILENAME4 = "session-state.json";
-var BACKUP_FILENAME = "session-state.v3.bak.json";
-var SWEEP_BACKUP_FILENAME = "session-state.pre-049-sweep.bak.json";
-var RETIRED_ORCHESTRATOR_KEYS = [
-  "chatSessionId",
-  "checkedOutAt",
-  "lastActivityAt"
-];
-var V4_TOP_LEVEL_DROPPED_KEYS2 = [
-  "lifecycleState",
-  "currentSession",
-  "totalSessions",
-  "completedSessions",
-  "startedAt",
-  "completedAt",
-  "orchestrator",
-  "verificationVerdict"
-];
-var V4_TOP_LEVEL_PRESERVED_KEYS = [
-  "schemaVersion",
-  "sessionSetName",
-  "status",
-  "sessions"
-];
-var V4_TOP_LEVEL_PASSTHROUGH_KEYS = [
-  "preCancelStatus",
-  "forceClosed"
-];
-function stripRetiredOrchestratorKeys(block) {
-  if (block === null || typeof block !== "object" || Array.isArray(block)) {
-    return [block, false];
-  }
-  const obj = block;
-  let changed = false;
-  const out = {};
-  for (const [key, value] of Object.entries(obj)) {
-    if (RETIRED_ORCHESTRATOR_KEYS.includes(key)) {
-      changed = true;
-      continue;
-    }
-    out[key] = value;
-  }
-  return [out, changed];
-}
-function sweepOrchestratorBlocks(state) {
-  let changed = false;
-  let newState = state;
-  const topOrch = state.orchestrator;
-  if (topOrch !== null && typeof topOrch === "object" && !Array.isArray(topOrch)) {
-    const [swept, topChanged] = stripRetiredOrchestratorKeys(topOrch);
-    if (topChanged) {
-      newState = { ...state };
-      newState.orchestrator = swept;
-      changed = true;
-    }
-  }
-  const sessions = state.sessions;
-  if (Array.isArray(sessions)) {
-    const newSessions = [];
-    let sessionsChanged = false;
-    for (const entry of sessions) {
-      if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
-        newSessions.push(entry);
-        continue;
-      }
-      const entryObj = entry;
-      const [swept, entryChanged] = stripRetiredOrchestratorKeys(
-        entryObj.orchestrator
-      );
-      if (entryChanged) {
-        newSessions.push({ ...entryObj, orchestrator: swept });
-        sessionsChanged = true;
-      } else {
-        newSessions.push(entry);
-      }
-    }
-    if (sessionsChanged) {
-      if (newState === state) {
-        newState = { ...state };
-      }
-      newState.sessions = newSessions;
-      changed = true;
-    }
-  }
-  return [newState, changed];
-}
-function buildV4OnDiskShape(normalized, original) {
-  const out = {};
-  for (const key of V4_TOP_LEVEL_PRESERVED_KEYS) {
-    if (key === "schemaVersion") {
-      out[key] = SCHEMA_VERSION_V4;
-    } else if (key === "status") {
-      const canon = canonicalizeStatus(
-        normalized.status ?? null
-      );
-      out[key] = canon ?? normalized.status ?? null;
-    } else if (key === "sessions") {
-      out[key] = normalized.sessions ?? [];
-    } else {
-      out[key] = normalized[key] ?? null;
-    }
-  }
-  for (const key of V4_TOP_LEVEL_PASSTHROUGH_KEYS) {
-    if (key in original) {
-      out[key] = original[key];
-    }
-  }
-  for (const key of V4_TOP_LEVEL_DROPPED_KEYS2) {
-    delete out[key];
-  }
-  return out;
-}
-function atomicWriteJson2(filePath, data) {
-  const dir = path21.dirname(filePath);
-  const base = path21.basename(filePath);
-  const tmp = path21.join(
-    dir,
-    `.${base}.tmp.${process.pid}.${Date.now()}`
-  );
-  const fd = fs16.openSync(tmp, "w");
-  try {
-    fs16.writeSync(fd, JSON.stringify(data, null, 2) + "\n", null, "utf-8");
-    fs16.fsyncSync(fd);
-  } finally {
-    fs16.closeSync(fd);
-  }
-  try {
-    fs16.renameSync(tmp, filePath);
-  } catch (exc) {
-    try {
-      fs16.unlinkSync(tmp);
-    } catch {
-    }
-    throw exc;
-  }
-}
-function atomicCopyJson(src, dst) {
-  const raw = JSON.parse(fs16.readFileSync(src, "utf-8"));
-  atomicWriteJson2(dst, raw);
-}
-function migrateOneSetV4(setDir, options = {}) {
-  const dryRun = options.dryRun ?? false;
-  const statePath = path21.join(setDir, SESSION_STATE_FILENAME4);
-  const backupPath = path21.join(setDir, BACKUP_FILENAME);
-  if (!fs16.existsSync(statePath)) {
-    return {
-      setDir,
-      action: "skipped-no-state",
-      reason: `${SESSION_STATE_FILENAME4} not found`
-    };
-  }
-  let raw;
-  try {
-    raw = fs16.readFileSync(statePath, "utf-8");
-  } catch (exc) {
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `failed to read: ${msg}`,
-      error: msg
-    };
-  }
-  let state;
-  try {
-    state = JSON.parse(raw);
-  } catch (exc) {
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `failed to parse: ${msg}`,
-      error: msg
-    };
-  }
-  if (state === null || typeof state !== "object" || Array.isArray(state)) {
-    const t2 = Array.isArray(state) ? "array" : typeof state;
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `top-level JSON is ${t2}, expected object`
-    };
-  }
-  const stateObj = state;
-  const schemaVersion = stateObj.schemaVersion;
-  if (typeof schemaVersion === "number" && schemaVersion > SCHEMA_VERSION_V4) {
-    return {
-      setDir,
-      action: "skipped-future-schema",
-      reason: `schemaVersion=${schemaVersion} is newer than this migrator (v${SCHEMA_VERSION_V4}); refusing to downgrade. Upgrade the migrator or hand-edit the file.`,
-      before: state
-    };
-  }
-  if (typeof schemaVersion === "number" && schemaVersion >= SCHEMA_VERSION_V4) {
-    const [sweptState, swept] = sweepOrchestratorBlocks(stateObj);
-    if (!swept) {
-      return {
-        setDir,
-        action: "skipped-v4",
-        reason: `already v4 (schemaVersion=${schemaVersion})`,
-        before: state,
-        after: state
-      };
-    }
-    if (dryRun) {
-      return {
-        setDir,
-        action: "swept-orchestrator",
-        reason: `v4 \u2192 v4 (orchestrator-block sweep: stripping ${RETIRED_ORCHESTRATOR_KEYS.join(", ")}; dry-run, no write performed)`,
-        before: state,
-        after: sweptState
-      };
-    }
-    const sweepBackupPath = path21.join(setDir, SWEEP_BACKUP_FILENAME);
-    try {
-      atomicCopyJson(statePath, sweepBackupPath);
-    } catch (exc) {
-      const msg = exc instanceof Error ? exc.message : String(exc);
-      return {
-        setDir,
-        action: "failed-backup",
-        reason: `could not write backup at ${sweepBackupPath}: ${msg}`,
-        error: msg,
-        before: state
-      };
-    }
-    try {
-      atomicWriteJson2(statePath, sweptState);
-    } catch (exc) {
-      const msg = exc instanceof Error ? exc.message : String(exc);
-      return {
-        setDir,
-        action: "failed-backup",
-        reason: `backup written at ${sweepBackupPath} but state-file write failed: ${msg}. Restore the backup via the rollback procedure at docs/v3-to-v4-rollback-procedure.md.`,
-        error: msg,
-        before: state,
-        backupPath: sweepBackupPath
-      };
-    }
-    return {
-      setDir,
-      action: "swept-orchestrator",
-      reason: `v4 \u2192 v4 (orchestrator-block sweep: stripped ${RETIRED_ORCHESTRATOR_KEYS.join(", ")})`,
-      before: state,
-      after: sweptState,
-      backupPath: sweepBackupPath
-    };
-  }
-  if (!(typeof schemaVersion === "number" && schemaVersion === SCHEMA_VERSION_V3)) {
-    return {
-      setDir,
-      action: "skipped-not-v3",
-      reason: `schemaVersion=${JSON.stringify(schemaVersion)} is not v${SCHEMA_VERSION_V3}; the v3\u2192v4 migrator only operates on v3 input. Right-click the row and run "Migrate to v3 schema" first, then re-run "Migrate to v4 schema".`,
-      before: state
-    };
-  }
-  if (!Array.isArray(stateObj.sessions)) {
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: "schemaVersion=3 but sessions[] is missing or not a list; this is a broken v3 file, not a downgrade candidate. Hand-repair or restore from git, then re-run.",
-      before: state
-    };
-  }
-  const specMdPath = path21.join(setDir, "spec.md");
-  let normalized;
-  try {
-    normalized = normalizeToV4Shape(stateObj, specMdPath);
-  } catch (exc) {
-    if (exc instanceof SessionStateInvariantError) {
-      return {
-        setDir,
-        action: "would-violate",
-        reason: exc.message,
-        error: exc.message,
-        before: state
-      };
-    }
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "skipped-malformed",
-      reason: `normalizeToV4Shape rejected the input: ${msg}`,
-      error: msg,
-      before: state
-    };
-  }
-  try {
-    getProgress(normalized);
-  } catch (exc) {
-    if (exc instanceof SessionStateInvariantError) {
-      return {
-        setDir,
-        action: "would-violate",
-        reason: exc.message,
-        error: exc.message,
-        before: state
-      };
-    }
-    throw exc;
-  }
-  let newState = buildV4OnDiskShape(normalized, stateObj);
-  const [sweptNewState] = sweepOrchestratorBlocks(newState);
-  newState = sweptNewState;
-  if (dryRun) {
-    return {
-      setDir,
-      action: "migrated",
-      reason: "v3 \u2192 v4 (dry-run; no write performed)",
-      before: state,
-      after: newState
-    };
-  }
-  try {
-    atomicCopyJson(statePath, backupPath);
-  } catch (exc) {
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "failed-backup",
-      reason: `could not write backup at ${backupPath}: ${msg}`,
-      error: msg,
-      before: state
-    };
-  }
-  try {
-    atomicWriteJson2(statePath, newState);
-  } catch (exc) {
-    const msg = exc instanceof Error ? exc.message : String(exc);
-    return {
-      setDir,
-      action: "failed-backup",
-      reason: `backup written at ${backupPath} but state-file write failed: ${msg}. Restore the backup via the rollback procedure at docs/v3-to-v4-rollback-procedure.md.`,
-      error: msg,
-      before: state,
-      backupPath
-    };
-  }
-  return {
-    setDir,
-    action: "migrated",
-    reason: "v3 \u2192 v4",
-    before: state,
-    after: newState,
-    backupPath
-  };
-}
-
-// src/commands/migrateSetV4.ts
-function registerMigrateSetV4Command(context, deps) {
-  context.subscriptions.push(
-    vscode14.commands.registerCommand(
-      "dabblerSessionSets.migrateToV4",
-      async (treeItem) => {
-        const set = treeItem?.set;
-        if (!set) {
-          vscode14.window.showErrorMessage(
-            "Migrate to v4 schema must be invoked from a session-set row in the Session Sets view. Right-click a row marked '(needs migration)' to use this command."
-          );
-          return;
-        }
-        if (set.migrationTargetSchemaVersion !== 4) {
-          if (set.migrationTargetSchemaVersion === 3) {
-            vscode14.window.showInformationMessage(
-              `${set.name} is at v1/v2 (or broken v3) \u2014 run "Migrate to v3 schema" first, then re-run this command.`
-            );
-          } else {
-            vscode14.window.showInformationMessage(
-              `${set.name} is already on schema v4 \u2014 nothing to migrate.`
-            );
-          }
-          return;
-        }
-        const confirm = await vscode14.window.showInformationMessage(
-          `Migrate ${set.name} to v4 schema? This will rewrite session-state.json in v4 shape and write a backup at session-state.v3.bak.json alongside it for rollback.`,
-          { modal: true },
-          "Migrate"
-        );
-        if (confirm !== "Migrate")
-          return;
-        await runMigratorV4(set, deps);
-      }
-    )
-  );
-}
-async function runMigratorV4(set, deps) {
-  await vscode14.window.withProgress(
-    {
-      location: vscode14.ProgressLocation.Notification,
-      title: `Migrating ${set.name} to v4 schema\u2026`,
-      cancellable: false
-    },
-    async () => {
-      let result;
-      try {
-        result = migrateOneSetV4(set.dir, { dryRun: false });
-      } catch (exc) {
-        const msg = exc instanceof Error ? exc.message : String(exc);
-        vscode14.window.showErrorMessage(
-          `Migration of ${set.name} to v4 failed with an unexpected error: ${msg}`
-        );
-        return;
-      }
-      handleMigrationResultV4(set, result, deps);
-    }
-  );
-}
-function handleMigrationResultV4(set, result, deps) {
-  if (result.action === "migrated") {
-    vscode14.window.showInformationMessage(
-      `${set.name} migrated to v4 schema. Backup at session-state.v3.bak.json. The tree will refresh shortly; the (needs migration) badge clears on the next read.`
-    );
-    deps.refreshView();
-    return;
-  }
-  if (result.action === "skipped-v4") {
-    vscode14.window.showInformationMessage(
-      `${set.name} is already v4 \u2014 no changes written.`
-    );
-    deps.refreshView();
-    return;
-  }
-  if (result.action === "skipped-not-v3") {
-    vscode14.window.showWarningMessage(
-      `Migration of ${set.name} to v4 was skipped: ${result.reason}`
-    );
-    return;
-  }
-  if (result.action === "would-violate") {
-    vscode14.window.showWarningMessage(
-      `Migration of ${set.name} stopped: the resulting v4 file would violate schema invariants. Reason: ${result.reason}. Hand-repair the state file before retrying.`
-    );
-    return;
-  }
-  if (result.action === "failed-backup") {
-    if (result.backupPath) {
-      vscode14.window.showErrorMessage(
-        `Migration of ${set.name} failed AFTER backup was written at ${result.backupPath}. ${result.reason} See docs/v3-to-v4-rollback-procedure.md to restore.`
-      );
-    } else {
-      vscode14.window.showErrorMessage(
-        `Migration of ${set.name} could not write its backup: ${result.reason}. The state file was not modified \u2014 fix the filesystem issue (permissions / disk space) and re-run. No rollback needed.`
-      );
-    }
-    return;
-  }
-  vscode14.window.showWarningMessage(
-    `Migration of ${set.name} skipped (${result.action}): ${result.reason}.`
-  );
-}
-
-// src/commands/openFile.ts
-var vscode15 = __toESM(require("vscode"));
-var fs17 = __toESM(require("fs"));
-var path22 = __toESM(require("path"));
-
-// src/providers/specSectionLocator.ts
-function lineAt(text, offset) {
-  let line = 0;
-  for (let i2 = 0; i2 < offset && i2 < text.length; i2 += 1) {
-    if (text[i2] === "\n")
-      line += 1;
-  }
-  return line;
-}
-function locateSessionSection(specText, sessionNumber) {
-  if (typeof specText !== "string" || specText === "")
-    return null;
-  if (!Number.isInteger(sessionNumber))
-    return null;
-  const body = stripFencedBlocks(specText);
-  const heads = scanSessionHeads(body);
-  const index = heads.findIndex((head2) => head2.number === sessionNumber);
-  if (index === -1)
-    return null;
-  const originalLines = specText.split("\n");
-  const lastLine = originalLines.length - 1;
-  const startLine = Math.min(lineAt(body, heads[index].headStart), lastLine);
-  let endLine = index + 1 < heads.length ? Math.max(lineAt(body, heads[index + 1].headStart) - 1, startLine) : lastLine;
-  while (endLine > startLine && (originalLines[endLine] ?? "").trim() === "") {
-    endLine -= 1;
-  }
-  return { startLine, endLine };
-}
-
-// src/commands/openFile.ts
-function openIfExists(filePath, label, reveal) {
-  if (!filePath || !fs17.existsSync(filePath)) {
-    vscode15.window.showInformationMessage(
-      `${label} does not exist yet: ${filePath ? path22.basename(filePath) : "<unknown>"}`
-    );
-    return;
-  }
-  const uri = vscode15.Uri.file(filePath);
-  if (!reveal) {
-    vscode15.commands.executeCommand("vscode.open", uri);
-    return;
-  }
-  void revealSection(uri, reveal);
-}
-async function revealSection(uri, range) {
-  try {
-    const editor = await vscode15.window.showTextDocument(uri);
-    const lastLine = Math.max(editor.document.lineCount - 1, 0);
-    const start = new vscode15.Position(Math.min(range.startLine, lastLine), 0);
-    const end = new vscode15.Position(Math.min(range.endLine, lastLine), 0);
-    editor.selection = new vscode15.Selection(start, start);
-    editor.revealRange(new vscode15.Range(start, end), vscode15.TextEditorRevealType.AtTop);
-  } catch (err) {
-    console.warn(`[Dabbler] reveal failed for ${uri.fsPath}; opening at the top`, err);
-    vscode15.commands.executeCommand("vscode.open", uri);
-  }
-}
-function sessionNumberOf(item) {
-  if (item === null || typeof item !== "object")
-    return void 0;
-  const node = item;
-  if (node.kind !== "session")
-    return void 0;
-  const number = node.session?.number;
-  if (typeof number !== "number" || !Number.isInteger(number) || number <= 0) {
-    return void 0;
-  }
-  return number;
-}
-function specSectionTargetFor(specPath, sessionNumber) {
-  if (!specPath || sessionNumber === void 0)
-    return void 0;
-  let text;
-  try {
-    text = fs17.readFileSync(specPath, "utf-8");
-  } catch {
-    return void 0;
-  }
-  return locateSessionSection(text, sessionNumber) ?? void 0;
-}
-async function openPrerequisiteSpec(set) {
-  const unsatisfied = set.unsatisfiedPrereqs ?? [];
-  if (unsatisfied.length === 0) {
-    vscode15.window.showInformationMessage(
-      `"${set.name}" has no unsatisfied prerequisites.`
-    );
-    return;
-  }
-  const allSets = readAllSessionSets();
-  const bySlug = new Map(allSets.map((s) => [s.name, s]));
-  const openTarget = (p2) => {
-    if (p2.targetState === "unknown") {
-      vscode15.window.showInformationMessage(
-        `Prerequisite "${p2.slug}" does not match any session set \u2014 check the slug in ${set.name}/spec.md.`
-      );
-      return;
-    }
-    openIfExists(bySlug.get(p2.slug)?.specPath, `Prerequisite spec (${p2.slug})`);
-  };
-  if (unsatisfied.length === 1) {
-    openTarget(unsatisfied[0]);
-    return;
-  }
-  const picked = await vscode15.window.showQuickPick(
-    unsatisfied.map((p2) => ({
-      label: p2.slug,
-      description: p2.targetState === "unknown" ? "unknown set \u2014 check the slug" : p2.targetState.replace("-", " "),
-      prereq: p2
-    })),
-    { placeHolder: `Prerequisites blocking "${set.name}"` }
-  );
-  if (picked)
-    openTarget(picked.prereq);
-}
-function findPlaywrightTests(set) {
-  const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
-  const testDirRel = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT) || PLAYWRIGHT_REL_DEFAULT;
-  const playwrightDir = path22.join(set.root, testDirRel);
-  if (!fs17.existsSync(playwrightDir))
-    return [];
-  const slugTokens = set.name.split("-").filter((s) => s.length >= 3);
-  const testRefs = set.uatSummary?.e2eRefs ?? [];
-  const candidates = /* @__PURE__ */ new Set();
-  const walk2 = (dir, depth) => {
-    if (depth > 4)
-      return;
-    let entries;
-    try {
-      entries = fs17.readdirSync(dir, { withFileTypes: true });
-    } catch {
-      return;
-    }
-    for (const e of entries) {
-      const p2 = path22.join(dir, e.name);
-      if (e.isDirectory()) {
-        if (e.name === "bin" || e.name === "obj" || e.name === "node_modules")
-          continue;
-        walk2(p2, depth + 1);
-        continue;
-      }
-      if (!/\.(cs|ts|js)$/.test(e.name))
-        continue;
-      const lowerName = e.name.toLowerCase();
-      if (slugTokens.some((t2) => lowerName.includes(t2.toLowerCase()))) {
-        candidates.add(p2);
-        continue;
-      }
-      if (testRefs.length > 0) {
-        try {
-          const txt = fs17.readFileSync(p2, "utf8");
-          for (const ref of testRefs) {
-            const short = String(ref).split(".").pop();
-            if (short && txt.includes(short)) {
-              candidates.add(p2);
-              break;
-            }
-          }
-        } catch {
-        }
-      }
-    }
-  };
-  walk2(playwrightDir, 0);
-  return Array.from(candidates).sort();
-}
-function registerOpenFileCommands(context) {
-  context.subscriptions.push(
-    // Set 115 S2: ONE `Open Spec`, two callers. A set row opens the file
-    // at the top exactly as before; a session row (`kind: "session"`)
-    // opens the same file positioned at its own `### Session N of M:`
-    // block. Adding a parallel command would have meant a second place
-    // for "which file is the spec" to be answered.
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.openSpec",
-      (item) => openIfExists(
-        item?.set?.specPath,
-        "Spec",
-        specSectionTargetFor(item?.set?.specPath, sessionNumberOf(item))
-      )
-    ),
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.openActivityLog",
-      (item) => openIfExists(item?.set?.activityPath, "Activity log")
-    ),
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.openChangeLog",
-      (item) => openIfExists(item?.set?.changeLogPath, "Change log")
-    ),
-    // Set 048 S3 (operator-locked L3): `Open AI Assignment` is fully
-    // removed. The `ai-assignment.md` file on disk continues to exist
-    // for any consumer that reads it directly; the menu / palette
-    // entry to open it does not.
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.openUatChecklist",
-      (item) => openIfExists(item?.set?.uatChecklistPath, "UAT checklist")
-    ),
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.openSessionState",
-      (item) => openIfExists(item?.set?.statePath, "Session state")
-    ),
-    // Set 061 S2 (spec D3): blocked-marker companion. Tolerates a
-    // bare Command Palette invocation (no row context) with an
-    // informational no-op, matching the other openFile commands.
-    vscode15.commands.registerCommand("dabblerSessionSets.openPrerequisiteSpec", (item) => {
-      if (!item?.set) {
-        vscode15.window.showInformationMessage(
-          "Open Prerequisite Spec is available from a session-set row's context menu."
-        );
-        return;
-      }
-      void openPrerequisiteSpec(item.set);
-    }),
-    vscode15.commands.registerCommand("dabblerSessionSets.openFolder", (item) => {
-      if (!item?.set)
-        return;
-      vscode15.commands.executeCommand("revealInExplorer", vscode15.Uri.file(item.set.dir));
-    }),
-    vscode15.commands.registerCommand(
-      "dabblerSessionSets.revealPlaywrightTests",
-      async (item) => {
-        if (!item?.set)
-          return;
-        const tests = findPlaywrightTests(item.set);
-        if (tests.length === 0) {
-          const cfg = vscode15.workspace.getConfiguration("dabblerSessionSets");
-          const dir = cfg.get("e2e.testDirectory", PLAYWRIGHT_REL_DEFAULT);
-          vscode15.window.showInformationMessage(
-            `No Playwright tests found for "${item.set.name}". Search root: ${dir}`
-          );
-          return;
-        }
-        if (tests.length === 1) {
-          vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(tests[0]));
-          return;
-        }
-        const picked = await vscode15.window.showQuickPick(
-          tests.map((p2) => ({
-            label: path22.basename(p2),
-            description: path22.relative(item.set.root, p2),
-            absolute: p2
-          })),
-          { placeHolder: `Playwright tests matching "${item.set.name}"` }
-        );
-        if (picked) {
-          vscode15.commands.executeCommand("vscode.open", vscode15.Uri.file(picked.absolute));
-        }
-      }
-    )
-  );
-}
-
-// src/commands/copyCommand.ts
-var vscode16 = __toESM(require("vscode"));
-async function copy(text, label) {
-  await vscode16.env.clipboard.writeText(text);
-  vscode16.window.setStatusBarMessage(`Copied: ${label}`, 4e3);
-}
-var startCommandPresets = {
-  default: (slug) => `Start the next session of \`${slug}\`.`,
-  parallel: (slug) => `Start the next parallel session of \`${slug}\`.`
-};
-var presetLabels = {
-  default: "start next session",
-  parallel: "start next parallel session"
-};
-function registerCopyCommands(context) {
-  for (const [key, builder] of Object.entries(startCommandPresets)) {
-    context.subscriptions.push(
-      vscode16.commands.registerCommand(
-        `dabblerSessionSets.copyStartCommand.${key}`,
-        async (item) => {
-          if (!item?.set)
-            return;
-          await copy(builder(item.set.name), presetLabels[key]);
-        }
-      )
-    );
-  }
-  context.subscriptions.push(
-    vscode16.commands.registerCommand(
-      "dabblerSessionSets.copySlug",
-      async (item) => {
-        if (!item?.set)
-          return;
-        await copy(item.set.name, "slug");
-      }
-    )
-  );
-}
-
-// src/commands/copyPromptCommands.ts
-var vscode18 = __toESM(require("vscode"));
-
-// src/providers/rowMenuHelpers.ts
-function planLeftClickActivation(setName, state) {
-  const openCommand = { commandId: "dabblerSessionSets.openSpec", setName };
-  if (state !== "in-progress" && state !== "not-started") {
-    return { openCommand, clipboardWrite: null };
-  }
-  const sanitized = setName.replace(/`/g, "'");
-  return {
-    openCommand,
-    clipboardWrite: {
-      text: `Start the next session of \`${sanitized}\`.`,
-      toast: `Copied: Start the next session of ${setName}`
-    }
-  };
-}
-function nextRunnableSessionNumber(sessions) {
-  const ordered = [...sessions ?? []].sort((a, b2) => a.number - b2.number);
-  let expected = 1;
-  for (const session of ordered) {
-    if (session.number !== expected)
-      return null;
-    expected += 1;
-    if (session.status === "complete" || session.status === "cancelled")
-      continue;
-    if (session.status === "in-progress" || session.status === "not-started") {
-      return session.number;
-    }
-    return null;
-  }
-  return null;
-}
-function sessionOffersRunPrompt(set, session) {
-  if (planLeftClickActivation(set.name, set.state).clipboardWrite === null) {
-    return false;
-  }
-  return nextRunnableSessionNumber(set.sessions) === session.number;
-}
-
-// src/commands/workExplorerTreeCommands.ts
-var vscode17 = __toESM(require("vscode"));
-function asSetNode(arg) {
-  if (arg === null || typeof arg !== "object")
-    return void 0;
-  const node = arg;
-  return node.kind === "set" && node.set ? node : void 0;
-}
-function asSessionNode(arg) {
-  if (arg === null || typeof arg !== "object")
-    return void 0;
-  const node = arg;
-  return node.kind === "session" && node.set && node.session ? node : void 0;
-}
-async function activateSetRow(arg) {
-  const node = asSetNode(arg);
-  if (!node)
-    return;
-  const plan = planLeftClickActivation(node.set.name, node.set.state);
-  await vscode17.commands.executeCommand(plan.openCommand.commandId, node);
-  if (!plan.clipboardWrite)
-    return;
-  try {
-    await vscode17.env.clipboard.writeText(plan.clipboardWrite.text);
-    vscode17.window.showInformationMessage(plan.clipboardWrite.toast);
-  } catch (err) {
-    console.warn(
-      `[WorkExplorerTree] left-click clipboard write failed for "${node.set.name}"`,
-      err
-    );
-  }
-}
-async function activateSessionRow(arg) {
-  const node = asSessionNode(arg);
-  if (!node)
-    return;
-  await vscode17.commands.executeCommand("dabblerSessionSets.openSpec", node);
-}
-function registerWorkExplorerTreeCommands(context) {
-  context.subscriptions.push(
-    vscode17.commands.registerCommand(
-      "dabblerWorkExplorer.activateSet",
-      (arg) => activateSetRow(arg)
-    ),
-    vscode17.commands.registerCommand(
-      "dabblerWorkExplorer.activateSession",
-      (arg) => activateSessionRow(arg)
-    )
-  );
-}
-
-// src/commands/copyPromptCommands.ts
-function sanitizeSlugForPrompt(slug) {
-  return slug.replace(/`/g, "'");
-}
-function buildStartNextSessionPrompt(set) {
-  return `Start the next session of \`${sanitizeSlugForPrompt(set.name)}\`.`;
-}
-function planSessionRunPrompt(set, session) {
-  if (!sessionOffersRunPrompt(set, session))
-    return null;
-  return {
-    text: buildStartNextSessionPrompt(set),
-    toast: `Copied: Start session ${session.number} of ${set.name}`
-  };
-}
-async function copyToClipboard(text, statusMessage) {
-  try {
-    await vscode18.env.clipboard.writeText(text);
-    vscode18.window.setStatusBarMessage(statusMessage, 4e3);
-  } catch (err) {
-    const detail = err instanceof Error ? err.message : String(err);
-    vscode18.window.showWarningMessage(`Failed to copy to clipboard: ${detail}`);
-  }
-}
-function registerCopyPromptCommands(context) {
-  context.subscriptions.push(
-    vscode18.commands.registerCommand(
-      "dabbler.copyStartNextSessionPrompt",
-      async (item) => {
-        if (!item?.set)
-          return;
-        const prompt = buildStartNextSessionPrompt(item.set);
-        await copyToClipboard(
-          prompt,
-          `Copied: Start the next session of ${item.set.name}`
-        );
-      }
-    ),
-    // Set 115 S3: the session row's sibling. It re-checks the gate on
-    // dispatch rather than trusting the menu — `contextValue` is computed
-    // at render time, so a row that has been on screen since before a
-    // session closed would otherwise still copy a prompt for a set that
-    // has moved on. A refused invocation is silent: the entry the
-    // operator clicked simply should not have been there.
-    vscode18.commands.registerCommand(
-      "dabbler.copySessionRunPrompt",
-      async (arg) => {
-        const node = asSessionNode(arg);
-        if (!node)
-          return;
-        const plan = planSessionRunPrompt(node.set, node.session);
-        if (!plan)
-          return;
-        await copyToClipboard(plan.text, plan.toast);
-      }
-    )
-  );
-}
-
 // src/commands/trySampleProject.ts
-var fs18 = __toESM(require("fs"));
-var path24 = __toESM(require("path"));
-var vscode19 = __toESM(require("vscode"));
+var fs12 = __toESM(require("fs"));
+var path18 = __toESM(require("path"));
+var vscode12 = __toESM(require("vscode"));
 
 // src/utils/sampleProject.ts
-var path23 = __toESM(require("path"));
+var path17 = __toESM(require("path"));
 function resolveBundledSampleDir(extensionPath) {
-  return path23.join(extensionPath, "dist", "templates", "sample-project");
+  return path17.join(extensionPath, "dist", "templates", "sample-project");
 }
 function renderedBasename(name) {
   return name.startsWith("dot-") ? `.${name.slice(4)}` : name;
@@ -27117,7 +19809,7 @@ function renderedRelPath(relPath) {
   return relPath.split(/[\\/]/).filter((s) => s.length > 0).map(renderedBasename).join("/");
 }
 function loadSampleBundle(bundleDir, io) {
-  const metaRaw = io.readFile(path23.join(bundleDir, "bundle.json"));
+  const metaRaw = io.readFile(path17.join(bundleDir, "bundle.json"));
   const meta = JSON.parse(metaRaw);
   for (const key of [
     "bundleVersion",
@@ -27132,10 +19824,10 @@ function loadSampleBundle(bundleDir, io) {
       throw new Error(`sample bundle: bundle.json is missing "${key}"`);
     }
   }
-  const filesDir = path23.join(bundleDir, "files");
+  const filesDir = path17.join(bundleDir, "files");
   const files = {};
   for (const rel of io.listFilesRecursive(filesDir)) {
-    const content = io.readFile(path23.join(filesDir, rel)).replace(/\r\n/g, "\n");
+    const content = io.readFile(path17.join(filesDir, rel)).replace(/\r\n/g, "\n");
     files[renderedRelPath(rel)] = content;
   }
   if (Object.keys(files).length === 0) {
@@ -27173,7 +19865,7 @@ function sampleOwnedTopLevelEntries(bundle) {
   return [...owned].sort();
 }
 function classifyTargetFolder(targetDir, bundleVersion, io) {
-  const markerAbs = path23.join(targetDir, SAMPLE_MARKER_REL);
+  const markerAbs = path17.join(targetDir, SAMPLE_MARKER_REL);
   if (io.exists(markerAbs)) {
     let marker = null;
     try {
@@ -27215,7 +19907,7 @@ async function createSampleProject(deps) {
       startedAt
     };
     deps.fileOps.writeFile(
-      path23.join(deps.targetDir, SAMPLE_MARKER_REL),
+      path17.join(deps.targetDir, SAMPLE_MARKER_REL),
       `${JSON.stringify(marker, null, 2)}
 `
     );
@@ -27238,7 +19930,7 @@ async function createSampleProject(deps) {
     report(SAMPLE_PROGRESS.render);
     try {
       for (const [rel, content] of Object.entries(deps.bundle.files)) {
-        deps.fileOps.writeFile(path23.join(deps.targetDir, rel), content);
+        deps.fileOps.writeFile(path17.join(deps.targetDir, rel), content);
         written.push(rel);
       }
     } catch (err) {
@@ -27270,7 +19962,7 @@ async function createSampleProject(deps) {
     report(SAMPLE_PROGRESS.marker);
     try {
       deps.fileOps.writeFile(
-        path23.join(deps.targetDir, LOCAL_ONLY_REL),
+        path17.join(deps.targetDir, LOCAL_ONLY_REL),
         renderLocalOnlyMarker(nowIso())
       );
       await deps.git.commitAll(deps.targetDir, MARKER_COMMIT);
@@ -27289,14 +19981,14 @@ async function createSampleProject(deps) {
     }
     if (!Object.keys(deps.bundle.files).some((rel) => rel.startsWith(`${SEEDED_ROUTER_DIR}/`))) {
       try {
-        deps.fileOps.removeRecursive(path23.join(deps.targetDir, SEEDED_ROUTER_DIR));
+        deps.fileOps.removeRecursive(path17.join(deps.targetDir, SEEDED_ROUTER_DIR));
       } catch {
       }
     }
     done.add("install");
   }
   try {
-    deps.fileOps.removeRecursive(path23.join(deps.targetDir, SAMPLE_MARKER_REL));
+    deps.fileOps.removeRecursive(path17.join(deps.targetDir, SAMPLE_MARKER_REL));
   } catch {
   }
   return {
@@ -27359,12 +20051,12 @@ function renderManualInstallCommands(targetDir, bootstrapPython, venvPythonPath)
     `"${venvPythonPath}" -m pip install dabbler-ai-router`
   ];
 }
-function renderInstallFailureLog(folder, reason, commands33) {
+function renderInstallFailureLog(folder, reason, commands29) {
   return [
     describeInstallFailure(folder, reason),
     "",
     MANUAL_COMMANDS_HEADING,
-    ...commands33.map((c3) => `  ${c3}`),
+    ...commands29.map((c3) => `  ${c3}`),
     "",
     PROXY_HINT
   ].join("\n");
@@ -27400,7 +20092,7 @@ async function pickTargetFolder(bundle, io) {
       }
       if (answer2 === RESUME_START_OVER_ACTION) {
         for (const rel of sampleOwnedTopLevelEntries(bundle)) {
-          io.removeRecursive(path24.join(folder, rel));
+          io.removeRecursive(path18.join(folder, rel));
         }
         return { folder, resumeFrom: [] };
       }
@@ -27418,16 +20110,16 @@ async function pickTargetFolder(bundle, io) {
 }
 function listFilesRecursiveSync(absDir) {
   const out = [];
-  const walk2 = (dir, prefix) => {
-    for (const entry of fs18.readdirSync(dir, { withFileTypes: true })) {
+  const walk = (dir, prefix) => {
+    for (const entry of fs12.readdirSync(dir, { withFileTypes: true })) {
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory())
-        walk2(path24.join(dir, entry.name), rel);
+        walk(path18.join(dir, entry.name), rel);
       else if (entry.isFile())
         out.push(rel);
     }
   };
-  walk2(absDir, "");
+  walk(absDir, "");
   return out.sort();
 }
 function makeSampleGitOps() {
@@ -27441,7 +20133,7 @@ function makeSampleGitOps() {
       }
     },
     init: async (dir) => {
-      if (!fs18.existsSync(path24.join(dir, ".git"))) {
+      if (!fs12.existsSync(path18.join(dir, ".git"))) {
         await esm_default(dir).init();
       }
     },
@@ -27467,7 +20159,7 @@ async function showPendingSampleLanding(context, io) {
   if (!pending)
     return false;
   const matches = io.openFolders.some(
-    (f) => path24.resolve(f) === path24.resolve(pending.folder)
+    (f) => path18.resolve(f) === path18.resolve(pending.folder)
   );
   if (!matches)
     return false;
@@ -27481,23 +20173,23 @@ async function showPendingSampleLanding(context, io) {
 }
 function registerTrySampleProjectCommand(context) {
   context.subscriptions.push(
-    vscode19.commands.registerCommand("dabbler.trySampleProject", async () => {
+    vscode12.commands.registerCommand("dabbler.trySampleProject", async () => {
       await runTrySampleProject(context);
     })
   );
   void showPendingSampleLanding(context, {
-    openFolders: (vscode19.workspace.workspaceFolders ?? []).map(
+    openFolders: (vscode12.workspace.workspaceFolders ?? []).map(
       (f) => f.uri.fsPath
     ),
-    showInfo: (msg, ...actions) => Promise.resolve(vscode19.window.showInformationMessage(msg, ...actions)),
-    copyToClipboard: (text) => Promise.resolve(vscode19.env.clipboard.writeText(text)),
-    setStatus: (msg) => vscode19.window.setStatusBarMessage(msg, 5e3)
+    showInfo: (msg, ...actions) => Promise.resolve(vscode12.window.showInformationMessage(msg, ...actions)),
+    copyToClipboard: (text) => Promise.resolve(vscode12.env.clipboard.writeText(text)),
+    setStatus: (msg) => vscode12.window.setStatusBarMessage(msg, 5e3)
   });
 }
 var sampleChannel;
 function sampleOutputChannel() {
   if (!sampleChannel) {
-    sampleChannel = vscode19.window.createOutputChannel("Dabbler: Sample Project");
+    sampleChannel = vscode12.window.createOutputChannel("Dabbler: Sample Project");
   }
   return sampleChannel;
 }
@@ -27505,18 +20197,18 @@ async function runTrySampleProject(context) {
   let bundle;
   try {
     bundle = loadSampleBundle(resolveBundledSampleDir(context.extensionPath), {
-      readFile: (p2) => fs18.readFileSync(p2, "utf8"),
+      readFile: (p2) => fs12.readFileSync(p2, "utf8"),
       listFilesRecursive: listFilesRecursiveSync
     });
   } catch (err) {
-    vscode19.window.showErrorMessage(
+    vscode12.window.showErrorMessage(
       `The sample project could not be loaded from the installed extension: ${describeError(err)}`
     );
     return;
   }
   const picked = await pickTargetFolder(bundle, {
     showOpenDialog: async () => {
-      const chosen = await vscode19.window.showOpenDialog({
+      const chosen = await vscode12.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -27525,28 +20217,28 @@ async function runTrySampleProject(context) {
       });
       return chosen?.[0]?.fsPath;
     },
-    showWarning: (msg, ...actions) => Promise.resolve(vscode19.window.showWarningMessage(msg, ...actions)),
-    exists: (p2) => fs18.existsSync(p2),
-    readFile: (p2) => fs18.readFileSync(p2, "utf8"),
-    listDir: (p2) => fs18.readdirSync(p2),
+    showWarning: (msg, ...actions) => Promise.resolve(vscode12.window.showWarningMessage(msg, ...actions)),
+    exists: (p2) => fs12.existsSync(p2),
+    readFile: (p2) => fs12.readFileSync(p2, "utf8"),
+    listDir: (p2) => fs12.readdirSync(p2),
     removeRecursive: (p2) => {
-      if (fs18.existsSync(p2))
-        fs18.rmSync(p2, { recursive: true, force: true });
+      if (fs12.existsSync(p2))
+        fs12.rmSync(p2, { recursive: true, force: true });
     }
   });
   if (!picked)
     return;
   const { folder, resumeFrom } = picked;
   if (!probePythonPresence(folder)) {
-    vscode19.window.showErrorMessage(
+    vscode12.window.showErrorMessage(
       describeMissingPython("Try a sample project")
     );
     return;
   }
   const bootstrapPython = resolveScaffoldBootstrapPython(folder) ?? resolveExplicitPythonPath(folder);
-  const result = await vscode19.window.withProgress(
+  const result = await vscode12.window.withProgress(
     {
-      location: vscode19.ProgressLocation.Notification,
+      location: vscode12.ProgressLocation.Notification,
       title: "Creating your sample project...",
       cancellable: false
     },
@@ -27587,31 +20279,31 @@ async function runTrySampleProject(context) {
     folder,
     slug: bundle.meta.sampleSetSlug
   });
-  const alreadyOpen = (vscode19.workspace.workspaceFolders ?? []).some(
-    (f) => path24.resolve(f.uri.fsPath) === path24.resolve(folder)
+  const alreadyOpen = (vscode12.workspace.workspaceFolders ?? []).some(
+    (f) => path18.resolve(f.uri.fsPath) === path18.resolve(folder)
   );
   if (alreadyOpen) {
     await showPendingSampleLanding(context, {
       openFolders: [folder],
-      showInfo: (msg, ...actions) => Promise.resolve(vscode19.window.showInformationMessage(msg, ...actions)),
-      copyToClipboard: (text) => Promise.resolve(vscode19.env.clipboard.writeText(text)),
-      setStatus: (msg) => vscode19.window.setStatusBarMessage(msg, 5e3)
+      showInfo: (msg, ...actions) => Promise.resolve(vscode12.window.showInformationMessage(msg, ...actions)),
+      copyToClipboard: (text) => Promise.resolve(vscode12.env.clipboard.writeText(text)),
+      setStatus: (msg) => vscode12.window.setStatusBarMessage(msg, 5e3)
     });
     return;
   }
-  await vscode19.commands.executeCommand(
+  await vscode12.commands.executeCommand(
     "vscode.openFolder",
-    vscode19.Uri.file(folder)
+    vscode12.Uri.file(folder)
   );
 }
 async function reportSampleFailure(folder, bootstrapPython, result) {
   const reason = result.failureReason ?? "no further detail available";
   if (result.failedStep === "git") {
-    vscode19.window.showErrorMessage(GIT_MISSING_MESSAGE);
+    vscode12.window.showErrorMessage(GIT_MISSING_MESSAGE);
     return;
   }
   if (result.failedStep !== "install") {
-    vscode19.window.showErrorMessage(
+    vscode12.window.showErrorMessage(
       `The sample project could not be created in '${folder}': ${reason}`
     );
     return;
@@ -27624,11 +20316,11 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
       renderManualInstallCommands(
         folder,
         bootstrapPython,
-        venvPython(path24.join(folder, ".venv"))
+        venvPython(path18.join(folder, ".venv"))
       )
     )
   );
-  const answer = await vscode19.window.showWarningMessage(
+  const answer = await vscode12.window.showWarningMessage(
     describeInstallFailure(folder, reason),
     INSTALL_FAILED_SHOW_LOG_ACTION,
     INSTALL_FAILED_RETRY_ACTION
@@ -27636,18 +20328,18 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
   if (answer === INSTALL_FAILED_SHOW_LOG_ACTION) {
     channel.show(true);
   } else if (answer === INSTALL_FAILED_RETRY_ACTION) {
-    await vscode19.commands.executeCommand("dabbler.trySampleProject");
+    await vscode12.commands.executeCommand("dabbler.trySampleProject");
   }
 }
 
 // src/commands/gitWorkflow.ts
-var vscode22 = __toESM(require("vscode"));
+var vscode15 = __toESM(require("vscode"));
 var cp4 = __toESM(require("child_process"));
-var fs20 = __toESM(require("fs"));
-var path26 = __toESM(require("path"));
+var fs14 = __toESM(require("fs"));
+var path20 = __toESM(require("path"));
 
 // src/utils/gitHost.ts
-var vscode20 = __toESM(require("vscode"));
+var vscode13 = __toESM(require("vscode"));
 var GIT_SUFFIX = /\.git$/i;
 function stripGitSuffix(s) {
   return s.replace(GIT_SUFFIX, "");
@@ -27769,7 +20461,7 @@ function resolveGitHostFromUrl(url, setting) {
   return auto.kind === "azure-devops" ? auto : { kind: "unknown", host: auto.host, owner: "", repo: "" };
 }
 function gitHostSetting() {
-  const v = vscode20.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
+  const v = vscode13.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
   return v === "github" || v === "azure-devops" ? v : "auto";
 }
 function createPrWebUrl(info, branch, targetBranch) {
@@ -27804,12 +20496,12 @@ function adoPrWebUrl(info, prId) {
 }
 
 // src/utils/hostCli.ts
-var fs19 = __toESM(require("fs"));
-var path25 = __toESM(require("path"));
-var vscode21 = __toESM(require("vscode"));
-var realExists3 = (p2) => {
+var fs13 = __toESM(require("fs"));
+var path19 = __toESM(require("path"));
+var vscode14 = __toESM(require("vscode"));
+var realExists2 = (p2) => {
   try {
-    return fs19.statSync(p2).isFile();
+    return fs13.statSync(p2).isFile();
   } catch {
     return false;
   }
@@ -27821,48 +20513,48 @@ function hostCliCommand(kind) {
     return { command: "az", settingKey: "azCliPath" };
   return null;
 }
-function findHostCliOnPath(cmd, env10 = process.env, fileExists2 = realExists3, platform = process.platform) {
-  const rawPath = env10.PATH ?? env10.Path ?? "";
+function findHostCliOnPath(cmd, env8 = process.env, fileExists = realExists2, platform = process.platform) {
+  const rawPath = env8.PATH ?? env8.Path ?? "";
   if (!rawPath)
     return null;
   const isWin = platform === "win32";
-  const p2 = isWin ? path25.win32 : path25.posix;
+  const p2 = isWin ? path19.win32 : path19.posix;
   const dirs = rawPath.split(isWin ? ";" : ":").filter((d) => d.trim() !== "");
   const names = isWin ? [`${cmd}.exe`, `${cmd}.cmd`, `${cmd}.bat`] : [cmd];
   for (const dir of dirs) {
     for (const name of names) {
       const candidate = p2.join(dir.trim(), name);
-      if (fileExists2(candidate))
+      if (fileExists(candidate))
         return candidate;
     }
   }
   return null;
 }
-function probeHostCliCore(command, explicitSetting, workspaceRoot2, env10 = process.env, fileExists2 = realExists3, platform = process.platform) {
-  const p2 = platform === "win32" ? path25.win32 : path25.posix;
+function probeHostCliCore(command, explicitSetting, workspaceRoot2, env8 = process.env, fileExists = realExists2, platform = process.platform) {
+  const p2 = platform === "win32" ? path19.win32 : path19.posix;
   if (explicitSetting) {
     if (p2.isAbsolute(explicitSetting)) {
-      return fileExists2(explicitSetting) ? { present: true, resolved: explicitSetting } : { present: false, resolved: null };
+      return fileExists(explicitSetting) ? { present: true, resolved: explicitSetting } : { present: false, resolved: null };
     }
     if (explicitSetting.includes("\\") || explicitSetting.includes("/")) {
       const abs = p2.resolve(workspaceRoot2, explicitSetting);
-      return fileExists2(abs) ? { present: true, resolved: abs } : { present: false, resolved: null };
+      return fileExists(abs) ? { present: true, resolved: abs } : { present: false, resolved: null };
     }
-    const found2 = findHostCliOnPath(explicitSetting, env10, fileExists2, platform);
+    const found2 = findHostCliOnPath(explicitSetting, env8, fileExists, platform);
     return found2 ? { present: true, resolved: found2 } : { present: false, resolved: null };
   }
-  const found = findHostCliOnPath(command, env10, fileExists2, platform);
+  const found = findHostCliOnPath(command, env8, fileExists, platform);
   return found ? { present: true, resolved: found } : { present: false, resolved: null };
 }
 function explicitCliPathSetting(key) {
-  const inspected = vscode21.workspace.getConfiguration("dabblerSessionSets").inspect(key);
+  const inspected = vscode14.workspace.getConfiguration("dabblerSessionSets").inspect(key);
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
   const trimmed2 = (value ?? "").trim();
   return trimmed2 === "" ? void 0 : trimmed2;
 }
-function probeHostCli(kind, workspaceRoot2, fileExists2 = realExists3) {
+function probeHostCli(kind, workspaceRoot2, fileExists = realExists2) {
   const cli = hostCliCommand(kind);
   if (!cli)
     return { present: false, resolved: null };
@@ -27871,7 +20563,7 @@ function probeHostCli(kind, workspaceRoot2, fileExists2 = realExists3) {
     explicitCliPathSetting(cli.settingKey),
     workspaceRoot2,
     process.env,
-    fileExists2,
+    fileExists,
     process.platform
   );
 }
@@ -27914,27 +20606,27 @@ function defaultRunner() {
     );
   });
 }
-function defaultUi3() {
+function defaultUi() {
   return {
     confirm: async (message, detail, button) => {
-      const picked = await vscode22.window.showWarningMessage(
+      const picked = await vscode15.window.showWarningMessage(
         message,
         { modal: true, detail },
         button
       );
       return picked === button;
     },
-    showInputBox: vscode22.window.showInputBox,
+    showInputBox: vscode15.window.showInputBox,
     showQuickPickLabels: (labels, placeHolder) => Promise.resolve(
-      vscode22.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
+      vscode15.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
     ),
-    showInfo: (m) => void vscode22.window.showInformationMessage(m),
-    showWarning: (m) => void vscode22.window.showWarningMessage(m),
-    showError: (m) => void vscode22.window.showErrorMessage(m),
+    showInfo: (m) => void vscode15.window.showInformationMessage(m),
+    showWarning: (m) => void vscode15.window.showWarningMessage(m),
+    showError: (m) => void vscode15.window.showErrorMessage(m),
     openExternal: async (url) => {
-      await vscode22.env.openExternal(vscode22.Uri.parse(url));
+      await vscode15.env.openExternal(vscode15.Uri.parse(url));
     },
-    workspaceRoot: () => vscode22.workspace.workspaceFolders?.[0]?.uri.fsPath
+    workspaceRoot: () => vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 var SESSION_BRANCH_PREFIX = "session-set/";
@@ -27947,7 +20639,7 @@ function cmdArgProblem(arg) {
 }
 function displayCommand(file, args) {
   const show = (s) => /[\s"]/.test(s) ? `"${s.replace(/"/g, '\\"')}"` : s;
-  return [show(path26.basename(file)), ...args.map(show)].join(" ");
+  return [show(path20.basename(file)), ...args.map(show)].join(" ");
 }
 function toRunnableInvocation(file, args, platform = process.platform) {
   const display = displayCommand(file, args);
@@ -28044,15 +20736,15 @@ async function gitLine(run, cwd, ...args) {
   return line ? line.trim() : null;
 }
 async function detectTrunkBranch(run, cwd) {
-  const head2 = await gitLine(
+  const head = await gitLine(
     run,
     cwd,
     "symbolic-ref",
     "--short",
     "refs/remotes/origin/HEAD"
   );
-  if (head2 && head2.startsWith("origin/"))
-    return head2.slice("origin/".length);
+  if (head && head.startsWith("origin/"))
+    return head.slice("origin/".length);
   for (const candidate of ["main", "master"]) {
     const r2 = await git(run, cwd, "show-ref", "--verify", "--quiet", `refs/heads/${candidate}`);
     if (r2.code === 0)
@@ -28074,7 +20766,7 @@ async function primaryRoot(run, cwd) {
   );
   if (!common)
     return null;
-  return path26.dirname(common);
+  return path20.dirname(common);
 }
 async function listLinkedWorktrees(run, cwd) {
   const r2 = await git(run, cwd, "worktree", "list", "--porcelain");
@@ -28234,7 +20926,7 @@ async function runFinalizeMergedSetFlow(deps) {
     return;
   }
   const toplevel = await gitLine(run, root, "rev-parse", "--show-toplevel");
-  if (!toplevel || path26.resolve(toplevel) !== path26.resolve(primary)) {
+  if (!toplevel || path20.resolve(toplevel) !== path20.resolve(primary)) {
     ui.showError(
       `Finalize runs from the main checkout (${primary}), not from inside a worktree \u2014 open the main checkout and re-run, so the worktree you are in can be removed.`
     );
@@ -28318,7 +21010,7 @@ async function runFinalizeMergedSetFlow(deps) {
     steps.push({
       display: `git worktree remove ${wtPath}`,
       exec: async () => {
-        const exists2 = (deps.fileExists ?? ((p2) => fs20.existsSync(p2)))(wtPath);
+        const exists2 = (deps.fileExists ?? ((p2) => fs14.existsSync(p2)))(wtPath);
         if (!exists2) {
           const prune = await git(run, primary, "worktree", "prune");
           return prune.code === 0 ? "worktree already gone (pruned stale registration)" : "worktree already gone";
@@ -28401,17 +21093,17 @@ ${notes.join("\n")}`);
 }
 function registerGitWorkflowCommands(context) {
   context.subscriptions.push(
-    vscode22.commands.registerCommand("dabbler.openPrForSet", async () => {
-      await runOpenPrFlow({ ui: defaultUi3(), run: defaultRunner() });
+    vscode15.commands.registerCommand("dabbler.openPrForSet", async () => {
+      await runOpenPrFlow({ ui: defaultUi(), run: defaultRunner() });
     }),
-    vscode22.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
-      await runFinalizeMergedSetFlow({ ui: defaultUi3(), run: defaultRunner() });
+    vscode15.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
+      await runFinalizeMergedSetFlow({ ui: defaultUi(), run: defaultRunner() });
     })
   );
 }
 
 // src/commands/gitRelease.ts
-var vscode23 = __toESM(require("vscode"));
+var vscode16 = __toESM(require("vscode"));
 var HOTFIX_BRANCH_PREFIX = "hotfix/";
 var REF_VISIBLE_UNSAFE = /[ ~^:?*[\\]/;
 function refNameProblem(name, kind) {
@@ -28729,30 +21421,30 @@ ${(checkedOut.stderr || checkedOut.stdout).trim()}`);
   );
 }
 function registerGitReleaseCommands(context) {
-  const deps = () => ({ ui: defaultUi3(), run: defaultRunner() });
+  const deps = () => ({ ui: defaultUi(), run: defaultRunner() });
   context.subscriptions.push(
-    vscode23.commands.registerCommand("dabbler.cutReleaseTag", async () => {
+    vscode16.commands.registerCommand("dabbler.cutReleaseTag", async () => {
       await runCutReleaseTagFlow(deps());
     }),
-    vscode23.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
+    vscode16.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
       await runStartHotfixFromTagFlow(deps());
     }),
-    vscode23.commands.registerCommand("dabbler.rollBackToTag", async () => {
+    vscode16.commands.registerCommand("dabbler.rollBackToTag", async () => {
       await runRollBackToTagFlow(deps());
     })
   );
 }
 
 // src/commands/troubleshoot.ts
-var vscode24 = __toESM(require("vscode"));
-var fs21 = __toESM(require("fs"));
-var path27 = __toESM(require("path"));
+var vscode17 = __toESM(require("vscode"));
+var fs15 = __toESM(require("fs"));
+var path21 = __toESM(require("path"));
 var cp5 = __toESM(require("child_process"));
 function workspaceRoot() {
-  return vscode24.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 function outputChannel() {
-  return vscode24.window.createOutputChannel("Dabbler Diagnostics");
+  return vscode17.window.createOutputChannel("Dabbler Diagnostics");
 }
 function checkActivation() {
   const ch = outputChannel();
@@ -28762,8 +21454,8 @@ function checkActivation() {
     ch.show();
     return;
   }
-  const dir = path27.join(root, SESSION_SETS_REL);
-  const exists2 = fs21.existsSync(dir);
+  const dir = path21.join(root, SESSION_SETS_REL);
+  const exists2 = fs15.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -28836,7 +21528,7 @@ function checkHighCost() {
   ch.appendLine("  Sonnet 4.x \u2192 ~$0.10\u20130.50 per session (good quality, moderate cost)");
   ch.appendLine("  Haiku 4.x  \u2192 ~$0.01\u20130.05 per session (fast, lowest cost)");
   ch.appendLine("");
-  ch.appendLine("Run 'Dabbler: Show Cost Dashboard' to see cumulative totals and a daily chart.");
+  ch.appendLine("Run 'python -m ai_router.report' for cumulative totals and a full spend report.");
   ch.appendLine("Set effort=low in spec.md Session Set Configuration to reduce token spend.");
   ch.show();
 }
@@ -28849,15 +21541,15 @@ function checkLayout() {
     return;
   }
   const dirs = [
-    path27.join("docs", "session-sets"),
-    path27.join("docs", "planning"),
+    path21.join("docs", "session-sets"),
+    path21.join("docs", "planning"),
     "ai_router"
   ];
   ch.appendLine(`Expected layout under: ${root}`);
   ch.appendLine("");
   for (const d of dirs) {
-    const full = path27.join(root, d);
-    const exists2 = fs21.existsSync(full);
+    const full = path21.join(root, d);
+    const exists2 = fs15.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -28866,7 +21558,7 @@ function checkLayout() {
 }
 function registerTroubleshootCommand(context) {
   context.subscriptions.push(
-    vscode24.commands.registerCommand("dabbler.troubleshoot", async () => {
+    vscode17.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items = [
         {
           label: "$(warning) Extension not activating",
@@ -28899,7 +21591,7 @@ function registerTroubleshootCommand(context) {
           run: checkLayout
         }
       ];
-      const picked = await vscode24.window.showQuickPick(
+      const picked = await vscode17.window.showQuickPick(
         items.map((i2) => ({ label: i2.label, detail: i2.detail, _run: i2.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
@@ -28910,16 +21602,16 @@ function registerTroubleshootCommand(context) {
 }
 
 // src/commands/cancelLifecycleCommands.ts
-var vscode25 = __toESM(require("vscode"));
+var vscode18 = __toESM(require("vscode"));
 function registerCancelLifecycleCommands(context, deps) {
   context.subscriptions.push(
-    vscode25.commands.registerCommand(
+    vscode18.commands.registerCommand(
       "dabblerSessionSets.cancel",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode25.window.showInformationMessage(
+        const choice = await vscode18.window.showInformationMessage(
           `Cancel session set "${set.name}"?`,
           { modal: true, detail: "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later." },
           "Cancel Session Set",
@@ -28927,7 +21619,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Cancel Session Set")
           return;
-        const reason = await vscode25.window.showInputBox({
+        const reason = await vscode18.window.showInputBox({
           prompt: `Reason for cancelling "${set.name}" (optional)`,
           placeHolder: "e.g. scope rolled into another set",
           ignoreFocusOut: true
@@ -28935,24 +21627,24 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await cancelSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode25.window.showErrorMessage(
+          vscode18.window.showErrorMessage(
             `Failed to cancel "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode25.window.showInformationMessage(
+        vscode18.window.showInformationMessage(
           `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`
         );
       }
     ),
-    vscode25.commands.registerCommand(
+    vscode18.commands.registerCommand(
       "dabblerSessionSets.restore",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode25.window.showInformationMessage(
+        const choice = await vscode18.window.showInformationMessage(
           `Restore session set "${set.name}"?`,
           { modal: true, detail: "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status." },
           "Restore",
@@ -28960,7 +21652,7 @@ function registerCancelLifecycleCommands(context, deps) {
         );
         if (choice !== "Restore")
           return;
-        const reason = await vscode25.window.showInputBox({
+        const reason = await vscode18.window.showInputBox({
           prompt: `Reason for restoring "${set.name}" (optional)`,
           placeHolder: "e.g. scope is back in plan",
           ignoreFocusOut: true
@@ -28968,13 +21660,13 @@ function registerCancelLifecycleCommands(context, deps) {
         try {
           await restoreSessionSet(set.dir, reason ?? "");
         } catch (err) {
-          vscode25.window.showErrorMessage(
+          vscode18.window.showErrorMessage(
             `Failed to restore "${set.name}": ${err instanceof Error ? err.message : String(err)}`
           );
           return;
         }
         deps.refreshView();
-        vscode25.window.showInformationMessage(
+        vscode18.window.showInformationMessage(
           `Restored "${set.name}". RESTORED.md kept as audit trail.`
         );
       }
@@ -28983,29 +21675,29 @@ function registerCancelLifecycleCommands(context, deps) {
 }
 
 // src/commands/copilotSeatSetupCommand.ts
-var fs22 = __toESM(require("fs"));
-var path28 = __toESM(require("path"));
-var vscode26 = __toESM(require("vscode"));
+var fs16 = __toESM(require("fs"));
+var path22 = __toESM(require("path"));
+var vscode19 = __toESM(require("vscode"));
 function registerCopilotSeatSetupCommand(context) {
   context.subscriptions.push(
-    vscode26.commands.registerCommand(
+    vscode19.commands.registerCommand(
       "dabblerSessionSets.setUpCopilotSeat",
       () => runSetUpCopilotSeat(context)
     )
   );
 }
 async function runSetUpCopilotSeat(context) {
-  const root = vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode19.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode26.window.showErrorMessage(
+    vscode19.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Set Up Copilot Seat."
     );
     return;
   }
-  const venvPath = path28.join(root, ".venv");
-  if (!fs22.existsSync(venvPath)) {
-    vscode26.window.showErrorMessage(
-      'No .venv found in this workspace \u2014 run "Build project structure" (Getting Started form) or "Dabbler: Install ai-router" first, then re-run this command.'
+  const venvPath = path22.join(root, ".venv");
+  if (!fs16.existsSync(venvPath)) {
+    vscode19.window.showErrorMessage(
+      'No .venv found in this workspace \u2014 run "Dabbler: Set Up New Project" or "Dabbler: Install ai-router" first, then re-run this command.'
     );
     return;
   }
@@ -29013,193 +21705,60 @@ async function runSetUpCopilotSeat(context) {
   await runCopilotSeatSetupWithProgress(context, root, venvPath);
 }
 
-// src/commands/newModule.ts
-var vscode27 = __toESM(require("vscode"));
-var path29 = __toESM(require("path"));
-function defaultUi4() {
-  return {
-    showInputBox: vscode27.window.showInputBox,
-    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
-    openFile: (absPath) => vscode27.commands.executeCommand("vscode.open", vscode27.Uri.file(absPath)),
-    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
+// src/commands/gettingStartedDoc.ts
+var vscode20 = __toESM(require("vscode"));
+var fs17 = __toESM(require("fs"));
+var path23 = __toESM(require("path"));
+function workspaceGettingStartedDoc(workspaceRoot2) {
+  if (!workspaceRoot2)
+    return void 0;
+  const abs = path23.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
+  try {
+    return fs17.statSync(abs).isFile() ? abs : void 0;
+  } catch {
+    return void 0;
+  }
 }
-async function runNewModuleFlow(ui = defaultUi4()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
-  const slug = await ui.showInputBox({
-    title: "New module (1/2): slug",
-    prompt: "Machine identity for the module (kebab-case). Session sets declare module: <slug> and the Explorer groups them under it.",
-    placeHolder: "greeter",
-    ignoreFocusOut: true,
-    validateInput: (v) => validateNewModuleSlug(v, existingSlugs)
-  });
-  if (slug === void 0 || slug.trim() === "")
-    return false;
-  const title = await ui.showInputBox({
-    title: "New module (2/2): display title",
-    prompt: `Shown as the module's group header in the Session Set Explorer. Press Enter to use "${slug.trim()}".`,
-    placeHolder: slug.trim(),
-    ignoreFocusOut: true
-  });
-  if (title === void 0)
-    return false;
-  let result;
-  try {
-    result = scaffoldNewModule(root, slug, title);
-  } catch (err) {
-    ui.showErrorMessage(
-      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  const declared = {
-    slug: slug.trim(),
-    title: title.trim() || slug.trim(),
-    codeRoots: [],
-    planPath: result.planRel,
-    touches: []
-  };
-  let lifecycleNote;
-  try {
-    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
-    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
-  } catch (err) {
-    lifecycleNote = ` The module's lifecycle sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}) \u2014 the module is still declared; scaffold them later.`;
-  }
-  await ui.openFile(path29.join(root, ...result.planRel.split("/")));
-  ui.showInformationMessage(
-    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`) + lifecycleNote
+function materializeBundledDoc(context) {
+  const src = path23.join(
+    resolveBundledTemplateDir(context.extensionPath),
+    GETTING_STARTED_TEMPLATE_FILENAME
   );
-  return true;
+  const dstDir = context.globalStorageUri.fsPath;
+  fs17.mkdirSync(dstDir, { recursive: true });
+  const dst = path23.join(dstDir, "getting-started.md");
+  fs17.copyFileSync(src, dst);
+  return dst;
 }
-function registerNewModuleCommand(context) {
+async function openGettingStartedDoc(context) {
+  try {
+    const root = vscode20.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const docPath = workspaceGettingStartedDoc(root) ?? materializeBundledDoc(context);
+    await vscode20.commands.executeCommand(
+      "markdown.showPreview",
+      vscode20.Uri.file(docPath)
+    );
+  } catch (err) {
+    console.warn("[gettingStarted] could not open the instructions doc", err);
+  }
+}
+function registerGetStartedCommand(context) {
   context.subscriptions.push(
-    vscode27.commands.registerCommand("dabbler.newModule", async () => {
-      await runNewModuleFlow();
+    vscode20.commands.registerCommand("dabbler.getStarted", async () => {
+      try {
+        await vscode20.commands.executeCommand("dabblerSessionSets.focus");
+      } catch (err) {
+        console.warn("[gettingStarted] could not focus the Work Explorer view", err);
+      }
+      await openGettingStartedDoc(context);
     })
   );
 }
 
-// src/commands/assignLegacySets.ts
-var vscode28 = __toESM(require("vscode"));
-function defaultUi5() {
-  return {
-    pickTargetModule: async (entries) => {
-      const picked = await vscode28.window.showQuickPick(
-        entries.map((e) => ({
-          label: e.title,
-          description: e.slug,
-          entry: e
-        })),
-        {
-          placeHolder: "Assign the selected sets to which module?",
-          ignoreFocusOut: true
-        }
-      );
-      return picked?.entry;
-    },
-    pickSets: async (candidates) => {
-      const picked = await vscode28.window.showQuickPick(
-        candidates.map((s) => ({ label: s.name, set: s })),
-        {
-          placeHolder: "Select the legacy (unassigned) sets to assign",
-          canPickMany: true,
-          ignoreFocusOut: true
-        }
-      );
-      return picked?.map((p2) => p2.set);
-    },
-    showInformationMessage: (m) => vscode28.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode28.window.showErrorMessage(m),
-    workspaceRoot: () => vscode28.workspace.workspaceFolders?.[0]?.uri.fsPath,
-    readSets: () => readAllSessionSets()
-  };
-}
-async function runAssignLegacySetsFlow(ui = defaultUi5()) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
-    return false;
-  }
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (entries.length === 0) {
-    ui.showInformationMessage(
-      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one, then assign sets to it.`
-    );
-    return false;
-  }
-  const candidates = ui.readSets().filter((s) => s.root === root && !s.config?.module);
-  if (candidates.length === 0) {
-    ui.showInformationMessage(
-      "No unassigned session sets to assign \u2014 every set already declares a module."
-    );
-    return false;
-  }
-  const target = await ui.pickTargetModule(entries);
-  if (!target)
-    return false;
-  const chosen = await ui.pickSets(candidates);
-  if (!chosen || chosen.length === 0)
-    return false;
-  const report = assignLegacySetsToModule(
-    root,
-    target.slug,
-    chosen.map((s) => ({ name: s.name, specAbs: s.specPath }))
-  );
-  if (report.refused) {
-    ui.showErrorMessage(
-      `No sets were assigned \u2014 ${report.refused.reason}. Every spec.md was left untouched.`
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    const tail = wf.written.length ? `Already stamped before the failure: ${wf.written.join(", ")}.` : "No files were changed.";
-    ui.showErrorMessage(
-      `Assigning to "${target.title}" failed on ${wf.setName}: ${wf.reason}. ${tail}`
-    );
-    return wf.written.length > 0;
-  }
-  const parts = [];
-  if (report.stamped.length) {
-    parts.push(
-      `Stamped module: ${target.slug} into ${report.stamped.length} set(s) (${report.stamped.join(", ")})`
-    );
-  }
-  if (report.alreadyAssigned.length) {
-    parts.push(
-      `${report.alreadyAssigned.length} already assigned (${report.alreadyAssigned.join(", ")})`
-    );
-  }
-  ui.showInformationMessage(
-    parts.length ? `${parts.join("; ")}.` : `Nothing to change \u2014 the selected sets already declare module: ${target.slug}.`
-  );
-  return report.stamped.length > 0;
-}
-function registerAssignLegacySetsCommand(context) {
-  context.subscriptions.push(
-    vscode28.commands.registerCommand(
-      "dabbler.assignLegacySetsToModule",
-      async () => {
-        await runAssignLegacySetsFlow();
-      }
-    )
-  );
-}
-
-// src/commands/renameModule.ts
-var vscode29 = __toESM(require("vscode"));
+// src/commands/openModulePlan.ts
+var vscode21 = __toESM(require("vscode"));
+var fs18 = __toESM(require("fs"));
+var path24 = __toESM(require("path"));
 
 // src/providers/ActionRegistry.ts
 var inFlightLike = (s) => s.state === "in-progress" || s.state === "not-started";
@@ -30068,11 +22627,395 @@ function descriptorFor(node, supports) {
   }
 }
 
-// src/commands/renameModule.ts
+// src/commands/openModulePlan.ts
+var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
+function defaultUi2() {
+  return {
+    showInformationMessage: vscode21.window.showInformationMessage,
+    showErrorMessage: vscode21.window.showErrorMessage,
+    showQuickPick: (items, opts) => vscode21.window.showQuickPick(items, opts),
+    executeCommand: (command, ...args) => vscode21.commands.executeCommand(command, ...args),
+    workspaceRoot: () => vscode21.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+async function resolvePlanTarget(root, ui, opts) {
+  if (!root)
+    return { entry: null, destPosix: PLAN_DEST_POSIX };
+  const pick2 = await pickModuleForAuthoring(
+    root,
+    {
+      showQuickPick: ui.showQuickPick,
+      showInformationMessage: ui.showInformationMessage,
+      showErrorMessage: ui.showErrorMessage
+    },
+    opts && opts.preselectedSlug !== void 0 ? { preselectedSlug: opts.preselectedSlug } : void 0
+  );
+  if (pick2.kind === "cancelled" || pick2.kind === "invalid-manifest" || pick2.kind === "unknown-module") {
+    return null;
+  }
+  return {
+    entry: pick2.entry,
+    destPosix: pick2.entry ? modulePlanRelPath(pick2.entry) : PLAN_DEST_POSIX
+  };
+}
+async function openModulePlan(ui = defaultUi2(), opts) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    void ui.showErrorMessage("No workspace folder is open.");
+    return;
+  }
+  const target = await resolvePlanTarget(root, ui, opts);
+  if (!target)
+    return;
+  const destPath = path24.join(root, ...target.destPosix.split("/"));
+  const containment = path24.relative(path24.resolve(root), path24.resolve(destPath));
+  if (containment === "" || containment.startsWith("..") || path24.isAbsolute(containment)) {
+    void ui.showErrorMessage(
+      `Refusing to open outside the workspace: ${target.destPosix}`
+    );
+    return;
+  }
+  if (!fs18.existsSync(destPath)) {
+    void ui.showInformationMessage(
+      `No plan yet at ${target.destPosix}. Create that file (or copy an existing plan there) and run this action again.`
+    );
+    return;
+  }
+  await ui.executeCommand("vscode.open", vscode21.Uri.file(destPath));
+}
+function registerOpenModulePlanCommand(context) {
+  context.subscriptions.push(
+    vscode21.commands.registerCommand(
+      "dabbler.openModulePlan",
+      async (arg) => {
+        await openModulePlan(void 0, preselectFromTreeNode(arg));
+      }
+    )
+  );
+}
+
+// src/commands/newModule.ts
+var vscode22 = __toESM(require("vscode"));
+var path25 = __toESM(require("path"));
+function defaultUi3() {
+  return {
+    showInputBox: vscode22.window.showInputBox,
+    showInformationMessage: (m) => vscode22.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode22.window.showErrorMessage(m),
+    openFile: (absPath) => vscode22.commands.executeCommand("vscode.open", vscode22.Uri.file(absPath)),
+    workspaceRoot: () => vscode22.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+async function runNewModuleFlow(ui = defaultUi3()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
+  const slug = await ui.showInputBox({
+    title: "New module (1/2): slug",
+    prompt: "Machine identity for the module (kebab-case). Session sets declare module: <slug> and the Explorer groups them under it.",
+    placeHolder: "greeter",
+    ignoreFocusOut: true,
+    validateInput: (v) => validateNewModuleSlug(v, existingSlugs)
+  });
+  if (slug === void 0 || slug.trim() === "")
+    return false;
+  const title = await ui.showInputBox({
+    title: "New module (2/2): display title",
+    prompt: `Shown as the module's group header in the Session Set Explorer. Press Enter to use "${slug.trim()}".`,
+    placeHolder: slug.trim(),
+    ignoreFocusOut: true
+  });
+  if (title === void 0)
+    return false;
+  let result;
+  try {
+    result = scaffoldNewModule(root, slug, title);
+  } catch (err) {
+    ui.showErrorMessage(
+      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  const declared = {
+    slug: slug.trim(),
+    title: title.trim() || slug.trim(),
+    codeRoots: [],
+    planPath: result.planRel,
+    touches: []
+  };
+  let lifecycleNote;
+  try {
+    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
+    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
+  } catch (err) {
+    lifecycleNote = ` The module's lifecycle sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}) \u2014 the module is still declared; scaffold them later.`;
+  }
+  await ui.openFile(path25.join(root, ...result.planRel.split("/")));
+  ui.showInformationMessage(
+    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`) + lifecycleNote
+  );
+  return true;
+}
+function registerNewModuleCommand(context) {
+  context.subscriptions.push(
+    vscode22.commands.registerCommand("dabbler.newModule", async () => {
+      await runNewModuleFlow();
+    })
+  );
+}
+
+// src/commands/openModulesManifest.ts
+var vscode23 = __toESM(require("vscode"));
+var path26 = __toESM(require("path"));
+function defaultUi4() {
+  return {
+    showInformationMessage: (m) => vscode23.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode23.window.showErrorMessage(m),
+    openFile: (absPath) => vscode23.commands.executeCommand("vscode.open", vscode23.Uri.file(absPath)),
+    workspaceRoot: () => vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath
+  };
+}
+async function openModulesManifestFlow(ui = defaultUi4()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  let created;
+  try {
+    created = ensureModulesManifest(root).created;
+  } catch (err) {
+    ui.showErrorMessage(
+      `Could not create ${MODULES_MANIFEST_DISPLAY}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  const abs = path26.join(root, MODULES_MANIFEST_REL);
+  try {
+    await ui.openFile(abs);
+  } catch (err) {
+    ui.showErrorMessage(
+      `Could not open ${MODULES_MANIFEST_DISPLAY}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  if (created) {
+    ui.showInformationMessage(
+      `Created ${MODULES_MANIFEST_DISPLAY}. Define your modules (or ask an AI assistant to decompose the project), then SAVE the file \u2014 the Work Explorer groups your session sets by module.`
+    );
+  }
+  return true;
+}
+function registerOpenModulesManifestCommand(context) {
+  context.subscriptions.push(
+    vscode23.commands.registerCommand("dabbler.openModulesManifest", async () => {
+      await openModulesManifestFlow();
+    })
+  );
+}
+
+// src/commands/copyModuleDecompositionPrompt.ts
+var vscode24 = __toESM(require("vscode"));
+var fs19 = __toESM(require("fs"));
+var path27 = __toESM(require("path"));
+function buildModuleDecompositionPrompt(planPresent) {
+  const planLine = planPresent ? `Read the repository directly \u2014 its folders and code, and the project plan at \`${LEGACY_ROOT_PLAN_REL}\` (read that file for the project's goals and scope). Nothing is inlined here.` : `Read the repository directly \u2014 its folders and code \u2014 to understand the project's areas of work. Nothing is inlined here (there is no \`${LEGACY_ROOT_PLAN_REL}\` yet).`;
+  return `Module-decomposition request (Dabbler module-organized project).
+
+Decompose THIS project into modules for the Dabbler AI-led workflow. A "module" groups related session sets by area of the project \u2014 a unit of work owned by ONE developer at a time (a developer may own several modules, but two developers should never work the same module concurrently; AI-speed changes make concurrent same-module work a constant merge-conflict source \u2014 size modules accordingly). ${planLine}
+
+Write your result into \`${MODULES_MANIFEST_DISPLAY}\` (already created from the canonical template): fill it in, preserving the header comments and the top-level \`modules:\` key, and replace the empty \`modules: []\` list with one block-style entry per module. Each entry:
+  - slug:      kebab-case machine identity, GLOBALLY UNIQUE across modules.
+  - title:     the display name the Work Explorer shows for the group.
+  - codeRoots: the repo-relative code paths this module owns ([] for an
+               integration module that only composes others).
+  - planPath:  the module's project plan, repo-relative (e.g.
+               docs/modules/<slug>/project-plan.md).
+  - touches:   integration modules ONLY \u2014 the slugs of the modules it
+               works across; owners of every touched module review its PRs.
+
+Hard invariants (do NOT violate):
+  - Session-set NAMES stay globally unique across ALL modules. \`module\` is a GROUPING attribute, never part of a set's identity \u2014 never rename a set to encode its module.
+  - Keep the file valid YAML matching the template's shape; do not rename or restructure the top-level \`modules:\` key.
+  - Every path is repo-relative and forward-slashed.
+
+If the project is a single area of work, one module (or none \u2014 leave \`modules: []\`) is correct; do not invent modules to fill the file. Save \`${MODULES_MANIFEST_DISPLAY}\` when done \u2014 the Work Explorer regroups your session sets as soon as you save.
+`;
+}
+function defaultUi5() {
+  return {
+    workspaceRoot: () => vscode24.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    // fs.existsSync never throws — swallows errors, returns false.
+    fileExists: (abs) => fs19.existsSync(abs),
+    copyToClipboard: (text) => vscode24.env.clipboard.writeText(text),
+    showInformationMessage: (m) => vscode24.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode24.window.showErrorMessage(m)
+  };
+}
+async function runCopyModuleDecompositionPromptFlow(ui = defaultUi5()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  let created;
+  try {
+    created = ensureModulesManifest(root).created;
+  } catch (err) {
+    ui.showErrorMessage(
+      `Could not create ${MODULES_MANIFEST_DISPLAY}: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  const planPresent = ui.fileExists(
+    path27.join(root, ...LEGACY_ROOT_PLAN_REL.split("/"))
+  );
+  const prompt = buildModuleDecompositionPrompt(planPresent);
+  try {
+    await ui.copyToClipboard(prompt);
+  } catch (err) {
+    ui.showErrorMessage(
+      `Failed to copy to clipboard: ${err instanceof Error ? err.message : String(err)}`
+    );
+    return false;
+  }
+  ui.showInformationMessage(
+    created ? `Created ${MODULES_MANIFEST_DISPLAY} and copied the module-decomposition prompt. Paste it into your AI assistant; it fills in ${MODULES_MANIFEST_DISPLAY} \u2014 then SAVE the file.` : `Copied the module-decomposition prompt. Paste it into your AI assistant; it fills in ${MODULES_MANIFEST_DISPLAY} \u2014 then SAVE the file.`
+  );
+  return true;
+}
+function registerCopyModuleDecompositionPromptCommand(context) {
+  context.subscriptions.push(
+    vscode24.commands.registerCommand(
+      "dabbler.copyModuleDecompositionPrompt",
+      async () => {
+        await runCopyModuleDecompositionPromptFlow();
+      }
+    )
+  );
+}
+
+// src/commands/assignLegacySets.ts
+var vscode25 = __toESM(require("vscode"));
 function defaultUi6() {
   return {
+    pickTargetModule: async (entries) => {
+      const picked = await vscode25.window.showQuickPick(
+        entries.map((e) => ({
+          label: e.title,
+          description: e.slug,
+          entry: e
+        })),
+        {
+          placeHolder: "Assign the selected sets to which module?",
+          ignoreFocusOut: true
+        }
+      );
+      return picked?.entry;
+    },
+    pickSets: async (candidates) => {
+      const picked = await vscode25.window.showQuickPick(
+        candidates.map((s) => ({ label: s.name, set: s })),
+        {
+          placeHolder: "Select the legacy (unassigned) sets to assign",
+          canPickMany: true,
+          ignoreFocusOut: true
+        }
+      );
+      return picked?.map((p2) => p2.set);
+    },
+    showInformationMessage: (m) => vscode25.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode25.window.showErrorMessage(m),
+    workspaceRoot: () => vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    readSets: () => readAllSessionSets()
+  };
+}
+async function runAssignLegacySetsFlow(ui = defaultUi6()) {
+  const root = ui.workspaceRoot();
+  if (!root) {
+    ui.showErrorMessage("No workspace folder is open.");
+    return false;
+  }
+  const classified = classifyModulesManifest(root);
+  if (classified.kind === "invalid") {
+    ui.showErrorMessage(INVALID_MANIFEST_MESSAGE);
+    return false;
+  }
+  const entries = classified.kind === "present" ? classified.entries : [];
+  if (entries.length === 0) {
+    ui.showInformationMessage(
+      `No modules are declared in ${MODULES_MANIFEST_DISPLAY} yet. Run "Dabbler: New Module" to declare one, then assign sets to it.`
+    );
+    return false;
+  }
+  const candidates = ui.readSets().filter((s) => s.root === root && !s.config?.module);
+  if (candidates.length === 0) {
+    ui.showInformationMessage(
+      "No unassigned session sets to assign \u2014 every set already declares a module."
+    );
+    return false;
+  }
+  const target = await ui.pickTargetModule(entries);
+  if (!target)
+    return false;
+  const chosen = await ui.pickSets(candidates);
+  if (!chosen || chosen.length === 0)
+    return false;
+  const report = assignLegacySetsToModule(
+    root,
+    target.slug,
+    chosen.map((s) => ({ name: s.name, specAbs: s.specPath }))
+  );
+  if (report.refused) {
+    ui.showErrorMessage(
+      `No sets were assigned \u2014 ${report.refused.reason}. Every spec.md was left untouched.`
+    );
+    return false;
+  }
+  if (report.writeFailed) {
+    const wf = report.writeFailed;
+    const tail = wf.written.length ? `Already stamped before the failure: ${wf.written.join(", ")}.` : "No files were changed.";
+    ui.showErrorMessage(
+      `Assigning to "${target.title}" failed on ${wf.setName}: ${wf.reason}. ${tail}`
+    );
+    return wf.written.length > 0;
+  }
+  const parts = [];
+  if (report.stamped.length) {
+    parts.push(
+      `Stamped module: ${target.slug} into ${report.stamped.length} set(s) (${report.stamped.join(", ")})`
+    );
+  }
+  if (report.alreadyAssigned.length) {
+    parts.push(
+      `${report.alreadyAssigned.length} already assigned (${report.alreadyAssigned.join(", ")})`
+    );
+  }
+  ui.showInformationMessage(
+    parts.length ? `${parts.join("; ")}.` : `Nothing to change \u2014 the selected sets already declare module: ${target.slug}.`
+  );
+  return report.stamped.length > 0;
+}
+function registerAssignLegacySetsCommand(context) {
+  context.subscriptions.push(
+    vscode25.commands.registerCommand(
+      "dabbler.assignLegacySetsToModule",
+      async () => {
+        await runAssignLegacySetsFlow();
+      }
+    )
+  );
+}
+
+// src/commands/renameModule.ts
+var vscode26 = __toESM(require("vscode"));
+function defaultUi7() {
+  return {
     pickModule: async (entries) => {
-      const picked = await vscode29.window.showQuickPick(
+      const picked = await vscode26.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -30082,32 +23025,32 @@ function defaultUi6() {
       );
       return picked?.entry;
     },
-    promptNewSlug: (currentSlug, validate) => vscode29.window.showInputBox({
+    promptNewSlug: (currentSlug, validate) => vscode26.window.showInputBox({
       prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
       value: currentSlug,
       ignoreFocusOut: true,
       validateInput: (v) => validate(v) ?? null
     }),
-    promptNewTitle: (currentTitle) => vscode29.window.showInputBox({
+    promptNewTitle: (currentTitle) => vscode26.window.showInputBox({
       prompt: "New module title (display name) \u2014 leave unchanged to keep it",
       value: currentTitle,
       ignoreFocusOut: true
     }),
     confirm: async (summary, detail) => {
-      const choice = await vscode29.window.showWarningMessage(
+      const choice = await vscode26.window.showWarningMessage(
         summary,
         { modal: true, detail },
         "Rename Module"
       );
       return choice === "Rename Module";
     },
-    showInformationMessage: (m) => vscode29.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode29.window.showErrorMessage(m),
-    workspaceRoot: () => vscode29.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode26.window.showErrorMessage(m),
+    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath,
     readSets: () => readAllSessionSets()
   };
 }
-async function runRenameModuleFlow(ui = defaultUi6(), opts) {
+async function runRenameModuleFlow(ui = defaultUi7(), opts) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -30206,18 +23149,18 @@ Every file is rewritten transactionally; any failure rolls the whole change back
 }
 function registerRenameModuleCommand(context) {
   context.subscriptions.push(
-    vscode29.commands.registerCommand("dabbler.renameModule", async (arg) => {
+    vscode26.commands.registerCommand("dabbler.renameModule", async (arg) => {
       await runRenameModuleFlow(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
 // src/commands/deleteModule.ts
-var vscode30 = __toESM(require("vscode"));
-function defaultUi7() {
+var vscode27 = __toESM(require("vscode"));
+function defaultUi8() {
   return {
     pickModule: async (entries) => {
-      const picked = await vscode30.window.showQuickPick(
+      const picked = await vscode27.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -30228,22 +23171,22 @@ function defaultUi7() {
       return picked?.entry;
     },
     confirm: async (summary, detail) => {
-      const choice = await vscode30.window.showWarningMessage(
+      const choice = await vscode27.window.showWarningMessage(
         summary,
         { modal: true, detail },
         "Delete Module"
       );
       return choice === "Delete Module";
     },
-    showInformationMessage: (m) => vscode30.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode30.window.showErrorMessage(m),
-    workspaceRoot: () => vscode30.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
+    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 function summarizeGroup(label, names) {
   return names.length > 0 ? `${label} (${names.length}): ${names.join(", ")}` : `${label}: none`;
 }
-async function runDeleteModuleFlow(ui = defaultUi7(), opts) {
+async function runDeleteModuleFlow(ui = defaultUi8(), opts) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -30312,2794 +23255,24 @@ Re-declaring "${target.slug}" later restores this grouping for any untouched his
 }
 function registerDeleteModuleCommand(context) {
   context.subscriptions.push(
-    vscode30.commands.registerCommand("dabbler.deleteModule", async (arg) => {
+    vscode27.commands.registerCommand("dabbler.deleteModule", async (arg) => {
       await runDeleteModuleFlow(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
-// src/wizard/planImport.ts
-var vscode31 = __toESM(require("vscode"));
-var fs23 = __toESM(require("fs"));
-var path30 = __toESM(require("path"));
-var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
-function buildPlanningPrompt(module2, destPosix) {
-  const subject = module2 ? `the "${module2.title}" module (\`${module2.slug}\`) of my software project` : "my software project";
-  const moduleNote = module2 ? `
-This plan covers ONLY the ${module2.slug} module (its scope is declared in
-docs/modules.yaml); the project's other modules have their own plans.
-` : "";
-  return `You are a project planning assistant for an AI-led development workflow.
-
-Help me create a project plan in Markdown format for ${subject}.
-${moduleNote}
-The plan should include:
-1. Project overview (2-3 sentences)
-2. Goals and success criteria
-3. High-level phases or feature areas
-4. For each phase: a brief description and the key deliverables
-
-Keep it concise and focused \u2014 this plan will be used to generate AI session sets, so each
-distinct feature area or phase should be something that can be implemented in 2-6 focused AI
-sessions.
-
-Format as a clean Markdown document I can save as ${destPosix}.`;
-}
-function defaultUi8() {
-  return {
-    showOpenDialog: vscode31.window.showOpenDialog,
-    showWarningMessage: vscode31.window.showWarningMessage,
-    showInformationMessage: vscode31.window.showInformationMessage,
-    showErrorMessage: vscode31.window.showErrorMessage,
-    showQuickPick: (items, opts) => vscode31.window.showQuickPick(items, opts),
-    writeClipboard: (text) => vscode31.env.clipboard.writeText(text),
-    executeCommand: (command, ...args) => vscode31.commands.executeCommand(command, ...args),
-    workspaceRoot: () => vscode31.workspace.workspaceFolders?.[0]?.uri.fsPath
-  };
-}
-async function resolvePlanTarget(root, ui, opts) {
-  if (!root)
-    return { entry: null, destPosix: PLAN_DEST_POSIX };
-  const pick2 = await pickModuleForAuthoring(
-    root,
-    {
-      showQuickPick: ui.showQuickPick,
-      showInformationMessage: ui.showInformationMessage,
-      showErrorMessage: ui.showErrorMessage
-    },
-    opts && opts.preselectedSlug !== void 0 ? { preselectedSlug: opts.preselectedSlug } : void 0
-  );
-  if (pick2.kind === "cancelled" || pick2.kind === "invalid-manifest" || pick2.kind === "unknown-module") {
-    return null;
-  }
-  return {
-    entry: pick2.entry,
-    destPosix: pick2.entry ? modulePlanRelPath(pick2.entry) : PLAN_DEST_POSIX
-  };
-}
-async function copyPlanningPrompt(ui = defaultUi8(), opts) {
-  const target = await resolvePlanTarget(ui.workspaceRoot(), ui, opts);
-  if (!target)
-    return;
-  await ui.writeClipboard(buildPlanningPrompt(target.entry, target.destPosix));
-  void ui.showInformationMessage(
-    `Plan-authoring prompt copied to clipboard. Paste it into your AI assistant, then save the result as ${target.destPosix} \u2014 or import it with 'Import project-plan.md'.`
-  );
-}
-async function importPlanFromFile(ui = defaultUi8(), opts) {
-  const root = ui.workspaceRoot();
-  const target = await resolvePlanTarget(root, ui, opts);
-  if (!target)
-    return false;
-  const picked = await ui.showOpenDialog({
-    canSelectFiles: true,
-    canSelectFolders: false,
-    canSelectMany: false,
-    filters: { "Markdown": ["md"] },
-    openLabel: "Import Plan"
-  });
-  if (!picked?.[0])
-    return false;
-  if (!root) {
-    void ui.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const destPath = path30.join(root, ...target.destPosix.split("/"));
-  const containment = path30.relative(path30.resolve(root), path30.resolve(destPath));
-  if (containment === "" || containment.startsWith("..") || path30.isAbsolute(containment)) {
-    void ui.showErrorMessage(
-      `Refusing to write outside the workspace: ${target.destPosix}`
-    );
-    return false;
-  }
-  const destDir = path30.dirname(destPath);
-  try {
-    if (!fs23.existsSync(destDir))
-      fs23.mkdirSync(destDir, { recursive: true });
-  } catch (err) {
-    void ui.showErrorMessage(
-      `Failed to create ${destDir}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  if (fs23.existsSync(destPath)) {
-    const overwrite = await ui.showWarningMessage(
-      `${target.destPosix} already exists. Overwrite it?`,
-      { modal: true },
-      "Overwrite"
-    );
-    if (overwrite !== "Overwrite")
-      return false;
-  }
-  try {
-    fs23.copyFileSync(picked[0].fsPath, destPath);
-  } catch (err) {
-    void ui.showErrorMessage(
-      `Failed to write ${target.destPosix}: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  void ui.executeCommand("vscode.open", vscode31.Uri.file(destPath));
-  void ui.showInformationMessage(
-    `Plan imported to ${target.destPosix}. Run 'Dabbler: Generate Session-Set Prompt' to translate it into session sets.`
-  );
-  return true;
-}
-async function openModulePlan(ui = defaultUi8(), opts) {
-  const root = ui.workspaceRoot();
-  if (!root) {
-    void ui.showErrorMessage("No workspace folder is open.");
-    return;
-  }
-  const target = await resolvePlanTarget(root, ui, opts);
-  if (!target)
-    return;
-  const destPath = path30.join(root, ...target.destPosix.split("/"));
-  const containment = path30.relative(path30.resolve(root), path30.resolve(destPath));
-  if (containment === "" || containment.startsWith("..") || path30.isAbsolute(containment)) {
-    void ui.showErrorMessage(
-      `Refusing to open outside the workspace: ${target.destPosix}`
-    );
-    return;
-  }
-  if (!fs23.existsSync(destPath)) {
-    const action = await ui.showWarningMessage(
-      `No plan found at ${target.destPosix}. Import one first?`,
-      "Import Plan"
-    );
-    if (action === "Import Plan") {
-      const importOpts = opts ?? { preselectedSlug: target.entry ? target.entry.slug : "" };
-      await importPlanFromFile(ui, importOpts);
-    }
-    return;
-  }
-  await ui.executeCommand("vscode.open", vscode31.Uri.file(destPath));
-}
-function registerPlanImportCommand(context) {
-  context.subscriptions.push(
-    vscode31.commands.registerCommand("dabbler.importPlan", async () => {
-      const action = await vscode31.window.showQuickPick(
-        [
-          { label: "$(file) Import existing plan from file", value: "file" },
-          { label: "$(clippy) Get a prompt to create a plan with AI", value: "prompt" }
-        ],
-        { placeHolder: "How would you like to add a project plan?" }
-      );
-      if (!action)
-        return;
-      if (action.value === "prompt") {
-        await copyPlanningPrompt();
-        return;
-      }
-      await importPlanFromFile();
-    })
-  );
-  context.subscriptions.push(
-    vscode31.commands.registerCommand("dabbler.openModulePlan", async (arg) => {
-      await openModulePlan(void 0, preselectFromTreeNode(arg));
-    })
-  );
-}
-
-// src/wizard/sessionGenPrompt.ts
-var vscode32 = __toESM(require("vscode"));
-var fs24 = __toESM(require("fs"));
-var path31 = __toESM(require("path"));
-var PLAN_PATH = path31.join("docs", "planning", "project-plan.md");
-var PLAN_REL_POSIX = "docs/planning/project-plan.md";
-function sampleContext(moduleSlug) {
-  return {
-    repoName: "example-app",
-    setTitle: "Example feature",
-    purpose: "A worked example \u2014 replace with the real set's purpose.",
-    slug: "001-example-feature",
-    created: "2026-01-01",
-    totalSessions: 3,
-    // Set 087 S3 (ruling Q2): a module-targeted decomposition renders the
-    // module: line IN the exemplar (writer-rendered, so the prompt cannot
-    // drift from what the shared writer emits); absent → no line at all.
-    module: moduleSlug
-  };
-}
-var PARALLEL_GUIDANCE = `- **Decompose for parallel execution.** You asked for parallel session sets
-  where possible: the orchestration runs independent session sets concurrently in
-  separate git worktrees, merged back to the main branch when the sets complete.
-  Minimize cross-set dependencies; when one set genuinely must follow another,
-  declare that explicitly with a \`prerequisites:\` entry in the dependent set's
-  Session Set Configuration block (slug + \`condition: complete\`). Any set with no
-  \`prerequisites:\` is treated as safe to start in parallel.
-`;
-function buildSessionGenPrompt(bundle, options = {}) {
-  const ctx = sampleContext(options.module?.slug);
-  const exampleSpec = renderSpec(bundle, ctx);
-  const exampleState = renderSessionState(bundle, ctx);
-  const parallelGuidance = options.parallel ? PARALLEL_GUIDANCE : "";
-  const moduleRequirement = options.module ? `- **Module:** declare \`module: ${options.module.slug}\` in EVERY generated set's
-  Session Set Configuration block, exactly as the worked example shows (the value is
-  validated against \`docs/modules.yaml\`). \`module\` is a grouping attribute only \u2014
-  session-set names stay globally unique across ALL modules.
-` : "";
-  const moduleGuidance = options.module ? `- **Module.** This decomposition targets the **${options.module.slug}** module
-  (declared in \`docs/modules.yaml\`). Stamp \`module: ${options.module.slug}\` in each
-  generated set's configuration block. Recommended (not enforced): include the module
-  slug in each set's name (e.g. \`00N-${options.module.slug}-<feature>\`) so names stay
-  self-describing and collision-free across modules.
-` : "";
-  const planRefPosix = options.module?.planPath ?? PLAN_REL_POSIX;
-  return `You are a session-set architect for an AI-led software development workflow (the Dabbler session-set workflow).
-
-Given a project plan, decompose it into a sequence of session sets. Each session set is a
-focused, independently deployable unit of work that one AI coding session can complete.
-
-For EACH session set, scaffold a folder \`docs/session-sets/<NNN-slug>/\` containing a
-\`spec.md\` AND a \`session-state.json\`, matching the worked examples below EXACTLY in shape.
-
-## Hard requirements (do not deviate)
-
-- **Slug:** \`NNN-kebab-title\` \u2014 a three-digit, zero-padded, monotonically increasing
-  prefix then a kebab-case title (e.g. \`001-user-authentication\`, \`002-product-catalog\`).
-  Never emit a bare (un-prefixed) slug.
-- **One \`### Session K of N\` block per planned session** (progress keys keyed
-  \`session-00K/\`), and **one object in the \`session-state.json\` \`sessions\` array per
-  planned session** (\`"number": K\`, \`"title": "Session K"\`, all other fields at their
-  not-started defaults).
-- **\`session-state.json\`** MUST use \`"schemaVersion": 4\` and \`"status": "not-started"\`.
-  Never emit the retired schemaVersion-2 state shape.
-${moduleRequirement}
-
-## Worked example \u2014 \`spec.md\` for a 3-session set (\`001-example-feature\`)
-
-Match this shape; substitute your own title/purpose/slug and emit exactly one session
-block per planned session:
-
-~~~~markdown
-${exampleSpec}
-~~~~
-
-## Worked example \u2014 its \`session-state.json\` (schemaVersion 4, three not-started sessions)
-
-~~~~json
-${exampleState}
-~~~~
-
-## Authoring guidance
-
-- Order sets so earlier ones unblock later ones.
-- Keep scope tight: prefer 2\u20134 sessions per set.
-- Set \`requiresUAT: true\` only for user-visible features that need manual verification;
-  when true, set \`uatStyle: dsl\` for web/browser UI (Playwright via dabbler-uat-dsl) or
-  \`uatStyle: ad-hoc\` for non-web surfaces (CLI, native, Access, COM apps). Default ad-hoc.
-- Set \`requiresE2E: true\` only if automated browser tests are relevant.
-${moduleGuidance}${parallelGuidance}
----
-
-## The project plan (read it from the workspace)
-
-The authoritative input for this decomposition is the project plan at
-\`${planRefPosix}\` in this workspace. Read that file directly \u2014 it is
-intentionally NOT inlined here. Decompose the plan it describes into session
-sets per the rules above.`;
-}
-async function copySessionSetGenPrompt(context, options = {}, pickOpts) {
-  const root = vscode32.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (!root) {
-    void vscode32.window.showErrorMessage("No workspace folder is open.");
-    return false;
-  }
-  const modulePick = await pickModuleForAuthoring(
-    root,
-    {
-      showQuickPick: (items, opts) => vscode32.window.showQuickPick(items, opts),
-      showInformationMessage: (m) => vscode32.window.showInformationMessage(m),
-      showErrorMessage: (m) => vscode32.window.showErrorMessage(m)
-    },
-    pickOpts && pickOpts.preselectedSlug !== void 0 ? { preselectedSlug: pickOpts.preselectedSlug } : void 0
-  );
-  if (modulePick.kind === "cancelled" || modulePick.kind === "invalid-manifest" || modulePick.kind === "unknown-module") {
-    return false;
-  }
-  const moduleOpt = modulePick.entry ? {
-    slug: modulePick.entry.slug,
-    planPath: modulePlanRelPath(modulePick.entry)
-  } : void 0;
-  const planRelPosix = moduleOpt?.planPath ?? PLAN_REL_POSIX;
-  const planPath = path31.join(root, ...planRelPosix.split("/"));
-  if (!fs24.existsSync(planPath)) {
-    const action = await vscode32.window.showWarningMessage(
-      moduleOpt ? `No project plan found at ${planRelPosix} for module "${moduleOpt.slug}". Create it (the New Module command writes a stub) or import one first?` : `No project plan found at ${PLAN_PATH}. Import one first?`,
-      "Import Plan"
-    );
-    if (action === "Import Plan")
-      void vscode32.commands.executeCommand("dabbler.importPlan");
-    return false;
-  }
-  let bundle;
-  try {
-    bundle = loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
-  } catch (err) {
-    void vscode32.window.showErrorMessage(
-      `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
-    );
-    return false;
-  }
-  const resolved = {
-    parallel: options.parallel,
-    module: moduleOpt
-  };
-  const prompt = buildSessionGenPrompt(bundle, resolved);
-  await vscode32.env.clipboard.writeText(prompt);
-  void vscode32.window.showInformationMessage(
-    "Session-set generation prompt copied to clipboard. Paste it into your AI assistant. When you receive the specs, save each one to docs/session-sets/<NNN-slug>/spec.md (alongside its session-state.json).\n\nCost reminder: each session set typically costs $0.10\u2013$2.00 depending on model and effort. Review the generated specs before running all sessions.",
-    { modal: false }
-  );
-  return true;
-}
-function registerSessionGenPromptCommand(context) {
-  context.subscriptions.push(
-    vscode32.commands.registerCommand("dabbler.generateSessionSetPrompt", async () => {
-      await copySessionSetGenPrompt(context);
-    }),
-    // Set 094 S2 (verdict amendment 7): the shelved parallel-sets UI's escape
-    // hatch — the ONLY live feeder of `parallel: true`. A deliberate,
-    // per-invocation Command-Palette variant for the narrow
-    // multiple-branches-in-one-module case (routed ruling 1a, chosen over a
-    // sticky `parallelHint` setting). The `prerequisites:` machinery + worktree
-    // tooling it references are untouched — this is UI shelving, reversible.
-    vscode32.commands.registerCommand(
-      "dabbler.generateParallelSessionSetPrompt",
-      async () => {
-        await copySessionSetGenPrompt(context, { parallel: true });
-      }
-    )
-  );
-}
-
-// src/dashboard/CostDashboard.ts
-var vscode33 = __toESM(require("vscode"));
-var fs27 = __toESM(require("fs"));
-var path33 = __toESM(require("path"));
-
-// src/utils/metrics.ts
-var fs26 = __toESM(require("fs"));
-
-// src/utils/routerConfig.ts
-var fs25 = __toESM(require("fs"));
-var path32 = __toESM(require("path"));
-var YAML3 = __toESM(require_dist());
-var DEFAULT_METRICS_FILENAME = "router-metrics.jsonl";
-var DEFAULT_REVIEW_FREQUENCY_DAYS = 30;
-function findAiRouterDir(workspaceRoot2) {
-  const candidate = path32.join(workspaceRoot2, "ai_router");
-  try {
-    if (fs25.existsSync(path32.join(candidate, "router-config.yaml"))) {
-      return candidate;
-    }
-  } catch {
-  }
-  return null;
-}
-function routesCost(workspaceRoot2) {
-  return findAiRouterDir(workspaceRoot2) !== null;
-}
-function readRouterConfig(workspaceRoot2) {
-  const aiRouterDir = findAiRouterDir(workspaceRoot2);
-  if (!aiRouterDir)
-    return null;
-  const configPath = path32.join(aiRouterDir, "router-config.yaml");
-  let doc = {};
-  try {
-    doc = YAML3.parse(fs25.readFileSync(configPath, "utf8")) ?? {};
-  } catch {
-    doc = {};
-  }
-  const root = doc && typeof doc === "object" ? doc : {};
-  const metricsCfg = asRecord(root.metrics);
-  const metadataCfg = asRecord(root.metadata);
-  const metricsEnabled = metricsCfg.enabled !== false;
-  const rawFilename = metricsCfg.log_filename;
-  const metricsFilename = typeof rawFilename === "string" && rawFilename.trim() ? rawFilename.trim() : DEFAULT_METRICS_FILENAME;
-  const rawReviewed = metadataCfg.pricing_reviewed;
-  const pricingReviewed = typeof rawReviewed === "string" && rawReviewed.trim() ? rawReviewed.trim() : null;
-  const rawFreq = metadataCfg.review_frequency_days;
-  const reviewFrequencyDays = typeof rawFreq === "number" && rawFreq > 0 ? rawFreq : DEFAULT_REVIEW_FREQUENCY_DAYS;
-  return {
-    configPath,
-    aiRouterDir,
-    metricsEnabled,
-    metricsFilename,
-    metricsPath: path32.join(aiRouterDir, metricsFilename),
-    pricingReviewed,
-    reviewFrequencyDays
-  };
-}
-function asRecord(v) {
-  return v && typeof v === "object" ? v : {};
-}
-function computeStaleness(info, now = /* @__PURE__ */ new Date()) {
-  const reviewFrequencyDays = info.reviewFrequencyDays;
-  if (!info.pricingReviewed) {
-    return { stale: true, ageDays: null, reviewFrequencyDays };
-  }
-  const reviewed = /* @__PURE__ */ new Date(`${info.pricingReviewed}T00:00:00Z`);
-  if (Number.isNaN(reviewed.getTime())) {
-    return { stale: true, ageDays: null, reviewFrequencyDays };
-  }
-  const ageDays = Math.floor((now.getTime() - reviewed.getTime()) / 864e5);
-  return { stale: ageDays > reviewFrequencyDays, ageDays, reviewFrequencyDays };
-}
-function selectCostState(info, entryCount) {
-  if (!info)
-    return { kind: "no-router" };
-  if (!info.metricsEnabled)
-    return { kind: "disabled" };
-  if (entryCount <= 0)
-    return { kind: "empty" };
-  return { kind: "data" };
-}
-
-// src/utils/metrics.ts
-function readMetrics(workspaceRoot2) {
-  const info = readRouterConfig(workspaceRoot2);
-  if (!info)
-    return [];
-  return readMetricsFromPath(info.metricsPath);
-}
-function sessionSetDisplayName(raw) {
-  if (typeof raw !== "string")
-    return "(no session set)";
-  const parts = raw.split(/[\\/]+/).filter((p2) => p2.trim().length > 0);
-  const name = parts.length > 0 ? parts[parts.length - 1].trim() : "";
-  return name === "" ? "(no session set)" : name;
-}
-function readMetricsFromPath(metricsPath) {
-  if (!fs26.existsSync(metricsPath))
-    return [];
-  try {
-    const lines = fs26.readFileSync(metricsPath, "utf8").split(/\r?\n/).filter(Boolean);
-    return lines.map((line) => {
-      try {
-        return JSON.parse(line);
-      } catch {
-        return null;
-      }
-    }).filter((e) => e !== null && e.call_type !== "adjudication" && !!e.model).map((e) => ({ ...e, session_set: sessionSetDisplayName(e.session_set) }));
-  } catch {
-    return [];
-  }
-}
-function summarizeMetrics(entries) {
-  const bySessionSet = {};
-  const byModel = {};
-  const dailyMap = {};
-  for (const e of entries) {
-    if (!bySessionSet[e.session_set]) {
-      bySessionSet[e.session_set] = { sessions: 0, cost: 0, lastRun: "" };
-    }
-    bySessionSet[e.session_set].sessions++;
-    bySessionSet[e.session_set].cost += e.cost_usd;
-    if (e.timestamp > bySessionSet[e.session_set].lastRun) {
-      bySessionSet[e.session_set].lastRun = e.timestamp;
-    }
-    byModel[e.model] = (byModel[e.model] ?? 0) + e.cost_usd;
-    const day = e.timestamp.slice(0, 10);
-    dailyMap[day] = (dailyMap[day] ?? 0) + e.cost_usd;
-  }
-  const today = /* @__PURE__ */ new Date();
-  const dailyCosts = Array.from({ length: 30 }, (_2, i2) => {
-    const d = new Date(today);
-    d.setDate(d.getDate() - (29 - i2));
-    const dateStr = d.toISOString().slice(0, 10);
-    return { date: dateStr, cost: dailyMap[dateStr] ?? 0 };
-  });
-  return {
-    totalCost: entries.reduce((s, e) => s + e.cost_usd, 0),
-    bySessionSet,
-    byModel,
-    dailyCosts
-  };
-}
-function buildSparkline(dailyCosts) {
-  const BLOCKS = "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588";
-  const values = dailyCosts.map((d) => d.cost);
-  const max = Math.max(...values, 1e-4);
-  return values.map((v) => BLOCKS[Math.min(7, Math.floor(v / max * 7.99))]).join("");
-}
-function exportToCsv(entries) {
-  const header = "session_set,session_number,model,effort,input_tokens,output_tokens,cost_usd,timestamp";
-  const rows = entries.map(
-    (e) => [
-      e.session_set,
-      e.session_number,
-      e.model,
-      e.effort,
-      e.input_tokens,
-      e.output_tokens,
-      e.cost_usd.toFixed(4),
-      e.timestamp
-    ].join(",")
-  );
-  return [header, ...rows].join("\n");
-}
-
-// src/dashboard/dashboardHtml.ts
-function findConfigAnchorLine(text, anchor) {
-  const lines = text.split(/\r?\n/);
-  const find = (re) => lines.findIndex((l) => re.test(l));
-  if (anchor === "metadata") {
-    const reviewed = find(/^\s*pricing_reviewed\s*:/);
-    if (reviewed >= 0)
-      return reviewed;
-    return find(/^metadata\s*:/);
-  }
-  const metricsHeader = find(/^metrics\s*:/);
-  if (metricsHeader >= 0) {
-    for (let i2 = metricsHeader + 1; i2 < lines.length; i2++) {
-      if (/^\S/.test(lines[i2]))
-        break;
-      if (/^\s*enabled\s*:/.test(lines[i2]))
-        return i2;
-    }
-    return metricsHeader;
-  }
-  return -1;
-}
-function esc(s) {
-  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-function head(nonce, cspSource) {
-  return `<meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
-  <style nonce="${nonce}">
-    body { font-family: var(--vscode-font-family); color: var(--vscode-foreground); padding: 20px 28px; max-width: 760px; margin: 0 auto; }
-    h2 { font-size: 1.1em; font-weight: 600; }
-    code { background: var(--vscode-textCodeBlock-background); padding: 1px 4px; border-radius: 3px; }
-    p { line-height: 1.5; }
-    .muted { color: var(--vscode-descriptionForeground); font-size: 0.9em; }
-    .btn { display: inline-block; padding: 5px 12px; margin: 8px 6px 0 0; background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 3px; font-size: inherit; cursor: pointer; }
-    .btn:hover { background: var(--vscode-button-hoverBackground); }
-    .banner { border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-charts-yellow)); background: var(--vscode-inputValidation-warningBackground, rgba(255,200,0,0.08)); border-radius: 4px; padding: 10px 14px; margin: 0 0 16px; }
-    .banner-title { font-weight: 600; }
-  </style>`;
-}
-function actionScript(nonce) {
-  return `<script nonce="${nonce}">
-    const vscode = acquireVsCodeApi();
-    document.addEventListener('click', (e) => {
-      const el = e.target && e.target.closest ? e.target.closest('[data-cmd]') : null;
-      if (el) vscode.postMessage({ command: el.getAttribute('data-cmd') });
-    });
-  </script>`;
-}
-function stalenessBannerHtml(staleness) {
-  if (!staleness.stale)
-    return "";
-  const age = staleness.ageDays === null ? "Cost estimates have no recorded review date" : `Cost estimates were last reviewed ${staleness.ageDays} day${staleness.ageDays === 1 ? "" : "s"} ago (threshold ${staleness.reviewFrequencyDays})`;
-  return `<div class="banner">
-    <div class="banner-title">\u26A0 Cost estimates may be stale</div>
-    <p class="muted">${esc(age)}. The per-provider rates behind these numbers are operator-maintained \u2014 refresh them so the costs stay accurate.</p>
-    <button class="btn" data-cmd="updateRates">Update cost estimates</button>
-  </div>`;
-}
-function noWorkspaceHtml(nonce, cspSource) {
-  return `<!DOCTYPE html><html><head>${head(nonce, cspSource)}</head><body>
-  <h2>Cost Dashboard</h2>
-  <p>Open a workspace folder to view routing costs.</p>
-  </body></html>`;
-}
-function noRouterHtml(nonce, cspSource) {
-  return `<!DOCTYPE html><html><head>${head(nonce, cspSource)}</head><body>
-  <h2>Cost Dashboard</h2>
-  <p>This workspace does not route through the AI router, so there is no
-  cost data to show. The cost dashboard is available in repositories that
-  carry an <code>ai_router/router-config.yaml</code> (Full tier).</p>
-  </body></html>`;
-}
-function disabledStateHtml(nonce, cspSource, configPath) {
-  return `<!DOCTYPE html><html><head>${head(nonce, cspSource)}</head><body>
-  <h2>Cost Dashboard</h2>
-  <p>Metrics logging is currently <strong>off</strong>, so no routing
-  costs are being recorded.</p>
-  <p>To start collecting cost data, set <code>metrics.enabled: true</code>
-  in <code>${esc(configPath)}</code>.</p>
-  <button class="btn" data-cmd="openConfig">Open router-config.yaml</button>
-  ${actionScript(nonce)}
-  </body></html>`;
-}
-function emptyStateHtml(nonce, cspSource, metricsPath, bannerHtml) {
-  return `<!DOCTYPE html><html><head>${head(nonce, cspSource)}</head><body>
-  <h2>Cost Dashboard</h2>
-  ${bannerHtml}
-  <p>Metrics are enabled, but no routed calls have been recorded yet.
-  Costs will appear here after the AI router runs.</p>
-  <p class="muted">Reading from <code>${esc(metricsPath)}</code>.</p>
-  ${actionScript(nonce)}
-  </body></html>`;
-}
-
-// src/dashboard/CostDashboard.ts
-function getNonce() {
-  let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i2 = 0; i2 < 32; i2++)
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  return text;
-}
-var CostDashboard = class _CostDashboard {
-  static show(extensionUri) {
-    if (_CostDashboard.currentPanel) {
-      _CostDashboard.currentPanel._panel.reveal(vscode33.ViewColumn.Two);
-      _CostDashboard.currentPanel._refresh();
-      return;
-    }
-    const panel = vscode33.window.createWebviewPanel(
-      "dabblerCostDashboard",
-      "Dabbler \u2014 Cost Dashboard",
-      vscode33.ViewColumn.Two,
-      {
-        enableScripts: true,
-        localResourceRoots: [vscode33.Uri.joinPath(extensionUri, "webview")]
-      }
-    );
-    _CostDashboard.currentPanel = new _CostDashboard(panel, extensionUri);
-  }
-  constructor(panel, extensionUri) {
-    this._panel = panel;
-    this._extensionUri = extensionUri;
-    this._refresh();
-    this._panel.onDidDispose(() => {
-      _CostDashboard.currentPanel = void 0;
-    });
-    this._panel.webview.onDidReceiveMessage((msg) => {
-      if (msg.command === "exportCsv")
-        this._exportCsv();
-      else if (msg.command === "refresh")
-        this._refresh();
-      else if (msg.command === "updateRates")
-        void this._openRouterConfig("metadata");
-      else if (msg.command === "openConfig")
-        void this._openRouterConfig("metrics");
-    });
-  }
-  _refresh() {
-    this._panel.webview.html = this._getHtml();
-  }
-  _exportCsv() {
-    const root = vscode33.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      vscode33.window.showErrorMessage("No workspace folder open.");
-      return;
-    }
-    const entries = readMetrics(root);
-    const csv = exportToCsv(entries);
-    const outPath = path33.join(root, "ai_router", "cost-export.csv");
-    try {
-      fs27.writeFileSync(outPath, csv, "utf8");
-      vscode33.commands.executeCommand("vscode.open", vscode33.Uri.file(outPath));
-    } catch (err) {
-      vscode33.window.showErrorMessage(`Export failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  async _openRouterConfig(anchor) {
-    const root = vscode33.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!root) {
-      vscode33.window.showErrorMessage("No workspace folder open.");
-      return;
-    }
-    const info = readRouterConfig(root);
-    if (!info) {
-      vscode33.window.showErrorMessage("No ai_router/router-config.yaml found in this workspace.");
-      return;
-    }
-    try {
-      const doc = await vscode33.workspace.openTextDocument(info.configPath);
-      const editor = await vscode33.window.showTextDocument(doc, vscode33.ViewColumn.One);
-      const line = findConfigAnchorLine(doc.getText(), anchor);
-      if (line >= 0) {
-        const pos = new vscode33.Position(line, 0);
-        editor.selection = new vscode33.Selection(pos, pos);
-        editor.revealRange(new vscode33.Range(pos, pos), vscode33.TextEditorRevealType.AtTop);
-      }
-    } catch (err) {
-      vscode33.window.showErrorMessage(`Could not open router-config.yaml: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
-  _getHtml() {
-    const root = vscode33.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    const nonce = getNonce();
-    const cspSource = this._panel.webview.cspSource;
-    if (!root) {
-      return noWorkspaceHtml(nonce, cspSource);
-    }
-    const info = readRouterConfig(root);
-    const entries = info ? readMetricsFromPath(info.metricsPath) : [];
-    const state = selectCostState(info, entries.length);
-    switch (state.kind) {
-      case "no-router":
-        return noRouterHtml(nonce, cspSource);
-      case "disabled":
-        return disabledStateHtml(nonce, cspSource, info.configPath);
-      case "empty": {
-        const banner = stalenessBannerHtml(computeStaleness(info));
-        return emptyStateHtml(nonce, cspSource, info.metricsPath, banner);
-      }
-      case "data":
-        return this._dataHtml(nonce, cspSource, info, entries);
-    }
-  }
-  _dataHtml(nonce, cspSource, info, entries) {
-    const summary = summarizeMetrics(entries);
-    const sparkline = buildSparkline(summary.dailyCosts);
-    const banner = stalenessBannerHtml(computeStaleness(info));
-    const htmlPath = vscode33.Uri.joinPath(this._extensionUri, "webview", "dashboard.html");
-    try {
-      let html = fs27.readFileSync(htmlPath.fsPath, "utf8");
-      const sessionSetRows = Object.entries(summary.bySessionSet).sort(([, a], [, b2]) => b2.cost - a.cost).map(
-        ([slug, d]) => `<tr><td>${esc(slug)}</td><td>${d.sessions}</td><td>$${d.cost.toFixed(3)}</td><td>${d.lastRun ? new Date(d.lastRun).toLocaleDateString("en-CA") : "\u2014"}</td></tr>`
-      ).join("\n");
-      const modelRows = Object.entries(summary.byModel).sort(([, a], [, b2]) => b2 - a).map(([model, cost]) => {
-        const pct = summary.totalCost > 0 ? (cost / summary.totalCost * 100).toFixed(1) : "0";
-        return `<tr><td>${esc(model)}</td><td>$${cost.toFixed(3)}</td><td>${pct}%</td></tr>`;
-      }).join("\n");
-      html = html.replace(/{{NONCE}}/g, nonce).replace(/{{CSP_SOURCE}}/g, cspSource).replace("{{BANNER}}", banner).replace("{{TOTAL_COST}}", `$${summary.totalCost.toFixed(3)}`).replace("{{SPARKLINE}}", sparkline).replace("{{SESSION_SET_ROWS}}", sessionSetRows).replace("{{MODEL_ROWS}}", modelRows).replace("{{METRICS_PATH}}", esc(info.metricsPath)).replace(
-        "{{SPARKLINE_DATES}}",
-        `${summary.dailyCosts[0]?.date ?? ""} \u2192 ${summary.dailyCosts[29]?.date ?? ""}`
-      );
-      return html;
-    } catch {
-      return emptyStateHtml(nonce, cspSource, info.metricsPath, banner);
-    }
-  }
-};
-function registerCostDashboardCommand(context) {
-  context.subscriptions.push(
-    vscode33.commands.registerCommand("dabbler.showCostDashboard", () => {
-      CostDashboard.show(context.extensionUri);
-    })
-  );
-}
-
-// src/configEditor/ConfigEditorPanel.ts
-var cp6 = __toESM(require("child_process"));
-var vscode34 = __toESM(require("vscode"));
-var fs29 = __toESM(require("fs"));
-var path34 = __toESM(require("path"));
-
-// src/configEditor/yamlReadWrite.ts
-var import_yaml = __toESM(require_dist());
-var fs28 = __toESM(require("fs"));
-function readYamlFile(filePath) {
-  if (!fs28.existsSync(filePath))
-    return null;
-  const text = fs28.readFileSync(filePath, "utf8");
-  const doc = parseDocumentFromText(text);
-  return { doc, text, parseErrors: collectParseErrors(doc) };
-}
-function parseDocumentFromText(text) {
-  return (0, import_yaml.parseDocument)(text);
-}
-function collectParseErrors(doc) {
-  const out = [];
-  for (const err of doc.errors ?? []) {
-    const lc = err.linePos?.[0];
-    out.push({
-      message: err.message,
-      line: lc?.line,
-      col: lc?.col
-    });
-  }
-  return out;
-}
-
-// src/configEditor/schemaValidator.ts
-var import_ajv = __toESM(require_ajv());
-var ajv = new import_ajv.default({ allErrors: true, strict: false });
-var ENV_VAR_PATTERN_STR = "^[A-Z_][A-Z0-9_]*$";
-var ROUTER_CONFIG_SCHEMA = {
-  type: "object",
-  properties: {
-    providers: {
-      type: "object",
-      additionalProperties: {
-        type: "object",
-        required: ["api_key_env"],
-        properties: {
-          display_label: { type: "string" },
-          enabled: { type: "boolean" },
-          api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
-          base_url: { type: "string" }
-        }
-      }
-    },
-    routing: {
-      type: "object",
-      properties: {
-        outsourcing_mode: {
-          type: "string",
-          enum: ["whenever-helpful", "verification-only", "disabled"]
-        }
-      }
-    },
-    models: {
-      type: "object",
-      additionalProperties: {
-        type: "object",
-        required: ["provider"],
-        properties: {
-          provider: { type: "string" }
-        }
-      }
-    },
-    // delegation.decision_consensus is the Set 031 opt-in sub-block.
-    // The router-config schema is deliberately open elsewhere; this
-    // entry validates only the fields the visual editor needs to render
-    // correctly. Unknown sub-keys are tolerated (forward-compat for the
-    // V1.5/V2 fields the design doc reserved).
-    delegation: {
-      type: "object",
-      properties: {
-        decision_consensus: {
-          type: "object",
-          properties: {
-            enabled: { type: "boolean" },
-            engines: {
-              type: "array",
-              items: {
-                type: "string",
-                // "provider:model" with non-empty halves
-                pattern: "^[^:]+:[^:]+$"
-              }
-            },
-            categories: {
-              type: "array",
-              items: {
-                type: "string",
-                enum: [
-                  "refactor-placement",
-                  "file-layout",
-                  "scoping",
-                  "spec-clarification",
-                  "testing-strategy",
-                  "api-surface",
-                  "design",
-                  "architecture"
-                ]
-              }
-            },
-            unresolved_action: {
-              type: "string",
-              enum: ["ask_user", "proceed_with_orchestrator_judgment"]
-            },
-            journal_path: { type: ["string", "null"] },
-            journal_full_payloads_dir: { type: ["string", "null"] }
-          }
-        }
-      }
-    }
-  }
-};
-var BUDGET_SCHEMA = {
-  type: "object",
-  required: ["threshold_usd"],
-  properties: {
-    threshold_usd: { type: "number", minimum: 0 },
-    scope: {
-      type: "string",
-      enum: ["per-session-set", "per-project", "per-session"]
-    },
-    warn_at_percent: { type: "integer", minimum: 0, maximum: 100 },
-    verification_method: {
-      type: "string",
-      enum: ["api", "manual-via-other-engine", "skipped"]
-    },
-    verification_nte_usd: { type: "number", minimum: 0 },
-    mode: { type: "string" }
-  }
-};
-var LOCAL_OVERRIDES_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  properties: {
-    transport: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        profile: {
-          type: "string",
-          enum: ["api", "copilot-cli"]
-        }
-      }
-    },
-    routing: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        outsourcing_mode: {
-          type: "string",
-          enum: ["whenever-helpful", "verification-only", "disabled"]
-        }
-      }
-    },
-    providers: {
-      type: "object",
-      additionalProperties: {
-        type: "object",
-        additionalProperties: false,
-        properties: {
-          enabled: { type: "boolean" },
-          api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
-          base_url: { type: "string" }
-        }
-      }
-    },
-    notifications: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        pushover: {
-          type: "object",
-          additionalProperties: false,
-          properties: {
-            enabled: { type: "boolean" },
-            api_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR },
-            user_key_env: { type: "string", minLength: 1, pattern: ENV_VAR_PATTERN_STR }
-          }
-        }
-      }
-    },
-    decision_review: {
-      type: "object",
-      additionalProperties: false,
-      properties: {
-        honor_annotations: { type: "boolean" }
-      }
-    }
-  }
-};
-var validateRouterConfig = ajv.compile(ROUTER_CONFIG_SCHEMA);
-var validateBudget = ajv.compile(BUDGET_SCHEMA);
-var validateLocalOverrides = ajv.compile(LOCAL_OVERRIDES_SCHEMA);
-var LOCAL_OVERRIDE_DENIED_TOP_LEVEL = /* @__PURE__ */ new Set([
-  "verification_method",
-  "scope"
-]);
-var LOCAL_OVERRIDE_DENIED_PROVIDER_KEYS = /* @__PURE__ */ new Set([
-  "display_label"
-]);
-function validateBatch(input) {
-  const errors = [];
-  if (input.routerConfig !== null) {
-    if (!validateRouterConfig(input.routerConfig)) {
-      for (const e of validateRouterConfig.errors ?? []) {
-        errors.push({
-          file: "router-config.yaml",
-          path: e.instancePath || "/",
-          message: e.message ?? "validation error"
-        });
-      }
-    }
-    _checkModelProviderRefs(input.routerConfig, errors);
-  }
-  if (input.budget !== null) {
-    if (!validateBudget(input.budget)) {
-      for (const e of validateBudget.errors ?? []) {
-        errors.push({
-          file: "budget.yaml",
-          path: e.instancePath || "/",
-          message: e.message ?? "validation error"
-        });
-      }
-    }
-  }
-  if (input.localOverrides !== null) {
-    const beforeAllowlist = errors.length;
-    _checkLocalOverridesAllowlist(input.localOverrides, input.routerConfig, errors);
-    const allowlistPaths = new Set(
-      errors.slice(beforeAllowlist).map((e) => e.path)
-    );
-    if (!validateLocalOverrides(input.localOverrides)) {
-      for (const e of validateLocalOverrides.errors ?? []) {
-        const ajvPath = _ajvErrorPath(e);
-        if (e.keyword === "additionalProperties" && allowlistPaths.has(ajvPath)) {
-          continue;
-        }
-        const reportedPath = e.keyword === "additionalProperties" ? ajvPath : e.instancePath || "/";
-        errors.push({
-          file: "local-overrides.yaml",
-          path: reportedPath,
-          message: e.message ?? "validation error"
-        });
-      }
-    }
-  }
-  return { valid: errors.length === 0, errors };
-}
-function _ajvErrorPath(e) {
-  const base = e.instancePath || "";
-  const extra = e.params && typeof e.params["additionalProperty"] === "string" ? `/${e.params["additionalProperty"]}` : "";
-  return `${base}${extra}` || "/";
-}
-function _checkModelProviderRefs(routerConfig, errors) {
-  const providers = routerConfig["providers"];
-  const models = routerConfig["models"];
-  if (!providers || typeof providers !== "object")
-    return;
-  if (!models || typeof models !== "object")
-    return;
-  const providerIds = new Set(Object.keys(providers));
-  for (const [modelId, modelRaw] of Object.entries(models)) {
-    const model = modelRaw;
-    if (!model || typeof model !== "object")
-      continue;
-    const ref = model["provider"];
-    if (typeof ref === "string" && !providerIds.has(ref)) {
-      errors.push({
-        file: "router-config.yaml",
-        path: `/models/${modelId}/provider`,
-        message: `provider "${ref}" not found in providers block`
-      });
-    }
-  }
-}
-function _checkLocalOverridesAllowlist(localOverrides, routerConfig, errors) {
-  for (const deniedPath of LOCAL_OVERRIDE_DENIED_TOP_LEVEL) {
-    if (deniedPath in localOverrides) {
-      errors.push({
-        file: "local-overrides.yaml",
-        path: `/${deniedPath}`,
-        message: `"${deniedPath}" is not locally overridable (project-canonical field)`
-      });
-    }
-  }
-  if (routerConfig !== null) {
-    const sharedProviders = routerConfig["providers"];
-    const sharedProviderIds = new Set(
-      sharedProviders && typeof sharedProviders === "object" ? Object.keys(sharedProviders) : []
-    );
-    const localProviders = localOverrides["providers"];
-    if (localProviders && typeof localProviders === "object") {
-      for (const [id, providerRaw] of Object.entries(
-        localProviders
-      )) {
-        if (!sharedProviderIds.has(id)) {
-          errors.push({
-            file: "local-overrides.yaml",
-            path: `/providers/${id}`,
-            message: `provider "${id}" exists only in local-overrides (local overrides cannot add new providers)`
-          });
-          continue;
-        }
-        const provider = providerRaw;
-        if (!provider || typeof provider !== "object")
-          continue;
-        for (const deniedKey of LOCAL_OVERRIDE_DENIED_PROVIDER_KEYS) {
-          if (deniedKey in provider) {
-            errors.push({
-              file: "local-overrides.yaml",
-              path: `/providers/${id}/${deniedKey}`,
-              message: `"${deniedKey}" is not locally overridable (project-canonical field)`
-            });
-          }
-        }
-      }
-    }
-  }
-}
-
-// src/configEditor/sections/helpers.ts
-function escapeHtml(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
-}
-function getByPath(obj, path43) {
-  if (!obj)
-    return void 0;
-  const parts = path43.split(".");
-  let cur = obj;
-  for (const p2 of parts) {
-    if (cur === null || cur === void 0 || typeof cur !== "object")
-      return void 0;
-    cur = cur[p2];
-  }
-  return cur;
-}
-function fieldSource(state, sharedObject, sharedPath, localPath, allowed) {
-  if (!allowed)
-    return "not-overridable";
-  if (sharedObject === "localOnly") {
-    const localVal2 = getByPath(state.localOverrides, localPath);
-    return localVal2 !== void 0 ? "local" : "default";
-  }
-  const localVal = getByPath(state.localOverrides, localPath);
-  if (localVal !== void 0)
-    return "local";
-  const sharedVal = sharedObject === "routerConfig" ? getByPath(state.routerConfig, sharedPath) : getByPath(state.budget, sharedPath);
-  return sharedVal !== void 0 ? "shared" : "default";
-}
-function indicatorHtml(source, fieldKey) {
-  switch (source) {
-    case "shared":
-      return `<span class="src-indicator src-shared" data-source="shared" data-field="${escapeHtml(fieldKey)}" title="Value comes from the shared (committed) config. Click to move to local overrides.">(shared)</span>`;
-    case "local":
-      return `<span class="src-indicator src-local" data-source="local" data-field="${escapeHtml(fieldKey)}" title="Value comes from local-overrides.yaml. Click to promote to shared.">(local override)</span>`;
-    case "default":
-      return `<span class="src-indicator src-default" data-source="default" data-field="${escapeHtml(fieldKey)}" title="Field is using the schema default \u2014 no value in either file.">(default)</span>`;
-    case "not-overridable":
-      return ``;
-  }
-}
-function envVarBadge(state, name) {
-  if (!name)
-    return `<span class="env-badge env-unset">(unset)</span>`;
-  return state.envVarPresence[name] ? `<span class="env-badge env-set" title="${escapeHtml(name)} is set in your shell.">&#10003;</span>` : `<span class="env-badge env-unset" title="${escapeHtml(name)} is not set in your shell.">(unset)</span>`;
-}
-function asString(v, fallback = "") {
-  if (v === void 0 || v === null)
-    return fallback;
-  return String(v);
-}
-function asNumber2(v) {
-  if (typeof v === "number")
-    return v;
-  if (typeof v === "string") {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : NaN;
-  }
-  return NaN;
-}
-
-// src/configEditor/sections/routingAndVerificationSection.ts
-function render(state) {
-  const localRouting = getByPath(state.localOverrides, "routing.outsourcing_mode");
-  const sharedRouting = getByPath(state.routerConfig, "routing.outsourcing_mode");
-  const effectiveRouting = (typeof localRouting === "string" ? localRouting : null) ?? (typeof sharedRouting === "string" ? sharedRouting : null) ?? "whenever-helpful";
-  const routingSource = fieldSource(
-    state,
-    "routerConfig",
-    "routing.outsourcing_mode",
-    "routing.outsourcing_mode",
-    true
-  );
-  const verification = getByPath(state.budget, "verification_method");
-  const effectiveVerification = typeof verification === "string" ? verification : "api";
-  const verificationSource = fieldSource(state, "budget", "verification_method", "", false);
-  const outsourcingDisabled = effectiveRouting === "disabled";
-  const html = `
-<div class="section-block">
-  <h3>Mid-session outsourcing</h3>
-  <p class="section-help">When should the orchestrator route reasoning tasks to external AI providers during the session itself (not at session end)?</p>
-  <div class="field-row">
-    <label for="s1-outsourcing-mode">Mode</label>
-    <select id="s1-outsourcing-mode" data-field="outsourcingMode">
-      <option value="whenever-helpful"${effectiveRouting === "whenever-helpful" ? " selected" : ""}>Whenever helpful (let AI decide)</option>
-      <option value="verification-only"${effectiveRouting === "verification-only" ? " selected" : ""}>Verification only</option>
-      <option value="disabled"${effectiveRouting === "disabled" ? " selected" : ""}>Disabled</option>
-    </select>
-    ${indicatorHtml(routingSource, "outsourcingMode")}
-  </div>
-</div>
-
-<div class="section-block">
-  <h3>Cross-provider verification</h3>
-  <p class="section-help">How should end-of-session cross-provider verification run? (Rule 2 of the workflow doc: every session ends with verification unless this is explicitly set to None.)</p>
-  <div class="field-row">
-    <label for="s1-verification-method">Method</label>
-    <select id="s1-verification-method" data-field="verificationMethod" data-disable-api="${outsourcingDisabled ? "1" : "0"}">
-      <option value="api"${effectiveVerification === "api" ? " selected" : ""}${outsourcingDisabled ? " disabled" : ""}>Automatic via API (recommended)</option>
-      <option value="manual-via-other-engine"${effectiveVerification === "manual-via-other-engine" ? " selected" : ""}>Manual via portable markdown</option>
-      <option value="skipped"${effectiveVerification === "skipped" ? " selected" : ""}>None</option>
-    </select>
-    ${indicatorHtml(verificationSource, "verificationMethod")}
-  </div>
-  <p class="section-info" id="s1-api-constraint" style="${outsourcingDisabled ? "" : "display:none;"}">
-    &#9432; "Automatic via API" requires outsourcing to be enabled. When outsourcing is Disabled, only "Manual" and "None" are available here.
-  </p>
-  <div id="s1-manual-template" style="${effectiveVerification === "manual-via-other-engine" ? "" : "display:none;"}">
-    <p class="section-info">
-      Manual verification template URL:
-      <a href="https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/ai_router/prompt-templates/verification.md" target="_blank" rel="noopener">
-        ai_router/prompt-templates/verification.md
-      </a>
-    </p>
-  </div>
-</div>
-`;
-  return { html };
-}
-
-// src/configEditor/sections/budgetSection.ts
-function render2(state) {
-  const sharedThreshold = asNumber2(getByPath(state.budget, "threshold_usd"));
-  const localThreshold = asNumber2(getByPath(state.localOverrides, "threshold_usd"));
-  const effectiveThreshold = Number.isFinite(localThreshold) ? localThreshold : Number.isFinite(sharedThreshold) ? sharedThreshold : 10;
-  const sharedScope = getByPath(state.budget, "scope");
-  const effectiveScope = typeof sharedScope === "string" ? sharedScope : "per-session-set";
-  const sharedWarn = asNumber2(getByPath(state.budget, "warn_at_percent"));
-  const localWarn = asNumber2(getByPath(state.localOverrides, "warn_at_percent"));
-  const effectiveWarn = Number.isFinite(localWarn) ? localWarn : Number.isFinite(sharedWarn) ? sharedWarn : 80;
-  const thresholdSource = fieldSource(state, "budget", "threshold_usd", "threshold_usd", true);
-  const scopeSource = fieldSource(state, "budget", "scope", "", false);
-  const warnSource = fieldSource(state, "budget", "warn_at_percent", "warn_at_percent", true);
-  const warnAmount = effectiveThreshold * effectiveWarn / 100;
-  const fmt = (n) => `$${n.toFixed(2)}`;
-  const html = `
-<div class="section-block">
-  <h3>Budget threshold</h3>
-  <p class="section-help">
-    Operating cost is governed by an open-source AI orchestration framework \u2014 actual provider costs vary
-    <strong>$0\u2013~$50/week</strong>, which works out to <strong>~$0\u2013$200/month</strong> or
-    <strong>~$5\u2013$50 for a typical 2\u20133 week session set</strong>, depending on routing mode and session frequency.
-    See the cost dashboard (Dabbler: Show Cost Dashboard) for live cumulative spend.
-    The framework is open-source; you are not billed by Dabbler \u2014 you are billed by
-    Anthropic, Google, and/or OpenAI directly per their pricing.
-  </p>
-  <div class="field-row">
-    <label for="s2-threshold-usd">Threshold (USD)</label>
-    <input type="number" id="s2-threshold-usd" data-field="thresholdUsd" min="0" step="0.01" value="${escapeHtml(effectiveThreshold.toFixed(2))}" />
-    ${indicatorHtml(thresholdSource, "thresholdUsd")}
-  </div>
-  <div class="field-row">
-    <label for="s2-scope">Scope</label>
-    <select id="s2-scope" data-field="scope">
-      <option value="per-session-set"${effectiveScope === "per-session-set" ? " selected" : ""}>Per session-set (recommended)</option>
-      <option value="per-project"${effectiveScope === "per-project" ? " selected" : ""}>Per project</option>
-      ${effectiveScope === "per-session" ? `<option value="per-session" selected>Per session (hand-edit only)</option>` : ""}
-    </select>
-    ${indicatorHtml(scopeSource, "scope")}
-  </div>
-  <div class="field-row">
-    <label for="s2-warn-at-percent">Warn at</label>
-    <input type="range" id="s2-warn-at-percent" data-field="warnAtPercent" min="0" max="100" step="5" value="${effectiveWarn}" />
-    <span id="s2-warn-at-percent-value" class="slider-value">${effectiveWarn}%</span>
-    ${indicatorHtml(warnSource, "warnAtPercent")}
-  </div>
-</div>
-
-<div class="section-block">
-  <h3>Prompt UX preview</h3>
-  <p class="section-help">How the orchestrator will react at each cumulative-spend band, based on the threshold and warn percentage above.</p>
-  <div class="preview-block" id="s2-preview">
-    <p><strong>Below ${effectiveWarn}% of ${fmt(effectiveThreshold)} (${fmt(warnAmount)}):</strong>
-       <span class="preview-detail">Silent \u2014 no prompt, just log to cost dashboard.</span></p>
-    <p><strong>Between ${effectiveWarn}% and 100% (${fmt(warnAmount)}\u2013${fmt(effectiveThreshold)}):</strong>
-       <span class="preview-detail">Heads-up \u2014 non-blocking notification, one per band.</span></p>
-    <p><strong>At or above ${fmt(effectiveThreshold)}:</strong>
-       <span class="preview-detail">Confirm-or-abort \u2014 modal dialog before the call proceeds.</span></p>
-  </div>
-</div>
-`;
-  return { html };
-}
-
-// src/configEditor/sections/providersTableSection.ts
-function render3(state) {
-  const sharedProviders = state.routerConfig && typeof state.routerConfig === "object" ? state.routerConfig["providers"] : void 0;
-  const rows = [];
-  if (sharedProviders && typeof sharedProviders === "object") {
-    for (const id of Object.keys(sharedProviders)) {
-      rows.push(resolveRow(state, id));
-    }
-  }
-  const tableRows = rows.map((row) => renderRow(state, row)).join("\n");
-  const html = `
-<div class="section-block">
-  <h3>AI providers configured for this project</h3>
-  <p class="section-help">One row per <code>providers</code> entry in <code>router-config.yaml</code>. Local overrides for <em>enabled</em>, <em>api_key_env</em>, and <em>base_url</em> live in <code>local-overrides.yaml</code> per Appendix B.</p>
-
-  <table class="provider-table" id="s3-providers">
-    <thead>
-      <tr>
-        <th>On?</th>
-        <th>Display label</th>
-        <th>ID</th>
-        <th>API key env var</th>
-        <th>API URL</th>
-        <th>Edit</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${tableRows || `<tr><td colspan="6" class="placeholder">No providers configured. Hand-edit ai_router/router-config.yaml to add providers.</td></tr>`}
-    </tbody>
-  </table>
-
-  <p class="legend">
-    <span class="env-badge env-set">&#10003;</span> env var is set in the current environment &nbsp;|&nbsp;
-    <span class="env-badge env-unset">(unset)</span> env var name is configured but not present.
-    <br/>
-    <em>Tip: The webview never shows env-var <strong>values</strong> \u2014 only names + presence.</em>
-  </p>
-</div>
-`;
-  return { html };
-}
-function resolveRow(state, id) {
-  const sharedPath = (k2) => `providers.${id}.${k2}`;
-  const sharedEnabled = getByPath(state.routerConfig, sharedPath("enabled"));
-  const localEnabled = getByPath(state.localOverrides, sharedPath("enabled"));
-  const enabled = typeof localEnabled === "boolean" ? localEnabled : typeof sharedEnabled === "boolean" ? sharedEnabled : true;
-  const enabledSource = fieldSource(state, "routerConfig", sharedPath("enabled"), sharedPath("enabled"), true);
-  const displayLabel = asString(getByPath(state.routerConfig, sharedPath("display_label")) ?? toTitle(id));
-  const sharedKey = getByPath(state.routerConfig, sharedPath("api_key_env"));
-  const localKey = getByPath(state.localOverrides, sharedPath("api_key_env"));
-  const apiKeyEnv = asString(
-    typeof localKey === "string" && localKey.length > 0 ? localKey : typeof sharedKey === "string" ? sharedKey : ""
-  );
-  const apiKeyEnvSource = fieldSource(state, "routerConfig", sharedPath("api_key_env"), sharedPath("api_key_env"), true);
-  const sharedUrl = getByPath(state.routerConfig, sharedPath("base_url"));
-  const localUrl = getByPath(state.localOverrides, sharedPath("base_url"));
-  const baseUrl = asString(typeof localUrl === "string" ? localUrl : typeof sharedUrl === "string" ? sharedUrl : "");
-  const baseUrlSource = fieldSource(state, "routerConfig", sharedPath("base_url"), sharedPath("base_url"), true);
-  return { id, displayLabel, enabled, enabledSource, apiKeyEnv, apiKeyEnvSource, baseUrl, baseUrlSource };
-}
-function renderRow(state, row) {
-  return `
-<tr class="provider-row" data-provider-id="${escapeHtml(row.id)}">
-  <td>
-    <input type="checkbox" data-field="enabled"${row.enabled ? " checked" : ""} aria-label="Enabled" />
-    ${indicatorHtml(row.enabledSource, `providers.${row.id}.enabled`)}
-  </td>
-  <td>
-    <input type="text" data-field="displayLabel" value="${escapeHtml(row.displayLabel)}" />
-  </td>
-  <td>
-    <code>${escapeHtml(row.id)}</code>
-  </td>
-  <td>
-    <input type="text" data-field="apiKeyEnv" value="${escapeHtml(row.apiKeyEnv)}" pattern="^[A-Z_][A-Z0-9_]*$" />
-    ${envVarBadge(state, row.apiKeyEnv)}
-    ${indicatorHtml(row.apiKeyEnvSource, `providers.${row.id}.api_key_env`)}
-  </td>
-  <td>
-    <input type="text" data-field="baseUrl" value="${escapeHtml(row.baseUrl)}" />
-    ${indicatorHtml(row.baseUrlSource, `providers.${row.id}.base_url`)}
-  </td>
-  <td>
-    <button type="button" class="secondary popover-toggle" data-target="popover-${escapeHtml(row.id)}">&hellip;</button>
-  </td>
-</tr>
-<tr class="provider-popover" id="popover-${escapeHtml(row.id)}" style="display:none;">
-  <td colspan="6">
-    <p class="section-info">
-      Advanced provider fields (<code>rate_limit</code>, <code>timeout_seconds</code>, <code>retry</code>)
-      are not editable from the webview in v1 \u2014 they remain hand-edit-only in
-      <code>router-config.yaml</code>. The webview's job is the operator-friendly surface; the
-      expert surface is the YAML itself.
-    </p>
-  </td>
-</tr>
-`;
-}
-function toTitle(id) {
-  return id.split(/[-_]/).map((p2) => p2.length === 0 ? p2 : p2[0].toUpperCase() + p2.slice(1)).join(" ");
-}
-
-// src/configEditor/sections/significanceFlaggingSection.ts
-function render4(state) {
-  const honor = getByPath(state.localOverrides, "decision_review.honor_annotations");
-  const honorOn = typeof honor === "boolean" ? honor : true;
-  const honorSource = fieldSource(state, "localOnly", "", "decision_review.honor_annotations", true);
-  const html = `
-<div class="section-block">
-  <h3>Two ways to flag a decision for cross-provider review</h3>
-
-  <ol class="numbered-list">
-    <li>
-      <strong>Run the command</strong>
-      <div class="command-box">
-        <code>Dabbler: Flag Decision for Cross-Provider Review</code>
-      </div>
-      <p class="section-help">You'll be prompted for a one-line reason. The flag is queued in the active session-set's decision-review queue.</p>
-      <button type="button" id="s4-run-flag-command" class="secondary">Run command now&hellip;</button>
-    </li>
-    <li>
-      <strong>Add an annotation in source code</strong>
-      <pre class="code-sample"># @dabbler:outsource-review("reason text here")
-// @dabbler:outsource-review("reason text here")</pre>
-      <p class="section-help">Run <code>Dabbler: Scan Workspace for @dabbler:outsource-review Annotations</code> from the command palette to walk workspace source files for these markers and append new findings to the queue (deduplicated against existing entries by file+line+reason). Both <code>#</code> and <code>//</code> comment styles are recognized.</p>
-    </li>
-  </ol>
-</div>
-
-<div class="section-block">
-  <h3>Honor annotations</h3>
-  <div class="field-row">
-    <label><input type="checkbox" id="s4-honor-annotations" data-field="honorAnnotations"${honorOn ? " checked" : ""} /> Honor <code>@dabbler:outsource-review</code> annotations in this project</label>
-    ${indicatorHtml(honorSource, "honorAnnotations")}
-  </div>
-  <p class="section-info">Defaults to ON; this setting lives in <code>local-overrides.yaml</code> at <code>decision_review.honor_annotations</code>.</p>
-</div>
-
-<div class="section-block">
-  <h3>Queue file</h3>
-  <p class="section-info">
-    Flagged decisions are appended to:
-    <br/>
-    <code>docs/session-sets/&lt;active-slug&gt;/decision-review-queue.jsonl</code>
-    <br/>
-    They surface in the orchestrator's initial planning checklist at the next session start.
-  </p>
-</div>
-`;
-  return { html };
-}
-
-// src/configEditor/sections/notificationsSection.ts
-function render5(state) {
-  const enabledRaw = getByPath(state.localOverrides, "notifications.pushover.enabled");
-  const apiKeyRaw = getByPath(state.localOverrides, "notifications.pushover.api_key_env");
-  const userKeyRaw = getByPath(state.localOverrides, "notifications.pushover.user_key_env");
-  const enabled = typeof enabledRaw === "boolean" ? enabledRaw : false;
-  const apiKeyEnv = asString(apiKeyRaw, "PUSHOVER_API_KEY");
-  const userKeyEnv = asString(userKeyRaw, "PUSHOVER_USER_KEY");
-  const enabledSource = fieldSource(state, "localOnly", "", "notifications.pushover.enabled", true);
-  const apiKeySource = fieldSource(state, "localOnly", "", "notifications.pushover.api_key_env", true);
-  const userKeySource = fieldSource(state, "localOnly", "", "notifications.pushover.user_key_env", true);
-  const html = `
-<div class="section-block">
-  <h3>Pushover notifications at end-of-session</h3>
-
-  <div class="field-row">
-    <label><input type="checkbox" id="s5-pushover-enabled" data-field="pushoverEnabled"${enabled ? " checked" : ""} /> Enable Pushover</label>
-    ${indicatorHtml(enabledSource, "pushoverEnabled")}
-  </div>
-
-  <div class="field-row">
-    <label for="s5-pushover-api-key-env">API key env var</label>
-    <input type="text" id="s5-pushover-api-key-env" data-field="pushoverApiKeyEnv" value="${escapeHtml(apiKeyEnv)}" pattern="^[A-Z_][A-Z0-9_]*$" />
-    ${envVarBadge(state, apiKeyEnv)}
-    ${indicatorHtml(apiKeySource, "pushoverApiKeyEnv")}
-  </div>
-
-  <div class="field-row">
-    <label for="s5-pushover-user-key-env">User key env var</label>
-    <input type="text" id="s5-pushover-user-key-env" data-field="pushoverUserKeyEnv" value="${escapeHtml(userKeyEnv)}" pattern="^[A-Z_][A-Z0-9_]*$" />
-    ${envVarBadge(state, userKeyEnv)}
-    ${indicatorHtml(userKeySource, "pushoverUserKeyEnv")}
-  </div>
-
-  <p class="section-info">
-    &#9432; These values live in <code>local-overrides.yaml</code> \u2014 they are
-    NOT shared with collaborators when you push the repo. The env vars themselves
-    resolve from your operating-system shell environment, not from any file in the repo.
-  </p>
-
-  <div class="field-row">
-    <button type="button" id="s5-test-notification" class="secondary">Send a test notification now</button>
-  </div>
-</div>
-`;
-  return { html };
-}
-
-// src/configEditor/sections/localOverridesSummarySection.ts
-function render6(state) {
-  const { localOverrides, localOverridesFileExists } = state;
-  if (!localOverridesFileExists) {
-    return {
-      html: `
-<div class="section-block">
-  <h3>No local overrides on this machine</h3>
-  <p class="section-info">
-    <code>ai_router/local-overrides.yaml</code> does not exist yet. The file is in
-    <code>.gitignore</code> by design \u2014 when you set a per-operator override in
-    Routing / Budget / Providers / Notifications, the webview creates it on Save.
-  </p>
-</div>
-`
-    };
-  }
-  const rows = collectOverrideRows(localOverrides, state);
-  if (rows.length === 0) {
-    return {
-      html: `
-<div class="section-block">
-  <h3>Local overrides summary</h3>
-  <p class="section-info">
-    <code>local-overrides.yaml</code> exists but contains no override entries.
-    All effective config comes from the shared YAML files.
-  </p>
-  <button type="button" id="s6-open-local-overrides" class="secondary">Open local-overrides.yaml</button>
-</div>
-`
-    };
-  }
-  const rowsHtml = rows.map((r2) => `
-<li class="override-row">
-  <div class="override-path"><code>${escapeHtml(r2.path)}</code></div>
-  <div class="override-side">
-    <strong>Shared:</strong>
-    <code>${escapeHtml(r2.sharedDisplay)}</code>
-  </div>
-  <div class="override-side">
-    <strong>Local:</strong>
-    <code>${escapeHtml(r2.localDisplay)}</code>
-  </div>
-</li>
-`).join("\n");
-  const html = `
-<div class="section-block">
-  <h3>These settings differ from the shared (committed) configuration</h3>
-  <ul class="override-list">
-    ${rowsHtml}
-  </ul>
-  <p class="section-info">
-    &#9432; <code>local-overrides.yaml</code> is in your <code>.gitignore</code> \u2014 values here are
-    personal to your machine and never get pushed to the repo.
-  </p>
-  <button type="button" id="s6-open-local-overrides" class="secondary">Open local-overrides.yaml directly</button>
-</div>
-`;
-  return { html };
-}
-function collectOverrideRows(localOverrides, state) {
-  if (!localOverrides)
-    return [];
-  const rows = [];
-  walk(localOverrides, [], (path43, value) => {
-    const dotted = path43.join(".");
-    const sharedSource = pickSharedSource(path43[0]);
-    const sharedVal = sharedSource === "routerConfig" ? getByPath(state.routerConfig, dotted) : sharedSource === "budget" ? getByPath(state.budget, dotted) : void 0;
-    rows.push({
-      path: dotted,
-      sharedDisplay: sharedSource === "none" ? "(local-only section)" : formatValue(sharedVal),
-      localDisplay: formatValue(value)
-    });
-  });
-  return rows;
-}
-function pickSharedSource(topKey) {
-  if (topKey === "routing" || topKey === "providers" || topKey === "models")
-    return "routerConfig";
-  if (topKey === "threshold_usd" || topKey === "warn_at_percent" || topKey === "scope")
-    return "budget";
-  return "none";
-}
-function formatValue(v) {
-  if (v === void 0)
-    return "(not set, defaults apply)";
-  if (v === null)
-    return "null";
-  if (typeof v === "string")
-    return v;
-  if (typeof v === "boolean")
-    return v ? "true" : "false";
-  if (typeof v === "number")
-    return String(v);
-  return JSON.stringify(v);
-}
-function walk(obj, prefix, emit) {
-  for (const [k2, v] of Object.entries(obj)) {
-    const path43 = [...prefix, k2];
-    if (v !== null && typeof v === "object" && !Array.isArray(v)) {
-      walk(v, path43, emit);
-    } else {
-      emit(path43, v);
-    }
-  }
-}
-
-// src/configEditor/patch.ts
-var import_yaml2 = __toESM(require_dist());
-function applyPatch(routerConfigDoc, budgetDoc, localOverridesDoc, payload) {
-  const result = {
-    routerConfigChanged: false,
-    budgetChanged: false,
-    localOverridesChanged: false,
-    warnings: []
-  };
-  if (payload.outsourcingMode !== void 0) {
-    const { value, source } = payload.outsourcingMode;
-    if (source === "local") {
-      if (setIfChanged(localOverridesDoc, ["routing", "outsourcing_mode"], value)) {
-        result.localOverridesChanged = true;
-      }
-      deleteIfPresent(routerConfigDoc, ["routing", "outsourcing_mode"], result, "routerConfigChanged");
-    } else {
-      if (setIfChanged(routerConfigDoc, ["routing", "outsourcing_mode"], value)) {
-        result.routerConfigChanged = true;
-      }
-      deleteIfPresent(localOverridesDoc, ["routing", "outsourcing_mode"], result, "localOverridesChanged");
-      pruneEmptyContainer(localOverridesDoc, ["routing"], result, "localOverridesChanged");
-    }
-  }
-  if (payload.verificationMethod !== void 0) {
-    if (setIfChanged(budgetDoc, ["verification_method"], payload.verificationMethod)) {
-      result.budgetChanged = true;
-    }
-  }
-  if (payload.thresholdUsd !== void 0) {
-    const { value, source } = payload.thresholdUsd;
-    if (source === "local") {
-      if (setIfChanged(localOverridesDoc, ["threshold_usd"], value)) {
-        result.localOverridesChanged = true;
-      }
-      result.warnings.push("threshold_usd is project-canonical per Appendix B and may be rejected by the local-overrides allowlist.");
-    } else {
-      if (setIfChanged(budgetDoc, ["threshold_usd"], value)) {
-        result.budgetChanged = true;
-      }
-      deleteIfPresent(localOverridesDoc, ["threshold_usd"], result, "localOverridesChanged");
-    }
-  }
-  if (payload.scope !== void 0) {
-    if (setIfChanged(budgetDoc, ["scope"], payload.scope)) {
-      result.budgetChanged = true;
-    }
-  }
-  if (payload.warnAtPercent !== void 0) {
-    const { value, source } = payload.warnAtPercent;
-    if (source === "local") {
-      if (setIfChanged(localOverridesDoc, ["warn_at_percent"], value)) {
-        result.localOverridesChanged = true;
-      }
-      result.warnings.push("warn_at_percent is project-canonical per Appendix B and may be rejected by the local-overrides allowlist.");
-    } else {
-      if (setIfChanged(budgetDoc, ["warn_at_percent"], value)) {
-        result.budgetChanged = true;
-      }
-      deleteIfPresent(localOverridesDoc, ["warn_at_percent"], result, "localOverridesChanged");
-    }
-  }
-  if (payload.providers !== void 0) {
-    for (const p2 of payload.providers) {
-      if (p2.removed) {
-        deleteIfPresent(routerConfigDoc, ["providers", p2.id], result, "routerConfigChanged");
-        deleteIfPresent(localOverridesDoc, ["providers", p2.id], result, "localOverridesChanged");
-        pruneEmptyContainer(localOverridesDoc, ["providers"], result, "localOverridesChanged");
-        continue;
-      }
-      if (p2.displayLabel !== void 0) {
-        if (setIfChanged(routerConfigDoc, ["providers", p2.id, "display_label"], p2.displayLabel)) {
-          result.routerConfigChanged = true;
-        }
-      }
-      if (p2.enabled !== void 0) {
-        applyOverridableField(
-          routerConfigDoc,
-          localOverridesDoc,
-          ["providers", p2.id, "enabled"],
-          p2.enabled.value,
-          p2.enabled.source,
-          result
-        );
-      }
-      if (p2.apiKeyEnv !== void 0) {
-        applyOverridableField(
-          routerConfigDoc,
-          localOverridesDoc,
-          ["providers", p2.id, "api_key_env"],
-          p2.apiKeyEnv.value,
-          p2.apiKeyEnv.source,
-          result
-        );
-      }
-      if (p2.baseUrl !== void 0) {
-        applyOverridableField(
-          routerConfigDoc,
-          localOverridesDoc,
-          ["providers", p2.id, "base_url"],
-          p2.baseUrl.value,
-          p2.baseUrl.source,
-          result
-        );
-      }
-    }
-    pruneEmptyProvidersBlock(localOverridesDoc, result);
-  }
-  if (payload.honorAnnotations !== void 0) {
-    if (setIfChanged(localOverridesDoc, ["decision_review", "honor_annotations"], payload.honorAnnotations)) {
-      result.localOverridesChanged = true;
-    }
-  }
-  if (payload.pushoverEnabled !== void 0) {
-    if (setIfChanged(localOverridesDoc, ["notifications", "pushover", "enabled"], payload.pushoverEnabled)) {
-      result.localOverridesChanged = true;
-    }
-  }
-  if (payload.pushoverApiKeyEnv !== void 0) {
-    if (setIfChanged(localOverridesDoc, ["notifications", "pushover", "api_key_env"], payload.pushoverApiKeyEnv)) {
-      result.localOverridesChanged = true;
-    }
-  }
-  if (payload.pushoverUserKeyEnv !== void 0) {
-    if (setIfChanged(localOverridesDoc, ["notifications", "pushover", "user_key_env"], payload.pushoverUserKeyEnv)) {
-      result.localOverridesChanged = true;
-    }
-  }
-  return result;
-}
-function applyOverridableField(routerConfigDoc, localOverridesDoc, path43, value, source, result) {
-  if (source === "local") {
-    if (setIfChanged(localOverridesDoc, path43, value)) {
-      result.localOverridesChanged = true;
-    }
-    deleteIfPresent(routerConfigDoc, path43, result, "routerConfigChanged");
-  } else {
-    if (setIfChanged(routerConfigDoc, path43, value)) {
-      result.routerConfigChanged = true;
-    }
-    deleteIfPresent(localOverridesDoc, path43, result, "localOverridesChanged");
-  }
-}
-function setIfChanged(doc, path43, value) {
-  const current = doc.getIn(path43);
-  if (current === value)
-    return false;
-  doc.setIn(path43, value);
-  return true;
-}
-function deleteIfPresent(doc, path43, result, flag) {
-  if (doc.hasIn(path43)) {
-    doc.deleteIn(path43);
-    result[flag] = true;
-  }
-}
-function pruneEmptyContainer(doc, path43, result, flag) {
-  if (!doc.hasIn(path43))
-    return;
-  const node = doc.getIn(path43);
-  if (node && typeof node === "object" && "items" in node) {
-    const items = node.items;
-    if (Array.isArray(items) && items.length === 0) {
-      doc.deleteIn(path43);
-      result[flag] = true;
-    }
-  }
-}
-function pruneEmptyProvidersBlock(doc, result) {
-  const providersNode = doc.getIn(["providers"]);
-  if (!providersNode || typeof providersNode !== "object" || !("items" in providersNode))
-    return;
-  const items = providersNode.items ?? [];
-  for (let i2 = items.length - 1; i2 >= 0; i2--) {
-    const key = items[i2]?.key?.value;
-    if (typeof key !== "string")
-      continue;
-    const providerEntry = doc.getIn(["providers", key]);
-    if (providerEntry && typeof providerEntry === "object" && "items" in providerEntry) {
-      const innerItems = providerEntry.items;
-      if (Array.isArray(innerItems) && innerItems.length === 0) {
-        doc.deleteIn(["providers", key]);
-        result.localOverridesChanged = true;
-      }
-    }
-  }
-  pruneEmptyContainer(doc, ["providers"], result, "localOverridesChanged");
-}
-function emptyLocalOverridesDoc() {
-  const text = `# ai_router/local-overrides.yaml
-# Machine-local overrides; this file is .gitignored.
-# Appendix B (Set 025 spec) defines which paths are locally overridable.
-{}
-`;
-  return (0, import_yaml2.parseDocument)(text);
-}
-
-// src/configEditor/ConfigEditorPanel.ts
-function getNonce2() {
-  let text = "";
-  const possible = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  for (let i2 = 0; i2 < 32; i2++)
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  return text;
-}
-var ConfigEditorPanel = class _ConfigEditorPanel {
-  constructor(panel, extensionUri) {
-    this._loaded = null;
-    this._validation = null;
-    this._parseIssues = [];
-    this._lastSaveSnapshot = null;
-    this._recovery = null;
-    this._panel = panel;
-    this._extensionUri = extensionUri;
-    this._loadFiles();
-    this._panel.webview.html = this._getHtml();
-    this._panel.onDidDispose(() => {
-      _ConfigEditorPanel.currentPanel = void 0;
-    });
-    this._panel.webview.onDidReceiveMessage((msg) => {
-      switch (msg.command) {
-        case "save":
-          this._handleSave(msg.payload);
-          break;
-        case "refresh":
-          this._refresh();
-          break;
-        case "runFlagCommand":
-          this._runFlagDecisionCommand();
-          break;
-        case "openLocalOverrides":
-          this._openLocalOverridesFile();
-          break;
-        case "retryFailedWrite":
-          this._retryFailedWrite();
-          break;
-        case "acceptHalfBatch":
-          this._acceptHalfBatchAsBaseline();
-          break;
-        case "reapplyLastSave":
-          this._reapplyLastSave();
-          break;
-        case "sendTestNotification":
-          this._handleTestNotification();
-          break;
-      }
-    });
-  }
-  static createOrShow(context) {
-    if (_ConfigEditorPanel.currentPanel) {
-      _ConfigEditorPanel.currentPanel._panel.reveal(vscode34.ViewColumn.One);
-      _ConfigEditorPanel.currentPanel._refresh();
-      return;
-    }
-    const panel = vscode34.window.createWebviewPanel(
-      "dabblerConfigEditor",
-      "Dabbler Config Editor",
-      vscode34.ViewColumn.One,
-      {
-        enableScripts: true,
-        localResourceRoots: [vscode34.Uri.joinPath(context.extensionUri, "webview")]
-      }
-    );
-    _ConfigEditorPanel.currentPanel = new _ConfigEditorPanel(panel, context.extensionUri);
-  }
-  _findAiRouterDir() {
-    const roots = vscode34.workspace.workspaceFolders;
-    if (!roots?.length)
-      return null;
-    for (const folder of roots) {
-      const candidate = path34.join(folder.uri.fsPath, "ai_router");
-      if (fs29.existsSync(candidate))
-        return candidate;
-    }
-    return null;
-  }
-  _loadFiles() {
-    const aiRouterDir = this._findAiRouterDir();
-    if (!aiRouterDir) {
-      this._loaded = null;
-      this._validation = null;
-      return;
-    }
-    const routerConfigPath = path34.join(aiRouterDir, "router-config.yaml");
-    const budgetPath = path34.join(aiRouterDir, "budget.yaml");
-    const localOverridesPath = path34.join(aiRouterDir, "local-overrides.yaml");
-    const routerResult = readYamlFile(routerConfigPath);
-    const budgetResult = readYamlFile(budgetPath);
-    const localResult = readYamlFile(localOverridesPath);
-    this._loaded = {
-      routerConfigPath,
-      budgetPath,
-      localOverridesPath,
-      localOverridesFileExists: localResult !== null,
-      routerConfigDoc: routerResult?.doc ?? null,
-      budgetDoc: budgetResult?.doc ?? null,
-      localOverridesDoc: localResult?.doc ?? null,
-      routerConfigText: routerResult?.text ?? null,
-      budgetText: budgetResult?.text ?? null,
-      localOverridesText: localResult?.text ?? null
-    };
-    this._parseIssues = [];
-    if (routerResult) {
-      for (const err of routerResult.parseErrors) {
-        this._parseIssues.push({ file: "router-config.yaml", err });
-      }
-    }
-    if (budgetResult) {
-      for (const err of budgetResult.parseErrors) {
-        this._parseIssues.push({ file: "budget.yaml", err });
-      }
-    }
-    if (localResult) {
-      for (const err of localResult.parseErrors) {
-        this._parseIssues.push({ file: "local-overrides.yaml", err });
-      }
-    }
-    const routerHasParse = this._parseIssues.some((p2) => p2.file === "router-config.yaml");
-    const budgetHasParse = this._parseIssues.some((p2) => p2.file === "budget.yaml");
-    const localHasParse = this._parseIssues.some((p2) => p2.file === "local-overrides.yaml");
-    const routerConfigObj = !routerHasParse ? routerResult?.doc.toJSON() ?? null : null;
-    const budgetObj = !budgetHasParse ? budgetResult?.doc.toJSON() ?? null : null;
-    const localObj = !localHasParse ? localResult?.doc.toJSON() ?? null : null;
-    this._validation = validateBatch({
-      routerConfig: routerConfigObj,
-      budget: budgetObj,
-      localOverrides: localObj
-    });
-    if (!this._recovery || this._recovery.failed.length === 0) {
-      this._recovery = this._detectDrift();
-    }
-  }
-  _detectDrift() {
-    if (!this._lastSaveSnapshot || !this._loaded)
-      return null;
-    const drifted = [];
-    const currentRouter = this._loaded.routerConfigText;
-    const currentBudget = this._loaded.budgetText;
-    const currentLocal = this._loaded.localOverridesText;
-    if (currentRouter !== null && currentRouter !== this._lastSaveSnapshot.routerConfigText) {
-      drifted.push("router-config.yaml");
-    } else if (currentRouter === null && this._lastSaveSnapshot.routerConfigText !== "") {
-      drifted.push("router-config.yaml");
-    }
-    if (currentBudget !== null && currentBudget !== this._lastSaveSnapshot.budgetText) {
-      drifted.push("budget.yaml");
-    } else if (currentBudget === null && this._lastSaveSnapshot.budgetText !== "") {
-      drifted.push("budget.yaml");
-    }
-    if (currentLocal !== this._lastSaveSnapshot.localOverridesText) {
-      drifted.push("local-overrides.yaml");
-    }
-    if (drifted.length === 0)
-      return null;
-    return { succeeded: [], failed: [], drifted, pendingContents: {} };
-  }
-  _deriveState() {
-    if (!this._loaded) {
-      return {
-        routerConfig: null,
-        budget: null,
-        localOverrides: null,
-        envVarPresence: {},
-        localOverridesFileExists: false
-      };
-    }
-    const routerObj = this._loaded.routerConfigDoc?.toJSON() ?? null;
-    const budgetObj = this._loaded.budgetDoc?.toJSON() ?? null;
-    const localObj = this._loaded.localOverridesDoc?.toJSON() ?? null;
-    const envVars = /* @__PURE__ */ new Set();
-    const sharedProviders = routerObj && typeof routerObj === "object" ? routerObj["providers"] : null;
-    if (sharedProviders) {
-      for (const v of Object.values(sharedProviders)) {
-        const ent = v;
-        if (typeof ent?.api_key_env === "string")
-          envVars.add(ent.api_key_env);
-      }
-    }
-    const localProviders = localObj && typeof localObj === "object" ? localObj["providers"] : null;
-    if (localProviders) {
-      for (const v of Object.values(localProviders)) {
-        const ent = v;
-        if (typeof ent?.api_key_env === "string")
-          envVars.add(ent.api_key_env);
-      }
-    }
-    const pushover = localObj && typeof localObj === "object" ? localObj["notifications"]?.["pushover"] : void 0;
-    if (pushover) {
-      if (typeof pushover.api_key_env === "string")
-        envVars.add(pushover.api_key_env);
-      if (typeof pushover.user_key_env === "string")
-        envVars.add(pushover.user_key_env);
-    }
-    const envVarPresence = {};
-    for (const name of envVars) {
-      const v = process.env[name];
-      envVarPresence[name] = typeof v === "string" && v.length > 0;
-    }
-    return {
-      routerConfig: routerObj,
-      budget: budgetObj,
-      localOverrides: localObj,
-      envVarPresence,
-      localOverridesFileExists: this._loaded.localOverridesFileExists
-    };
-  }
-  _handleSave(payload) {
-    if (!this._loaded) {
-      vscode34.window.showErrorMessage("No config files loaded.");
-      return;
-    }
-    if (this._parseIssues.length > 0) {
-      vscode34.window.showErrorMessage(
-        `Save aborted \u2014 ${this._parseIssues.length} YAML parse error(s). Fix the parse errors in the source files before saving.`
-      );
-      return;
-    }
-    if (!payload) {
-      vscode34.window.showErrorMessage("Save aborted \u2014 no payload from webview.");
-      return;
-    }
-    if (!this._loaded.routerConfigDoc || !this._loaded.budgetDoc) {
-      vscode34.window.showErrorMessage("Save aborted \u2014 required config files are missing.");
-      return;
-    }
-    const routerClone = parseDocumentFromText(this._loaded.routerConfigDoc.toString());
-    const budgetClone = parseDocumentFromText(this._loaded.budgetDoc.toString());
-    const localClone = this._loaded.localOverridesDoc ? parseDocumentFromText(this._loaded.localOverridesDoc.toString()) : emptyLocalOverridesDoc();
-    let applyResult;
-    try {
-      applyResult = applyPatch(routerClone, budgetClone, localClone, payload);
-    } catch (err) {
-      vscode34.window.showErrorMessage(
-        `Save aborted \u2014 patch application failed: ${err instanceof Error ? err.message : String(err)}`
-      );
-      return;
-    }
-    const routerObj = routerClone.toJSON() ?? null;
-    const budgetObj = budgetClone.toJSON() ?? null;
-    const localObj = localClone.toJSON() ?? null;
-    const validation = validateBatch({ routerConfig: routerObj, budget: budgetObj, localOverrides: localObj });
-    if (!validation.valid) {
-      const msgs = validation.errors.map((e) => `${e.file}${e.path}: ${e.message}`).join("\n");
-      vscode34.window.showErrorMessage(
-        `Save aborted \u2014 ${validation.errors.length} validation error(s):
-${msgs}`,
-        { modal: false }
-      );
-      return;
-    }
-    this._loaded.routerConfigDoc = routerClone;
-    this._loaded.budgetDoc = budgetClone;
-    this._loaded.localOverridesDoc = localClone;
-    const localJson = localClone.toJSON();
-    const localHasContent = localJson && Object.keys(localJson).length > 0;
-    const shouldWriteLocal = applyResult.localOverridesChanged && (localHasContent || this._loaded.localOverridesFileExists);
-    const pending = {};
-    if (applyResult.routerConfigChanged)
-      pending["router-config.yaml"] = routerClone.toString();
-    if (applyResult.budgetChanged)
-      pending["budget.yaml"] = budgetClone.toString();
-    if (shouldWriteLocal)
-      pending["local-overrides.yaml"] = localClone.toString();
-    const succeeded = [];
-    const failed = [];
-    const writeAtomic = (file, target, content) => {
-      const tmp = target + ".tmp";
-      try {
-        fs29.writeFileSync(tmp, content, "utf8");
-        fs29.renameSync(tmp, target);
-        succeeded.push(file);
-      } catch (err) {
-        try {
-          if (fs29.existsSync(tmp))
-            fs29.unlinkSync(tmp);
-        } catch {
-        }
-        failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
-      }
-    };
-    if (pending["router-config.yaml"] !== void 0) {
-      writeAtomic("router-config.yaml", this._loaded.routerConfigPath, pending["router-config.yaml"]);
-    }
-    if (pending["budget.yaml"] !== void 0) {
-      writeAtomic("budget.yaml", this._loaded.budgetPath, pending["budget.yaml"]);
-    }
-    if (pending["local-overrides.yaml"] !== void 0) {
-      const workspaceRoot2 = path34.dirname(path34.dirname(this._loaded.localOverridesPath));
-      const ignored = ensureLocalOverridesIgnored(
-        {
-          exists: (p2) => fs29.existsSync(p2),
-          readFile: (p2) => fs29.readFileSync(p2, "utf8"),
-          writeFile: (p2, c3) => fs29.writeFileSync(p2, c3, "utf8"),
-          removeRecursive: (p2) => fs29.rmSync(p2, { recursive: true, force: true })
-        },
-        workspaceRoot2
-      );
-      if (!ignored.ok) {
-        vscode34.window.showWarningMessage(
-          `Saving ${LOCAL_OVERRIDES_REL}, but could not confirm it is git-ignored (${ignored.reason}). Add "${LOCAL_OVERRIDES_IGNORE_RULE}" to .gitignore before committing \u2014 these are per-machine settings.`
-        );
-      }
-      writeAtomic("local-overrides.yaml", this._loaded.localOverridesPath, pending["local-overrides.yaml"]);
-    }
-    if (failed.length > 0 && succeeded.length > 0) {
-      const pendingContents = {};
-      for (const f of failed) {
-        const content = pending[f.file];
-        if (content !== void 0)
-          pendingContents[f.file] = content;
-      }
-      this._recovery = { succeeded, failed, drifted: [], pendingContents };
-      this._refresh();
-      vscode34.window.showErrorMessage(
-        `Partial save \u2014 ${succeeded.length} file(s) saved, ${failed.length} failed. See the recovery banner in the editor.`
-      );
-      return;
-    }
-    if (failed.length > 0) {
-      this._refresh();
-      vscode34.window.showErrorMessage(
-        `Save failed: ${failed.map((f) => `${f.file}: ${f.reason}`).join("; ")}`
-      );
-      return;
-    }
-    this._lastSaveSnapshot = this._captureSnapshot(applyResult.routerConfigChanged, applyResult.budgetChanged, shouldWriteLocal);
-    if (applyResult.warnings.length > 0) {
-      vscode34.window.showWarningMessage(applyResult.warnings.join(" "));
-    }
-    if (applyResult.routerConfigChanged || applyResult.budgetChanged || applyResult.localOverridesChanged) {
-      vscode34.window.showInformationMessage("Dabbler config saved.");
-    } else {
-      vscode34.window.showInformationMessage("No changes to save.");
-    }
-    this._refresh();
-  }
-  /**
-   * Snapshot the exact file contents the panel just persisted. For files
-   * NOT touched this save, we use the raw text already on disk (loaded
-   * earlier). For files written, we use doc.toString() which matches
-   * what writeYamlFile serialized. If local-overrides was not written
-   * AND the file exists on disk, we still snapshot it so drift detection
-   * uses the loaded text as the baseline rather than null.
-   */
-  _captureSnapshot(routerWritten, budgetWritten, localWritten) {
-    const routerText = routerWritten && this._loaded?.routerConfigDoc ? this._loaded.routerConfigDoc.toString() : this._loaded?.routerConfigText ?? "";
-    const budgetText = budgetWritten && this._loaded?.budgetDoc ? this._loaded.budgetDoc.toString() : this._loaded?.budgetText ?? "";
-    let localText;
-    if (localWritten && this._loaded?.localOverridesDoc) {
-      localText = this._loaded.localOverridesDoc.toString();
-    } else if (this._loaded?.localOverridesFileExists) {
-      localText = this._loaded.localOverridesText;
-    } else {
-      localText = null;
-    }
-    return {
-      routerConfigText: routerText,
-      budgetText,
-      localOverridesText: localText,
-      at: Date.now()
-    };
-  }
-  _retryFailedWrite() {
-    if (!this._recovery || this._recovery.failed.length === 0 || !this._loaded)
-      return;
-    const stillFailed = [];
-    const newSucceeded = [...this._recovery.succeeded];
-    const remainingPending = {};
-    for (const f of this._recovery.failed) {
-      const cachedContent = this._recovery.pendingContents?.[f.file];
-      if (cachedContent === void 0) {
-        stillFailed.push({ file: f.file, reason: "internal: no cached content to retry" });
-        continue;
-      }
-      let target = null;
-      if (f.file === "router-config.yaml")
-        target = this._loaded.routerConfigPath;
-      else if (f.file === "budget.yaml")
-        target = this._loaded.budgetPath;
-      else if (f.file === "local-overrides.yaml")
-        target = this._loaded.localOverridesPath;
-      if (!target) {
-        stillFailed.push({ file: f.file, reason: "internal: no target path" });
-        continue;
-      }
-      const tmp = target + ".tmp";
-      try {
-        fs29.writeFileSync(tmp, cachedContent, "utf8");
-        fs29.renameSync(tmp, target);
-        newSucceeded.push(f.file);
-      } catch (err) {
-        try {
-          if (fs29.existsSync(tmp))
-            fs29.unlinkSync(tmp);
-        } catch {
-        }
-        stillFailed.push({ file: f.file, reason: err instanceof Error ? err.message : String(err) });
-        remainingPending[f.file] = cachedContent;
-      }
-    }
-    if (stillFailed.length === 0) {
-      this._lastSaveSnapshot = this._captureSnapshot(
-        newSucceeded.includes("router-config.yaml"),
-        newSucceeded.includes("budget.yaml"),
-        newSucceeded.includes("local-overrides.yaml")
-      );
-      if (this._lastSaveSnapshot && this._recovery.pendingContents) {
-        const pc = this._recovery.pendingContents;
-        if (pc["router-config.yaml"] !== void 0) {
-          this._lastSaveSnapshot.routerConfigText = pc["router-config.yaml"];
-        }
-        if (pc["budget.yaml"] !== void 0) {
-          this._lastSaveSnapshot.budgetText = pc["budget.yaml"];
-        }
-        if (pc["local-overrides.yaml"] !== void 0) {
-          this._lastSaveSnapshot.localOverridesText = pc["local-overrides.yaml"];
-        }
-      }
-      this._recovery = null;
-      vscode34.window.showInformationMessage("Retry succeeded \u2014 all files saved.");
-    } else {
-      this._recovery = {
-        succeeded: newSucceeded,
-        failed: stillFailed,
-        drifted: [],
-        pendingContents: remainingPending
-      };
-      vscode34.window.showErrorMessage(
-        `Retry partial \u2014 ${stillFailed.length} file(s) still failing.`
-      );
-    }
-    this._refresh();
-  }
-  _acceptHalfBatchAsBaseline() {
-    this._recovery = null;
-    if (this._loaded) {
-      this._lastSaveSnapshot = {
-        routerConfigText: this._loaded.routerConfigText ?? "",
-        budgetText: this._loaded.budgetText ?? "",
-        localOverridesText: this._loaded.localOverridesText,
-        at: Date.now()
-      };
-    }
-    this._refresh();
-    vscode34.window.showInformationMessage("On-disk state accepted as new baseline.");
-  }
-  _reapplyLastSave() {
-    if (!this._lastSaveSnapshot || !this._loaded) {
-      vscode34.window.showErrorMessage(
-        "Re-apply unavailable \u2014 no last-saved snapshot exists in this session."
-      );
-      return;
-    }
-    const succeeded = [];
-    const failed = [];
-    const pendingContents = {};
-    const reapply = (file, target, content) => {
-      pendingContents[file] = content;
-      const tmp = target + ".tmp";
-      try {
-        fs29.writeFileSync(tmp, content, "utf8");
-        fs29.renameSync(tmp, target);
-        succeeded.push(file);
-      } catch (err) {
-        try {
-          if (fs29.existsSync(tmp))
-            fs29.unlinkSync(tmp);
-        } catch {
-        }
-        failed.push({ file, reason: err instanceof Error ? err.message : String(err) });
-      }
-    };
-    reapply("router-config.yaml", this._loaded.routerConfigPath, this._lastSaveSnapshot.routerConfigText);
-    reapply("budget.yaml", this._loaded.budgetPath, this._lastSaveSnapshot.budgetText);
-    if (this._lastSaveSnapshot.localOverridesText !== null) {
-      reapply("local-overrides.yaml", this._loaded.localOverridesPath, this._lastSaveSnapshot.localOverridesText);
-    } else if (fs29.existsSync(this._loaded.localOverridesPath)) {
-      try {
-        fs29.unlinkSync(this._loaded.localOverridesPath);
-        succeeded.push("local-overrides.yaml");
-      } catch (err) {
-        failed.push({
-          file: "local-overrides.yaml",
-          reason: err instanceof Error ? err.message : String(err)
-        });
-      }
-    }
-    if (failed.length > 0 && succeeded.length > 0) {
-      const failedPending = {};
-      for (const f of failed) {
-        if (pendingContents[f.file] !== void 0)
-          failedPending[f.file] = pendingContents[f.file];
-      }
-      this._recovery = { succeeded, failed, drifted: [], pendingContents: failedPending };
-      this._refresh();
-      vscode34.window.showErrorMessage(
-        `Re-apply partial \u2014 ${succeeded.length} file(s) restored, ${failed.length} failed. See the recovery banner.`
-      );
-      return;
-    }
-    if (failed.length > 0) {
-      this._refresh();
-      vscode34.window.showErrorMessage(
-        `Re-apply failed: ${failed.map((f) => `${f.file}: ${f.reason}`).join("; ")}`
-      );
-      return;
-    }
-    this._recovery = null;
-    this._lastSaveSnapshot = { ...this._lastSaveSnapshot, at: Date.now() };
-    vscode34.window.showInformationMessage("Last-saved state re-applied to disk.");
-    this._refresh();
-  }
-  async _runFlagDecisionCommand() {
-    await vscode34.commands.executeCommand("dabbler.flagDecisionForReview");
-  }
-  _handleTestNotification() {
-    const aiRouterDir = this._findAiRouterDir();
-    if (!aiRouterDir) {
-      vscode34.window.showErrorMessage("No ai_router/ directory found in the workspace.");
-      return;
-    }
-    const localObj = this._loaded?.localOverridesDoc?.toJSON() ?? null;
-    const pushover = localObj ? localObj["notifications"]?.["pushover"] : void 0;
-    const apiKeyEnv = (typeof pushover?.["api_key_env"] === "string" ? pushover["api_key_env"] : "PUSHOVER_API_KEY") || "PUSHOVER_API_KEY";
-    const userKeyEnv = (typeof pushover?.["user_key_env"] === "string" ? pushover["user_key_env"] : "PUSHOVER_USER_KEY") || "PUSHOVER_USER_KEY";
-    const apiKeyValue = process.env[apiKeyEnv];
-    const userKeyValue = process.env[userKeyEnv];
-    if (!apiKeyValue) {
-      vscode34.window.showErrorMessage(
-        `Pushover API key env var $${apiKeyEnv} is not set. Export it in your shell before running VS Code.`
-      );
-      return;
-    }
-    if (!userKeyValue) {
-      vscode34.window.showErrorMessage(
-        `Pushover user key env var $${userKeyEnv} is not set. Export it in your shell before running VS Code.`
-      );
-      return;
-    }
-    const pythonPath = resolvePythonInterpreter(path34.dirname(aiRouterDir));
-    const script = [
-      "import json, sys",
-      "try:",
-      "  from ai_router.notifications import send_pushover_notification",
-      "  r = send_pushover_notification('Dabbler test', 'Test notification from Dabbler Config Editor')",
-      "  print(json.dumps({'ok': True, 'request_id': r.request_id}))",
-      "except Exception as e:",
-      "  print(json.dumps({'ok': False, 'error': str(e)}))"
-    ].join("\n");
-    const env10 = { ...process.env, PUSHOVER_API_KEY: apiKeyValue, PUSHOVER_USER_KEY: userKeyValue };
-    const child = cp6.spawn(pythonPath, ["-c", script], {
-      cwd: path34.dirname(aiRouterDir),
-      env: env10,
-      windowsHide: true
-    });
-    let stdout = "";
-    let stderr = "";
-    let spawnErrored = false;
-    const outDec = makeUtf8ChunkDecoder();
-    const errDec = makeUtf8ChunkDecoder();
-    child.stdout?.on("data", (chunk) => {
-      stdout += outDec.write(chunk);
-    });
-    child.stderr?.on("data", (chunk) => {
-      stderr += errDec.write(chunk);
-    });
-    child.on("error", (err) => {
-      spawnErrored = true;
-      vscode34.window.showErrorMessage(`Test notification failed \u2014 could not spawn Python: ${err.message}`);
-    });
-    child.on("close", () => {
-      if (spawnErrored)
-        return;
-      stdout += outDec.end();
-      stderr += errDec.end();
-      try {
-        const result = JSON.parse(stdout.trim());
-        if (result.ok) {
-          vscode34.window.showInformationMessage(
-            `Pushover test notification sent. Request ID: ${result.request_id ?? "(unknown)"}`
-          );
-        } else {
-          vscode34.window.showErrorMessage(`Test notification failed: ${result.error ?? "unknown error"}`);
-        }
-      } catch {
-        if (isAiRouterNotInstalled(stderr)) {
-          vscode34.window.showErrorMessage(
-            `Test notification failed \u2014 ${describeAiRouterImportFailure(pythonPath)}`
-          );
-          return;
-        }
-        const detail = stderr.trim() || stdout.trim() || "no output";
-        vscode34.window.showErrorMessage(`Test notification failed \u2014 unexpected Python output: ${detail}`);
-      }
-    });
-  }
-  async _openLocalOverridesFile() {
-    if (!this._loaded)
-      return;
-    const target = this._loaded.localOverridesPath;
-    if (!fs29.existsSync(target)) {
-      vscode34.window.showInformationMessage(
-        "local-overrides.yaml does not exist yet. Save any per-operator override and the file is created automatically."
-      );
-      return;
-    }
-    const doc = await vscode34.workspace.openTextDocument(target);
-    await vscode34.window.showTextDocument(doc);
-  }
-  _refresh() {
-    this._loadFiles();
-    this._panel.webview.html = this._getHtml();
-  }
-  _getHtml() {
-    const nonce = getNonce2();
-    const cspSource = this._panel.webview.cspSource;
-    if (!this._loaded) {
-      return this._noWorkspaceHtml(nonce, cspSource);
-    }
-    const hasRouterConfig = this._loaded.routerConfigDoc !== null;
-    const hasBudget = this._loaded.budgetDoc !== null;
-    if (!hasRouterConfig) {
-      return this._missingFilesHtml(nonce, cspSource, this._loaded.routerConfigPath);
-    }
-    if (!hasBudget) {
-      return this._missingFilesHtml(nonce, cspSource, this._loaded.budgetPath);
-    }
-    const validationPassed = this._validation?.valid ?? false;
-    const errors = this._validation?.errors ?? [];
-    const parseIssues = this._parseIssues;
-    const hasParseIssues = parseIssues.length > 0;
-    const savedStatus = this._lastSaveSnapshot ? `All changes saved (${new Date(this._lastSaveSnapshot.at).toLocaleTimeString()}).` : "No unsaved changes.";
-    const fileList = [
-      "ai_router/router-config.yaml",
-      hasBudget ? "ai_router/budget.yaml" : null,
-      this._loaded.localOverridesFileExists ? "ai_router/local-overrides.yaml" : null
-    ].filter(Boolean).join(" + ");
-    const parseBanner = hasParseIssues ? `<div class="banner banner-error">
-          <strong>&#9888; YAML parse error</strong> \u2014 ${parseIssues.length} parse issue(s). Save is blocked until resolved.
-          <ul>${parseIssues.map(
-      (p2) => `<li><code>${p2.file}</code>${p2.err.line != null ? ` (line ${p2.err.line})` : ""}: ${escapeHtml3(p2.err.message)}</li>`
-    ).join("")}</ul>
-        </div>` : "";
-    const driftBanner = !validationPassed && !hasParseIssues ? `<div class="banner banner-error">
-          <strong>&#9888; Drift detected</strong> \u2014 ${errors.length} validation error(s). Sections remain editable but Save will reject until fixed.
-          <ul>${errors.map((e) => `<li><code>${escapeHtml3(e.file + e.path)}</code>: ${escapeHtml3(e.message)}</li>`).join("")}</ul>
-        </div>` : "";
-    const recoveryBanner = this._recovery ? this._renderRecoveryBanner(this._recovery) : "";
-    const state = this._deriveState();
-    const s1 = render(state);
-    const s2 = render2(state);
-    const s3 = render3(state);
-    const s4 = render4(state);
-    const s5 = render5(state);
-    const s6 = render6(state);
-    const sections = [
-      { num: 1, label: "Routing &amp; Verification", body: s1.html },
-      { num: 2, label: "Budget", body: s2.html },
-      { num: 3, label: "Providers", body: s3.html },
-      { num: 4, label: "Significance flagging", body: s4.html },
-      { num: 5, label: "Notifications", body: s5.html },
-      { num: 6, label: "Local overrides summary", body: s6.html }
-    ];
-    const sectionNav = sections.map((s) => `<button class="section-btn" data-section="${s.num}">&rsaquo; ${s.label}</button>`).join("\n");
-    const sectionContent = sections.map(
-      (s) => `<div class="section-panel" id="section-${s.num}" style="display:${s.num === 1 ? "block" : "none"}">
-          <h2>${s.label}</h2>
-          ${s.body}
-        </div>`
-    ).join("\n");
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-${nonce}'; style-src ${cspSource} 'unsafe-inline';">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Dabbler Config Editor</title>
-  <style>
-    body { font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); color: var(--vscode-foreground); background: var(--vscode-editor-background); margin: 0; padding: 0; }
-    .header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: var(--vscode-sideBarSectionHeader-background); border-bottom: 1px solid var(--vscode-panel-border); }
-    .header h1 { font-size: 1em; margin: 0; }
-    .header-actions { display: flex; gap: 8px; }
-    .meta { padding: 6px 16px; font-size: 0.85em; color: var(--vscode-descriptionForeground); border-bottom: 1px solid var(--vscode-panel-border); }
-    .banner { padding: 8px 16px; margin: 8px 16px; border-radius: 3px; font-size: 0.85em; }
-    .banner ul { margin: 4px 0 0 16px; padding: 0; }
-    .banner-error { background: var(--vscode-inputValidation-errorBackground); border: 1px solid var(--vscode-inputValidation-errorBorder); }
-    .banner-warning { background: var(--vscode-inputValidation-warningBackground); border: 1px solid var(--vscode-inputValidation-warningBorder); }
-    .layout { display: flex; min-height: calc(100vh - 80px); }
-    .nav { width: 220px; min-width: 180px; border-right: 1px solid var(--vscode-panel-border); padding: 8px 0; display: flex; flex-direction: column; }
-    .section-btn { background: none; border: none; color: var(--vscode-foreground); padding: 6px 16px; text-align: left; cursor: pointer; font-size: 0.9em; width: 100%; }
-    .section-btn:hover, .section-btn.active { background: var(--vscode-list-hoverBackground); }
-    .section-btn.active { color: var(--vscode-list-activeSelectionForeground); background: var(--vscode-list-activeSelectionBackground); }
-    .content { flex: 1; padding: 16px; overflow-y: auto; }
-    .section-panel h2 { font-size: 1.1em; margin-top: 0; margin-bottom: 16px; }
-    .section-block { margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--vscode-panel-border); }
-    .section-block h3 { font-size: 1em; margin-bottom: 6px; }
-    .section-help { color: var(--vscode-descriptionForeground); font-size: 0.85em; margin: 0 0 10px 0; }
-    .section-info { color: var(--vscode-descriptionForeground); font-size: 0.85em; margin: 6px 0; font-style: italic; }
-    .field-row { display: flex; align-items: center; gap: 8px; margin: 6px 0; flex-wrap: wrap; }
-    .field-row label { min-width: 140px; }
-    .field-row input[type="number"], .field-row input[type="text"], .field-row select { padding: 2px 6px; }
-    .src-indicator { font-size: 0.78em; padding: 1px 4px; border-radius: 2px; cursor: pointer; }
-    .src-shared { color: var(--vscode-descriptionForeground); background: rgba(127,127,127,0.1); }
-    .src-local { color: var(--vscode-charts-orange); background: rgba(255,150,0,0.1); }
-    .src-default { color: var(--vscode-descriptionForeground); background: rgba(127,127,127,0.05); cursor: default; }
-    .env-badge { font-size: 0.85em; padding: 1px 4px; border-radius: 2px; }
-    .env-set { color: var(--vscode-charts-green); }
-    .env-unset { color: var(--vscode-descriptionForeground); font-style: italic; }
-    .placeholder { color: var(--vscode-descriptionForeground); font-style: italic; }
-    .preview-block { background: rgba(127,127,127,0.06); padding: 8px 12px; border-radius: 3px; }
-    .preview-block p { margin: 6px 0; }
-    .preview-detail { color: var(--vscode-descriptionForeground); }
-    .slider-value { min-width: 40px; font-variant-numeric: tabular-nums; }
-    .provider-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
-    .provider-table th, .provider-table td { padding: 4px 6px; text-align: left; border-bottom: 1px solid var(--vscode-panel-border); vertical-align: middle; }
-    .provider-table th { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
-    .provider-row input[type="text"] { width: 100%; }
-    .legend { font-size: 0.8em; color: var(--vscode-descriptionForeground); margin-top: 8px; }
-    .command-box { background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.1)); padding: 6px 10px; border-radius: 3px; margin: 4px 0; }
-    .code-sample { background: var(--vscode-textCodeBlock-background, rgba(127,127,127,0.1)); padding: 8px 10px; border-radius: 3px; margin: 6px 0; }
-    .numbered-list { padding-left: 18px; }
-    .numbered-list li { margin-bottom: 12px; }
-    .override-list { list-style: none; padding-left: 0; }
-    .override-row { background: rgba(127,127,127,0.06); padding: 8px 12px; margin: 6px 0; border-radius: 3px; }
-    .override-path { font-weight: bold; margin-bottom: 4px; }
-    .override-side { font-size: 0.9em; margin: 2px 0; }
-    button.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; padding: 4px 12px; cursor: pointer; border-radius: 2px; font-size: 0.9em; }
-    button.primary:hover { background: var(--vscode-button-hoverBackground); }
-    button.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); border: none; padding: 4px 12px; cursor: pointer; border-radius: 2px; font-size: 0.9em; }
-    button.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>Dabbler Config Editor</h1>
-    <div class="header-actions">
-      <button class="primary" id="btn-save">Save</button>
-    </div>
-  </div>
-  <div class="meta">
-    Editing: <strong>${escapeHtml3(fileList)}</strong> &nbsp;|&nbsp; ${escapeHtml3(savedStatus)}
-  </div>
-  ${parseBanner}
-  ${driftBanner}
-  ${recoveryBanner}
-  <div class="layout">
-    <div class="nav">
-      ${sectionNav}
-    </div>
-    <div class="content">
-      ${sectionContent}
-    </div>
-  </div>
-  <script nonce="${nonce}">
-    (function() {
-      const vscode = acquireVsCodeApi();
-
-      // --- Section nav ---
-      const buttons = document.querySelectorAll('.section-btn');
-      const panels = document.querySelectorAll('.section-panel');
-      buttons.forEach((btn, i) => {
-        if (i === 0) btn.classList.add('active');
-        btn.addEventListener('click', () => {
-          buttons.forEach(b => b.classList.remove('active'));
-          panels.forEach(p => { p.style.display = 'none'; });
-          btn.classList.add('active');
-          const sectionNum = btn.getAttribute('data-section');
-          const panel = document.getElementById('section-' + sectionNum);
-          if (panel) panel.style.display = 'block';
-        });
-      });
-
-      // --- \xA71 dropdown constraint: outsourcing-mode -> verification options ---
-      const outsourcingSel = document.getElementById('s1-outsourcing-mode');
-      const verificationSel = document.getElementById('s1-verification-method');
-      const apiConstraintInfo = document.getElementById('s1-api-constraint');
-      const manualTemplate = document.getElementById('s1-manual-template');
-      function applyOutsourcingConstraint() {
-        if (!outsourcingSel || !verificationSel) return;
-        const disabled = outsourcingSel.value === 'disabled';
-        const apiOpt = verificationSel.querySelector('option[value="api"]');
-        if (apiOpt) apiOpt.disabled = disabled;
-        if (apiConstraintInfo) apiConstraintInfo.style.display = disabled ? '' : 'none';
-        if (disabled && verificationSel.value === 'api') {
-          verificationSel.value = 'manual-via-other-engine';
-        }
-      }
-      function applyManualTemplateVisibility() {
-        if (!verificationSel || !manualTemplate) return;
-        manualTemplate.style.display = verificationSel.value === 'manual-via-other-engine' ? '' : 'none';
-      }
-      if (outsourcingSel) outsourcingSel.addEventListener('change', () => { applyOutsourcingConstraint(); applyManualTemplateVisibility(); });
-      if (verificationSel) verificationSel.addEventListener('change', applyManualTemplateVisibility);
-      applyOutsourcingConstraint();
-      applyManualTemplateVisibility();
-
-      // --- \xA72 slider live update + preview re-render ---
-      const warnSlider = document.getElementById('s2-warn-at-percent');
-      const warnValueEl = document.getElementById('s2-warn-at-percent-value');
-      const thresholdInput = document.getElementById('s2-threshold-usd');
-      const previewBlock = document.getElementById('s2-preview');
-      function fmtUsd(n) { return '$' + (Math.round(n * 100) / 100).toFixed(2); }
-      function rerenderPreview() {
-        if (!warnSlider || !thresholdInput || !previewBlock) return;
-        const pct = Number(warnSlider.value);
-        const thr = Number(thresholdInput.value);
-        const warn = (pct * thr) / 100;
-        if (warnValueEl) warnValueEl.textContent = pct + '%';
-        previewBlock.innerHTML =
-          '<p><strong>Below ' + pct + '% of ' + fmtUsd(thr) + ' (' + fmtUsd(warn) + '):</strong> ' +
-          '<span class="preview-detail">Silent &mdash; no prompt, just log to cost dashboard.</span></p>' +
-          '<p><strong>Between ' + pct + '% and 100% (' + fmtUsd(warn) + '&ndash;' + fmtUsd(thr) + '):</strong> ' +
-          '<span class="preview-detail">Heads-up &mdash; non-blocking notification, one per band.</span></p>' +
-          '<p><strong>At or above ' + fmtUsd(thr) + ':</strong> ' +
-          '<span class="preview-detail">Confirm-or-abort &mdash; modal dialog before the call proceeds.</span></p>';
-      }
-      if (warnSlider) warnSlider.addEventListener('input', rerenderPreview);
-      if (thresholdInput) thresholdInput.addEventListener('input', rerenderPreview);
-
-      // --- \xA73 provider popover toggle ---
-      document.querySelectorAll('.popover-toggle').forEach(btn => {
-        btn.addEventListener('click', () => {
-          const target = btn.getAttribute('data-target');
-          if (!target) return;
-          const row = document.getElementById(target);
-          if (row) row.style.display = row.style.display === 'none' ? '' : 'none';
-        });
-      });
-
-      // --- \xA74 run-flag-command button ---
-      const flagBtn = document.getElementById('s4-run-flag-command');
-      if (flagBtn) flagBtn.addEventListener('click', () => { vscode.postMessage({ command: 'runFlagCommand' }); });
-
-      // --- \xA75 test notification button ---
-      const testNotifBtn = document.getElementById('s5-test-notification');
-      if (testNotifBtn) testNotifBtn.addEventListener('click', () => { vscode.postMessage({ command: 'sendTestNotification' }); });
-
-      // --- \xA76 open-local-overrides button ---
-      const openLocalBtn = document.getElementById('s6-open-local-overrides');
-      if (openLocalBtn) openLocalBtn.addEventListener('click', () => { vscode.postMessage({ command: 'openLocalOverrides' }); });
-
-      // --- recovery banner buttons ---
-      const retryBtn = document.getElementById('recovery-retry');
-      const acceptBtn = document.getElementById('recovery-accept');
-      const reapplyBtn = document.getElementById('recovery-reapply');
-      if (retryBtn) retryBtn.addEventListener('click', () => { vscode.postMessage({ command: 'retryFailedWrite' }); });
-      if (acceptBtn) acceptBtn.addEventListener('click', () => { vscode.postMessage({ command: 'acceptHalfBatch' }); });
-      if (reapplyBtn) reapplyBtn.addEventListener('click', () => { vscode.postMessage({ command: 'reapplyLastSave' }); });
-
-      // --- (shared)/(local override) toggle ---
-      document.querySelectorAll('.src-indicator').forEach(ind => {
-        const source = ind.getAttribute('data-source');
-        if (source === 'not-overridable' || source === 'default') return;
-        ind.addEventListener('click', () => {
-          const cur = ind.getAttribute('data-source');
-          const next = cur === 'local' ? 'shared' : 'local';
-          ind.setAttribute('data-source', next);
-          ind.className = 'src-indicator src-' + next;
-          ind.textContent = next === 'local' ? '(local override)' : '(shared)';
-        });
-      });
-
-      // --- Save gather ---
-      function gatherPayload() {
-        const payload = {};
-        // \xA71
-        if (outsourcingSel) {
-          const ind = outsourcingSel.parentElement && outsourcingSel.parentElement.querySelector('.src-indicator');
-          const src = (ind && ind.getAttribute('data-source') === 'local') ? 'local' : 'shared';
-          payload.outsourcingMode = { value: outsourcingSel.value, source: src };
-        }
-        if (verificationSel) payload.verificationMethod = verificationSel.value;
-        // \xA72
-        if (thresholdInput) {
-          const ind = thresholdInput.parentElement && thresholdInput.parentElement.querySelector('.src-indicator');
-          const src = (ind && ind.getAttribute('data-source') === 'local') ? 'local' : 'shared';
-          payload.thresholdUsd = { value: Number(thresholdInput.value), source: src };
-        }
-        const scopeSel = document.getElementById('s2-scope');
-        if (scopeSel) payload.scope = scopeSel.value;
-        if (warnSlider) {
-          const ind = warnSlider.parentElement && warnSlider.parentElement.querySelector('.src-indicator');
-          const src = (ind && ind.getAttribute('data-source') === 'local') ? 'local' : 'shared';
-          payload.warnAtPercent = { value: Number(warnSlider.value), source: src };
-        }
-        // \xA73 providers
-        const providerRows = document.querySelectorAll('tr.provider-row');
-        payload.providers = [];
-        providerRows.forEach(row => {
-          const id = row.getAttribute('data-provider-id');
-          if (!id) return;
-          const enabledInput = row.querySelector('input[data-field="enabled"]');
-          const labelInput = row.querySelector('input[data-field="displayLabel"]');
-          const keyInput = row.querySelector('input[data-field="apiKeyEnv"]');
-          const urlInput = row.querySelector('input[data-field="baseUrl"]');
-          const enabledInd = enabledInput && enabledInput.parentElement && enabledInput.parentElement.querySelector('.src-indicator');
-          const enabledSrc = (enabledInd && enabledInd.getAttribute('data-source') === 'local') ? 'local' : 'shared';
-          const keyInd = keyInput && keyInput.parentElement && keyInput.parentElement.querySelector('.src-indicator');
-          const keySrc = (keyInd && keyInd.getAttribute('data-source') === 'local') ? 'local' : 'shared';
-          const urlInd = urlInput && urlInput.parentElement && urlInput.parentElement.querySelector('.src-indicator');
-          const urlSrc = (urlInd && urlInd.getAttribute('data-source') === 'local') ? 'local' : 'shared';
-          const pp = { id: id };
-          if (enabledInput) pp.enabled = { value: !!enabledInput.checked, source: enabledSrc };
-          if (labelInput) pp.displayLabel = labelInput.value;
-          if (keyInput) pp.apiKeyEnv = { value: keyInput.value, source: keySrc };
-          if (urlInput) pp.baseUrl = { value: urlInput.value, source: urlSrc };
-          payload.providers.push(pp);
-        });
-        // \xA74
-        const honorChk = document.getElementById('s4-honor-annotations');
-        if (honorChk) payload.honorAnnotations = !!honorChk.checked;
-        // \xA75
-        const puEnabled = document.getElementById('s5-pushover-enabled');
-        const puApiKey = document.getElementById('s5-pushover-api-key-env');
-        const puUserKey = document.getElementById('s5-pushover-user-key-env');
-        if (puEnabled) payload.pushoverEnabled = !!puEnabled.checked;
-        if (puApiKey) payload.pushoverApiKeyEnv = puApiKey.value;
-        if (puUserKey) payload.pushoverUserKeyEnv = puUserKey.value;
-        return payload;
-      }
-      document.getElementById('btn-save').addEventListener('click', () => {
-        const payload = gatherPayload();
-        vscode.postMessage({ command: 'save', payload: payload });
-      });
-    })();
-  </script>
-</body>
-</html>`;
-  }
-  _renderRecoveryBanner(r2) {
-    if (r2.failed.length > 0 && r2.succeeded.length > 0) {
-      const succeededList = r2.succeeded.map((f) => `<code>${f}</code>`).join(", ");
-      const failedList = r2.failed.map((f) => `<li><code>${f.file}</code>: ${escapeHtml3(f.reason)}</li>`).join("");
-      return `<div class="banner banner-warning">
-          <strong>&#9888; Half-batch save</strong> \u2014 ${r2.succeeded.length} file(s) saved (${succeededList}); ${r2.failed.length} failed.
-          <ul>${failedList}</ul>
-          <div style="margin-top:8px;display:flex;gap:8px;">
-            <button id="recovery-retry" class="primary">Retry failed write</button>
-            <button id="recovery-accept" class="secondary">Accept current state as new baseline</button>
-          </div>
-        </div>`;
-    }
-    if (r2.drifted.length > 0) {
-      const driftedList = r2.drifted.map((f) => `<code>${f}</code>`).join(", ");
-      return `<div class="banner banner-warning">
-          <strong>&#9888; External modification detected</strong> \u2014 ${r2.drifted.length} file(s) changed on disk since your last save: ${driftedList}.
-          <div style="margin-top:8px;display:flex;gap:8px;">
-            <button id="recovery-reapply" class="secondary">Re-apply my last save (overwrites on-disk)</button>
-            <button id="recovery-accept" class="secondary">Accept on-disk as new baseline</button>
-          </div>
-        </div>`;
-    }
-    return "";
-  }
-  _noWorkspaceHtml(nonce, cspSource) {
-    return `<!DOCTYPE html><html lang="en"><head>
-      <meta charset="UTF-8">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline';">
-      <title>Dabbler Config Editor</title>
-      <style>body{font-family:var(--vscode-font-family);padding:16px;color:var(--vscode-foreground);background:var(--vscode-editor-background);}</style>
-    </head><body>
-      <h1>Dabbler Config Editor</h1>
-      <p>No workspace folder is open. Open a folder containing an <code>ai_router/</code> directory to use the config editor.</p>
-    </body></html>`;
-  }
-  _missingFilesHtml(nonce, cspSource, missingFilePath) {
-    const fileName = path34.basename(missingFilePath);
-    return `<!DOCTYPE html><html lang="en"><head>
-      <meta charset="UTF-8">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'unsafe-inline';">
-      <title>Dabbler Config Editor</title>
-      <style>body{font-family:var(--vscode-font-family);padding:16px;color:var(--vscode-foreground);background:var(--vscode-editor-background);}</style>
-    </head><body>
-      <h1>Dabbler Config Editor</h1>
-      <p>Could not find <code>${escapeHtml3(fileName)}</code> at:<br><code>${escapeHtml3(missingFilePath)}</code></p>
-      <p>Run the Dabbler project setup wizard to create the config files, or create them manually.</p>
-    </body></html>`;
-  }
-};
-function registerConfigEditorCommand(context) {
-  context.subscriptions.push(
-    vscode34.commands.registerCommand("dabbler.openConfigEditor", () => {
-      ConfigEditorPanel.createOrShow(context);
-    })
-  );
-}
-function escapeHtml3(str) {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 // src/commands/flagDecisionForReview.ts
-var vscode35 = __toESM(require("vscode"));
-var path36 = __toESM(require("path"));
+var vscode28 = __toESM(require("vscode"));
+var path29 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
-var fs30 = __toESM(require("fs"));
-var path35 = __toESM(require("path"));
+var fs20 = __toESM(require("fs"));
+var path28 = __toESM(require("path"));
 var QUEUE_FILENAME = "decision-review-queue.jsonl";
 function appendQueueEntry(sessionSetDir, entry) {
-  const queuePath = path35.join(sessionSetDir, QUEUE_FILENAME);
+  const queuePath = path28.join(sessionSetDir, QUEUE_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  fs30.appendFileSync(queuePath, line, "utf8");
+  fs20.appendFileSync(queuePath, line, "utf8");
 }
 function findActiveSessionSetDir(provider) {
   const all = provider();
@@ -33113,17 +23286,17 @@ function findActiveSessionSetDir(provider) {
 // src/commands/flagDecisionForReview.ts
 function registerFlagDecisionForReview(context) {
   context.subscriptions.push(
-    vscode35.commands.registerCommand(
+    vscode28.commands.registerCommand(
       "dabbler.flagDecisionForReview",
       async () => {
         const activeDir = findActiveSessionSetDir(readAllSessionSets);
         if (!activeDir) {
-          vscode35.window.showInformationMessage(
+          vscode28.window.showInformationMessage(
             "No active session set to flag against. Start a session set first (its state must be 'in-progress' for the flag to attach to it)."
           );
           return;
         }
-        const reason = await vscode35.window.showInputBox({
+        const reason = await vscode28.window.showInputBox({
           title: "Flag Decision for Cross-Provider Review",
           prompt: "One-line reason this decision should get a second-engine read at the next session start.",
           placeHolder: "e.g. budget-tier defaulting choice \u2014 confirm with Gemini before shipping",
@@ -33145,13 +23318,13 @@ function registerFlagDecisionForReview(context) {
           appendQueueEntry(activeDir, entry);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          vscode35.window.showErrorMessage(
+          vscode28.window.showErrorMessage(
             `Failed to append to decision-review queue: ${msg}`
           );
           return;
         }
-        const slug = path36.basename(activeDir);
-        vscode35.window.showInformationMessage(
+        const slug = path29.basename(activeDir);
+        vscode28.window.showInformationMessage(
           `Flagged for cross-provider review in ${slug}/${QUEUE_FILENAME}. Will surface in the next session's planning checklist.`
         );
       }
@@ -33160,11 +23333,11 @@ function registerFlagDecisionForReview(context) {
 }
 
 // src/commands/scanAnnotationsForActiveSet.ts
-var vscode36 = __toESM(require("vscode"));
-var fs32 = __toESM(require("fs"));
-var path38 = __toESM(require("path"));
+var vscode29 = __toESM(require("vscode"));
+var fs23 = __toESM(require("fs"));
+var path31 = __toESM(require("path"));
 
-// src/configEditor/annotationParser.ts
+// src/utils/annotationParser.ts
 var ANNOTATION_RE = /(?:#|\/\/)\s*@dabbler:outsource-review\(\s*"((?:\\.|[^"\\\r\n])*)"\s*\)/g;
 function findAnnotations(text, filePath, now = () => (/* @__PURE__ */ new Date()).toISOString()) {
   const out = [];
@@ -33239,9 +23412,35 @@ function unescapeReason(raw) {
   return out;
 }
 
+// src/utils/yamlReadWrite.ts
+var import_yaml = __toESM(require_dist());
+var fs21 = __toESM(require("fs"));
+function readYamlFile(filePath) {
+  if (!fs21.existsSync(filePath))
+    return null;
+  const text = fs21.readFileSync(filePath, "utf8");
+  const doc = parseDocumentFromText(text);
+  return { doc, text, parseErrors: collectParseErrors(doc) };
+}
+function parseDocumentFromText(text) {
+  return (0, import_yaml.parseDocument)(text);
+}
+function collectParseErrors(doc) {
+  const out = [];
+  for (const err of doc.errors ?? []) {
+    const lc = err.linePos?.[0];
+    out.push({
+      message: err.message,
+      line: lc?.line,
+      col: lc?.col
+    });
+  }
+  return out;
+}
+
 // src/commands/annotationScanner.ts
-var fs31 = __toESM(require("fs"));
-var path37 = __toESM(require("path"));
+var fs22 = __toESM(require("fs"));
+var path30 = __toESM(require("path"));
 var SCAN_EXTENSIONS = [
   "ts",
   "tsx",
@@ -33275,7 +23474,7 @@ var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**
 function toPosixPath(p2) {
   return p2.replace(/\\/g, "/");
 }
-function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs31.readFileSync(p2, "utf8")) {
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs22.readFileSync(p2, "utf8")) {
   const out = [];
   for (const abs of files) {
     let text;
@@ -33284,7 +23483,7 @@ function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE_
     } catch {
       continue;
     }
-    const rel = toPosixPath(path37.relative(workspaceRoot2, abs));
+    const rel = toPosixPath(path30.relative(workspaceRoot2, abs));
     const anns = findAnnotations(text, rel, now);
     for (const a of anns)
       out.push(a);
@@ -33292,7 +23491,7 @@ function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE_
   return out;
 }
 function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
-  const candidate = path37.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
+  const candidate = path30.join(workspaceRoot2, "ai_router", "local-overrides.yaml");
   const parsed = readYaml(candidate);
   if (parsed == null)
     return true;
@@ -33304,9 +23503,9 @@ function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
     return v;
   return true;
 }
-function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs31.readFileSync(p2, "utf8")) {
-  const queuePath = path37.join(sessionSetDir, QUEUE_FILENAME);
-  if (!fs31.existsSync(queuePath))
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs22.readFileSync(p2, "utf8")) {
+  const queuePath = path30.join(sessionSetDir, QUEUE_FILENAME);
+  if (!fs22.existsSync(queuePath))
     return [];
   let text;
   try {
@@ -33332,7 +23531,7 @@ function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs31.readFil
 
 // src/commands/scanAnnotationsForActiveSet.ts
 function defaultReadYaml(absPath) {
-  if (!fs32.existsSync(absPath))
+  if (!fs23.existsSync(absPath))
     return null;
   try {
     const result = readYamlFile(absPath);
@@ -33348,28 +23547,28 @@ function defaultReadYaml(absPath) {
 }
 function registerScanAnnotationsForActiveSet(context) {
   context.subscriptions.push(
-    vscode36.commands.registerCommand(
+    vscode29.commands.registerCommand(
       "dabbler.scanAnnotationsForActiveSet",
       async () => {
         const all = readAllSessionSets();
         const activeDir = findActiveSessionSetDir(() => all);
         if (!activeDir) {
-          vscode36.window.showInformationMessage(
+          vscode29.window.showInformationMessage(
             "No active session set to scan against. Start a session set first."
           );
           return;
         }
         const activeSet = all.find((s) => s.dir === activeDir);
-        const workspaceRoot2 = activeSet?.root ?? path38.dirname(path38.dirname(activeDir));
+        const workspaceRoot2 = activeSet?.root ?? path31.dirname(path31.dirname(activeDir));
         if (!loadHonorAnnotationsToggle(workspaceRoot2, defaultReadYaml)) {
-          vscode36.window.showInformationMessage(
+          vscode29.window.showInformationMessage(
             "Annotation scanning is disabled for this project (local-overrides.yaml \u2192 decision_review.honor_annotations: false). No queue entries appended."
           );
           return;
         }
-        const uris = await vscode36.workspace.findFiles(
-          new vscode36.RelativePattern(workspaceRoot2, SCAN_GLOB),
-          new vscode36.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
+        const uris = await vscode29.workspace.findFiles(
+          new vscode29.RelativePattern(workspaceRoot2, SCAN_GLOB),
+          new vscode29.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
         );
         const filePaths = uris.map((u) => u.fsPath);
         const annotations = scanFilesForAnnotations(
@@ -33380,7 +23579,7 @@ function registerScanAnnotationsForActiveSet(context) {
         const fresh = deduplicateAnnotations(annotations, existing);
         if (fresh.length === 0) {
           const msg = annotations.length === 0 ? "No `@dabbler:outsource-review` annotations found in workspace." : `All ${annotations.length} annotation(s) already in the queue \u2014 nothing new appended.`;
-          vscode36.window.showInformationMessage(msg);
+          vscode29.window.showInformationMessage(msg);
           return;
         }
         try {
@@ -33389,13 +23588,13 @@ function registerScanAnnotationsForActiveSet(context) {
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          vscode36.window.showErrorMessage(
+          vscode29.window.showErrorMessage(
             `Failed to append annotation(s) to queue: ${msg}`
           );
           return;
         }
-        const slug = path38.basename(activeDir);
-        vscode36.window.showInformationMessage(
+        const slug = path31.basename(activeDir);
+        vscode29.window.showInformationMessage(
           `Appended ${fresh.length} new annotation(s) to ${slug}/${QUEUE_FILENAME}.`
         );
       }
@@ -33404,21 +23603,21 @@ function registerScanAnnotationsForActiveSet(context) {
 }
 
 // src/commands/regenerateNarrationTemplates.ts
-var cp7 = __toESM(require("child_process"));
-var fs33 = __toESM(require("fs"));
-var path39 = __toESM(require("path"));
-var vscode37 = __toESM(require("vscode"));
+var cp6 = __toESM(require("child_process"));
+var fs24 = __toESM(require("fs"));
+var path32 = __toESM(require("path"));
+var vscode30 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
 function registerRegenerateNarrationTemplatesCommand(context) {
   context.subscriptions.push(
-    vscode37.commands.registerCommand(COMMAND_ID, async () => {
+    vscode30.commands.registerCommand(COMMAND_ID, async () => {
       await runRegenerate();
     })
   );
 }
 async function runRegenerate() {
-  if (!vscode37.workspace.workspaceFolders?.length) {
-    vscode37.window.showErrorMessage(
+  if (!vscode30.workspace.workspaceFolders?.length) {
+    vscode30.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Regenerate Narration Templates."
     );
     return;
@@ -33426,7 +23625,7 @@ async function runRegenerate() {
   const allSets = readAllSessionSets();
   const inProgress = allSets.filter((s) => s.state === "in-progress");
   if (inProgress.length === 0) {
-    vscode37.window.showInformationMessage(
+    vscode30.window.showInformationMessage(
       "No session set is in-progress. Start a session via `start_session` (or the orchestrator hook) before regenerating narration templates."
     );
     return;
@@ -33435,13 +23634,13 @@ async function runRegenerate() {
   if (!set)
     return;
   const pythonPath = resolvePythonInterpreter(set.root);
-  const outDir = path39.join(set.dir, "narration-templates");
-  fs33.mkdirSync(outDir, { recursive: true });
-  const claudeOut = path39.join(outDir, "CLAUDE.md");
-  const agentsOut = path39.join(outDir, "AGENTS.md");
-  const render7 = await vscode37.window.withProgress(
+  const outDir = path32.join(set.dir, "narration-templates");
+  fs24.mkdirSync(outDir, { recursive: true });
+  const claudeOut = path32.join(outDir, "CLAUDE.md");
+  const agentsOut = path32.join(outDir, "AGENTS.md");
+  const render = await vscode30.window.withProgress(
     {
-      location: vscode37.ProgressLocation.Notification,
+      location: vscode30.ProgressLocation.Notification,
       title: `Regenerating narration templates for ${set.name}\u2026`,
       cancellable: false
     },
@@ -33465,17 +23664,17 @@ async function runRegenerate() {
       return { ok: true, message: "" };
     }
   );
-  if (!render7.ok) {
-    vscode37.window.showErrorMessage(
-      `Failed to render narration templates: ${render7.message}`
+  if (!render.ok) {
+    vscode30.window.showErrorMessage(
+      `Failed to render narration templates: ${render.message}`
     );
     return;
   }
-  const relClaude = path39.relative(set.root, claudeOut).replace(/\\/g, "/");
-  const relAgents = path39.relative(set.root, agentsOut).replace(/\\/g, "/");
+  const relClaude = path32.relative(set.root, claudeOut).replace(/\\/g, "/");
+  const relAgents = path32.relative(set.root, agentsOut).replace(/\\/g, "/");
   const COPY_ACTION = "Copy to consumer workspace\u2026";
   const OPEN_ACTION = "Open Rendered CLAUDE.md";
-  const choice = await vscode37.window.showInformationMessage(
+  const choice = await vscode30.window.showInformationMessage(
     `Narration templates regenerated for ${set.name}: ${relClaude}, ${relAgents}.`,
     OPEN_ACTION,
     COPY_ACTION
@@ -33484,14 +23683,14 @@ async function runRegenerate() {
     await offerCopyToConsumerWorkspace(claudeOut, agentsOut);
   } else if (choice === OPEN_ACTION || choice === void 0) {
     try {
-      const doc = await vscode37.workspace.openTextDocument(claudeOut);
-      await vscode37.window.showTextDocument(doc, { preview: false });
+      const doc = await vscode30.workspace.openTextDocument(claudeOut);
+      await vscode30.window.showTextDocument(doc, { preview: false });
     } catch {
     }
   }
 }
 async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
-  const pick2 = await vscode37.window.showQuickPick(
+  const pick2 = await vscode30.window.showQuickPick(
     [
       { label: "Copy CLAUDE.md (for Claude Code consumers)", source: claudeOut, target: "CLAUDE.md" },
       { label: "Copy AGENTS.md (for Copilot CLI consumers)", source: agentsOut, target: "AGENTS.md" }
@@ -33500,7 +23699,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   );
   if (!pick2)
     return;
-  const dirUri = await vscode37.window.showOpenDialog({
+  const dirUri = await vscode30.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -33509,9 +23708,9 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   if (!dirUri || !dirUri.length)
     return;
   const destDir = dirUri[0].fsPath;
-  const destPath = path39.join(destDir, pick2.target);
-  if (fs33.existsSync(destPath)) {
-    const overwrite = await vscode37.window.showWarningMessage(
+  const destPath = path32.join(destDir, pick2.target);
+  if (fs24.existsSync(destPath)) {
+    const overwrite = await vscode30.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
       "Overwrite"
@@ -33520,14 +23719,14 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
       return;
   }
   try {
-    fs33.copyFileSync(pick2.source, destPath);
+    fs24.copyFileSync(pick2.source, destPath);
   } catch (err) {
-    vscode37.window.showErrorMessage(
+    vscode30.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
     );
     return;
   }
-  vscode37.window.showInformationMessage(
+  vscode30.window.showInformationMessage(
     `Copied ${pick2.target} to ${destDir}. The assistant will emit the session-start marker on its next launch in that workspace.`
   );
 }
@@ -33537,10 +23736,10 @@ async function pickSet(inProgress) {
   const choices = inProgress.map((s) => ({
     label: s.name,
     description: `session ${s.liveSession?.currentSession ?? "?"} of ${s.totalSessions ?? "?"}`,
-    detail: path39.relative(s.root, s.dir).replace(/\\/g, "/"),
+    detail: path32.relative(s.root, s.dir).replace(/\\/g, "/"),
     set: s
   }));
-  const picked = await vscode37.window.showQuickPick(choices, {
+  const picked = await vscode30.window.showQuickPick(choices, {
     placeHolder: "Select the session set to regenerate narration templates for"
   });
   return picked?.set;
@@ -33558,7 +23757,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
   ];
   let result;
   try {
-    result = cp7.spawnSync(pythonPath, cliArgs, {
+    result = cp6.spawnSync(pythonPath, cliArgs, {
       cwd: workspaceRoot2,
       encoding: "utf8"
     });
@@ -33584,7 +23783,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
       message: `python -m ai_router.narration exited ${result.status}: ${stderr}`
     };
   }
-  if (!fs33.existsSync(args.outputPath)) {
+  if (!fs24.existsSync(args.outputPath)) {
     return {
       ok: false,
       message: `python -m ai_router.narration exited 0 but did not write ${args.outputPath}`
@@ -33594,14 +23793,14 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
 }
 
 // src/commands/resolveSetNumber.ts
-var vscode38 = __toESM(require("vscode"));
+var vscode31 = __toESM(require("vscode"));
 function registerResolveSetNumberCommand(context, deps = {}) {
   const readSets = deps.readSets ?? readAllSessionSets;
   context.subscriptions.push(
-    vscode38.commands.registerCommand(
+    vscode31.commands.registerCommand(
       "dabblerSessionSets.resolveSetNumber",
       async () => {
-        const raw = await vscode38.window.showInputBox({
+        const raw = await vscode31.window.showInputBox({
           title: "Resolve session set by number",
           prompt: "Enter a session-set number (e.g. 50 or 050)",
           placeHolder: "50",
@@ -33612,7 +23811,7 @@ function registerResolveSetNumberCommand(context, deps = {}) {
           return;
         const n = parseSetHandle(raw);
         if (n === null) {
-          vscode38.window.showErrorMessage(
+          vscode31.window.showErrorMessage(
             `"${raw}" is not a session-set number. Enter a bare integer like 50.`
           );
           return;
@@ -33622,13 +23821,13 @@ function registerResolveSetNumberCommand(context, deps = {}) {
         const result = resolveSetNumber(slugs, n);
         if (result.kind === "no-match") {
           const avail = result.available.length > 0 ? result.available.join(", ") : "(none)";
-          vscode38.window.showErrorMessage(
+          vscode31.window.showErrorMessage(
             `No session set numbered ${n}. Available numbers: ${avail}.`
           );
           return;
         }
         if (result.kind === "collision") {
-          vscode38.window.showErrorMessage(
+          vscode31.window.showErrorMessage(
             `Number ${n} is ambiguous \u2014 it matches ${result.matches.join(
               " and "
             )}. Two session sets must not share a numeric prefix; rename one.`
@@ -33648,18 +23847,18 @@ async function presentActions(slug, set) {
       label: "$(clippy) Copy slug",
       description: slug,
       run: async () => {
-        await vscode38.env.clipboard.writeText(slug);
-        vscode38.window.setStatusBarMessage(`Copied: ${slug}`, 4e3);
+        await vscode31.env.clipboard.writeText(slug);
+        vscode31.window.setStatusBarMessage(`Copied: ${slug}`, 4e3);
       }
     },
     {
       label: "$(clippy) Copy \u201CStart the next session\u201D prompt",
       description: `Start the next session of \`${slug}\`.`,
       run: async () => {
-        await vscode38.env.clipboard.writeText(
+        await vscode31.env.clipboard.writeText(
           `Start the next session of \`${slug}\`.`
         );
-        vscode38.window.setStatusBarMessage("Copied: start next session", 4e3);
+        vscode31.window.setStatusBarMessage("Copied: start next session", 4e3);
       }
     }
   ];
@@ -33667,12 +23866,12 @@ async function presentActions(slug, set) {
     actions.push({
       label: "$(go-to-file) Open spec",
       description: slug,
-      run: () => void vscode38.commands.executeCommand("dabblerSessionSets.openSpec", {
+      run: () => void vscode31.commands.executeCommand("dabblerSessionSets.openSpec", {
         set
       })
     });
   }
-  const pick2 = await vscode38.window.showQuickPick(actions, {
+  const pick2 = await vscode31.window.showQuickPick(actions, {
     title: `Set ${slug}`,
     placeHolder: "What would you like to do with this set?"
   });
@@ -33681,15 +23880,15 @@ async function presentActions(slug, set) {
 }
 
 // src/commands/upgradeOlderSets.ts
-var vscode39 = __toESM(require("vscode"));
-var cp8 = __toESM(require("child_process"));
-var path40 = __toESM(require("path"));
-var fs34 = __toESM(require("fs"));
+var vscode32 = __toESM(require("vscode"));
+var cp7 = __toESM(require("child_process"));
+var path33 = __toESM(require("path"));
+var fs25 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
   "ai_router.migrate_session_state",
   "ai_router.migrate_v3_to_v4"
 ];
-var SESSION_SETS_REL2 = path40.join("docs", "session-sets");
+var SESSION_SETS_REL2 = path33.join("docs", "session-sets");
 function runMigrator2(pythonPath, module2, cwd) {
   return new Promise((resolve7) => {
     const args = [
@@ -33700,7 +23899,7 @@ function runMigrator2(pythonPath, module2, cwd) {
       "--in-place",
       "--json"
     ];
-    const child = cp8.spawn(pythonPath, args, { cwd, windowsHide: true });
+    const child = cp7.spawn(pythonPath, args, { cwd, windowsHide: true });
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
@@ -33753,28 +23952,28 @@ function summarizeJson(stdout) {
 }
 function registerUpgradeOlderSetsCommand(context, deps) {
   context.subscriptions.push(
-    vscode39.commands.registerCommand(
+    vscode32.commands.registerCommand(
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
-          (r2) => fs34.existsSync(path40.join(r2, SESSION_SETS_REL2))
+          (r2) => fs25.existsSync(path33.join(r2, SESSION_SETS_REL2))
         );
         if (roots.length === 0) {
-          vscode39.window.showInformationMessage(
+          vscode32.window.showInformationMessage(
             "No docs/session-sets directory found in the workspace \u2014 nothing to upgrade."
           );
           return;
         }
-        const confirm = await vscode39.window.showInformationMessage(
+        const confirm = await vscode32.window.showInformationMessage(
           "Upgrade all older session sets to the current schema? This runs the three schema migrators in sequence, in-place, across every set. Each migrator writes a backup alongside any file it rewrites and is a no-op on already-current sets.",
           { modal: true },
           "Upgrade"
         );
         if (confirm !== "Upgrade")
           return;
-        await vscode39.window.withProgress(
+        await vscode32.window.withProgress(
           {
-            location: vscode39.ProgressLocation.Notification,
+            location: vscode32.ProgressLocation.Notification,
             title: "Upgrading older session sets\u2026",
             cancellable: false
           },
@@ -33784,7 +23983,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
             for (const root of roots) {
               const pythonPath = resolvePythonInterpreter(root);
               for (const module2 of BULK_UPGRADE_MODULES) {
-                progress.report({ message: `${path40.basename(root)}: ${module2}` });
+                progress.report({ message: `${path33.basename(root)}: ${module2}` });
                 const res = await runMigrator2(pythonPath, module2, root);
                 if (res.ok) {
                   summaries.push(`${module2}: ${res.detail}`);
@@ -33795,11 +23994,11 @@ function registerUpgradeOlderSetsCommand(context, deps) {
             }
             deps.refreshView();
             if (failures.length === 0) {
-              vscode39.window.showInformationMessage(
+              vscode32.window.showInformationMessage(
                 `Session sets upgraded. ${summaries.join("; ")}. The tree refreshes shortly; the schema markers clear on the next read.`
               );
             } else {
-              vscode39.window.showErrorMessage(
+              vscode32.window.showErrorMessage(
                 `Bulk upgrade hit ${failures.length} error(s): ${failures.join(
                   " | "
                 )}. If Python / dabbler-ai-router isn't installed, set dabblerSessionSets.pythonPath to a venv with the router, or run the migrator chain manually from the repo root.`
@@ -33813,22 +24012,22 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 }
 
 // src/providers/WorkExplorerTreeProvider.ts
-var vscode41 = __toESM(require("vscode"));
+var vscode34 = __toESM(require("vscode"));
 
 // src/providers/moduleAssembly.ts
-var fs35 = __toESM(require("fs"));
-var path41 = __toESM(require("path"));
-var vscode40 = __toESM(require("vscode"));
+var fs26 = __toESM(require("fs"));
+var path34 = __toESM(require("path"));
+var vscode33 = __toESM(require("vscode"));
 function nodeModuleAssemblyIo() {
   return {
-    workspaceRoots: () => (vscode40.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
+    workspaceRoots: () => (vscode33.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
     classify: (root) => classifyModulesManifest(root),
     // Set 100 S1: the 093-era per-module plan-existence resolution retired
     // with the persistent `Plan` child node it fed. This probe stays — it
     // drives pseudo-module VISIBILITY (the legacy root plan keeps the
     // pseudo-module rendered even when every set is stamped).
-    legacyRootPlanExists: (root) => fs35.existsSync(path41.join(root, LEGACY_ROOT_PLAN_REL)),
-    rootLabel: (root) => path41.basename(root)
+    legacyRootPlanExists: (root) => fs26.existsSync(path34.join(root, LEGACY_ROOT_PLAN_REL)),
+    rootLabel: (root) => path34.basename(root)
   };
 }
 var INVALID_MANIFEST_MESSAGE2 = "docs/modules.yaml is invalid (expected a YAML mapping with a modules list). Fix the file by hand; Work Explorer never overwrites it.";
@@ -33863,11 +24062,71 @@ function assembleVisibleModules(allSets, io, lastKnownGood) {
   return { modules: mergeVisibleModules(byRoot), manifestFaults };
 }
 
+// src/utils/startupTiming.ts
+var fs27 = __toESM(require("fs"));
+var path35 = __toESM(require("path"));
+var marks = {
+  moduleLoadedAtUptimeMs: null,
+  moduleLoadedAt: null,
+  activateStart: null,
+  activateEnd: null,
+  treeFirstChildrenServed: null,
+  treeFirstChildrenCount: null
+};
+try {
+  marks.moduleLoadedAt = Date.now();
+  marks.moduleLoadedAtUptimeMs = Math.round(process.uptime() * 1e3);
+} catch {
+}
+function markActivateStart() {
+  marks.activateStart = Date.now();
+}
+function markActivateEnd() {
+  marks.activateEnd = Date.now();
+  emitIfRequested();
+}
+function markFirstChildrenServed(count) {
+  if (marks.treeFirstChildrenServed !== null)
+    return;
+  marks.treeFirstChildrenServed = Date.now();
+  marks.treeFirstChildrenCount = count;
+  emitIfRequested();
+}
+function readStartupMarks() {
+  return { ...marks };
+}
+var delta = (from, to) => from === null || to === null ? null : to - from;
+function startupDurations(m = marks) {
+  return {
+    activateMs: delta(m.activateStart, m.activateEnd),
+    activateEndToTreeRootsMs: delta(m.activateEnd, m.treeFirstChildrenServed)
+  };
+}
+function emitIfRequested() {
+  const target = process.env.DABBLER_STARTUP_TIMING_PATH;
+  if (!target)
+    return;
+  const payload = {
+    marks: readStartupMarks(),
+    durations: startupDurations(),
+    note: "Host-side buckets only. First paint is NOT here \u2014 it is observed from the DOM by the Layer 3 harness, because the host cannot see when a row becomes visible."
+  };
+  try {
+    fs27.mkdirSync(path35.dirname(target), { recursive: true });
+    fs27.writeFileSync(target, JSON.stringify(payload, null, 2), { encoding: "utf-8" });
+  } catch (err) {
+    console.error(
+      `[dabbler-ai-orchestration] startup timing: could not write DABBLER_STARTUP_TIMING_PATH (${target}) \u2014 the harness will find no file, which must NOT be read as "startup was not instrumented".`,
+      err
+    );
+  }
+}
+
 // src/providers/WorkExplorerTreeProvider.ts
 var WorkExplorerTreeProvider = class {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
-    this.onDidChangeEmitter = new vscode41.EventEmitter();
+    this.onDidChangeEmitter = new vscode34.EventEmitter();
     this.onDidChangeTreeData = this.onDidChangeEmitter.event;
     /** Memoised scan for the current refresh generation; cleared by `refresh()`. */
     this.scanCache = null;
@@ -33950,7 +24209,7 @@ var WorkExplorerTreeProvider = class {
   supports() {
     if (this.supportsCache)
       return this.supportsCache;
-    const cfg = vscode41.workspace.getConfiguration("dabblerSessionSets");
+    const cfg = vscode34.workspace.getConfiguration("dabblerSessionSets");
     const uatPref = cfg.get("uatSupport.enabled", "auto");
     const e2ePref = cfg.get("e2eSupport.enabled", "auto");
     const all = this.sets();
@@ -33961,15 +24220,15 @@ var WorkExplorerTreeProvider = class {
     return this.supportsCache;
   }
   toTreeItem(descriptor, node) {
-    const item = new vscode41.TreeItem(
+    const item = new vscode34.TreeItem(
       descriptor.label,
-      descriptor.collapsible === "collapsed" ? vscode41.TreeItemCollapsibleState.Collapsed : vscode41.TreeItemCollapsibleState.None
+      descriptor.collapsible === "collapsed" ? vscode34.TreeItemCollapsibleState.Collapsed : vscode34.TreeItemCollapsibleState.None
     );
     item.id = descriptor.id;
     item.description = descriptor.description;
     item.contextValue = descriptor.contextValue;
     if (descriptor.tooltip !== void 0) {
-      const md = new vscode41.MarkdownString(descriptor.tooltip, true);
+      const md = new vscode34.MarkdownString(descriptor.tooltip, true);
       item.tooltip = md;
     }
     if (descriptor.icon)
@@ -33992,11 +24251,11 @@ var WorkExplorerTreeProvider = class {
   }
   toIconPath(icon) {
     if (icon.kind === "theme") {
-      return icon.color ? new vscode41.ThemeIcon(icon.id, new vscode41.ThemeColor(icon.color)) : new vscode41.ThemeIcon(icon.id);
+      return icon.color ? new vscode34.ThemeIcon(icon.id, new vscode34.ThemeColor(icon.color)) : new vscode34.ThemeIcon(icon.id);
     }
     return {
-      light: vscode41.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
-      dark: vscode41.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
+      light: vscode34.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
+      dark: vscode34.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
     };
   }
 };
@@ -34010,44 +24269,18 @@ function describeManifestFaults(faults) {
 }
 
 // src/extension.ts
-var SESSION_SETS_REL3 = path42.join("docs", "session-sets");
-function evaluateRouterCapabilityContextKey() {
-  const folders = vscode42.workspace.workspaceFolders ?? [];
-  let routes = false;
-  try {
-    routes = folders.some((f) => routesCost(f.uri.fsPath));
-  } catch {
-    routes = false;
-  }
-  vscode42.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
-}
-function evaluateSetupNeededContextKey(extensionPath, allSets) {
-  let needed = true;
-  try {
-    needed = isSetupNeeded(extensionPath, allSets.length > 0);
-  } catch (err) {
-    console.error(
-      "[dabbler-ai-orchestration] setup-needed evaluation threw; showing the Setup & Status view.",
-      err
-    );
-  }
-  vscode42.commands.executeCommand(
-    "setContext",
-    "dabblerSessionSets.setupNeeded",
-    needed
-  );
-}
+var SESSION_SETS_REL3 = path36.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode42.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode35.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode42.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode42.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
-  vscode42.commands.executeCommand(
+  vscode35.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode35.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode35.commands.executeCommand(
     "setContext",
     "dabblerSessionSets.hasSubCurrentSets",
     hasSubCurrentSets(allSets)
@@ -34055,17 +24288,9 @@ function evaluateSupportContextKeys(allSets) {
 }
 function activate(context) {
   markActivateStart();
-  const scanState = new ScanState();
-  context.subscriptions.push({ dispose: () => scanState.dispose() });
-  scanState.setLoading();
-  const provider = new SetupStatusView(context, scanState);
-  context.subscriptions.push({ dispose: () => provider.dispose() });
-  context.subscriptions.push(
-    vscode42.window.registerWebviewViewProvider(SetupStatusView.viewType, provider)
-  );
   const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
   context.subscriptions.push({ dispose: () => treeProvider.dispose() });
-  const treeView = vscode42.window.createTreeView(WorkExplorerTreeProvider.viewType, {
+  const treeView = vscode35.window.createTreeView(WorkExplorerTreeProvider.viewType, {
     treeDataProvider: treeProvider,
     showCollapseAll: true
   });
@@ -34076,10 +24301,6 @@ function activate(context) {
   const evaluateContextKeys = () => {
     const allSets = readAllSessionSets();
     evaluateSupportContextKeys(allSets);
-    evaluateRouterCapabilityContextKey();
-    setImmediate(
-      () => evaluateSetupNeededContextKey(context.extensionPath, allSets)
-    );
   };
   try {
     evaluateContextKeys();
@@ -34090,7 +24311,7 @@ function activate(context) {
     );
   }
   context.subscriptions.push(
-    vscode42.workspace.onDidChangeConfiguration((e) => {
+    vscode35.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -34109,14 +24330,13 @@ function activate(context) {
     watcherSubs = [];
     boundRoots = want;
     for (const root of roots) {
-      const sessionSetsAbs = path42.join(root, SESSION_SETS_REL3);
-      const pattern = new vscode42.RelativePattern(
+      const sessionSetsAbs = path36.join(root, SESSION_SETS_REL3);
+      const pattern = new vscode35.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json,close-obligations.json}"
       );
-      const watcher = vscode42.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode35.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {
-        provider.refresh();
         treeProvider.refresh();
       };
       watcher.onDidCreate(onEvent);
@@ -34124,11 +24344,11 @@ function activate(context) {
       watcher.onDidChange(onEvent);
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
-      const gsPattern = new vscode42.RelativePattern(
+      const gsPattern = new vscode35.RelativePattern(
         root,
-        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**}"
+        "{docs/modules.yaml,docs/planning/project-plan.md}"
       );
-      const gsWatcher = vscode42.workspace.createFileSystemWatcher(gsPattern);
+      const gsWatcher = vscode35.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);
       gsWatcher.onDidDelete(onEvent);
       gsWatcher.onDidChange(onEvent);
@@ -34138,7 +24358,6 @@ function activate(context) {
   }
   const refreshAll = () => {
     bindWatchers();
-    provider.refresh();
     treeProvider.refresh();
     setImmediate(evaluateContextKeys);
   };
@@ -34150,11 +24369,11 @@ function activate(context) {
       err
     );
   }
-  context.subscriptions.push(vscode42.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode35.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode42.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode35.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const safeRegister = (name, fn) => {
     try {
@@ -34182,7 +24401,10 @@ function activate(context) {
   safeRegister("registerGitReleaseCommands", () => registerGitReleaseCommands(context));
   safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
-  safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));
+  safeRegister(
+    "registerOpenModulePlanCommand",
+    () => registerOpenModulePlanCommand(context)
+  );
   safeRegister("registerNewModuleCommand", () => registerNewModuleCommand(context));
   safeRegister(
     "registerOpenModulesManifestCommand",
@@ -34205,11 +24427,6 @@ function activate(context) {
     () => registerDeleteModuleCommand(context)
   );
   safeRegister(
-    "registerSessionGenPromptCommand",
-    () => registerSessionGenPromptCommand(context)
-  );
-  safeRegister("registerCostDashboardCommand", () => registerCostDashboardCommand(context));
-  safeRegister(
     "registerCancelLifecycleCommands",
     () => registerCancelLifecycleCommands(context, { refreshView: refreshAll })
   );
@@ -34220,10 +24437,6 @@ function activate(context) {
   safeRegister(
     "registerCopilotSeatSetupCommand",
     () => registerCopilotSeatSetupCommand(context)
-  );
-  safeRegister(
-    "registerConfigEditorCommand",
-    () => registerConfigEditorCommand(context)
   );
   safeRegister(
     "registerFlagDecisionForReview",
@@ -34253,22 +24466,19 @@ function activate(context) {
     "registerUpgradeOlderSetsCommand",
     () => registerUpgradeOlderSetsCommand(context, { refreshView: refreshAll })
   );
-  setImmediate(() => {
-    scanState.setReady();
-  });
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
-  if (!hasSeenOnboarding && (vscode42.workspace.workspaceFolders?.length ?? 0) > 0) {
+  if (!hasSeenOnboarding && (vscode35.workspace.workspaceFolders?.length ?? 0) > 0) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs36.existsSync(path42.join(r2, SESSION_SETS_REL3));
+        return fs28.existsSync(path36.join(r2, SESSION_SETS_REL3));
       } catch {
         return false;
       }
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode42.commands.executeCommand("dabbler.getStarted");
+      vscode35.commands.executeCommand("dabbler.getStarted");
     }
   }
   markActivateEnd();

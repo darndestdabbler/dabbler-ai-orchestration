@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "cedf0317d528845673476cd2e36e318a6a76f49d",
+  "fixedTree": "04898e0e98efd29722662cb4b8b474ccfa29bcb3",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-12T02:35:40.225331+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Copilot seat setup failure messages still claim the effective profile falls back to `api` via `local-overrides.yaml`, but Set 123 made `project-verify-type.txt` override that file. - **Category:** ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In a project whose committed verify type is COPILOT_CLI, every non-success Dabbler: Set Up Copilot Seat outcome must either consult the effective project verify type or avoid claiming an effective api fallback; no message may imply local-overrides.yaml controls transport.profile when project-verify-type.txt overrides it.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

@@ -157,8 +157,7 @@ const MODULES_YAML_HEADER_COMMENTS = `# docs/modules.yaml — the module manifes
 #
 # To have an AI assistant decompose this project into modules and fill this
 # file in, run the "Dabbler: Copy Module Decomposition Prompt" command
-# (Command Palette) — or the "Copy AI decomposition prompt" button in the
-# Getting Started form — then paste the copied prompt into your assistant.
+# (Command Palette) — then paste the copied prompt into your assistant.
 #
 # Renaming, deleting, splitting, or merging modules later (and adopting
 # modules in an older repo) is covered in the module reorganization guide:

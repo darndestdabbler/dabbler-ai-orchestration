@@ -34,7 +34,7 @@ import {
 } from "../../utils/moduleAuthoring";
 import { readSessionSets } from "../../utils/fileSystem";
 import { ModuleManifestEntry, SessionSet, SessionState } from "../../types";
-import { RowPayload } from "../../types/sessionSetsWebviewProtocol";
+import { RowPayload } from "../../types/explorerPayloads";
 
 function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
   return {

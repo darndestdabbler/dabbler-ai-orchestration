@@ -43,7 +43,10 @@ interface Pkg {
   contributes: {
     commands: { command: string; title: string; icon?: string }[];
     submenus?: { id: string; label: string }[];
-    views: Record<string, { id: string; name: string; visibility?: string; when?: string }[]>;
+    views: Record<
+      string,
+      { id: string; name: string; type?: string; visibility?: string; when?: string }[]
+    >;
     menus: Record<string, MenuEntry[]>;
   };
 }
@@ -75,23 +78,32 @@ suite("Set 110 S3 — the native tree is the shipping Work Explorer", () => {
     assert.strictEqual(native.when, undefined);
   });
 
-  test("the webview is a conditionally-present Setup & Status surface above it", () => {
-    assert.strictEqual(views[0].id, "dabblerSessionSets", "setup/status stacks above the tree");
-    assert.strictEqual(views[0].name, "Setup & Status");
-    // The presence rule. A view hidden by a `when` clause is never resolved,
-    // so its own provider cannot decide to bring it back — the key is
-    // computed in `extension.ts` via `providers/systemStatus.ts`, which
-    // fails toward VISIBLE so a fault is never invisible.
-    assert.strictEqual(views[0].when, "dabblerSessionSets.setupNeeded");
-    assert.strictEqual(views[1].id, VIEW, "the tree is the second, and last, view");
-    assert.strictEqual(views.length, 2);
+  test("the tree is the ONLY view in the container — no webview stacks above it", () => {
+    // Set 123 S3: the "Setup & Status" webview (`dabblerSessionSets`, gated on
+    // `dabblerSessionSets.setupNeeded`) is deleted. Setup resolves in the
+    // terminal now, so there is no second surface to stack, no presence rule
+    // to compute, and no way for the two to disagree about one workspace.
+    //
+    // Asserted as an EXACT set rather than "the webview is absent": a
+    // never-matching absence check would go on passing if some third view
+    // were contributed later, which is the failure mode this file exists to
+    // prevent.
+    assert.deepStrictEqual(
+      views.map((v) => v.id),
+      [VIEW],
+    );
+    assert.strictEqual(
+      views.filter((v) => v.type === "webview").length,
+      0,
+      "the extension contributes no webview views at all",
+    );
   });
 
   test("every title-bar action is gated on the tree, not on the conditional view", () => {
-    // The failure this catches is quiet and total: an action gated on the
-    // webview disappears with it, so on a healthy repo the operator would
-    // lose Refresh, the cost dashboard, Get Started, the manifest opener and
-    // the bulk upgrade — with nothing on screen to say why.
+    // The failure this catches is quiet and total: an action gated on a
+    // conditionally-present view disappears with it, so the operator would
+    // lose Refresh, Get Started, the manifest opener and the bulk upgrade —
+    // with nothing on screen to say why.
     const titleEntries = menus["view/title"] ?? [];
     assert.ok(titleEntries.length > 0, "no view/title contributions found");
     for (const entry of titleEntries) {
@@ -103,9 +115,65 @@ suite("Set 110 S3 — the native tree is the shipping Work Explorer", () => {
       );
       assert.ok(
         !when.includes("view == dabblerSessionSets "),
-        `${entry.command} is still gated on the conditional webview`,
+        `${entry.command} is still gated on the retired webview`,
       );
     }
+  });
+
+  test("every contributed command has a registration in shipping source", () => {
+    // Set 123 S3, from cross-provider verification round 1 (found by BOTH
+    // discovery lenses independently). This session deleted `wizard/`, whose
+    // `registerPlanImportCommand` registered TWO commands, not one:
+    // `dabbler.importPlan` — retired on purpose — and `dabbler.openModulePlan`,
+    // the Work Explorer's `Open Plan` row action, which is emphatically NOT
+    // retired. The manifest still contributed it and module rows still emitted
+    // `;can-open-plan;`, so the inline action stayed visible and would have
+    // failed with command-not-found on the main module workflow.
+    //
+    // Nothing caught it: `tsc` is happy (no import dangles — the whole import
+    // went), the menu-parity tests above check menu -> contributes, not
+    // contributes -> registration, and the Layer 3 tree specs never click
+    // Open Plan. This closes that direction, which is the one a DELETION
+    // breaks: a command loses its backing while every declaration that
+    // advertises it survives.
+    //
+    // Two registration shapes must both count as registered, or the guard
+    // fails on correct code: `regenerateNarrationTemplates.ts` registers via a
+    // `COMMAND_ID` constant, and `copyCommand.ts` registers a family from a
+    // template literal. So the check is "the id is reachable as a literal, or
+    // as the literal prefix of a template" rather than "it is spelled inside
+    // registerCommand(".
+    const srcDir = path.resolve(__dirname, "..", "..");
+    const sources: string[] = [];
+    const walk = (dir: string): void => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const p = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (entry.name === "test") continue; // shipping source only
+          walk(p);
+        } else if (entry.name.endsWith(".ts")) {
+          sources.push(fs.readFileSync(p, "utf8"));
+        }
+      }
+    };
+    walk(srcDir);
+    const all = sources.join("\n");
+
+    const templatePrefixes = [...all.matchAll(/`([^`$]*)\$\{/g)].map((m) => m[1]);
+    const backed = (id: string): boolean =>
+      all.includes(`"${id}"`) ||
+      templatePrefixes.some((prefix) => prefix.length > 0 && id.startsWith(prefix));
+
+    const orphans = pkg.contributes.commands
+      .map((c) => c.command)
+      .filter((id) => !backed(id));
+    assert.deepStrictEqual(
+      orphans,
+      [],
+      `these commands are contributed in package.json but nothing in shipping ` +
+        `source registers them, so invoking them fails with command-not-found: ` +
+        `${orphans.join(", ")}`,
+    );
   });
 });
 

@@ -6,7 +6,8 @@
 > (the file's previous writer and the previous home of this schema)
 > was retired. The shape documented here is the **post-migration**
 > shape: it is exactly what `python -m ai_router.migrate_router_config`
-> emits and what the visual config editor validates. Legacy
+> emits. (Until Set 123 S3 it was also what the extension's visual
+> config editor validated; that editor is deleted.) Legacy
 > (pre-migration) files keep working via the compatibility rules at
 > the end of this doc.
 
@@ -67,46 +68,40 @@ notes: |
   Started form requires an explicit choice before it will scaffold.
 - **`verification_nte_usd`** — the operator's stated not-to-exceed
   ceiling for cumulative API verification spend. Defaults to
-  `threshold_usd` when absent; the Getting Started form writes it
-  explicitly so no reader needs the default. The orchestrator reports
+  `threshold_usd` when absent; the retired Getting Started form wrote it
+  explicitly, and a hand-authored file should too, so no reader needs the
+  default. The orchestrator reports
   running spend against this ceiling at every session stop; if the
   ceiling is reached mid-session, verification switches to
   `manual-via-other-engine` for that session rather than failing.
 - **`set_at`** — ISO-8601 timestamp (local time with offset) of when
   the budget was set.
-- **`set_by`** — who/what set it. `"getting-started-form"` when written
-  by the extension's Getting Started form (0.32.0+);
+- **`set_by`** — who/what set it. `"getting-started-form"` in files
+  written by the extension's Getting Started form (0.32.0 to 0.51.0,
+  retired in Set 123 S3);
   `"adoption-bootstrap-flow"` appears in files written by the retired
   conversational flow; hand edits can use any identifying string.
 - **`warn_at_percent`** — integer 0–100; the spend percentage at which
   warning surfaces should fire. The migrator injects `80` when absent.
-- **`notes`** — free-form text, optional. The Getting Started form does
-  not collect it; hand-edit anytime.
+- **`notes`** — free-form text, optional. Hand-edit anytime.
 
 ## Writers
 
-- **The Getting Started form's budget step** (VS Code extension
-  0.32.0+) is the standard writer: a required
-  budget/NTE input in the Build-project-structure step, written at
-  scaffold time. It **never clobbers** an existing
-  `ai_router/budget.yaml` (skip + report). The pure-TS writer lives at
-  [`tools/dabbler-ai-orchestration/src/utils/budgetYaml.ts`](../tools/dabbler-ai-orchestration/src/utils/budgetYaml.ts)
-  and emits exactly the canonical shape above (minus `notes`).
-- **Hand authoring** is fully supported — the file is plain YAML and
-  the operator can create or edit it anytime (the visual config
-  editor's Budget section is the recommended editing surface).
+- **Hand authoring** is the standard path — the file is plain YAML and
+  the operator creates or edits it anytime.
+- **The extension's scaffold** still carries the pure-TS writer at
+  [`tools/dabbler-ai-orchestration/src/utils/budgetYaml.ts`](../tools/dabbler-ai-orchestration/src/utils/budgetYaml.ts),
+  which emits exactly the canonical shape above (minus `notes`) and
+  **never clobbers** an existing `ai_router/budget.yaml` (skip + report).
+  Set 123 S3 retired the Getting Started form's budget step that supplied
+  its input, so `Dabbler: Set Up New Project` scaffolds without a budget
+  and writes no file — the writer is reached only by a caller that
+  supplies one.
 - The retired **adoption-bootstrap chat flow** (extension ≤ 0.31.0)
   wrote the pre-migration shape; see the compatibility rules below.
 
 ## Readers
 
-- **The visual config editor**
-  ([`tools/dabbler-ai-orchestration/src/configEditor/schemaValidator.ts`](../tools/dabbler-ai-orchestration/src/configEditor/schemaValidator.ts),
-  `BUDGET_SCHEMA`) — requires `threshold_usd`; validates `scope`,
-  `warn_at_percent`, `verification_method`, `verification_nte_usd`,
-  `mode`. The schema is **open**: legacy fields (`set_at`, `set_by`,
-  `notes`, a stray `threshold_scope`) coexist without failing
-  validation.
 - **The session orchestrator (AI)** reads the file procedurally at
   Step 6 of
   [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) to

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The extension-local README still directs users to the retired Getting Started form for provider setup.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/README.md:24-34`, `tools/dabbler-ai-orchestration/package.json:53-60`, `tools/dabbler-ai-orchestration/src/extension.ts:18-23`\n  - **Failure scenario:** A typical new user reads the Marketplace/extension README before setup. It still says the Copilot path is “Install the Copilot CLI and sign in; the form configures the rest” and that “The Getting Started form asks which one you want,” but the current extension contributes only the native Work Explorer view and `dabbler.getStarted` opens static instructions. That user will look for, or rely on, a setup form that no longer exists instead of running `Dabbler: Set Up New Project`, `verify_type`, and `Dabbler: Set Up Copilot Seat`.\n  - **Acceptance criterion:** JUDGMENT - The extension-local README’s provider/setup section no longer says a Getting Started form configures or asks provider setup, and instead points to the surviving setup flow.\n  - **Details:** **Violation:** the remediation needed to close L3’s live-doc sweep for retired setup/config/prompt surfaces. **Impact:** this is the extension’s front-door documentation, so stale setup instructions materially impair onboarding. **Evidence:** the README still names the deleted form while the manifest/code show the webview form is retired and `getStarted` is documentation-only; the correct guidance is the Set Up New Project + `ai_router.verify_type` + Set Up Copilot Seat path.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A typical new user reads the Marketplace/extension README before setup. It still says the Copilot path is “Install the Copilot CLI and sign in; the form configures the rest” and that “The Getting Started form asks which one you want,” but the current extension contributes only the native Work Explorer view and `dabbler.getStarted` opens static instructions. That user will look for, or rely on, a setup form that no longer exists instead of running `Dabbler: Set Up New Project`, `verify_type`, and `Dabbler: Set Up Copilot Seat`.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/README.md",
+        "tools/dabbler-ai-orchestration/package.json",
+        "tools/dabbler-ai-orchestration/src/extension.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The extension-local README’s provider/setup section no longer says a Getting Started form configures or asks provider setup, and instead points to the surviving setup flow."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 Open Module Plan backing restored",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 live docs retired setup surfaces",
+      "verdict": "fix-rejected",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 Copilot seat setup profile-fallback messaging",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 quick-start budget scaffold claim",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    }
+  ]
+}

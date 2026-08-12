@@ -1,8 +1,6 @@
 import * as vscode from "vscode";
 import * as fs from "fs";
 import * as path from "path";
-import { SetupStatusView } from "./providers/SetupStatusView";
-import { ScanState } from "./providers/scanState";
 import { registerMigrateSetCommand } from "./commands/migrateSet";
 import { registerMigrateSetV4Command } from "./commands/migrateSetV4";
 import { discoverRoots, readAllSessionSets } from "./utils/fileSystem";
@@ -17,92 +15,34 @@ import { registerTroubleshootCommand } from "./commands/troubleshoot";
 import { registerCancelLifecycleCommands } from "./commands/cancelLifecycleCommands";
 import { registerInstallAiRouterCommands } from "./commands/installAiRouterCommands";
 import { registerCopilotSeatSetupCommand } from "./commands/copilotSeatSetupCommand";
-// Set 060 S3: the Set 021 WizardPanel (webview/wizard.html) is retired.
-// `dabbler.getStarted` now focuses the Session Set Explorer (whose
-// Getting Started form is the interactive surface, D1) and opens the
-// static instructions doc (D8). The plan-import and session-gen-prompt
-// commands the wizard module used to register survive as standalone
-// registrations.
+// Set 123 S3: the Set 021 WizardPanel and, after it, the Getting Started
+// webview form are both retired. Setup is now a terminal step — `python -m
+// ai_router.verify_type` resolves what verifies the project and writes
+// `project-verify-type.txt` — so `dabbler.getStarted` opens the static
+// instructions doc that explains it, and nothing renders a form.
 import { registerGetStartedCommand } from "./commands/gettingStartedDoc";
+import { registerOpenModulePlanCommand } from "./commands/openModulePlan";
 import { registerNewModuleCommand } from "./commands/newModule";
 import { registerOpenModulesManifestCommand } from "./commands/openModulesManifest";
 import { registerCopyModuleDecompositionPromptCommand } from "./commands/copyModuleDecompositionPrompt";
 import { registerAssignLegacySetsCommand } from "./commands/assignLegacySets";
 import { registerRenameModuleCommand } from "./commands/renameModule";
 import { registerDeleteModuleCommand } from "./commands/deleteModule";
-import { registerPlanImportCommand } from "./wizard/planImport";
-import { registerSessionGenPromptCommand } from "./wizard/sessionGenPrompt";
-import { registerCostDashboardCommand } from "./dashboard/CostDashboard";
-import { registerConfigEditorCommand } from "./configEditor/ConfigEditorPanel";
 import { registerFlagDecisionForReview } from "./commands/flagDecisionForReview";
 import { registerScanAnnotationsForActiveSet } from "./commands/scanAnnotationsForActiveSet";
 import { registerRegenerateNarrationTemplatesCommand } from "./commands/regenerateNarrationTemplates";
 import { registerResolveSetNumberCommand } from "./commands/resolveSetNumber";
 import { registerUpgradeOlderSetsCommand } from "./commands/upgradeOlderSets";
 import { hasSubCurrentSets } from "./providers/SessionSetsModel";
-import { routesCost } from "./utils/routerConfig";
 import { SessionSet } from "./types";
-// Set 110 Session 2: the native TreeView, shipped alongside the webview
-// so the two can be compared before Session 3 switches over.
+// Set 123 S3: the native TreeView is the only Work Explorer surface — the
+// webview that used to stack above it is deleted.
 import { WorkExplorerTreeProvider } from "./providers/WorkExplorerTreeProvider";
 import { registerWorkExplorerTreeCommands } from "./commands/workExplorerTreeCommands";
-// Set 110 Session 3: the presence rule for the setup/status webview.
-import { isSetupNeeded } from "./providers/systemStatus";
 // Set 110 Session 2: host-side startup buckets (S1's assigned residual).
 import { markActivateEnd, markActivateStart } from "./utils/startupTiming";
 
 const SESSION_SETS_REL = path.join("docs", "session-sets");
-
-// Set 052 S2 (D3 gate): project whether ANY open workspace folder
-// routes through the AI router (resolvable `ai_router/router-config.yaml`)
-// into a context key. The cost icon/command is contributed only when this
-// is true. Folder existence alone is insufficient; `routesCost` requires
-// the config file itself.
-function evaluateRouterCapabilityContextKey(): void {
-  const folders = vscode.workspace.workspaceFolders ?? [];
-  let routes = false;
-  try {
-    routes = folders.some((f) => routesCost(f.uri.fsPath));
-  } catch {
-    routes = false;
-  }
-  vscode.commands.executeCommand("setContext", "dabblerSessionSets.routesCost", routes);
-}
-
-// Set 110 S3: the setup/status webview is contributed with
-// `when: dabblerSessionSets.setupNeeded`, so it appears only when it has
-// something to say — a repo with sets and a healthy environment gets the
-// whole panel for its tree, which is the operator's standing complaint about
-// this Explorer.
-//
-// The key MUST be computed here rather than inside the view: a view hidden by
-// a `when` clause is never resolved, so its own provider could never decide
-// to bring it back. `isSetupNeeded` answers the fault half by loading the
-// webview's own renderer in-process rather than reimplementing its rules —
-// see `providers/systemStatus.ts` for why that matters.
-function evaluateSetupNeededContextKey(
-  extensionPath: string,
-  allSets: SessionSet[],
-): void {
-  let needed = true;
-  try {
-    needed = isSetupNeeded(extensionPath, allSets.length > 0);
-  } catch (err) {
-    // Fail toward VISIBLE. The point of the gate is that a fault is never
-    // invisible; a gate that fails closed would hide the surface that
-    // reports faults, which is the opposite of what it is for.
-    console.error(
-      "[dabbler-ai-orchestration] setup-needed evaluation threw; " +
-        "showing the Setup & Status view.",
-      err,
-    );
-  }
-  vscode.commands.executeCommand(
-    "setContext",
-    "dabblerSessionSets.setupNeeded",
-    needed,
-  );
-}
 
 function evaluateSupportContextKeys(allSets: SessionSet[]): void {
   const cfg = vscode.workspace.getConfiguration("dabblerSessionSets");
@@ -134,52 +74,20 @@ export function activate(context: vscode.ExtensionContext): void {
   // the `activate()` bucket S1 could only measure against a Node stub.
   markActivateStart();
   // Set 059: activation must NOT bail when no folder is open. The previous
-  // `if (!workspaceFolders?.length) return;` guard left the webview view
-  // provider AND every command unregistered in exactly the case "Set up a new
-  // project" / "Get Started" exist for — a fresh window with no folder — so the
-  // Session Sets view hung (no provider) and `dabbler.setupNewProject` /
+  // `if (!workspaceFolders?.length) return;` guard left every command
+  // unregistered in exactly the case "Set up a new project" / "Get Started"
+  // exist for — a fresh window with no folder — so `dabbler.setupNewProject` /
   // `dabbler.getStarted` were never registered (operator UAT, 0.28.0). Everything
   // below is folder-defensive: `discoverRoots()` / `readAllSessionSets()` return
   // `[]` with no folders, the context-key / watcher blocks are wrapped in
   // try/catch, and `onDidChangeWorkspaceFolders(refreshAll)` re-runs the
-  // folder-dependent runtime the moment a folder is added. The view renders its
-  // Getting Started surface as the empty state instead of hanging.
+  // folder-dependent runtime the moment a folder is added.
 
-  // Set 030 Session 5: scanState lifecycle. Flip to "loading" BEFORE
-  // we register the tree provider so the very first `getChildren()`
-  // sees `phase === "loading"` and returns the sentinel — no
-  // empty-state flash window. The async `setImmediate` below flips
-  // to "ready" after the synchronous body of `activate` returns,
-  // which lets the tree provider's reactive `onDidChange` refresh
-  // swap the sentinel for real rows on the next render tick.
-  const scanState = new ScanState();
-  context.subscriptions.push({ dispose: () => scanState.dispose() });
-  scanState.setLoading();
-
-  // Set 110 Session 3: the webview no longer renders a tree. It carries
-  // only the surfaces a `TreeItem` cannot host — the Getting Started form
-  // and the System Status strip — and is contributed conditionally, so on a
-  // healthy repo with session sets it is absent entirely and the tree gets
-  // the whole panel.
-  const provider = new SetupStatusView(context, scanState);
-  context.subscriptions.push({ dispose: () => provider.dispose() });
-  // Set 077 S2 (Feature 1, A1): `retainContextWhenHidden` was evaluated
-  // here as belt-and-braces for the Getting Started state-leak fix and
-  // deliberately NOT enabled. The webview persists its form state via
-  // `vscode.setState()` and re-seeds the seat profile from the durable
-  // router config on every load (client.js), which covers BOTH teardown
-  // cases — hide/re-expand AND window reload —
-  // whereas retainContextWhenHidden covers only the hide case, at a
-  // standing memory cost VS Code's own guidance says to avoid when
-  // getState/setState suffices.
-  context.subscriptions.push(
-    vscode.window.registerWebviewViewProvider(SetupStatusView.viewType, provider),
-  );
-
-  // Set 110 Session 3: the native `TreeView` is now THE Work Explorer. The
-  // webview above it carries only the surfaces a `TreeItem` cannot host —
-  // the Getting Started form and the System Status strip — and is
-  // contributed conditionally.
+  // Set 123 S3: the native `TreeView` is now the ONLY Work Explorer surface.
+  // The webview that used to stack above it — the Getting Started form and
+  // the System Status strip — is deleted: setup resolves in the terminal via
+  // `python -m ai_router.verify_type`, so there is no form left to render and
+  // no `dabblerSessionSets.setupNeeded` presence rule to evaluate.
   //
   // `createTreeView` rather than `registerTreeDataProvider` because the
   // former returns the `TreeView` handle that `TreeView.message`,
@@ -215,18 +123,6 @@ export function activate(context: vscode.ExtensionContext): void {
   const evaluateContextKeys = () => {
     const allSets = readAllSessionSets();
     evaluateSupportContextKeys(allSets);
-    evaluateRouterCapabilityContextKey();
-    // Set 110 S3: DELIBERATELY off the synchronous path. `isSetupNeeded`
-    // stats every PATH entry twice (the Python and Copilot-CLI presence
-    // probes), and this function is called inside `activate()`. The probes
-    // are filesystem stats rather than subprocess spawns, so the cost is
-    // small — but this whole session set exists because of startup cost, and
-    // Session 4 has a sub-second view-open gate to hit. Paying it one tick
-    // later costs nothing an operator can perceive and keeps it out of the
-    // bucket VS Code charges to activation.
-    setImmediate(() =>
-      evaluateSetupNeededContextKey(context.extensionPath, allSets),
-    );
   };
   // v0.13.2: defensive — `evaluateContextKeys()` calls `readAllSessionSets()`
   // which iterates every session set's session-state.json. A single
@@ -302,7 +198,6 @@ export function activate(context: vscode.ExtensionContext): void {
       );
       const watcher = vscode.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {
-        provider.refresh();
         treeProvider.refresh();
       };
       watcher.onDidCreate(onEvent);
@@ -311,33 +206,26 @@ export function activate(context: vscode.ExtensionContext): void {
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
 
-      // Set 060 Session 1: Getting Started form + module-tree live-progress
-      // watcher. It invalidates the view on a change to any of the paths the
-      // form and the module tree derive state from — paths the spec.md-scoped
-      // session-sets watcher above does NOT cover. The covered inputs:
-      //   - Build-section `structureBuilt`: CLAUDE.md / AGENTS.md / GEMINI.md
-      //     (engine files) + .venv/**/site-packages/ai_router/** (the
-      //     router-importable filesystem proxy);
+      // Set 123 S3: the module-tree live-progress watcher. It invalidates the
+      // tree on a change to any of the paths the module tier derives state
+      // from — paths the spec.md-scoped session-sets watcher above does NOT
+      // cover. The covered inputs:
       //   - docs/modules.yaml (Set 092 S2): edit → invalidate → repair updates
-      //     the diagnostics strip + last-known-good tree without the poll;
+      //     the `TreeView.message` diagnostic + last-known-good tree without
+      //     waiting for the poll;
       //   - docs/planning/project-plan.md: the pseudo-module's Plan node state
       //     (Set 093 — LEGACY_ROOT_PLAN_REL) flips present/missing live.
-      // Set 094: the form shrank to two sections, so the retired step-2
-      // (planPresent) and step-3 (sessionSetsPresent) inputs left the form.
-      // project-plan.md is KEPT — its consumer moved from the form's step-2
-      // indicator to the Set 093 pseudo-module Plan node (list mode). The
-      // bare `docs/session-sets/*` glob was DROPPED: the getting-started →
-      // list flip keys on a MATERIALIZED set (spec.md), which the
-      // session-sets watcher above already catches; a bare numbered directory
-      // no longer greens any form step, so watching it bought only a no-op
-      // refresh (what the watcher contract loses — recorded per spec Step 2).
+      // The engine files (CLAUDE.md / AGENTS.md / GEMINI.md) and the
+      // `.venv/**/site-packages/ai_router/**` router-importable proxy were
+      // DROPPED with the Getting Started form: they only ever greened that
+      // form's Build section, and nothing in the tree derives from them, so
+      // watching them now buys a no-op refresh (what the watcher contract
+      // loses — recorded per spec Step 2).
       // In-workspace globs ride VS Code's existing recursive workspace
-      // watcher, so this adds event subscriptions, not a new OS watch —
-      // even the .venv glob is cheap (and dead when a user excludes
-      // .venv via files.watcherExclude, where the 30s poll backstops).
+      // watcher, so this adds event subscriptions, not a new OS watch.
       const gsPattern = new vscode.RelativePattern(
         root,
-        "{CLAUDE.md,AGENTS.md,GEMINI.md,docs/modules.yaml,docs/planning/project-plan.md,.venv/**/site-packages/ai_router/**}",
+        "{docs/modules.yaml,docs/planning/project-plan.md}",
       );
       const gsWatcher = vscode.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);
@@ -350,10 +238,6 @@ export function activate(context: vscode.ExtensionContext): void {
 
   const refreshAll = () => {
     bindWatchers();
-    provider.refresh();
-    // Set 110 S2: both surfaces refresh from the same signal while they
-    // coexist, so a drift between them is never explained by one having
-    // seen a watcher tick the other missed.
     treeProvider.refresh();
     setImmediate(evaluateContextKeys);
   };
@@ -385,10 +269,9 @@ export function activate(context: vscode.ExtensionContext): void {
   // Each register*Commands call is wrapped in its own try/catch so a
   // throw in one group does not silently skip the registrations that
   // follow. v0.13.1 shipped without these wrappers; in dabbler-platform
-  // workspaces some users hit "command 'dabbler.showCostDashboard' not
-  // found" because an earlier register call threw and the cascade
-  // skipped the cost-dashboard + wizard + install-ai-router
-  // registrations. Defensive logging via console.error means a future
+  // workspaces some users hit "command not found" because an earlier
+  // register call threw and the cascade skipped every registration after
+  // it. Defensive logging via console.error means a future
   // similar failure surfaces in `Help → Toggle Developer Tools →
   // Console` with the exact group name, instead of presenting as
   // an opaque command-not-found at click time.
@@ -422,7 +305,9 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerGitReleaseCommands", () => registerGitReleaseCommands(context));
   safeRegister("registerTroubleshootCommand", () => registerTroubleshootCommand(context));
   safeRegister("registerGetStartedCommand", () => registerGetStartedCommand(context));
-  safeRegister("registerPlanImportCommand", () => registerPlanImportCommand(context));
+  safeRegister("registerOpenModulePlanCommand", () =>
+    registerOpenModulePlanCommand(context),
+  );
   safeRegister("registerNewModuleCommand", () => registerNewModuleCommand(context));
   safeRegister("registerOpenModulesManifestCommand", () =>
     registerOpenModulesManifestCommand(context),
@@ -439,10 +324,6 @@ export function activate(context: vscode.ExtensionContext): void {
   safeRegister("registerDeleteModuleCommand", () =>
     registerDeleteModuleCommand(context),
   );
-  safeRegister("registerSessionGenPromptCommand", () =>
-    registerSessionGenPromptCommand(context),
-  );
-  safeRegister("registerCostDashboardCommand", () => registerCostDashboardCommand(context));
   safeRegister("registerCancelLifecycleCommands", () =>
     registerCancelLifecycleCommands(context, { refreshView: refreshAll }),
   );
@@ -451,9 +332,6 @@ export function activate(context: vscode.ExtensionContext): void {
   );
   safeRegister("registerCopilotSeatSetupCommand", () =>
     registerCopilotSeatSetupCommand(context),
-  );
-  safeRegister("registerConfigEditorCommand", () =>
-    registerConfigEditorCommand(context),
   );
   safeRegister("registerFlagDecisionForReview", () =>
     registerFlagDecisionForReview(context),
@@ -500,24 +378,13 @@ export function activate(context: vscode.ExtensionContext): void {
     registerUpgradeOlderSetsCommand(context, { refreshView: refreshAll }),
   );
 
-  // Set 030 Session 5: flip scanState to "ready" once activation
-  // finishes. `setImmediate` yields the event loop one tick so the
-  // synchronous body of activate() returns first (VS Code measures
-  // extension-activation time; we don't want the scan in that
-  // metric). The tree provider's `onDidChange` subscription on
-  // scanState triggers a re-render the moment the phase flips, so
-  // the loading sentinel is replaced by real rows the same frame.
-  setImmediate(() => {
-    scanState.setReady();
-  });
-
   // Show onboarding on first activation in a workspace with no session sets.
   // Set 059: gate on having a folder open. `workspaceState` does not persist
-  // reliably in an empty (no-folder) window, so without this guard the wizard
+  // reliably in an empty (no-folder) window, so without this guard onboarding
   // would auto-pop on EVERY fresh no-folder launch — intrusive when the user
   // opened a blank window for something unrelated. With no folder the user
-  // still reaches Get Started via the view's Getting Started surface or the
-  // Command Palette; auto-onboarding is reserved for an opened workspace.
+  // still reaches Get Started from the Command Palette; auto-onboarding is
+  // reserved for an opened workspace.
   const hasSeenOnboarding = context.workspaceState.get<boolean>("hasSeenOnboarding", false);
   if (!hasSeenOnboarding && (vscode.workspace.workspaceFolders?.length ?? 0) > 0) {
     const roots = discoverRoots();

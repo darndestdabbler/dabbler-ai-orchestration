@@ -102,15 +102,17 @@ the framework is built around.
 ## Part 3 — Set up Dabbler and name your first module
 
 1. Click the **Dabbler AI Orchestration** icon in the Activity Bar. The repo has no session
-   sets yet, so the **Getting Started** form opens. In **Build project structure**, set
-   **Tier** to **Full**, set **Provider access (how routed calls run)** to **GitHub Copilot
-   CLI seat**, and click **Build project structure**. (On the direct-API variant, leave
-   provider access on its default and enter a not-to-exceed budget when asked.)
+   sets yet. Run **`Dabbler: Set Up New Project`** from the Command Palette — it is
+   non-interactive. Then declare how this project is verified:
+   `python -m ai_router.verify_type --set COPILOT_CLI` (or `DIRECT_API` on the
+   direct-API variant), commit `project-verify-type.txt`, and on the Copilot path
+   run **`Dabbler: Set Up Copilot Seat`**. On the direct-API variant, hand-author
+   `ai_router/budget.yaml` with your not-to-exceed budget.
 
    You get a `.venv/` with `ai_router` installed, an `ai_router/` config folder,
    `docs/session-sets/`, AI-agent instruction files, comment-only `.github/CODEOWNERS` and
    `monorepo-ci.yml` templates, and a starter module **Default** carrying `001-default-plan` and
-   `002-default-decomposition`. The form gives way to the tree.
+   `002-default-decomposition`, all of which appear in the Work Explorer tree.
 
 2. **Make the starter module yours** — your first module is `greeter`:
    - Run **`Dabbler: New Module`**. At *New module (1/2): slug* enter `greeter`; at *New

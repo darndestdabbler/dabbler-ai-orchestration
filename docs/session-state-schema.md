@@ -1,9 +1,8 @@
 # session-state.json schema — `docs/session-sets/<slug>/session-state.json`
 
-The machine-readable lifecycle file for every session set. The Session
-Set Explorer extension, `ai_router`'s `close_session`, the cancel /
-restore commands, and the cost dashboard all read it; `ai_router`'s
-sanctioned writers own it.
+The machine-readable lifecycle file for every session set. The Work
+Explorer extension, `ai_router`'s `close_session`, and the cancel /
+restore commands all read it; `ai_router`'s sanctioned writers own it.
 
 The schema is **strict where machines parse**: a fixed field set with
 canonical string values for `status`. Field-name drift or status-value

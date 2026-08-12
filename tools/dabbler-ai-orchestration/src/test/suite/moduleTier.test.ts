@@ -30,7 +30,7 @@ import {
 } from "../../providers/SessionSetsModel";
 import { readSessionSets } from "../../utils/fileSystem";
 import { SessionSet } from "../../types";
-import { RowPayload } from "../../types/sessionSetsWebviewProtocol";
+import { RowPayload } from "../../types/explorerPayloads";
 
 function fakeSet(over: Partial<SessionSet> = {}): SessionSet {
   return {
@@ -286,8 +286,6 @@ suite("Set 087 S2 — buildModulePayloads payload shape (Layer 2 fixture)", () =
       duplicateNameTooltip: "",
       kindBadge: "",
       kindTooltip: "",
-      accordionHtml: null,
-      accordionUpdatedAt: null,
     };
   }
 

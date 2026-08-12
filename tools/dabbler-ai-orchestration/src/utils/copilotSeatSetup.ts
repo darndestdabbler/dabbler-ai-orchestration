@@ -995,8 +995,26 @@ export function describeSeatSetupOutcome(
   const rerun = `Re-run seat setup (no need to re-scaffold): ${rerunHint}`;
   const keyless =
     "no DABBLER_* provider key is set, so the router is not yet functional";
+  // Set 123 S3 (supplementary verification, Major): this used to read "keep
+  // the api profile working" flat, and every failure branch below claimed
+  // "local-overrides.yaml keeps transport.profile: api". Both became FALSE in
+  // Session 1: `verify_type.derive_transport_profile()` returns the committed
+  // `project-verify-type.txt` profile BEFORE it reads any configured
+  // `transport.profile`, so on a project that committed COPILOT_CLI the
+  // effective profile stays copilot-cli no matter what this file says. An
+  // operator told "you are safely on api" would proceed on a broken seat.
+  //
+  // The fix is subtraction, not a new file read: these messages now report
+  // only what this command actually DID (the seat profile was not enabled)
+  // and name the file that really decides, rather than asserting an effective
+  // profile they are not in a position to know.
   const keyed =
-    "the DABBLER_* provider key(s) already set keep the api profile working";
+    "the DABBLER_* provider key(s) already set keep the api profile working " +
+    "wherever this project's committed verify type is DIRECT_API";
+  const notEnabled =
+    "the copilot-cli seat profile was NOT enabled in " +
+    "ai_router/local-overrides.yaml (and project-verify-type.txt, not that " +
+    "file, decides this project's effective transport)";
   switch (outcome.kind) {
     case "success":
       return {
@@ -1028,8 +1046,7 @@ export function describeSeatSetupOutcome(
         message:
           `Copilot seat setup completed, but only ${outcome.providers.length} ` +
           `distinct provider(s) confirmed (${outcome.providers.join(", ") || "none"}) — ` +
-          "routed dispatch would fail closed, so local-overrides.yaml keeps " +
-          `transport.profile: api. ${cause}` +
+          `routed dispatch would fail closed, so ${notEnabled}. ${cause}` +
           (providerKeysPresent ? `Meanwhile ${keyed}. ` : `And ${keyless}. `) +
           "The probe lockfile was kept for inspection at " +
           `ai_router/copilot-catalog.lock. ${rerun}`,
@@ -1039,20 +1056,19 @@ export function describeSeatSetupOutcome(
       return {
         level: "warning",
         message: providerKeysPresent
-          ? `Copilot seat setup failed: ${outcome.detail}. local-overrides.yaml ` +
-            `keeps transport.profile: api, and ${keyed}. To use the Copilot ` +
+          ? `Copilot seat setup failed: ${outcome.detail}. So ${notEnabled}, ` +
+            `and ${keyed}. To use the Copilot ` +
             `seat instead, fix the cause first. ${rerun}`
           : `Scaffold completed, but the Copilot seat setup did not: ` +
-            `${outcome.detail}. local-overrides.yaml keeps transport.profile: ` +
-            `api, and ${keyless}. Fix the cause, then: ${rerun}`,
+            `${outcome.detail}. So ${notEnabled}, ` +
+            `and ${keyless}. Fix the cause, then: ${rerun}`,
       };
     case "cancelled":
       return {
         level: "warning",
         message:
           "Copilot seat setup was cancelled — the lockfile was restored to " +
-          "its pre-run state and local-overrides.yaml keeps " +
-          "transport.profile: api. " +
+          `its pre-run state and ${notEnabled}. ` +
           (providerKeysPresent
             ? `Meanwhile ${keyed}. `
             : `Note ${keyless} until seat setup completes. `) +
@@ -1068,10 +1084,11 @@ export function describeSeatSetupOutcome(
           "`profile: copilot-cli` under the `transport:` block in that file " +
           "by hand — no re-probe is needed. Until then " +
           (providerKeysPresent
-            ? "the router keeps running on the api profile with the " +
+            ? "the router keeps running on whatever profile " +
+              "project-verify-type.txt resolves to, with the " +
               "DABBLER_* key(s) already set."
-            : "the router is not yet functional (transport.profile is " +
-              "still api and no DABBLER_* provider key is set)."),
+            : "the router is not yet functional (the seat profile is " +
+              "unwritten and no DABBLER_* provider key is set)."),
       };
     default: {
       // Exhaustiveness guard (S3 review finding 6): a future

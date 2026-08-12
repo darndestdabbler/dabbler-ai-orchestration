@@ -2,7 +2,7 @@ import * as assert from "assert";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
-import { readYamlFile, writeYamlFile, parseDocumentFromText } from "../../configEditor/yamlReadWrite";
+import { readYamlFile, writeYamlFile, parseDocumentFromText } from "../../utils/yamlReadWrite";
 
 function makeTmpDir(): string {
   return fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-yaml-test-"));

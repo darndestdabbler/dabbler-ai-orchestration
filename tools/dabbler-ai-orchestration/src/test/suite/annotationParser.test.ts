@@ -3,7 +3,7 @@ import {
   Annotation,
   findAnnotations,
   deduplicateAnnotations,
-} from "../../configEditor/annotationParser";
+} from "../../utils/annotationParser";
 
 const FIXED_TS = "2026-05-16T00:00:00.000Z";
 const now = (): string => FIXED_TS;

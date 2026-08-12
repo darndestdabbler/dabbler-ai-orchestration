@@ -1,14 +1,19 @@
 // Set 063 S2 — unit matrix for the pure-TS budget.yaml writer behind
-// the Getting Started form's Full-tier budget / NTE step (spec D1).
+// the consumer-repo scaffolder's Full-tier budget / NTE step (spec D1).
 //
 // The matrix the S1 design lock requires: amounts across all four mode
 // bands, $0 with each zero-rule method, invalid-input narrowing,
-// Lightweight-never-writes, no-clobber, and the shape checks against
-// the audited readers — the config editor's BUDGET_SCHEMA (validated
-// directly via validateBatch) and a TS twin of the
+// Lightweight-never-writes, no-clobber, and the shape check against
+// the audited reader — a TS twin of the
 // `migrate_router_config._migrate_budget` no-op property (post-
 // migration keys only: `scope` not `threshold_scope`, no `period`,
 // `warn_at_percent` already present).
+//
+// Set 123 S3: the second shape check — "every band's emission passes the
+// config editor BUDGET_SCHEMA" — went with the config editor webview it
+// validated for. Nothing in the extension reads budget.yaml any more; the
+// router owns it, and the migrator twin below is the property that still
+// has a live consumer.
 
 import * as assert from "assert";
 import * as path from "path";
@@ -23,7 +28,6 @@ import {
   resolveVerificationMethod,
   writeBudgetYaml,
 } from "../../utils/budgetYaml";
-import { validateBatch } from "../../configEditor/schemaValidator";
 import { FileOps } from "../../utils/aiRouterInstall";
 import { scaffoldConsumerRepo } from "../../commands/gitScaffold";
 import {
@@ -143,19 +147,6 @@ suite("renderBudgetYaml — the §2.4 post-migration contract shape", () => {
       assert.strictEqual(doc.mode, "zero-budget");
       assert.strictEqual(doc.verification_method, method);
       assert.strictEqual(doc.verification_nte_usd, 0);
-    }
-  });
-
-  test("every band's emission passes the config editor BUDGET_SCHEMA", () => {
-    for (const v of [0, 5, 20, 99, 100, 12.5]) {
-      const doc = emit(v, v === 0 ? "skipped" : "api");
-      const result = validateBatch({
-        routerConfig: null,
-        budget: doc,
-        localOverrides: null,
-      });
-      assert.deepStrictEqual(result.errors, [], `threshold ${v}`);
-      assert.strictEqual(result.valid, true, `threshold ${v}`);
     }
   });
 

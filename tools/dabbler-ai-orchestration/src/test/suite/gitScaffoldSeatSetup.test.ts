@@ -247,7 +247,7 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     assert.ok(captured.infos[0].includes("transport.profile: copilot-cli"));
   });
 
-  test("insufficient-providers warns honestly: fail-closed, config stays api, lockfile kept", async () => {
+  test("insufficient-providers warns honestly: fail-closed, seat profile not enabled, lockfile kept", async () => {
     const { captured, seams } = makeSeams({
       kind: "insufficient-providers",
       providers: ["anthropic"],
@@ -258,7 +258,15 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     assert.strictEqual(captured.infos.length, 0);
     assert.strictEqual(captured.warnings.length, 1);
     assert.ok(captured.warnings[0].includes("fail closed"));
-    assert.ok(captured.warnings[0].includes("transport.profile: api"));
+    // Set 123 S3 (supplementary verification, Major): this used to pin
+    // "transport.profile: api" — a claim Session 1 made FALSE, because
+    // `derive_transport_profile()` answers from the committed
+    // `project-verify-type.txt` before it reads local-overrides.yaml. The
+    // message must report what this command did (the seat profile was not
+    // enabled) and must NOT assert an effective profile it cannot know.
+    assert.ok(captured.warnings[0].includes("was NOT enabled"));
+    assert.ok(captured.warnings[0].includes("project-verify-type.txt"));
+    assert.ok(!captured.warnings[0].includes("keeps transport.profile: api"));
     assert.ok(captured.warnings[0].includes("Re-run seat setup"));
   });
 
@@ -275,12 +283,13 @@ suite("gitScaffold — runCopilotSeatSetupWithProgress (VS Code layer)", () => {
     assert.ok(captured.warnings[0].includes("no re-probe is needed"));
   });
 
-  test("cancelled warns that the lockfile was restored and config stays api", async () => {
+  test("cancelled warns that the lockfile was restored and the seat profile was not enabled", async () => {
     const { captured, seams } = makeSeams({ kind: "cancelled", by: "operator" });
     await runCopilotSeatSetupWithProgress(fakeContext(), projectDir, venvPath, seams);
     assert.strictEqual(captured.warnings.length, 1);
     assert.ok(captured.warnings[0].includes("restored"));
-    assert.ok(captured.warnings[0].includes("transport.profile: api"));
+    assert.ok(captured.warnings[0].includes("was NOT enabled"));
+    assert.ok(!captured.warnings[0].includes("keeps transport.profile: api"));
   });
 
   test("refresh-failed warns with the detail and the re-run hint", async () => {

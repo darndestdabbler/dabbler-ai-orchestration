@@ -25,13 +25,17 @@ Two ways to give the router a provider to call:
 
 | | **Direct provider API keys** | **GitHub Copilot CLI seat** |
 |---|---|---|
-| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` / `DABBLER_OPENAI_API_KEY` | Install the Copilot CLI and sign in; the form configures the rest |
+| Setup | Set `DABBLER_ANTHROPIC_API_KEY` / `DABBLER_GEMINI_API_KEY` / `DABBLER_OPENAI_API_KEY` | Install the Copilot CLI and sign in, then run **`Dabbler: Set Up Copilot Seat`** |
 | Spend | Metered, capped by your not-to-exceed budget (a 3-session set typically totals $0.15–$2.50) | Covered by your existing Copilot subscription |
 | Best for | Anyone with provider accounts | Shops whose staff hold only a Copilot seat and cannot get provider keys |
 
 Either way you need reach to **at least two provider families**, or
-cross-provider verification has nothing to cross to. The Getting
-Started form asks which one you want; that is its only setup question.
+cross-provider verification has nothing to cross to. Which one a project
+uses is its **committed** answer, written once by
+`python -m ai_router.verify_type --set DIRECT_API` (or `COPILOT_CLI`) and
+recorded in `project-verify-type.txt` at the repo root — the router derives
+`transport.profile` from that file, so the choice travels with the project
+rather than with the machine.
 
 > **Upgrading from a version before 2026-08?** A second "Lightweight"
 > tier used to let a session set opt out of routed verification
@@ -96,64 +100,60 @@ Started form asks which one you want; that is its only setup question.
 
 ## Get started
 
-Open a project folder with no session sets yet and the Work Explorer
-renders the staged **Getting Started form** (two sections), with
-companion step-by-step instructions in the editor:
+Open a project folder and run **`Dabbler: Set Up New Project`** from the
+Command Palette. There is no form to fill in - the command is
+non-interactive on purpose, and everything it needs it either derives or
+asks for in the terminal you are already in.
 
-![The two-section Getting Started form in the Work Explorer: Build project structure with a provider-access choice, then Define modules (optional)](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/getting-started.png)
+1. **Build project structure** - the command scaffolds the `.venv` with
+   the router package, the AI-agent instruction files, and the
+   `docs/session-sets/` home. It checks prerequisites before writing
+   anything, so a missing tool fails with a friendly explainer instead of
+   a raw error, leaving no partial setup behind.
+2. **Say what verifies the project** - one terminal command, answered
+   once and committed:
 
-1. **Build project structure** — pick your **provider access**:
-   **direct provider API keys** (the default) or a **GitHub Copilot
-   CLI seat** (calls run through your Copilot subscription's
-   command-line tool — no `DABBLER_*` keys needed). Your choice
-   persists through a window reload, so
-   revisiting the form never silently reverts it. The form
-   scaffolds everything: the `.venv` with the router package, the
-   AI-agent instruction files, and the `docs/session-sets/` home.
-   On the direct-keys path the form also asks for your verification
-   **budget / NTE cap** (saved to `ai_router/budget.yaml`; a `$0` budget asks
-   you to pick manual-via-other-engine or skipped verification
-   explicitly). Environment faults render in a persistent **System
-   Status strip** above the form (the same strip that sits above the
-   Work Explorer tree), visible only when a fault exists: a missing
-   provider API key (the direct-API option needs one), a missing
-   Python interpreter, or — with the Copilot seat option selected —
-   a missing `copilot` CLI, each with install guidance; the Build
-   action checks prerequisites before writing
-   anything, so a missing tool fails with a friendly explainer
-   instead of a raw error, leaving no partial setup behind. With the
-   Copilot seat option, Build finishes by checking the seat's model
-   catalog and enables the seat profile only when the seat confirms
-   two distinct provider families — a check validated so far only on
-   a single personal seat (the same seat Set 078 validated on);
-   multi-seat and enterprise-seat model availability are not yet
-   validated, and an enterprise-managed seat may expose only one
-   provider family and fail the two-provider check even though the
-   guided flow itself ran — the form says so honestly rather than
-   leaving a silently broken router.
-2. **Define modules (optional)** — for a project split across areas
+   ```
+   python -m ai_router.verify_type            # prints the guided setup
+   python -m ai_router.verify_type --set DIRECT_API
+   ```
+
+   `DIRECT_API` means provider API keys; `COPILOT_CLI` means a GitHub
+   Copilot seat and no `DABBLER_*` keys. The answer is written to
+   `project-verify-type.txt` at the repo root and **committed** - it is
+   project configuration, not machine state, so it does not change with
+   whichever machine the repo is checked out on, and the router's
+   `transport.profile` is derived from it rather than configured
+   separately. If your machine sets `AI_ORCHESTRATION_VERIFY_TYPE`, that
+   value is offered as a suggestion and `--confirm` commits it; until
+   then it changes nothing. On the Copilot path,
+   **`Dabbler: Set Up Copilot Seat`** checks the seat's model catalog and
+   enables the seat profile only when the seat confirms two distinct
+   provider families - validated so far only on a single personal seat, so
+   an enterprise-managed seat may expose one family and fail that check
+   honestly rather than leaving a silently broken router.
+3. **Define modules (optional)** - for a project split across areas
    of work, declare **modules** in `docs/modules.yaml` so the Work
    Explorer groups your session sets by module. A module is a unit of
-   work for one developer at a time — a developer may own several
+   work for one developer at a time - a developer may own several
    modules, but two developers should never work the same module
    concurrently (AI-speed changes make concurrent same-module work a
    constant merge-conflict source). **Open modules.yaml**
    creates the file from a commented template (on this explicit
-   action only — the extension never writes it just because you
+   action only - the extension never writes it just because you
    opened the repo) and opens it to edit; **Copy AI decomposition
    prompt** hands your AI assistant a ready-made prompt that fills the
    file in for you. Save the file and the tree regroups. Solo or
-   single-area projects can skip this — your work stays under one
+   single-area projects can skip this - your work stays under one
    default group.
 
 Build hands you a working starting point, not a blank repo. It
 declares a `default` module and scaffolds its two starter sets —
 `001-default-plan` (create or import your project plan) and
 `002-default-decomposition` (turn that plan into your real work sets),
-the Visual Studio `Class1` pattern. Because those sets exist, the
-Getting Started form is immediately replaced by the Work Explorer
-**tree** (the form only shows while a repo has **no session sets** —
-re-focus it any time with **`Dabbler: Get Started`**). Run the plan
+the Visual Studio `Class1` pattern. Those sets appear straight away in
+the Work Explorer **tree** (open the step-by-step instructions any time
+with **`Dabbler: Get Started`**). Run the plan
 set, then the decomposition set, then **rename** the Default module into
 your first real module once you know your project's names (rename re-homes
 the work sets; **delete** instead only if you have not run them yet).
@@ -193,11 +193,7 @@ appetite. Honest framing:
 
 The router writes one JSON line per call to
 `ai_router/router-metrics.jsonl` so you can audit spend at any
-time. The **Cost Dashboard** command surfaces cumulative spend
-visually — it appears only in workspaces that actually route (a
-resolvable `ai_router/router-config.yaml`) and, on open, prompts you to refresh the
-per-provider rate estimates if they have gone stale (older than
-`metadata.review_frequency_days`, default 30 days). `python -m ai_router.report` produces a full markdown
+time. `python -m ai_router.report` produces a full markdown
 manager-report with the Opus-baseline savings headline,
 per-task-type unreliability rates, and auto-generated action
 items. The framework is open-source (MIT) — your costs are entirely
@@ -312,13 +308,6 @@ Sign-up links and a full prerequisites checklist live in the
   A right-click action "Open Prerequisite Spec" jumps straight to
   the blocking dependency's spec — when more than one prerequisite
   is unsatisfied, a QuickPick lists them with their states.
-- **Visual config editor** (`Dabbler: Open Dabbler Config Editor`) —
-  edit `router-config.yaml`, `budget.yaml`, and the gitignored
-  `local-overrides.yaml` through a six-section panel without touching
-  YAML directly. Sections cover routing mode, budget threshold,
-  provider API-key env vars, significance flagging, Pushover
-  notifications, and a local-overrides summary. Includes a
-  live-validation drift banner and a "Send a test notification" button.
 - **Significance flagging** — `Dabbler: Flag Decision for Cross-Provider
   Review` appends a one-line reason to the active set's review queue.
   `Dabbler: Scan Workspace for @dabbler:outsource-review Annotations`

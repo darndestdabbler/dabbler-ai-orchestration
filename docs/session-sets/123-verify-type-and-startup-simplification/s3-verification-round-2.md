@@ -1,0 +1,14 @@
+ISSUES FOUND
+
+- **Issue 1:** Copilot seat setup failure messages still claim the effective profile falls back to `api` via `local-overrides.yaml`, but Set 123 made `project-verify-type.txt` override that file.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/copilotSeatSetup.ts:990-1074`, `tools/dabbler-ai-orchestration/src/commands/copilotSeatSetupCommand.ts:39-64`, `ai_router/verify_type.py:361-424`, `ai_router/config.py:258-281`, `ai_router/tests/test_verify_type_resolution.py:262-281`
+  - **Failure scenario:** In a normal post-Set-123 `COPILOT_CLI` project, a user runs `Dabbler: Set Up Copilot Seat` on a new or broken machine and the probe fails or confirms too few providers. The command reports that `local-overrides.yaml keeps transport.profile: api` or that provider keys keep the `api` profile working, but `load_config()` derives the effective profile from the committed project file, so the project remains `copilot-cli` and dispatch will not use that claimed API fallback. This is probable because the seat-setup command exists specifically for re-running setup after missing CLI/auth/catalog/provider failures.
+  - **Acceptance criterion:** `JUDGMENT - In a project whose committed verify type is COPILOT_CLI, every non-success Dabbler: Set Up Copilot Seat outcome must either consult the effective project verify type or avoid claiming an effective api fallback; no message may imply local-overrides.yaml controls transport.profile when project-verify-type.txt overrides it.`
+  - **Details:** **Violation:** the task’s new contract says `project-verify-type.txt` “derives `transport.profile`” and outranks `local-overrides.yaml`; `verify_type.derive_transport_profile()` implements that by returning the project-file profile before reading configured `transport.profile`. **Impact:** the setup failure UX can tell operators the router is safely on `api` when the actual config is still `copilot-cli`, leading them to proceed with a broken seat or wrong remediation. **Evidence:** `describeSeatSetupOutcome()` hard-codes `local-overrides.yaml keeps transport.profile: api` / “api profile working” in failure branches, while `config.load_config()` overwrites `config["transport"]["profile"]` from `derive_transport_profile()` and the tests prove a project file beats a seat-local override.
+
+NITS
+
+- **Nit:** `dabbler.getStarted` still executes `dabblerSessionSets.focus`, the deleted webview id, so the command no longer reveals the surviving `dabblerWorkExplorerTree` when launched from the Command Palette.
+- **Nit:** Live generated/user-facing copy still mentions retired surfaces in source paths not covered by the prior docs finding, e.g. `troubleshoot.ts` points “Cost seems high” users to `Dabbler: Show Cost Dashboard`, and the generated `docs/modules.yaml` header still names the Getting Started form button.

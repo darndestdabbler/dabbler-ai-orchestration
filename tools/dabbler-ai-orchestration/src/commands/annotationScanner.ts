@@ -10,7 +10,7 @@ import * as path from "path";
 import {
   Annotation,
   findAnnotations,
-} from "../configEditor/annotationParser";
+} from "../utils/annotationParser";
 import { QueueEntry, QUEUE_FILENAME } from "./decisionReviewQueue";
 
 /**

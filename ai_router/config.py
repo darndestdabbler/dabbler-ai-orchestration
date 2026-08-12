@@ -641,10 +641,13 @@ def _check_pricing_staleness(config: dict) -> None:
     wrong for months sat under a global date that looked fresh.
 
     ``metadata.pricing_reviewed`` is deliberately still read as a fallback.
-    The VS Code extension's Cost Dashboard renders its own staleness banner
-    from that field, and extension work is an explicit non-goal of this set;
-    deleting the field here would have broken a shipped surface this session
-    is not allowed to touch. Set 119 S3 deleted ``pricing_proposal``, the
+    It was kept because the VS Code extension's Cost Dashboard rendered its
+    own staleness banner from that field; Set 123 S3 deleted that dashboard
+    along with every other webview, so the field's only remaining consumer is
+    this fallback and the rollup below. Left in place rather than removed in
+    the same breath as an unrelated deletion -- a config field with hand-
+    maintained data is retired on purpose, by a set that owns the schema, not
+    as a side effect. Set 119 S3 deleted ``pricing_proposal``, the
     CLI that used to maintain both fields, so both are now maintained by
     hand in ``router-config.yaml`` -- keep them in step when you edit a
     rate, or the rollup drifts away from the stamps it summarises.

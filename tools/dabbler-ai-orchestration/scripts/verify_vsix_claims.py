@@ -1,5 +1,18 @@
 """Verify a packaged VSIX against the CHANGELOG's top entry.
 
+SUPERSEDED -- a point-in-time record for the 0.49.0 VSIX, kept, not maintained.
+------------------------------------------------------------------------------
+``EXPECTED_VERSION`` is pinned to ``0.49.0`` and the CHANGELOG check requires a
+matching top entry, so this script has been unable to pass since the extension
+moved past that version; it is a record of what Set 110 S4 verified, not a live
+gate. Set 123 S3 deleted every webview in the extension, which falsifies the
+"Setup & Status is a webview behind a `when`" claim below and its assertion --
+noted here rather than rewritten, because rewriting a superseded artifact to
+agree with today would destroy the record of what was actually checked then.
+The claims that DID survive are enforced as Layer 2 gates
+(``workExplorerMenuParity.test.ts``, ``viewsContainerIcon.test.ts``,
+``statusIconAssets.test.ts``), which is where a future release should look.
+
 Set 110 S4. Spec step 7 requires the artifact's CONTENTS to be checked, not
 just that a file was produced -- the S4 verification round raised the missing
 release deliverables as a blocking finding, so this is a script that can be

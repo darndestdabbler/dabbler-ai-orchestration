@@ -8,7 +8,7 @@ import {
   BucketPayload,
   ModulePayload,
   RowPayload,
-} from "../types/sessionSetsWebviewProtocol";
+} from "../types/explorerPayloads";
 import { listInProgressSets } from "./inProgressSetsService";
 import { isRecognizedVerdictToken } from "../utils/verdictTokens";
 

@@ -1,7 +1,7 @@
 // Set 101 Session 1 — the REAL first-run walkthrough the spec's "Ends
 // with" line names verbatim: "walk Default -> rename -> delete -> re-add
 // a real module -- the full first-run loop against the locally built
-// VSIX." Unlike every other test this session added (which call
+// VSIX." Unlike every other test that session added (which call
 // `buildProjectStructureNoPrompt` / the writer functions directly, or
 // stub `vscode.commands.registerCommand` to capture a callback), THIS
 // spec drives the actual packaged code end to end through the real user
@@ -9,40 +9,60 @@
 // `--extensionDevelopmentPath` mechanism this repo's whole Layer-3 suite
 // already relies on as the accepted stand-in for "the locally built
 // VSIX" -- it runs the identical compiled `dist/extension.js` the .vsix
-// packages), the real Getting Started webview form for Build (the actual
-// primary first-run path per docs/dabbler/getting-started.md — the
-// Command Palette route converges on the same no-prompt scaffold, per
-// gitScaffold.ts's own comments), and the real Command Palette +
-// QuickPick + InputBox + modal-confirm dialogs for rename / delete /
-// re-add — no seams, no fixture seeding, no fakery, a REAL git init +
-// REAL network `pip install`.
+// packages), and the real Command Palette + QuickPick + InputBox +
+// modal-confirm dialogs — no seams, no fixture seeding, no fakery, a REAL
+// git init + REAL network `pip install`.
 //
 // This closes the gap a routed third-party opinion (gemini-pro,
 // s1-third-opinion-vsix-dispute.json) identified and the round-5 verifier
 // held the orchestrator to: a stub-level callback test proves wiring but
 // not the real interactive journey; this spec proves the journey itself.
 //
+// SET 123 S3 — REWRITTEN, NOT RETIRED.
+//
+// The Build step used to drive the Getting Started webview form, because
+// that form was the primary documented first-run path. That form is
+// deleted: setup is now a terminal step (`python -m ai_router.verify_type`
+// resolves what verifies the project and writes `project-verify-type.txt`),
+// and the scaffold's own entry point is the fully non-interactive
+// `Dabbler: Set Up New Project` palette command. So the Build step now goes
+// through the palette like every other step in this walk, and the spec is
+// end-to-end through ONE surface instead of two.
+//
+// It is rewritten rather than deleted for two reasons already adjudicated:
+// it is the ONLY end-to-end proof of first run, and first run is the path
+// NEW STAFF take — every other Layer 3 spec tests a surface an existing user
+// navigates. That argument got stronger, not weaker, in this session: the 8
+// webview scenarios retired alongside it were the rest of the first-run
+// coverage.
+//
+// THE REAL NETWORK `pip install` IS KEPT, deliberately (the spec asked for
+// this to be a decision rather than an inheritance). It is the bulk of the
+// runtime and the only network dependency, and the case for dropping it —
+// "at some point it is testing pip rather than testing us" — is real. It
+// stays because provisioning is precisely what this spec exists to prove:
+// `L-079-3` requires any set shipping provisioning to dogfood the TRUE cold
+// start, this session ships a provisioning change (the scaffold no longer
+// has a form in front of it), and trimming coverage in the same session that
+// retired 8 scenarios would compound a reduction rather than offset it. The
+// completion signal below also depends on the scaffold really running.
+//
 // Hard-won lessons from getting this running (kept so a future editor
 // does not have to rediscover them):
 //   1. The extension's `activationEvents` is `[]` — it activates on the
 //      Dabbler view being revealed, not eagerly at window load. Open the
-//      Work Explorer (openSessionSetsView) BEFORE invoking any Dabbler
+//      container (openDabblerContainer) BEFORE invoking any Dabbler
 //      palette command, or the command simply does not exist yet.
-//   2. The Getting Started form's Build click handler VALIDATES the
-//      verification-budget field client-side BEFORE posting to the host;
-//      an empty budget (the "25" is a placeholder, not a value) makes the
-//      click a silent no-op. Fill the budget first — a real operator
-//      must, too.
-//   3. F1 opens the Command Palette with the `>` command prefix already
+//   2. F1 opens the Command Palette with the `>` command prefix already
 //      in the input, and Playwright's fill() REPLACES the whole value —
 //      losing the prefix turns the query into a file search that matches
 //      no commands. Always fill(">" + title).
-//   4. A QuickPick's placeHolder is an input ATTRIBUTE, not rendered
+//   3. A QuickPick's placeHolder is an input ATTRIBUTE, not rendered
 //      text — `filter({ hasText })` never matches it. Wait on
 //      input[placeholder*=...] instead. An InputBox's prefilled VALUE
 //      (toHaveValue) is the cleanest swap signal, since VS Code reuses
 //      ONE quick-input widget and swaps its content in place.
-//   5. `window.dialogStyle` defaults to "native" on desktop (verified in
+//   4. `window.dialogStyle` defaults to "native" on desktop (verified in
 //      the shipped 1.128 workbench.desktop.main.js), so a modal
 //      showWarningMessage confirm is an OS dialog Playwright cannot see.
 //      Launching with `--enable-smoke-test-driver` (the facility VS
@@ -53,14 +73,6 @@
 // SLOW: includes a real venv + pip install (the same first-run cost any
 // human operator pays). Generous timeouts throughout.
 
-//   6. Set 110 S3: this walkthrough now spans BOTH surfaces, and that is
-//      the point of keeping it. The Getting Started form is still a webview
-//      (a `TreeItem` cannot host radio buttons and a validated budget
-//      field), so the Build step drives `openSessionSetsView`; every
-//      MODULE assertion afterwards reads the native tree through
-//      `openWorkExplorerTree`. If the two views ever stop agreeing about
-//      the same workspace, this is the spec that notices.
-
 import { expect, test } from "@playwright/test";
 import {
   cleanupTmpDir,
@@ -69,7 +81,7 @@ import {
   launchVSCode,
   LaunchedVSCode,
   makeTmpDir,
-  openSessionSetsView,
+  openDabblerContainer,
   treeRow,
   treeRows,
   workExplorerPane,
@@ -104,7 +116,7 @@ async function teardown(per: PerTest): Promise<void> {
 
 /** Open the Command Palette (F1 — the cross-platform binding) and run a
  * command by its palette title. fill() must re-include the `>` command
- * prefix F1 pre-filled (lesson 3 above). Only called after the extension
+ * prefix F1 pre-filled (lesson 2 above). Only called after the extension
  * has activated (lesson 1). */
 async function runCommand(
   page: import("@playwright/test").Page,
@@ -118,7 +130,7 @@ async function runCommand(
 }
 
 /** Wait for a QuickPick identified by its placeholder ATTRIBUTE
- * (lesson 4), then accept the focused (sole) item with Enter. */
+ * (lesson 3), then accept the focused (sole) item with Enter. */
 async function acceptSoleQuickPickItem(
   page: import("@playwright/test").Page,
   placeholderSubstring: string,
@@ -150,52 +162,47 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
   const per: PerTest = {};
   try {
     per.tmpPath = makeTmpDir("dabbler-pw-vsix-walkthrough");
-    // Lesson 5: force HTML dialogs so the modal rename/delete confirms
+    // Lesson 4: force HTML dialogs so the modal rename/delete confirms
     // are clickable.
     per.launch = await launchVSCode(per.tmpPath, ["--enable-smoke-test-driver"]);
     const page = per.launch.page;
 
-    // Activates the extension (lesson 1) and opens the Getting Started
-    // form — the real cold-start view for a genuinely empty workspace.
-    const inner = await openSessionSetsView(page);
+    // Reveal the Dabbler container, which is what activates the extension
+    // (lesson 1) and therefore what makes its palette commands exist. On a
+    // genuinely empty workspace the tree has no rows yet — that is the
+    // correct cold-start shape, not a failure.
+    await openDabblerContainer(page);
 
-    // ---- Step 1: Build project structure, through the REAL Getting
-    // Started webview form — real git init, real template render, real
-    // venv + pip install, and — the point of this session — the new
-    // default-module + lifecycle-set scaffold. Direct-API is the form's
-    // default provider-access pick; the budget must be filled or the click
-    // is a client-side no-op (lesson 2). ----
-    await inner.locator("#gs-budget-input").fill("25");
-    const buildButton = inner.locator('[data-gs-action="build-structure"]');
-    await expect(buildButton).toBeEnabled({ timeout: 15_000 });
-    await buildButton.click();
+    // ---- Step 1: Build project structure, through the REAL palette
+    // command — real git init, real template render, real venv + pip
+    // install, and the default-module + lifecycle-set scaffold.
+    // `Dabbler: Set Up New Project` is fully non-interactive by design
+    // (Set 060 S3 retired the prompt chain; Set 112 S2 retired the last
+    // tier QuickPick), so there is nothing to answer: the command IS the
+    // consent, exactly as clicking Build used to be. ----
+    await runCommand(page, "Dabbler: Set Up New Project");
 
-    // The real install takes a while; the NATIVE tree acquiring the
-    // scaffolded Default module is the observable completion signal (the
-    // Layer 3 convention: assert the rendered tree, never a transient
-    // toast). Set 110 S3: this is the hand-off point between the two
-    // surfaces — the form posted to the host, and the tree is where the
-    // result appears.
+    // The real install takes a while; the tree acquiring the scaffolded
+    // Default module is the observable completion signal (the Layer 3
+    // convention: assert the rendered tree, never a transient toast).
     // `workExplorerPane`, NOT `openWorkExplorerTree`: the latter waits 30s
     // for a first row, and at this instant the tree has none — the real venv
     // + pip install is still running and can take minutes. The wait that
     // matters is the one below, on the Default module row, with the install's
-    // own timeout. Reaching for the row-waiting helper here made this the
-    // last failure of the switch-over and is worth naming: a convenience
+    // own timeout. Reaching for the row-waiting helper here was the last
+    // failure of Set 110 S3's switch-over and is worth naming: a convenience
     // helper's built-in wait is a hidden assumption about what has already
     // happened.
-    //   - `reveal: false`: the container is ALREADY open (the Build step above
-    //     drove the Getting Started webview inside it). Revealing again would
-    //     click the activity-bar icon a second time, which TOGGLES the sidebar
-    //     shut.
+    //   - `reveal: false`: the container is ALREADY open (opened above).
+    //     Revealing again would click the activity-bar icon a second time,
+    //     which TOGGLES the sidebar shut.
     const pane = await workExplorerPane(page, { reveal: false });
     // The SET COUNT is the completion signal, not the module row. The
     // scaffold writes `docs/modules.yaml` before it creates the lifecycle
     // sets, so the Default row appears reading "Default0 sets" while the real
     // venv + pip install is still running, and only later becomes "2 sets".
     // Waiting on the row and then asserting the count with a short timeout
-    // raced that gap and failed on "Default0 sets" — the webview never
-    // exposed the seam because it rebuilt the whole tree per snapshot.
+    // raced that gap and failed on "Default0 sets".
     await expect(treeRow(pane, "Default")).toContainText("2 sets", {
       timeout: 300_000,
     });

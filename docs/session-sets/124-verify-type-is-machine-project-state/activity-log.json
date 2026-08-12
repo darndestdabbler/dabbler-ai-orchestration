@@ -164,6 +164,14 @@
       "dateTime": "2026-08-12T06:57:17.367638-04:00",
       "description": "Replaced rather than deleted both tests that pinned the retired precedence: test_project_file_beats_a_seat_local_override -> test_a_retired_seat_local_transport_profile_is_refused, and test_local_transport_profile_overrides_shared -> test_local_transport_profile_is_refused_and_names_its_replacement. Added the replacement-command falsifier (asserts the DERIVED value for both profiles), a look-alike proving still-allowed overrides work, and a structural assertion that no transport.* key remains in _LOCAL_OVERRIDE_ALLOWED. Propagated the claim to router-config.yaml (two comment blocks) and verify_type.py docstring. MUTATION-TESTED: disabling the targeted message fails all 3 refusal tests; restored 44 pass. A first mutation attempt silently did not apply (CRLF/LF mismatch in the PowerShell replace) and a first version of one test passed under mutation because the generic Appendix B refusal also names the path -- both caught and fixed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "targeted-pytest",
+      "dateTime": "2026-08-12T07:30:07.176727-04:00",
+      "description": "Targeted 194 passed. Full pytest run of record: 3991 passed, 9 skipped (618s). The first full run exposed 7 failures caused BY this session: TestPinnedOverrideRespectsIsEnabled (6) and TestSessionVerificationPathWasNeverAffected (1) call ai_router._init() with require_api_keys=True and had been passing on this keyless Copilot seat only because local-overrides.yaml set transport.profile=copilot-cli, which exempts the key check. S2 retired that override and S1 conftest guard already blocks the real project file inside the suite, so the config resolved api and demanded keys the seat never had. Fixed with the sanctioned placeholder_provider_keys fixture (Set 111 S2) at class level -- same machine-state-coupling class S1 found, surfaced from the other side.",
+      "status": "complete"
     }
   ]
 }

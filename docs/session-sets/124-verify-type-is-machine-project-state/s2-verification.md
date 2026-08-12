@@ -1,0 +1,6 @@
+**VERIFIED** — I checked the Session 2 plan obligations against `config.py`, router config comments, verify-type derivation docs, the decision journal, the migrated local override file, and the replacement tests. The work retires `transport.profile` as a local override, refuses stale keys with the derived replacement command, preserves still-allowed overrides, and replaces the old precedence coverage; no Critical/Major defects found.
+
+#### NITS
+
+- **Nit:** Some nearby comments/test prose still describe `ai_router/local-overrides.yaml` as the seat-local `transport.profile` home, which now contradicts the new rule: `ai_router/tests/conftest.py:226-234`, `ai_router/tests/test_local_overrides_merge.py:252-254`, `ai_router/tests/test_local_overrides_merge.py:323-325`, `ai_router/tests/test_verify_type_resolution.py:7-8`, and `ai_router/config.py:266-267`.
+- **Nit:** If a `transport:` override block contains another disallowed `transport.*` key before `profile`, the generic Appendix B error fires before the targeted migration guidance. Low impact: no other `transport.*` key was previously allowed, so the real legacy block is expected to contain only `profile`.

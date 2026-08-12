@@ -666,6 +666,7 @@ class TestCopilotCliVerifierHonoursTheExclusion:
 # A pinned task type cannot route work to a model the registry disabled.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.usefixtures("placeholder_provider_keys")
 class TestPinnedOverrideRespectsIsEnabled:
     """Handed to this session by Set 109 S1's disposition: ``pick_model``
     returned a ``task_type_overrides`` pin without its ``_survives`` check
@@ -676,6 +677,17 @@ class TestPinnedOverrideRespectsIsEnabled:
     identity-registry-only, the record of what an orchestrator IS, never a
     destination for work. ``claude-opus-5`` and ``claude-sonnet-5`` are in
     the shipping registry on those terms today.
+
+    Set 124 S2: these tests call ``ai_router._init()``, which loads the real
+    config with ``require_api_keys=True``. They used to pass on a keyless
+    Copilot seat only because this machine's ``local-overrides.yaml`` set
+    ``transport.profile: copilot-cli``, and that profile exempts the
+    provider-key check. S2 retired that override, and Session 1's conftest
+    guard already stops the real ``project-verify-type.txt`` from answering
+    inside the suite — so the config now resolves ``api`` here and demands
+    keys the seat has never had. ``placeholder_provider_keys`` is the
+    sanctioned answer (Set 111 S2): the keys are placeholders precisely
+    because no call is made with them.
     """
 
     def _config_pinning(self, model_name: str) -> dict:
@@ -789,7 +801,13 @@ class TestPinnedOverrideRespectsIsEnabled:
 # The verify_session path — the question the spec insisted be answered plainly.
 # ---------------------------------------------------------------------------
 
+@pytest.mark.usefixtures("placeholder_provider_keys")
 class TestSessionVerificationPathWasNeverAffected:
+    """Set 124 S2: same reason as ``TestPinnedOverrideRespectsIsEnabled``
+    above — these call ``ai_router._init()`` with ``require_api_keys=True``,
+    which on this keyless seat used to be exempted by a
+    ``transport.profile: copilot-cli`` local override that S2 retired."""
+
     def test_session_verification_does_not_take_the_auto_verify_branch(self):
         """``session-verification`` is not an auto-verified task type, so the
         leaking branch was never on the verification path. This asserts the

@@ -86,7 +86,8 @@ An in-progress glyph answers *which* step is running; the operator's next
 question — the one that made them look in the first place — is *how long
 has it been running*. Each step row therefore carries a **start time** in
 the tree, rendered `12:06-` (hour and minute, trailing dash to mark it as a
-start rather than a completion).
+start rather than a completion), in **grey at the end of the row** —
+VS Code's dimmed `description` slot, which on step rows is empty today.
 
 **There is no recorded start time on disk, and this set does not add one.**
 `log_step` writes *after* a step finishes, so an entry's `dateTime` is that
@@ -282,11 +283,18 @@ row that has started carries a derived start time the tree can render.
    and only then offer the one-item guided walk.
 5. Full pytest and the Layer 3 run recorded as runs of record; verify; close.
 6. **Mirror the start time and render it `12:06-`.** Same derivation as
-   Session 1, in the TS row model, displayed in the tree row's **dimmed
-   description slot** — not concatenated into the label, which is narrow and
-   already carries the step text plus its own label tests. Local time,
-   24-hour, hour and minute only; the full timestamp goes in the tooltip,
-   where width is free. A row with no derived start renders no time at all.
+   Session 1, in the TS row model, displayed in the step row's **dimmed
+   description slot** — `RowDescriptor.description`, which VS Code renders in
+   grey immediately after the label, as session rows already do with
+   `in flight`. Not concatenated into the label, which is narrow and already
+   carries the step text plus its own label tests. That slot is currently
+   **empty on every step row** and its own comment says why: it held the
+   `<- here` marker until Set 115 S4 retired it. The timestamp reuses the
+   slot that was vacated by a worse answer to the same question, so nothing
+   is displaced. Local time, 24-hour, hour and minute only, trailing dash;
+   the full timestamp goes in the tooltip, where width is free. A row with no
+   derived start renders no description at all — the slot stays as empty as
+   it is today.
 
 **Creates:** the TypeScript mirror, the cross-language parity falsifier, and
 `127-the-active-step-shows-in-progress-uat-checklist.json`

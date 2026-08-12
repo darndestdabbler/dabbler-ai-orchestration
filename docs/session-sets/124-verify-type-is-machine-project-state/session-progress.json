@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-12T05:43:02.055972-04:00",
+  "generatedAt": "2026-08-12T07:36:38.529149-04:00",
   "sessionSetDir": "124-verify-type-is-machine-project-state",
   "inputs": {
-    "activity-log.json": "95ee7be2f9c7525b4bb34a9bb294b3125b3639f07cc89b0bd77854204aac9541",
-    "session-state.json": "bee8829445b945551092b7764480fccef4baa89454a43ab93dd06c0556af4faf",
+    "activity-log.json": "fd6552d4790a225e09dc094e61ceffdabb9b749d676e08272a8aa7e5f18b740a",
+    "session-state.json": "b988a00c1fdefd54eb484e55a8243502b2d46c211e8f795f73525a1e2997655e",
     "spec.md": "b95c089aa559c3b77d7777f49e057e6fcd219fbab9ac5bbf4f08c12fa9707005"
   },
   "orphanEntries": 0,
@@ -80,16 +80,67 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered Set 124 S2 (github-copilot/anthropic/claude-opus-5).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "retire-transport-profile-from-ai-router",
+          "description": "Removed transport.profile from config._LOCAL_OVERRIDE_ALLOWED so no transport key is locally overridable. Once the project file is gitignored machine/project state, local-overrides.yaml occupied the identical scope -- the two-mechanisms-for-one-fact defect router-config.yaml names.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "choose-refuse-vs-warn-by-the",
+          "description": "REFUSE, journaled to decisions.jsonl under prefer-reversible. Deciding case: a Copilot seat with no project file would, under warn-and-ignore, silently fall back to api and then fail validate_provider_api_keys on a seat that has no keys by design. Message names python -m ai_router.verify_type --set <VALUE> and DERIVES <VALUE> from the stale profile via VERIFY_TYPE_BY_PROFILE. Dogfooded on this machine, which carried the key: refusal fired naming COPILOT_CLI; after migration load_config still derives copilot-cli and copilot_preflight is green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "replace-do-not-delete-the-coverage",
+          "description": "Replaced rather than deleted both tests that pinned the retired precedence: test_project_file_beats_a_seat_local_override -> test_a_retired_seat_local_transport_profile_is_refused, and test_local_transport_profile_overrides_shared -> test_local_transport_profile_is_refused_and_names_its_replacement. Added the replacement-command falsifier (asserts the DERIVED value for both profiles), a look-alike proving still-allowed overrides work, and a structural assertion that no transport.* key remains in _LOCAL_OVERRIDE_ALLOWED. Propagated the claim to router-config.yaml (two comment blocks) and verify_type.py docstring. MUTATION-TESTED: disabling the targeted message fails all 3 refusal tests; restored 44 pass. A first mutation attempt silently did not apply (CRLF/LF mismatch in the PowerShell replace) and a first version of one test passed under mutation because the generic Appendix B refusal also names the path -- both caught and fixed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "targeted-pytest",
+          "description": "Targeted 194 passed. Full pytest run of record: 3991 passed, 9 skipped (618s). The first full run exposed 7 failures caused BY this session: TestPinnedOverrideRespectsIsEnabled (6) and TestSessionVerificationPathWasNeverAffected (1) call ai_router._init() with require_api_keys=True and had been passing on this keyless Copilot seat only because local-overrides.yaml set transport.profile=copilot-cli, which exempts the key check. S2 retired that override and S1 conftest guard already blocks the real project file inside the suite, so the config resolved api and demanded keys the seat never had. Fixed with the sanctioned placeholder_provider_keys fixture (Set 111 S2) at class level -- same machine-state-coupling class S1 found, surfaced from the other side.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 5
       },
       "current": [],
       "remaining": []

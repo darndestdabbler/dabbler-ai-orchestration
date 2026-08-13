@@ -695,6 +695,55 @@ def test_create_does_not_reuse_a_different_modules_lifecycle_set(tmp_path):
     ) == ("api", "plan")
 
 
+def test_create_never_mints_a_number_another_set_already_holds(tmp_path):
+    """WHY the scaffolder needs no collision refusal of its own (Set 122 S4).
+
+    An assertion rather than a gate. ``_next_set_number_from`` mints
+    ``max(existing) + 1`` from a live listing, so within one worktree it
+    can never take a number that is already there -- including one held
+    by a directory with no ``spec.md``, which is the shape a reserved or
+    half-scaffolded set has and which the skip-existing guard would miss.
+    A refusal here could therefore only ever pass, and L-112-1 is
+    explicit that such a gate proves nothing; the refusal lives at
+    ``start_session`` and in ``resolve_set --check`` instead, which are
+    the moments a cross-worktree collision is actually visible.
+    """
+    root = make_repo(tmp_path, POPULATED_MANIFEST)
+    sets_root = root / "docs" / "session-sets"
+    (sets_root / "005-existing").mkdir(parents=True)
+    (sets_root / "006-someone-elses-work").mkdir(parents=True)  # no spec.md
+
+    result = modules.create_module(str(root), "payment-api", "Payment API")
+
+    assert result.exit_code == 0, result.refused or result.write_failed
+    assert result.details["planSetSlug"] == "007-payment-api-plan"
+    assert result.details["decompositionSetSlug"] == "008-payment-api-decomposition"
+    names = sorted(p.name for p in sets_root.iterdir() if p.is_dir())
+    numbers = [n.split("-", 1)[0] for n in names if n[0].isdigit()]
+    assert len(numbers) == len(set(numbers)), f"minted a duplicate number: {names}"
+    assert (sets_root / "006-someone-elses-work").exists()
+
+
+def test_create_still_reuses_its_own_set_rather_than_calling_it_a_collision(tmp_path):
+    """The look-alike a collision refusal must never fire on (L-112-1).
+
+    Re-running create for a module that already has its lifecycle sets is
+    the idempotent path Session 1 shipped deliberately. Any collision
+    check reaching this path would break retryability to prevent nothing.
+    """
+    root = make_repo(tmp_path, POPULATED_MANIFEST)
+    sets_root = root / "docs" / "session-sets"
+    _write(sets_root / "004-payment-api-plan" / "spec.md", "# plan\n")
+    _write(sets_root / "005-payment-api-decomposition" / "spec.md", "# decomp\n")
+
+    result = modules.create_module(str(root), "payment-api")
+
+    assert result.exit_code == 0, result.refused or result.write_failed
+    assert result.details["planSetSlug"] == "004-payment-api-plan"
+    assert result.details["planSetCreated"] is False
+    assert result.details["decompositionSetCreated"] is False
+
+
 def test_create_rolls_back_the_lifecycle_sets_too(tmp_path):
     """FALSIFIER: the scaffold runs inside the same transaction as the
     manifest write, so a failure must leave no half-created module behind."""

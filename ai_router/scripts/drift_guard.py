@@ -491,6 +491,118 @@ def check_actions_are_sha_pinned(repo_root: Path) -> list[Violation]:
 
 
 # ---------------------------------------------------------------------------
+# Set 122 S4 — concurrent-session conflict guards
+#
+# The two things two developers running concurrent session sets collide on:
+# an append-only file, and a set number. Both are now partitioned or
+# refused, and both refusals belong in a fast dependency-light gate rather
+# than at the end of a 10-minute suite, because both are introduced by a
+# MERGE -- the merge captain needs the answer immediately.
+# ---------------------------------------------------------------------------
+
+
+def check_set_numbers_are_unique(repo_root: Path) -> list[Violation]:
+    """No two session sets may share a numeric prefix.
+
+    Verdict 6.4 asks developers to reserve numbers in chat before
+    scaffolding. Nothing enforced it, and the collision is invisible
+    inside a single worktree: two branches each mint ``123-`` and the
+    clash only exists after they merge -- which is exactly when this
+    check runs.
+    """
+    scan_root = repo_root / "docs" / "session-sets"
+    if not scan_root.is_dir():
+        return []
+    index: dict[int, list[str]] = {}
+    prefix_re = re.compile(r"^(\d+)-")
+    for entry in sorted(scan_root.iterdir()):
+        if not entry.is_dir() or entry.name.startswith("_"):
+            continue
+        m = prefix_re.match(entry.name)
+        if not m:
+            continue
+        index.setdefault(int(m.group(1)), []).append(entry.name)
+    return [
+        Violation(
+            check="set-number-collision",
+            location=f"docs/session-sets/ (number {number})",
+            detail=(
+                f"{len(slugs)} session sets share numeric prefix {number}: "
+                f"{', '.join(sorted(slugs))}. Number addressing, prerequisite "
+                f"links and the set index all become ambiguous. Rename one "
+                f"(keep the work, change the prefix) to the next free number "
+                f"from `python -m ai_router.resolve_set --next`."
+            ),
+        )
+        for number, slugs in sorted(index.items())
+        if len(slugs) > 1
+    ]
+
+
+def check_changelog_partition_round_trips(repo_root: Path) -> list[Violation]:
+    """The partitioned changelogs still reproduce the document they replaced.
+
+    The import is guarded, but NOT fail-open. A repo that carries no
+    partition at all (a consumer repo, or this one before Set 122 S4) has
+    nothing to check and reports nothing. A repo that HAS ``changelog.d/``
+    directories and cannot import the module is a broken gate, and a gate
+    that skips itself when its own code fails to load is the silent
+    fail-open branch L-079-3 warns about -- so that case is a violation.
+    """
+    partitions = [
+        path
+        for path in (
+            repo_root / "ai_router" / "changelog.d",
+            repo_root / "tools" / "dabbler-ai-orchestration" / "changelog.d",
+        )
+        if path.is_dir()
+    ]
+    sys.path.insert(0, str(repo_root))
+    try:
+        from ai_router import changelog as cl  # type: ignore[import-not-found]
+    except Exception as exc:  # noqa: BLE001 - reported, never swallowed
+        if not partitions:
+            return []
+        return [
+            Violation(
+                check="changelog-round-trip",
+                location="ai_router/changelog.py",
+                detail=(
+                    f"{len(partitions)} changelog.d/ partition(s) exist but "
+                    f"`ai_router.changelog` could not be imported "
+                    f"({type(exc).__name__}: {exc}). The round-trip gate cannot "
+                    f"run, and a gate that skips itself when its own code fails "
+                    f"to load is indistinguishable from a passing one."
+                ),
+            )
+        ]
+    finally:
+        if sys.path and sys.path[0] == str(repo_root):
+            sys.path.pop(0)
+
+    violations: list[Violation] = []
+    for key in sorted(cl.TARGETS):
+        target = cl.TARGETS[key]
+        if not (repo_root / target.rendered_rel).is_file():
+            continue
+        if not (repo_root / target.fragments_rel).is_dir():
+            continue
+        try:
+            problems = cl.check(target, str(repo_root))
+        except cl.ChangelogError as exc:
+            problems = [str(exc)]
+        violations.extend(
+            Violation(
+                check="changelog-round-trip",
+                location=target.fragments_rel,
+                detail=problem,
+            )
+            for problem in problems
+        )
+    return violations
+
+
+# ---------------------------------------------------------------------------
 # Aggregate + CLI
 # ---------------------------------------------------------------------------
 
@@ -500,6 +612,8 @@ ALL_CHECKS = (
     ("sample-dist-in-sync", check_sample_bundle_in_sync),
     ("model-registry-drift", check_model_registry_matches_providers),
     ("actions-sha-pinned", check_actions_are_sha_pinned),
+    ("set-number-collision", check_set_numbers_are_unique),
+    ("changelog-round-trip", check_changelog_partition_round_trips),
 )
 
 

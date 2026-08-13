@@ -198,19 +198,31 @@ nothing goes wrong.
    workflow's first job verifies the tag matches this string; a mismatch
    exits the run before any upload.
 
-3. **Author release notes.** Most releases earn a short
-   `## vX.Y.Z (YYYY-MM-DD)` section in `CHANGELOG.md` (or, if the repo
-   doesn't carry one yet, in the GitHub release body when the tag is
-   created via `gh release create`). Capture: what changed, what
-   adopters need to do, any breaking changes (rare in 0.x).
-
-4. **Commit `pyproject.toml` + release notes.** If the repo carries a
-   `CHANGELOG.md`, include it; if release notes live in a different
-   file (or only in the GitHub release body created in step 9 below),
-   adjust the `git add` accordingly:
+3. **Author release notes — fold the changelog fragments first.**
+   In this repo, unreleased entries live in `ai_router/changelog.d/` as
+   one fragment per contribution rather than in `CHANGELOG.md`, so
+   concurrent sessions cannot conflict on the shared file (Set 122 S4;
+   [`docs/partitioned-append-files.md`](../partitioned-append-files.md)).
+   Fold them in with:
 
    ```bash
-   git add pyproject.toml <release-notes-files>   # e.g. CHANGELOG.md
+   python -m ai_router.changelog fold --target router
+   ```
+
+   That writes the computed view back into `ai_router/CHANGELOG.md` and
+   clears the fragments; retitle the folded block as `## [X.Y.Z] —
+   YYYY-MM-DD` by hand. Capture: what changed, what adopters need to do,
+   any breaking changes (rare in 0.x). **Folding is an operator act at
+   release time only.** A consumer repo that carries no `changelog.d/`
+   simply edits `CHANGELOG.md` (or the GitHub release body) as before.
+
+4. **Commit `pyproject.toml` + release notes.** Include the cleared
+   fragment directory alongside the changelog; if release notes live in
+   a different file (or only in the GitHub release body created in step 9
+   below), adjust the `git add` accordingly:
+
+   ```bash
+   git add pyproject.toml ai_router/CHANGELOG.md ai_router/changelog.d
    git commit -m "Bump version to vX.Y.Z"
    git push origin master
    ```

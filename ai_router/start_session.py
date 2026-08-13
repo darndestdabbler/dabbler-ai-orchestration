@@ -106,7 +106,10 @@ try:
         release_lock,
     )
     from resolve_set import (  # type: ignore[import-not-found]
+        SetCollisionError,
         SetResolutionError,
+        assert_number_available,
+        numeric_prefix,
         resolve_session_set_dir,
     )
     from check_migrations import summarize_drift  # type: ignore[import-not-found]
@@ -128,7 +131,10 @@ except ImportError:
         release_lock,
     )
     from .resolve_set import (  # type: ignore[no-redef]
+        SetCollisionError,
         SetResolutionError,
+        assert_number_available,
+        numeric_prefix,
         resolve_session_set_dir,
     )
     from .check_migrations import summarize_drift  # type: ignore[no-redef]
@@ -566,6 +572,30 @@ def _complete_register_step(
         )
 
 
+def _refuse_duplicate_set_number(session_set_dir: str) -> Optional[str]:
+    """Set 122 S4: refuse to register a set whose number is used twice.
+
+    Returns the refusal message, or ``None`` when the number is unique
+    (including when the directory carries no numeric prefix at all --
+    bare descriptive slugs predate the convention and are not a bug).
+
+    Deliberately keyed on the *number of this set*, not on repo health:
+    a developer starting ``124-foo`` should not be blocked because
+    ``087-a`` and ``087-b`` collide somewhere else in the tree. The
+    repo-wide sweep is ``python -m ai_router.resolve_set --check``.
+    """
+    scan_root = os.path.dirname(os.path.abspath(session_set_dir))
+    slug = os.path.basename(os.path.abspath(session_set_dir))
+    number = numeric_prefix(slug)
+    if number is None:
+        return None
+    try:
+        assert_number_available(scan_root, number, slug=slug)
+    except SetCollisionError as exc:
+        return str(exc)
+    return None
+
+
 def _refuse_unresolvable_identity(args: argparse.Namespace) -> Optional[str]:
     """Set 084 (F1): the start-time identity boundary.
 
@@ -769,6 +799,18 @@ def run(args: argparse.Namespace) -> int:
             f"{session_set_dir}",
             file=sys.stderr,
         )
+        return EXIT_USAGE
+
+    # Set 122 S4: surface a duplicate set number BEFORE the work starts.
+    # Verdict 6.4 asks developers to reserve numbers in chat; this is the
+    # check that fires when they do not. Scoped to the number of the set
+    # being started rather than the whole repo -- refusing to register
+    # because two unrelated sets collide would block work that has
+    # nothing to do with the bug, and the repo-wide sweep has its own
+    # entry point (`resolve_set --check`).
+    collision_refusal = _refuse_duplicate_set_number(session_set_dir)
+    if collision_refusal is not None:
+        print(f"start_session: {collision_refusal}", file=sys.stderr)
         return EXIT_USAGE
 
     # T2 accept-with-warning: emit a one-line stderr deprecation note

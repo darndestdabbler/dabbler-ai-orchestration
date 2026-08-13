@@ -303,19 +303,34 @@ publish run and the post-publish Marketplace listing.
    verifies the tag matches this string; a mismatch exits the run
    before any upload.
 
-3. **Author release notes.** Update
-   [`tools/dabbler-ai-orchestration/CHANGELOG.md`](../../tools/dabbler-ai-orchestration/CHANGELOG.md):
-   move anything from `[Unreleased]` into the new `## [X.Y.Z] —
-   YYYY-MM-DD` section, capture what changed, what adopters need to do,
-   any breaking changes (rare in 0.x). The CHANGELOG is part of the
-   VSIX bytes — Marketplace listings render the latest section as the
-   "What's New" callout.
+3. **Author release notes — fold the changelog fragments first.**
+   Unreleased entries no longer live in
+   [`tools/dabbler-ai-orchestration/CHANGELOG.md`](../../tools/dabbler-ai-orchestration/CHANGELOG.md);
+   sessions write one fragment each under
+   `tools/dabbler-ai-orchestration/changelog.d/` so concurrent sessions
+   cannot conflict on the shared file (Set 122 S4;
+   [`docs/partitioned-append-files.md`](../partitioned-append-files.md)).
+   Fold them in with:
 
-4. **Commit `package.json` + `CHANGELOG.md`.**
+   ```bash
+   python -m ai_router.changelog fold --target extension
+   ```
+
+   That writes the computed view back into `CHANGELOG.md` and clears the
+   fragments. Then, by hand, retitle the folded block as `## [X.Y.Z] —
+   YYYY-MM-DD`, and capture what changed, what adopters need to do, and
+   any breaking changes (rare in 0.x). The CHANGELOG is part of the VSIX
+   bytes — Marketplace listings render the latest section as the "What's
+   New" callout. **Folding is an operator act at release time only:** a
+   session that folded would put the shared file back in the write path
+   and re-create the conflict.
+
+4. **Commit `package.json` + `CHANGELOG.md` + the cleared fragments.**
 
    ```bash
    git add tools/dabbler-ai-orchestration/package.json \
-           tools/dabbler-ai-orchestration/CHANGELOG.md
+           tools/dabbler-ai-orchestration/CHANGELOG.md \
+           tools/dabbler-ai-orchestration/changelog.d
    git commit -m "Bump extension to vsix-vX.Y.Z"
    git push origin master
    ```

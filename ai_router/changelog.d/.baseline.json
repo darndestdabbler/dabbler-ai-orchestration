@@ -1,0 +1,59 @@
+{
+  "note": "Set 122 S4. Pins the byte-identity contract: rendering from the fragments listed here must reproduce the pre-partition CHANGELOG.md exactly (after LF normalization). Verified by `python -m ai_router.changelog check` and by ai_router/tests/test_changelog_partition.py.",
+  "target": "router",
+  "rendered": "ai_router/CHANGELOG.md",
+  "partitionedAt": "2026-08-13T12:31:39.015221-04:00",
+  "fragmentHeadingLevel": 2,
+  "partitionSha256": "2682fc4726c877fc0517e3186f9d15bc70c507d309aeb1f051f9796098b8f8af",
+  "partitionPendingSha256": "1d1db94140644b6193d27c26e2ff93c9e51e5c26db05eeabd01fd3d8e8645882",
+  "originalSha256": "5cd0462b1b4d45df814c3844c3567d3a4c1d3a2beab1814db9918f511789a350",
+  "originalBytes": 309222,
+  "fragments": [
+    {
+      "file": "0090-set-128-the-shape-a-session-declares.md",
+      "sha256": "2f0bc226b5e397d99ecff34b508cb53a1081fcbd7228699822428c1e7f1c4b8e",
+      "bytes": 14068
+    },
+    {
+      "file": "0080-set-127-the-active-step-and-the-round-that-posts-itself.md",
+      "sha256": "537553d3a5f816769daa169f92dd6ccdc0fcd2749c9e2802f377d63e3d3109d5",
+      "bytes": 3921
+    },
+    {
+      "file": "0070-set-126-setup-finishes-itself.md",
+      "sha256": "581b19136d54a56f5fdb0d6069ca5546fdfc8fee3dc37ce593a47cc3f3d2781d",
+      "bytes": 5330
+    },
+    {
+      "file": "0060-set-120-s3-one-computed-projection-and-the-marker-goes.md",
+      "sha256": "68e9e90b6551f0f2c6f9d591d812f400791fe8740e22a09671bdf2a80a7534fd",
+      "bytes": 16555
+    },
+    {
+      "file": "0050-set-120-s2-the-drift-inventory-and-the-scoped-history-migration.md",
+      "sha256": "6f3b2b1ddf25548a4914f4acae732d3876e0d3490b13b1a13ce1f39e9142585d",
+      "bytes": 4392
+    },
+    {
+      "file": "0040-set-120-s1-the-step-status-vocabulary-enforced-at-the-writer.md",
+      "sha256": "812524a946100a8242a3674f2a5db525d954db0a31659a8dc715468dc9b5defe",
+      "bytes": 3574
+    },
+    {
+      "file": "0030-set-119-s3-close-mandated-writes-the-backstop-s-recovery-path-and-what-n.md",
+      "sha256": "bfe6c6cc7ff77911d2dd2435a7f295f54907e59cacfacd9b034bfdd16d640657",
+      "bytes": 5620
+    },
+    {
+      "file": "0020-set-119-s1-finding-provenance-and-the-doc-only-severity-cap.md",
+      "sha256": "aaf41350fb785faee5a1b8b53d0fff788e57aa373a102d0abf86de2608a69812",
+      "bytes": 3317
+    },
+    {
+      "file": "0010-set-119-s2-the-close-preflight.md",
+      "sha256": "da561e8c333387d5637fbbe45c92d45c74fcdb90b7b23dc198eceea29aba37d9",
+      "bytes": 4674
+    }
+  ],
+  "restampedAt": "2026-08-13T12:32:32.796240-04:00"
+}

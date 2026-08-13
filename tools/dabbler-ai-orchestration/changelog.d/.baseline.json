@@ -1,0 +1,64 @@
+{
+  "note": "Set 122 S4. Pins the byte-identity contract: rendering from the fragments listed here must reproduce the pre-partition CHANGELOG.md exactly (after LF normalization). Verified by `python -m ai_router.changelog check` and by ai_router/tests/test_changelog_partition.py.",
+  "target": "extension",
+  "rendered": "tools/dabbler-ai-orchestration/CHANGELOG.md",
+  "partitionedAt": "2026-08-13T12:31:38.951088-04:00",
+  "fragmentHeadingLevel": 3,
+  "partitionSha256": "77b8de43ff8d7148534713e75e1662713541f73a445610e9808703ecf7a14293",
+  "partitionPendingSha256": "970caf344906cb71af39b89f697712aa2cc763ab890e05f64cbea720230d84f1",
+  "originalSha256": "165fb13ab70942a21c3a50f5d8323879282f9b487aff6c2883a4f607316c3c30",
+  "originalBytes": 239999,
+  "fragments": [
+    {
+      "file": "0100-set-122-s3-changed.md",
+      "sha256": "7901eed8849b8506dab3415011aa811a618822dca4c1289b56529057ac35c49b",
+      "bytes": 5072
+    },
+    {
+      "file": "0090-set-122-s2-removed.md",
+      "sha256": "dc091347120b8007b168463a646812449811c257ebff9efb88e4ad307d464448",
+      "bytes": 1155
+    },
+    {
+      "file": "0080-set-122-s2-added.md",
+      "sha256": "6f214e6e1de9b5bd08ce7afb12f71f2c76662cf3cee87bf49b8697a3beadac24",
+      "bytes": 1538
+    },
+    {
+      "file": "0070-set-128-s1-fixed.md",
+      "sha256": "5346d0c71edf5673cf5899bcbccec31baf469d86e30030d794aa598cd10cf403",
+      "bytes": 2546
+    },
+    {
+      "file": "0060-set-123-s3-removed.md",
+      "sha256": "79b830567f4ac25ffddb5366cc4f2aba67d1a74e6d4a40a0bb89a543a0acaee0",
+      "bytes": 2852
+    },
+    {
+      "file": "0050-set-127-s2-added.md",
+      "sha256": "32724b3d63883581c25067791d669772ee51b7931e40cbcb48d90bf51ac3ded8",
+      "bytes": 4538
+    },
+    {
+      "file": "0040-set-124-s3-changed.md",
+      "sha256": "163d356b31c4cdce77b3d77942d5befd79caafea5198584bdc6a40f52f39204f",
+      "bytes": 5596
+    },
+    {
+      "file": "0030-set-115-s1-fixed.md",
+      "sha256": "04cc3ea5cb2e4bc81baee20e1af992bc0e33e70303fcdb53c022d5d6d6c5f591",
+      "bytes": 1745
+    },
+    {
+      "file": "0020-changed.md",
+      "sha256": "07fb5d1d433764f35b47c3249c05becc9b22f10da777b48f6e7bf638c69c59d1",
+      "bytes": 828
+    },
+    {
+      "file": "0010-removed.md",
+      "sha256": "140070f262b66e29b7d8fb4442c0f3f811dda0060d35b9c356c970c839148e85",
+      "bytes": 430
+    }
+  ],
+  "restampedAt": "2026-08-13T12:32:32.776883-04:00"
+}

@@ -151,8 +151,15 @@ test.describe("Set 110 S3 — native Work Explorer structure", () => {
     // the webview's `toHaveCount(0)` and is why that assertion is dropped
     // rather than translated.
     per.tmpPath = makeTmpDir("dabbler-native-multi-inflight");
+    // The two sets must carry DIFFERENT numeric prefixes. Set 122 S4 made
+    // `start_session` refuse to register a set whose number another
+    // directory already carries, so the original `033-set-a` / `033-set-b`
+    // pair now fails at the second `startSession` with exit 2. The shared
+    // number was incidental to what this test asserts -- that two
+    // in-progress sets both render -- and a fixture that reproduces a
+    // repo-authoring bug is not a reason to weaken the refusal.
     const a = makeSet(per.tmpPath, "033-set-a", 2);
-    const b = makeAdditionalSet(a, "033-set-b", 2);
+    const b = makeAdditionalSet(a, "034-set-b", 2);
     startSession(a, 1);
     seedOrchestratorBlock(a, {
       engine: "claude",
@@ -174,7 +181,7 @@ test.describe("Set 110 S3 — native Work Explorer structure", () => {
     await expandTreeRow(pane, "In Progress");
 
     await expect(treeRow(pane, "033-set-a")).toBeVisible();
-    await expect(treeRow(pane, "033-set-b")).toBeVisible();
+    await expect(treeRow(pane, "034-set-b")).toBeVisible();
     await expect(treeRow(pane, "In Progress")).toContainText("2 sets");
   });
 

@@ -483,3 +483,164 @@ def test_the_real_repo_has_every_action_sha_pinned():
 def test_the_real_repo_declares_a_dependabot_bump_path():
     """A SHA pin that nothing maintains rots invisibly."""
     assert (_repo_root() / ".github" / "dependabot.yml").is_file()
+
+
+# ---------------------------------------------------------------------------
+# Set 122 S4: the two things concurrent session sets collide on
+# ---------------------------------------------------------------------------
+
+
+def _sets(tmp_path: Path, *names: str) -> Path:
+    root = tmp_path / "repo"
+    for name in names:
+        (root / "docs" / "session-sets" / name).mkdir(parents=True, exist_ok=True)
+    return root
+
+
+def test_set_number_collision_is_silent_on_unique_numbers(tmp_path: Path):
+    root = _sets(tmp_path, "001-a", "002-b", "003-c")
+    assert drift_guard.check_set_numbers_are_unique(root) == []
+
+
+def test_set_number_collision_flags_a_duplicate(tmp_path: Path):
+    """FALSIFIER: the shape a merge of two concurrently-scaffolded branches has."""
+    root = _sets(tmp_path, "001-a", "123-alpha", "123-beta")
+    (violation,) = drift_guard.check_set_numbers_are_unique(root)
+    assert violation.check == "set-number-collision"
+    assert "123-alpha" in violation.detail and "123-beta" in violation.detail
+
+
+def test_set_number_collision_normalizes_leading_zeros(tmp_path: Path):
+    """`7-x` and `007-y` are the same number however they are typed."""
+    root = _sets(tmp_path, "7-seven", "007-also-seven")
+    assert len(drift_guard.check_set_numbers_are_unique(root)) == 1
+
+
+def test_set_number_collision_ignores_unnumbered_and_underscore_dirs(tmp_path: Path):
+    """The legitimate look-alikes: they must NOT be flagged.
+
+    Bare descriptive slugs predate the numbering convention, and
+    `_archived/` is a holding pen the resolver already skips. A guard
+    that flagged either would be a false positive on every repo that has
+    one.
+    """
+    root = _sets(tmp_path, "harvester-cli", "another-bare-slug", "_archived", "001-a")
+    assert drift_guard.check_set_numbers_are_unique(root) == []
+
+
+def test_set_number_collision_is_silent_without_a_session_sets_dir(tmp_path: Path):
+    assert drift_guard.check_set_numbers_are_unique(tmp_path) == []
+
+
+def test_set_number_collision_is_registered_so_it_actually_runs():
+    assert "set-number-collision" in dict(drift_guard.ALL_CHECKS)
+
+
+def test_the_real_repo_has_no_duplicate_set_numbers():
+    root = _repo_root()
+    assert drift_guard.check_set_numbers_are_unique(root) == []
+    # L-112-1: name the corpus, so a scan that examined nothing cannot
+    # read as a clean bill of health.
+    numbered = [
+        p.name
+        for p in (root / "docs" / "session-sets").iterdir()
+        if p.is_dir() and not p.name.startswith("_") and p.name[0].isdigit()
+    ]
+    assert len(numbered) > 50, "the collision scan examined an empty corpus"
+
+
+def test_changelog_round_trip_is_registered_so_it_actually_runs():
+    assert "changelog-round-trip" in dict(drift_guard.ALL_CHECKS)
+
+
+def test_the_real_repo_changelog_partition_round_trips():
+    assert drift_guard.check_changelog_partition_round_trips(_repo_root()) == []
+
+
+def test_changelog_round_trip_flags_a_planted_reorder(tmp_path: Path):
+    """FALSIFIER: swap two fragments' order keys in a copy of the real corpus."""
+    import os
+    import shutil
+
+    from ai_router import changelog as cl
+
+    repo = _repo_root()
+    root = tmp_path / "repo"
+    target = cl.TARGETS["router"]
+    dst = root / target.rendered_rel.replace("/", os.sep)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(target.rendered_path(str(repo)), dst)
+    shutil.copytree(
+        target.fragments_dir(str(repo)), root / target.fragments_rel.replace("/", os.sep)
+    )
+    assert drift_guard.check_changelog_partition_round_trips(root) == []
+
+    fragments = cl.load_fragments(target, str(root))
+    directory = target.fragments_dir(str(root))
+    first, second = fragments[0], fragments[1]
+    tmp = os.path.join(directory, "tmp.md")
+    os.rename(os.path.join(directory, first.filename), tmp)
+    os.rename(
+        os.path.join(directory, second.filename),
+        os.path.join(directory, f"{first.order:04d}-{second.slug}.md"),
+    )
+    os.rename(tmp, os.path.join(directory, f"{second.order:04d}-{first.slug}.md"))
+
+    violations = drift_guard.check_changelog_partition_round_trips(root)
+    assert violations, "a reordered changelog partition passed the CI gate"
+    assert violations[0].check == "changelog-round-trip"
+
+
+def test_changelog_round_trip_is_silent_in_a_repo_without_changelogs(tmp_path: Path):
+    assert drift_guard.check_changelog_partition_round_trips(tmp_path) == []
+
+
+def test_changelog_round_trip_reports_a_broken_import_instead_of_skipping(tmp_path: Path):
+    """FALSIFIER for the round-1 nit: the gate must not skip itself.
+
+    A partitioned repo whose `ai_router.changelog` cannot be imported has
+    a gate that CANNOT run, and a gate that returns clean in that state
+    is indistinguishable from a passing one -- the silent fail-open
+    branch L-079-3 warns about. Simulated by giving the fake repo a
+    `changelog.d/` and an `ai_router/changelog.py` that raises on import,
+    with the real package shadowed off `sys.path`.
+    """
+    import subprocess
+    import sys as _sys
+    import textwrap
+
+    root = tmp_path / "repo"
+    (root / "ai_router" / "changelog.d").mkdir(parents=True)
+    (root / "ai_router" / "__init__.py").write_text("", encoding="utf-8")
+    (root / "ai_router" / "changelog.py").write_text(
+        "raise RuntimeError('planted import failure')\n", encoding="utf-8"
+    )
+    (root / "ai_router" / "CHANGELOG.md").write_text("# C\n", encoding="utf-8")
+
+    # Run in a subprocess so the planted `ai_router` package wins the
+    # import and the real one in this process is not disturbed.
+    script = textwrap.dedent(
+        f"""
+        import sys
+        sys.path.insert(0, {str(_repo_root() / "ai_router" / "scripts")!r})
+        import drift_guard
+        from pathlib import Path
+        v = drift_guard.check_changelog_partition_round_trips(Path({str(root)!r}))
+        print(len(v))
+        print(v[0].check if v else "")
+        """
+    )
+    result = subprocess.run(
+        [_sys.executable, "-c", script], capture_output=True, text=True
+    )
+    assert result.returncode == 0, result.stderr
+    lines = result.stdout.strip().splitlines()
+    assert lines[0] == "1", f"gate skipped itself: {result.stdout} {result.stderr}"
+    assert lines[1] == "changelog-round-trip"
+
+
+def test_changelog_round_trip_stays_silent_in_a_repo_with_no_partition(tmp_path: Path):
+    """The paired look-alike: a consumer repo with no changelog.d/ owes nothing."""
+    root = tmp_path / "repo"
+    (root / "ai_router").mkdir(parents=True)
+    assert drift_guard.check_changelog_partition_round_trips(root) == []

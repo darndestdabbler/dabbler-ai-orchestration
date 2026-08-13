@@ -262,6 +262,7 @@ Open the named reference at the step's trigger moment — not before.
 | 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |
 | 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options |
 | 8 | `ai_router/docs/close-out.md` | Preflight BEFORE close (`close_preflight`); close failure, stranded session, drift, flags |
+| 8 | `docs/partitioned-append-files.md` | Writing a CHANGELOG entry (a fragment, never an edit to the shared file); duplicate set numbers |
 | 8 | `docs/disposition-schema.md` | Authoring `disposition.json` |
 | 9 | `docs/guidance-lifecycle.md` | Citation, archival, ceilings, the preload admission test |
 | 9 | `docs/ai-led-session-workflow.md` | Path-aware critique stage mechanics; Step 9 procedure detail |

@@ -399,6 +399,117 @@
       "dateTime": "2026-08-13T11:57:44.429315-04:00",
       "description": "Authoring disposition.json, committing and pushing, running close_session.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "partition-the-append-only-files",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "**Partition the append-only files.** Instead of every session appending to one file, sessions write their own (`changelogs/121.md`, `metrics/121.json`), and a small script concatenates on demand. This is the same shape as Set 120's projection \u2014 **partitioned sources, one computed view** \u2014 and it removes a guaranteed conflict from every concurrent session. **`lessons-learned.md` is exempt** (verdict \u00a77).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "keep-the-concatenated-view-byte-identical",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "**Keep the concatenated view byte-identical** to what the unpartitioned file produced for the same inputs, and ship a falsifier proving the round trip. A partitioning that quietly reorders history is worse than the conflict it removes.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "refuse-a-duplicate-set-number-at",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "**Refuse a duplicate set number at scaffold time.** The protocol currently asks developers to reserve numbers in chat (verdict \u00a76.4); a check that refuses the collision is worth more than a convention nobody remembers, and is far smaller than a reservation system. `resolve_set.py` already treats the collision as a bug \u2014 surface it before the work starts, not after.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T12:17:31.620168-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T12:17:31.695767-04:00",
+      "description": "Registered session 4 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "partition-the-append-only-files",
+      "dateTime": "2026-08-13T12:33:00.804432-04:00",
+      "description": "Shipped ai_router/changelog.py and partitioned both tracked append-only changelogs: ai_router/CHANGELOG.md -> ai_router/changelog.d/ (9 fragments) and tools/dabbler-ai-orchestration/CHANGELOG.md -> its changelog.d/ (10 fragments). A fragment stores the VERBATIM slice of the pending region, so concatenation equals the original by construction rather than by care. Scope decision journaled: router-metrics.jsonl is gitignored and untracked (cannot conflict) so it is out of scope; lessons-learned/-archive are exempt per verdict 7. Render splices fragments at the END of the pending region - the round-trip assertion caught the first version splicing after the preamble, which silently dropped the extension's 1086-byte Unreleased lead.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "keep-the-concatenated-view-byte",
+      "dateTime": "2026-08-13T12:40:24.771665-04:00",
+      "description": "Byte-identity proven against HEAD: render() reproduces both pre-session changelogs exactly (306974 and 237977 chars, LF-normalized because core.autocrlf=true makes a raw-byte digest a platform assertion). changelog.d/.baseline.json freezes partitionPendingSha256 + per-fragment digests + order; restamp can move originalSha256 for a deliberate frozen-prose edit but REFUSES when a fragment moved or changed. 40 tests in test_changelog_partition.py, falsifier-paired per L-112-1: planted reorder / dropped fragment / edited fragment / edited released history / empty baseline / missing baseline all fail the check, and a heading inside a fenced code block is NOT a split point while a real sibling heading still is. Mutation-checked by flipping the fragment sort to ascending: 10 tests fail. That mutation first exposed a real gap - check() re-sorted internally, so it was self-consistent and blind to an ordering bug in the production render path; check() now asserts against the order load_fragments actually returns.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "refuse-a-duplicate-set-number",
+      "dateTime": "2026-08-13T12:50:28.480994-04:00",
+      "description": "resolve_set gained find_collisions / describe_collisions / assert_no_collisions / assert_number_available plus a --check sweep (exit 3, --json), wired into start_session (refuses BEFORE the work starts, scoped to THIS set's number so an unrelated collision elsewhere does not block registration) and into ai_router/scripts/drift_guard.py as set-number-collision + changelog-round-trip, which CI already runs as a fast gate - the right home because both defects are introduced by a MERGE. A scaffold-time check inside modules.py was written, then REMOVED: create_module mints max(existing)+1 from a live listing so it cannot self-collide, making that gate one that could only ever pass (L-112-1). Replaced with an assertion proving the property. Falsifier-paired throughout: planted duplicate / leading-zero duplicate flagged; bare descriptive slugs, _archived dirs, and an idempotent re-scaffold of a set's own number NOT flagged.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T13:13:08.575243-04:00",
+      "description": "Cross-provider verification (gpt-5.5; anthropic excluded as the orchestrator's effective provider). Discovery round 1 fanned out 2/2 (spec-conformance + failure-scenario) and returned VERIFIED with ZERO blocking findings and three nits, all real: (1) add --target router emitted '## Added', a heading shape Keep a Changelog does not have and that render would place where a VERSION heading goes - both lenses found it independently; (2) the new drift_guard check returned clean on any import exception, the silent fail-open branch L-079-3 names, so the gate could skip itself; (3) a test docstring named a wiring point the code does not have (L-064-8 class). All three fixed with paired falsifiers rather than deferred, since all landed before the run of record. Remediation-review round 2 (delta-scoped): VERIFIED, 3 accepted / 0 rejected / 0 accepted-with-modification, 0 new findings. Artifacts s4-conventions.md, s4-verification.md, s4-verification-fanout-2.md, s4-remediation-round-1.md, s4-verification-round-2.md. Cost $0.00 (Copilot CLI seat).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T13:54:56.890365-04:00",
+      "description": "All three layers run after the last code change and recorded via run_of_record; all three report fresh+green. Layer 1 pytest: 4295 passed, 9 skipped in 740.8s (digest 35d3549fbb94). Layer 2 mocha: 1450 passing, 2 pending in 45s (digest 035018dc03c4). Layer 3 Playwright FULL, owed because playwright.covers names ai_router/start_session.py and this session modified it: 31/31 passed in 448s at 2 workers (digest 88f0eda6b493). The first Layer 3 attempt (4 workers, the local default) failed 2: (a) work-explorer-tree 'two in-progress sets both render' was a REAL regression from this session - the new duplicate-set-number refusal fired on a fixture naming two sets 033-set-a/033-set-b; the refusal is correct and the shared number was incidental to what the test asserts, so the fixture was renumbered to 034-set-b rather than the check weakened. (b) vsix-first-run-walkthrough timed out waiting for 'Default 2 sets' at 4 workers and passed at 2 - another data point for residual S122-S2-R2, not a new defect. Test-only fix after the suite, so A4 owes no re-verification round.",
+      "status": "complete"
     }
   ]
 }

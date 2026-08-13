@@ -163,6 +163,83 @@ def resolve_set(scan_root: str, number: int) -> str:
     return os.path.join(scan_root, resolve_slug(scan_root, number))
 
 
+# --- collision refusal (Set 122 Session 4) -----------------------------------
+#
+# Verdict §6.4 asks developers to reserve set numbers in chat before
+# scaffolding. That is a convention, and a convention nobody remembers is
+# not a control: two developers scaffolding on separate branches mint
+# ``123-foo`` and ``123-bar``, and nothing notices until the branches
+# merge and every number-addressed command becomes ambiguous at once.
+#
+# The collision is already understood here as a repo-authoring bug --
+# :func:`resolve_slug` refuses to guess between two matches. What was
+# missing is *when* it is reported. Refusing at address time tells you
+# after the work is done, on a path the operator may not run for days;
+# refusing at scaffold time and at session start tells you before the
+# work starts, which is the whole point.
+
+
+def find_collisions(scan_root: str) -> Dict[int, List[str]]:
+    """Every numeric prefix carried by more than one directory.
+
+    Returns ``{number: [slug, slug, ...]}`` with the slugs sorted, empty
+    when the repo is well-formed.
+    """
+    return {
+        number: sorted(slugs)
+        for number, slugs in index_by_prefix(scan_root).items()
+        if len(slugs) > 1
+    }
+
+
+def describe_collisions(scan_root: str, collisions: Dict[int, List[str]]) -> str:
+    """Operator-facing text for a collision report (ASCII-only)."""
+    lines = [
+        f"duplicate session-set number(s) under {scan_root}:",
+    ]
+    for number in sorted(collisions):
+        lines.append(f"  {number}: {', '.join(collisions[number])}")
+    lines.append(
+        "Two session sets must not share a numeric prefix -- number "
+        "addressing, prerequisite links and the set index all become "
+        "ambiguous. Rename one (keep the work, change the prefix) using "
+        "the next free number from `resolve_set --next`."
+    )
+    return "\n".join(lines)
+
+
+def assert_no_collisions(scan_root: str) -> None:
+    """Raise :class:`SetCollisionError` if any number is used twice."""
+    collisions = find_collisions(scan_root)
+    if collisions:
+        raise SetCollisionError(describe_collisions(scan_root, collisions))
+
+
+def assert_number_available(
+    scan_root: str, number: int, *, slug: Optional[str] = None
+) -> None:
+    """Refuse *number* if a different session set already carries it.
+
+    Called at **scaffold** time, before a directory is created. *slug*
+    names the directory about to be minted so a re-run that resolves to
+    the very same set is not reported as a collision with itself -- the
+    lifecycle scaffolders are deliberately idempotent, and a refusal
+    that fired on re-entry would break retryability to prevent nothing.
+    """
+    existing = index_by_prefix(scan_root).get(number, [])
+    others = [name for name in existing if name != slug]
+    if not others:
+        return
+    minted = f" for {slug!r}" if slug else ""
+    raise SetCollisionError(
+        f"session-set number {number} is already taken by "
+        f"{', '.join(sorted(others))} under {scan_root}; refusing to proceed"
+        f"{minted}. Two session sets must not share a numeric prefix. Reserve a "
+        f"number before scaffolding (verdict 6.4), or rename one to the next "
+        f"free number from `resolve_set --next`."
+    )
+
+
 def next_session_set_number(scan_root: str) -> Tuple[int, str]:
     """Return the next monotonic prefix as ``(int, zero_padded_str)``.
 
@@ -258,6 +335,15 @@ def main(argv: Optional[List[str]] = None) -> int:
         help="Print the next free monotonic number (int and zero-padded).",
     )
     parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "Report every duplicate session-set number under the scan root and "
+            "exit 3 if any exist. Exit 0 with a one-line confirmation when the "
+            "repo is well-formed."
+        ),
+    )
+    parser.add_argument(
         "--json", action="store_true", help="Machine-readable JSON output."
     )
     ns = parser.parse_args(argv)
@@ -266,6 +352,31 @@ def main(argv: Optional[List[str]] = None) -> int:
     if not os.path.isdir(scan):
         print(f"resolve_set: scan root not found: {scan}", file=sys.stderr)
         return 2
+
+    if ns.check:
+        collisions = find_collisions(scan)
+        indexed = index_by_prefix(scan)
+        if ns.json:
+            import json
+
+            print(
+                json.dumps(
+                    {
+                        "scan": scan,
+                        "numbered": len(indexed),
+                        "collisions": {str(k): v for k, v in sorted(collisions.items())},
+                    },
+                    indent=2,
+                )
+            )
+        elif collisions:
+            print(f"resolve_set: {describe_collisions(scan, collisions)}", file=sys.stderr)
+        else:
+            # Name the corpus size: a scan that found nothing because it
+            # looked at nothing must not read as a clean bill of health
+            # (L-112-1).
+            print(f"[dabbler] {len(indexed)} numbered session set(s), no duplicates.")
+        return 3 if collisions else 0
 
     if ns.next:
         nxt_int, nxt_str = next_session_set_number(scan)
@@ -324,6 +435,10 @@ __all__ = [
     "numeric_prefix",
     "index_by_prefix",
     "available_prefixes",
+    "assert_no_collisions",
+    "assert_number_available",
+    "describe_collisions",
+    "find_collisions",
     "resolve_slug",
     "resolve_set",
     "next_session_set_number",

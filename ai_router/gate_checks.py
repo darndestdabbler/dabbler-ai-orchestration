@@ -1783,6 +1783,13 @@ def check_test_run_fresh(
     surfaces this session did not touch is not required, and a set that
     declares no expensive suites passes trivially. There is no tier-shaped
     escape — Set 112 removed the Lightweight early-out.
+
+    **A suite-configuration error blocks (Set 129 S1).** "No expensive
+    suites declared" used to be indistinguishable from "every declared
+    suite was malformed and silently dropped", so one typo in a
+    consumer's ``testing.suites`` block disarmed this gate for the whole
+    repo and reported nothing. The information the skip needs is missing,
+    so there is no skip.
     """
     _ = allow_empty_commit
 
@@ -1795,17 +1802,25 @@ def check_test_run_fresh(
         try:
             from .run_of_record import (  # type: ignore[import-not-found]
                 evaluate_freshness,
-                load_suites,
+                load_suites_checked,
             )
         except ImportError:
             from ai_router.run_of_record import (  # type: ignore[no-redef]
                 evaluate_freshness,
-                load_suites,
+                load_suites_checked,
             )
     except ImportError as exc:  # pragma: no cover - defensive
         return False, f"run_of_record unavailable: {exc}"
 
-    suites = load_suites(_router_config_or_none())
+    loaded = load_suites_checked(_router_config_or_none())
+    if loaded.errors:
+        return False, (
+            "the test-suite declaration is malformed, so the suites this "
+            "session owes cannot be determined; fix testing.suites in "
+            "router-config.yaml — "
+            + "; ".join(loaded.errors)
+        )
+    suites = loaded.suites
     if not any(s.expensive for s in suites):
         return True, ""
 

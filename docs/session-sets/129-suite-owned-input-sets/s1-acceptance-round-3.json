@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "4104bc140e2514b1409f602e5bbd0165fa25d983",
+  "fixedTree": "760c921c7dcd5c9edb32b391d5fabf803fd6073a",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T19:33:25.379094+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Pytest still does not account for real `docs/session-sets/` inputs. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `ai_router/run_of_record.py:314-347`, `ai_router/tests/t ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "pytest freshness selection must account for the real docs/session-sets inputs, either by declaring them with bookkeeping-aware digest exclusions or by equivalent freshness logic, so a docs/session-sets-only change that can fail pytest requires pytest without making record_run stale immediately after its own bookkeeping write.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

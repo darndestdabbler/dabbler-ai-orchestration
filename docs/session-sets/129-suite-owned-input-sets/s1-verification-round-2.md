@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** `covers` entries written with a leading `./` are accepted but never match ordinary changed paths.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/session-sets/129-suite-owned-input-sets/spec.md:60,166-172`, `ai_router/run_of_record.py:141-192,517-595,880-930`, `ai_router/gate_checks.py:1815-1833`
+  - **Failure scenario:** A consumer hand-authors `testing.suites` with a common repo-relative spelling like `covers: ["./src/"]`, then changes `src/app.py`. The loader accepts the suite with no error, but `matching_prefixes()` normalizes only the changed path, not the declared prefix, so `affected_suites()` returns nothing and `check_test_run_fresh()` can pass without requiring the suite. This is probable because `./src/` is ordinary relative-path notation and the spec only says `covers` is “repo-relative path prefixes.”
+  - **Acceptance criterion:** `JUDGMENT - A suite whose declared cover is "./src/" must either match a changed path "src/app.py" through affected_suites()/check_test_run_fresh(), or load_suites_checked() must report that cover as a blocking suite-configuration error.`
+  - **Details:** **Violation:** the spec says “`covers` is a flat list of repo-relative path prefixes” and `check_test_run_fresh()` must “block on a suite-configuration error instead of reading it as ‘no expensive suites’.” **Impact:** a valid-looking consumer declaration silently disarms the expensive-suite close gate for a typical source change, changing the merge decision from “rerun/record the suite” to “nothing owed.” **Evidence:** `load_suites_checked()` only applies `_posix(c.strip())` to covers and reports no error for `"./src/"`; `matching_prefixes()` normalizes `rel` with `_normalise_rel()` but compares it to the unnormalized prefix, so `"src/app.py"` cannot match `"./src/"`; the gate only blocks on `loaded.errors`, then trusts the empty affected set.

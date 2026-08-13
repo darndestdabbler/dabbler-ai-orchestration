@@ -1,0 +1,34 @@
+{
+  "status": "completed",
+  "summary": "Set 129 Session 1 of 2. Redefined `covers` as a suite's complete INPUT SET -- the allowlist of prefixes that can affect its result, including lockfiles, build/test configuration and checked-in toolchain config -- and re-derived this repo's three suites against it empirically rather than editorially (a full pytest run under an audit hook recorded 1655 distinct repo paths the suite actually reads). Shipped `affected_suites()`, which answers WHICH suites a change set affects and WHICH declared inputs made each one affected, consumed once by `evaluate_freshness()` instead of re-derived per suite. Closed the live fail-open defect the set was written for: `load_suites()` dropped malformed entries in silence, so `check_test_run_fresh()` read the resulting empty tuple as 'no expensive suites declared' and PASSED -- one typo in a consumer's `testing.suites` block disarmed the close gate governing every expensive suite in the repo. `load_suites_checked()` now reports every unusable entry, value and unrecognised KEY, and the gate blocks on any of them. Four coupled fail-open bugs were found and fixed along the way: `session_touched` normalised paths with a character-set strip that ate the leading dot of every dotfile, so a `.github/` or `.gitignore` declaration matched nothing; prefixes were normalised on only one side of the comparison, so the ordinary `covers: [./src/]` spelling matched nothing; a repo-root `covers: [./]` normalised to empty and matched nothing, disarming a whole-repo suite for every change; and an unrecognised key such as `expensvie: true` silently kept `expensive`'s default, loading the suite as cheap. `surface_digest()` learned about close-flow bookkeeping (`is_active_set_bookkeeping`, reusing `verification_stamp.WORK_DIFF_SET_BOOKKEEPING` rather than re-listing it), which is what made `docs/session-sets/` declarable at all -- without it `record_run` stales its own run the instant it appends `test-runs.jsonl`. Cross-provider verification raised nine Major findings across five rounds; all nine were accepted and fixed, and the sharpest of them overturned a narrowing this session had recorded as a deliberate decision: Layer 3 does not exercise the published router, it installs this tree editable, so `ai_router/` and `pyproject.toml` are genuine Playwright inputs. Declarations are now wider in the direction of truth and the cost is named rather than denied; smoke/full E2E tiering is the sanctioned relief and is deferred behind its trigger in verdict.md section 7.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    "ai_router/run_of_record.py",
+    "ai_router/gate_checks.py",
+    "ai_router/tests/test_run_of_record.py",
+    "ai_router/tests/test_run_of_record_affected_suites.py",
+    "docs/session-sets/129-suite-owned-input-sets/ai-assignment.md",
+    "docs/session-sets/129-suite-owned-input-sets/s1-remediation-round-1.md",
+    "docs/session-sets/129-suite-owned-input-sets/s1-remediation-round-2.md",
+    "docs/session-sets/129-suite-owned-input-sets/s1-remediation-round-3.md",
+    "docs/session-sets/129-suite-owned-input-sets/s1-remediation-round-4.md"
+  ],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 is the doctrine-and-record half of the same question: A5's answer and the corrected safety claim into the authoring guide, the eight refusals and six trigger-gated deferrals recorded where a future author will meet them, A5 closed in session-step-skeleton-and-verification-cost.md, and change-log.md. Its raw material is verdict.md plus this session's own reasoning about what was declared, what was refused, and -- most usefully -- which refusal turned out to rest on a false premise. That context is expensive to rebuild and cheap to carry, and none of it is code work that would benefit from a fresh lens. The verifier must stay a non-anthropic provider, as it was for all five rounds here."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-112-1",
+    "L-125-1",
+    "L-064-8"
+  ]
+}

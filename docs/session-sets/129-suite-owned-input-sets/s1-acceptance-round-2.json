@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "4104bc140e2514b1409f602e5bbd0165fa25d983",
+  "fixedTree": "81994956b9e4a1de12986515172367bc26b5bb53",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T19:23:32.372890+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `covers` entries written with a leading `./` are accepted but never match ordinary changed paths. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/129-suit ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A suite whose declared cover is \"./src/\" must either match a changed path \"src/app.py\" through affected_suites()/check_test_run_fresh(), or load_suites_checked() must report that cover as a blocking suite-configuration error.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

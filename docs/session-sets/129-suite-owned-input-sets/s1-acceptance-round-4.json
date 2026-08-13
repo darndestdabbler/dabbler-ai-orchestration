@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 4,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "4104bc140e2514b1409f602e5bbd0165fa25d983",
+  "fixedTree": "54af10e2590e721a8bbfc1a958273f022180ab8f",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T19:43:19.054310+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `load_suites_checked()` still accepts unknown/misspelled suite fields that can disarm the close gate. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/run_of_recor ...",
+      "severity": "Major",
+      "outcome": "baseline-mismatch",
+      "criterion": "python -c \"exec('import importlib.util, pathlib, sys\\nroot=pathlib.Path.cwd()\\nsys.path.insert(0, str(root / \\\"ai_router\\\"))\\nspec=importlib.util.spec_from_file_location(\\\"ror_under_test\\\", root / \\\"ai_router\\\" / \\\"run_of_record.py\\\")\\nror=importlib.util.module_from_spec(spec)\\nsys.modules[spec.name]=ror\\nspec.loader.exec_module(ror)\\nloaded=ror.load_suites_checked({\\\"testing\\\":{\\\"suites\\\":[{\\\"name\\\":\\\"e2e\\\",\\\"covers\\\":[\\\"src/\\\"],\\\"expensvie\\\":True}]}})\\nraise SystemExit(0 if loaded.errors else 1)')\"",
+      "reason": "the only pre-fix tree available belongs to an earlier round than the one that raised this finding, so a fails-before result would not be attributable to this fix. The finding stays judgment-based."
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `covers: [\"./\"]` is accepted but normalizes to an unusable empty prefix, so a whole-repo suite matches nothing. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/ru ...",
+      "severity": "Major",
+      "outcome": "baseline-mismatch",
+      "criterion": "python -c \"exec('import importlib.util, pathlib, sys\\nroot=pathlib.Path.cwd()\\nsys.path.insert(0, str(root / \\\"ai_router\\\"))\\nspec=importlib.util.spec_from_file_location(\\\"ror_under_test\\\", root / \\\"ai_router\\\" / \\\"run_of_record.py\\\")\\nror=importlib.util.module_from_spec(spec)\\nsys.modules[spec.name]=ror\\nspec.loader.exec_module(ror)\\nloaded=ror.load_suites_checked({\\\"testing\\\":{\\\"suites\\\":[{\\\"name\\\":\\\"all\\\",\\\"covers\\\":[\\\"./\\\"],\\\"expensive\\\":True}]}})\\nok=bool(loaded.errors) or bool(loaded.suites and ror.affected_suites([\\\"src/app.py\\\"], loaded.suites))\\nraise SystemExit(0 if ok else 1)')\"",
+      "reason": "the only pre-fix tree available belongs to an earlier round than the one that raised this finding, so a fails-before result would not be attributable to this fix. The finding stays judgment-based."
+    }
+  ]
+}

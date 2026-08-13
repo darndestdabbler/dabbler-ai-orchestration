@@ -369,13 +369,33 @@ class TestDefaultSuiteCoverage:
         "changed",
         [
             "docs/planning/project-guidance.md",
-            "ai_router/notifications.py",
             "README.md",
+            "CONTRIBUTING.md",
         ],
     )
     def test_unrelated_surfaces_do_not_require_layer_3(self, changed):
         """Widening must not become "every change pays 13 minutes"."""
         assert not ror.session_touched("", self._playwright().covers, [changed])
+
+    def test_a_router_module_now_DOES_require_layer_3(self):
+        """Set 129 S1 moved this case across the line, and the move is the
+        point rather than a casualty of it.
+
+        `ai_router/notifications.py` used to be listed here as an
+        unrelated surface, because Layer 3 declared three router files by
+        name on the reasoning that a 13-minute suite armed by every router
+        edit would get routed around. Cross-provider verification found
+        the premise false: `vsix-first-run-walkthrough.spec.ts` sets
+        `DABBLER_ROUTER_INSTALL_SPEC` to the repo root, so the cold-start
+        walk `pip install -e`s this tree and drives the router it just
+        built -- Set 122 S2's structurally-red walk is the incident.
+
+        The boundary above still exists and still matters; what changed is
+        which side the router sits on.
+        """
+        assert ror.session_touched(
+            "", self._playwright().covers, ["ai_router/notifications.py"]
+        )
 
     def test_the_playwright_suite_is_still_the_expensive_one(self):
         assert self._playwright().expensive is True

@@ -1,0 +1,118 @@
+{
+  "sessionSetName": "129-suite-owned-input-sets",
+  "createdDate": "2026-08-13T14:07:24.494329-04:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "re-derive-this-repo-s-three",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "**Re-derive this repo's three suites against the stronger definition of `covers`,** and fix what it exposes. Every prefix that can change a suite's result must be declared \u2014 including the ones the old reading let sit outside, such as build and test configuration and lockfiles. Report what moved and what deliberately did not; a declaration this set does not change is a *finding*, not a silence.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "ship-affected-suites-and-make-suite",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "**Ship `affected_suites()` and make suite loading fail closed.** `affected_suites(files_changed, suites)` returns which suites a change set affects **and which inputs matched**, and `evaluate_freshness()` consumes it rather than re-deriving per suite (one definition \u2014 L-069-1). `load_suites()` gains a checked result carrying its errors, and `check_test_run_fresh()` **blocks** on a suite-configuration error instead of reading it as \"no expensive suites\".",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "**Falsify in both directions** (`L-112-1`), by planting the declaration rather than reading the code. FIRES: one shared input affects several suites; an input changed after a run stales it; a malformed `testing.suites` block **blocks the close** rather than disarming the gate; an empty declaration cannot pass as \"nothing owed\". DOES NOT FIRE: an input touched by no suite owes nothing; a repo with no `docs/modules.yaml` behaves exactly as it does today. STRUCTURAL: the reported `changed_inputs` for a real change set equals the intersection an independent walk computes.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T14:07:24.493880-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T14:07:24.525881-04:00",
+      "description": "Registered session 1 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "re-derive-this-repo-s-three",
+      "dateTime": "2026-08-13T14:46:55.629077-04:00",
+      "description": "Re-derived all three suites against the stronger definition of covers. Derivation was EMPIRICAL: a full pytest run under a sys.addaudithook tracer recorded every repo path the suite opened or enumerated (1655 distinct). Added to pytest: pytest.ini, pyproject.toml, .github/, test-fixtures/, scripts/, tests/, docs/templates/, tools/dabbler-ai-orchestration/dist/templates/, tools/dabbler-ai-orchestration/changelog.d/. Added to mocha: package.json, package-lock.json, tsconfig.json (test:unit = mocha via ts-node). Added to playwright: esbuild.js, tsconfig.json, playwright.config.ts, package-lock.json (test:playwright = npm run compile && npx tsc && npx playwright test). Deliberately NOT declared, with reasons recorded in the module docstring: docs/session-sets/ (the gate own bookkeeping lives there; record_run digests then appends test-runs.jsonl, so the suite would stale its own run - demonstrated, reports PREDATES with nothing else touched) and docs/planning/ (cite_lessons rewrites lesson trailers in the final commit, after the run of record). MANIFEST.in looked like an input and the trace never touched it - correctly absent.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "ship-affected-suites-and-make-suite",
+      "dateTime": "2026-08-13T14:46:55.632801-04:00",
+      "description": "Shipped affected_suites(files_changed, suites) -> tuple[SuiteMatch] reporting suite, changed_inputs and matched_prefixes; evaluate_freshness now consumes it once instead of re-deriving per suite (L-069-1) and FreshnessVerdict carries changed_inputs. Unified four copies of prefix matching into matching_prefixes(); that unification exposed and fixed a live bug - session_touched normalised with lstrip('./'), a CHARACTER-set strip that ate the leading dot of every dotfile, so .github/ and .gitignore declarations matched nothing while reading as correct (fail-open). Added load_suites_checked() -> SuiteLoadResult(suites, errors); load_suites() is now its error-discarding projection. check_test_run_fresh blocks on a suite-configuration error instead of reading zero suites as no expensive suites. CLI: new affected subcommand, check prints matched inputs and refuses a malformed declaration.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "falsify-in-both-directions-l-112",
+      "dateTime": "2026-08-13T14:46:55.635582-04:00",
+      "description": "Ten new test functions in ai_router/tests/test_run_of_record_affected_suites.py, on the declared irony budget, weighted to fail-closed. FIRES: shared input fans out to several suites and names what matched; a build-config input changed after a run stales it (PREDATES); six plausible typo shapes are reported instead of dropped; a non-list suites: key no longer silently becomes DEFAULT_SUITES; the close gate blocks on a malformed declaration; an empty declaration cannot pass as nothing owed. DOES NOT FIRE: an input under no declared input set owes nothing; an explicit suites: [] stays the deliberate operator disarm; affected_suites is identical with and without a docs/modules.yaml assigning the path to a different module (A5, structurally). STRUCTURAL: changed_inputs equals an intersection recomputed by ancestor-set membership rather than startswith, with both the change set and the suite corpus asserted non-empty (L-112-1). Plus a falsifier for the dotfile bug.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T16:21:44.077318-04:00",
+      "description": "Five rounds, verifier gpt-5.5 (openai) on every one -- a different effective provider from the orchestrator, enforced by registry-resolved exclusion. Discovery fan-out 2 (spec-conformance, failure-scenario) -> 5 Major; supplementary -> 1 Major; remediation-review -> 1 Major; remediation-review cycle 2 -> 2 Major; operator-authorized round 5 -> VERIFIED, 0 findings, 8 fixes accepted + 1 accepted-with-modification. Nine Major findings total, all accepted, none disputed, all fixed. Round 5 needed the operator attestation because cycles 1-2 were spent settling earlier rounds fixes, leaving round 4 two findings fixed but unreviewed. Verification earned its cost: it caught that Layer 2 and Layer 3 had been derived from their COMMANDS rather than from what their specs read, and then caught a narrowing this session had recorded as a deliberate decision on a FALSE premise -- Layer 3 does not exercise the published router, it pip install -e s this tree.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T16:21:44.079323-04:00",
+      "description": "All three suites owed and all three run after the last code change. pytest: 4349 passed, 9 skipped, 0 failed (713.4s). mocha: 1450 passing, 2 pending, 0 failing (187.7s). playwright: 31 passed, 0 failed (374.6s) at --workers=2, CI worker count. The first full playwright pass at the 4-worker local default starved the Electron launches and timed out vsix-first-run-walkthrough at 0 sets; the spec passes in isolation in 53.9s and the re-run at CI worker count is 31/31, matching Sets 123/124/127/128 exactly -- the parallel-load flake Set 122 recorded on this box, not a regression. All three recorded as runs of record. Note the obligation itself is this session own deliverable: mocha and playwright were owed only because this session declared ai_router/ an input of both, which is the change under test dogfooding itself.",
+      "status": "complete"
+    }
+  ]
+}

@@ -65,11 +65,52 @@ nothing") is FALSE here: ``covers`` is a path prefix, not a file type.
 prefix is what makes the rule cheap to evaluate and impossible to argue
 with, and the failure direction is running a suite you did not need
 rather than skipping one you did.
+
+What the re-derivation declared, and the one thing it did not
+-------------------------------------------------------------
+Set 129 S1 traced a full pytest run under an audit hook and found the
+suite reads far more of this repo than it declared. Nearly all of that
+became ``covers`` entries, including ``docs/session-sets/`` -- which
+needed the digest to learn about close-flow bookkeeping first, because
+``record_run`` digests the covered surfaces and *then* appends
+``test-runs.jsonl`` into the set directory. A suite covering that
+directory naively stales its own run the instant it records it
+(demonstrated, not assumed). :func:`is_active_set_bookkeeping` is the
+narrow exclusion that makes the declaration honest AND satisfiable.
+
+One input is still deliberately undeclared, and it is named here so that
+it is a decision rather than a silence: ``docs/planning/``. The suite
+does read it -- the guidance ceilings are checked against the real files
+-- but ``cite_lessons`` rewrites lesson metadata trailers there **in the
+final commit**, after the run of record, by design. The bookkeeping
+exclusion does not reach it: ``lessons-learned.md`` is a real
+guidance file with a real ceiling, not a per-set ledger with a
+sanctioned-writer basename. Declaring it would make every session that
+cites a lesson unclosable, which is a gate that refuses every close
+rather than one that guards any.
+
+``MANIFEST.in`` is the other kind of finding: it looked like an input and
+the trace never touched it, so it is correctly absent. Evidence keeps a
+declaration from growing as fast as imagination does.
+
+The re-derivation's own first draft got one of these wrong in the other
+direction, and it is worth recording because the reasoning read well.
+Layer 3 kept three ``ai_router`` writers listed file-by-file rather than
+``ai_router/``, on the argument that arming a 13-minute browser suite for
+every router edit would make the gate something sessions route around
+instead of satisfy. True as far as it went -- and resting on the false
+premise that Layer 3 exercised the PUBLISHED router. It installs this
+tree (``DABBLER_ROUTER_INSTALL_SPEC`` -> repo root, editable). Cost is a
+reason to make a suite cheaper, never a reason to declare an input set
+smaller than it is; a declaration narrower than the truth is not a saving,
+it is a gate that cannot fire. Smoke/full E2E tiering is deferred in
+``verdict.md`` §7 behind precisely this trigger.
 """
 
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import json
 import math
 import os
@@ -81,9 +122,15 @@ from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 try:
-    from .verification_stamp import sha256_hex  # type: ignore[import-not-found]
+    from .verification_stamp import (  # type: ignore[import-not-found]
+        WORK_DIFF_SET_BOOKKEEPING,
+        sha256_hex,
+    )
 except ImportError:  # pragma: no cover - direct-script fallback
-    from verification_stamp import sha256_hex  # type: ignore[no-redef]
+    from verification_stamp import (  # type: ignore[no-redef]
+        WORK_DIFF_SET_BOOKKEEPING,
+        sha256_hex,
+    )
 
 
 TEST_RUNS_FILENAME = "test-runs.jsonl"
@@ -102,6 +149,79 @@ def _posix(path: str) -> str:
     """
     return path.replace("\\", "/")
 
+
+def _normalise_rel(raw: str) -> str:
+    """Normalise a declared repo-relative path for prefix comparison.
+
+    Set 129 S1: this replaced ``_posix(raw).lstrip("./")``, which was a
+    live bug the re-derivation of ``covers`` walked straight into.
+    ``str.lstrip`` strips a CHARACTER SET, not a prefix, so it ate the
+    leading dot of every dotfile: ``".github/workflows/test.yml"`` became
+    ``"github/workflows/test.yml"`` and ``".gitignore"`` became
+    ``"gitignore"``. Any suite declaring a dotted input therefore matched
+    NOTHING through :func:`session_touched` while reading perfectly
+    correct in the declaration -- a gate silently scoped smaller than it
+    is written, which is the fail-open direction this repo refuses
+    (L-125-1). Strip the ``"./"`` prefix as a prefix instead.
+    """
+    rel = _posix(raw.strip())
+    while rel.startswith("./"):
+        rel = rel[2:]
+    rel = rel.lstrip("/")
+    return "" if rel == "." else rel
+
+
+def matching_prefixes(
+    rel: str, prefixes: Sequence[str]
+) -> Tuple[str, ...]:
+    """Every prefix in *prefixes* that *rel* sits under, in declared order.
+
+    THE one definition of "under a declared surface" for this module
+    (L-069-1). Before Set 129 S1 the same comparison was written out four
+    times -- in ``path_is_test_surface``, in ``surface_digest``, in
+    ``session_touched``, and about to be a fourth time in
+    :func:`affected_suites` -- so a fix to one was a fix to one. Matching
+    is anchored at a path boundary, so ``ai_router/tests_helper.py`` does
+    not match the prefix ``ai_router/tests/``.
+
+    **Both sides are normalised.** The changed path and the declared
+    prefix go through the same :func:`_normalise_rel`, because
+    normalising only one of them is a silent narrowing either way round:
+    a consumer writing the ordinary relative spelling ``covers:
+    ["./src/"]`` would match nothing while the declaration read as
+    correct, exactly as a dotfile prefix used to.
+
+    Returns the prefixes rather than a bool because the affected-suite
+    answer must be **auditable**: a session is owed not just *that* it
+    must run a suite but *which declared input* made it so.
+    """
+    rel = _normalise_rel(rel)
+    if not rel:
+        return ()
+    out: List[str] = []
+    for prefix in prefixes:
+        if not prefix:
+            continue
+        p = _normalise_rel(prefix)
+        if not p:
+            # A repo-ROOT prefix -- the ordinary spellings are `./` and
+            # `.`, and a whole-repo suite is a legitimate declaration for
+            # a small consumer. Round-4 verification caught this: the
+            # normaliser turned it into the empty string and the loop
+            # then skipped it, so the suite that declared EVERYTHING
+            # matched NOTHING and its gate was disarmed for every change.
+            # The empty-original case above is different and still
+            # skipped: `covers: [""]` declares nothing and the loader
+            # rejects it outright.
+            out.append(prefix)
+            continue
+        if rel == p.rstrip("/") or rel.startswith(
+            p if p.endswith("/") else p + "/"
+        ):
+            out.append(prefix)
+    return tuple(out)
+
+
 # Recognised outcomes. ``passed`` is the only one that can satisfy the gate;
 # the others exist so an honest record of a red or aborted run can still be
 # written (silence is worse than a recorded failure).
@@ -115,7 +235,40 @@ OUTCOMES = (OUTCOME_PASSED, OUTCOME_FAILED, OUTCOME_ABORTED)
 class SuiteSpec:
     """One declared test suite.
 
-    ``covers`` is a list of repo-relative path prefixes (posix separators).
+    ``covers`` is the suite's **input set**: the complete allowlist of
+    repo-relative path prefixes (posix separators) that can affect the
+    suite's RESULT. Set 129 S1 strengthened this from "the paths the
+    suite is about", and the difference has teeth. Product source, test
+    source, fixtures, contracts, mocks, shared libraries, **lockfiles,
+    build and test configuration, and checked-in toolchain
+    configuration** all belong in it. Under the old reading a lockfile
+    outside ``covers`` was merely out of scope; under this one it is a
+    **declaration bug**, because a dependency bump can turn a suite red
+    without touching a line the declaration names.
+
+    What that does NOT license is the inverse claim. Unchanged declared
+    inputs are **evidence that a rerun is likely redundant within a
+    qualified execution environment; they do not prove identical
+    outcomes for non-hermetic or flaky suites.** Scheduler interleaving,
+    browser and VS Code runtime, dependency resolution, environment
+    variables, filesystem timing, service state, network responses and
+    random seed all sit outside any file digest, and ``covers`` is a path
+    prefix list, not a dependency graph. Skipping a suite therefore
+    remains a verification reduction and needs the operator attestation
+    every verification reduction needs -- it is not "provably redundant
+    work being removed".
+
+    There is deliberately **no module field.** In a repo with a declared
+    module tier the question "which suites does this session owe" is
+    still answered by intersecting the change set with the declared input
+    sets; a module axis answers nothing that adds, and can only SUBTRACT
+    -- a session in module Y that genuinely touches module X's inputs
+    would stop owing X's suite because of a label. Nothing checks that a
+    module's declared roots match its real imports, so that subtraction
+    would fail open (L-125-1). Modules group and assign ownership; the
+    suite declares; the intersection decides (Set 129, ``verdict.md``
+    §3-§4).
+
     ``expensive`` marks the suites the once-per-session-at-close rule
     governs; cheap suites are recordable but never gate-required. It is
     a statement about *whether the gate has an opinion*, not about the
@@ -150,8 +303,23 @@ class SuiteSpec:
     tests: Tuple[str, ...] = ()
 
 
+#: The suite-declaration keys ``load_suites_checked`` recognises. An
+#: allowlist, so an unrecognised key is an ERROR rather than a silent
+#: default (Set 129 S1, round-4 verification).
+SUITE_FIELDS = frozenset({"name", "command", "covers", "expensive", "tests"})
+
+
 # Locked defaults for this repo's three layers. A consumer repo with no
 # ``testing:`` block inherits these; one with a block replaces them wholesale.
+#
+# Set 129 S1 re-derived all three against the STRONGER definition of
+# ``covers`` -- the complete allowlist of prefixes that can affect the
+# suite's RESULT, not "the product paths the suite is about". The
+# derivation was empirical, not editorial: a full run under an audit hook
+# recorded every path the suite actually opened or enumerated, and the
+# additions below are the ones that evidence named. Under the old reading
+# a lockfile or a build config outside ``covers`` was simply out of
+# scope; under the new one it is a DECLARATION BUG.
 DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
     SuiteSpec(
         name="pytest",
@@ -159,7 +327,54 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # (845.76s serial -> 234.55s with -n auto) with identical
         # results, measured at commit 9277e104.
         command=".venv/Scripts/python.exe -m pytest ai_router/tests -q -n auto",
-        covers=("ai_router/",),
+        covers=(
+            "ai_router/",
+            # The suite's own runner configuration. `pytest.ini` sets the
+            # `-n` handling, testpaths and filter rules, so it decides
+            # what runs and how; `pyproject.toml` declares the
+            # dependencies and console entry points that
+            # `test_entry_points` and `test_packaging_hygiene` assert
+            # against. Both are read on every run and neither was
+            # declared.
+            "pytest.ini",
+            "pyproject.toml",
+            # Checked-in toolchain configuration, and not merely by
+            # analogy: `test_drift_guard` runs `drift_guard.run_all()`
+            # over the REAL repo, which asserts every GitHub action is
+            # SHA-pinned and that `.github/dependabot.yml` exists. An
+            # unpinned action added here turns this suite red.
+            ".github/",
+            # Corpora the suite reads rather than stages. The cold-start
+            # golden tree is compared byte-for-byte by
+            # `test_cold_start_acceptance`; `scripts/` and the
+            # failure-injection traces are enumerated and read.
+            "test-fixtures/",
+            "scripts/",
+            "tests/",
+            # The drift guard's two sides: it proves the bundled template
+            # mirror still matches its source, and that the changelog
+            # partition round-trips. A change to either side alone is
+            # exactly the drift it exists to catch, and neither side was
+            # declared -- so the session that CAUSED the drift owed no
+            # run of the suite that detects it.
+            "docs/templates/",
+            "tools/dabbler-ai-orchestration/dist/templates/",
+            "tools/dabbler-ai-orchestration/changelog.d/",
+            # The suite polices the session-set corpus itself:
+            # `test_step_status_drift` inventories every set's activity
+            # log and asserts an exact count, `test_spec_config` parses
+            # every real `spec.md`, and the drift guard refuses duplicate
+            # set numbers. A session-set-only edit really can turn Layer 1
+            # red.
+            #
+            # Declaring it is only possible because `surface_digest` now
+            # excludes the ACTIVE set's own close-out bookkeeping
+            # (`is_active_set_bookkeeping`); without that the suite stales
+            # its own run at the moment `record_run` appends
+            # `test-runs.jsonl`. Another set's files are ordinary changed
+            # files and bind normally.
+            "docs/session-sets/",
+        ),
         # Set 116 S3, the operator's gate ruling: `test_run_fresh` is one
         # of the three gates that survive, and it was BROKEN — pytest was
         # declared cheap, so the once-per-session-after-the-last-code-
@@ -184,7 +399,48 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # record against a command it had not run, so the release-boundary
         # evidence named a suite nobody could execute on the dev platform.
         command="npm run test:unit",
-        covers=("tools/dabbler-ai-orchestration/src/",),
+        covers=(
+            "tools/dabbler-ai-orchestration/src/",
+            # Set 129 S1, read straight off the command: `test:unit` is
+            # `mocha --require ts-node/register ...`, so `package.json`
+            # carries the invocation and the dependency ranges,
+            # `package-lock.json` carries the versions actually
+            # installed, and `tsconfig.json` is what ts-node compiles
+            # through. A lockfile bump can turn this suite red without
+            # touching a line of `src/`, which is the archetype the
+            # stronger definition of `covers` exists to catch.
+            "tools/dabbler-ai-orchestration/package.json",
+            "tools/dabbler-ai-orchestration/package-lock.json",
+            "tools/dabbler-ai-orchestration/tsconfig.json",
+            # Round-1 verification: the Layer 2 specs assert against real
+            # assets outside `src/`, one named test each.
+            # `statusIconAssets` reads `media/`; `uatMatrixFixtures` reads
+            # the extension's own `test-fixtures/uat-matrix`;
+            # `consumerBootstrap` asserts the REAL packaged
+            # `dist/templates/` bundle has all fifteen files and compares
+            # it against the repo-root `docs/templates/` source, which
+            # `sampleProjectCore` also reads; `coldStartSnapshot`
+            # compares the repo-root `test-fixtures/cold-start` golden
+            # tree. Every one of these could be broken by a session that,
+            # before this, owed Layer 2 nothing.
+            "tools/dabbler-ai-orchestration/media/",
+            "tools/dabbler-ai-orchestration/test-fixtures/",
+            "tools/dabbler-ai-orchestration/dist/templates/",
+            # `walkStager.test.ts` does not mock these -- it `require`s
+            # `scripts/vscode-launch.js`, `scripts/stage-walk.js` and
+            # `scripts/make-uat-workspace.js` directly and asserts on
+            # their real behaviour.
+            "tools/dabbler-ai-orchestration/scripts/",
+            "docs/templates/",
+            "test-fixtures/",
+            # `moduleCliFixture` / `moduleAuthoring` / `sampleProjectSmoke`
+            # shell out to the workspace venv and drive the REAL
+            # `ai_router` module CLIs, so Layer 2 genuinely depends on the
+            # router. This is the cross-language edge the old declaration
+            # missed entirely: a Python-only change could turn the
+            # TypeScript suite red while owing it nothing.
+            "ai_router/",
+        ),
         # Set 116 S3: same repair as pytest, and Set 114 S3 is the
         # evidence. Layer 2 is in CONTRIBUTING.md's canonical full pass,
         # but Sessions 1 and 2 of that set recorded only pytest and
@@ -208,10 +464,7 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # that changed a sanctioned writer or the harness that stages the
         # fixtures could therefore close with Playwright reported "not
         # required", which is precisely the rendering-regression class
-        # Layer 2 and the static gates cannot see. The writers are listed
-        # file-by-file rather than as `ai_router/`, because arming the
-        # expensive suite for every router change would make the gate
-        # something sessions route around instead of satisfy.
+        # Layer 2 and the static gates cannot see.
         covers=(
             "tools/dabbler-ai-orchestration/src/",
             "tools/dabbler-ai-orchestration/package.json",
@@ -219,11 +472,61 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
             # the fixture/walk harness that stages what Layer 3 looks at
             "tools/dabbler-ai-orchestration/scripts/",
             "tools/dabbler-ai-orchestration/test-fixtures/",
-            "ai_router/tests/e2e/",
-            # the sanctioned state-file writers whose shape the views render
-            "ai_router/session_state.py",
-            "ai_router/start_session.py",
-            "ai_router/close_session.py",
+            # Set 129 S1 (round-2 remediation). This entry used to be
+            # three `ai_router` files -- session_state.py,
+            # start_session.py, close_session.py -- listed one by one,
+            # with a comment explaining that arming a 13-minute suite for
+            # every router change would make the gate something sessions
+            # route around instead of satisfy.
+            #
+            # The reasoning was sound and the premise was FALSE, and
+            # cross-provider verification is what caught it. The
+            # narrowing assumed Layer 3 exercised the PUBLISHED router
+            # wheel, so local router edits could not reach it. They can:
+            # `vsix-first-run-walkthrough.spec.ts` sets
+            # `DABBLER_ROUTER_INSTALL_SPEC` to the repo root, so the
+            # cold-start walk `pip install -e`s THIS tree and drives the
+            # router it just built. Set 122 S2 is the incident -- the
+            # walk went structurally red the moment the extension
+            # depended on router code that was not yet released.
+            # `pyproject.toml` is on the same chain: it is what that
+            # editable install resolves.
+            #
+            # So the whole package is declared, because that is what is
+            # true. The cost is real and is not denied: a router-only
+            # session now owes Layer 3. The sanctioned relief is to make
+            # the suite cheaper rather than the declaration smaller --
+            # smoke/full E2E tiering is deferred in `verdict.md` §7
+            # behind exactly this trigger, "two independently executable
+            # named commands with measured runtimes", represented as
+            # separate SuiteSpec entries. A declaration narrower than the
+            # truth is not a cost saving; it is a gate that cannot fire.
+            "ai_router/",
+            "pyproject.toml",
+            # Set 129 S1: `test:playwright` is `npm run compile && npx tsc
+            # --outDir out && npx playwright test`, so the BUILD is part
+            # of the run. `esbuild.js` is the compile step itself,
+            # `tsconfig.json` governs the `tsc` step, `playwright.config.ts`
+            # decides which specs run at all (its `testDir` is what makes
+            # the src/test/playwright entry above reachable), and
+            # `package-lock.json` pins the browser/runner versions. A
+            # config that silently narrows `testDir` would empty this
+            # suite while every recorded run still reported green.
+            "tools/dabbler-ai-orchestration/esbuild.js",
+            "tools/dabbler-ai-orchestration/tsconfig.json",
+            "tools/dabbler-ai-orchestration/playwright.config.ts",
+            "tools/dabbler-ai-orchestration/package-lock.json",
+            # Round-1 verification: the first-run walkthrough spec drives
+            # the real scaffold and installer paths, which read the
+            # BUNDLED copies rather than the repo sources -- `esbuild.js`
+            # is what copies `docs/templates/` into `dist/templates/`, so
+            # all three sit on the same chain, and `resources/` carries
+            # the cost-estimate data the views render. A stale or
+            # mispackaged bundle is invisible to `src/` and fatal to the
+            # walkthrough.
+            "tools/dabbler-ai-orchestration/dist/templates/",
+            "tools/dabbler-ai-orchestration/resources/",
+            "docs/templates/",
         ),
         expensive=True,
         # playwright.config.ts -> testDir: ./src/test/playwright, which
@@ -276,6 +579,10 @@ class FreshnessVerdict:
     required: bool
     passed: bool
     reason: str = ""
+    #: Set 129 S1: the declared inputs this session changed that made the
+    #: suite required, so the gate's demand can be audited rather than
+    #: merely obeyed. Empty for a suite nothing touched.
+    changed_inputs: Tuple[str, ...] = ()
 
 
 def _repo_root_for(path: str) -> Optional[str]:
@@ -284,6 +591,190 @@ def _repo_root_for(path: str) -> Optional[str]:
         if (candidate / ".git").exists():
             return str(candidate)
     return None
+
+
+@dataclass(frozen=True)
+class SuiteLoadResult:
+    """The suite declaration, plus what was WRONG with it (Set 129 S1).
+
+    ``load_suites`` is deliberately tolerant -- a config typo must not
+    crash a session boundary -- and that tolerance was silently load-
+    bearing in the wrong place. A malformed entry was dropped without a
+    word, so a ``testing.suites`` block whose entries were all typos
+    yielded an empty tuple, and ``check_test_run_fresh`` read that as
+    *"no expensive suites declared"* and **passed**. One misspelled key
+    in a consumer's config therefore disarmed the close gate that
+    governs every expensive suite in the repo, and nothing anywhere said
+    so. Found by review, not by use.
+
+    Tolerance is right for a **reader** and wrong for the input to a
+    **gate**, so the two are separated rather than traded off: the reader
+    still returns whatever it could parse, and it now also returns
+    ``errors``, which a gate is obliged to treat as a block. If the
+    information a skip needs is missing or unverifiable, do not skip.
+
+    ``errors`` being empty is not the same as ``suites`` being non-empty:
+    an explicit ``suites: []`` parses cleanly and yields no suites, which
+    stays the deliberate operator disarm it has always been.
+    """
+
+    suites: Tuple[SuiteSpec, ...]
+    errors: Tuple[str, ...] = ()
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+
+def load_suites_checked(config: Optional[dict] = None) -> SuiteLoadResult:
+    """Build the suite list from ``testing.suites``, keeping the errors.
+
+    Same parsing as :func:`load_suites`, except every entry it declines
+    to use is reported instead of vanishing. A ``suites:`` key that is
+    present but not a list is an error too: it is a config mistake, not
+    a declaration, and returning the defaults for it would silently
+    substitute a different answer than the operator wrote.
+    """
+    if not isinstance(config, dict):
+        return SuiteLoadResult(DEFAULT_SUITES)
+    block = config.get("testing")
+    if not isinstance(block, dict) or "suites" not in block:
+        return SuiteLoadResult(DEFAULT_SUITES)
+    raw = block.get("suites")
+    if not isinstance(raw, list):
+        return SuiteLoadResult(
+            DEFAULT_SUITES,
+            (
+                f"testing.suites must be a list of suite mappings "
+                f"(got {type(raw).__name__}); falling back to the built-in "
+                f"defaults, which is almost certainly not what the config "
+                f"intends",
+            ),
+        )
+    out: List[SuiteSpec] = []
+    errors: List[str] = []
+    for index, item in enumerate(raw):
+        where = f"testing.suites[{index}]"
+        if not isinstance(item, dict):
+            errors.append(
+                f"{where} is not a mapping (got {type(item).__name__})"
+            )
+            continue
+        name = item.get("name")
+        if not isinstance(name, str) or not name.strip():
+            errors.append(f"{where} has no usable 'name' (got {name!r})")
+            continue
+        label = f"{where} ({name.strip()!r})"
+
+        # Every field is checked, not just the ones whose absence would
+        # crash. Round-1 and round-2 verification both landed here: a
+        # loader that filters bad ITEMS out of an otherwise-usable list,
+        # or ignores a bad VALUE on an otherwise-usable entry, narrows
+        # the declaration silently -- and a silently narrowed input set
+        # is the same fail-open defect as a silently dropped suite, one
+        # level down. `expensive: "true"` is the sharpest: a quoted
+        # boolean is not `True`, so the suite loads as CHEAP and the
+        # close gate stops having an opinion about it at all.
+        entry_errors: List[str] = []
+
+        # ...and an unknown KEY is the same defect once more, which
+        # round-4 verification caught: `expensvie: true` is not a value
+        # error, it is a key that nothing reads, so the suite loads cheap
+        # and the gate goes quiet. A hand-authored YAML key typo is the
+        # exact scenario this whole session exists to fail closed on, so
+        # the recognised set is an ALLOWLIST -- a denylist of known-bad
+        # spellings could never contain the next one (L-125-1).
+        unknown = sorted(set(item) - SUITE_FIELDS)
+        if unknown:
+            entry_errors.append(
+                f"{label} has unrecognised field(s) "
+                f"{', '.join(repr(k) for k in unknown)}; nothing reads them, "
+                f"so a misspelled key silently keeps its default -- a "
+                f"misspelled 'expensive' loads the suite as CHEAP and "
+                f"removes it from the close gate (recognised: "
+                f"{', '.join(sorted(SUITE_FIELDS))})"
+            )
+
+        command = item.get("command")
+        if command is not None and not isinstance(command, str):
+            entry_errors.append(
+                f"{label} has a non-string 'command' "
+                f"(got {type(command).__name__})"
+            )
+
+        if "expensive" in item and not isinstance(item.get("expensive"), bool):
+            entry_errors.append(
+                f"{label} has a non-boolean 'expensive' "
+                f"({item.get('expensive')!r}); a quoted or numeric value "
+                f"loads the suite as CHEAP, which silently removes it from "
+                f"the close gate"
+            )
+
+        covers_raw = item.get("covers")
+        if not isinstance(covers_raw, list):
+            errors.append(
+                f"{label} has no 'covers' list (got "
+                f"{type(covers_raw).__name__}); a suite that declares no "
+                f"input set can never be found affected"
+            )
+            continue
+        covers = tuple(
+            _normalise_rel(c) or "./"
+            for c in covers_raw
+            if isinstance(c, str) and c.strip()
+        )
+        for position, c in enumerate(covers_raw):
+            if not isinstance(c, str) or not c.strip():
+                entry_errors.append(
+                    f"{label} covers[{position}] is not a usable path "
+                    f"prefix (got {c!r}); the surrounding entries would "
+                    f"still load, so this narrows the declared input set "
+                    f"without removing the suite"
+                )
+        if not covers:
+            errors.append(
+                f"{label} declares an empty 'covers'; a suite that declares "
+                f"no input set can never be found affected"
+            )
+            continue
+
+        tests_raw = item.get("tests")
+        tests: Tuple[str, ...] = ()
+        if tests_raw is not None:
+            if not isinstance(tests_raw, list):
+                entry_errors.append(
+                    f"{label} has a non-list 'tests' "
+                    f"(got {type(tests_raw).__name__})"
+                )
+            else:
+                for position, t in enumerate(tests_raw):
+                    if not isinstance(t, str) or not t.strip():
+                        entry_errors.append(
+                            f"{label} tests[{position}] is not a usable path "
+                            f"prefix (got {t!r}); an unrecognised test "
+                            f"surface classifies as SHIPPED, so this widens "
+                            f"what a post-suite fix owes"
+                        )
+                tests = tuple(
+                    _normalise_rel(t)
+                    for t in tests_raw
+                    if isinstance(t, str) and t.strip()
+                )
+
+        if entry_errors:
+            errors.extend(entry_errors)
+            continue
+
+        out.append(
+            SuiteSpec(
+                name=name.strip(),
+                command=command if isinstance(command, str) else "",
+                covers=covers,
+                expensive=item.get("expensive") is True,
+                tests=tests,
+            )
+        )
+    return SuiteLoadResult(tuple(out), tuple(errors))
 
 
 def load_suites(config: Optional[dict] = None) -> Tuple[SuiteSpec, ...]:
@@ -296,53 +787,14 @@ def load_suites(config: Optional[dict] = None) -> Tuple[SuiteSpec, ...]:
     defaults -- an operator who deliberately declares no suites gets no
     suites, and silently resurrecting the defaults would re-arm a gate
     they just turned off.
+
+    **This projection DISCARDS the errors.** Anything deciding whether a
+    close may proceed must call :func:`load_suites_checked` instead and
+    block on ``errors``; dropped entries are indistinguishable from an
+    empty declaration from here, which is exactly how a typo used to
+    disarm ``check_test_run_fresh``.
     """
-    if not isinstance(config, dict):
-        return DEFAULT_SUITES
-    block = config.get("testing")
-    if not isinstance(block, dict) or "suites" not in block:
-        return DEFAULT_SUITES
-    raw = block.get("suites")
-    if not isinstance(raw, list):
-        return DEFAULT_SUITES
-    out: List[SuiteSpec] = []
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        name = item.get("name")
-        if not isinstance(name, str) or not name.strip():
-            continue
-        covers_raw = item.get("covers")
-        if not isinstance(covers_raw, list):
-            continue
-        covers = tuple(
-            _posix(c.strip())
-            for c in covers_raw
-            if isinstance(c, str) and c.strip()
-        )
-        if not covers:
-            continue
-        command = item.get("command")
-        tests_raw = item.get("tests")
-        tests = (
-            tuple(
-                _posix(t.strip())
-                for t in tests_raw
-                if isinstance(t, str) and t.strip()
-            )
-            if isinstance(tests_raw, list)
-            else ()
-        )
-        out.append(
-            SuiteSpec(
-                name=name.strip(),
-                command=command if isinstance(command, str) else "",
-                covers=covers,
-                expensive=item.get("expensive") is True,
-                tests=tests,
-            )
-        )
-    return tuple(out)
+    return load_suites_checked(config).suites
 
 
 def test_surface_prefixes(suites: Sequence[SuiteSpec]) -> Tuple[str, ...]:
@@ -365,22 +817,10 @@ def test_surface_prefixes(suites: Sequence[SuiteSpec]) -> Tuple[str, ...]:
 def path_is_test_surface(rel: str, prefixes: Sequence[str]) -> bool:
     """True when *rel* sits under one of the declared test *prefixes*.
 
-    Prefix matching is the same shape :func:`surface_digest` and
-    :func:`session_touched` use -- one notion of "under a declared
-    surface" for the whole module (L-069-1) -- and it is anchored at a
-    path boundary so ``ai_router/tests_helper.py`` does not match
-    ``ai_router/tests/``.
+    A thin boolean over :func:`matching_prefixes` -- one notion of "under
+    a declared surface" for the whole module (L-069-1).
     """
-    rel = _posix(rel)
-    for prefix in prefixes:
-        if not prefix:
-            continue
-        p = _posix(prefix)
-        if rel == p.rstrip("/"):
-            return True
-        if rel.startswith(p if p.endswith("/") else p + "/"):
-            return True
-    return False
+    return bool(matching_prefixes(rel, prefixes))
 
 
 def classify_changed_paths(
@@ -416,13 +856,75 @@ def _git_z(repo_root: str, *args: str) -> Optional[List[str]]:
     return [p for p in out.split("\0") if p]
 
 
-def surface_digest(repo_root: str, covers: Sequence[str]) -> Optional[str]:
+def _set_rel(repo_root: str, session_set_dir: Optional[str]) -> Optional[str]:
+    """The active session-set directory, relative to *repo_root*."""
+    if not session_set_dir:
+        return None
+    try:
+        rel = os.path.relpath(
+            os.path.abspath(session_set_dir), os.path.abspath(repo_root)
+        )
+    except ValueError:  # different drives on Windows
+        return None
+    rel = _posix(rel)
+    return None if rel.startswith("..") else rel.rstrip("/")
+
+
+def is_active_set_bookkeeping(rel: str, set_rel: Optional[str]) -> bool:
+    """True when *rel* is the ACTIVE set's own close-out bookkeeping.
+
+    Set 129 S1, round-3 remediation. Declaring ``docs/session-sets/`` as
+    a pytest input is correct -- the suite really does inventory every
+    set's activity log and parse every ``spec.md`` -- and declaring it
+    naively **deadlocks the gate**: :func:`record_run` digests the
+    covered surfaces and then appends ``test-runs.jsonl`` into the set
+    directory, so the run stales itself the instant it is recorded, with
+    nothing else touched.
+
+    The exclusion is deliberately narrow in both dimensions. It applies
+    only to the **active** set (another set's artifacts are ordinary
+    changed files, and a set-number collision or a resurrected status
+    token there is exactly what the suite is meant to catch), and only to
+    the **basenames the sanctioned writers own**, reused from
+    ``verification_stamp.WORK_DIFF_SET_BOOKKEEPING`` rather than
+    re-listed, so the two cannot drift (L-069-1). ``spec.md`` is not in
+    that list, so editing the active set's own spec still stales its run.
+
+    What this concedes, stated plainly: a change to the active set's own
+    ``activity-log.json`` can in principle fail
+    ``test_step_status_drift``, and is exempt here. It has to be --
+    ``log_step`` writes that file continuously while the session runs, so
+    binding it would make the gate unsatisfiable rather than strict. It
+    is exempt from the verification stamp for the same reason.
+    """
+    if not set_rel:
+        return False
+    prefix = set_rel + "/"
+    if not rel.startswith(prefix):
+        return False
+    name = rel[len(prefix):]
+    if "/" in name:
+        return False
+    return any(fnmatch.fnmatch(name, pat) for pat in WORK_DIFF_SET_BOOKKEEPING)
+
+
+def surface_digest(
+    repo_root: str,
+    covers: Sequence[str],
+    *,
+    session_set_dir: Optional[str] = None,
+) -> Optional[str]:
     """SHA-256 over the current content of every file under *covers*.
 
     One ``path\\0blob-hash`` line per tracked-or-untracked-not-ignored file
     whose repo-relative path starts with one of the *covers* prefixes,
     sorted for determinism. Ignored files (``node_modules``, build output)
     never enter, because they are not in ``git ls-files``.
+
+    *session_set_dir*, when given, excludes that set's own close-out
+    bookkeeping from the digest (:func:`is_active_set_bookkeeping`), which
+    is what lets a suite declare ``docs/session-sets/`` without staling
+    its own run at the moment it records it.
 
     Returns ``None`` when git is unavailable or fails, so every caller
     fails **closed** rather than treating an unmeasurable surface as
@@ -438,16 +940,16 @@ def surface_digest(repo_root: str, covers: Sequence[str]) -> Optional[str]:
     if tracked is None or untracked is None:
         return None
 
+    set_rel = _set_rel(repo_root, session_set_dir)
+
     def _covered(rel: str) -> bool:
-        return any(
-            rel == p.rstrip("/") or rel.startswith(p if p.endswith("/") else p + "/")
-            or rel == p
-            for p in prefixes
-        )
+        return bool(matching_prefixes(rel, prefixes))
 
     lines: List[str] = []
     for rel in sorted(set(tracked) | set(untracked)):
         if not _covered(rel):
+            continue
+        if is_active_set_bookkeeping(rel, set_rel):
             continue
         target = Path(repo_root) / rel
         try:
@@ -560,7 +1062,7 @@ def record_run(
             f"no git repository found above {session_set_dir!r}; "
             "cannot digest the covered surfaces"
         )
-    digest = surface_digest(root, suite.covers)
+    digest = surface_digest(root, suite.covers, session_set_dir=session_set_dir)
     if digest is None:
         raise RuntimeError(
             f"could not digest the surfaces covered by suite {suite.name!r} "
@@ -591,19 +1093,101 @@ def session_touched(
 
     ``files_changed`` is the disposition's declared surface. Paths are
     normalised to posix separators before comparison so a Windows-authored
-    disposition matches a posix-style ``covers`` prefix.
+    disposition matches a posix-style ``covers`` prefix. The boolean
+    projection of :func:`affected_suites`; both go through
+    :func:`matching_prefixes`.
     """
     _ = repo_root
-    prefixes = tuple(_posix(c) for c in covers if c)
     for raw in files_changed:
         if not isinstance(raw, str) or not raw.strip():
             continue
-        rel = _posix(raw.strip()).lstrip("./")
-        for p in prefixes:
-            norm = p if p.endswith("/") else p + "/"
-            if rel == p.rstrip("/") or rel.startswith(norm):
-                return True
+        if matching_prefixes(raw, covers):
+            return True
     return False
+
+
+@dataclass(frozen=True)
+class SuiteMatch:
+    """One suite a change set affects, and the inputs that made it so.
+
+    Set 129 S1. ``changed_inputs`` are the paths from the change set that
+    landed inside the suite's declared input set; ``matched_prefixes``
+    are the ``covers`` entries they matched. Both are reported because
+    "which suites does this session owe" must be **auditable** rather
+    than a bare boolean: a session told only *that* it owes a 14-minute
+    suite cannot check the claim, and a wrong declaration is invisible
+    from a yes/no answer.
+    """
+
+    suite: str
+    changed_inputs: Tuple[str, ...]
+    matched_prefixes: Tuple[str, ...]
+    expensive: bool = False
+
+
+def affected_suites(
+    files_changed: Sequence[str],
+    suites: Sequence[SuiteSpec],
+    *,
+    set_rel: Optional[str] = None,
+) -> Tuple[SuiteMatch, ...]:
+    """Which suites *files_changed* affects, and which inputs matched.
+
+    The answer A5 resolves to (Set 129, ``verdict.md`` §4): **the suite
+    declares its inputs, the intersection decides the obligation, and
+    modules are grouping metadata**. There is deliberately no module
+    axis. A module label could only ever SUBTRACT from this intersection
+    -- a session in module Y that genuinely touches module X's inputs
+    would stop owing X's suite because of a label -- and nothing checks
+    that a module's declared roots match its real imports, so routing
+    test selection through one would be a verification reduction wearing
+    an organizational costume (L-125-1).
+
+    Reports **every** matched suite, cheap ones included: this answers
+    "what does this change affect", which is not the same question as
+    "what does the close gate require". :func:`evaluate_freshness` owns
+    the ``expensive`` policy and consumes this rather than re-deriving
+    the intersection itself (L-069-1).
+
+    Order follows the declaration, and a suite matched by nothing is
+    absent rather than present-and-empty, so ``if affected_suites(...)``
+    reads correctly.
+
+    *set_rel* names the active session-set directory relative to the repo
+    root. When given, that set's own close-out bookkeeping does not count
+    as a changed input: those files are excluded from the freshness
+    digest too, so counting them here would demand a suite that the very
+    same files then cannot stale. Another set's artifacts are ordinary
+    changed files and count normally.
+    """
+    out: List[SuiteMatch] = []
+    for suite in suites:
+        inputs: List[str] = []
+        prefixes: List[str] = []
+        for raw in files_changed:
+            if not isinstance(raw, str) or not raw.strip():
+                continue
+            rel = _normalise_rel(raw)
+            if is_active_set_bookkeeping(rel, set_rel):
+                continue
+            hits = matching_prefixes(raw, suite.covers)
+            if not hits:
+                continue
+            inputs.append(rel)
+            for p in hits:
+                if p not in prefixes:
+                    prefixes.append(p)
+        if not inputs:
+            continue
+        out.append(
+            SuiteMatch(
+                suite=suite.name,
+                changed_inputs=tuple(sorted(set(inputs))),
+                matched_prefixes=tuple(prefixes),
+                expensive=suite.expensive,
+            )
+        )
+    return tuple(out)
 
 
 def evaluate_freshness(
@@ -619,14 +1203,24 @@ def evaluate_freshness(
     at least one path under its ``covers``. A required suite passes only
     when the most recent record for it is ``passed`` and its
     ``surface_digest`` still equals the surfaces' current digest.
+
+    The intersection is computed ONCE by :func:`affected_suites` and
+    consumed here (L-069-1); this function owns only the ``expensive``
+    policy and the freshness judgement.
     """
     verdicts: List[FreshnessVerdict] = []
     root = repo_root or _repo_root_for(session_set_dir)
     records = read_records(session_set_dir)
+    set_rel = _set_rel(root, session_set_dir) if root else None
+    affected = {
+        m.suite: m
+        for m in affected_suites(files_changed, suites, set_rel=set_rel)
+    }
 
     for suite in suites:
         if not suite.expensive:
             continue
+        match = affected.get(suite.name)
         if root is None:
             verdicts.append(
                 FreshnessVerdict(
@@ -637,10 +1231,11 @@ def evaluate_freshness(
                         "no git repository found; cannot digest the covered "
                         "surfaces (failing closed)"
                     ),
+                    changed_inputs=match.changed_inputs if match else (),
                 )
             )
             continue
-        if not session_touched(root, suite.covers, files_changed):
+        if match is None:
             verdicts.append(
                 FreshnessVerdict(
                     suite=suite.name,
@@ -650,8 +1245,11 @@ def evaluate_freshness(
                 )
             )
             continue
+        inputs = match.changed_inputs
 
-        current = surface_digest(root, suite.covers)
+        current = surface_digest(
+            root, suite.covers, session_set_dir=session_set_dir
+        )
         if current is None:
             verdicts.append(
                 FreshnessVerdict(
@@ -662,6 +1260,7 @@ def evaluate_freshness(
                         "could not digest the covered surfaces "
                         "(failing closed)"
                     ),
+                    changed_inputs=inputs,
                 )
             )
             continue
@@ -681,6 +1280,7 @@ def evaluate_freshness(
                         f"--suite {suite.name} --outcome passed "
                         f"--duration-seconds <elapsed>`"
                     ),
+                    changed_inputs=inputs,
                 )
             )
             continue
@@ -699,6 +1299,7 @@ def evaluate_freshness(
                         f"re-run `{suite.command}` after your last code "
                         f"change and record it again"
                     ),
+                    changed_inputs=inputs,
                 )
             )
             continue
@@ -714,6 +1315,7 @@ def evaluate_freshness(
                         f"outcome is {latest.outcome!r}; a close needs a "
                         f"green run of record"
                     ),
+                    changed_inputs=inputs,
                 )
             )
             continue
@@ -724,6 +1326,7 @@ def evaluate_freshness(
                 required=True,
                 passed=True,
                 reason=f"fresh, green, recorded {latest.recorded_at}",
+                changed_inputs=inputs,
             )
         )
     return verdicts
@@ -811,6 +1414,21 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     sub.add_parser("suites", help="List the declared suites.")
+
+    aff = sub.add_parser(
+        "affected",
+        help="Report which suites a change set affects, and which inputs matched.",
+    )
+    aff.add_argument("--session-set-dir", required=True)
+    aff.add_argument(
+        "--files-changed",
+        nargs="*",
+        default=None,
+        help=(
+            "Paths this session changed. Defaults to the disposition's "
+            "files_changed."
+        ),
+    )
     return p
 
 
@@ -827,7 +1445,10 @@ def _files_changed_from_disposition(session_set_dir: str) -> List[str]:
 
 def run(argv: Optional[Sequence[str]] = None) -> int:
     args = build_parser().parse_args(argv)
-    suites = load_suites(_load_router_config())
+    loaded = load_suites_checked(_load_router_config())
+    suites = loaded.suites
+    for err in loaded.errors:
+        print(f"run_of_record: suite declaration error: {err}", file=sys.stderr)
 
     if args.cmd == "suites":
         for s in suites:
@@ -835,7 +1456,7 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
             print(f"{s.name:<12} [{tag}]  covers: {', '.join(s.covers)}")
             if s.command:
                 print(f"{'':<12}  command: {s.command}")
-        return 0
+        return 1 if loaded.errors else 0
 
     if args.cmd == "record":
         suite = _find_suite(suites, args.suite)
@@ -875,9 +1496,35 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         if args.files_changed is not None
         else _files_changed_from_disposition(args.session_set_dir)
     )
+
+    if args.cmd == "affected":
+        root = _repo_root_for(args.session_set_dir)
+        set_rel = _set_rel(root, args.session_set_dir) if root else None
+        matches = affected_suites(files_changed, suites, set_rel=set_rel)
+        if not matches:
+            print(
+                "No declared suite's input set intersects this change "
+                f"({len(files_changed)} path(s))."
+            )
+            return 1 if loaded.errors else 0
+        for m in matches:
+            tag = "expensive" if m.expensive else "cheap"
+            print(f"{m.suite} [{tag}]")
+            print(f"  matched covers: {', '.join(m.matched_prefixes)}")
+            for rel in m.changed_inputs:
+                print(f"  changed input: {rel}")
+        return 1 if loaded.errors else 0
+
     verdicts = evaluate_freshness(
         args.session_set_dir, files_changed, suites
     )
+    if loaded.errors:
+        print(
+            "run_of_record: refusing to report freshness against a "
+            "malformed suite declaration",
+            file=sys.stderr,
+        )
+        return 1
     if not verdicts:
         print("No expensive suites declared; nothing to check.")
         return 0
@@ -891,6 +1538,8 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         else:
             failed = True
             print(f"[!!] {v.suite}: {v.reason}")
+        if v.changed_inputs:
+            print(f"     changed inputs: {', '.join(v.changed_inputs)}")
     if failed and args.check:
         return 1
     return 0
@@ -912,16 +1561,22 @@ __all__ = [
     "OUTCOME_ABORTED",
     "DEFAULT_SUITES",
     "SuiteSpec",
+    "SuiteMatch",
+    "SuiteLoadResult",
     "TestRunRecord",
     "FreshnessVerdict",
     "load_suites",
+    "load_suites_checked",
     "surface_digest",
+    "is_active_set_bookkeeping",
+    "matching_prefixes",
     "test_surface_prefixes",
     "path_is_test_surface",
     "classify_changed_paths",
     "read_records",
     "record_run",
     "session_touched",
+    "affected_suites",
     "evaluate_freshness",
     "main",
     "run",

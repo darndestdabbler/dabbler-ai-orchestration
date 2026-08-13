@@ -117,7 +117,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="122" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="129" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -137,7 +137,7 @@ full text in `lessons-archive.md`:
 
 
 ## A Gate That Only Ever Passes Proves Nothing — Ship It With Falsifiers
-<!-- lesson: id="L-112-1" added-set="112" last-used-set="122" status="active" scope="portable" -->
+<!-- lesson: id="L-112-1" added-set="112" last-used-set="129" status="active" scope="portable" -->
 
 - A pattern-matching gate (grep guard, banned-phrase scan) that matches
   nothing looks **identical** to one that finds nothing, and reviewing
@@ -158,7 +158,7 @@ full text in `lessons-archive.md`:
   independently. Probe it by making discovery return empty.
 
 ## Compare What A Transport CAN DO, Not What It Returns
-<!-- lesson: id="L-125-1" added-set="125" last-used-set="128" status="active" scope="portable" -->
+<!-- lesson: id="L-125-1" added-set="125" last-used-set="129" status="active" scope="portable" -->
 
 - Backends behind one interface differ in **capability**, not output. Under
   one `route()` contract, direct-API sends no `tools` key and cannot touch

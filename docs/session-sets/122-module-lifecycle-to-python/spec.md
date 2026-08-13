@@ -43,6 +43,24 @@ prerequisites:
     condition: complete
 ```
 
+> **Amended 2026-08-13 (after Session 1 closed): this set has FOUR sessions.**
+> Session 4 was added by operator decision — journaled in `decisions.jsonl`,
+> authority `human`, rubric line `external-consequence`. The configuration
+> block above is unchanged and stays immutable; only the session plan grew.
+> `totalSessions` moves 3 → 4 through the sanctioned writer, by passing
+> `--total-sessions 4` to `start_session` at Session 2's registration — never
+> by hand-editing `session-state.json`.
+>
+> **Why.** Session 2 makes the extension depend on `python -m
+> ai_router.modules`. Live PyPI is `0.34.0`; this repo stages `1.0.0`. The
+> setup flow's install path is a plain `pip install dabbler-ai-router`
+> (`aiRouterInstall.ts:431` — only the *update* mode passes `--upgrade`),
+> which pip reports as already-satisfied against an existing `0.34.0` venv.
+> So every **existing** project would take the Marketplace update and then
+> fail every module command with `No module named ai_router.modules`. The
+> operator publishes both registries immediately after this set lands, which
+> makes the guarantee a release blocker rather than a follow-up.
+
 ---
 
 ## What is already decided (verdict §8, operator-confirmed)
@@ -110,7 +128,7 @@ rather than three.
 
 ## Sessions
 
-### Session 1 of 3: The lifecycle CLI
+### Session 1 of 4: The lifecycle CLI
 
 `python -m ai_router.modules create | rename | delete | assign-sets`.
 Verdict §4's adopted surface: validation, rollback, numbering,
@@ -142,7 +160,7 @@ running-session refusal, sanctioned cancellation.
 
 ---
 
-### Session 2 of 3: Thin launchers, and the command made visible
+### Session 2 of 4: Thin launchers, and the command made visible
 
 The commands already exist and are already on the menu. This session
 changes **what happens behind them** and **what the developer sees**.
@@ -152,12 +170,27 @@ changes **what happens behind them** and **what the developer sees**.
 1. Register.
 2. **Point the five existing context-menu commands at the CLI**, passing
    an explicit repo root and slug, showing output and refreshing the tree
-   (verdict §4). Then **delete the lifecycle logic from
+   (verdict §4). **Invoke the resolved workspace-venv interpreter, never a
+   bare `python`** — the launcher must run the same interpreter the install
+   flow targets (`venvPython(...)` / the `dabblerSessionSets.pythonPath`
+   setting), because a bare `python` on `PATH` is the documented cause of
+   the `No module named ai_router` mis-diagnosis
+   (`describeAiRouterImportFailure`, and the constitution's own warning).
+   Branch on the CLI's exit codes: `3` = refused, nothing written; `4` =
+   write failure. Then **delete the lifecycle logic from
    `moduleAuthoring.ts`** rather than leaving two implementations — the
    duplication is the defect Set 120 spent a session removing elsewhere.
+   **This reaches `gitScaffold.ts` whether or not it is named here:**
+   `scaffoldDefaultModuleAndLifecycleSets` calls `scaffoldNewModule`, so
+   the default-module scaffold becomes Python-backed in this session.
    **Do not change any command id:** renaming one breaks keybindings,
    `when`-clauses and Layer 3 fixtures, and the 2026-08-11 menu trim
    deliberately renamed titles only, verified against all 52 ids.
+   Fold in residual **`S122-S1-R1`** while here (Session 1's
+   `disposition.json`): `_existing_lifecycle_slug` matches a module's
+   lifecycle sets by basename suffix, so creating module `api` reuses
+   `payment-api`'s sets; the identity test should be that the name, minus
+   its numeric prefix, equals `<slug>-<kind>` exactly.
 3. **Echo the command before running it** (operator, 2026-08-11:
    *"echoed... so developers know what commands are being executed"*).
    Show the exact `python -m ai_router.modules …` line the extension is
@@ -182,13 +215,13 @@ changes **what happens behind them** and **what the developer sees**.
 7. **Close-out.**
 
 **Creates:** thin launchers, the visible-command surface, the module copy-prompt menu entry
-**Touches:** `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts`, `src/commands/`, `package.json`
-**Ends with:** one implementation of module lifecycle, in Python, and a developer who can see and reproduce every command the extension runs.
+**Touches:** `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts`, `src/commands/`, `src/commands/gitScaffold.ts`, `package.json`
+**Ends with:** one implementation of module lifecycle, in Python, invoked through the resolved workspace-venv interpreter, and a developer who can see and reproduce every command the extension runs.
 **Progress keys:** `launchersWired`, `commandEchoed`, `tsWriterRemoved`, `copyPromptOnMenu`
 
 ---
 
-### Session 3 of 3: Remove the guaranteed merge conflicts
+### Session 3 of 4: Remove the guaranteed merge conflicts
 
 Verdict §7, adopted. The one genuine conflict Option A has, with a fix
 that needs no architecture change.
@@ -221,11 +254,104 @@ that needs no architecture change.
 **Ends with:** two developers running concurrent sessions no longer collide on an append-only file or a set number.
 **Progress keys:** `filesPartitioned`, `roundTripFalsified`, `collisionRefused`
 
+---
+
+### Session 4 of 4: Guarantee the router the launchers require
+
+Session 2 made the extension depend on a Python module. Nothing yet
+guarantees that module is *there*, or is new enough. This session closes
+that gap, and it is the **release gate**: the operator publishes
+`dabbler-ai-router` to PyPI and the extension to the Marketplace
+immediately after this set lands, so a set that lands without this ships a
+known regression to every existing project.
+
+**The failure this prevents, concretely.** A developer's `.venv` holds
+`dabbler-ai-router==0.34.0`. They update the extension. Every module
+command now shells out to `python -m ai_router.modules`, which that wheel
+does not contain. Re-running **Dabbler: Set Up New Project** does not help:
+its install path is a plain `pip install`, which pip reports as
+already-satisfied.
+
+**Steps:**
+
+1. Register.
+2. **Declare the floor, and make the install satisfy it.** Define the
+   minimum router the extension requires (`dabbler-ai-router>=1.0.0` if
+   `ai_router.modules` ships in the staged `1.0.0`) in ONE place both the
+   install path and the precondition read — two independently-maintained
+   version constants is the drift defect this repo keeps re-finding
+   (L-069-1). The setup install must **upgrade an existing older
+   installation** rather than accept it: today only `mode: "update"` passes
+   `--upgrade` (`aiRouterInstall.ts:431`), and `mode: "install"` does not.
+   Prefer widening the existing install path over adding a third mode.
+3. **Probe the capability, and refuse to proceed without it.** After
+   installing, probe **the same venv interpreter the launcher will use** by
+   importing `ai_router.modules` — never infer success from pip's exit code
+   alone (L-125-1: compare what the transport CAN DO, not what it returns;
+   L-079-3: provisioning is exactly where silent fail-open paths hide). On
+   failure, do **not** run Python-backed default-module creation; report it
+   and leave a supported retry path — `describeAiRouterImportFailure` is
+   already the right message and the Copilot-seat gate
+   (`skip-install-incomplete`, `gitScaffold.ts:638`) is already the right
+   pattern. Then **fix retryability**: `gitScaffold.ts:530` gates
+   default-module creation on the manifest having been created *in that
+   call*, so a second setup attempt after a failed install can never
+   produce the default module — the user's only recovery is deleting a
+   `docs/modules.yaml` nobody told them about. Gate on the module being
+   absent, not on who created the manifest.
+4. **Dogfood the true cold start, and the upgrade.** L-079-3 is binding
+   for any set shipping provisioning: at least one walk must begin from a
+   **fresh empty folder** with no pre-seeded config and assert the
+   provisioned artifacts exist. Two scenarios, both automated — the set
+   declares `requiresUAT: false` and that flag is immutable, so this is a
+   scripted/Layer 3 dogfood, **not** an operator walk: (a) a clean project
+   with no `.venv` finishes setup with `ai_router.modules` importable from
+   the created venv and the default module present; (b) a project whose
+   `.venv` holds `dabbler-ai-router==0.34.0` is upgraded to a compatible
+   release by setup. Assert the failure path too: an unavailable install
+   attempts no Python-backed module mutation, and re-running setup after
+   that failure succeeds **without** deleting the already-created
+   `docs/modules.yaml`.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.** This session touches the
+   scaffold and install surfaces the Explorer renders from; if it edits
+   `package.json`, **`L-064-12` applies** and the full
+   `npm run test:playwright` is owed alongside pytest, run after the last
+   edit and never before.
+7. **Close-out.**
+
+**Creates:** the version floor, the capability precondition, the cold-start and upgrade dogfoods
+**Touches:** `tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts`, `src/commands/gitScaffold.ts`, `test-fixtures/cold-start/`
+**Ends with:** a project that finishes setup can run every module command, an older installation is upgraded rather than accepted, a failed install never half-creates a module, and re-running setup recovers — each proven from a fresh empty folder.
+**Progress keys:** `floorDeclared`, `installUpgrades`, `capabilityProbed`, `setupRetryable`, `coldStartDogfooded`
+
+> **Release ordering (operator-executed, not automated by this set).**
+> Publish `dabbler-ai-router` first, confirm the wheel is live on PyPI,
+> then publish the extension — so a newly installed extension can never
+> request Python functionality the registry does not yet provide.
+> Publishing is operator-only authority in every case.
+
+---
+
 > **Irony budget: 30 new test functions across all three sessions.**
 > Below Set 120's 40 because Session 2 is mostly replacement behind
 > existing commands, already covered by the menu-parity test. Session 1
 > should take most of it — the refusals and rollback are where the risk
 > is. If the design cannot be covered in 30, simplify the design.
+>
+> **Actual, recorded 2026-08-13: Session 1 shipped 41 test functions —
+> already over the whole set's budget.** Recorded rather than quietly
+> re-baselined, because the overrun is the interesting part. Roughly half
+> is the budget being wrong rather than the design being complex: the
+> spec's own steps mandate falsifiers ("ship a falsifier that injects the
+> failure"), each refusal is parameterized across the shapes a running
+> session can take, and verification then added a whole capability
+> (lifecycle-set scaffolding + numbering) the budget never priced. Sessions
+> 2–4 should **not** try to claw the overrun back by under-testing;
+> Session 4 in particular ships provisioning, where L-079-3 requires a
+> cold-start walk. Carry this to the Step 9 review as evidence that a
+> per-set count is the wrong unit — the cap the authoring guide actually
+> enforces is session SIZE, and Session 1 met that.
 
 ---
 

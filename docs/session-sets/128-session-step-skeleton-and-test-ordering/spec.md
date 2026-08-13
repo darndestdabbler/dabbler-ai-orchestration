@@ -253,7 +253,7 @@ critique named ahead of the suite rather than beside it.
 
 ---
 
-### Session 3 of 3: Set 118, re-authored under the new rules
+### Session 3 of 3: The unstarted corpus, re-authored under the new rules
 
 **Steps:**
 
@@ -263,28 +263,51 @@ critique named ahead of the suite rather than beside it.
    steps, its retirement rule and coupling budget are stated in terms of
    A1 (what "targeted" covers) and A3 (what "the required portion" means
    once tests are retired), and its measurements are re-read rather than
-   restated — the counts in it are from 2026-08-10 and are a floor.
-3. **Re-admit 118 through `spec_admission`** — the dogfood: the set that
-   introduced the check proves it on a spec it did not author. Then
-   retire `docs/planning/session-step-skeleton-and-verification-cost.md`
-   from "diagnosed, not fixed" to fixed, citing the sessions that closed
-   it and naming any residual (the modules question below) with an owner,
-   and author `change-log.md`.
+   restated — the counts in it are from 2026-08-10 and are a floor. This
+   is the **substantive** half: judgment, not text.
+3. **Restructure the other three unstarted specs, then re-admit all
+   four.** `113-narrated-video-walkthroughs`,
+   `121-guidance-becomes-executable` and
+   `122-module-lifecycle-to-python` need only the **mechanical** edit —
+   all fourteen of their sessions carry the identical malformation, a
+   five-step session whose last step compresses verify + full suite +
+   close, most in the wrong internal order. Replacing that one step with
+   three yields seven steps and exactly `N = 3` work steps, so no
+   `sessionSizeException` is owed anywhere; re-measure rather than trust
+   that sentence. Then the dogfood: `spec_admission` must pass on **four
+   specs this set did not author**. Retire
+   `docs/planning/session-step-skeleton-and-verification-cost.md` from
+   "diagnosed, not fixed" to fixed, citing the sessions that closed it
+   and naming the modules residual (A5) with its owner — **Set 129**,
+   which the operator scheduled during Session 2 — and author
+   `change-log.md`.
 4. **Cross-provider verification.**
 5. **Required portion of the full test suite.**
 6. **Close-out**, including the Step 9 reorganization review of
    `project-guidance.md` / `lessons-learned.md`.
 
 **Creates:** `change-log.md`
-**Touches:** `docs/session-sets/118-test-retirement-and-coupling-budget/spec.md`, `docs/planning/session-step-skeleton-and-verification-cost.md`, `docs/planning/project-guidance.md`, `docs/planning/lessons-learned.md`
-**Ends with:** Set 118 can be started by an orchestrator who reads only
-its spec and the preload, and gets the ordering right without knowing
-this set existed.
-**Progress keys:** `set118Reauthored`, `dogfoodAdmitted`, `noteRetired`
+**Touches:** `docs/session-sets/118-test-retirement-and-coupling-budget/spec.md`, `docs/session-sets/113-narrated-video-walkthroughs/spec.md`, `docs/session-sets/121-guidance-becomes-executable/spec.md`, `docs/session-sets/122-module-lifecycle-to-python/spec.md`, `docs/planning/session-step-skeleton-and-verification-cost.md`, `docs/planning/project-guidance.md`, `docs/planning/lessons-learned.md`
+**Ends with:** every unstarted set can be started by an orchestrator who
+reads only its own spec and the preload, and gets the ordering right
+without knowing this set existed — and `spec_admission --all --check`
+has no non-conforming unstarted spec left to refuse.
+**Progress keys:** `set118Reauthored`, `corpusRestructured`, `dogfoodAdmitted`, `noteRetired`
 
-> **Irony budget: 2 new test functions.** The deliverable is a spec and
-> two documents; the check that matters is `spec_admission` passing on a
-> spec this set did not write.
+> **Irony budget: 2 new test functions.** The deliverable is four specs
+> and two documents; the check that matters is `spec_admission` passing
+> on specs this set did not write.
+>
+> **Scope note (operator, 2026-08-12, journalled in `decisions.jsonl`).**
+> Session 3 was originally scoped to Set 118 alone. Session 1's check is
+> **blocking for unstarted sets**, and the operator intends to run 122
+> next, so 122 was blocked the moment Session 1 landed. The alternative
+> considered and rejected was giving each unstarted set a new first
+> session that restructures its own spec — self-defeating, because
+> adding a session *is* a spec edit and the restructuring is the same
+> edit, strictly smaller, and a session spends four ceremony steps to
+> perform a text edit. Splitting step 2 (substantive) from step 3
+> (mechanical) keeps `N = 3` and needs no new sessions anywhere.
 
 ---
 
@@ -304,6 +327,19 @@ answering it speculatively would ship a mapping nothing exercises.
 Session 3 names it as a residual with an owner rather than leaving it
 silent.
 
+**Owner assigned, 2026-08-12 (operator, during Session 2).** A5 is now
+**Set 129**, authored from a proposal the operator supplied and reviewed
+independently by `gpt-5.6-sol` and `gemini-3.1-pro`. Both converged:
+adopt the suite-owned *input set* abstraction (which `covers` already
+almost is), reject the contract / mock / lock apparatus as premature for
+a framework whose consumer repos have not demonstrated that
+architecture, and reject the proposal's claim that skipping an
+unaffected suite is *"provably redundant work"* rather than a risk
+trade-off — real pytest / Electron / Playwright suites are not pure
+functions of their declared inputs, and `covers` is a path prefix, not a
+dependency graph. Session 3 cites 129 as the owner when it retires the
+source-of-record note.
+
 ---
 
 ## End-of-set deliverables
@@ -319,7 +355,9 @@ silent.
   keyed on what changed rather than on how many lines, with the
   mechanizable half encoded and falsified.
 - Set 118 re-authored so it can be run correctly by someone who never
-  read this set.
+  read this set, and the other three unstarted specs (113, 121, 122)
+  restructured to the skeleton so none of them is blocked by the check
+  this set ships.
 - The source-of-record note moved to fixed, with the modules residual
-  named and owned.
+  named and owned by Set 129.
 - `change-log.md`, `disposition.json`, and the Step 9 guidance review.

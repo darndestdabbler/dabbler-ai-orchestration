@@ -1358,6 +1358,13 @@ guidance:
       - path: docs/planning/project-guidance.md
         ceiling_tokens: 3499
       - path: docs/planning/lessons-learned.md
-        ceiling_tokens: 2385
+        # Set 128 S3: raised 2385 -> 2504 under the standing operator
+        # authorization of 2026-08-12 (docs/guidance-lifecycle.md ->
+        # "Standing operator authorization, 2026-08-12 -> Set 121").
+        # Raised TO FIT the measured corpus, not to make room: L-112-1
+        # gained the vacuous-input-set clause after both path-aware
+        # critics caught a corpus scan that would have passed having
+        # examined nothing. Set 121 ratchets this back down.
+        ceiling_tokens: 2504
       - path: AGENTS.md   # largest engine bootstrap file (representative)
         ceiling_tokens: 2031

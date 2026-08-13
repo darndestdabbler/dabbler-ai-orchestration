@@ -23,6 +23,7 @@ uatStyle: ad-hoc
 prerequisites:
   - slug: 120-strict-writer-and-one-projection
     condition: complete
+sessionSizeException: 2 - Eight steps, of which four are the Set 128 ceremony (register + the three-step tail), leaving N = 4 authored work steps against the ratified budget of 3. The overrun is one step and it is real, not an artifact of the skeleton: steps 3 and 4 define the retention RULES for the two artifact types and step 5 derives their PARAMETERS (N and the cap), which the sequencing note's section 4b flags as proposed-not-measured and which therefore must not be inherited silently. Folding step 5 into either rule step would bury a named deliverable (progress key `numbersDerived`) in prose, which is the exact failure mode the skeleton exists to prevent. Measured and declared by Set 128 Session 3 on 2026-08-13; the other thirteen unstarted sessions needed none.
 ```
 
 > **`pathAwareCritique` is deliberately absent** — the guide's default is
@@ -254,7 +255,9 @@ from this spec.
    `lessons-learned.md`, moving full text to `lessons-archive.md` where
    the archive is the right home. Report tokens freed via
    `guidance_report --check`.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** the encoded checks and their falsifiers, the journaled dispositions, a measurably smaller `lessons-learned.md`
 **Touches:** `ai_router/`, `ai_router/tests/`, `docs/planning/lessons-learned.md`, `docs/planning/lessons-archive.md`, `decisions.jsonl`
@@ -310,8 +313,10 @@ ledger* below.
    sequencing note flags both as *proposed, not measured*. Derive what
    the citation history supports. **If it supports nothing, say so** and
    pick a default with a stated reason — an honest arbitrary number beats
-   a fabricated derivation. Then full pytest at close after freeze;
-   verify, close.
+   a fabricated derivation.
+6. **Cross-provider verification.**
+7. **Required portion of the full test suite.**
+8. **Close-out.**
 
 **Creates:** the usage ledger, the retention rules for both artifact types, and a recorded basis for N and the cap
 **Touches:** `ai_router/`, `ai_router/tests/`, `ai_router/router-config.yaml`, `docs/planning/lessons-learned.md`, `docs/guidance-lifecycle.md`
@@ -445,7 +450,9 @@ those two funds ids for the whole document.
    `project-guidance.md` measurably **under** its ceiling, and the
    ceiling should be ratcheted down to the new measured size — standing
    decision 2, and the mechanism only works if reductions are taken.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** the encoded lints and their falsifiers, ids on all surviving entries, a lower ceiling
 **Touches:** `ai_router/`, `ai_router/tests/`, `docs/planning/project-guidance.md`, `ai_router/router-config.yaml`, the usage ledger
@@ -489,7 +496,9 @@ those two funds ids for the whole document.
    is a successful outcome of this step** — it is the answer the
    sequencing note asked for, and it sizes the deferred
    `project-guidance` triage.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** the promoted lines, a smaller preload corpus, and the cap's first real measurement
 **Touches:** `docs/session-constitution.md`, `docs/planning/project-guidance.md`, `docs/planning/guidance-candidates.md`, `ai_router/router-config.yaml`

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "128-session-step-skeleton-and-test-ordering",
+  "pathAwareCritique": "required",
+  "critiquedAt": "2026-08-13T04:38:04.835656-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.5",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Read the Session 3 working tree end to end via the copilot-cli agentic transport with the read-only tool allowlist: the four re-authored specs, the retired planning note, the two new corpus tests, and spec_admission/_discover_specs. Confirmed the Set 118 A4.1 deletion analysis and the restructurings, and found one Major: the new corpus test iterates _discover_specs without asserting it returned anything, so an empty discovery would let it pass having checked nothing -- the exact L-112-1 shape this set exists to prevent. Two non-blocking nits on the 118 re-read ratio band and a change-log falsifier count.",
+      "findings": [
+        {
+          "severity": "Major",
+          "category": "false-confidence",
+          "description": "Violation: the class docstring claims \"only a test keeps it true\", but test_no_unstarted_spec_in_the_repo_requires_restructuring iterates sa._discover_specs(str(repo_root)) with no guard that the list is non-empty. Impact: if _discover_specs ever returns [] for the real repo (a path change, a directory rename, a discovery refactor), offenders stays {} and the assertion passes having examined zero specs -- a gate that only ever passes is indistinguishable from one that checks nothing, and the Set 112/127 incident recurs unnoticed. Evidence: ai_router/spec_admission.py:688 returns [] immediately when docs/session-sets is absent; ai_router/tests/test_spec_admission_shape.py starts its loop directly. The sibling test test_that_scan_can_actually_fail DOES carry the guard (assert specs) but runs against tmp_path, not repo_root, so it does not close the gap. Fix: assert the discovery result is non-empty before the loop.",
+          "evidencePaths": [
+            "ai_router/tests/test_spec_admission_shape.py",
+            "ai_router/spec_admission.py"
+          ]
+        }
+      ],
+      "rawVerdictPath": "docs/session-sets/128-session-step-skeleton-and-test-ordering/s3-critique-openai.md"
+    },
+    {
+      "provider": "google",
+      "model": "gemini-3.1-pro-preview",
+      "verdict": "ISSUES_FOUND",
+      "summary": "Independently read run_of_record.classify_changed_paths, post_round_delta.classify_delta, the full new test file, spec_admission (restructuring_required, _discover_specs, _STARTED_STATUSES), all four re-authored specs, decisions.jsonl and change-log.md. CONFIRMED the A4.1 collision independently: classify_changed_paths classifies by path prefix over output that does include deleted files, so deleted test paths classify as test-only and DELTA_TEST_ONLY does not trigger owes_review -- the spec analysis and remedy are correct. Re-computed the change-log arithmetic (+56/day = 168/3; 0.99 = 67,182/67,634) and found it consistent, and found every RESOLVED marker in the retired note names a concrete deliverable. Found the same vacuous-pass gap as the other critic, graded Minor.",
+      "findings": [
+        {
+          "severity": "Minor",
+          "category": "false-confidence",
+          "description": "Violation: neither new test guards that sa._discover_specs(str(repo_root)) returns a non-empty list; _discover_specs returns [] immediately if docs/session-sets does not exist. Impact: a future refactor that moves specs or renames the directory gives a green corpus test while scanning nothing. Evidence: ai_router/spec_admission.py:688 (if not os.path.isdir(base): return []) against the unguarded loop in ai_router/tests/test_spec_admission_shape.py; the falsifier sibling plants into tmp_path and so cannot close the gap on the repo_root scan. Fix: assert the discovered list before iterating.",
+          "evidencePaths": [
+            "ai_router/tests/test_spec_admission_shape.py",
+            "ai_router/spec_admission.py"
+          ]
+        }
+      ],
+      "rawVerdictPath": "docs/session-sets/128-session-step-skeleton-and-test-ordering/s3-critique-google.md"
+    }
+  ]
+}

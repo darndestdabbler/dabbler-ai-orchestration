@@ -156,7 +156,9 @@ session is cancelled.
    direction; the attestation is written here, in `decisions.jsonl`, under
    operator authority. `decision_journal` refuses it under AI authority, and
    that refusal is correct.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** the UAT record schema, the inventory-aware gate, the journaled decision
 **Touches:** `ai_router/disposition.py`, `ai_router/gate_checks.py`, `ai_router/tests/`, `docs/planning/session-set-authoring-guide.md`
@@ -185,7 +187,9 @@ session is cancelled.
    decision 2 in what the documents actually say: reaching an arbitrary
    point means replaying a documented prefix from a baseline or a named
    checkpoint. State that plainly rather than implying random access.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** the scenario model, the renderers, the divergence test
 **Touches:** `ai_router/`, `docs/`
@@ -217,8 +221,10 @@ live. **Not** against this repo's extension.
 4. **Generate into ignored output**, with deterministic cleanup on failure,
    and a static generated index linking video to steps. Failure to record
    must never fail the walkthrough.
-5. Full Layer 3 at close after freeze (this session touches the rendering
-   surface); verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite** — this session drives a
+   rendering surface, so Layer 3 is owed (`L-064-12`).
+7. **Close-out.**
 
 **Creates:** the browser recorder, the step-event stream, the run manifest, the static index, one recorded web scenario
 **Touches:** extension `scripts/`, `ai_router/`, a fixture web app
@@ -260,12 +266,15 @@ tooling on its own product.
    capability behind the **internal, explicitly unstable** recorder
    interface, with manual-only degradation intact. Fail → keep the
    measurements as the durable deliverable, keep manual-only degradation,
-   and defer desktop capture **with evidence**.
-5. **Dogfood and close.** This set's own UAT is its own scenario document
-   plus, if the pilot passed, its own narrated recording. **Reserve the
-   follow-on sets** named below so they are not lost. Full matrix once at
-   the release boundary; verify, close; `change-log.md`, Step 9 review,
-   advisory path-aware critique.
+   and defer desktop capture **with evidence**. **Reserve the follow-on
+   sets** named below so they are not lost.
+5. **Cross-provider verification**, including the advisory path-aware
+   critique.
+6. **Required portion of the full test suite** — the full matrix once, at
+   the release boundary.
+7. **Close-out**, including this set's own dogfood UAT — its scenario
+   document plus, if the pilot passed, its own narrated recording —
+   `change-log.md`, and the Step 9 review.
 
 **Creates:** the pilot measurements, and (only on a pass) an optional Windows recorder
 **Touches:** extension `scripts/`, `docs/`

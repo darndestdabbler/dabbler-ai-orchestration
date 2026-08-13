@@ -131,7 +131,9 @@ running-session refusal, sanctioned cancellation.
    and then fails to append the manifest entry must leave neither behind.
    Ship a falsifier that injects the failure and asserts nothing is
    stranded — `L-112-1`: a gate that only ever passes proves nothing.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** `ai_router/modules.py` and its tests
 **Touches:** `ai_router/`, `ai_router/tests/`
@@ -172,9 +174,12 @@ changes **what happens behind them** and **what the developer sees**.
    is palette-only, and it is the operator's *"copy-prompt context menu
    items for modules"* one manifest entry away. Use the `Copy X` label
    convention, no colon.
-5. `package.json` is the extension MANIFEST, so **`L-064-12` applies**:
-   run the full `npm run test:playwright` after the last edit, not before.
-   Then full pytest, verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.** `package.json` is the
+   extension MANIFEST, so **`L-064-12` applies**: the full
+   `npm run test:playwright` is owed here alongside pytest, run after the
+   last edit and never before.
+7. **Close-out.**
 
 **Creates:** thin launchers, the visible-command surface, the module copy-prompt menu entry
 **Touches:** `tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts`, `src/commands/`, `package.json`
@@ -207,7 +212,9 @@ that needs no architecture change.
    remembers, and is far smaller than a reservation system. `resolve_set.py`
    already treats the collision as a bug — surface it before the work
    starts, not after.
-5. Full pytest at close after freeze; verify, close.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
 
 **Creates:** the partitioned layout, the concatenation script, the collision refusal
 **Touches:** `ai_router/`, `ai_router/tests/`, `docs/`

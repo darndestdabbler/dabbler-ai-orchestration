@@ -418,6 +418,69 @@ class TestStructural:
         assert sa.DEFAULT_MAX_STEPS == 7
 
 
+class TestTheUnstartedCorpusStaysConforming:
+    """Set 128 S3's dogfood, made permanent rather than run once.
+
+    Session 3 restructured the four unstarted specs (113, 118, 121, 122)
+    so the check this set ships refuses none of them. A one-off command
+    run proves that on the day; only a test keeps it true, and it is the
+    corpus -- not this set's own spec -- that a future author edits.
+    """
+
+    def test_no_unstarted_spec_in_the_repo_requires_restructuring(self):
+        repo_root = Path(sa.__file__).resolve().parents[1]
+        discovered = sa._discover_specs(str(repo_root))
+        # Without this, an empty discovery makes the scan below pass
+        # having checked nothing -- the very shape L-112-1 is about.
+        assert discovered, (
+            "_discover_specs returned no specs for the real repo root "
+            f"{repo_root}; the corpus scan would pass vacuously"
+        )
+        offenders = {}
+        for spec in discovered:
+            result = sa.check_spec(spec, max_steps=sa.DEFAULT_MAX_STEPS)
+            if result.restructuring_required:
+                offenders[Path(spec).parent.name] = [
+                    f.problem for f in result.restructuring_required
+                ]
+        assert offenders == {}, (
+            "an unstarted spec no longer conforms to the step skeleton; "
+            "restructure it at authoring time, which is the whole point "
+            f"of the check: {offenders}"
+        )
+
+    def test_that_scan_can_actually_fail(self, tmp_path):
+        """L-112-1: the corpus scan above must be falsifiable.
+
+        A scan that only ever passes is indistinguishable from one that
+        reads nothing, so plant the Set 127 S2 shape in a fake repo root
+        and assert the SAME discovery + check path reports it.
+        """
+        planted = tmp_path / "docs" / "session-sets" / "999-planted"
+        planted.mkdir(parents=True)
+        _spec(
+            planted,
+            [
+                REGISTER,
+                "Do the work.",
+                "Do more work.",
+                "Full pytest and the Layer 3 run recorded as runs of "
+                "record; verify; close.",
+            ],
+        )
+
+        specs = sa._discover_specs(str(tmp_path))
+        assert specs, "the planted spec must be discovered at all"
+
+        offenders = {
+            Path(s).parent.name
+            for s in specs
+            if sa.check_spec(s, max_steps=sa.DEFAULT_MAX_STEPS)
+            .restructuring_required
+        }
+        assert offenders == {"999-planted"}
+
+
 def _report(result: sa.SpecAdmission) -> str:
     out = sa.format_report(result)
     out.encode("cp1252")  # L-079-1: the console text layer on Windows

@@ -117,7 +117,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="126" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" last-used-set="128" status="active" scope="portable" -->
 
 - Prose carried over from a superseded doc was true (or tolerated) in the
   old context and reads authoritative in the new one — a defect class of
@@ -149,9 +149,16 @@ full text in `lessons-archive.md`:
   verification rounds — every one found by planting it, none by reading
   the code. Add a **structural** assertion beside the textual one; it
   holds however a thing is spelled.
+- **Assert the INPUT SET is non-empty as well as the verdict.** A scan
+  whose corpus comes back empty passes having examined nothing, and a
+  planted-violation falsifier does **not** cover it when the falsifier
+  plants into a different root than the real scan reads. Set 128 S3
+  shipped that exact shape — a corpus check looping a discovery helper
+  with no `assert discovered` — and both path-aware critics found it
+  independently. Probe it by making discovery return empty.
 
 ## Compare What A Transport CAN DO, Not What It Returns
-<!-- lesson: id="L-125-1" added-set="125" last-used-set="125" status="active" scope="portable" -->
+<!-- lesson: id="L-125-1" added-set="125" last-used-set="128" status="active" scope="portable" -->
 
 - Backends behind one interface differ in **capability**, not output. Under
   one `route()` contract, direct-API sends no `tools` key and cannot touch

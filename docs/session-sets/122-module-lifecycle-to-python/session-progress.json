@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-13T06:16:20.101610-04:00",
+  "sessionSetDir": "122-module-lifecycle-to-python",
+  "inputs": {
+    "activity-log.json": "4bdd8c4d84260545f71a0bf770a36a20f3cf0ba2ef3f4bcc84891b15626d6aaa",
+    "session-state.json": "6ff280fc58c26c1f2a2ae7872bf31b4d8acebd0cca5e92662df555e401e2302e",
+    "spec.md": "1c964cce329fdfa996d4a8c7a55bf0d6c46afaa3e43c2474bf6ffda6aa065bc7"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 1 of Set 122 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T05:17:26.462841-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "ship-the-four-subcommands-against-the",
+          "description": "Shipped ai_router/modules.py: create/rename/delete/assign-sets against the unchanged docs/modules.yaml contract (format-preserving splices, parse-after-write guards, ported normalization).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T05:20:42.248597-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "make-the-dangerous-paths-refuse",
+          "description": "rename/delete refuse on a running session (incl. legacy file-presence inference); every session-state.json mutation routes through session_lifecycle.cancel_session_set, asserted behaviorally with a planted direct write as the falsifier.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T05:34:05.053301-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "rollback-on-partial-failure",
+          "description": "_Transaction records every effect and undoes all of them; four injected-failure falsifiers (create/rename/assign-sets rollback, delete stays declared). Mutation-checked: disabling rollback fails 3 of them.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T05:34:05.054671-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "**Cross-provider verification.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "**Required portion of the full test suite.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 3,
+        "in-progress": 0,
+        "complete": 4,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 7
+      },
+      "current": [],
+      "remaining": [
+        "cross-provider-verification",
+        "required-portion-of-the-full-test",
+        "close-out"
+      ]
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

@@ -16,6 +16,7 @@
     "tools/dabbler-ai-orchestration/src/utils/sessionLifecycleCli.ts",
     "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
     "tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts",
+    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
     "tools/dabbler-ai-orchestration/src/commands/newModule.ts",
     "tools/dabbler-ai-orchestration/src/commands/renameModule.ts",
     "tools/dabbler-ai-orchestration/src/commands/deleteModule.ts",
@@ -36,7 +37,9 @@
     "tools/dabbler-ai-orchestration/src/test/suite/renameModule.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/deleteModule.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/assignLegacySets.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts"
+    "tools/dabbler-ai-orchestration/src/test/suite/installAiRouter.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/vsix-first-run-walkthrough.spec.ts"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -46,7 +49,7 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Run SESSION 4 NEXT, not Session 3 (operator decision, 2026-08-13, journalled). Session 2 made the extension depend on `python -m ai_router.modules`, and the true cold-start walkthrough is red because a real PyPI install fetches 0.34.0, a wheel that predates that module. Session 4 owns the version floor, the upgrade-capable install and the capability probe that close it, and it is the release gate for both registries. The orchestrator that just made the extension depend on the router knows which call sites need the guarantee and what the walkthrough asserts, so this is same-surface continuation rather than fresh-eyes work; independence is supplied by verification, which excludes the orchestrator's own provider. Session 3 (append-file partitioning) is independent of both and can follow."
+      "specifics": "Run SESSION 4 NEXT, not Session 3 (operator decision, 2026-08-13, journalled). Session 2 made the extension depend on `python -m ai_router.modules`, and Session 4 owns the guarantee that the module is there and new enough -- the version floor, the upgrade-capable install, the capability probe and the retryability fix. It is also the release gate for both registries. Two carry-ins make it same-surface continuation rather than fresh-eyes work: residual S122-S2-R3 (nothing now asserts the PUBLISHED wheel is compatible; that check moved to the release walk and needs building there), and the `DABBLER_ROUTER_INSTALL_SPEC` seam this session added, which is exactly where a registry-versus-local install assertion belongs. Session 3 (append-file partitioning) is independent of both and can follow."
     }
   },
   "blockers": [],
@@ -61,21 +64,31 @@
       "id": "S122-S2-R1",
       "severity": "major",
       "source": "Full Layer 3 run of record (npm run test:playwright), 2026-08-13",
-      "description": "`vsix-first-run-walkthrough.spec.ts` is RED. It performs a real network `pip install`, which fetches `dabbler-ai-router` 0.34.0 from PyPI -- a wheel released before `ai_router.modules` existed. The default-module scaffold is Python-backed as of this session, so on a genuinely fresh project it cannot run and the tree stalls at `Default0 sets`. This is not a test defect: it is the exact regression Session 4 was added to prevent, reproduced faithfully by the set's own L-079-3 cold-start dogfood.",
-      "adjudication": "operator-attested-known-red",
-      "rationale": "Fixing it requires the version floor, the upgrade-capable install and the post-install capability probe -- all of which are Session 4's declared scope, split out from Session 2 by operator decision on 2026-08-13 precisely because folding them in would break the session-size cap. Session 4 is also the release gate: the operator publishes `dabbler-ai-router` to PyPI and the extension to the Marketplace only after it lands, so nothing ships while this is red. Skipping or weakening the test would have been a verification reduction, which the constitution makes operator-only; the operator was briefed with the failure named explicitly and chose to close with it recorded rather than hidden.",
+      "description": "`vsix-first-run-walkthrough.spec.ts` went RED when the default-module scaffold became Python-backed. It performs a real `pip install` from a genuinely empty folder, but it resolved `dabbler-ai-router` from live PyPI -- 0.34.0, a wheel released before `ai_router.modules` existed -- so the scaffold could not run and the tree stalled at `Default0 sets`.",
+      "adjudication": "fixed",
+      "rationale": "Diagnosed as structural rather than incidental: a test that installs from the registry can only ever validate the LAST PUBLISHED wheel against the CURRENT extension, so once the extension depended on unreleased router code the walk was red until a publish it is itself supposed to gate -- Session 4 could not have fixed it either. Operator decision 2026-08-13 (journalled): split the two questions. `DABBLER_ROUTER_INSTALL_SPEC` (harness-only, the `DABBLER_STARTUP_TIMING_PATH` precedent) points the walk at this repo, so it still starts from an empty folder with a real git init, a real venv and a real pip install -- L-079-3 intact -- and now proves the code actually being shipped. The local tree is installed EDITABLE: a non-editable install copies the whole checkout (node_modules included) into a PEP 517 build sandbox, which turned a 9-second install into one still unfinished after 20 minutes.",
+      "owner": "Set 122 Session 2",
+      "owner_rationale": "Closed in this session; the walk passes in 47.6s standalone and inside a fully green 31/31 suite."
+    },
+    {
+      "id": "S122-S2-R3",
+      "severity": "major",
+      "source": "Adjudication of S122-S2-R1, 2026-08-13",
+      "description": "Nothing in the automated suite now asserts that the PUBLISHED `dabbler-ai-router` wheel is compatible with the shipping extension. That coverage did not lapse silently -- it moved from a pre-release test (where it was unanswerable) to a release-time check (where it is answerable), and it needs an owner there.",
+      "adjudication": "deferred-residual",
+      "rationale": "A pre-release test cannot know whether an unpublished version is on PyPI. The question belongs to the release walk, whose ordering this set's spec already mandates: publish `dabbler-ai-router` first, CONFIRM THE WHEEL IS LIVE, then publish the extension. Session 4 already owns the version floor and the post-install capability probe that make the check executable; what it should add is the post-publish half -- probe the registry wheel, not just the local one.",
       "owner": "Set 122 Session 4",
-      "owner_rationale": "Session 4's Ends-with already promises exactly this: 'a project that finishes setup can run every module command ... each proven from a fresh empty folder.' This walkthrough turning green IS that proof."
+      "owner_rationale": "Session 4 is the release gate and already declares the version floor and the capability probe. Asserting the floor against the PUBLISHED wheel is one step further along the same path, and it is the step that protects every existing project taking the Marketplace update."
     },
     {
       "id": "S122-S2-R2",
       "severity": "nit",
-      "source": "Full Layer 3 run of record, 2026-08-13",
-      "description": "Eight Layer 3 specs (blocked-by-prereqs x2, cancellation-state-file x2, default-module-scaffold-tree, icon-render-mechanism, manifest-diagnostic, migration-drift) failed in the full parallel run and pass when run in isolation. icon-render-mechanism was additionally confirmed green at HEAD and green again after a recompile, so the signature is startup contention on a four-vCPU box (rows not rendered inside a 20s wait), not a behavioural regression.",
+      "source": "Full Layer 3 runs of record, 2026-08-13",
+      "description": "Layer 3 is worker-count sensitive on this hardware. At the local default of 4 workers, specs intermittently fail waiting for the first tree row (icon-render-mechanism, blocked-by-prereqs, cancellation-state-file, manifest-diagnostic, migration-drift, default-module-scaffold-tree). At 2 workers -- the count CI uses -- the same suite is 31/31 green in 6.1 minutes. Each failure also passes when its spec is run alone, and icon-render-mechanism was additionally confirmed green at HEAD.",
       "adjudication": "deferred-residual",
-      "rationale": "Each was individually re-run and passes; the failure mode is a timeout waiting for the first tree row while the machine is saturated by other Playwright workers. Chasing it inside this session would be tuning test infrastructure the session did not touch. Recorded rather than silently re-run-until-green, because a suite that only passes when run one file at a time is a real cost even when it is not a product defect.",
+      "rationale": "Not a behavioural regression: every affected spec passes in isolation and the whole suite passes at 2 workers, so the signature is Electron startup contention (each worker launches a full VS Code) rather than product behaviour. The run of record was taken at 2 workers and is recorded as such. Recorded rather than silently re-run-until-green, because a suite whose result depends on the worker count is a real cost even when it is not a defect.",
       "owner": "unassigned",
-      "owner_rationale": "Belongs with whoever next revisits Layer 3 runtime/parallelism; the Step 9 review should decide whether it earns its own set."
+      "owner_rationale": "Belongs with whoever next revisits Layer 3 runtime/parallelism; the Step 9 review should decide whether lowering the local default to match CI earns its own change."
     }
   ],
   "checklist": {

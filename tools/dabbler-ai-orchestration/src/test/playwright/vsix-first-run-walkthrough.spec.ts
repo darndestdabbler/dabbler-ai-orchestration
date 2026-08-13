@@ -74,6 +74,7 @@
 // human operator pays). Generous timeouts throughout.
 
 import { expect, test } from "@playwright/test";
+import * as path from "path";
 import {
   cleanupTmpDir,
   closeVSCode,
@@ -86,6 +87,16 @@ import {
   treeRows,
   workExplorerPane,
 } from "./electronLaunch";
+
+/**
+ * This repository's root — the pip requirement the walk installs.
+ *
+ * From `src/test/playwright/`, five levels up is the repo root (the same
+ * arithmetic `moduleCliFixture.ts` and `sampleProjectSmoke.test.ts` use).
+ */
+function repoRoot(): string {
+  return path.resolve(__dirname, "../../../../..");
+}
 
 interface PerTest {
   tmpPath?: string;
@@ -211,7 +222,25 @@ test("REAL first-run walkthrough: Build -> Default -> rename -> delete -> re-add
     per.tmpPath = makeTmpDir("dabbler-pw-vsix-walkthrough");
     // Lesson 4: force HTML dialogs so the modal rename/delete confirms
     // are clickable.
-    per.launch = await launchVSCode(per.tmpPath, ["--enable-smoke-test-driver"]);
+    //
+    // Set 122 S2: the install resolves THIS repo's router rather than the
+    // registry's. The walk is still a true cold start — genuinely empty
+    // folder, real git init, real venv, real network-capable pip install —
+    // and it is still the L-079-3 dogfood. What changed is WHICH wheel it
+    // proves, and the reason is that the old answer had become impossible:
+    // this set makes the extension depend on `ai_router.modules`, live PyPI
+    // is 0.34.0, and a wheel cannot contain code that has not been
+    // published yet. Left alone, the walk would have stayed red no matter
+    // what any session did, right up until a publish it is supposed to
+    // gate.
+    //
+    // "Is the PUBLISHED wheel compatible?" is a real question and it is not
+    // gone — it is a RELEASE gate, answered by the spec's own ordering
+    // (publish the router, confirm the wheel is live, then publish the
+    // extension), and carried as residual S122-S2-R3 for Session 4.
+    per.launch = await launchVSCode(per.tmpPath, ["--enable-smoke-test-driver"], {
+      DABBLER_ROUTER_INSTALL_SPEC: repoRoot(),
+    });
     const page = per.launch.page;
 
     // Reveal the Dabbler container, which is what activates the extension

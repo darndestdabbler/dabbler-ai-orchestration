@@ -6899,14 +6899,14 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs29 = this.flowScalar(this.type);
+              const fs30 = this.flowScalar(this.type);
               if (atNextItem || it.value) {
-                map.items.push({ start, key: fs29, sep: [] });
+                map.items.push({ start, key: fs30, sep: [] });
                 this.onKeyLine = true;
               } else if (it.sep) {
-                this.stack.push(fs29);
+                this.stack.push(fs30);
               } else {
-                Object.assign(it, { key: fs29, sep: [] });
+                Object.assign(it, { key: fs30, sep: [] });
                 this.onKeyLine = true;
               }
               return;
@@ -7034,13 +7034,13 @@ var require_parser = __commonJS({
             case "scalar":
             case "single-quoted-scalar":
             case "double-quoted-scalar": {
-              const fs29 = this.flowScalar(this.type);
+              const fs30 = this.flowScalar(this.type);
               if (!it || it.value)
-                fc.items.push({ start: [], key: fs29, sep: [] });
+                fc.items.push({ start: [], key: fs30, sep: [] });
               else if (it.sep)
-                this.stack.push(fs29);
+                this.stack.push(fs30);
               else
-                Object.assign(it, { key: fs29, sep: [] });
+                Object.assign(it, { key: fs30, sep: [] });
               return;
             }
             case "flow-map-end":
@@ -8218,7 +8218,7 @@ __export(extension_exports, {
 });
 module.exports = __toCommonJS(extension_exports);
 var vscode36 = __toESM(require("vscode"));
-var fs28 = __toESM(require("fs"));
+var fs29 = __toESM(require("fs"));
 var path36 = __toESM(require("path"));
 
 // src/commands/migrateSet.ts
@@ -16656,6 +16656,7 @@ init_git_response_error();
 var esm_default = gitInstanceFactory;
 
 // src/utils/aiRouterInstall.ts
+var fs9 = __toESM(require("fs"));
 var path9 = __toESM(require("path"));
 var PYPI_PACKAGE_NAME = "dabbler-ai-router";
 var REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
@@ -16780,11 +16781,28 @@ function venvPython(venvPath) {
   const candidates = process.platform === "win32" ? [path9.join(venvPath, "Scripts", "python.exe"), path9.join(venvPath, "Scripts", "python")] : [path9.join(venvPath, "bin", "python"), path9.join(venvPath, "bin", "python3")];
   return candidates[0];
 }
+function routerInstallSpec(env8 = process.env) {
+  const override = (env8.DABBLER_ROUTER_INSTALL_SPEC ?? "").trim();
+  return override === "" ? PYPI_PACKAGE_NAME : override;
+}
+function routerInstallRequirement(env8 = process.env, isDirectory = (p2) => {
+  try {
+    return fs9.statSync(p2).isDirectory();
+  } catch {
+    return false;
+  }
+}) {
+  const spec = routerInstallSpec(env8);
+  return spec !== PYPI_PACKAGE_NAME && isDirectory(spec) ? ["-e", spec] : [spec];
+}
 async function runPyPiInstall(deps, opts) {
+  const requirement = routerInstallRequirement();
+  const spec = routerInstallSpec();
+  const source = spec === PYPI_PACKAGE_NAME ? "PyPI" : spec;
   opts.report(
-    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from PyPI\u2026` : `Installing ${PYPI_PACKAGE_NAME} from PyPI\u2026`
+    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from ${source}\u2026` : `Installing ${PYPI_PACKAGE_NAME} from ${source}\u2026`
   );
-  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", PYPI_PACKAGE_NAME] : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
+  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", ...requirement] : ["-m", "pip", "install", ...requirement];
   const venvPy = venvPython(opts.venvPath);
   const result = await deps.spawner(venvPy, pipArgs, {
     cwd: deps.workspaceRoot,
@@ -17049,18 +17067,18 @@ function oneLine(s) {
 
 // src/commands/installAiRouterCommands.ts
 var cp2 = __toESM(require("child_process"));
-var fs10 = __toESM(require("fs"));
+var fs11 = __toESM(require("fs"));
 var os = __toESM(require("os"));
 var path11 = __toESM(require("path"));
 var vscode9 = __toESM(require("vscode"));
 
 // src/utils/pythonInterpreter.ts
-var fs9 = __toESM(require("fs"));
+var fs10 = __toESM(require("fs"));
 var path10 = __toESM(require("path"));
 var vscode8 = __toESM(require("vscode"));
 var realExists = (p2) => {
   try {
-    return fs9.statSync(p2).isFile();
+    return fs10.statSync(p2).isFile();
   } catch {
     return false;
   }
@@ -17248,7 +17266,7 @@ async function runInstallFlow(mode) {
   }
   vscode9.window.showInformationMessage(outcome.message);
   const routerConfig = path11.join(root, ROUTER_CONFIG_REL);
-  if (fs10.existsSync(routerConfig)) {
+  if (fs11.existsSync(routerConfig)) {
     try {
       const doc = await vscode9.workspace.openTextDocument(routerConfig);
       await vscode9.window.showTextDocument(doc, { preview: false });
@@ -17318,8 +17336,8 @@ function makeSpawner() {
 }
 function makeFileOps() {
   return {
-    exists: (p2) => fs10.existsSync(p2),
-    readFile: (p2) => fs10.readFileSync(p2, "utf8"),
+    exists: (p2) => fs11.existsSync(p2),
+    readFile: (p2) => fs11.readFileSync(p2, "utf8"),
     // Always ensure the parent directory exists before writing. The
     // GitHub-fallback flow can momentarily leave the destination
     // ai_router/ directory missing (between `removeRecursive(dst)` and
@@ -17329,8 +17347,8 @@ function makeFileOps() {
     // cost of dropping it is silent data loss in a narrow but real
     // failure window. Round-3 verifier catch.
     writeFile: (p2, content) => {
-      fs10.mkdirSync(path11.dirname(p2), { recursive: true });
-      fs10.writeFileSync(p2, content, "utf8");
+      fs11.mkdirSync(path11.dirname(p2), { recursive: true });
+      fs11.writeFileSync(p2, content, "utf8");
     },
     // Set 094: atomic, symlink-safe exclusive create (temp-write → hard-link
     // publish) — fails EEXIST when the path already exists, INCLUDING a
@@ -17338,31 +17356,31 @@ function makeFileOps() {
     // (round-4 verifier catch). The caller (ensureModulesManifest) mkdirps the
     // parent first.
     writeFileExclusive: (p2, content) => writeFileExclusiveSync(p2, content),
-    mkdirp: (p2) => fs10.mkdirSync(p2, { recursive: true }),
+    mkdirp: (p2) => fs11.mkdirSync(p2, { recursive: true }),
     copyDir: (src, dst) => copyDirSync(src, dst),
     removeRecursive: (p2) => {
-      if (fs10.existsSync(p2))
-        fs10.rmSync(p2, { recursive: true, force: true });
+      if (fs11.existsSync(p2))
+        fs11.rmSync(p2, { recursive: true, force: true });
     },
-    mkdtemp: (prefix) => fs10.mkdtempSync(path11.join(os.tmpdir(), prefix)),
+    mkdtemp: (prefix) => fs11.mkdtempSync(path11.join(os.tmpdir(), prefix)),
     // Set 079 S3: same-directory atomic replace for the seat-setup config
     // write (fs.rename replaces an existing destination file on both NTFS
     // and POSIX filesystems).
-    rename: (oldP, newP) => fs10.renameSync(oldP, newP)
+    rename: (oldP, newP) => fs11.renameSync(oldP, newP)
   };
 }
 function copyDirSync(src, dst) {
-  fs10.mkdirSync(dst, { recursive: true });
-  for (const entry of fs10.readdirSync(src, { withFileTypes: true })) {
+  fs11.mkdirSync(dst, { recursive: true });
+  for (const entry of fs11.readdirSync(src, { withFileTypes: true })) {
     const s = path11.join(src, entry.name);
     const d = path11.join(dst, entry.name);
     if (entry.isDirectory()) {
       copyDirSync(s, d);
     } else if (entry.isSymbolicLink()) {
-      const target = fs10.readlinkSync(s);
-      fs10.symlinkSync(target, d);
+      const target = fs11.readlinkSync(s);
+      fs11.symlinkSync(target, d);
     } else {
-      fs10.copyFileSync(s, d);
+      fs11.copyFileSync(s, d);
     }
   }
 }
@@ -17890,7 +17908,7 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
 }
 
 // src/utils/moduleAuthoring.ts
-var fs11 = __toESM(require("fs"));
+var fs12 = __toESM(require("fs"));
 var path15 = __toESM(require("path"));
 var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
 var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -17919,7 +17937,7 @@ function classifyModulesManifest(root) {
 }
 function manifestEntryExists(abs) {
   try {
-    fs11.lstatSync(abs);
+    fs12.lstatSync(abs);
     return true;
   } catch {
     return false;
@@ -17970,7 +17988,7 @@ var MODULES_YAML_TEMPLATE = `${MODULES_YAML_HEADER_COMMENTS}#
 modules: []
 `;
 var NODE_ENSURE_MANIFEST_IO = {
-  mkdirp: (dir) => fs11.mkdirSync(dir, { recursive: true }),
+  mkdirp: (dir) => fs12.mkdirSync(dir, { recursive: true }),
   writeFileExclusive: (abs, data) => writeFileExclusiveSync(abs, data)
 };
 function ensureModulesManifest(root, io = NODE_ENSURE_MANIFEST_IO) {
@@ -18075,19 +18093,19 @@ var EXECUTION_ARTIFACT_FILENAMES = [
   "RESTORED.md"
 ];
 function hasExecutionArtifacts(dir) {
-  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs11.existsSync(path15.join(dir, f)));
+  return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs12.existsSync(path15.join(dir, f)));
 }
 function inferLegacyStatus(dir) {
-  if (fs11.existsSync(path15.join(dir, "change-log.md")))
+  if (fs12.existsSync(path15.join(dir, "change-log.md")))
     return "complete";
-  if (fs11.existsSync(path15.join(dir, "activity-log.json")))
+  if (fs12.existsSync(path15.join(dir, "activity-log.json")))
     return "in-progress";
   return "not-started";
 }
 function rawSessionSetStatus(dir) {
   let raw;
   try {
-    raw = fs11.readFileSync(path15.join(dir, "session-state.json"), "utf8");
+    raw = fs12.readFileSync(path15.join(dir, "session-state.json"), "utf8");
   } catch {
     return inferLegacyStatus(dir);
   }
@@ -18756,7 +18774,7 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
 }
 
 // src/commands/trySampleProject.ts
-var fs12 = __toESM(require("fs"));
+var fs13 = __toESM(require("fs"));
 var path18 = __toESM(require("path"));
 var vscode13 = __toESM(require("vscode"));
 
@@ -19074,7 +19092,7 @@ async function pickTargetFolder(bundle, io) {
 function listFilesRecursiveSync(absDir) {
   const out = [];
   const walk = (dir, prefix) => {
-    for (const entry of fs12.readdirSync(dir, { withFileTypes: true })) {
+    for (const entry of fs13.readdirSync(dir, { withFileTypes: true })) {
       const rel = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.isDirectory())
         walk(path18.join(dir, entry.name), rel);
@@ -19096,7 +19114,7 @@ function makeSampleGitOps() {
       }
     },
     init: async (dir) => {
-      if (!fs12.existsSync(path18.join(dir, ".git"))) {
+      if (!fs13.existsSync(path18.join(dir, ".git"))) {
         await esm_default(dir).init();
       }
     },
@@ -19160,7 +19178,7 @@ async function runTrySampleProject(context) {
   let bundle;
   try {
     bundle = loadSampleBundle(resolveBundledSampleDir(context.extensionPath), {
-      readFile: (p2) => fs12.readFileSync(p2, "utf8"),
+      readFile: (p2) => fs13.readFileSync(p2, "utf8"),
       listFilesRecursive: listFilesRecursiveSync
     });
   } catch (err) {
@@ -19181,12 +19199,12 @@ async function runTrySampleProject(context) {
       return chosen?.[0]?.fsPath;
     },
     showWarning: (msg, ...actions) => Promise.resolve(vscode13.window.showWarningMessage(msg, ...actions)),
-    exists: (p2) => fs12.existsSync(p2),
-    readFile: (p2) => fs12.readFileSync(p2, "utf8"),
-    listDir: (p2) => fs12.readdirSync(p2),
+    exists: (p2) => fs13.existsSync(p2),
+    readFile: (p2) => fs13.readFileSync(p2, "utf8"),
+    listDir: (p2) => fs13.readdirSync(p2),
     removeRecursive: (p2) => {
-      if (fs12.existsSync(p2))
-        fs12.rmSync(p2, { recursive: true, force: true });
+      if (fs13.existsSync(p2))
+        fs13.rmSync(p2, { recursive: true, force: true });
     }
   });
   if (!picked)
@@ -19298,7 +19316,7 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
 // src/commands/gitWorkflow.ts
 var vscode16 = __toESM(require("vscode"));
 var cp5 = __toESM(require("child_process"));
-var fs14 = __toESM(require("fs"));
+var fs15 = __toESM(require("fs"));
 var path20 = __toESM(require("path"));
 
 // src/utils/gitHost.ts
@@ -19459,12 +19477,12 @@ function adoPrWebUrl(info, prId) {
 }
 
 // src/utils/hostCli.ts
-var fs13 = __toESM(require("fs"));
+var fs14 = __toESM(require("fs"));
 var path19 = __toESM(require("path"));
 var vscode15 = __toESM(require("vscode"));
 var realExists2 = (p2) => {
   try {
-    return fs13.statSync(p2).isFile();
+    return fs14.statSync(p2).isFile();
   } catch {
     return false;
   }
@@ -19973,7 +19991,7 @@ async function runFinalizeMergedSetFlow(deps) {
     steps.push({
       display: `git worktree remove ${wtPath}`,
       exec: async () => {
-        const exists2 = (deps.fileExists ?? ((p2) => fs14.existsSync(p2)))(wtPath);
+        const exists2 = (deps.fileExists ?? ((p2) => fs15.existsSync(p2)))(wtPath);
         if (!exists2) {
           const prune = await git(run3, primary, "worktree", "prune");
           return prune.code === 0 ? "worktree already gone (pruned stale registration)" : "worktree already gone";
@@ -20400,7 +20418,7 @@ function registerGitReleaseCommands(context) {
 
 // src/commands/troubleshoot.ts
 var vscode18 = __toESM(require("vscode"));
-var fs15 = __toESM(require("fs"));
+var fs16 = __toESM(require("fs"));
 var path21 = __toESM(require("path"));
 var cp6 = __toESM(require("child_process"));
 function workspaceRoot() {
@@ -20418,7 +20436,7 @@ function checkActivation() {
     return;
   }
   const dir = path21.join(root, SESSION_SETS_REL);
-  const exists2 = fs15.existsSync(dir);
+  const exists2 = fs16.existsSync(dir);
   ch.appendLine(`docs/session-sets/ exists: ${exists2}`);
   ch.appendLine(`Expected path: ${dir}`);
   if (!exists2) {
@@ -20512,7 +20530,7 @@ function checkLayout() {
   ch.appendLine("");
   for (const d of dirs) {
     const full = path21.join(root, d);
-    const exists2 = fs15.existsSync(full);
+    const exists2 = fs16.existsSync(full);
     ch.appendLine(`  ${exists2 ? "\u2713" : "\u2717"} ${d}`);
   }
   ch.appendLine("");
@@ -20694,7 +20712,7 @@ function registerCancelLifecycleCommands(context, deps) {
 }
 
 // src/commands/copilotSeatSetupCommand.ts
-var fs16 = __toESM(require("fs"));
+var fs17 = __toESM(require("fs"));
 var path22 = __toESM(require("path"));
 var vscode20 = __toESM(require("vscode"));
 function registerCopilotSeatSetupCommand(context) {
@@ -20714,7 +20732,7 @@ async function runSetUpCopilotSeat(context) {
     return;
   }
   const venvPath = path22.join(root, ".venv");
-  if (!fs16.existsSync(venvPath)) {
+  if (!fs17.existsSync(venvPath)) {
     vscode20.window.showErrorMessage(
       'No .venv found in this workspace \u2014 run "Dabbler: Set Up New Project" or "Dabbler: Install ai-router" first, then re-run this command.'
     );
@@ -20726,14 +20744,14 @@ async function runSetUpCopilotSeat(context) {
 
 // src/commands/gettingStartedDoc.ts
 var vscode21 = __toESM(require("vscode"));
-var fs17 = __toESM(require("fs"));
+var fs18 = __toESM(require("fs"));
 var path23 = __toESM(require("path"));
 function workspaceGettingStartedDoc(workspaceRoot2) {
   if (!workspaceRoot2)
     return void 0;
   const abs = path23.join(workspaceRoot2, ...GETTING_STARTED_REL_PATH.split("/"));
   try {
-    return fs17.statSync(abs).isFile() ? abs : void 0;
+    return fs18.statSync(abs).isFile() ? abs : void 0;
   } catch {
     return void 0;
   }
@@ -20744,9 +20762,9 @@ function materializeBundledDoc(context) {
     GETTING_STARTED_TEMPLATE_FILENAME
   );
   const dstDir = context.globalStorageUri.fsPath;
-  fs17.mkdirSync(dstDir, { recursive: true });
+  fs18.mkdirSync(dstDir, { recursive: true });
   const dst = path23.join(dstDir, "getting-started.md");
-  fs17.copyFileSync(src, dst);
+  fs18.copyFileSync(src, dst);
   return dst;
 }
 async function openGettingStartedDoc(context) {
@@ -20776,7 +20794,7 @@ function registerGetStartedCommand(context) {
 
 // src/commands/openModulePlan.ts
 var vscode22 = __toESM(require("vscode"));
-var fs18 = __toESM(require("fs"));
+var fs19 = __toESM(require("fs"));
 var path24 = __toESM(require("path"));
 
 // src/providers/ActionRegistry.ts
@@ -21714,7 +21732,7 @@ async function openModulePlan(ui = defaultUi3(), opts) {
     );
     return;
   }
-  if (!fs18.existsSync(destPath)) {
+  if (!fs19.existsSync(destPath)) {
     void ui.showInformationMessage(
       `No plan yet at ${target.destPosix}. Create that file (or copy an existing plan there) and run this action again.`
     );
@@ -21845,7 +21863,7 @@ function registerOpenModulesManifestCommand(context) {
 
 // src/commands/copyModuleDecompositionPrompt.ts
 var vscode25 = __toESM(require("vscode"));
-var fs19 = __toESM(require("fs"));
+var fs20 = __toESM(require("fs"));
 var path27 = __toESM(require("path"));
 function buildModuleDecompositionPrompt(planPresent) {
   const planLine = planPresent ? `Read the repository directly \u2014 its folders and code, and the project plan at \`${LEGACY_ROOT_PLAN_REL}\` (read that file for the project's goals and scope). Nothing is inlined here.` : `Read the repository directly \u2014 its folders and code \u2014 to understand the project's areas of work. Nothing is inlined here (there is no \`${LEGACY_ROOT_PLAN_REL}\` yet).`;
@@ -21875,7 +21893,7 @@ function defaultUi6() {
   return {
     workspaceRoot: () => vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath,
     // fs.existsSync never throws — swallows errors, returns false.
-    fileExists: (abs) => fs19.existsSync(abs),
+    fileExists: (abs) => fs20.existsSync(abs),
     copyToClipboard: (text) => vscode25.env.clipboard.writeText(text),
     showInformationMessage: (m) => vscode25.window.showInformationMessage(m),
     showErrorMessage: (m) => vscode25.window.showErrorMessage(m)
@@ -22249,13 +22267,13 @@ var vscode29 = __toESM(require("vscode"));
 var path29 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
-var fs20 = __toESM(require("fs"));
+var fs21 = __toESM(require("fs"));
 var path28 = __toESM(require("path"));
 var QUEUE_FILENAME = "decision-review-queue.jsonl";
 function appendQueueEntry(sessionSetDir, entry) {
   const queuePath = path28.join(sessionSetDir, QUEUE_FILENAME);
   const line = JSON.stringify(entry) + "\n";
-  fs20.appendFileSync(queuePath, line, "utf8");
+  fs21.appendFileSync(queuePath, line, "utf8");
 }
 function findActiveSessionSetDir(provider) {
   const all = provider();
@@ -22317,7 +22335,7 @@ function registerFlagDecisionForReview(context) {
 
 // src/commands/scanAnnotationsForActiveSet.ts
 var vscode30 = __toESM(require("vscode"));
-var fs23 = __toESM(require("fs"));
+var fs24 = __toESM(require("fs"));
 var path31 = __toESM(require("path"));
 
 // src/utils/annotationParser.ts
@@ -22397,11 +22415,11 @@ function unescapeReason(raw) {
 
 // src/utils/yamlReadWrite.ts
 var import_yaml = __toESM(require_dist());
-var fs21 = __toESM(require("fs"));
+var fs22 = __toESM(require("fs"));
 function readYamlFile(filePath) {
-  if (!fs21.existsSync(filePath))
+  if (!fs22.existsSync(filePath))
     return null;
-  const text = fs21.readFileSync(filePath, "utf8");
+  const text = fs22.readFileSync(filePath, "utf8");
   const doc = parseDocumentFromText(text);
   return { doc, text, parseErrors: collectParseErrors(doc) };
 }
@@ -22422,7 +22440,7 @@ function collectParseErrors(doc) {
 }
 
 // src/commands/annotationScanner.ts
-var fs22 = __toESM(require("fs"));
+var fs23 = __toESM(require("fs"));
 var path30 = __toESM(require("path"));
 var SCAN_EXTENSIONS = [
   "ts",
@@ -22457,7 +22475,7 @@ var SCAN_EXCLUDE_GLOB = "{**/node_modules/**,**/dist/**,**/out/**,**/build/**,**
 function toPosixPath(p2) {
   return p2.replace(/\\/g, "/");
 }
-function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs22.readFileSync(p2, "utf8")) {
+function scanFilesForAnnotations(files, workspaceRoot2, now = () => (/* @__PURE__ */ new Date()).toISOString(), readFile = (p2) => fs23.readFileSync(p2, "utf8")) {
   const out = [];
   for (const abs of files) {
     let text;
@@ -22486,9 +22504,9 @@ function loadHonorAnnotationsToggle(workspaceRoot2, readYaml) {
     return v;
   return true;
 }
-function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs22.readFileSync(p2, "utf8")) {
+function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs23.readFileSync(p2, "utf8")) {
   const queuePath = path30.join(sessionSetDir, QUEUE_FILENAME);
-  if (!fs22.existsSync(queuePath))
+  if (!fs23.existsSync(queuePath))
     return [];
   let text;
   try {
@@ -22514,7 +22532,7 @@ function loadExistingQueueEntries(sessionSetDir, readFile = (p2) => fs22.readFil
 
 // src/commands/scanAnnotationsForActiveSet.ts
 function defaultReadYaml(absPath) {
-  if (!fs23.existsSync(absPath))
+  if (!fs24.existsSync(absPath))
     return null;
   try {
     const result = readYamlFile(absPath);
@@ -22587,7 +22605,7 @@ function registerScanAnnotationsForActiveSet(context) {
 
 // src/commands/regenerateNarrationTemplates.ts
 var cp7 = __toESM(require("child_process"));
-var fs24 = __toESM(require("fs"));
+var fs25 = __toESM(require("fs"));
 var path32 = __toESM(require("path"));
 var vscode31 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
@@ -22618,7 +22636,7 @@ async function runRegenerate() {
     return;
   const pythonPath = resolvePythonInterpreter(set.root);
   const outDir = path32.join(set.dir, "narration-templates");
-  fs24.mkdirSync(outDir, { recursive: true });
+  fs25.mkdirSync(outDir, { recursive: true });
   const claudeOut = path32.join(outDir, "CLAUDE.md");
   const agentsOut = path32.join(outDir, "AGENTS.md");
   const render = await vscode31.window.withProgress(
@@ -22692,7 +22710,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
     return;
   const destDir = dirUri[0].fsPath;
   const destPath = path32.join(destDir, pick2.target);
-  if (fs24.existsSync(destPath)) {
+  if (fs25.existsSync(destPath)) {
     const overwrite = await vscode31.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
@@ -22702,7 +22720,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
       return;
   }
   try {
-    fs24.copyFileSync(pick2.source, destPath);
+    fs25.copyFileSync(pick2.source, destPath);
   } catch (err) {
     vscode31.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
@@ -22766,7 +22784,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
       message: `python -m ai_router.narration exited ${result.status}: ${stderr}`
     };
   }
-  if (!fs24.existsSync(args.outputPath)) {
+  if (!fs25.existsSync(args.outputPath)) {
     return {
       ok: false,
       message: `python -m ai_router.narration exited 0 but did not write ${args.outputPath}`
@@ -22896,7 +22914,7 @@ async function presentActions(slug, set) {
 var vscode33 = __toESM(require("vscode"));
 var cp8 = __toESM(require("child_process"));
 var path33 = __toESM(require("path"));
-var fs25 = __toESM(require("fs"));
+var fs26 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
   "ai_router.migrate_session_state",
   "ai_router.migrate_v3_to_v4"
@@ -22969,7 +22987,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
-          (r2) => fs25.existsSync(path33.join(r2, SESSION_SETS_REL2))
+          (r2) => fs26.existsSync(path33.join(r2, SESSION_SETS_REL2))
         );
         if (roots.length === 0) {
           vscode33.window.showInformationMessage(
@@ -23028,7 +23046,7 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 var vscode35 = __toESM(require("vscode"));
 
 // src/providers/moduleAssembly.ts
-var fs26 = __toESM(require("fs"));
+var fs27 = __toESM(require("fs"));
 var path34 = __toESM(require("path"));
 var vscode34 = __toESM(require("vscode"));
 function nodeModuleAssemblyIo() {
@@ -23039,7 +23057,7 @@ function nodeModuleAssemblyIo() {
     // with the persistent `Plan` child node it fed. This probe stays — it
     // drives pseudo-module VISIBILITY (the legacy root plan keeps the
     // pseudo-module rendered even when every set is stamped).
-    legacyRootPlanExists: (root) => fs26.existsSync(path34.join(root, LEGACY_ROOT_PLAN_REL)),
+    legacyRootPlanExists: (root) => fs27.existsSync(path34.join(root, LEGACY_ROOT_PLAN_REL)),
     rootLabel: (root) => path34.basename(root)
   };
 }
@@ -23076,7 +23094,7 @@ function assembleVisibleModules(allSets, io, lastKnownGood) {
 }
 
 // src/utils/startupTiming.ts
-var fs27 = __toESM(require("fs"));
+var fs28 = __toESM(require("fs"));
 var path35 = __toESM(require("path"));
 var marks = {
   moduleLoadedAtUptimeMs: null,
@@ -23125,8 +23143,8 @@ function emitIfRequested() {
     note: "Host-side buckets only. First paint is NOT here \u2014 it is observed from the DOM by the Layer 3 harness, because the host cannot see when a row becomes visible."
   };
   try {
-    fs27.mkdirSync(path35.dirname(target), { recursive: true });
-    fs27.writeFileSync(target, JSON.stringify(payload, null, 2), { encoding: "utf-8" });
+    fs28.mkdirSync(path35.dirname(target), { recursive: true });
+    fs28.writeFileSync(target, JSON.stringify(payload, null, 2), { encoding: "utf-8" });
   } catch (err) {
     console.error(
       `[dabbler-ai-orchestration] startup timing: could not write DABBLER_STARTUP_TIMING_PATH (${target}) \u2014 the harness will find no file, which must NOT be read as "startup was not instrumented".`,
@@ -23484,7 +23502,7 @@ function activate(context) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
-        return fs28.existsSync(path36.join(r2, SESSION_SETS_REL3));
+        return fs29.existsSync(path36.join(r2, SESSION_SETS_REL3));
       } catch {
         return false;
       }

@@ -9,6 +9,8 @@ import {
   describeAiRouterImportFailure,
   deriveVenvFromPythonPath,
   resolveLatestReleaseTag,
+  routerInstallRequirement,
+  routerInstallSpec,
   venvPython,
   FileOps,
   InstallSource,
@@ -1124,5 +1126,67 @@ suite("aiRouterInstall — install-method marker round-trip", () => {
     assert.strictEqual(presentedDefault, "pypi",
       "expected unknown marker contents to fall through to the PyPI default");
     fs.rmSync(ws, { recursive: true, force: true });
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Set 122 S2 — which requirement the install resolves
+// ---------------------------------------------------------------------------
+
+suite("aiRouterInstall — routerInstallSpec / routerInstallRequirement", () => {
+  const neverADir = () => false;
+  const alwaysADir = () => true;
+
+  test("production installs the published package name", () => {
+    assert.strictEqual(routerInstallSpec({}), "dabbler-ai-router");
+    assert.deepStrictEqual(routerInstallRequirement({}, neverADir), [
+      "dabbler-ai-router",
+    ]);
+  });
+
+  test("an unset or blank override is not an override", () => {
+    // A blank env var is the shape a harness leaves behind when it cleans
+    // up badly; treating it as a requirement would make pip install "".
+    for (const value of [undefined, "", "   "]) {
+      assert.strictEqual(
+        routerInstallSpec({ DABBLER_ROUTER_INSTALL_SPEC: value }),
+        "dabbler-ai-router",
+        JSON.stringify(value),
+      );
+    }
+  });
+
+  test("a local source tree is installed EDITABLE", () => {
+    // Not a style preference. Without `-e`, PEP 517 copies the whole
+    // directory into a build sandbox first, and for a repo carrying
+    // node_modules/ and .git/ that turned a 9-second install into one that
+    // had not finished 20 minutes later. This is the falsifier for that.
+    assert.deepStrictEqual(
+      routerInstallRequirement(
+        { DABBLER_ROUTER_INSTALL_SPEC: "C:\\repo" },
+        alwaysADir,
+      ),
+      ["-e", "C:\\repo"],
+    );
+  });
+
+  test("a non-directory override is passed through verbatim", () => {
+    // e.g. a pinned version or a wheel URL — nothing to build in place.
+    assert.deepStrictEqual(
+      routerInstallRequirement(
+        { DABBLER_ROUTER_INSTALL_SPEC: "dabbler-ai-router==1.0.0" },
+        neverADir,
+      ),
+      ["dabbler-ai-router==1.0.0"],
+    );
+  });
+
+  test("the package name is never turned editable, even if a like-named dir exists", () => {
+    // A `dabbler-ai-router/` folder in the cwd must not silently convert a
+    // registry install into an editable one.
+    assert.deepStrictEqual(routerInstallRequirement({}, alwaysADir), [
+      "dabbler-ai-router",
+    ]);
   });
 });

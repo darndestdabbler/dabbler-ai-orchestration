@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 
 /**
@@ -416,19 +417,81 @@ interface PyPiOpts {
   report: ProgressReporter;
 }
 
+/**
+ * The pip requirement the install path resolves.
+ *
+ * Normally the published package name. `DABBLER_ROUTER_INSTALL_SPEC` is a
+ * **harness-only override** (the `DABBLER_STARTUP_TIMING_PATH` precedent):
+ * it lets the Layer 3 cold-start walkthrough install THIS repo's router
+ * instead of the registry's.
+ *
+ * Set 122 S2 (operator decision, 2026-08-13). The walkthrough performs a
+ * real `pip install` from a genuinely empty folder, which is what L-079-3
+ * asks for — but it was resolving `dabbler-ai-router` from live PyPI, so it
+ * could only ever validate the LAST PUBLISHED wheel against the CURRENT
+ * extension. The moment the extension started depending on router code that
+ * was not yet released (`ai_router.modules`, shipped by this set), the walk
+ * became structurally red and no amount of code could fix it before a
+ * publish.
+ *
+ * Splitting the two questions is the fix. "Does provisioning work from
+ * nothing?" is a pre-release test, and it still runs end to end. "Is the
+ * PUBLISHED wheel compatible with this extension?" is a release gate — it
+ * is answered by publishing the router first, confirming the wheel is live,
+ * and then publishing the extension, which is exactly the ordering this
+ * set's spec already mandates and which only the operator can execute.
+ *
+ * Unset in production, where the value is simply the package name.
+ */
+export function routerInstallSpec(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  const override = (env.DABBLER_ROUTER_INSTALL_SPEC ?? "").trim();
+  return override === "" ? PYPI_PACKAGE_NAME : override;
+}
+
+/**
+ * The requirement tokens handed to `pip install`.
+ *
+ * A local source tree is installed EDITABLE (`-e`). Without it, PEP 517
+ * copies the entire directory into a build sandbox first — and for a repo
+ * carrying `node_modules/`, `.git/` and sibling worktrees that turned a
+ * nine-second install into one that had not finished twenty minutes later.
+ * Editable installs build in place, so the cost is the package, not the
+ * checkout.
+ *
+ * A registry name has no such problem and is passed through untouched.
+ */
+export function routerInstallRequirement(
+  env: Record<string, string | undefined> = process.env,
+  isDirectory: (p: string) => boolean = (p) => {
+    try {
+      return fs.statSync(p).isDirectory();
+    } catch {
+      return false;
+    }
+  },
+): string[] {
+  const spec = routerInstallSpec(env);
+  return spec !== PYPI_PACKAGE_NAME && isDirectory(spec) ? ["-e", spec] : [spec];
+}
+
 async function runPyPiInstall(
   deps: InstallDeps,
   opts: PyPiOpts,
 ): Promise<InstallOutcome> {
+  const requirement = routerInstallRequirement();
+  const spec = routerInstallSpec();
+  const source = spec === PYPI_PACKAGE_NAME ? "PyPI" : spec;
   opts.report(
     opts.mode === "update"
-      ? `Force-refreshing ${PYPI_PACKAGE_NAME} from PyPI…`
-      : `Installing ${PYPI_PACKAGE_NAME} from PyPI…`,
+      ? `Force-refreshing ${PYPI_PACKAGE_NAME} from ${source}…`
+      : `Installing ${PYPI_PACKAGE_NAME} from ${source}…`,
   );
   const pipArgs =
     opts.mode === "update"
-      ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", PYPI_PACKAGE_NAME]
-      : ["-m", "pip", "install", PYPI_PACKAGE_NAME];
+      ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", ...requirement]
+      : ["-m", "pip", "install", ...requirement];
   const venvPy = venvPython(opts.venvPath);
   const result = await deps.spawner(venvPy, pipArgs, {
     cwd: deps.workspaceRoot,

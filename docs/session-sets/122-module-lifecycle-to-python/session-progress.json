@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-13T09:49:08.140412-04:00",
+  "generatedAt": "2026-08-13T12:03:17.947110-04:00",
   "sessionSetDir": "122-module-lifecycle-to-python",
   "inputs": {
-    "activity-log.json": "8bb37a6361bc6dea11894bae987b8605e9b68431b1746a9cae51477df03d99fe",
-    "session-state.json": "490f0016479f1b577f4208bd58abb51dbecc0596de473230e1570fbfb8ab2a4d",
-    "spec.md": "075bab8541bc03df0776634f7be32cae51818c9878316d3e26c88782166ad842"
+    "activity-log.json": "c814710ad5a7e7f6acf3a5cf8f187a422704852c7a5b93c5409d2afeea485735",
+    "session-state.json": "72e546dc7583ff46bead80232d0bd83ec4a6906112abc1d953a7ce2f4696937d",
+    "spec.md": "276af0900f3fa4124ff1717355343a5900fe50b39b9f62a1ba00f290b4ef2163"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -217,19 +217,108 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T10:07:38.613968-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "declare-the-floor-and-make-the",
+          "description": "MINIMUM_ROUTER_VERSION + PYPI_REQUIREMENT declared once in aiRouterInstall.ts; the install requirement and the capability precondition both derive from it (L-069-1), pinned by a test that fails if either is hard-coded. mode:install now passes --upgrade, so an existing older venv is upgraded rather than reported already-satisfied.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T10:07:38.644945-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "probe-the-capability-and-refuse-to",
+          "description": "probeRouterCapability imports ai_router.modules with the VENV interpreter the launcher uses (L-125-1), never inferring success from pip exit codes; a failed probe flips the install outcome to ok:false with no fail-open branch. gitScaffold gates default-module creation on decideDefaultModuleScaffold (module ABSENT, not manifest provenance), which fixes retryability: a retry after a failed install now scaffolds without deleting docs/modules.yaml.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T10:31:51.966568-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "dogfood-the-true-cold-start-and",
+          "description": "New lane npm run test:dogfood (src/test/dogfood/), 4 scenarios, real venv + real network pip, no seams: (a) clean project with no .venv finishes setup with ai_router.modules importable and the scaffold gate saying scaffold; (b) a venv holding a REAL dabbler-ai-router==0.34.0 from PyPI is upgraded past the floor, with the vacuity premise asserted first (0.34.0 must NOT provide ai_router.modules); (c) an unresolvable install attempts no Python-backed mutation and a re-run recovers with docs/modules.yaml untouched; (d) the probe answers for the venv it is given, not the host. Caught a real defect while authoring: passing a venv-shaped pythonPath made ensureVenv provision into the REPO venv, so the cold-start scenario had been passing vacuously (13s vs 38s). Fixed by resolving sys.base_prefix and asserting the venv lands under the temp project.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T10:31:51.968739-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Cross-provider verification (gpt-5.5; anthropic excluded as the orchestrator effective provider). Discovery round 1 fanned out 2/2 and returned 4 blocking Majors reducing to 2 classes: the capability probe answered for the install venv rather than the interpreter the launchers resolve, and the dogfood asserted the GATE instead of the outcome. Supplementary round 2 added 1 more: the new CI lane depended on untracked local Python state. Remediation-review round 3 accepted 1 and REJECTED 2, catching a regression the round-1 fix introduced (the launcher interpreter was resolved eagerly, before .venv existed, which would have made the ordinary cold start report a good install as failed). Fixed by making it a thunk resolved after install, plus a mutation-checked falsifier. Round 4: VERIFIED, 5 accepted / 0 rejected, 0 findings.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T10:43:29.876976-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three layers run after the last code change and recorded via run_of_record. Layer 1 pytest: 4214 passed, 9 skipped in 662s (digest 1a94cea85bbf). Layer 2 mocha: 1450 passing, 2 pending in 63s (digest f440dafe1fe1). Layer 3 Playwright FULL, owed because package.json is the extension MANIFEST (L-064-12): 31/31 passed in 6.7m at 2 workers, the count CI uses per residual S122-S2-R2 - including vsix-first-run-walkthrough, which Session 2 closed out as KNOWN-RED. The first pytest attempt failed one test: the anti-resurrection guard scanned build/lib, a pip-generated copy of its own source. Fixed by excluding build/ and .eggs from the shared scan with a narrow falsifier; classified A4.2 by post_round_delta and settled by a delta-scoped remediation-review (round 5, VERIFIED).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T11:21:33.405666-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "Authoring disposition.json, committing and pushing, running close_session.",
+          "status": "in-progress",
+          "state": "in-progress",
+          "box": "[~]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T11:57:44.424658-04:00",
+          "isTerminal": false
+        }
+      ],
       "counts": {
         "pending": 0,
-        "in-progress": 0,
-        "complete": 0,
+        "in-progress": 1,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
-      "current": [],
-      "remaining": []
+      "current": [
+        "close-out"
+      ],
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 4,

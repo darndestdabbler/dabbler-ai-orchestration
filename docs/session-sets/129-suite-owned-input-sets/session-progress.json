@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-13T16:24:05.904312-04:00",
+  "generatedAt": "2026-08-13T17:46:54.124538-04:00",
   "sessionSetDir": "129-suite-owned-input-sets",
   "inputs": {
-    "activity-log.json": "aef1575d4e1c842e55017e5c1c5390fbaeff759576950fea1084736bfdffce08",
-    "session-state.json": "d33183123718176e4404a821d32df1189d4c67a780446a30ec7ac8fb0d4c98b7",
+    "activity-log.json": "e25b7c85a0f2718e3c88667ffd53871adf62b58d917a6a9ede9ff029e3ed1d09",
+    "session-state.json": "fb346783a0f4b8865a1ef19b68bdff5336c2ce2427e738b128e33fb425b16786",
     "spec.md": "2943195b8a672605057b16f40b6a0e6860006629386f6b40419004cac70d36d6"
   },
   "orphanEntries": 0,
@@ -116,19 +116,94 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T17:01:36.710895-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "write-a5-s-answer-and-the",
+          "description": "A5 answered in the authoring guide beside A1-A4, and the section is now A1-A5. Three parts: the suite declares its inputs (covers = the complete input allowlist, derived from EVIDENCE not from the suite command -- S1 traced 1655 paths under an audit hook and its command-derived first draft for Layers 2/3 was the gap verification caught); the intersection decides (run_of_record affected names the suites AND the inputs that matched, evaluate_freshness consumes the same affected_suites so report and gate cannot disagree, L-069-1); modules group and do not select (no SuiteSpec.module, three reasons: the input set already answers it, a module axis can only SUBTRACT and fails open per L-125-1, and the label is unenforced -- no codeRoots-vs-imports check exists, section 6.4). Fail-closed loading written up: a malformed testing.suites block blocks the close; suites: [] stays the deliberate operator disarm. The corrected safety claim carried verbatim from verdict.md 2a, with the reason the stronger 'provably redundant' framing is REFUSED: it would let a skip happen without the operator attestation a verification reduction requires. Stated explicitly that A5 authorizes no new skip. Also updated the two stale echoes: the 'read covers literally' paragraph now names the input-set definition and the suite-key allowlist (name/command/covers/expensive/tests), and the constitution's Step 8 required-portion sentence now says intersection and names the command (preload total 12,183/12,200 tokens, still under ceiling).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T17:01:36.729552-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "record-the-refusals-so-they-are",
+          "description": "Refusals and deferrals recorded, A5 retired, change-log.md authored. The eight rejections (with reasons) and six deferrals (with their TRIGGER conditions, not a schedule) are now two tables in the authoring guide immediately after A5 -- where an author proposing contract locks or module-scoped test selection meets them, not in a proposal folder nobody re-reads. session-step-skeleton-and-verification-cost.md: A5's heading is RESOLVED, its marker answers the three sub-questions in order and names where the canonical text now lives, the note's status header says no open items remain, and verdict.md joins Related work. The note's own convention is honoured -- the 2026-08-12 diagnosis prose is preserved verbatim beneath the inline marker rather than rewritten. module-organized-projects-recommendation.md section 6.4 now carries the rule that the scope check, when built, may never be read as an input to suite selection; that is the one place a future author would most plausibly reintroduce the module axis, and the section's own admission that no codeRoots-vs-imports check exists is the argument. Authored change-log.md (both sessions, what was refused and why, what deliberately did not change) and ai_router/changelog.d/0110-set-129-suite-owned-input-sets.md as a FRAGMENT rather than an edit to the shared CHANGELOG; changelog check --target all round-trips OK.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T17:06:58.431016-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "cross-provider-verification",
+          "description": "One round, VERIFIED, 0 findings. Discovery fan-out 2 (lenses spec-conformance and failure-scenario), verifier gpt-5.5 (openai) on both calls -- a different effective provider from the orchestrator, enforced by the registry-resolved exclusion (excluded providers: anthropic). Both lenses checked the A5 doctrine against verdict.md, the guide, the diagnosis note, the module recommendation, the constitution echo, the changelog fragment, the set change log and the drift-guard test change, and both reported the refusals, deferrals, corrected claim and current-code behaviour claims consistent. Per A1/A2 only TARGETED tests preceded this: test_guidance_preload_manifest, test_guidance_meta, test_guidance_report, test_changelog_partition, test_drift_guard, test_doc_only_cap, test_step_status_drift. That targeted run caught a real defect this session CAUSED: test_changelog_round_trip_flags_a_planted_reorder planted its reorder into load_fragments()[0:2] -- the two NEWEST fragments -- while changelog.check() deliberately re-renders from the BASELINE set alone, so the falsifier only fired while at most one post-baseline fragment existed. This set's own fragment made it two and the plant stopped firing. Fixed test-only: it now selects from the baseline corpus and asserts that corpus is non-empty (L-112-1), matching the baseline_fragments() helper in test_changelog_partition.py whose docstring names this exact hazard and which the drift-guard copy had not used (L-069-1). The gate itself was never wrong. New deliverables were git-added before the evidence bundle so the diff-based evidence does not omit them (L-064-9).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T17:10:49.407902-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three suites owed and all three run after the last code change, then recorded; run_of_record check reports all three fresh and green. pytest: 4349 passed, 9 skipped, 0 failed (681.4s). mocha: 1455 passing, 2 pending, 0 failing (47.9s). playwright: 31 passed, 0 failed (399.2s) at --workers=2, the CI worker count that Sets 122/123/124/127/128 all use on this box. The mocha count moved from Session 1's 1450 to 1455 legitimately: commit d6b99264, an ad-hoc operator fix landed between the two sessions, added workExplorerTreeModel tests. Layer 3 is 31 in both sessions. The obligation was resolved with the set's own tool rather than by eye -- run_of_record affected named all three suites and, in every case, the SAME single input: ai_router/changelog.d/0110-set-129-suite-owned-input-sets.md, a markdown fragment. A close-out changelog entry under ai_router/ arms a 6.5-minute browser suite, and that is the stronger covers definition binding its own author on the very session that wrote it down: cost is a reason to make a suite cheaper, never a reason to declare an input set smaller than it is. npm run compile regenerated no tracked dist/ drift, so the pytest run recorded before it stayed fresh.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T17:22:28.896442-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "close-out-including-the-step-9",
+          "description": "**Close-out**, including the Step 9 reorganization review of `project-guidance.md` / `lessons-learned.md`.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out-including-the-step-9"
+      ]
     }
   ]
 }

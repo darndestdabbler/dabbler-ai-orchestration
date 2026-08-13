@@ -149,13 +149,15 @@ full text in `lessons-archive.md`:
   verification rounds — every one found by planting it, none by reading
   the code. Add a **structural** assertion beside the textual one; it
   holds however a thing is spelled.
-- **Assert the INPUT SET is non-empty as well as the verdict.** A scan
-  whose corpus comes back empty passes having examined nothing, and a
-  planted-violation falsifier does **not** cover it when the falsifier
-  plants into a different root than the real scan reads. Set 128 S3
-  shipped that exact shape — a corpus check looping a discovery helper
-  with no `assert discovered` — and both path-aware critics found it
-  independently. Probe it by making discovery return empty.
+- **Assert the INPUT SET is non-empty, and PLANT INTO THE CORPUS THE
+  GATE READS.** A scan whose corpus comes back empty passes having
+  examined nothing. Set 128 S3 shipped that shape — a corpus check
+  looping a discovery helper with no `assert discovered`. Set 129 S2
+  added the drifting variant: a falsifier selecting its plant by
+  **recency** (`fragments[0:1]`) rather than from the frozen corpus fired
+  only until ordinary repo growth moved its target off that corpus.
+  Select by the gate's own corpus definition, never by position, and
+  assert the selection.
 
 ## Compare What A Transport CAN DO, Not What It Returns
 <!-- lesson: id="L-125-1" added-set="125" last-used-set="129" status="active" scope="portable" -->
@@ -171,7 +173,5 @@ full text in `lessons-archive.md`:
 ## Repo-Specific Lessons
 
 > _No repo-specific lessons are currently in the active tier._ L-064-12
-> (Explorer / state-writer / fixture / **manifest** changes run the full
-> Layer 3 locally before close, after the last code change) was promoted at
-> Set 110 Step 9 to `project-guidance.md` -> Conventions -> Build and Test;
-> its full text is in `lessons-archive.md`.
+> was promoted at Set 110 Step 9 (see the table above for where its rule
+> lives); its full text is in `lessons-archive.md`.

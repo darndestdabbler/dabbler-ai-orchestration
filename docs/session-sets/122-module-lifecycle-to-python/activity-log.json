@@ -1,0 +1,110 @@
+{
+  "sessionSetName": "122-module-lifecycle-to-python",
+  "createdDate": "2026-08-13T05:17:26.479233-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "ship-the-four-subcommands-against-the",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "**Ship the four subcommands** against the existing `docs/modules.yaml` contract \u2014 read the shape `moduleAuthoring.ts` writes today and match it; this is a port, and a format change here would strand every repo that already has a manifest.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "make-the-dangerous-paths-refuse",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "**Make the dangerous paths refuse.** `delete` and `rename` must refuse a module with a **running session**, and must route any `session-state.json` mutation through the sanctioned writer rather than touching the file. This is the invariant the set exists to restore.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "rollback-on-partial-failure",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "**Rollback on partial failure.** A create that scaffolds a directory and then fails to append the manifest entry must leave neither behind. Ship a falsifier that injects the failure and asserts nothing is stranded \u2014 `L-112-1`: a gate that only ever passes proves nothing.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T05:17:26.479036-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T05:20:42.248597-04:00",
+      "description": "Registered session 1 of Set 122 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "ship-the-four-subcommands-against-the",
+      "dateTime": "2026-08-13T05:20:42.249880-04:00",
+      "description": "Porting moduleAuthoring.ts lifecycle into ai_router/modules.py: create/rename/delete/assign-sets against the existing docs/modules.yaml contract.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "ship-the-four-subcommands-against-the",
+      "dateTime": "2026-08-13T05:34:05.053301-04:00",
+      "description": "Shipped ai_router/modules.py: create/rename/delete/assign-sets against the unchanged docs/modules.yaml contract (format-preserving splices, parse-after-write guards, ported normalization).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "make-the-dangerous-paths-refuse",
+      "dateTime": "2026-08-13T05:34:05.054671-04:00",
+      "description": "rename/delete refuse on a running session (incl. legacy file-presence inference); every session-state.json mutation routes through session_lifecycle.cancel_session_set, asserted behaviorally with a planted direct write as the falsifier.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "rollback-on-partial-failure",
+      "dateTime": "2026-08-13T05:34:05.056028-04:00",
+      "description": "_Transaction records every effect and undoes all of them; four injected-failure falsifiers (create/rename/assign-sets rollback, delete stays declared). Mutation-checked: disabling rollback fails 3 of them.",
+      "status": "complete"
+    }
+  ]
+}

@@ -13,6 +13,54 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 122 S1) `python -m ai_router.modules create | rename | delete |
+  assign-sets` — the module lifecycle, in Python, transactional.** The
+  verdict-adopted port (`docs/proposals/2026-08-11-multi-module-architecture/
+  verdict.md` §4) of the lifecycle logic that lived in the extension's
+  `moduleAuthoring.ts`. The **on-disk contract is unchanged**: the same
+  `docs/modules.yaml` shape, the same header template, the same
+  format-preserving text splices (never a re-serialization, which would
+  destroy the operator's comments and entry order) and the same
+  parse-after-write guards, because a format change would strand every repo
+  that already has a manifest.
+
+  Two things are genuinely new. **Refusals**: `rename` and `delete` refuse
+  while any affected set has a running session — including a legacy set with
+  no `session-state.json`, whose status is inferred from file presence rather
+  than read as "not started". **Rollback**: every writer runs through one
+  transaction that records each effect and undoes all of them on failure, so
+  a create that scaffolds a directory and then fails to append the manifest
+  entry leaves neither behind (the TypeScript scaffold wrote the stub first
+  and stranded it). `delete` is the exception by design — its cancels and
+  scaffold removals are idempotent and the manifest entry is written last, so
+  an interrupted run leaves the module still declared and is simply re-run.
+
+  `create` also carries the **numbering** half of the adopted surface: it
+  scaffolds the module's `kind: plan` and `kind: decomposition` set pair at
+  the next two free set numbers, cross-linked by `prerequisites:`, and
+  skip-existing by identity so a re-run never mints a duplicate. Unlike the
+  TypeScript flow — which scaffolded them after the manifest write and
+  downgraded a failure to a warning, because it could not undo the entry it
+  had just written — the scaffold runs inside the same transaction, so a
+  create either fully happened or did not happen at all. The two spec
+  templates now ship as package data under `ai_router/templates/`, since a
+  pip-installed router has no repo checkout to read
+  `docs/templates/consumer-bootstrap/` from; a parity test pins the two
+  copies byte-identical.
+
+  Every `session-state.json` mutation goes through
+  `session_lifecycle.cancel_session_set`, the sanctioned writer. That is the
+  point of the port: `src/utils/cancelLifecycle.ts:296` writes the state file
+  from TypeScript today, reached through `deleteModule`, and the framework
+  believed it had already stopped doing that. The test suite asserts the
+  invariant behaviorally — neutralize the sanctioned writer and every state
+  file is byte-identical — with a planted direct write proving the assertion
+  can fail.
+
+  Exit codes are stable for the extension's launchers: `3` = refused
+  (nothing written), `4` = write failure (rolled back, or still-declared and
+  re-runnable). `--json` for a machine read.
+
 - **(Set 128 S2) `python -m ai_router.post_round_delta` — what a fix made
   after the full suite owes, decided mechanically.** Classifies everything
   that changed since the session's recorded verification round as

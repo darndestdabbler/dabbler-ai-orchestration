@@ -89,4 +89,10 @@ ai_router = [
     "prompt-templates/*.md",
     "schemas/*.json",
     "docs/*.md",
+    # Set 122 S1: the two module-lifecycle spec templates
+    # (`ai_router.modules create` renders them). They must ship in the wheel,
+    # because a pip-installed router has no repo checkout to read
+    # `docs/templates/consumer-bootstrap/` from. The two copies are pinned
+    # byte-identical by `test_modules_lifecycle.py`.
+    "templates/*.template",
 ]

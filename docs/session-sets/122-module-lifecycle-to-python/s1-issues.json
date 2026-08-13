@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Title-only `rename` bypasses the required running-session refusal.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `docs/session-sets/122-module-lifecycle-to-python/spec.md:126`, `ai_router/modules.py:1362`, `ai_router/modules.py:1403`, `ai_router/tests/test_modules_lifecycle.py:301`\n  - **Failure scenario:** A developer runs `python -m ai_router.modules rename --slug greeter --new-title \"Greeting Service\"` while a `greeter` session set is in progress. This is probable because `--new-title` is a first-class CLI option and the test suite explicitly exercises title-only rename as a successful path; the code only checks `has_running_session` inside `if slug_changing`, so the manifest title is written instead of refusing.\n  - **Acceptance criterion:** `JUDGMENT - A title-only rename of a module with any affected running session exits as a refusal with no manifest change, and the same running-session refusal is covered for slug-only, title-only, and slug+title rename paths.`\n  - **Details:** **Violation:** the spec says “`delete` and `rename` must refuse a module with a **running session**.” **Impact:** the `refusalsEnforced` deliverable is not true for one supported rename mode, so a reviewer should not accept the session as satisfying its dangerous-path preflight contract. **Evidence:** `rename_module` collects affected sets but gates the running check on `slug_changing`; title-only rename then proceeds to `rewrite_manifest_entry_text` and writes `docs/modules.yaml`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A developer runs `python -m ai_router.modules rename --slug greeter --new-title \"Greeting Service\"` while a `greeter` session set is in progress. This is probable because `--new-title` is a first-class CLI option and the test suite explicitly exercises title-only rename as a successful path; the code only checks `has_running_session` inside `if slug_changing`, so the manifest title is written instead of refusing.",
+      "evidencePaths": [
+        "docs/session-sets/122-module-lifecycle-to-python/spec.md",
+        "ai_router/modules.py",
+        "ai_router/tests/test_modules_lifecycle.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A title-only rename of a module with any affected running session exits as a refusal with no manifest change, and the same running-session refusal is covered for slug-only, title-only, and slug+title rename paths."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "8a14e580beac08503ff3b66091b0562a9c2b41ba"
+}

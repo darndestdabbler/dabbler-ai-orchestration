@@ -47,13 +47,14 @@ verifier reviews the session's actual work.
 
 from __future__ import annotations
 
+import datetime as _dt
 import os
 import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Tuple
 
 try:
     from disposition import Disposition  # type: ignore[import-not-found]
@@ -186,6 +187,15 @@ class BackstopDecision:
     identity: Optional[object] = None
     round_number: Optional[int] = None
     diff_base: Optional[str] = None
+    # Set 128 S2 (A4.2): when the reason this close has no settling
+    # evidence is a post-round SHIPPED-CODE fix, the sanctioned answer is
+    # a delta-scoped remediation-review, not an open re-verification. The
+    # backstop then runs that phase itself rather than the classic
+    # unphased round -- so the phase has to be resolved BEFORE the bound
+    # check, because a phased round is bounded by its own family.
+    phase: Optional[str] = None
+    fix_delta_baseline: Optional[str] = None
+    a4_note: Optional[str] = None
 
 
 def _default_route(prompt: str, session_set: str, session_number: int,
@@ -390,6 +400,7 @@ def _existing_evidence_settles_the_close(
     session_number: int,
     disposition: Disposition,
     orchestrator_provider: str,
+    notes: Optional[List[str]] = None,
 ) -> Optional[dict]:
     """The authoritative settling row when valid stamped evidence
     already covers this close, else ``None``.
@@ -403,9 +414,14 @@ def _existing_evidence_settles_the_close(
       VERIFIED for the loop, L-071-1). A blocking or envelope-less
       ``ISSUES_FOUND`` claim does NOT settle it: the backstop runs a
       fresh round so its verdict, not the stale one, governs.
+
+    *notes* (Set 128 S2) collects the A4.1 exemption line when the
+    settling row is one whose work diff moved but moved only under
+    declared test surfaces, so the caller can ledger it.
     """
     _all, valid, _reasons = find_session_verification_evidence(
         str(session_set_dir), session_number, orchestrator_provider,
+        notes=notes,
     )
     if not valid:
         return None
@@ -649,14 +665,22 @@ def decide_backstop(
     # still carries the corroborating evidence's bookkeeping paths so a
     # rerun after a later gate failure keeps tolerating the uncommitted
     # artifacts a prior backstop round wrote (I-084-S2-9).
+    a4_notes: List[str] = []
     settling_row = _existing_evidence_settles_the_close(
         set_dir, session_number, disposition, identity.effective_provider,
+        notes=a4_notes,
     )
     if settling_row is not None:
+        # Set 128 S2: name an A4.1 settlement out loud. A close that
+        # settled because every post-round change was a declared test
+        # surface must be distinguishable in the record from one whose
+        # tree never moved -- the reduction is auditable or it is not a
+        # reduction anyone can review. ``run_close_backstop`` ledgers it.
         return BackstopDecision(
             would_route=False,
             outcome=BackstopOutcome(
                 status=STATUS_SKIPPED_EVIDENCE_PRESENT,
+                messages=list(a4_notes),
                 written_paths=_settling_bookkeeping_paths(
                     set_dir, settling_row
                 ),
@@ -685,9 +709,19 @@ def decide_backstop(
     # it took to get there. The budget only bites when the close has no
     # settling evidence AND the loop is already spent -- which is the
     # state that should stop for a human, not buy round 11.
+    # --- Set 128 S2 (A4.2): resolve the PHASE before the bound, because
+    # a phased round is bounded by its own family. A post-round
+    # shipped-code delta owes a delta-scoped remediation-review; anything
+    # else (test-only cannot reach here -- it settled above -- plus
+    # unclassifiable deltas and missing anchors) stays the classic
+    # unphased round.
+    phase, fix_delta_baseline, a4_note = _a4_phase_for_close(
+        set_dir, session_number
+    )
+
     round_number = _vs.resolve_round(set_dir, session_number, None)
     bound_status = _vs.evaluate_phase_bound(
-        set_dir, session_number, round_number, None
+        set_dir, session_number, round_number, phase
     )
     if bound_status.exceeds:
         return BackstopDecision(
@@ -726,6 +760,115 @@ def decide_backstop(
         identity=identity,
         round_number=round_number,
         diff_base=diff_base,
+        phase=phase,
+        fix_delta_baseline=fix_delta_baseline,
+        a4_note=a4_note,
+    )
+
+
+def _ledger_a4_exemption(
+    session_set_dir: Path, session_number: int, outcome: BackstopOutcome
+) -> None:
+    """Record an A4.1 test-only settlement in the round ledger.
+
+    Written HERE and not inside the validator because a validator that
+    writes is no longer a validator: ``validate_stamped_row`` stays pure
+    and reports through its ``notes`` sink, and the close -- which is a
+    writer, runs once, and holds the close lock -- lands the durable
+    record. The row is an ``event`` the round-counting arithmetic does
+    not recognise, so ledgering an exemption can never be mistaken for
+    spending a round.
+
+    Fail-open: an unwritable ledger must not fail a close that the
+    evidence rules already settled. The exemption still appears in the
+    outcome messages on that path.
+    """
+    try:
+        try:
+            from .post_round_delta import (  # type: ignore[import-not-found]
+                DELTA_TEST_ONLY,
+                classify_delta,
+            )
+        except ImportError:
+            from post_round_delta import (  # type: ignore[no-redef]
+                DELTA_TEST_ONLY,
+                classify_delta,
+            )
+        verdict = classify_delta(session_set_dir, session_number)
+        if verdict.classification != DELTA_TEST_ONLY:
+            return
+        record = {
+            "event": "a4-test-only-exemption",
+            "sessionNumber": session_number,
+            "anchor": verdict.anchor,
+            "anchorRound": verdict.anchor_round,
+            "testPaths": list(verdict.test_paths),
+            "recordedAt": _dt.datetime.now().astimezone().isoformat(),
+            "rule": (
+                "A4.1 -- a post-suite fix to tests only owes no "
+                "re-verification (operator-attested, Set 128 S2)"
+            ),
+        }
+        _vs._append_round_ledger(
+            _vs.round_ledger_path(session_set_dir, session_number), record
+        )
+        outcome.messages.append(
+            "A4.1: this close settled on evidence whose work diff moved "
+            "only under declared test surfaces "
+            f"({', '.join(verdict.test_paths)}); recorded in the round "
+            "ledger as a4-test-only-exemption"
+        )
+    except Exception:  # pragma: no cover - defensive, fail-open
+        return
+
+
+def _a4_phase_for_close(
+    session_set_dir: Path, session_number: int
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """``(phase, fix_delta_baseline, note)`` for a backstop about to run.
+
+    A4.2: a close with no settling evidence whose post-round delta
+    touches shipped code owes a **delta-scoped remediation-review**, not
+    an open re-verification. The backstop runs that round itself rather
+    than reporting that someone else should have — the operator ratified
+    the consult at the one place that spends money, and reaching here
+    means nobody ran it by hand.
+
+    Returns ``(None, None, None)`` whenever the delta is not
+    shipped-code, or cannot be classified, or no anchor exists. Every one
+    of those falls back to the classic unphased round, which is the
+    conservative direction: a narrower round is bought only on a
+    positively classified delta with a recorded baseline to diff from.
+    """
+    try:
+        try:
+            from .post_round_delta import (  # type: ignore[import-not-found]
+                DELTA_SHIPPED_CODE,
+                classify_delta,
+            )
+        except ImportError:
+            from post_round_delta import (  # type: ignore[no-redef]
+                DELTA_SHIPPED_CODE,
+                classify_delta,
+            )
+        verdict = classify_delta(session_set_dir, session_number)
+    except Exception:  # pragma: no cover - defensive
+        return None, None, None
+    if verdict.classification != DELTA_SHIPPED_CODE or not verdict.anchor_tree:
+        return None, None, None
+    shown = ", ".join(verdict.shipped_paths[:5])
+    more = ", ..." if len(verdict.shipped_paths) > 5 else ""
+    return (
+        _vs.PHASE_REMEDIATION_REVIEW,
+        verdict.anchor_tree,
+        (
+            "A4.2: the work changed after this session's recorded round and "
+            f"the change touches shipped code ({shown}{more}), so this "
+            "backstop round is a DELTA-SCOPED remediation-review of that fix "
+            f"delta (baseline {verdict.anchor_tree[:12]}, anchor "
+            f"{verdict.anchor}) rather than an open re-verification "
+            "(operator-attested, Set 128 S2)."
+        ),
     )
 
 
@@ -754,18 +897,34 @@ def run_close_backstop(
 
     decision = decide_backstop(session_set_dir, session_number, disposition)
     if not decision.would_route:
-        # decide_backstop always pairs would_route=False with an outcome;
-        # the fallback keeps a future edit from returning None here.
-        return decision.outcome or BackstopOutcome(
+        outcome = decision.outcome or BackstopOutcome(
             status=STATUS_ROUTE_FAILED,
             remediation="the backstop reached no decision",
         )
+        # Set 128 S2 (A4.1): ledger a close that settled on evidence whose
+        # work diff had moved but moved only under declared test surfaces.
+        # The classification is re-derived structurally rather than parsed
+        # out of the message above -- a message is a rendering, and an
+        # audit trail keyed on one drifts the first time the wording
+        # changes.
+        if (
+            outcome.status == STATUS_SKIPPED_EVIDENCE_PRESENT
+            and session_number is not None
+        ):
+            _ledger_a4_exemption(set_dir, session_number, outcome)
+        return outcome
 
     # Narrow for the type checker: a routing decision carries all three.
     assert session_number is not None and disposition is not None
     identity = decision.identity
     round_number = decision.round_number
     diff_base = decision.diff_base
+    # Set 128 S2 (A4.2): resolved in decide_backstop, ahead of the bound,
+    # so a delta-scoped round is counted against the remediation-review
+    # family rather than the classic one.
+    a4_phase = decision.phase
+    a4_baseline = decision.fix_delta_baseline
+    a4_owed = decision.a4_note
 
     # --- The backstop runs. Same machinery as verify_session, end to
     # --- end: evidence -> template -> exclusion -> stamped row ->
@@ -785,11 +944,38 @@ def run_close_backstop(
     # discovery round to get back in. Fails OPEN like verify_session's:
     # the round is still sound evidence without it.
     baseline_tree = _vs.snapshot_worktree_tree(repo_root)
+    # Set 128 S2 (A4.2): a round that CALLS itself remediation-review must
+    # BE one. Two consecutive verification rounds found the same class
+    # here -- the backstop MIRRORED the CLI's phase piece by piece, and
+    # each round found a piece missing (first the cross-round ledger and
+    # the fix-verdict coverage check, then the phased evidence
+    # exclusions). The mirroring was the defect, so both callers now read
+    # ONE assembly (L-069-1: fix the class, not the instance).
+    a4_inputs = _vs.build_phase_round_inputs(
+        set_dir, session_number, round_number, a4_phase,
+        base_excludes=_vs.DEFAULT_DIFF_EXCLUDES,
+    )
+    a4_excludes = a4_inputs.excludes
+    a4_framing = a4_inputs.framing
+    a4_ledger = a4_inputs.ledger
+    a4_ledger_ids = a4_inputs.ledger_ids
     try:
-        evidence = _vs.assemble_evidence(
-            set_dir, session_number, diff_base,
-            list(_vs.DEFAULT_DIFF_EXCLUDES),
-        )
+        if a4_phase == _vs.PHASE_REMEDIATION_REVIEW and a4_baseline:
+            # A4.2: review the fix delta only, against the baseline the
+            # session's own round recorded -- the same bundle
+            # `verify_session --phase remediation-review` would build,
+            # because it IS that phase, run by the framework instead of
+            # by hand. New defects stay admissible only inside these
+            # hunks, which is what makes the round cheaper without making
+            # it weaker.
+            evidence = _vs.assemble_fix_delta_evidence(
+                set_dir, session_number, a4_baseline, a4_excludes,
+            )
+        else:
+            evidence = _vs.assemble_evidence(
+                set_dir, session_number, diff_base,
+                list(_vs.DEFAULT_DIFF_EXCLUDES),
+            )
     except _vs.EvidenceTooLargeError as exc:
         # Set 112 S2: assemble_evidence raises this (deliberately NOT a
         # VerifySessionError -- the CLI maps it to its own
@@ -829,6 +1015,8 @@ def run_close_backstop(
     prompt = _vs.build_prompt(
         evidence, session_number, round_number,
         conventions=_backstop_conventions(round_number),
+        framing=a4_framing,
+        ledger=a4_ledger,
     )
     review_path = _vs.verification_artifact_path(
         set_dir, session_number, round_number
@@ -964,6 +1152,18 @@ def run_close_backstop(
     written = [str(review_path)]
 
     verdict, issues = parse_verification_response(result.content)
+    # Set 128 S2 (A4.2): the remediation-review phase's own grading, via
+    # the shared evaluator verify_session uses. Anti-laundering (a bare
+    # structured fix-rejected blocks even without a restated Issue) and
+    # coverage (every ledger id needs a terminal verdict) apply to this
+    # round exactly as they would to a hand-run one -- otherwise the
+    # delta-scoped round would be the cheap tier AND the weak one.
+    fix_verdicts: List[dict] = []
+    if a4_phase == _vs.PHASE_REMEDIATION_REVIEW:
+        fix_verdicts, escalations = _vs.evaluate_fix_verdicts(
+            result.content, a4_ledger_ids, verdict, issues,
+        )
+        issues = list(issues) + escalations
     classification = classify_blocking(verdict, issues)
     # Set 123 S2 (L-069-1 -- the backstop is a sibling writer of the same
     # two records verify_session writes, so it resolves the qualification
@@ -1000,6 +1200,8 @@ def run_close_backstop(
         _vs.write_issues_artifact(
             issues_path, session_number, round_number, verdict, issues,
             qualification=round_qualification,
+            phase=a4_phase,
+            fix_verdicts=fix_verdicts or None,
         )
         written.append(str(issues_path))
 
@@ -1013,15 +1215,19 @@ def run_close_backstop(
     # `ended_loop` follows the same rule as everywhere else: a clean
     # round settles the close and consumes no budget; a blocking one
     # sends the session back to remediation and does. There is no
-    # supplementary-blockers case to consider here -- the backstop runs
-    # unphased, and it never reaches this point when settling evidence
-    # already exists.
+    # supplementary-blockers case to consider here -- the backstop is
+    # unphased or (Set 128 S2, A4.2) a remediation-review, and it never
+    # reaches this point when settling evidence already exists.
+    #
+    # The recorded `phase` must be the phase that actually ran, or the
+    # bounded-totals arithmetic reads a delta-scoped round as a classic
+    # one on the next pass and the two disagree about the same ledger.
     ledger_path = _vs.round_ledger_path(set_dir, session_number)
     _vs.record_round_completed(
         ledger_path,
         session_number=session_number,
         round_number=round_number,
-        phase=None,
+        phase=a4_phase,
         verdict=verdict,
         blocking=classification.blocking,
         ended_loop=not classification.blocking,
@@ -1048,6 +1254,8 @@ def run_close_backstop(
         f"verification_verdict={verdict}) — commit these in the "
         "close-out commit",
     ]
+    if a4_owed:
+        messages.append(a4_owed)
 
     if classification.blocking:
         findings = "; ".join(

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 4,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "f77eda2e2756f680a0ad30fea33284efb1ab7014",
+  "fixedTree": "33e120135ccd34a4988233463c330dd1244a5eea",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T07:13:01.684834+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The A4.2 close backstop’s remediation-review omits the CLI phase’s evidence exclusions, so its “FIX DELTA ONLY” prompt includes loop bookkeeping as reviewable fix hunks. - **Category:** Correctness ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The close-backstop A4.2 remediation-review must apply the same phased set exclusions that `verify_session --phase remediation-review` applies before `assemble_fix_delta_evidence`, and a fixture with a post-round shipped-code edit plus post-anchor round/checklist bookkeeping must produce a prompt whose fix-delta diff contains the shipped-code hunk but not the excluded loop-bookkeeping paths.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

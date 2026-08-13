@@ -1859,6 +1859,18 @@ def record_round_completed(
     a whole discovery round. The ledger has no findings precondition, so
     recording it here covers every round that ran. Omit-null: a round
     that could not snapshot writes no key, and readers tolerate absence.
+
+    ``worktreeTreeAtCompletion`` (Set 128 S2) is the sibling A4 needs and
+    the baseline above cannot serve. ``discoveryBaselineTree`` is taken
+    BEFORE a round assembles its evidence, so a diff from it includes
+    that round's own remediation; A4 asks what changed AFTER the round
+    settled, which needs a snapshot taken here, at completion. It is
+    written for every completed round -- including remediation-review and
+    backstop rounds, the two that record no discovery baseline at all --
+    because the settling round is precisely the one A4 anchors on.
+    Snapshotting is fail-open (a git failure omits the key), and
+    ``post_round_delta`` fails CLOSED on its absence by reporting the
+    delta as unknown, which owes a review.
     """
     record = {
         "event": ROUND_EVENT_COMPLETED,
@@ -1873,6 +1885,17 @@ def record_round_completed(
     }
     if discovery_baseline_tree:
         record["discoveryBaselineTree"] = discovery_baseline_tree
+    completion_tree = None
+    try:
+        completion_tree = snapshot_worktree_tree(repo_root_for(path.parent))
+    except VerifySessionError:
+        # No repo (a tmp-dir ledger, a consumer running outside git):
+        # fail OPEN here and let post_round_delta fail closed on the
+        # missing key. The ledger row must never fail to record because
+        # an optional forensic field could not be computed.
+        completion_tree = None
+    if completion_tree:
+        record["worktreeTreeAtCompletion"] = completion_tree
     return _append_round_ledger(path, record)
 
 
@@ -2503,6 +2526,259 @@ def build_phase_framing(phase: Optional[str], lens: Optional[str] = None) -> str
     return ""
 
 
+@dataclass(frozen=True)
+class PhaseRoundInputs:
+    """Everything a PHASED round's prompt and bundle need, in one place.
+
+    Set 128 S2, from two consecutive verification rounds that found the
+    same class rather than two defects: the close backstop's A4.2
+    remediation-review was assembled by MIRRORING this phase piece by
+    piece, and each round found a piece missing -- first the cross-round
+    ledger and the fix-verdict coverage check, then the phased evidence
+    exclusions. Mirroring is the defect; there is no third piece to find
+    because both callers now read one assembly (L-069-1).
+
+    ``supplementary_unavailable`` exists so the assembly stays a pure
+    read: the CLI turns it into its EXIT_USAGE refusal, which is the
+    caller's decision, not this function's.
+    """
+
+    excludes: List[str]
+    framing: str
+    ledger: str
+    ledger_ids: List[str]
+    supplementary_unavailable: bool = False
+
+
+def build_phase_round_inputs(
+    session_set_dir: Path,
+    session_number: int,
+    round_number: int,
+    phase: Optional[str],
+    *,
+    base_excludes: Sequence[str],
+) -> PhaseRoundInputs:
+    """Assemble a phased round's excludes, framing and cross-round ledger.
+
+    * **Excludes** — the caller's base list plus, for any phase, the
+      set-dir bookkeeping the loop writes BETWEEN rounds (round
+      artifacts, issues envelopes, remediation sidecars, the round
+      ledger, the acceptance artifact). Without them the framework's own
+      records arrive inside a bundle whose heading tells the verifier
+      that new defects are admissible within these hunks. Deliberately
+      NOT the freshness exclusion list: a file can be exempt from
+      staling a stamp and still be something the verifier must READ
+      (``decisions.jsonl`` is the standing example -- suppressing the
+      decision record from review would be a verification reduction).
+    * **Framing** — the phase's coverage/scope block, plus the
+      prior-findings completeness-critic block on supplementary and the
+      acceptance harness's recorded results on remediation-review.
+    * **Ledger** — the settled-points cross-round ledger and its ids.
+      Supplementary gets neither: the ledger's re-evaluate/re-raise
+      framing is for the post-remediation loop and would contradict
+      do-not-re-report.
+
+    An unphased (classic) round gets the base excludes, no framing, and
+    the ledger -- exactly what it got before this was extracted.
+    """
+    excludes = list(base_excludes)
+    if phase is not None:
+        try:
+            from .verification_stamp import (  # type: ignore[import-not-found]
+                PHASED_EVIDENCE_SET_EXCLUDES,
+                repo_relative_posix as _rel_posix,
+            )
+        except ImportError:
+            from verification_stamp import (  # type: ignore[no-redef]
+                PHASED_EVIDENCE_SET_EXCLUDES,
+                repo_relative_posix as _rel_posix,
+            )
+        try:
+            set_rel = _rel_posix(
+                session_set_dir.resolve(), repo_root_for(session_set_dir)
+            )
+            excludes.extend(
+                f"{set_rel}/{name}" for name in PHASED_EVIDENCE_SET_EXCLUDES
+            )
+        except VerifySessionError:
+            pass  # no repo root -> evidence assembly raises its own error
+
+    if phase == PHASE_SUPPLEMENTARY:
+        prior_findings = assemble_prior_findings_block(
+            session_set_dir, session_number, round_number
+        )
+        if not prior_findings:
+            return PhaseRoundInputs(
+                excludes=excludes,
+                framing="",
+                ledger="",
+                ledger_ids=[],
+                supplementary_unavailable=True,
+            )
+        return PhaseRoundInputs(
+            excludes=excludes,
+            framing=build_phase_framing(phase) + "\n\n" + prior_findings,
+            ledger="",
+            ledger_ids=[],
+        )
+
+    ledger, ledger_ids = assemble_cross_round_ledger_with_ids(
+        session_set_dir, session_number, round_number
+    )
+    framing = build_phase_framing(phase)
+    if phase == PHASE_REMEDIATION_REVIEW:
+        acceptance_block = assemble_acceptance_block(
+            session_set_dir, session_number, round_number
+        )
+        if acceptance_block:
+            framing = framing + "\n\n" + acceptance_block
+    return PhaseRoundInputs(
+        excludes=excludes,
+        framing=framing,
+        ledger=ledger,
+        ledger_ids=list(ledger_ids),
+    )
+
+
+def evaluate_fix_verdicts(
+    content: str,
+    ledger_ids: Sequence[str],
+    verdict: str,
+    merged_issues: Sequence[dict],
+) -> Tuple[List[dict], List[dict]]:
+    """Parse a remediation-review's fix verdicts and grade their coverage.
+
+    Returns ``(fix_verdicts, escalations)``; the caller extends its own
+    issue list with *escalations* and stores *fix_verdicts* on the round
+    envelope. Pure — it prints the coverage note to stderr and touches
+    nothing else.
+
+    Extracted from ``run`` by Set 128 S2 so the close backstop's A4.2
+    round can be a remediation-review in full rather than in name. The
+    backstop round that labels itself ``remediation-review`` must apply
+    the SAME parsing, the same anti-laundering escalation and the same
+    coverage arithmetic, or a bare ``VERIFIED`` would settle a close that
+    the CLI's own phase would have refused for missing coverage. A second
+    spelling of this logic in ``close_backstop`` would be the same
+    defect with an extra place to drift from (L-069-1).
+
+    The two escalations, unchanged from their originals:
+
+    * **Anti-laundering** — an explicit structured ``fix-rejected`` is
+      blocking evidence even when the reviewer failed to restate an Issue
+      block (or wrapped it in a contradictory ``VERIFIED`` token). Only
+      escalated when the round would otherwise be non-blocking; on the
+      normal path the restated Issue already blocks.
+    * **Coverage** — the ledger numbers every blocking finding
+      (``L1..Ln``) and each id must receive a TERMINAL verdict: a direct
+      ``fix-accepted`` / ``fix-rejected`` / ``accepted-with-modification``,
+      or a ``duplicate-of`` chain ending in one. Cycles, self-references
+      and dangling targets are not coverage. An id-less but honest full
+      enumeration falls back to a count comparison. A gap escalates at
+      ``unknown`` severity, which blocks: an under-enumerated review is
+      not settlement evidence and never closes the loop.
+    """
+    fix_verdicts = parse_fix_verdicts(content)
+    escalations: List[dict] = []
+    rejected = [
+        fv for fv in fix_verdicts if fv["verdict"] == "fix-rejected"
+    ]
+    already_blocking = classify_blocking(
+        verdict, list(merged_issues)
+    ).blocking
+    if rejected and not already_blocking:
+        for fv in rejected:
+            escalations.append({
+                "description": (
+                    "fix-rejected verdict without a restated Issue "
+                    f"block: {fv['finding']} -- the reviewer rejected "
+                    "this finding's remediation; consult the raw round "
+                    "artifact."
+                ),
+                "category": "fix-rejected",
+                "severity": "Major",
+            })
+    gap_note = ""
+    if ledger_ids:
+        parsed_ids = {
+            fv["ledgerId"] for fv in fix_verdicts if fv.get("ledgerId")
+        }
+        if not fix_verdicts:
+            gap_note = (
+                "no per-finding fix verdicts could be parsed from this "
+                "remediation-review response -- an un-enumerated "
+                "review is not settlement evidence for the ledger's "
+                "findings."
+            )
+        elif parsed_ids:
+            real_ids = {
+                fv["ledgerId"] for fv in fix_verdicts
+                if fv.get("ledgerId") and fv.get("verdict") in (
+                    "fix-accepted", "fix-rejected",
+                    "accepted-with-modification",
+                )
+            }
+            dup_map_round = {
+                fv["ledgerId"]: str(fv.get("duplicateOf") or "").upper()
+                for fv in fix_verdicts
+                if fv.get("ledgerId")
+                and fv.get("verdict") == "duplicate-of"
+            }
+            id_universe = set(ledger_ids)
+
+            def _terminates(lid: str) -> bool:
+                seen: set = set()
+                cur = lid
+                while True:
+                    if cur in seen:
+                        return False  # duplicate-of cycle
+                    seen.add(cur)
+                    if cur in real_ids:
+                        return True
+                    nxt = dup_map_round.get(cur)
+                    if not nxt or nxt not in id_universe:
+                        return False  # no verdict / dangling target
+                    cur = nxt
+
+            unterminated = [i for i in ledger_ids if not _terminates(i)]
+            if unterminated:
+                gap_note = (
+                    "ledger id(s) "
+                    + ", ".join(unterminated)
+                    + " received no terminal fix verdict -- each "
+                    "required id needs a real disposition, directly "
+                    "or via a duplicate-of chain that ends in one "
+                    "(cycles and dangling targets are not coverage)."
+                )
+        elif len(fix_verdicts) < len(ledger_ids):
+            gap_note = (
+                f"only {len(fix_verdicts)} fix verdict(s) parsed for "
+                f"{len(ledger_ids)} numbered blocking finding(s), and "
+                "none carry the prescribed ledger ids -- coverage "
+                "cannot be confirmed."
+            )
+    if gap_note:
+        print(
+            f"verify_session: incomplete fix-verdict coverage -- "
+            f"{gap_note}",
+            file=sys.stderr,
+        )
+        if not classify_blocking(
+            verdict, list(merged_issues) + escalations
+        ).blocking:
+            escalations.append({
+                "description": (
+                    "incomplete fix-verdict coverage: " + gap_note
+                    + " Re-run --phase remediation-review (one 'Fix "
+                    "verdict: L<n> ...' line per ledger id), or "
+                    "escalate to the operator."
+                ),
+                "category": "incomplete-fix-verdict-coverage",
+                "severity": "unknown",
+            })
+    return fix_verdicts, escalations
+
+
 def build_prompt(
     evidence: EvidenceBundle,
     session_number: int,
@@ -3089,47 +3365,35 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             file=sys.stderr,
         )
 
-    # -- Evidence bundle.
-    excludes: List[str] = []
+    # -- Evidence bundle. Set 128 S2: the phase's excludes, framing and
+    #    cross-round ledger are assembled by ONE function, which the close
+    #    backstop's A4.2 remediation-review also calls. Mirroring them by
+    #    hand is what two consecutive verification rounds kept finding
+    #    holes in (L-069-1).
+    base_excludes: List[str] = []
     if not args.no_default_excludes:
-        excludes.extend(DEFAULT_DIFF_EXCLUDES)
+        base_excludes.extend(DEFAULT_DIFF_EXCLUDES)
     if args.exclude:
-        excludes.extend(args.exclude)
-    if phase is not None:
-        # S2 verification round 1: between phased rounds the loop writes its
-        # own bookkeeping into the working tree (round artifacts, issues
-        # envelopes, remediation sidecars, disposition patches). That is
-        # immutable review machinery (the template's Review-scope carve-out),
-        # not work under review — and in the fix delta it is pure noise that
-        # dilutes the new-defects-only-within-fix-hunks scope. Exclude this
-        # set's bookkeeping from PHASED evidence (the classic path is
-        # unchanged for compat; exclusions are disclosed like every other
-        # exclude, never silent).
-        #
-        # S3 supplementary round: this uses PHASED_EVIDENCE_SET_EXCLUDES,
-        # NOT the freshness list. They are deliberately different: a file
-        # can be exempt from staling a stamp (it is a record ABOUT work
-        # that binds on its own) while still being something the verifier
-        # must READ. decisions.jsonl is the first such file — suppressing
-        # the AI-authority decision record from review is a verification
-        # reduction, and no orchestrator may self-authorize one.
-        try:
-            from .verification_stamp import (  # type: ignore[import-not-found]
-                PHASED_EVIDENCE_SET_EXCLUDES as _BOOKKEEPING,
-                repo_relative_posix as _rel_posix,
-            )
-        except ImportError:
-            from verification_stamp import (  # type: ignore[no-redef]
-                PHASED_EVIDENCE_SET_EXCLUDES as _BOOKKEEPING,
-                repo_relative_posix as _rel_posix,
-            )
-        try:
-            set_rel = _rel_posix(
-                session_set_dir.resolve(), repo_root_for(session_set_dir)
-            )
-            excludes.extend(f"{set_rel}/{name}" for name in _BOOKKEEPING)
-        except VerifySessionError:
-            pass  # no repo root -> evidence assembly raises its own error
+        base_excludes.extend(args.exclude)
+    phase_inputs = build_phase_round_inputs(
+        session_set_dir, session_number, round_number, phase,
+        base_excludes=base_excludes,
+    )
+    if phase_inputs.supplementary_unavailable:
+        print(
+            "verify_session: --phase supplementary is the "
+            "completeness-critic pass over a prior discovery round's "
+            "findings, but no prior round of this session bears a "
+            "findings envelope. Run --phase discovery first; a clean "
+            "discovery round needs no supplementary pass.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+    excludes = phase_inputs.excludes
+    framing = phase_inputs.framing
+    ledger = phase_inputs.ledger
+    ledger_ids = phase_inputs.ledger_ids
+
     baseline_round: Optional[int] = None
     baseline_tree: Optional[str] = None
     if phase == PHASE_REMEDIATION_REVIEW:
@@ -3201,47 +3465,6 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                 file=sys.stderr,
             )
             return EXIT_USAGE
-
-    # -- Set 096: the settled-points cross-round ledger is machinery, not a
-    #    hand-carried conventions section. Assembled from prior rounds'
-    #    immutable sN-issues*.json + the orchestrator's remediation-note
-    #    sidecars; empty on round 1 / no prior findings. The SUPPLEMENTARY
-    #    phase replaces it with the prior-findings completeness-critic
-    #    block: the ledger's re-evaluate/re-raise framing is for the
-    #    post-remediation loop and would contradict do-not-re-report.
-    if phase == PHASE_SUPPLEMENTARY:
-        ledger = ""
-        prior_findings = assemble_prior_findings_block(
-            session_set_dir, session_number, round_number
-        )
-        if not prior_findings:
-            print(
-                "verify_session: --phase supplementary is the "
-                "completeness-critic pass over a prior discovery round's "
-                "findings, but no prior round of this session bears a "
-                "findings envelope. Run --phase discovery first; a clean "
-                "discovery round needs no supplementary pass.",
-                file=sys.stderr,
-            )
-            return EXIT_USAGE
-        framing = build_phase_framing(phase) + "\n\n" + prior_findings
-        ledger_ids: List[str] = []
-    else:
-        ledger, ledger_ids = assemble_cross_round_ledger_with_ids(
-            session_set_dir, session_number, round_number
-        )
-        framing = build_phase_framing(phase)
-        # -- Set 111 S2: the remediation-review reads the acceptance
-        #    harness's results, so criteria-closed findings arrive with
-        #    their executable evidence attached instead of as open
-        #    questions. Empty (and the phase is unchanged) when no
-        #    harness artifact exists.
-        if phase == PHASE_REMEDIATION_REVIEW:
-            acceptance_block = assemble_acceptance_block(
-                session_set_dir, session_number, round_number
-            )
-            if acceptance_block:
-                framing = framing + "\n\n" + acceptance_block
 
     # -- Rounds that could later be a remediation baseline snapshot the
     #    working tree, so a later remediation-review can diff the fix
@@ -3724,124 +3947,10 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
 
     fix_verdicts: List[dict] = []
     if phase == PHASE_REMEDIATION_REVIEW and results:
-        fix_verdicts = parse_fix_verdicts(results[0][1].content)
-        rejected = [
-            fv for fv in fix_verdicts if fv["verdict"] == "fix-rejected"
-        ]
-        # S2 verification round 1 (anti-laundering): an explicit structured
-        # ``fix-rejected`` is blocking evidence even when the reviewer
-        # failed to restate an Issue block (or wrapped it in a
-        # contradictory VERIFIED token). Only escalate when the round
-        # would otherwise be non-blocking — on the normal path the
-        # restated Issue already blocks and needs no duplicate.
-        if rejected and not classify_blocking(verdict, merged_issues).blocking:
-            for fv in rejected:
-                merged_issues.append({
-                    "description": (
-                        "fix-rejected verdict without a restated Issue "
-                        f"block: {fv['finding']} -- the reviewer rejected "
-                        "this finding's remediation; consult the raw round "
-                        "artifact."
-                    ),
-                    "category": "fix-rejected",
-                    "severity": "Major",
-                })
-        # -- Coverage (S2 verification rounds 3-4): the ledger numbers
-        #    every blocking finding (L1..Ln); the reviewer must verdict
-        #    each id, and the check is an EXACT id-set comparison — no
-        #    fuzzy text matching, no double-counted restatements. A review
-        #    that skipped the id format falls back to a count comparison
-        #    against the id list, so an honest full enumeration still
-        #    passes. A gap on an otherwise non-blocking round escalates
-        #    (unknown severity blocks): an under-enumerated review is not
-        #    settlement evidence and never closes the loop.
-        gap_note = ""
-        if ledger_ids:
-            parsed_ids = {
-                fv["ledgerId"] for fv in fix_verdicts if fv.get("ledgerId")
-            }
-            if not fix_verdicts:
-                gap_note = (
-                    "no per-finding fix verdicts could be parsed from this "
-                    "remediation-review response -- an un-enumerated "
-                    "review is not settlement evidence for the ledger's "
-                    "findings."
-                )
-            elif parsed_ids:
-                # Round 10: coverage means every id's verdict chain
-                # TERMINATES in a real disposition — a direct
-                # fix-accepted / fix-rejected / accepted-with-modification
-                # verdict, or a duplicate-of chain ending at one. Cycles
-                # (L1<->L2), self-references, and dangling targets are NOT
-                # coverage: an aliased id with no terminal disposition
-                # escalates exactly like a missing one. Every id is
-                # re-verdicted every cycle (round 11, operator decision:
-                # the one-line restatement IS the regression check).
-                real_ids = {
-                    fv["ledgerId"] for fv in fix_verdicts
-                    if fv.get("ledgerId") and fv.get("verdict") in (
-                        "fix-accepted", "fix-rejected",
-                        "accepted-with-modification",
-                    )
-                }
-                dup_map_round = {
-                    fv["ledgerId"]: str(fv.get("duplicateOf") or "").upper()
-                    for fv in fix_verdicts
-                    if fv.get("ledgerId")
-                    and fv.get("verdict") == "duplicate-of"
-                }
-                id_universe = set(ledger_ids)
-
-                def _terminates(lid: str) -> bool:
-                    seen: set = set()
-                    cur = lid
-                    while True:
-                        if cur in seen:
-                            return False  # duplicate-of cycle
-                        seen.add(cur)
-                        if cur in real_ids:
-                            return True
-                        nxt = dup_map_round.get(cur)
-                        if not nxt or nxt not in id_universe:
-                            return False  # no verdict / dangling target
-                        cur = nxt
-
-                unterminated = [
-                    i for i in ledger_ids if not _terminates(i)
-                ]
-                if unterminated:
-                    gap_note = (
-                        "ledger id(s) "
-                        + ", ".join(unterminated)
-                        + " received no terminal fix verdict -- each "
-                        "required id needs a real disposition, directly "
-                        "or via a duplicate-of chain that ends in one "
-                        "(cycles and dangling targets are not coverage)."
-                    )
-            elif len(fix_verdicts) < len(ledger_ids):
-                gap_note = (
-                    f"only {len(fix_verdicts)} fix verdict(s) parsed for "
-                    f"{len(ledger_ids)} numbered blocking finding(s), and "
-                    "none carry the prescribed ledger ids -- coverage "
-                    "cannot be confirmed."
-                )
-        if gap_note:
-            print(
-                f"verify_session: incomplete fix-verdict coverage -- "
-                f"{gap_note}",
-                file=sys.stderr,
-            )
-            if not classify_blocking(verdict, merged_issues).blocking:
-                merged_issues.append({
-                    "description": (
-                        "incomplete fix-verdict coverage: " + gap_note
-                        + " Re-run --phase remediation-review (one 'Fix "
-                        "verdict: L<n> ...' line per ledger id), or "
-                        "escalate to the operator."
-                    ),
-                    "category": "incomplete-fix-verdict-coverage",
-                    "severity": "unknown",
-                })
+        fix_verdicts, escalations = evaluate_fix_verdicts(
+            results[0][1].content, ledger_ids, verdict, merged_issues,
+        )
+        merged_issues.extend(escalations)
 
     classification = classify_blocking(verdict, merged_issues)
 

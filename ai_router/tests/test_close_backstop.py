@@ -1686,3 +1686,267 @@ class TestAnOversizedBundleCannotTakeTheGateDown:
         )
         assert outcome.status == close_backstop.STATUS_UNAVAILABLE
         assert "968227" in outcome.remediation
+
+
+class TestA4PostRoundDelta:
+    """Set 128 S2 -- A4 at the one place that spends money.
+
+    The operator-attested rule: a post-suite fix to TESTS ONLY owes no
+    re-verification (A4.1), and a post-suite fix to SHIPPED CODE owes a
+    delta-scoped remediation-review rather than an open one (A4.2).
+    Before this, ANY post-verification edit staled the stamped row and
+    the backstop bought a full unphased round, so the machinery
+    contradicted the rule rather than merely omitting it.
+
+    Both tests plant a real post-round edit and then run the real close,
+    which is the only way to tell a rule that is enforced from one that
+    is merely written down (L-112-1).
+    """
+
+    def _anchor_the_round(self, root: Path, set_dir: Path) -> str:
+        """Record a completed round whose completion snapshot is NOW."""
+        import verify_session as _vs
+
+        tree = _vs.snapshot_worktree_tree(root)
+        assert tree is not None
+        (set_dir / "s1-rounds.jsonl").write_text(
+            json.dumps({
+                "event": "round-completed",
+                "sessionNumber": 1,
+                "verificationRound": 1,
+                "phase": "discovery",
+                "source": "verify_session_cli",
+                "verdict": "VERIFIED",
+                "blocking": False,
+                "endedLoop": True,
+                "worktreeTreeAtCompletion": tree,
+            }) + "\n",
+            encoding="utf-8",
+        )
+        return tree
+
+    def test_a4_1_a_test_only_fix_settles_the_close_with_no_round(
+        self, closeable, fake_route,
+    ):
+        """DOES NOT FIRE. The stamped row's work diff HAS moved -- so
+        without A4.1 this close buys a metered round -- but every changed
+        path is a declared test surface, so the existing verification
+        still settles it. The exemption is ledgered, not silent."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        self._anchor_the_round(root, set_dir)
+
+        tests_dir = root / "ai_router" / "tests"
+        tests_dir.mkdir(parents=True)
+        (tests_dir / "test_late_fix.py").write_text(
+            "def test_late():\n    assert True\n", encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "succeeded", outcome.messages
+        assert fake_route.calls == [], (
+            "a test-only post-round fix bought a metered verification round"
+        )
+        ledger = [
+            json.loads(line)
+            for line in (set_dir / "s1-rounds.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+            if line.strip()
+        ]
+        exemptions = [
+            r for r in ledger if r.get("event") == "a4-test-only-exemption"
+        ]
+        assert len(exemptions) == 1, ledger
+        assert exemptions[0]["testPaths"] == [
+            "ai_router/tests/test_late_fix.py"
+        ]
+
+    def test_a4_2_a_shipped_code_fix_routes_a_delta_scoped_review(
+        self, closeable, fake_route,
+    ):
+        """FIRES, but narrowly. A shipped-code post-round fix still owes a
+        round -- the carve-out does not reach it -- and that round is the
+        delta-scoped remediation-review, recorded as such so the bounded
+        totals count it against the right family."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        anchor = self._anchor_the_round(root, set_dir)
+
+        shipped = root / "ai_router"
+        shipped.mkdir(parents=True, exist_ok=True)
+        (shipped / "widget.py").write_text(
+            "VALUE = 2  # the post-suite fix\n", encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        outcome = close_session.run(_ns(session_set_dir=str(set_dir)))
+
+        assert outcome.result == "succeeded", outcome.messages
+        assert len(fake_route.calls) == 1, (
+            "a shipped-code post-round fix must still buy a round"
+        )
+        prompt = fake_route.calls[0]["prompt"]
+        assert "FIX DELTA ONLY" in prompt, (
+            "the backstop round was not scoped to the fix delta"
+        )
+        assert anchor[:12] in prompt
+        ledger = [
+            json.loads(line)
+            for line in (set_dir / "s1-rounds.jsonl").read_text(
+                encoding="utf-8"
+            ).splitlines()
+            if line.strip()
+        ]
+        backstop_rows = [
+            r for r in ledger
+            if r.get("source") == "close_session_backstop"
+        ]
+        assert len(backstop_rows) == 1, ledger
+        assert backstop_rows[0]["phase"] == "remediation-review", (
+            "a delta-scoped round recorded itself as an unphased one, so "
+            "the bounded totals would count it against the wrong family"
+        )
+
+    def test_a4_2_round_enforces_remediation_review_coverage(
+        self, closeable, monkeypatch,
+    ):
+        """FIRES. A round that CALLS itself remediation-review must BE
+        one. A bare `VERIFIED` that verdicts none of the ledger's prior
+        blocking findings is not settlement evidence -- the CLI phase
+        refuses it for incomplete fix-verdict coverage, and a backstop
+        that skipped that check would have bought the cheap tier AND
+        dropped the regression check that defines it."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        self._anchor_the_round(root, set_dir)
+        # A prior round bearing a blocking finding, so the cross-round
+        # ledger numbers an id the delta review owes a verdict for.
+        (set_dir / "s1-issues.json").write_text(
+            json.dumps({
+                "schemaVersion": 1,
+                "sessionNumber": 1,
+                "verificationRound": 1,
+                "verificationVerdict": "ISSUES_FOUND",
+                "issues": [{
+                    "description": "a prior blocking defect",
+                    "category": "Correctness",
+                    "severity": "Major",
+                }],
+            }),
+            encoding="utf-8",
+        )
+
+        shipped = root / "ai_router"
+        shipped.mkdir(parents=True, exist_ok=True)
+        (shipped / "widget.py").write_text("VALUE = 2\n", encoding="utf-8")
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        # The reviewer returns a clean token and enumerates nothing.
+        bare = FakeBackstopRoute(response="VERIFIED -- looks fine.")
+        monkeypatch.setattr(close_backstop, "_default_route", bare)
+
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        assert len(bare.calls) == 1
+        prompt = bare.calls[0]["prompt"]
+        assert "L1" in prompt, (
+            "the delta round carried no cross-round ledger, so nothing "
+            "required the prior blocking finding to be re-verdicted"
+        )
+        assert outcome.status == close_backstop.STATUS_BLOCKING, (
+            "an un-enumerated remediation-review settled the close"
+        )
+        assert "coverage" in outcome.remediation.lower()
+
+    def test_a4_2_round_applies_the_phased_evidence_exclusions(
+        self, closeable, monkeypatch,
+    ):
+        """FIRES. The fix-delta bundle tells the verifier that new defects
+        are admissible WITHIN THESE HUNKS, so what lands in the hunks is
+        the round's scope. The loop writes its own bookkeeping into the
+        tree between phased rounds -- and `record_round_completed` appends
+        to the round ledger AFTER taking the snapshot this delta is
+        anchored on -- so without the phased exclusions the framework's
+        own records arrive as reviewable fix hunks."""
+        root, set_dir = closeable
+        row = write_stamped_evidence(set_dir)
+        Path(os.environ["AI_ROUTER_METRICS_PATH"]).write_text(
+            json.dumps(row) + "\n", encoding="utf-8",
+        )
+        self._anchor_the_round(root, set_dir)
+
+        shipped = root / "ai_router"
+        shipped.mkdir(parents=True, exist_ok=True)
+        (shipped / "widget.py").write_text(
+            "VALUE = 2  # the real post-suite fix\n", encoding="utf-8",
+        )
+        # Loop bookkeeping written AFTER the anchor, exactly as the
+        # framework writes it.
+        (set_dir / "s1-issues-round-2.json").write_text(
+            json.dumps({"issues": [], "marker": "BOOKKEEPING-MARKER"}),
+            encoding="utf-8",
+        )
+        (set_dir / "s1-acceptance-round-1.json").write_text(
+            json.dumps({"marker": "BOOKKEEPING-MARKER"}), encoding="utf-8",
+        )
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        route = FakeBackstopRoute()
+        monkeypatch.setattr(close_backstop, "_default_route", route)
+        run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        assert len(route.calls) == 1
+        prompt = route.calls[0]["prompt"]
+        assert "the real post-suite fix" in prompt, (
+            "the shipped-code fix is the whole point of the delta and "
+            "must be in the bundle"
+        )
+        assert "BOOKKEEPING-MARKER" not in prompt, (
+            "loop bookkeeping reached the fix-delta hunks, where the "
+            "bundle's own heading declares new defects admissible"
+        )
+
+    def test_the_backstop_has_no_second_spelling_of_the_phase_assembly(self):
+        """STRUCTURAL, and the one that closes the class.
+
+        Rounds 3 and 4 of this session found the same defect twice: the
+        backstop MIRRORED the CLI's remediation-review phase piece by
+        piece, and each round found a piece missing. Asserting the two
+        agree today would only re-assert the instances. What must hold is
+        that there is exactly ONE assembly site -- so a piece added to the
+        phase later reaches the backstop with no second edit, and cannot
+        silently not reach it.
+        """
+        import inspect
+
+        source = inspect.getsource(close_backstop.run_close_backstop)
+        assert "build_phase_round_inputs" in source, (
+            "the backstop must read the shared phase assembly"
+        )
+        for mirrored in (
+            "build_phase_framing",
+            "assemble_cross_round_ledger_with_ids",
+            "assemble_acceptance_block",
+            "PHASED_EVIDENCE_SET_EXCLUDES",
+        ):
+            assert mirrored not in source, (
+                f"{mirrored} is assembled a second time inside the "
+                "backstop; that is the mirroring this set removed, and it "
+                "drifts from the CLI the moment either side changes"
+            )

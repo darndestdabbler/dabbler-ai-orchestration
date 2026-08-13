@@ -1159,6 +1159,8 @@ def find_session_verification_evidence(
     session_set_dir: str,
     session_number: int,
     orchestrator_effective_provider: str,
+    *,
+    notes: Optional[List[str]] = None,
 ) -> Tuple[List[dict], List[dict], List[str]]:
     """Return ``(all_rows, valid_stamped_rows, rejection_reasons)``.
 
@@ -1169,6 +1171,10 @@ def find_session_verification_evidence(
     consistent, and cross-provider against
     *orchestrator_effective_provider*. A missing/unreadable metrics file
     yields ``([], [], [])`` — the caller's fail-closed case.
+
+    *notes* (Set 128 S2) is the audit sink threaded down to
+    ``validate_stamped_row``: the backstop passes one so it can ledger
+    an A4.1 test-only exemption, and every other caller omits it.
     """
     metrics_path = _metrics_log_path()
     if not metrics_path:
@@ -1195,6 +1201,7 @@ def find_session_verification_evidence(
         orchestrator_effective_provider=orchestrator_effective_provider,
         models_registry=_models_registry() or None,
         repo_root=_repo_root_for(session_set_dir),
+        notes=notes,
     )
     return rows, valid, reasons
 

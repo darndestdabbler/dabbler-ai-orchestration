@@ -1,7 +1,7 @@
 {
   "sessionSetName": "128-session-step-skeleton-and-test-ordering",
   "createdDate": "2026-08-12T22:18:03.017600+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -130,6 +130,117 @@
       "stepKey": "close-out",
       "dateTime": "2026-08-12T19:42:03.695093-04:00",
       "description": "disposition.json authored (VERIFIED, next_orchestrator for session 2, four lessons cited, three residuals and the advisory checklist gap recorded rather than waived); cite_lessons run; committed d3e87ba and pushed; close_session succeeded with every blocking gate PASS and checklist_posted the one advisory WARN.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "Register. **Journal A4.1 and A4.2 as an operator-attested verification-reduction** \u2014 the constitution's hard carve-out, which `decision_journal` refuses to write without the attestation. Record the superseded line-count formulation as the rejected alternative, with the Set 127 S2 mutation evidence (six of eight two-line defects were real correctness bugs) as the reason it was dropped.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "write-a1-a3-into-the-constitution",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "**Write A1\u2013A3 into the constitution and the authoring guide.** Targeted runs only before verification; **no full suite before any cross-verification stage, including the path-aware critique** \u2014 which moves ahead of the suite rather than sitting inside close beside it; only *full* suites are pinned, so a targeted Layer 3 spec before a UAT walk stays legitimate; and \"required portion\" is carried by `covers`, not by running everything.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "encode-the-mechanizable-half-of-a4",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "**Encode the mechanizable half of A4:** classify the diff since the recorded verification round as **test-only** or **touching shipped code**, reusing `run_of_record`'s surface digests rather than adding a second notion of \"what changed\". Test-only owes nothing; shipped code owes a `remediation-review` round and not an open re-verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "falsify-in-both-directions",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "**Falsify in both directions.** FIRES: a shipped-code fix after the recorded round is reported as owing a delta review. DOES NOT FIRE: a test-only fix owes nothing; a session with no post-round change is untouched. STRUCTURAL: nothing here weakens the existing bounds, the no-resurrection rule, or `verification_integrity` \u2014 assert that against a hand-built ledger.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-12T20:06:38.115342-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T01:40:29.902902-04:00",
+      "description": "Registered session 2. Journalled A4.1/A4.2 as an operator-attested verification-reduction, with the superseded less-than-two-lines formulation recorded as the rejected alternative (Set 127 S2 planted eight defects, six were two lines or fewer, every one a real correctness bug). Second record journals the mechanization DEPTH: the close backstop consults the classifier - a test-only post-round delta lets the settling round stand, a shipped-code delta runs the delta-scoped remediation-review phase - because today ANY post-verification change stales the stamped row and the backstop buys a full metered round, so A4.1 was contradicted by the machinery rather than merely unwritten. Operator was inclined to the work-diff digest exclusion, asked for its risks, and switched on reading them.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "write-a1-a3-into-the-constitution",
+      "dateTime": "2026-08-13T01:48:55.748229-04:00",
+      "description": "Wrote A1-A4 into the constitution (Steps 5 and 8) and the authoring guide (a new A1-A4 section heading the test-run policy, with the operator rulings verbatim, the superseded line-count formulation marked do-not-reintroduce, and the bounds-untouched statement). A2 now names the path-aware critique explicitly as a stage no full suite may precede; A3 keeps a targeted spec at any layer legitimate and puts required-portion on covers. Mid-step the operator issued a STANDING authorization to exceed the guidance ceilings until Set 121: recorded in docs/guidance-lifecycle.md (new section, verbatim quote, three conditions), in router-config.yaml beside the ratchet rule, and as an explicit retirement obligation in Set 121 Session 4 Step 3; constitution ceiling 4000->4200 and total 12000->12200, raise-to-fit so the gate still reports honestly. The three unrelated compressions made before that authorization arrived were reverted. Also fixed a pre-existing merged row in the constitution per-step pointer table.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "encode-the-mechanizable-half-of-a4",
+      "dateTime": "2026-08-13T02:01:56.781826-04:00",
+      "description": "Encoded A4. run_of_record.SuiteSpec gains a declared tests tuple beside covers (allowlist, narrow: test-fixtures/ and scripts/ deliberately excluded because they stage what Layer 3 asserts) plus test_surface_prefixes / path_is_test_surface / classify_changed_paths. New ai_router/post_round_delta.py classifies the delta since the recorded round as no-change / test-only / shipped-code / unknown, reusing verification_stamp.work_diff_binding_paths for what changed and run_of_record for what is a test - no second notion of either. verify_session.record_round_completed now snapshots worktreeTreeAtCompletion on EVERY completed round (discoveryBaselineTree is taken pre-round and over-reports; it stays the named fallback). validate_stamped_row check 9 gains the A4.1 exemption, reached only on a digest mismatch, exempting freshness and nothing else, reported through a new notes sink. close_backstop threads the sink, ledgers an a4-test-only-exemption row when a close settles that way, and names the A4.2 obligation when it routes. SCOPE-BACK from the ratified option 1: the backstop does NOT substitute a delta-scoped remediation-review for its own round - reaching the backstop means A4.2 was skipped rather than satisfied, so a narrower round would be bought on an assumption; it reports what was owed instead.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "falsify-in-both-directions",
+      "dateTime": "2026-08-13T02:10:25.101997-04:00",
+      "description": "ai_router/tests/test_post_round_delta.py: 11 test functions / 13 cases, all planting real edits in a real git repo rather than reading predicates. FIRES: a post-round shipped-code fix owes a delta review; an unresolvable anchor fails closed to UNKNOWN which owes one too; a pre-Set-128 ledger falls back to the discovery baseline and SAYS it over-reports. DOES NOT FIRE: a test-only fix across both declared surfaces owes nothing; an unmoved tree is no-change; round bookkeeping written after the round is not work. NOT WIDENABLE: one shipped path among test paths still owes the review, planted three ways (a plain module, the near-miss ai_router/tests_helper.py, and test-fixtures/ which stages what Layer 3 asserts); an undeclared consumer repo exempts nothing. STRUCTURAL: the exemption relaxes freshness only (a bad source still refuses); the exemption predicate refuses shipped-code AND unknown deltas; an a4-test-only-exemption ledger row moves neither the round counter nor prior_rounds nor the bound verdict. Two mutation probes: widening classify_changed_paths failed 6 of 13 cases; a second probe pinning the exemption predicate to True initially survived ALL of them - the gap was real, a both-directions assertion was added, and the re-probe now fails on it. Both reverted byte-for-byte (hash-verified). Irony budget overrun declared: 11 functions against a budget of 8, because the spec assumed one classifier and two documents and did not know the machinery actively contradicted A4.1 - four surfaces ended up needing falsifiers, not one.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T03:16:39.788065-04:00",
+      "description": "Five rounds against gpt-5.5 (orchestrator provider anthropic excluded). Round 1 discovery, 2-lens fan-out: 2 blocking Majors, both the same defect - A4.2 was only REPORTED, not implemented, and my authoring-guide prose asserted behaviour the code did not have. The verifiers were right and my scope-back reasoning was wrong: the baseline is recorded, not assumed. Round 2 supplementary (run BEFORE remediating): 1 more Major, and the more valuable one - classify_delta reused work_diff_binding_paths, which unions ALL currently-untracked files, so an unchanged untracked file captured in the anchor tree was re-reported as a post-round change; that denied A4.1 to exactly the sessions that create a new file, the common shape. Fixed by making the delta a tree-to-tree diff. Round 3 remediation-review: L3 accepted, L1 rejected - the delta round called itself remediation-review without the phase machinery. Round 4 (cycle 2): L1-L3 accepted, new Major - the backstop omitted PHASED_EVIDENCE_SET_EXCLUDES. Rounds 3 and 4 were the same CLASS: the backstop mirrored the CLI phase piece by piece. Bound reached; operator adjudicated at an education-mode brief and authorized one round for the CLASS fix rather than the instance. Extracted verify_session.build_phase_round_inputs so both callers read one assembly, plus a structural falsifier that fails on any second spelling. Round 5 (operator-authorized): VERIFIED, 4 fix verdicts accepted, 0 rejected, 0 findings. All rounds cost \\.00 on the Copilot CLI seat.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T03:39:31.085740-04:00",
+      "description": "run_of_record check reported pytest as the only suite owed - mocha and playwright were untouched by this session and stayed fresh from session 1, which is A3 working as written (the required portion is carried by covers, not by running everything). First full pytest: 4161 passed / 1 failed - test_phased_evidence_actually_uses_the_evidence_list_not_the_freshness_one asserted verify_session.run source names PHASED_EVIDENCE_SET_EXCLUDES, and the class fix legitimately moved that wiring into build_phase_round_inputs. Updated the assertion to follow the wiring (checking the single assembly is strictly more precise, and run is still checked for the WRONG constant). That post-suite fix was then classified by this session own new machinery: post_round_delta reported test-only, A4.1, owes NO re-verification - a live dogfood of the rule on the session that shipped it. A4.1 exempts re-verification, not suite freshness, so pytest was re-run in full: 4162 passed / 9 skipped in 597.9s, recorded as the run of record.",
       "status": "complete"
     }
   ]

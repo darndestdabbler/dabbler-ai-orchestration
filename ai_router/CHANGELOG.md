@@ -13,6 +13,23 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 128 S2) `python -m ai_router.post_round_delta` — what a fix made
+  after the full suite owes, decided mechanically.** Classifies everything
+  that changed since the session's recorded verification round as
+  `no-change`, `test-only` (A4.1 — owes nothing), `shipped-code` (A4.2 —
+  owes one delta-scoped remediation-review) or `unknown` (fails closed,
+  owes one). Exit 1 when a review is owed, `--json` for a machine read.
+  Neither half of "what changed" is invented: the path list is
+  `verification_stamp.work_diff_binding_paths` (the same set whose digest
+  decides stamp freshness, already excluding round bookkeeping) and the
+  test classification is `run_of_record`'s declared suite surfaces — a
+  second notion of either would drift silently, because both directions
+  still produce an answer (L-069-1). `record_round_completed` now snapshots
+  `worktreeTreeAtCompletion` on **every** completed round, including
+  remediation-review and backstop rounds; `discoveryBaselineTree` is taken
+  *before* a round assembles evidence, so it over-reports and is used only
+  as a named fallback that says so.
+
 - **(Set 128 S1) A spec can no longer declare its steps in the shape that
   produced two verification-ordering incidents.** The canonical order —
   targeted tests → verify → remediate → full suites → close — already lived
@@ -49,6 +66,44 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   mutation probe gutting the checker fails 12 of its 19 cases.
 
 ### Fixed
+
+- **(Set 128 S2) A one-line test fix after the full suite no longer buys a
+  fresh metered verification round.** Operator ruling of 2026-08-12,
+  journalled as an **operator-attested verification-reduction** (the
+  constitution's hard carve-out): **A4.1** — a post-suite fix to tests only
+  triggers no re-verification; **A4.2** — a post-suite fix to shipped code
+  triggers a targeted `--phase remediation-review`, not an open
+  re-verification. This is the other half of A2, not a saving bolted onto it:
+  once every full suite runs *after* every cross-verification stage, a late
+  suite failure strands a stale verdict **by construction**.
+
+  The rule was contradicted by the machinery, not merely unwritten. Any
+  post-verification change — including a one-line test fix — moved
+  `work_diff_sha256`, so the stamped row went stale and `close_session`'s
+  backstop bought a full round. `validate_stamped_row`'s freshness check now
+  consults the new `post_round_delta` classifier and exempts a delta whose
+  every path is a **declared test surface** (`SuiteSpec.tests`, an allowlist
+  beside `covers`; `test-fixtures/` and `scripts/` are deliberately absent
+  because they stage what Layer 3 asserts). Reached only on a digest
+  mismatch, it relaxes freshness and nothing else: source, template,
+  verifier identity, the cross-provider exclusion, the artifact hash and the
+  verdict re-derivation all still refuse, and the round bounds and
+  no-resurrection arithmetic are untouched. Every exemption is reported and
+  ledgered (`a4-test-only-exemption`), so a close that settled under A4.1 is
+  distinguishable in the record from one that re-verified.
+
+  **The rule is keyed on what changed, never on how much.** An earlier
+  "less than two lines" formulation is superseded and must not return: Set
+  127 S2 planted eight defects against its finished suite and **six were two
+  lines or fewer** — `if (false)`, `const status = row.status`, one inverted
+  ternary — every one a real correctness bug. Size does not track blast
+  radius.
+
+  Shipped with 11 falsifiers that plant real edits in a real repo. Two
+  mutation probes: widening the classifier fails 6 of 13 cases, and a probe
+  pinning the exemption predicate to "granted" initially survived all of
+  them — the gap was real and closed with a both-directions assertion before
+  the change shipped.
 
 - **(Set 128 S1) `session_checklist.build_rows` no longer renders a
   gate-policy record as a step.** A `path_aware_critique` /

@@ -7,3 +7,15 @@
 {"sessionNumber": 1, "postedAt": "2026-08-12T19:21:04.140421-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
 {"sessionNumber": 1, "postedAt": "2026-08-12T19:36:27.296108-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
 {"sessionNumber": 1, "postedAt": "2026-08-12T19:41:24.523200-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["close-out"]}
+{"sessionNumber": 2, "postedAt": "2026-08-12T20:06:43.153944-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["register"]}
+{"sessionNumber": 2, "postedAt": "2026-08-12T20:11:26.306649-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["register"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T02:11:27.088239-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T02:19:07.839576-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T02:24:22.685292-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T02:40:11.784743-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T02:50:46.898511-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T02:59:16.044090-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T03:16:13.674673-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T03:17:03.087542-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T03:28:55.871847-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 2, "postedAt": "2026-08-13T03:39:31.520072-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["close-out"]}

@@ -121,12 +121,33 @@ class SuiteSpec:
     a statement about *whether the gate has an opinion*, not about the
     clock -- all three of this repo's layers carry it since Set 116 S3,
     and a consumer repo is free to declare a suite cheap.
+
+    ``tests`` (Set 128 S2) is the subset of ``covers`` holding the
+    suite's own test SOURCES -- the files that are not shipped. It exists
+    for A4.1: a post-suite fix confined to these paths changes nothing a
+    verifier reviewed as product, so it owes no re-verification, while
+    anything else does. Declaring it here rather than in a second module
+    keeps ONE definition of a suite's surfaces (L-069-1); the ordering
+    policy asks a different question of the same map.
+
+    It is deliberately an ALLOWLIST and deliberately narrow. A path is a
+    test surface only if it matches a declared ``tests`` prefix;
+    everything else -- including anything the list forgets -- classifies
+    as shipped and owes the review. A denylist here would fail OPEN
+    (L-125-1), and the classification is genuinely open-ended: Set 111
+    S2's close-backstop round 7 established that "what counts as a test
+    asset" has no attributable criterion, which is why this is a
+    declaration and not a heuristic. Note what is NOT declared:
+    ``test-fixtures/`` and ``scripts/`` stage what Layer 3 asserts, so a
+    change there is a change to what the rendering tests see, not a test
+    fix.
     """
 
     name: str
     command: str
     covers: Tuple[str, ...]
     expensive: bool = False
+    tests: Tuple[str, ...] = ()
 
 
 # Locked defaults for this repo's three layers. A consumer repo with no
@@ -151,6 +172,7 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # that guards every close-out path in the framework is exactly
         # what a close should have to prove it ran.
         expensive=True,
+        tests=("ai_router/tests/",),
     ),
     SuiteSpec(
         name="mocha",
@@ -173,6 +195,7 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
         # contributing guide but not in the recorded run set is a suite
         # that will not notice.
         expensive=True,
+        tests=("tools/dabbler-ai-orchestration/src/test/",),
     ),
     SuiteSpec(
         name="playwright",
@@ -203,6 +226,14 @@ DEFAULT_SUITES: Tuple[SuiteSpec, ...] = (
             "ai_router/close_session.py",
         ),
         expensive=True,
+        # playwright.config.ts -> testDir: ./src/test/playwright, which
+        # sits under the mocha entry above; ai_router/tests/e2e/ is the
+        # Python-side half. test-fixtures/ and scripts/ are deliberately
+        # absent -- they stage what these specs assert.
+        tests=(
+            "tools/dabbler-ai-orchestration/src/test/",
+            "ai_router/tests/e2e/",
+        ),
     ),
 )
 
@@ -292,15 +323,85 @@ def load_suites(config: Optional[dict] = None) -> Tuple[SuiteSpec, ...]:
         if not covers:
             continue
         command = item.get("command")
+        tests_raw = item.get("tests")
+        tests = (
+            tuple(
+                _posix(t.strip())
+                for t in tests_raw
+                if isinstance(t, str) and t.strip()
+            )
+            if isinstance(tests_raw, list)
+            else ()
+        )
         out.append(
             SuiteSpec(
                 name=name.strip(),
                 command=command if isinstance(command, str) else "",
                 covers=covers,
                 expensive=item.get("expensive") is True,
+                tests=tests,
             )
         )
     return tuple(out)
+
+
+def test_surface_prefixes(suites: Sequence[SuiteSpec]) -> Tuple[str, ...]:
+    """Every declared test-source prefix across *suites*, deduped+sorted.
+
+    The union is the right shape even though ``tests`` is declared
+    per-suite: A4 asks "is this path a test?", not "whose test is it?",
+    and a path under any suite's test sources is a test source.
+
+    A suite that declares none contributes none, so a consumer repo that
+    never declares ``tests`` gets an empty union -- under which
+    :func:`classify_changed_paths` calls EVERYTHING shipped and A4.1
+    never fires. That is the correct default for an undeclared repo:
+    the reduction is opt-in by declaration, and silence buys nothing.
+    """
+    out = {p for suite in suites for p in suite.tests if p}
+    return tuple(sorted(out))
+
+
+def path_is_test_surface(rel: str, prefixes: Sequence[str]) -> bool:
+    """True when *rel* sits under one of the declared test *prefixes*.
+
+    Prefix matching is the same shape :func:`surface_digest` and
+    :func:`session_touched` use -- one notion of "under a declared
+    surface" for the whole module (L-069-1) -- and it is anchored at a
+    path boundary so ``ai_router/tests_helper.py`` does not match
+    ``ai_router/tests/``.
+    """
+    rel = _posix(rel)
+    for prefix in prefixes:
+        if not prefix:
+            continue
+        p = _posix(prefix)
+        if rel == p.rstrip("/"):
+            return True
+        if rel.startswith(p if p.endswith("/") else p + "/"):
+            return True
+    return False
+
+
+def classify_changed_paths(
+    paths: Sequence[str], suites: Sequence[SuiteSpec]
+) -> Tuple[Tuple[str, ...], Tuple[str, ...]]:
+    """Split *paths* into ``(test_paths, shipped_paths)`` for A4.
+
+    The allowlist direction is the whole point: a path counts as a test
+    only when it matches a declared prefix, so an unrecognised,
+    misspelled or newly-invented location lands in ``shipped_paths`` and
+    owes the delta review. Nothing here decides what that OBLIGATION is
+    -- see ``post_round_delta`` -- this is only the classification.
+    """
+    prefixes = test_surface_prefixes(suites)
+    tests: List[str] = []
+    shipped: List[str] = []
+    for rel in paths:
+        (tests if path_is_test_surface(rel, prefixes) else shipped).append(
+            _posix(rel)
+        )
+    return tuple(sorted(tests)), tuple(sorted(shipped))
 
 
 def _git_z(repo_root: str, *args: str) -> Optional[List[str]]:
@@ -815,6 +916,9 @@ __all__ = [
     "FreshnessVerdict",
     "load_suites",
     "surface_digest",
+    "test_surface_prefixes",
+    "path_is_test_surface",
+    "classify_changed_paths",
     "read_records",
     "record_run",
     "session_touched",

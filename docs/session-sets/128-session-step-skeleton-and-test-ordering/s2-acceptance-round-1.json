@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "4c5613c5025d1da0d88a73e915eb619270b99c09",
+  "fixedTree": "f827e3e6f7ec187427a9bf2b733f79ae7f22a51c",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T06:37:01.846014+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** A4.2 is only reported; close backstop still runs an unphased full backstop round for shipped-code deltas. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/close_ba ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A close with stale stamped evidence caused by a post-round shipped-code delta must route through a delta-scoped remediation-review path, with the round recorded as remediation-review/fix-delta evidence, not as an unphased close-backstop round.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** A4.2 is only reported; the close backstop still runs an unphased full verification round for shipped-code post-round deltas. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A shipped-code post-round delta must no longer take the classic unphased backstop path; close/backstop must either execute or require a",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

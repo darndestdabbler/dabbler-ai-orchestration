@@ -1304,6 +1304,17 @@ guidance:
   # operator-authorized config edit with a stated reason, never an
   # in-session accommodation (docs/guidance-lifecycle.md).
   #
+  # STANDING OPERATOR AUTHORIZATION, 2026-08-12 (Set 128 S2), ACTIVE
+  # UNTIL SET 121: "I hereby authorize all sessions to go over the
+  # ceiling on guidance until we fix guidance in set 121." Until
+  # 121-guidance-becomes-executable lands, a session adding preload prose
+  # may raise the affected ceiling TO FIT its measured size instead of
+  # removing an equivalent amount first -- stating the reason here, as
+  # below. Set 121 re-slims the corpus, ratchets every number back down
+  # to the slimmed measurement, and deletes this paragraph along with
+  # the matching section in docs/guidance-lifecycle.md. Canonical:
+  # docs/guidance-lifecycle.md -> "Standing operator authorization".
+  #
   # These ceilings are the "preload residency" budget and are DISTINCT
   # from the two Set-064 lifecycle ceilings above (which remain the
   # lessons/guidance pruning backstop that summarize_overhead and
@@ -1333,10 +1344,17 @@ guidance:
   # (docs/guidance-lifecycle.md -> "Membership follows the
   # required-reading contract").
   preload:
-    total_ceiling_tokens: 12000
+    # Set 128 S2, under the standing operator authorization of 2026-08-12
+    # recorded above: raised 12000 -> 12200 to fit the A1-A4 test-ordering
+    # rules written into the constitution. Set 121 ratchets it back down
+    # to the slimmed corpus's measurement.
+    total_ceiling_tokens: 12200
     files:
       - path: docs/session-constitution.md
-        ceiling_tokens: 4000
+        # Set 128 S2: raised 4000 -> 4200 under the same authorization.
+        # The A1-A4 ordering rules belong in the per-session operating
+        # doc; no other preload file can carry them.
+        ceiling_tokens: 4200
       - path: docs/planning/project-guidance.md
         ceiling_tokens: 3499
       - path: docs/planning/lessons-learned.md

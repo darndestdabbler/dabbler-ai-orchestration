@@ -1022,6 +1022,7 @@ def validate_stamped_row(
     orchestrator_effective_provider: str,
     models_registry: Optional[dict] = None,
     repo_root: Optional[str] = None,
+    notes: Optional[List[str]] = None,
 ) -> Tuple[bool, str]:
     """Return ``(ok, reason)`` for one ``session-verification`` row.
 
@@ -1050,6 +1051,11 @@ def validate_stamped_row(
     6. ``artifact_path`` names an ``s<N>-verification*.md`` file at
        the session-set root whose bytes hash to ``artifact_sha256``.
     7. ``package_version`` is a non-empty string.
+
+    *notes* (Set 128 S2) is an optional sink for audit lines a caller
+    wants to surface. Only the A4.1 exemption in check 9 writes to it
+    today. A caller that passes nothing is unaffected in every way; the
+    sink can never change a verdict, only explain one.
     """
     # 1. Source.
     source = row.get("source")
@@ -1284,14 +1290,86 @@ def validate_stamped_row(
             "cannot be diffed against the current tree (fails closed)"
         )
     if current_work_diff != row.get("work_diff_sha256"):
+        # A4.1 (operator-attested verification-reduction, Set 128 S2):
+        # the work changed, but if EVERY changed path is a declared test
+        # surface then nothing that ships moved, and there is nothing for
+        # a verifier to re-examine. Without this the machinery
+        # contradicted the ruling: a one-line test fix after the full
+        # suite staled the row and the close backstop bought a fresh
+        # metered round.
+        #
+        # Four things keep this from becoming a hole:
+        #   * it is reached ONLY on a digest mismatch, so it can never
+        #     turn a fresh row stale or admit anything an unmodified tree
+        #     would not already admit;
+        #   * it exempts check 9 and nothing else — source, template,
+        #     verifier identity, the cross-provider exclusion, the
+        #     artifact hash and the verdict re-derivation all still
+        #     govern, and any of them failing has already returned above;
+        #   * "test surface" is an allowlist declared in
+        #     ``run_of_record``'s suites, so an unrecognised path
+        #     classifies as shipped and stales the row (L-125-1:
+        #     denylists fail open);
+        #   * every exemption is reported through *notes* and ledgered by
+        #     the close backstop, so a close that settled under A4.1 is
+        #     distinguishable in the record from one that re-verified.
+        exempt, detail = _a4_test_only_exemption(
+            session_set_dir, session_number
+        )
+        if exempt:
+            if notes is not None:
+                notes.append(
+                    "A4.1 exemption: the row's work_diff_sha256 no longer "
+                    f"matches, but {detail} — test-only deltas owe no "
+                    "re-verification (operator-attested, Set 128 S2)"
+                )
+            return True, ""
         return False, (
             "the session's work changed after this row was stamped "
             "(work_diff_sha256 no longer matches the tree diffed from "
             f"evidence_base {str(row.get('evidence_base'))[:12]}) — "
-            "stale evidence cannot settle this close; re-verify"
+            f"stale evidence cannot settle this close; re-verify. {detail}"
         )
 
     return True, ""
+
+
+def _a4_test_only_exemption(
+    session_set_dir: str, session_number: int
+) -> Tuple[bool, str]:
+    """``(exempt, detail)`` for check 9's A4.1 carve-out.
+
+    Delegates the classification entirely to ``post_round_delta`` so
+    there is exactly one implementation of "what changed since the
+    recorded round" and one of "what counts as a test" (L-069-1). Any
+    failure to classify — a missing module, an unresolvable anchor, a
+    git failure — returns ``False``: the carve-out is opt-in on positive
+    evidence, never on an absence of evidence.
+    """
+    try:
+        try:
+            from .post_round_delta import (  # type: ignore[import-not-found]
+                DELTA_TEST_ONLY,
+                classify_delta,
+            )
+        except ImportError:
+            from post_round_delta import (  # type: ignore[no-redef]
+                DELTA_TEST_ONLY,
+                classify_delta,
+            )
+        verdict = classify_delta(session_set_dir, session_number)
+    except Exception as exc:  # pragma: no cover - defensive
+        return False, (
+            f"the post-round delta could not be classified "
+            f"({type(exc).__name__}), so the A4.1 test-only exemption does "
+            "not apply (fails closed)"
+        )
+    if verdict.classification == DELTA_TEST_ONLY:
+        return True, (
+            f"every changed path is a declared test surface "
+            f"({', '.join(verdict.test_paths)}; anchor {verdict.anchor})"
+        )
+    return False, f"A4 delta: {verdict.classification} — {verdict.reason}"
 
 
 def find_valid_stamped_rows(
@@ -1302,12 +1380,17 @@ def find_valid_stamped_rows(
     orchestrator_effective_provider: str,
     models_registry: Optional[dict] = None,
     repo_root: Optional[str] = None,
+    notes: Optional[List[str]] = None,
 ) -> Tuple[List[dict], List[str]]:
     """Split *rows* into ``(valid_stamped, rejection_reasons)``.
 
     *rows* are pre-filtered ``session-verification`` rows for the
     (set, session) under close. The reasons list carries one entry per
     rejected row, in row order, for the gate's refusal message.
+
+    *notes* is passed straight through to :func:`validate_stamped_row`
+    (Set 128 S2): a caller that wants to know an A4.1 exemption fired
+    supplies a list, and one that does not is unaffected.
     """
     valid: List[dict] = []
     reasons: List[str] = []
@@ -1319,6 +1402,7 @@ def find_valid_stamped_rows(
             orchestrator_effective_provider=orchestrator_effective_provider,
             models_registry=models_registry,
             repo_root=repo_root,
+            notes=notes,
         )
         if ok:
             valid.append(row)

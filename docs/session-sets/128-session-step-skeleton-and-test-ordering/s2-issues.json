@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** A4.2 is only reported; close backstop still runs an unphased full backstop round for shipped-code deltas.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_backstop.py:887`, `ai_router/close_backstop.py:918`, `ai_router/close_backstop.py:1149`, `docs/planning/session-set-authoring-guide.md:1873`, `docs/session-sets/128-session-step-skeleton-and-test-ordering/decisions.jsonl:4`\n  - **Failure scenario:** A typical session fixes shipped code after the post-verification full suite and then attempts close without manually running A4.2. That is the exact stale-evidence path A4 addresses; `validate_stamped_row` rejects the row, `decide_backstop` routes, and `run_close_backstop` assembles the normal session diff and records `phase=None`, so the close buys the unphased backstop round the operator decision says must be replaced by a delta-scoped remediation-review.\n  - **Acceptance criterion:** `JUDGMENT - A close with stale stamped evidence caused by a post-round shipped-code delta must route through a delta-scoped remediation-review path, with the round recorded as remediation-review/fix-delta evidence, not as an unphased close-backstop round.`\n  - **Details:** **Violation:** the recorded operator decision says “a shipped-code delta runs the delta-scoped remediation-review phase instead of an unphased full round,” and the authoring guide says the close backstop consults the classifier “rather than buying an unphased full round.” **Impact:** the central A4.2 cost-reduction objective is not delivered for the close path that spends money; reviewers would merge a change that still does the old expensive thing for code fixes. **Evidence:** `close_backstop._a4_obligation_note` explicitly “Reports; never decides,” then `run_close_backstop` calls `_vs.assemble_evidence(...)` and records the ledger row with `phase=None`; it appends only a message saying remediation-review was owed.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical session fixes shipped code after the post-verification full suite and then attempts close without manually running A4.2. That is the exact stale-evidence path A4 addresses; `validate_stamped_row` rejects the row, `decide_backstop` routes, and `run_close_backstop` assembles the normal session diff and records `phase=None`, so the close buys the unphased backstop round the operator decision says must be replaced by a delta-scoped remediation-review.",
+      "evidencePaths": [
+        "ai_router/close_backstop.py",
+        "docs/planning/session-set-authoring-guide.md",
+        "docs/session-sets/128-session-step-skeleton-and-test-ordering/decisions.jsonl"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A close with stale stamped evidence caused by a post-round shipped-code delta must route through a delta-scoped remediation-review path, with the round recorded as remediation-review/fix-delta evidence, not as an unphased close-backstop round."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** A4.2 is only reported; the close backstop still runs an unphased full verification round for shipped-code post-round deltas.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_backstop.py:803`, `ai_router/close_backstop.py:887`, `ai_router/close_backstop.py:918`, `ai_router/close_backstop.py:1149`, `docs/planning/session-set-authoring-guide.md:877`, `docs/planning/session-set-authoring-guide.md:907`, `docs/session-sets/128-session-step-skeleton-and-test-ordering/decisions.jsonl:4`\n  - **Failure scenario:** A session verifies, runs the full suite, fixes a shipped-code failure, and proceeds to close without manually running `verify_session --phase remediation-review`. That is the named A4.2 path. The stale stamped row will not settle, `decide_backstop` will route, and `run_close_backstop` deterministically calls `_vs.assemble_evidence(...)` with no remediation-review framing and records `phase=None`, so the user buys the classic open backstop round every time instead of the promised delta-scoped review.\n  - **Acceptance criterion:** `JUDGMENT - A shipped-code post-round delta must no longer take the classic unphased backstop path; close/backstop must either execute or require a `remediation-review` phase round, and product tests must cover that path.`\n  - **Details:** **Violation:** the documented/operator-ratified rule says “A4.2 — a post-suite fix to code triggers targeted/focused remediation-review only, not an open re-verification,” and the authoring guide claims “the close backstop consults the same classifier rather than buying an unphased full round.” **Impact:** the main A4.2 objective is not delivered: the close path still spends the expensive broad verification round and allows out-of-delta review scope, changing the merge decision because the mechanized half of A4.2 is incomplete. **Evidence:** `_a4_obligation_note` explicitly “Reports; never decides,” `run_close_backstop` only appends that note after routing, then assembles classic evidence via `_vs.assemble_evidence(...)` and records the completed round with `phase=None`. The correct behavior is to avoid the unphased backstop for `DELTA_SHIPPED_CODE` and make the owed round a remediation-review.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A session verifies, runs the full suite, fixes a shipped-code failure, and proceeds to close without manually running `verify_session --phase remediation-review`. That is the named A4.2 path. The stale stamped row will not settle, `decide_backstop` will route, and `run_close_backstop` deterministically calls `_vs.assemble_evidence(...)` with no remediation-review framing and records `phase=None`, so the user buys the classic open backstop round every time instead of the promised delta-scoped review.",
+      "evidencePaths": [
+        "ai_router/close_backstop.py",
+        "docs/planning/session-set-authoring-guide.md",
+        "docs/session-sets/128-session-step-skeleton-and-test-ordering/decisions.jsonl"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A shipped-code post-round delta must no longer take the classic unphased backstop path; close/backstop must either execute or require a"
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "4c5613c5025d1da0d88a73e915eb619270b99c09"
+}

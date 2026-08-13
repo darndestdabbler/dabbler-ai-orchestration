@@ -163,6 +163,38 @@ it does not edit the number. The `stamp: true` per-entry opt-in controls
 `--write-headers` auto-editing (default false — canonical docs and the
 engine bootstrap files are never machine-stamped).
 
+### Standing operator authorization, 2026-08-12 → Set 121 (ACTIVE)
+
+> **Operator, 2026-08-12 (Set 128 Session 2):** *"I hereby authorize all
+> sessions to go over the ceiling on guidance until we fix guidance in
+> set 121."*
+
+Until [`121-guidance-becomes-executable`](session-sets/121-guidance-becomes-executable/spec.md)
+lands, a session that must add preload prose is **not** required to
+remove an equivalent amount first, and it may raise the affected
+`ceiling_tokens` (and `total_ceiling_tokens`) to fit. This is the
+operator's standing authorization, so it satisfies the
+"operator-authorized config edit with a stated reason" rule above
+without a fresh stop each time. Three conditions hold anyway:
+
+1. **Raise to fit, not to make room.** Set the number to what the
+   corpus actually measures, so the gate still reports honestly and CI
+   stays green. A raise is not a licence to stop measuring.
+2. **State the reason in the config comment,** citing this
+   authorization and the date, exactly as the ratchet rule requires.
+3. **Set 121 clears it.** That set re-slims the corpus, ratchets every
+   ceiling back down to the slimmed measurement, and **deletes this
+   section** — the authorization expires with it, and an authorization
+   nobody retires is how a temporary accommodation becomes the norm.
+
+The reason this is a standing authorization rather than four ad-hoc
+ones: the corpus has been pinned at 99–100% of every ceiling since Set
+085 S2, so *every* set that touches a preload file pays a slimming tax
+to land one line of unrelated policy. Set 128 S2 hit it writing the A1–A4
+ordering rules into the constitution and spent its first pass
+compressing prose in three sections it had no other business editing.
+Set 121 fixes the corpus; until then the tax buys nothing but churn.
+
 Back-compat: a repo with no `preload:` block keeps exactly the two-file
 Set-064 behavior (universal core, gated extension). Only a
 **workspace-resolved** `router-config.yaml` (or one explicitly pointed

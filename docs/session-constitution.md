@@ -62,30 +62,30 @@ Run every router CLI through the workspace venv
     (`python -m ai_router.session_checklist`, `--markdown` for a chat
     surface) at each named transition: session start; before a
     long-running command and again once its run is **recorded**; every
-    operator stop (post before the brief — the gate sees the post
-    after the decision is journaled); and before close.
+    operator stop (post before the brief — the gate sees the post after
+    the decision is journaled); and before close.
     `verify_session` posts the round transitions itself (Set 127 S3).
-    Rendering it is what
-    records it, and the `checklist_posted` close gate compares that
-    record against the transitions your own records show — a session
-    that never posted cannot close quietly. The active
-    orchestrator owns implementation, architecture, analysis, documentation,
-    and test authoring for the temporary policy window. Route only
-    `session-verification`, which must use a different effective provider;
-    own the mechanics (file edits, shell, git, and mechanical single-file
-    edits under ~50 lines).
-- **5. Build + test — targeted only.** Run the tests covering what you
-  just changed; log the result. **Do not run a full suite here** — not
-  even "just to see": Step 7 remediation is a code change, so it is
-  invalidated in nearly every session. Set 112 S3 obeyed the old
-  ordering into 15 runs and 186 minutes (Set 116 S3).
-- **6. Verify (mandatory, every session).** Run the phased
-  loop: `python -m ai_router.verify_session --phase discovery` for the
-  set (fan-out sized by config; all severities). It routes the evidence
-  to a **different-provider** verifier and writes the raw round
-  artifacts. There is no skip — verification is machine-enforced at
-  close, and running `verify_session` yourself is the sanctioned way to
-  iterate before that enforcement fires.
+    Rendering it records it, and the `checklist_posted` gate compares
+    that record against your own — a session that never posted cannot
+    close quietly. The active orchestrator owns implementation,
+    architecture, analysis, documentation and test authoring for the
+    temporary policy window; route only `session-verification`, on a
+    different effective provider, and own the mechanics (file edits,
+    shell, git, mechanical single-file edits under ~50 lines).
+- **5. Build + test — targeted only** (A1). Run the tests covering what
+  you just changed; log the result. **No FULL suite before ANY
+  cross-provider stage** (A2) — the path-aware critique is one, and
+  Step 7 remediation is a code change, so an early full run is
+  invalidated wherever it matters (Set 112 S3: 15 runs, 186 minutes).
+  Only *full* suites are pinned (A3) — a targeted spec at any layer,
+  including Layer 3 before a UAT walk, stays legitimate.
+- **6. Verify (mandatory, every session).** Run the phased loop:
+  `python -m ai_router.verify_session --phase discovery` for the set
+  (fan-out sized by config; all severities). It routes the evidence to a
+  **different-provider** verifier and writes the raw round artifacts.
+  There is no skip — verification is machine-enforced at close, and
+  running `verify_session` yourself is the sanctioned way to iterate
+  before that enforcement fires.
 - **7. Handle the verdict by blocking-ness, not the bare token.** Only
   a Critical/Major (or unknown-severity) finding continues the loop; a
   Minor-only round is effectively VERIFIED — record the nits and
@@ -100,22 +100,24 @@ Run every router CLI through the workspace venv
   `advisory`/`required`, RUN the multi-provider path-aware critique now
   and remediate it** — it is code-changing and its artifact is gated at
   the set-terminal close. Then, after **every** code-changing stage is
-  finished, fully run every
-  expensive suite whose `covers` surfaces this session touched and
-  record each (`python -m ai_router.run_of_record record --suite <s>
-  --outcome passed --duration-seconds <n>`, required) or
-  `test_run_fresh` refuses the close. All three layers are governed
-  (Set 116 S3); `covers` is by path, so docs under `ai_router/` owe
-  pytest. Recording does **not** stale the verification that just
-  passed (Set 116 S2) — which makes this a last step, not a loop. Then
-  author `disposition.json`
-  (`verification_verdict` always; `next_orchestrator` on a mid-set
-  completion; `uat` when the set declares `requiresUAT`), commit **and
-  push**, run
-  `python -m ai_router.close_session` for the set, and only after it
-  succeeds fire the session-complete notification. Record instrumental
-  lessons in `disposition.lessons_cited` and run `cite_lessons` in the
-  final commit.
+  finished, fully run every expensive suite whose `covers` surfaces this
+  session touched and record each (`python -m ai_router.run_of_record
+  record --suite <s> --outcome passed --duration-seconds <n>`, required)
+  or `test_run_fresh` refuses the close. All three layers are governed
+  (Set 116 S3); the **required portion** is carried by `covers`, which
+  is by path — so docs under `ai_router/` owe pytest, and a suite this
+  session did not touch is not owed at all. Recording does **not** stale the verification that just passed
+  (Set 116 S2) — a last step, not a loop. A fix made AFTER the suite
+  (A4, operator-attested): test-only owes nothing; shipped code owes one
+  delta-scoped `--phase remediation-review`, never an open
+  re-verification (`post_round_delta` classifies it). Then author
+  `disposition.json` (`verification_verdict` always; `next_orchestrator`
+  on a mid-set completion; `uat` when the set declares `requiresUAT`),
+  commit **and push**, run `python -m ai_router.close_session` for the
+  set, and only after it succeeds fire the session-complete
+  notification. Record instrumental lessons in
+  `disposition.lessons_cited` and run `cite_lessons` in the final
+  commit.
 - **9. Last session only (post-notify).** Run the reorganization review
   of `project-guidance.md` / `lessons-learned.md` — "no changes
   recommended" is a valid outcome, skipping the review is not.
@@ -255,7 +257,8 @@ Open the named reference at the step's trigger moment — not before.
 | 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, **session-size cap**, slugs) |
 | 2 | `docs/ai-led-session-workflow.md` | The set declares `requiresUAT` / `requiresE2E` — the gated UAT/E2E procedures |
 | 4 | `docs/planning/session-set-authoring-guide.md` | The step-checklist cadence: what a transition is, the post ledger, the `checklist_posted` gate |
-| 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy and the run-of-record freshness gate || 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
+| 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy (A1–A4: what runs when, relative to verification) and the run-of-record freshness gate |
+| 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
 | 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |
 | 6–7 | `docs/ai-led-session-workflow.md` | Verification mechanics: materiality / loop discipline detail, adjudication options |
 | 8 | `ai_router/docs/close-out.md` | Preflight BEFORE close (`close_preflight`); close failure, stranded session, drift, flags |

@@ -830,10 +830,111 @@ prerequisites.
 
 ---
 
-## The test-run policy (Set 111 S4)
+## The test-run policy (Set 111 S4; A1–A4 added by Set 128 S2)
 
 Canonizes the policy piloted in Set 110's operator notes. The waste
 pattern being eliminated is **invalidated runs**, not full runs.
+
+### A1–A4: what runs when, relative to verification
+
+The canonical order is **targeted tests → verify → remediate → full
+suites → close**. Set 116 S3 established it after Set 112 S3 obeyed the
+old ordering into 15 runs and 186 minutes; Set 127 S2 then re-encoded
+the retired ordering in one compressed step (*"Full pytest and the
+Layer 3 run recorded as runs of record; verify; close"*) and an
+orchestrator followed the spec's letter over the policy that outranks
+it. Session 1 of Set 128 made that shape unspeakable in a spec; these
+four rules are what the shape protects.
+
+- **A1 — before verification, targeted runs only.** Run the tests
+  covering what you changed, log the result, stop there.
+- **A2 — no full suite before *any* cross-verification stage,
+  including the path-aware critique.** Operator ruling, 2026-08-12:
+  *"the full test suite should never be run before any
+  cross-verification, including the path-aware critique. That is quite
+  wasteful and probably accounting for untold extra minutes of
+  processing."* Both stages are code-changing, and either one staling a
+  suite run costs the same wasted minutes. This is stricter than
+  treating the critique and the suite as one Step-8 stage.
+- **A3 — only *full* suites are pinned, and only the required
+  portion.** A targeted Layer 3 spec before a UAT walk is legitimate
+  and stays legitimate; Set 127 S2 got that part right and then ran the
+  *whole* Playwright suite before verification, which is the part that
+  was wrong. The rule has to name "full", or it forbids the useful case
+  and permits the wasteful one. "Required portion" is carried by
+  `covers`: `run_of_record check` reports *"session touched none of
+  this suite's surfaces"*, and a step that overstates its own
+  obligation is a step that gets improvised around.
+- **A4 — what a fix made AFTER the suite owes.** Operator ruling,
+  2026-08-12, journalled as an **operator-attested
+  verification-reduction** (the constitution's hard carve-out;
+  `decision_journal` refuses to write it otherwise) in Set 128 S2's
+  `decisions.jsonl`:
+  - **A4.1 — a post-suite fix to one or more tests only (and not to
+    code) does not trigger any re-verification.** A fix to a test
+    changes nothing that ships, so there is nothing for a verifier to
+    re-examine.
+  - **A4.2 — a post-suite fix to code triggers targeted/focused
+    remediation-review only, not an open re-verification.** That maps
+    onto machinery that already exists: `verify_session --phase
+    remediation-review` reviews only the fix hunks against the recorded
+    discovery baseline. The choice was never "full round or nothing".
+
+  **A2 makes A4 necessary, not merely economical.** Under the old
+  ordering a suite failure was fixed *before* verification, so the
+  verifier saw the fix. Pushing every full suite after every
+  cross-verification stage means a late suite failure strands a stale
+  verdict **by construction**. Read A4 alone and it looks like
+  cost-cutting; it is the other half of A2.
+
+  **The rule is keyed on what changed, never on how large the change
+  is.** An earlier formulation exempted fixes of "less than two lines"
+  and is **superseded — do not reintroduce it.** Set 127 S2 planted
+  eight defects against its finished suite to prove its falsifiers
+  bite, and **six were two lines or fewer** — `if (false)`,
+  `const status = row.status`, one inverted ternary — every one a real
+  correctness bug that changed shipped behaviour. A two-line edit is
+  precisely the size that inverts a predicate. Size does not track
+  blast radius.
+
+**Which one you owe is decided mechanically, not by eye:**
+
+```bash
+python -m ai_router.post_round_delta \
+    --session-set-dir docs/session-sets/<slug>    # add --json for a machine read
+```
+
+It classifies everything that changed since the session's recorded
+verification round as `no-change`, `test-only` (A4.1 — owes nothing) or
+`shipped-code` (A4.2 — owes one delta-scoped `--phase
+remediation-review`), and an unclassifiable delta reports `unknown`,
+which owes the review exactly as a shipped-code change does. It reuses
+`run_of_record`'s declared suite surfaces, so "what changed" and "what
+is a test" each have exactly one definition in this repo.
+
+The close backstop consults the same classifier, so A4 is enforced and
+not merely advertised:
+
+- a **test-only** delta lets the session's existing verification stand —
+  the stamped row's freshness check exempts it — instead of buying a
+  metered round, and the settlement is recorded in `sN-rounds.jsonl` as
+  an `a4-test-only-exemption`;
+- a **shipped-code** delta still buys a round, but the backstop runs it
+  as a **delta-scoped `remediation-review`** against the baseline the
+  session's own round recorded, not an unphased re-review of the whole
+  session. The ledger row carries `phase: remediation-review`, so the
+  bounded totals count it against the right family.
+
+Both arms are **reported and ledgered** every time they fire — a close
+that settled under A4.1 is distinguishable in the record from one that
+re-verified.
+
+**A4 does not touch the round bounds.** A delta review is a
+remediation-review cycle like any other: it is ledgered in
+`sN-rounds.jsonl` and counts against the machine-enforced cap of two.
+At the cap the resolution is the operator's, exactly as before.
+
+### The mechanics
 
 - **Every suite runs in two modes:** *targeted* — the specific tests
   covering what you just changed, any time; and *full* — **exactly once
@@ -850,7 +951,8 @@ pattern being eliminated is **invalidated runs**, not full runs.
   changed — that is what *targeted* means, and it is seconds, not
   minutes. The rule bounds the runs, not merely which one is recorded.
 - **Count the path-aware critique as a code-changing stage** (Set 116
-  S3, learned the expensive way). On a set whose `pathAwareCritique` is
+  S3, learned the expensive way; now **A2**). On a set whose
+  `pathAwareCritique` is
   `advisory` or `required`, the critique reads the repo and routinely
   produces remediation — and it is produced *before* the set-terminal
   close, which is *after* Step 8's run in the naive reading. Set 116 S3

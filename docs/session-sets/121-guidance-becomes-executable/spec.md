@@ -56,6 +56,17 @@ only; raising one is an operator-authorized config edit, never an
 in-session accommodation. So the only way to admit anything is to
 **remove prose first**, which is what Session 1 does.
 
+> **Superseded in part, 2026-08-12 (Set 128 S2).** The operator issued a
+> **standing authorization** to exceed the guidance ceilings until this
+> set lands, precisely because the no-headroom condition above was
+> taxing every unrelated set that touched a preload file. Set 128 S2
+> raised `docs/session-constitution.md` to 4,200 and the total to
+> 12,200 to fit the A1–A4 test-ordering rules. So the table above is a
+> **floor, not the current state** — re-derive it in Session 1 as the
+> spec already requires, and note that Session 4 Step 3 now owes the
+> retirement of that authorization. Canonical:
+> `docs/guidance-lifecycle.md` → *Standing operator authorization*.
+
 **And 148 of those tokens are spent on bookkeeping.** The per-lesson
 usage trailers live *inside* `lessons-learned.md`, which is preload —
 six of them, 594 bytes, ~148 tokens. The accounting that decides what to
@@ -459,7 +470,15 @@ those two funds ids for the whole document.
    the extent the promotions require, per proposal step 3. Content
    demoted to on-demand reference is a ceiling *reduction*, which is
    routine. `guidance_report --check` must pass at the end, and any
-   ceiling that can now ratchet down should.
+   ceiling that can now ratchet down should. **Retire the standing
+   operator authorization of 2026-08-12** in the same pass: ratchet
+   every `ceiling_tokens` (and `total_ceiling_tokens`) back down to the
+   slimmed corpus's measurement, and delete both the
+   *"Standing operator authorization"* section of
+   `docs/guidance-lifecycle.md` and the matching paragraph in
+   `router-config.yaml`. That authorization exists because this set had
+   not run yet; an accommodation nobody retires is how a temporary one
+   becomes the norm.
 4. **Measure the doc-only cap on this set's own verification traffic** —
    the first prose-heavy work since it shipped, now across all **four**
    sessions. Report, per round: findings raised, how many cited

@@ -578,14 +578,23 @@ def test_phased_evidence_actually_uses_the_evidence_list_not_the_freshness_one()
     Defining ``PHASED_EVIDENCE_SET_EXCLUDES`` and leaving the evidence
     bundle pointed at the freshness list would reproduce the exact defect
     with a new name, and every other test here would still pass.
+
+    Set 128 S2 moved the wiring out of ``run`` and into
+    ``build_phase_round_inputs``, the single phase assembly the CLI and
+    the close backstop now share. The assertion follows the wiring rather
+    than the old address: checking the assembly is strictly more precise,
+    because it is the only place either caller can get its exclusions
+    from. ``run`` is still checked for the WRONG constant, so pointing it
+    back at the freshness list would still fail.
     """
     import inspect
 
     from ai_router import verify_session as vs
 
-    source = inspect.getsource(vs.run)
-    assert "PHASED_EVIDENCE_SET_EXCLUDES" in source
-    assert "WORK_DIFF_SET_BOOKKEEPING" not in source
+    assembly = inspect.getsource(vs.build_phase_round_inputs)
+    assert "PHASED_EVIDENCE_SET_EXCLUDES" in assembly
+    assert "WORK_DIFF_SET_BOOKKEEPING" not in assembly
+    assert "WORK_DIFF_SET_BOOKKEEPING" not in inspect.getsource(vs.run)
 
 
 # --- CLI ----------------------------------------------------------------

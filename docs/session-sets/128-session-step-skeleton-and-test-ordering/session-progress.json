@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-13T03:44:59.399262-04:00",
+  "generatedAt": "2026-08-13T05:14:28.467315-04:00",
   "sessionSetDir": "128-session-step-skeleton-and-test-ordering",
   "inputs": {
-    "activity-log.json": "f58243ee726fca5d3e8c44b85a56c43fc1ddd9938977e20f35a6f13018d9176c",
-    "session-state.json": "04fccacaed991103f5e10140656595798df6ce7b90a082b07aeff6b86f3a1c9d",
-    "spec.md": "f8e4a67d40e25207a63ce54dcf699160149130c9e0d679ff9b845c46b173a57e"
+    "activity-log.json": "ad4664e080731610fcd3f7697b41e493936bb1c7ff5c242b58275d8692260668",
+    "session-state.json": "3825eb5803cabd147cee3e2c6679d02466d88c7d198b686ed3c2b20e59274510",
+    "spec.md": "3eae9319302a182b74b61915273c79028492224e90f22d07d48137fc4e093210"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -217,19 +217,94 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 of 3. Read the whole preload, confirmed session 2 closed VERIFIED, and confirmed the operator scope change journalled at the end of session 2: session 3 handles FOUR unstarted specs, not one. Baseline measured rather than trusted - spec_admission --all --check reports exactly four unstarted specs requiring restructuring (113, 118, 121, 122; 14 sessions in total), every one with the identical malformation.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T03:55:20.965294-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "re-author-118-test-retirement-and",
+          "description": "Re-authored 118-test-retirement-and-coupling-budget substantively, not just structurally. SHAPE: all three sessions now 7 steps / N=3 work steps, admitting clean, no sessionSizeException. MEASUREMENTS RE-READ rather than restated: counters validated by reproducing the 2026-08-10 row exactly at 8fda8d85 (124/3345/60188) before being run at HEAD -> 133 files, 3513 functions, 67182 test LOC, 4171 collected, ratio 0.99 (inside the measured 0.91-1.04 band, so the sets own bounding finding survives), +56 test functions/day over 3 days against the +29/day the 100-day series reports. The COUPLING figure does NOT reproduce: the spec prose detector gives 43/1294 at the specs own commit and a bare __file__ reading gives 48/1497, bracketing the stated 47/1485 - so the number was always detector-dependent and the detector was never written down. Step 4 now chases a named discrepancy instead of hoping for a match. ORDERING (A1/A3/A4): A1 - retirement silently changes what targeted resolves to, so test_inventory must flag sole-cover-for-a-module candidates and they never enter a bulk pass. A3 - covers is a path prefix, so retirement changes what a suite contains and never which suites are owed; a vacated covers prefix is reported, not edited; A5 stays Set 129s. A4.1 - the real find: classify_changed_paths is purely path-based and does not distinguish an edited test from a DELETED one, so a post-suite retirement classifies test-only and post_round_delta reports nothing owed, while this sets own Session 2 rules that retiring a test IS a verification reduction. Both correct in their own frame; together a hole exactly the shape of 118s deliverable. Resolved with a hard ordering constraint carried IN THE ATTESTED RECORD (retirement lands before verification, never after the suite; one discovered late is deferred to a later session), plus an anti-pattern and an end-of-set deliverable. Framed as a constraint on 118, not a defect against 128.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T03:56:47.271899-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "restructure-the-other-three-unstarted-specs",
+          "description": "Restructured 113, 121 and 122 and re-admitted all four. THE DOGFOOD IS MET: spec_admission --all --check now reports 0 unstarted specs requiring restructuring, on four specs this set did not author. The specs prediction (all fourteen sessions land at 7 steps / N=3, no sessionSizeException owed anywhere) was RE-MEASURED and is 13/14 true. Two sessions had work compressed into the ceremony step rather than pure ceremony. 113 S4: reserve the follow-on sets folded into step 4 (already the outcome-recording step) and the dogfood UAT moved into close-out where disposition.uat is authored anyway - both were bundled with and close in the original, so faithful; lands at 7/N=3. 121 S2: NO fold - its step 5 derives the PARAMETERS (N, the cap) that steps 3-4 rules consume, the sequencing note 4b flags both proposed-not-measured, and it owns progress key numbersDerived; folding would bury a named deliverable in prose, the exact failure mode the skeleton prevents. Declared sessionSizeException: 2 with its reason at 8 steps / N=4, and journalled the call to decisions.jsonl (goal-over-letter, reversible, verification_effect none) with the two rejected alternatives. Also confirmed no CI job gates on spec_admission --all --check, so the 49 historical over-cap sessions (started/complete sets, explicitly out of scope) do not turn CI red. RETIRED the source-of-record note docs/planning/session-step-skeleton-and-verification-cost.md from diagnosed-not-fixed to FIXED: status header names the three closing sessions, and each open question carries an inline RESOLVED marker (A4 journalled+mechanized in S2; the budget N=3 ratified in S1 plus the 13/14 re-measurement; refuse-or-warn ratified blocking-for-unstarted; the 118 recommendation done and widened to four specs). A5 marked OWNED - Set 129, with the two independent reviews conclusion. Marked the one stale current-behaviour claim (max_steps_per_session currently 5) per L-064-8 rather than leaving a retired doc reading authoritative. Authored change-log.md for the set.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T04:04:20.344230-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "cross-provider-verification",
+          "description": "Two rounds plus the required path-aware critique, all against gpt-5.5/gemini (orchestrator provider anthropic excluded), all \\.00 on the Copilot CLI seat. Round 1 discovery, 2-lens fan-out: VERIFIED, 0 findings, both lenses substantive (one confirmed the 118 deleted-test premise matches the code, the other the 121 exception and the folded 113 content). PATH-AWARE CRITIQUE (set declares required, and A2 puts it BEFORE any full suite): pull_critique refused - it only speaks the direct-API lane and this seat holds no DABBLER_* keys by design - so ran the sanctioned manual flow through route() on the copilot-cli transport, which is agentic and path-aware with a read-only tool allowlist (L-125-1), gpt-5.5 then gemini-3.1-pro-preview, cheapest-weight first, both on the SAME tree so the second was not grading a remediated one. BOTH CRITICS INDEPENDENTLY FOUND THE SAME REAL DEFECT (openai Major, google Minor): my new corpus test iterated _discover_specs without asserting it returned anything, so an empty discovery would have let it pass having checked ZERO specs - the exact L-112-1 vacuous-pass shape this set exists to prevent, and the sibling falsifier could not close it because it plants into tmp_path rather than repo_root. Fixed with a non-empty guard, then PROVED the fix by probing _discover_specs to return [] - both tests now fail on it, and spec_admission.py was restored byte-for-byte (git diff empty). Two nits also taken: 118s re-read inherited a 0.91-1.04 ratio band no row on the page supports (L-064-8, a replacement doc inheriting a retired docs claim) - now states the observed 0.91-1.01 and flags the unsupported ceiling; and the two LOC counters that disagree for the same commit now carry an explicit callout instead of one easily-missed sentence. change-log falsifier count corrected (step 3 shipped 12/19; the file closed session 1 at 20 functions). path-aware-critique.json assembled from both raw verdicts and validates ok=valid, 2 distinct providers, 2 findings. The critique fix then staled round 1, so post_round_delta - this sets OWN machinery - was asked what was owed: shipped-code, A4.2, one delta-scoped remediation-review. Ran exactly that: round 2 VERIFIED, 1 fix verdict accepted, 0 rejected, 0 findings.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T04:12:03.189693-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "run_of_record check reported pytest as the ONLY suite owed: mocha and playwright report session touched none of this suite surfaces, because this session changed one test file plus documentation and neither extension nor rendering surface. That is A3 working exactly as written - the required portion is carried by covers, by path, not by running everything - and it is the second session in a row where A3 saved two expensive suites. Full run after the last change of any kind (the path-aware critique fix and its two nit fixes all preceded it, per A2 no full suite before any cross-verification stage): 4164 passed / 9 skipped in 664.4s, zero failures, recorded as the run of record (digest 180c2ac94c5b). Recheck now reports fresh, green. Count moved 4162 -> 4164 exactly as expected: the two new corpus tests this session added, and nothing else.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T04:40:07.866511-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "close-out-including-the-step-9",
+          "description": "**Close-out**, including the Step 9 reorganization review of `project-guidance.md` / `lessons-learned.md`.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out-including-the-step-9"
+      ]
     }
   ]
 }

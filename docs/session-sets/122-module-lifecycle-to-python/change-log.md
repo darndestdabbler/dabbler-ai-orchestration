@@ -191,3 +191,65 @@ The release walk also now folds the changelog fragments
 (`python -m ai_router.changelog fold`) before assigning the version —
 see [`docs/partitioned-append-files.md`](../../partitioned-append-files.md)
 and both release runbooks.
+
+---
+
+## Step 9 — guidance reorganization review (final session)
+
+**Outcome: no changes to the preload corpus.** Not for lack of
+candidates — because the corpus is full and nothing earned eviction.
+
+`guidance_report --check` at close:
+
+| file | tokens | ceiling |
+| :--- | ---: | :--- |
+| `session-constitution.md` | 4,132 | 4,200 (98%) |
+| `project-guidance.md` | 3,499 | 3,499 (**100%**) |
+| `lessons-learned.md` | 2,504 | 2,504 (**100%**) |
+| `AGENTS.md` | 2,018 | 2,031 (99%) |
+| total | 12,153 | 12,200 (**100%**) |
+
+Ceilings ratchet down only, so at 100% an addition is not a writing
+decision, it is an eviction decision. Every active lesson was cited
+within the last few sets (`L-112-1`, `L-079-1`, `L-064-8`, `L-064-9` all
+cited by this set alone; `L-125-1` by Set 128), so no lesson has decayed
+into evictable. The one edit made was a pointer row in the constitution's
+per-step table, absorbed inside its existing headroom.
+
+### Candidates recorded, not admitted
+
+1. **"If you cannot write the falsifier, delete the gate."** This session
+   wrote a duplicate-set-number refusal into `modules.py`, then removed
+   it on discovering the scaffolder cannot self-collide, so the check
+   could only ever pass. That is `L-112-1` applied in an unusual
+   direction — the lesson says a gate needs a planted violation, and the
+   corollary is that a gate for which no violation *can* be planted
+   should not ship. Worth folding into `L-112-1` as a clause rather than
+   a new lesson, when a removal is available.
+
+2. **A per-set test-count budget is the wrong unit.** The spec budgeted
+   30 new test functions for the whole set; Session 1 shipped 41 and
+   Session 4 added 69. The overrun was not complexity — it was the spec's
+   own steps mandating falsifiers, refusals parameterized across the
+   shapes they must and must not fire on, and verification twice adding
+   capabilities the budget never priced. The control that actually works
+   is the authoring guide's session **size** cap, which every session
+   met. Recommend the authoring guide drop the per-set count from the
+   spec template; that file is an on-demand reference, not preload, so it
+   has room.
+
+Both are logged here rather than forced into a full corpus, which is what
+`docs/guidance-lifecycle.md` exists to adjudicate.
+
+### Two code-level recommendations for whoever picks them up
+
+- **Lower Layer 3's local worker default from 4 to 2** to match CI
+  (`playwright.config.ts:46`). Residual `S122-S2-R2` now has a clean A/B
+  on one tree: 29/31 at four workers, 31/31 at two. The current default
+  costs a false failure and a full re-run on every session that trusts
+  it.
+- **Give staged extension builds distinguishable versions** (residual
+  `S122-S4-R1`). Every rebuild since Set 114 S3 is `0.51.0`, so neither
+  VS Code nor a developer can tell two builds apart, and installing a
+  newer one over an older is a no-op without `--force`. This cost the
+  operator a live debugging cycle during this session.

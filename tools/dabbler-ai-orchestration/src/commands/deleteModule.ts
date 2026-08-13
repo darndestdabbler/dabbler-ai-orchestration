@@ -17,9 +17,14 @@ import {
   INVALID_MANIFEST_MESSAGE,
   classifyModulesManifest,
   classifyModuleSetsForDeletion,
-  deleteModule,
   unknownModuleMessage,
 } from "../utils/moduleAuthoring";
+import {
+  describeDelete,
+  describeFailure,
+  runDeleteModule,
+} from "../utils/moduleLifecycleCli";
+import { RunRouterCliDeps } from "../utils/routerCli";
 import { ModuleManifestEntry } from "../types";
 import { preselectFromTreeNode } from "../providers/workExplorerTreeModel";
 
@@ -87,6 +92,7 @@ export interface DeleteModuleOptions {
 export async function runDeleteModuleFlow(
   ui: DeleteModuleUi = defaultUi(),
   opts?: DeleteModuleOptions,
+  cliDeps?: RunRouterCliDeps,
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -147,28 +153,23 @@ export async function runDeleteModuleFlow(
   );
   if (!confirmed) return false;
 
-  const report = await deleteModule(root, target.slug);
+  const result = await runDeleteModule(root, target.slug, cliDeps);
 
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Delete refused — ${report.refused.reason} Every file was left untouched.`,
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure("Delete", result));
+    // A partial delete still changed files, so the tree must refresh even
+    // though the command failed — the CLI reports what it managed to do
+    // before it stopped, and an un-refreshed tree would show sets that are
+    // already gone.
+    const cancelled = result.payload?.["cancelled"];
+    const removed = result.payload?.["removed"];
+    return (
+      (Array.isArray(cancelled) && cancelled.length > 0) ||
+      (Array.isArray(removed) && removed.length > 0)
     );
-    return false;
-  }
-  if (report.partialFailure) {
-    ui.showErrorMessage(
-      `Delete stopped partway: ${report.partialFailure.reason} ` +
-        `${report.cancelled.length} set(s) cancelled and ${report.removed.length} ` +
-        `scaffold(s) removed so far — re-run "Dabbler: Delete Module" to finish ` +
-        `(already-applied steps are skipped on retry).`,
-    );
-    return report.cancelled.length > 0 || report.removed.length > 0;
   }
 
-  ui.showInformationMessage(
-    `Deleted module "${target.slug}" — ${report.cancelled.length} set(s) cancelled, ` +
-      `${report.removed.length} scaffold(s) removed, ${report.terminal.length} left untouched.`,
-  );
+  ui.showInformationMessage(describeDelete(result.payload));
   return true;
 }
 

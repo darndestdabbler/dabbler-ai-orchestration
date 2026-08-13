@@ -975,13 +975,13 @@ var require_Collection = __commonJS({
 var require_stringifyComment = __commonJS({
   "node_modules/yaml/dist/stringify/stringifyComment.js"(exports2) {
     "use strict";
-    var stringifyComment = (str) => str.replace(/^(?!$)(?: $)?/gm, "#");
+    var stringifyComment = (str2) => str2.replace(/^(?!$)(?: $)?/gm, "#");
     function indentComment(comment, indent) {
       if (/^\n+$/.test(comment))
         return comment.substring(1);
       return indent ? comment.replace(/^(?! *$)/gm, indent) : comment;
     }
-    var lineComment = (str, indent, comment) => str.endsWith("\n") ? indentComment(comment, indent) : comment.includes("\n") ? "\n" + indentComment(comment, indent) : (str.endsWith(" ") ? "" : " ") + comment;
+    var lineComment = (str2, indent, comment) => str2.endsWith("\n") ? indentComment(comment, indent) : comment.includes("\n") ? "\n" + indentComment(comment, indent) : (str2.endsWith(" ") ? "" : " ") + comment;
     exports2.indentComment = indentComment;
     exports2.lineComment = lineComment;
     exports2.stringifyComment = stringifyComment;
@@ -1135,16 +1135,16 @@ var require_stringifyString = __commonJS({
       lineWidth: ctx.options.lineWidth,
       minContentWidth: ctx.options.minContentWidth
     });
-    var containsDocumentMarker = (str) => /^(%|---|\.\.\.)/m.test(str);
-    function lineLengthOverLimit(str, lineWidth, indentLength) {
+    var containsDocumentMarker = (str2) => /^(%|---|\.\.\.)/m.test(str2);
+    function lineLengthOverLimit(str2, lineWidth, indentLength) {
       if (!lineWidth || lineWidth < 0)
         return false;
       const limit = lineWidth - indentLength;
-      const strLen = str.length;
+      const strLen = str2.length;
       if (strLen <= limit)
         return false;
       for (let i2 = 0, start = 0; i2 < strLen; ++i2) {
-        if (str[i2] === "\n") {
+        if (str2[i2] === "\n") {
           if (i2 - start > limit)
             return true;
           start = i2 + 1;
@@ -1161,11 +1161,11 @@ var require_stringifyString = __commonJS({
       const { implicitKey } = ctx;
       const minMultiLineLength = ctx.options.doubleQuotedMinMultiLineLength;
       const indent = ctx.indent || (containsDocumentMarker(value) ? "  " : "");
-      let str = "";
+      let str2 = "";
       let start = 0;
       for (let i2 = 0, ch = json[i2]; ch; ch = json[++i2]) {
         if (ch === " " && json[i2 + 1] === "\\" && json[i2 + 2] === "n") {
-          str += json.slice(start, i2) + "\\ ";
+          str2 += json.slice(start, i2) + "\\ ";
           i2 += 1;
           start = i2;
           ch = "\\";
@@ -1174,38 +1174,38 @@ var require_stringifyString = __commonJS({
           switch (json[i2 + 1]) {
             case "u":
               {
-                str += json.slice(start, i2);
+                str2 += json.slice(start, i2);
                 const code = json.substr(i2 + 2, 4);
                 switch (code) {
                   case "0000":
-                    str += "\\0";
+                    str2 += "\\0";
                     break;
                   case "0007":
-                    str += "\\a";
+                    str2 += "\\a";
                     break;
                   case "000b":
-                    str += "\\v";
+                    str2 += "\\v";
                     break;
                   case "001b":
-                    str += "\\e";
+                    str2 += "\\e";
                     break;
                   case "0085":
-                    str += "\\N";
+                    str2 += "\\N";
                     break;
                   case "00a0":
-                    str += "\\_";
+                    str2 += "\\_";
                     break;
                   case "2028":
-                    str += "\\L";
+                    str2 += "\\L";
                     break;
                   case "2029":
-                    str += "\\P";
+                    str2 += "\\P";
                     break;
                   default:
                     if (code.substr(0, 2) === "00")
-                      str += "\\x" + code.substr(2);
+                      str2 += "\\x" + code.substr(2);
                     else
-                      str += json.substr(i2, 6);
+                      str2 += json.substr(i2, 6);
                 }
                 i2 += 5;
                 start = i2 + 1;
@@ -1215,14 +1215,14 @@ var require_stringifyString = __commonJS({
               if (implicitKey || json[i2 + 2] === '"' || json.length < minMultiLineLength) {
                 i2 += 1;
               } else {
-                str += json.slice(start, i2) + "\n\n";
+                str2 += json.slice(start, i2) + "\n\n";
                 while (json[i2 + 2] === "\\" && json[i2 + 3] === "n" && json[i2 + 4] !== '"') {
-                  str += "\n";
+                  str2 += "\n";
                   i2 += 2;
                 }
-                str += indent;
+                str2 += indent;
                 if (json[i2 + 2] === " ")
-                  str += "\\";
+                  str2 += "\\";
                 i2 += 1;
                 start = i2 + 1;
               }
@@ -1231,8 +1231,8 @@ var require_stringifyString = __commonJS({
               i2 += 1;
           }
       }
-      str = start ? str + json.slice(start) : json;
-      return implicitKey ? str : foldFlowLines.foldFlowLines(str, indent, foldFlowLines.FOLD_QUOTED, getFoldOptions(ctx, false));
+      str2 = start ? str2 + json.slice(start) : json;
+      return implicitKey ? str2 : foldFlowLines.foldFlowLines(str2, indent, foldFlowLines.FOLD_QUOTED, getFoldOptions(ctx, false));
     }
     function singleQuotedString(value, ctx) {
       if (ctx.options.singleQuote === false || ctx.implicitKey && value.includes("\n") || /[ \t]\n|\n[ \t]/.test(value))
@@ -1360,15 +1360,15 @@ ${indent}${start}${value}${end}`;
           return quotedString(value, ctx);
         }
       }
-      const str = value.replace(/\n+/g, `$&
+      const str2 = value.replace(/\n+/g, `$&
 ${indent}`);
       if (actualString) {
-        const test = (tag) => tag.default && tag.tag !== "tag:yaml.org,2002:str" && tag.test?.test(str);
+        const test = (tag) => tag.default && tag.tag !== "tag:yaml.org,2002:str" && tag.test?.test(str2);
         const { compat, tags } = ctx.doc.schema;
         if (tags.some(test) || compat?.some(test))
           return quotedString(value, ctx);
       }
-      return implicitKey ? str : foldFlowLines.foldFlowLines(str, indent, foldFlowLines.FOLD_FLOW, getFoldOptions(ctx, false));
+      return implicitKey ? str2 : foldFlowLines.foldFlowLines(str2, indent, foldFlowLines.FOLD_FLOW, getFoldOptions(ctx, false));
     }
     function stringifyString(item, ctx, onComment, onChompKeep) {
       const { implicitKey, inFlow } = ctx;
@@ -1520,11 +1520,11 @@ var require_stringify = __commonJS({
       const props = stringifyProps(node, tagObj, ctx);
       if (props.length > 0)
         ctx.indentAtStart = (ctx.indentAtStart ?? 0) + props.length + 1;
-      const str = typeof tagObj.stringify === "function" ? tagObj.stringify(node, ctx, onComment, onChompKeep) : identity.isScalar(node) ? stringifyString.stringifyString(node, ctx, onComment, onChompKeep) : node.toString(ctx, onComment, onChompKeep);
+      const str2 = typeof tagObj.stringify === "function" ? tagObj.stringify(node, ctx, onComment, onChompKeep) : identity.isScalar(node) ? stringifyString.stringifyString(node, ctx, onComment, onChompKeep) : node.toString(ctx, onComment, onChompKeep);
       if (!props)
-        return str;
-      return identity.isScalar(node) || str[0] === "{" || str[0] === "[" ? `${props} ${str}` : `${props}
-${ctx.indent}${str}`;
+        return str2;
+      return identity.isScalar(node) || str2[0] === "{" || str2[0] === "[" ? `${props} ${str2}` : `${props}
+${ctx.indent}${str2}`;
     }
     exports2.createStringifyContext = createStringifyContext;
     exports2.stringify = stringify;
@@ -1559,8 +1559,8 @@ var require_stringifyPair = __commonJS({
       });
       let keyCommentDone = false;
       let chompKeep = false;
-      let str = stringify.stringify(key, ctx, () => keyCommentDone = true, () => chompKeep = true);
-      if (!explicitKey && !ctx.inFlow && str.length > 1024) {
+      let str2 = stringify.stringify(key, ctx, () => keyCommentDone = true, () => chompKeep = true);
+      if (!explicitKey && !ctx.inFlow && str2.length > 1024) {
         if (simpleKeys)
           throw new Error("With simple keys, single line scalar must not span more than 1024 characters");
         explicitKey = true;
@@ -1569,27 +1569,27 @@ var require_stringifyPair = __commonJS({
         if (allNullValues || value == null) {
           if (keyCommentDone && onComment)
             onComment();
-          return str === "" ? "?" : explicitKey ? `? ${str}` : str;
+          return str2 === "" ? "?" : explicitKey ? `? ${str2}` : str2;
         }
       } else if (allNullValues && !simpleKeys || value == null && explicitKey) {
-        str = `? ${str}`;
+        str2 = `? ${str2}`;
         if (keyComment && !keyCommentDone) {
-          str += stringifyComment.lineComment(str, ctx.indent, commentString(keyComment));
+          str2 += stringifyComment.lineComment(str2, ctx.indent, commentString(keyComment));
         } else if (chompKeep && onChompKeep)
           onChompKeep();
-        return str;
+        return str2;
       }
       if (keyCommentDone)
         keyComment = null;
       if (explicitKey) {
         if (keyComment)
-          str += stringifyComment.lineComment(str, ctx.indent, commentString(keyComment));
-        str = `? ${str}
+          str2 += stringifyComment.lineComment(str2, ctx.indent, commentString(keyComment));
+        str2 = `? ${str2}
 ${indent}:`;
       } else {
-        str = `${str}:`;
+        str2 = `${str2}:`;
         if (keyComment)
-          str += stringifyComment.lineComment(str, ctx.indent, commentString(keyComment));
+          str2 += stringifyComment.lineComment(str2, ctx.indent, commentString(keyComment));
       }
       let vsb, vcb, valueComment;
       if (identity.isNode(value)) {
@@ -1605,7 +1605,7 @@ ${indent}:`;
       }
       ctx.implicitKey = false;
       if (!explicitKey && !keyComment && identity.isScalar(value))
-        ctx.indentAtStart = str.length + 1;
+        ctx.indentAtStart = str2.length + 1;
       chompKeep = false;
       if (!indentSeq && indentStep.length >= 2 && !ctx.inFlow && !explicitKey && identity.isSeq(value) && !value.flow && !value.tag && !value.anchor) {
         ctx.indent = ctx.indent.substring(2);
@@ -1649,16 +1649,16 @@ ${ctx.indent}`;
       } else if (valueStr === "" || valueStr[0] === "\n") {
         ws = "";
       }
-      str += ws + valueStr;
+      str2 += ws + valueStr;
       if (ctx.inFlow) {
         if (valueCommentDone && onComment)
           onComment();
       } else if (valueComment && !valueCommentDone) {
-        str += stringifyComment.lineComment(str, ctx.indent, commentString(valueComment));
+        str2 += stringifyComment.lineComment(str2, ctx.indent, commentString(valueComment));
       } else if (chompKeep && onChompKeep) {
         onChompKeep();
       }
-      return str;
+      return str2;
     }
     exports2.stringifyPair = stringifyPair;
   }
@@ -1885,31 +1885,31 @@ var require_stringifyCollection = __commonJS({
           }
         }
         chompKeep = false;
-        let str2 = stringify.stringify(item, itemCtx, () => comment2 = null, () => chompKeep = true);
+        let str3 = stringify.stringify(item, itemCtx, () => comment2 = null, () => chompKeep = true);
         if (comment2)
-          str2 += stringifyComment.lineComment(str2, itemIndent, commentString(comment2));
+          str3 += stringifyComment.lineComment(str3, itemIndent, commentString(comment2));
         if (chompKeep && comment2)
           chompKeep = false;
-        lines.push(blockItemPrefix + str2);
+        lines.push(blockItemPrefix + str3);
       }
-      let str;
+      let str2;
       if (lines.length === 0) {
-        str = flowChars.start + flowChars.end;
+        str2 = flowChars.start + flowChars.end;
       } else {
-        str = lines[0];
+        str2 = lines[0];
         for (let i2 = 1; i2 < lines.length; ++i2) {
           const line = lines[i2];
-          str += line ? `
+          str2 += line ? `
 ${indent}${line}` : "\n";
         }
       }
       if (comment) {
-        str += "\n" + stringifyComment.indentComment(commentString(comment), indent);
+        str2 += "\n" + stringifyComment.indentComment(commentString(comment), indent);
         if (onComment)
           onComment();
       } else if (chompKeep && onChompKeep)
         onChompKeep();
-      return str;
+      return str2;
     }
     function stringifyFlowCollection({ items }, ctx, { flowChars, itemIndent }) {
       const { indent, indentStep, flowCollectionPadding: fcPadding, options: { commentString } } = ctx;
@@ -1952,21 +1952,21 @@ ${indent}${line}` : "\n";
         }
         if (comment)
           reqNewline = true;
-        let str = stringify.stringify(item, itemCtx, () => comment = null);
-        reqNewline || (reqNewline = lines.length > linesAtValue || str.includes("\n"));
+        let str2 = stringify.stringify(item, itemCtx, () => comment = null);
+        reqNewline || (reqNewline = lines.length > linesAtValue || str2.includes("\n"));
         if (i2 < items.length - 1) {
-          str += ",";
+          str2 += ",";
         } else if (ctx.options.trailingComma) {
           if (ctx.options.lineWidth > 0) {
-            reqNewline || (reqNewline = lines.reduce((sum, line) => sum + line.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
+            reqNewline || (reqNewline = lines.reduce((sum, line) => sum + line.length + 2, 2) + (str2.length + 2) > ctx.options.lineWidth);
           }
           if (reqNewline) {
-            str += ",";
+            str2 += ",";
           }
         }
         if (comment)
-          str += stringifyComment.lineComment(str, itemIndent, commentString(comment));
-        lines.push(str);
+          str2 += stringifyComment.lineComment(str2, itemIndent, commentString(comment));
+        lines.push(str2);
         linesAtValue = lines.length;
       }
       const { start, end } = flowChars;
@@ -1978,11 +1978,11 @@ ${indent}${line}` : "\n";
           reqNewline = ctx.options.lineWidth > 0 && len > ctx.options.lineWidth;
         }
         if (reqNewline) {
-          let str = start;
+          let str2 = start;
           for (const line of lines)
-            str += line ? `
+            str2 += line ? `
 ${indentStep}${indent}${line}` : "\n";
-          return `${str}
+          return `${str2}
 ${indent}${end}`;
         } else {
           return `${start}${fcPadding}${lines.join(" ")}${fcPadding}${end}`;
@@ -2314,7 +2314,7 @@ var require_string = __commonJS({
       identify: (value) => typeof value === "string",
       default: true,
       tag: "tag:yaml.org,2002:str",
-      resolve: (str) => str,
+      resolve: (str2) => str2,
       stringify(item, ctx, onComment, onChompKeep) {
         ctx = Object.assign({ actualString: true }, ctx);
         return stringifyString.stringifyString(item, ctx, onComment, onChompKeep);
@@ -2352,7 +2352,7 @@ var require_bool = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:bool",
       test: /^(?:[Tt]rue|TRUE|[Ff]alse|FALSE)$/,
-      resolve: (str) => new Scalar.Scalar(str[0] === "t" || str[0] === "T"),
+      resolve: (str2) => new Scalar.Scalar(str2[0] === "t" || str2[0] === "T"),
       stringify({ source, value }, ctx) {
         if (source && boolTag.test.test(source)) {
           const sv = source[0] === "t" || source[0] === "T";
@@ -2404,7 +2404,7 @@ var require_float = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:float",
       test: /^(?:[-+]?\.(?:inf|Inf|INF)|\.nan|\.NaN|\.NAN)$/,
-      resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY,
+      resolve: (str2) => str2.slice(-3).toLowerCase() === "nan" ? NaN : str2[0] === "-" ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY,
       stringify: stringifyNumber.stringifyNumber
     };
     var floatExp = {
@@ -2413,7 +2413,7 @@ var require_float = __commonJS({
       tag: "tag:yaml.org,2002:float",
       format: "EXP",
       test: /^[-+]?(?:\.[0-9]+|[0-9]+(?:\.[0-9]*)?)[eE][-+]?[0-9]+$/,
-      resolve: (str) => parseFloat(str),
+      resolve: (str2) => parseFloat(str2),
       stringify(node) {
         const num = Number(node.value);
         return isFinite(num) ? num.toExponential() : stringifyNumber.stringifyNumber(node);
@@ -2424,11 +2424,11 @@ var require_float = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:float",
       test: /^[-+]?(?:\.[0-9]+|[0-9]+\.[0-9]*)$/,
-      resolve(str) {
-        const node = new Scalar.Scalar(parseFloat(str));
-        const dot = str.indexOf(".");
-        if (dot !== -1 && str[str.length - 1] === "0")
-          node.minFractionDigits = str.length - dot - 1;
+      resolve(str2) {
+        const node = new Scalar.Scalar(parseFloat(str2));
+        const dot = str2.indexOf(".");
+        if (dot !== -1 && str2[str2.length - 1] === "0")
+          node.minFractionDigits = str2.length - dot - 1;
         return node;
       },
       stringify: stringifyNumber.stringifyNumber
@@ -2445,7 +2445,7 @@ var require_int = __commonJS({
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     var intIdentify = (value) => typeof value === "bigint" || Number.isInteger(value);
-    var intResolve = (str, offset, radix, { intAsBigInt }) => intAsBigInt ? BigInt(str) : parseInt(str.substring(offset), radix);
+    var intResolve = (str2, offset, radix, { intAsBigInt }) => intAsBigInt ? BigInt(str2) : parseInt(str2.substring(offset), radix);
     function intStringify(node, radix, prefix) {
       const { value } = node;
       if (intIdentify(value) && value >= 0)
@@ -2458,7 +2458,7 @@ var require_int = __commonJS({
       tag: "tag:yaml.org,2002:int",
       format: "OCT",
       test: /^0o[0-7]+$/,
-      resolve: (str, _onError, opt) => intResolve(str, 2, 8, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 2, 8, opt),
       stringify: (node) => intStringify(node, 8, "0o")
     };
     var int = {
@@ -2466,7 +2466,7 @@ var require_int = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:int",
       test: /^[-+]?[0-9]+$/,
-      resolve: (str, _onError, opt) => intResolve(str, 0, 10, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 0, 10, opt),
       stringify: stringifyNumber.stringifyNumber
     };
     var intHex = {
@@ -2475,7 +2475,7 @@ var require_int = __commonJS({
       tag: "tag:yaml.org,2002:int",
       format: "HEX",
       test: /^0x[0-9a-fA-F]+$/,
-      resolve: (str, _onError, opt) => intResolve(str, 2, 16, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 2, 16, opt),
       stringify: (node) => intStringify(node, 16, "0x")
     };
     exports2.int = int;
@@ -2492,7 +2492,7 @@ var require_schema = __commonJS({
     var _null = require_null();
     var seq = require_seq();
     var string = require_string();
-    var bool = require_bool();
+    var bool2 = require_bool();
     var float = require_float();
     var int = require_int();
     var schema = [
@@ -2500,7 +2500,7 @@ var require_schema = __commonJS({
       seq.seq,
       string.string,
       _null.nullTag,
-      bool.boolTag,
+      bool2.boolTag,
       int.intOct,
       int.int,
       int.intHex,
@@ -2528,7 +2528,7 @@ var require_schema2 = __commonJS({
         identify: (value) => typeof value === "string",
         default: true,
         tag: "tag:yaml.org,2002:str",
-        resolve: (str) => str,
+        resolve: (str2) => str2,
         stringify: stringifyJSON
       },
       {
@@ -2545,7 +2545,7 @@ var require_schema2 = __commonJS({
         default: true,
         tag: "tag:yaml.org,2002:bool",
         test: /^true$|^false$/,
-        resolve: (str) => str === "true",
+        resolve: (str2) => str2 === "true",
         stringify: stringifyJSON
       },
       {
@@ -2553,7 +2553,7 @@ var require_schema2 = __commonJS({
         default: true,
         tag: "tag:yaml.org,2002:int",
         test: /^-?(?:0|[1-9][0-9]*)$/,
-        resolve: (str, _onError, { intAsBigInt }) => intAsBigInt ? BigInt(str) : parseInt(str, 10),
+        resolve: (str2, _onError, { intAsBigInt }) => intAsBigInt ? BigInt(str2) : parseInt(str2, 10),
         stringify: ({ value }) => intIdentify(value) ? value.toString() : JSON.stringify(value)
       },
       {
@@ -2561,7 +2561,7 @@ var require_schema2 = __commonJS({
         default: true,
         tag: "tag:yaml.org,2002:float",
         test: /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]*)?(?:[eE][-+]?[0-9]+)?$/,
-        resolve: (str) => parseFloat(str),
+        resolve: (str2) => parseFloat(str2),
         stringify: stringifyJSON
       }
     ];
@@ -2569,9 +2569,9 @@ var require_schema2 = __commonJS({
       default: true,
       tag: "",
       test: /^/,
-      resolve(str, onError2) {
-        onError2(`Unresolved plain scalar ${JSON.stringify(str)}`);
-        return str;
+      resolve(str2, onError2) {
+        onError2(`Unresolved plain scalar ${JSON.stringify(str2)}`);
+        return str2;
       }
     };
     var schema = [map.map, seq.seq].concat(jsonScalars, jsonError);
@@ -2603,10 +2603,10 @@ var require_binary = __commonJS({
         if (typeof node_buffer.Buffer === "function") {
           return node_buffer.Buffer.from(src, "base64");
         } else if (typeof atob === "function") {
-          const str = atob(src.replace(/[\n\r]/g, ""));
-          const buffer = new Uint8Array(str.length);
-          for (let i2 = 0; i2 < str.length; ++i2)
-            buffer[i2] = str.charCodeAt(i2);
+          const str2 = atob(src.replace(/[\n\r]/g, ""));
+          const buffer = new Uint8Array(str2.length);
+          for (let i2 = 0; i2 < str2.length; ++i2)
+            buffer[i2] = str2.charCodeAt(i2);
           return buffer;
         } else {
           onError2("This environment does not support reading binary tags; either Buffer or atob is required");
@@ -2617,28 +2617,28 @@ var require_binary = __commonJS({
         if (!value)
           return "";
         const buf = value;
-        let str;
+        let str2;
         if (typeof node_buffer.Buffer === "function") {
-          str = buf instanceof node_buffer.Buffer ? buf.toString("base64") : node_buffer.Buffer.from(buf.buffer).toString("base64");
+          str2 = buf instanceof node_buffer.Buffer ? buf.toString("base64") : node_buffer.Buffer.from(buf.buffer).toString("base64");
         } else if (typeof btoa === "function") {
           let s = "";
           for (let i2 = 0; i2 < buf.length; ++i2)
             s += String.fromCharCode(buf[i2]);
-          str = btoa(s);
+          str2 = btoa(s);
         } else {
           throw new Error("This environment does not support writing binary tags; either Buffer or btoa is required");
         }
         type ?? (type = Scalar.Scalar.BLOCK_LITERAL);
         if (type !== Scalar.Scalar.QUOTE_DOUBLE) {
           const lineWidth = Math.max(ctx.options.lineWidth - ctx.indent.length, ctx.options.minContentWidth);
-          const n = Math.ceil(str.length / lineWidth);
+          const n = Math.ceil(str2.length / lineWidth);
           const lines = new Array(n);
           for (let i2 = 0, o2 = 0; i2 < n; ++i2, o2 += lineWidth) {
-            lines[i2] = str.substr(o2, lineWidth);
+            lines[i2] = str2.substr(o2, lineWidth);
           }
-          str = lines.join(type === Scalar.Scalar.BLOCK_LITERAL ? "\n" : " ");
+          str2 = lines.join(type === Scalar.Scalar.BLOCK_LITERAL ? "\n" : " ");
         }
-        return stringifyString.stringifyString({ comment, type, value: str }, ctx, onComment, onChompKeep);
+        return stringifyString.stringifyString({ comment, type, value: str2 }, ctx, onComment, onChompKeep);
       }
     };
     exports2.binary = binary;
@@ -2844,7 +2844,7 @@ var require_float2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:float",
       test: /^(?:[-+]?\.(?:inf|Inf|INF)|\.nan|\.NaN|\.NAN)$/,
-      resolve: (str) => str.slice(-3).toLowerCase() === "nan" ? NaN : str[0] === "-" ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY,
+      resolve: (str2) => str2.slice(-3).toLowerCase() === "nan" ? NaN : str2[0] === "-" ? Number.NEGATIVE_INFINITY : Number.POSITIVE_INFINITY,
       stringify: stringifyNumber.stringifyNumber
     };
     var floatExp = {
@@ -2853,7 +2853,7 @@ var require_float2 = __commonJS({
       tag: "tag:yaml.org,2002:float",
       format: "EXP",
       test: /^[-+]?(?:[0-9][0-9_]*)?(?:\.[0-9_]*)?[eE][-+]?[0-9]+$/,
-      resolve: (str) => parseFloat(str.replace(/_/g, "")),
+      resolve: (str2) => parseFloat(str2.replace(/_/g, "")),
       stringify(node) {
         const num = Number(node.value);
         return isFinite(num) ? num.toExponential() : stringifyNumber.stringifyNumber(node);
@@ -2864,11 +2864,11 @@ var require_float2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:float",
       test: /^[-+]?(?:[0-9][0-9_]*)?\.[0-9_]*$/,
-      resolve(str) {
-        const node = new Scalar.Scalar(parseFloat(str.replace(/_/g, "")));
-        const dot = str.indexOf(".");
+      resolve(str2) {
+        const node = new Scalar.Scalar(parseFloat(str2.replace(/_/g, "")));
+        const dot = str2.indexOf(".");
         if (dot !== -1) {
-          const f = str.substring(dot + 1).replace(/_/g, "");
+          const f = str2.substring(dot + 1).replace(/_/g, "");
           if (f[f.length - 1] === "0")
             node.minFractionDigits = f.length;
         }
@@ -2888,34 +2888,34 @@ var require_int2 = __commonJS({
     "use strict";
     var stringifyNumber = require_stringifyNumber();
     var intIdentify = (value) => typeof value === "bigint" || Number.isInteger(value);
-    function intResolve(str, offset, radix, { intAsBigInt }) {
-      const sign = str[0];
+    function intResolve(str2, offset, radix, { intAsBigInt }) {
+      const sign = str2[0];
       if (sign === "-" || sign === "+")
         offset += 1;
-      str = str.substring(offset).replace(/_/g, "");
+      str2 = str2.substring(offset).replace(/_/g, "");
       if (intAsBigInt) {
         switch (radix) {
           case 2:
-            str = `0b${str}`;
+            str2 = `0b${str2}`;
             break;
           case 8:
-            str = `0o${str}`;
+            str2 = `0o${str2}`;
             break;
           case 16:
-            str = `0x${str}`;
+            str2 = `0x${str2}`;
             break;
         }
-        const n2 = BigInt(str);
+        const n2 = BigInt(str2);
         return sign === "-" ? BigInt(-1) * n2 : n2;
       }
-      const n = parseInt(str, radix);
+      const n = parseInt(str2, radix);
       return sign === "-" ? -1 * n : n;
     }
     function intStringify(node, radix, prefix) {
       const { value } = node;
       if (intIdentify(value)) {
-        const str = value.toString(radix);
-        return value < 0 ? "-" + prefix + str.substr(1) : prefix + str;
+        const str2 = value.toString(radix);
+        return value < 0 ? "-" + prefix + str2.substr(1) : prefix + str2;
       }
       return stringifyNumber.stringifyNumber(node);
     }
@@ -2925,7 +2925,7 @@ var require_int2 = __commonJS({
       tag: "tag:yaml.org,2002:int",
       format: "BIN",
       test: /^[-+]?0b[0-1_]+$/,
-      resolve: (str, _onError, opt) => intResolve(str, 2, 2, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 2, 2, opt),
       stringify: (node) => intStringify(node, 2, "0b")
     };
     var intOct = {
@@ -2934,7 +2934,7 @@ var require_int2 = __commonJS({
       tag: "tag:yaml.org,2002:int",
       format: "OCT",
       test: /^[-+]?0[0-7_]+$/,
-      resolve: (str, _onError, opt) => intResolve(str, 1, 8, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 1, 8, opt),
       stringify: (node) => intStringify(node, 8, "0")
     };
     var int = {
@@ -2942,7 +2942,7 @@ var require_int2 = __commonJS({
       default: true,
       tag: "tag:yaml.org,2002:int",
       test: /^[-+]?[0-9][0-9_]*$/,
-      resolve: (str, _onError, opt) => intResolve(str, 0, 10, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 0, 10, opt),
       stringify: stringifyNumber.stringifyNumber
     };
     var intHex = {
@@ -2951,7 +2951,7 @@ var require_int2 = __commonJS({
       tag: "tag:yaml.org,2002:int",
       format: "HEX",
       test: /^[-+]?0x[0-9a-fA-F_]+$/,
-      resolve: (str, _onError, opt) => intResolve(str, 2, 16, opt),
+      resolve: (str2, _onError, opt) => intResolve(str2, 2, 16, opt),
       stringify: (node) => intStringify(node, 16, "0x")
     };
     exports2.int = int;
@@ -3055,9 +3055,9 @@ var require_timestamp = __commonJS({
   "node_modules/yaml/dist/schema/yaml-1.1/timestamp.js"(exports2) {
     "use strict";
     var stringifyNumber = require_stringifyNumber();
-    function parseSexagesimal(str, asBigInt) {
-      const sign = str[0];
-      const parts = sign === "-" || sign === "+" ? str.substring(1) : str;
+    function parseSexagesimal(str2, asBigInt) {
+      const sign = str2[0];
+      const parts = sign === "-" || sign === "+" ? str2.substring(1) : str2;
       const num = (n) => asBigInt ? BigInt(n) : Number(n);
       const res = parts.replace(/_/g, "").split(":").reduce((res2, p2) => res2 * num(60) + num(p2), num(0));
       return sign === "-" ? num(-1) * res : res;
@@ -3094,7 +3094,7 @@ var require_timestamp = __commonJS({
       tag: "tag:yaml.org,2002:int",
       format: "TIME",
       test: /^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+$/,
-      resolve: (str, _onError, { intAsBigInt }) => parseSexagesimal(str, intAsBigInt),
+      resolve: (str2, _onError, { intAsBigInt }) => parseSexagesimal(str2, intAsBigInt),
       stringify: stringifySexagesimal
     };
     var floatTime = {
@@ -3103,7 +3103,7 @@ var require_timestamp = __commonJS({
       tag: "tag:yaml.org,2002:float",
       format: "TIME",
       test: /^[-+]?[0-9][0-9_]*(?::[0-5]?[0-9])+\.[0-9_]*$/,
-      resolve: (str) => parseSexagesimal(str, false),
+      resolve: (str2) => parseSexagesimal(str2, false),
       stringify: stringifySexagesimal
     };
     var timestamp = {
@@ -3114,8 +3114,8 @@ var require_timestamp = __commonJS({
       // may be omitted altogether, resulting in a date format. In such a case, the time part is
       // assumed to be 00:00:00Z (start of day, UTC).
       test: RegExp("^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})(?:(?:t|T|[ \\t]+)([0-9]{1,2}):([0-9]{1,2}):([0-9]{1,2}(\\.[0-9]+)?)(?:[ \\t]*(Z|[-+][012]?[0-9](?::[0-9]{2})?))?)?$"),
-      resolve(str) {
-        const match = str.match(timestamp.test);
+      resolve(str2) {
+        const match = str2.match(timestamp.test);
         if (!match)
           throw new Error("!!timestamp expects a date, starting with yyyy-mm-dd");
         const [, year, month, day, hour, minute, second] = match.map(Number);
@@ -3147,7 +3147,7 @@ var require_schema3 = __commonJS({
     var seq = require_seq();
     var string = require_string();
     var binary = require_binary();
-    var bool = require_bool2();
+    var bool2 = require_bool2();
     var float = require_float2();
     var int = require_int2();
     var merge = require_merge();
@@ -3160,8 +3160,8 @@ var require_schema3 = __commonJS({
       seq.seq,
       string.string,
       _null.nullTag,
-      bool.trueTag,
-      bool.falseTag,
+      bool2.trueTag,
+      bool2.falseTag,
       int.intBin,
       int.intOct,
       int.int,
@@ -3190,7 +3190,7 @@ var require_tags = __commonJS({
     var _null = require_null();
     var seq = require_seq();
     var string = require_string();
-    var bool = require_bool();
+    var bool2 = require_bool();
     var float = require_float();
     var int = require_int();
     var schema = require_schema();
@@ -3211,7 +3211,7 @@ var require_tags = __commonJS({
     ]);
     var tagsByName = {
       binary: binary.binary,
-      bool: bool.boolTag,
+      bool: bool2.boolTag,
       float: float.float,
       floatExp: float.floatExp,
       floatNaN: float.floatNaN,
@@ -6334,15 +6334,15 @@ var require_parser = __commonJS({
     var node_process = require("process");
     var cst = require_cst();
     var lexer = require_lexer();
-    function includesToken(list, type) {
-      for (let i2 = 0; i2 < list.length; ++i2)
-        if (list[i2].type === type)
+    function includesToken(list2, type) {
+      for (let i2 = 0; i2 < list2.length; ++i2)
+        if (list2[i2].type === type)
           return true;
       return false;
     }
-    function findNonEmptyIndex(list) {
-      for (let i2 = 0; i2 < list.length; ++i2) {
-        switch (list[i2].type) {
+    function findNonEmptyIndex(list2) {
+      for (let i2 = 0; i2 < list2.length; ++i2) {
+        switch (list2[i2].type) {
           case "space":
           case "comment":
           case "newline":
@@ -7247,7 +7247,7 @@ var require_public_api = __commonJS({
       }
       return doc;
     }
-    function parse3(src, reviver, options) {
+    function parse2(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
@@ -7288,7 +7288,7 @@ var require_public_api = __commonJS({
         return value.toString(options);
       return new Document2.Document(value, _replacer, options).toString(options);
     }
-    exports2.parse = parse3;
+    exports2.parse = parse2;
     exports2.parseAllDocuments = parseAllDocuments;
     exports2.parseDocument = parseDocument;
     exports2.stringify = stringify;
@@ -7360,7 +7360,7 @@ var require_ms = __commonJS({
       options = options || {};
       var type = typeof val;
       if (type === "string" && val.length > 0) {
-        return parse3(val);
+        return parse2(val);
       } else if (type === "number" && isFinite(val)) {
         return options.long ? fmtLong(val) : fmtShort(val);
       }
@@ -7368,13 +7368,13 @@ var require_ms = __commonJS({
         "val is not a non-empty string or a valid number. val=" + JSON.stringify(val)
       );
     };
-    function parse3(str) {
-      str = String(str);
-      if (str.length > 100) {
+    function parse2(str2) {
+      str2 = String(str2);
+      if (str2.length > 100) {
         return;
       }
       var match = /^(-?(?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|weeks?|w|years?|yrs?|y)?$/i.exec(
-        str
+        str2
       );
       if (!match) {
         return;
@@ -8090,7 +8090,7 @@ var require_node = __commonJS({
     var { formatters } = module2.exports;
     formatters.o = function(v) {
       this.inspectOpts.colors = this.useColors;
-      return util.inspect(v, this.inspectOpts).split("\n").map((str) => str.trim()).join(" ");
+      return util.inspect(v, this.inspectOpts).split("\n").map((str2) => str2.trim()).join(" ");
     };
     formatters.O = function(v) {
       this.inspectOpts.colors = this.useColors;
@@ -8217,7 +8217,7 @@ __export(extension_exports, {
   deactivate: () => deactivate
 });
 module.exports = __toCommonJS(extension_exports);
-var vscode35 = __toESM(require("vscode"));
+var vscode36 = __toESM(require("vscode"));
 var fs28 = __toESM(require("fs"));
 var path36 = __toESM(require("path"));
 
@@ -9683,87 +9683,8 @@ var path5 = __toESM(require("path"));
 var CANCELLED_FILENAME = "CANCELLED.md";
 var RESTORED_FILENAME = "RESTORED.md";
 var SESSION_STATE_FILENAME4 = "session-state.json";
-var V4_TOP_LEVEL_DROPPED_KEYS2 = [
-  "lifecycleState",
-  "currentSession",
-  "totalSessions",
-  "completedSessions",
-  "startedAt",
-  "completedAt",
-  "orchestrator",
-  "verificationVerdict"
-];
-var HISTORY_HEADER = "# Cancellation history";
-function formatLocalIsoSeconds(d) {
-  const pad = (n, width = 2) => String(n).padStart(width, "0");
-  const yyyy = d.getFullYear();
-  const mm = pad(d.getMonth() + 1);
-  const dd = pad(d.getDate());
-  const HH = pad(d.getHours());
-  const MM = pad(d.getMinutes());
-  const SS = pad(d.getSeconds());
-  const offsetMin = -d.getTimezoneOffset();
-  const sign = offsetMin >= 0 ? "+" : "-";
-  const offH = pad(Math.floor(Math.abs(offsetMin) / 60));
-  const offM = pad(Math.abs(offsetMin) % 60);
-  return `${yyyy}-${mm}-${dd}T${HH}:${MM}:${SS}${sign}${offH}:${offM}`;
-}
 function isCancelled(sessionSetDir) {
   return fs5.existsSync(path5.join(sessionSetDir, CANCELLED_FILENAME));
-}
-function readCancellationState(sessionSetDir) {
-  const state = readSessionState(sessionSetDir);
-  if (state === null)
-    return "unknown";
-  if (typeof state.status !== "string" || state.status.length === 0) {
-    return "unknown";
-  }
-  if (state.status === "cancelled")
-    return "cancelled";
-  if (fs5.existsSync(path5.join(sessionSetDir, RESTORED_FILENAME))) {
-    return "restored";
-  }
-  return "active";
-}
-function atomicWriteFile(filePath, content) {
-  const directory = path5.dirname(filePath);
-  const base = path5.basename(filePath);
-  const tmpPath = path5.join(
-    directory,
-    `.${base}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`
-  );
-  try {
-    fs5.writeFileSync(tmpPath, content, { encoding: "utf8" });
-    fs5.renameSync(tmpPath, filePath);
-  } catch (err) {
-    if (fs5.existsSync(tmpPath)) {
-      try {
-        fs5.unlinkSync(tmpPath);
-      } catch {
-      }
-    }
-    throw err;
-  }
-}
-function prependEntry(existing, verb, reason, when) {
-  const newEntry = `${verb} on ${when}
-${reason}
-
-`;
-  if (existing == null) {
-    return `${HISTORY_HEADER}
-
-${newEntry}`;
-  }
-  if (existing.startsWith(HISTORY_HEADER)) {
-    const afterHeader = existing.slice(HISTORY_HEADER.length).replace(/^\n+/, "");
-    return `${HISTORY_HEADER}
-
-${newEntry}${afterHeader}`;
-  }
-  return `${HISTORY_HEADER}
-
-${newEntry}${existing}`;
 }
 function readSessionState(sessionSetDir) {
   const statePath = path5.join(sessionSetDir, SESSION_STATE_FILENAME4);
@@ -9779,111 +9700,19 @@ function readSessionState(sessionSetDir) {
   }
   return null;
 }
-function writeSessionState(sessionSetDir, state) {
-  const statePath = path5.join(sessionSetDir, SESSION_STATE_FILENAME4);
-  atomicWriteFile(statePath, JSON.stringify(state, null, 2) + "\n");
-}
-function toV4OnDiskShape(state, sessionSetDir) {
-  const specMdPath = path5.join(sessionSetDir, "spec.md");
-  let normalized;
-  try {
-    normalized = normalizeToV4Shape(
-      state,
-      specMdPath
-    );
-  } catch (exc) {
-    if (exc instanceof SessionStateInvariantError || exc instanceof TypeError || exc instanceof RangeError) {
-      return state;
-    }
-    throw exc;
-  }
-  const out = {
-    schemaVersion: SCHEMA_VERSION_V4,
-    sessionSetName: normalized.sessionSetName ?? state.sessionSetName ?? path5.basename(sessionSetDir.replace(/[\\/]+$/, "")),
-    status: normalized.status ?? state.status
-  };
-  const inputHasSessions = Array.isArray(state.sessions);
-  const normalizedSessions = normalized.sessions;
-  const isPlanless = !inputHasSessions && (!Array.isArray(normalizedSessions) || normalizedSessions.length === 0);
-  if (isPlanless) {
-    for (const carveoutKey of ["orchestrator", "startedAt"]) {
-      const value = state[carveoutKey];
-      if (carveoutKey === "orchestrator" && value !== null && typeof value === "object" || carveoutKey === "startedAt" && typeof value === "string") {
-        out[carveoutKey] = value;
-      }
-    }
-  } else if (Array.isArray(normalizedSessions)) {
-    out.sessions = normalizedSessions;
-  }
-  for (const passthroughKey of ["preCancelStatus", "forceClosed"]) {
-    if (passthroughKey in normalized) {
-      out[passthroughKey] = normalized[passthroughKey];
-    } else if (passthroughKey in state) {
-      out[passthroughKey] = state[passthroughKey];
-    }
-  }
-  for (const key of V4_TOP_LEVEL_DROPPED_KEYS2) {
-    if (isPlanless && (key === "orchestrator" || key === "startedAt")) {
-      continue;
-    }
-    delete out[key];
-  }
-  return out;
-}
-function inferStatusFromFiles(sessionSetDir) {
-  if (fs5.existsSync(path5.join(sessionSetDir, "change-log.md"))) {
-    return "complete";
-  }
-  if (fs5.existsSync(path5.join(sessionSetDir, "activity-log.json"))) {
-    return "in-progress";
-  }
-  return "not-started";
-}
-async function cancelSessionSet(sessionSetDir, reason = "") {
-  const cancelledPath = path5.join(sessionSetDir, CANCELLED_FILENAME);
-  const restoredPath = path5.join(sessionSetDir, RESTORED_FILENAME);
-  if (fs5.existsSync(restoredPath) && !fs5.existsSync(cancelledPath)) {
-    fs5.renameSync(restoredPath, cancelledPath);
-  }
-  const existing = fs5.existsSync(cancelledPath) ? fs5.readFileSync(cancelledPath, "utf8") : null;
-  const updated = prependEntry(existing, "Cancelled", reason, formatLocalIsoSeconds(/* @__PURE__ */ new Date()));
-  atomicWriteFile(cancelledPath, updated);
+function readCancellationState(sessionSetDir) {
   const state = readSessionState(sessionSetDir);
-  if (state !== null) {
-    if (state.status !== "cancelled") {
-      state.preCancelStatus = state.status ?? null;
-    }
-    state.status = "cancelled";
-    const v4State = toV4OnDiskShape(state, sessionSetDir);
-    writeSessionState(sessionSetDir, v4State);
+  if (state === null)
+    return "unknown";
+  if (typeof state.status !== "string" || state.status.length === 0) {
+    return "unknown";
   }
-}
-async function restoreSessionSet(sessionSetDir, reason = "") {
-  const cancelledPath = path5.join(sessionSetDir, CANCELLED_FILENAME);
-  const restoredPath = path5.join(sessionSetDir, RESTORED_FILENAME);
-  if (!fs5.existsSync(cancelledPath)) {
-    throw new Error(
-      `restoreSessionSet: ${cancelledPath} does not exist; nothing to restore`
-    );
+  if (state.status === "cancelled")
+    return "cancelled";
+  if (fs5.existsSync(path5.join(sessionSetDir, RESTORED_FILENAME))) {
+    return "restored";
   }
-  const existing = fs5.readFileSync(cancelledPath, "utf8");
-  const updated = prependEntry(existing, "Restored", reason, formatLocalIsoSeconds(/* @__PURE__ */ new Date()));
-  atomicWriteFile(restoredPath, updated);
-  const state = readSessionState(sessionSetDir);
-  if (state !== null) {
-    let restored = state.preCancelStatus;
-    if (typeof restored !== "string" || restored.length === 0 || restored === "cancelled") {
-      restored = inferStatusFromFiles(sessionSetDir);
-    }
-    state.status = restored;
-    delete state.preCancelStatus;
-    const v4State = toV4OnDiskShape(state, sessionSetDir);
-    writeSessionState(sessionSetDir, v4State);
-  }
-  try {
-    fs5.unlinkSync(cancelledPath);
-  } catch {
-  }
+  return "active";
 }
 
 // src/providers/sessionStepModel.ts
@@ -11859,8 +11688,8 @@ function registerCopyPromptCommands(context) {
 }
 
 // src/commands/gitScaffold.ts
-var vscode11 = __toESM(require("vscode"));
-var cp3 = __toESM(require("child_process"));
+var vscode12 = __toESM(require("vscode"));
+var cp4 = __toESM(require("child_process"));
 var os3 = __toESM(require("os"));
 var path16 = __toESM(require("path"));
 
@@ -12487,8 +12316,8 @@ function remove(target, item) {
 function asArray(source) {
   return Array.isArray(source) ? source : [source];
 }
-function asCamelCase(str) {
-  return str.replace(/[\s-]+(.)/g, (_all, chr) => {
+function asCamelCase(str2) {
+  return str2.replace(/[\s-]+(.)/g, (_all, chr) => {
     return chr.toUpperCase();
   });
 }
@@ -12759,7 +12588,7 @@ function parseStringResponse(result, parsers12, texts, trim = true) {
         }
         return lines[i2 + offset];
       };
-      parsers12.some(({ parse: parse3 }) => parse3(line, result));
+      parsers12.some(({ parse: parse2 }) => parse2(line, result));
     }
   });
   return result;
@@ -17340,6 +17169,17 @@ function probePythonPresenceCore(explicitSetting, workspaceRoot2, env8 = process
     platform
   ) !== null;
 }
+function interpreterResolves(pythonPath, env8 = process.env, fileExists = realExists, platform = process.platform) {
+  if (!pythonPath)
+    return false;
+  const p2 = platform === "win32" ? path10.win32 : path10.posix;
+  if (p2.isAbsolute(pythonPath))
+    return fileExists(pythonPath);
+  if (pythonPath.includes("\\") || pythonPath.includes("/")) {
+    return fileExists(path10.resolve(pythonPath));
+  }
+  return findCommandOnPath(pythonPath, env8, fileExists, platform) !== null;
+}
 function probePythonPresence(workspaceRoot2, fileExists = realExists) {
   return probePythonPresenceCore(
     explicitPythonPathSetting(),
@@ -18050,51 +17890,8 @@ function writeBudgetYaml(projectDir, budget, fileOps, now = /* @__PURE__ */ new 
 }
 
 // src/utils/moduleAuthoring.ts
-var crypto3 = __toESM(require("crypto"));
 var fs11 = __toESM(require("fs"));
 var path15 = __toESM(require("path"));
-var YAML2 = __toESM(require_dist());
-
-// src/utils/resolveSetNumber.ts
-var PREFIX_RE = /^(\d+)-/;
-function numericPrefix(slug) {
-  const m = PREFIX_RE.exec(slug);
-  return m ? parseInt(m[1], 10) : null;
-}
-function resolveSetNumber(slugs, n) {
-  const matches = slugs.filter((s) => numericPrefix(s) === n);
-  if (matches.length === 0) {
-    const available = Array.from(
-      new Set(
-        slugs.map(numericPrefix).filter((p2) => p2 !== null)
-      )
-    ).sort((a, b2) => a - b2);
-    return { kind: "no-match", available };
-  }
-  if (matches.length > 1) {
-    return { kind: "collision", matches: matches.slice().sort() };
-  }
-  return { kind: "match", slug: matches[0] };
-}
-function parseSetHandle(raw) {
-  const trimmed2 = raw.trim().replace(/^set\s+/i, "");
-  if (!/^\d+$/.test(trimmed2))
-    return null;
-  return parseInt(trimmed2, 10);
-}
-function prefixWidth(slug) {
-  const m = PREFIX_RE.exec(slug);
-  return m ? m[1].length : 0;
-}
-function nextSessionSetNumberFrom(dirNames) {
-  const numbered = dirNames.map(numericPrefix).filter((p2) => p2 !== null);
-  const n = numbered.length ? Math.max(...numbered) + 1 : 1;
-  const widest = dirNames.reduce((w, name) => Math.max(w, prefixWidth(name)), 0);
-  const width = Math.max(3, widest);
-  return { n, padded: String(n).padStart(width, "0") };
-}
-
-// src/utils/moduleAuthoring.ts
 var MODULES_MANIFEST_DISPLAY = MODULES_MANIFEST_REL.replace(/\\/g, "/");
 var MODULE_SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function validateNewModuleSlug(raw, existingSlugs) {
@@ -18189,134 +17986,6 @@ function ensureModulesManifest(root, io = NODE_ENSURE_MANIFEST_IO) {
     throw err;
   }
 }
-function renderModuleManifestEntry(slug, title, planRelPath) {
-  return `  - slug: ${slug}
-    title: ${JSON.stringify(title)}
-    codeRoots: []                # TODO: the code paths this module owns, e.g. [src/${slug}]
-    planPath: ${planRelPath}
-`;
-}
-function renderModulePlanStub(slug, title) {
-  return `# ${title} \u2014 module project plan
-
-> Module: \`${slug}\` (declared in \`docs/modules.yaml\`)
-> Owner: TODO \u2014 name the developer(s) who own this module.
-
-TODO: describe this module's goals, phases, and key deliverables. When the
-plan is ready, decompose it into session sets: run "Dabbler: Generate
-Session-Set Prompt" and pick this module \u2014 each generated set is stamped
-\`module: ${slug}\` and grouped under this module in the Session Set
-Explorer. Session-set names stay globally unique across all modules; we
-recommend including \`${slug}\` in each set's name.
-`;
-}
-var EMPTY_MODULES_LINE_RE = /^([ \t]*)(["']?)modules\2:[ \t]*(?:\[[ \t]*\]|~|null|Null|NULL)?[ \t]*(#[^\r\n]*)?\r?$/gm;
-function replaceEmptyModulesList(text, entryBlock) {
-  const out = [];
-  for (const m of text.matchAll(EMPTY_MODULES_LINE_RE)) {
-    const indent = m[1];
-    const quote = m[2];
-    const comment = m[3] ? ` ${m[3]}` : "";
-    const after = text.slice(m.index + m[0].length);
-    const block = (entryBlock.endsWith("\n") ? entryBlock.slice(0, -1) : entryBlock).split("\n").map((line) => indent + line).join("\n");
-    out.push(
-      text.slice(0, m.index) + `${indent}${quote}modules${quote}:${comment}
-` + block + (after === "" ? "\n" : after)
-    );
-  }
-  return out;
-}
-function scaffoldNewModule(root, rawSlug, rawTitle) {
-  const slug = (rawSlug ?? "").trim();
-  const classified = classifyModulesManifest(root);
-  const existing = classified.kind === "present" ? classified.entries : [];
-  const slugError = validateNewModuleSlug(
-    slug,
-    existing.map((e) => e.slug)
-  );
-  if (slugError)
-    throw new Error(slugError);
-  const manifestAbs = path15.join(root, MODULES_MANIFEST_REL);
-  if (classified.kind === "invalid") {
-    throw new Error(INVALID_MANIFEST_MESSAGE);
-  }
-  const title = (rawTitle ?? "").trim() || slug;
-  const planRel = defaultModulePlanPath(slug);
-  const entryBlock = renderModuleManifestEntry(slug, title, planRel);
-  const manifestCreated = classified.kind === "absent";
-  const sourceText = manifestCreated ? MODULES_YAML_TEMPLATE : fs11.readFileSync(manifestAbs, "utf8");
-  let candidate = null;
-  if (existing.length === 0) {
-    for (const replaced of replaceEmptyModulesList(sourceText, entryBlock)) {
-      try {
-        assertAppendedManifestParses(
-          replaced,
-          slug,
-          existing.length + 1,
-          entryBlock
-        );
-        candidate = replaced;
-        break;
-      } catch {
-      }
-    }
-  }
-  if (candidate === null) {
-    candidate = (sourceText.endsWith("\n") ? sourceText : sourceText + "\n") + entryBlock;
-  }
-  assertAppendedManifestParses(
-    candidate,
-    slug,
-    existing.length + 1,
-    entryBlock
-  );
-  const planAbs = path15.join(root, ...planRel.split("/"));
-  let planCreated = false;
-  if (!fs11.existsSync(planAbs)) {
-    fs11.mkdirSync(path15.dirname(planAbs), { recursive: true });
-    fs11.writeFileSync(planAbs, renderModulePlanStub(slug, title), {
-      encoding: "utf8"
-    });
-    planCreated = true;
-  }
-  fs11.writeFileSync(manifestAbs, candidate, { encoding: "utf8" });
-  return {
-    manifestRel: MODULES_MANIFEST_DISPLAY,
-    planRel,
-    manifestCreated,
-    planCreated
-  };
-}
-function assertAppendedManifestParses(candidate, slug, expectedCount, entryBlock) {
-  const refuse = (why) => {
-    throw new Error(
-      `Could not append the module entry to ${MODULES_MANIFEST_DISPLAY} automatically (${why}). Add this entry to the "modules:" list by hand:
-${entryBlock}`
-    );
-  };
-  let doc;
-  try {
-    doc = YAML2.parse(candidate);
-  } catch {
-    return refuse(
-      'appending requires the "modules:" block list to be the last top-level key'
-    );
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the result is not a YAML mapping");
-  }
-  const modules = doc.modules;
-  if (!Array.isArray(modules))
-    return refuse('no "modules:" list survived');
-  const slugs = modules.filter(
-    (m) => m !== null && typeof m === "object" && !Array.isArray(m)
-  ).map((m) => typeof m.slug === "string" ? m.slug.trim() : "").filter((s) => s !== "");
-  if (modules.length !== expectedCount || !slugs.includes(slug)) {
-    return refuse(
-      'the appended entry did not land in the "modules:" list \u2014 the list is probably flow-style, holds entries the manifest reader dropped, or is not the last top-level key'
-    );
-  }
-}
 function resolveModuleTarget(entries) {
   if (!entries || entries.length === 0)
     return { kind: "none" };
@@ -18396,708 +18065,6 @@ async function pickModuleForAuthoring(root, ui, opts) {
     return { kind: "cancelled", entry: null };
   return { kind: "picked", entry: picked.entry };
 }
-var CONFIG_HEADING_RE = /^##[ \t]+Session Set Configuration[ \t]*$/im;
-var CONFIG_YAML_FENCE_OPEN_RE = /^```ya?ml[ \t]*\r?\n/im;
-var CONFIG_FENCE_CLOSE_RE = /^```[ \t]*$/m;
-var CONFIG_TOP_LEVEL_MODULE_RE = /^module[ \t]*:/gm;
-function stampModuleIntoSpecText(text, slug) {
-  const heading = CONFIG_HEADING_RE.exec(text);
-  if (!heading)
-    return { kind: "refused", reason: { code: "no-config-block" } };
-  const afterHeading = heading.index + heading[0].length;
-  const rest = text.slice(afterHeading);
-  const nextHeadingRel = rest.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
-  const section = text.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen)
-    return { kind: "refused", reason: { code: "no-yaml-fence" } };
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = text.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1)
-    return { kind: "refused", reason: { code: "no-yaml-fence" } };
-  const blockContent = boundedTail.slice(0, closeRel);
-  let parsedBlock;
-  try {
-    parsedBlock = YAML2.parse(blockContent);
-  } catch {
-    parsedBlock = void 0;
-  }
-  if (parsedBlock !== null && typeof parsedBlock === "object" && !Array.isArray(parsedBlock) && "module" in parsedBlock) {
-    const existingModule = parsedBlock.module;
-    if (existingModule === slug)
-      return { kind: "noop" };
-    return {
-      kind: "refused",
-      reason: {
-        code: "already-assigned",
-        existing: typeof existingModule === "string" ? existingModule : String(existingModule)
-      }
-    };
-  }
-  const inserted = `module: ${slug}
-`;
-  const newText = text.slice(0, blockContentStart) + inserted + text.slice(blockContentStart);
-  return { kind: "written", text: newText, inserted, insertAt: blockContentStart };
-}
-function extractConfigBlock(text) {
-  const heading = CONFIG_HEADING_RE.exec(text);
-  if (!heading)
-    return null;
-  const afterHeading = heading.index + heading[0].length;
-  const rest = text.slice(afterHeading);
-  const nextHeadingRel = rest.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
-  const section = text.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen)
-    return null;
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = text.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1)
-    return null;
-  return boundedTail.slice(0, closeRel);
-}
-function assertStampedTextValid(originalText, newText, slug) {
-  const refuse = (why) => {
-    throw new Error(`Refusing the module stamp (${why}).`);
-  };
-  const expected = stampModuleIntoSpecText(originalText, slug);
-  if (expected.kind !== "written") {
-    return refuse(
-      expected.kind === "noop" ? "the original is already stamped to this module" : "the original has no spliceable config block"
-    );
-  }
-  if (newText !== expected.text) {
-    return refuse("the result is not the exact canonical single-line splice");
-  }
-  const block = extractConfigBlock(newText);
-  if (block === null)
-    return refuse("the config block no longer parses");
-  let doc;
-  try {
-    doc = YAML2.parse(block);
-  } catch {
-    return refuse("the config block is not valid YAML after the stamp");
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the config block is not a YAML mapping");
-  }
-  const parsedModule = doc.module;
-  if (parsedModule !== slug) {
-    return refuse(`module resolved to ${JSON.stringify(parsedModule)}, not ${JSON.stringify(slug)}`);
-  }
-  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
-  if (moduleLineCount !== 1) {
-    return refuse(`${moduleLineCount} top-level module: lines in the block`);
-  }
-}
-var NODE_SPEC_IO = {
-  readFileSync: (p2) => fs11.readFileSync(p2, "utf8"),
-  writeFileSync: (p2, d) => fs11.writeFileSync(p2, d, { encoding: "utf8" }),
-  renameSync: (from, to) => fs11.renameSync(from, to),
-  rmSync: (p2) => fs11.rmSync(p2, { force: true })
-};
-function assignLegacySetsToModule(root, targetSlug, sets, io = NODE_SPEC_IO) {
-  const slug = (targetSlug ?? "").trim();
-  if (slug === "" || slug.toLowerCase() === "default") {
-    return {
-      stamped: [],
-      alreadyAssigned: [],
-      refused: { reason: `"${targetSlug}" is not a valid module target.` }
-    };
-  }
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid") {
-    return { stamped: [], alreadyAssigned: [], refused: { reason: INVALID_MANIFEST_MESSAGE } };
-  }
-  const declaredSlugs = classified.kind === "present" ? classified.entries.map((e) => e.slug) : [];
-  if (!declaredSlugs.includes(slug)) {
-    return {
-      stamped: [],
-      alreadyAssigned: [],
-      refused: { reason: unknownModuleMessage(slug) }
-    };
-  }
-  const queued = [];
-  const alreadyAssigned = [];
-  for (const set of sets) {
-    let original;
-    try {
-      original = io.readFileSync(set.specAbs);
-    } catch (err) {
-      return {
-        stamped: [],
-        alreadyAssigned: [],
-        refused: {
-          reason: `could not read ${set.name}'s spec.md: ${err instanceof Error ? err.message : String(err)}`,
-          setName: set.name
-        }
-      };
-    }
-    const result = stampModuleIntoSpecText(original, slug);
-    if (result.kind === "noop") {
-      alreadyAssigned.push(set.name);
-      continue;
-    }
-    if (result.kind === "refused") {
-      const why = result.reason.code === "already-assigned" ? `${set.name} is already stamped module: ${result.reason.existing} \u2014 reassigning is not a legacy stamp` : result.reason.code === "no-config-block" ? `${set.name}'s spec.md has no "Session Set Configuration" block to stamp` : `${set.name}'s Session Set Configuration block has no \`\`\`yaml fence to stamp`;
-      return {
-        stamped: [],
-        alreadyAssigned: [],
-        refused: { reason: why, setName: set.name }
-      };
-    }
-    try {
-      assertStampedTextValid(original, result.text, slug);
-    } catch (err) {
-      return {
-        stamped: [],
-        alreadyAssigned: [],
-        refused: {
-          reason: `${set.name}: ${err instanceof Error ? err.message : String(err)}`,
-          setName: set.name
-        }
-      };
-    }
-    queued.push({ name: set.name, specAbs: set.specAbs, original, next: result.text });
-  }
-  const stamped = [];
-  const fail = (setName, reason) => ({
-    stamped,
-    alreadyAssigned,
-    writeFailed: { setName, reason, written: [...stamped] }
-  });
-  const revalidateTarget = () => {
-    const c3 = classifyModulesManifest(root);
-    if (c3.kind === "invalid")
-      return INVALID_MANIFEST_MESSAGE;
-    const slugs = c3.kind === "present" ? c3.entries.map((e) => e.slug) : [];
-    return slugs.includes(slug) ? null : unknownModuleMessage(slug);
-  };
-  for (const item of queued) {
-    const manifestErr = revalidateTarget();
-    if (manifestErr) {
-      return stamped.length > 0 ? fail(
-        item.name,
-        `the target module "${slug}" is no longer declared in the manifest after ${stamped.length} set(s) were already stamped \u2014 ${manifestErr}`
-      ) : {
-        stamped: [],
-        alreadyAssigned,
-        refused: { reason: manifestErr, setName: item.name }
-      };
-    }
-    let current;
-    try {
-      current = io.readFileSync(item.specAbs);
-    } catch (err) {
-      return fail(
-        item.name,
-        `could not re-read ${item.name}'s spec.md before writing: ${err instanceof Error ? err.message : String(err)}`
-      );
-    }
-    if (current !== item.original) {
-      return fail(
-        item.name,
-        `${item.name}'s spec.md changed after it was validated (a concurrent edit) \u2014 refused to overwrite it`
-      );
-    }
-    const tmp = `${item.specAbs}.${process.pid}.${crypto3.randomBytes(6).toString("hex")}.dabbler-assign-tmp`;
-    let staged = false;
-    try {
-      io.writeFileSync(tmp, item.next);
-      staged = true;
-      if (io.readFileSync(tmp) !== item.next) {
-        throw new Error("the staged temp file did not verify");
-      }
-      if (io.readFileSync(item.specAbs) !== item.original) {
-        io.rmSync(tmp);
-        return fail(
-          item.name,
-          `${item.name}'s spec.md changed during the staged write (a concurrent edit) \u2014 refused to overwrite it`
-        );
-      }
-      io.renameSync(tmp, item.specAbs);
-    } catch (err) {
-      if (staged) {
-        try {
-          io.rmSync(tmp);
-        } catch {
-        }
-      }
-      return fail(
-        item.name,
-        `writing ${item.name}'s spec.md failed; the original was left intact (${err instanceof Error ? err.message : String(err)})`
-      );
-    }
-    stamped.push(item.name);
-  }
-  return { stamped, alreadyAssigned };
-}
-function restampModuleInSpecText(text, expectedOldSlug, newSlug) {
-  const heading = CONFIG_HEADING_RE.exec(text);
-  if (!heading) {
-    return { kind: "refused", reason: 'no "Session Set Configuration" block' };
-  }
-  const afterHeading = heading.index + heading[0].length;
-  const rest = text.slice(afterHeading);
-  const nextHeadingRel = rest.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? text.length : afterHeading + nextHeadingRel;
-  const section = text.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen) {
-    return { kind: "refused", reason: "the config block has no ```yaml fence" };
-  }
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = text.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1) {
-    return { kind: "refused", reason: "the config block has no closing fence" };
-  }
-  const blockContent = boundedTail.slice(0, closeRel);
-  let parsed;
-  try {
-    parsed = YAML2.parse(blockContent);
-  } catch {
-    return { kind: "refused", reason: "the config block is not valid YAML" };
-  }
-  const parsedModule = parsed !== null && typeof parsed === "object" && !Array.isArray(parsed) ? parsed.module : void 0;
-  if (parsedModule === void 0) {
-    return { kind: "refused", reason: "no top-level module: key to rewrite" };
-  }
-  if (parsedModule === newSlug)
-    return { kind: "noop" };
-  if (parsedModule !== expectedOldSlug) {
-    return {
-      kind: "refused",
-      reason: `stamped module: ${JSON.stringify(parsedModule)}, not ${JSON.stringify(expectedOldSlug)}`
-    };
-  }
-  const lineRe = /^(module[ \t]*:[ \t]*)([^\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
-  const lm = lineRe.exec(blockContent);
-  if (!lm) {
-    return { kind: "refused", reason: "could not locate the module: line to rewrite" };
-  }
-  const valueAbs = blockContentStart + lm.index + lm[1].length;
-  const valueLen = lm[2].length;
-  const newText = text.slice(0, valueAbs) + newSlug + text.slice(valueAbs + valueLen);
-  return { kind: "written", text: newText };
-}
-function assertRestampedTextValid(originalText, newText, oldSlug, newSlug) {
-  const refuse = (why) => {
-    throw new Error(`Refusing the module restamp (${why}).`);
-  };
-  const expected = restampModuleInSpecText(originalText, oldSlug, newSlug);
-  if (expected.kind !== "written") {
-    return refuse(
-      expected.kind === "noop" ? "the original is already stamped to the new module" : `the original cannot be restamped (${expected.reason})`
-    );
-  }
-  if (newText !== expected.text) {
-    return refuse("the result is not the exact canonical single-value rewrite");
-  }
-  const heading = CONFIG_HEADING_RE.exec(newText);
-  const afterHeading = heading ? heading.index + heading[0].length : -1;
-  if (afterHeading < 0)
-    return refuse("the config block no longer parses");
-  const restText = newText.slice(afterHeading);
-  const nextHeadingRel = restText.search(/^##[ \t]/m);
-  const sectionEnd = nextHeadingRel === -1 ? newText.length : afterHeading + nextHeadingRel;
-  const section = newText.slice(afterHeading, sectionEnd);
-  const fenceOpen = CONFIG_YAML_FENCE_OPEN_RE.exec(section);
-  if (!fenceOpen)
-    return refuse("the config block no longer parses");
-  const blockContentStart = afterHeading + fenceOpen.index + fenceOpen[0].length;
-  const boundedTail = newText.slice(blockContentStart, sectionEnd);
-  const closeRel = boundedTail.search(CONFIG_FENCE_CLOSE_RE);
-  if (closeRel === -1)
-    return refuse("the config block no longer parses");
-  const block = boundedTail.slice(0, closeRel);
-  let doc;
-  try {
-    doc = YAML2.parse(block);
-  } catch {
-    return refuse("the config block is not valid YAML after the restamp");
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return refuse("the config block is not a YAML mapping");
-  }
-  if (doc.module !== newSlug) {
-    return refuse(
-      `module resolved to ${JSON.stringify(doc.module)}, not ${JSON.stringify(newSlug)}`
-    );
-  }
-  const moduleLineCount = (block.match(CONFIG_TOP_LEVEL_MODULE_RE) || []).length;
-  if (moduleLineCount !== 1) {
-    return refuse(`${moduleLineCount} top-level module: lines in the block`);
-  }
-}
-function parseManifestEntriesFromText(text) {
-  let doc;
-  try {
-    doc = YAML2.parse(text);
-  } catch {
-    return null;
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc))
-    return null;
-  const rawModules = doc.modules;
-  if (rawModules === null)
-    return [];
-  if (!Array.isArray(rawModules))
-    return null;
-  const stringList = (v) => Array.isArray(v) ? v.filter((x2) => typeof x2 === "string" && x2.trim() !== "").map((s) => s.trim()) : [];
-  const out = [];
-  const seen = /* @__PURE__ */ new Set();
-  for (const raw of rawModules) {
-    if (raw === null || typeof raw !== "object" || Array.isArray(raw))
-      continue;
-    const obj = raw;
-    const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
-    if (!slug || seen.has(slug))
-      continue;
-    seen.add(slug);
-    const title = typeof obj.title === "string" && obj.title.trim() !== "" ? obj.title.trim() : slug;
-    const planPath = typeof obj.planPath === "string" && obj.planPath.trim() !== "" ? obj.planPath.trim() : null;
-    out.push({
-      slug,
-      title,
-      codeRoots: stringList(obj.codeRoots),
-      planPath,
-      touches: stringList(obj.touches)
-    });
-  }
-  return out;
-}
-function entriesEqual(a, b2) {
-  return a.slug === b2.slug && a.title === b2.title && a.planPath === b2.planPath && a.codeRoots.length === b2.codeRoots.length && a.codeRoots.every((v, i2) => v === b2.codeRoots[i2]) && a.touches.length === b2.touches.length && a.touches.every((v, i2) => v === b2.touches[i2]);
-}
-function unquoteScalar(raw) {
-  const t2 = raw.trim();
-  if (t2.length >= 2 && (t2[0] === '"' || t2[0] === "'") && t2[t2.length - 1] === t2[0]) {
-    return t2.slice(1, -1);
-  }
-  return t2;
-}
-function rewriteManifestEntryText(text, oldSlug, opts) {
-  const markerRe = /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
-  let target = null;
-  for (const m of text.matchAll(markerRe)) {
-    if (unquoteScalar(m[4]) === oldSlug) {
-      target = m;
-      break;
-    }
-  }
-  if (target === null)
-    return null;
-  const entryIndent = target[1].length;
-  const keyIndent = target[1].length + 1 + target[2].length;
-  const slugValueStart = target.index + target[1].length + 1 + target[2].length + 4 + target[3].length;
-  const slugValueEnd = slugValueStart + target[4].length;
-  const slugLineEnd = target.index + target[0].length;
-  let spanEnd = text.length;
-  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|[^ \t\r\n#])/g;
-  boundaryRe.lastIndex = slugLineEnd;
-  let bm;
-  while ((bm = boundaryRe.exec(text)) !== null) {
-    if (bm[1].length <= entryIndent) {
-      spanEnd = bm.index;
-      break;
-    }
-  }
-  const edits = [];
-  if (opts.newSlug !== void 0 && opts.newSlug !== oldSlug) {
-    edits.push({ start: slugValueStart, end: slugValueEnd, replacement: opts.newSlug });
-  }
-  if (opts.newTitle !== void 0) {
-    const titleRe = /^([ \t]+)title([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/m;
-    const span = text.slice(slugLineEnd, spanEnd);
-    const tm = titleRe.exec(span);
-    if (tm) {
-      const titleValueStart = slugLineEnd + tm.index + tm[1].length + 5 + tm[2].length;
-      const titleValueEnd = titleValueStart + tm[3].length;
-      edits.push({
-        start: titleValueStart,
-        end: titleValueEnd,
-        replacement: JSON.stringify(opts.newTitle)
-      });
-    } else {
-      const nl = text.includes("\r\n") ? "\r\n" : "\n";
-      const insertion = `${nl}${" ".repeat(keyIndent)}title: ${JSON.stringify(opts.newTitle)}`;
-      edits.push({ start: slugLineEnd, end: slugLineEnd, replacement: insertion });
-    }
-  }
-  if (edits.length === 0)
-    return text;
-  edits.sort((a, b2) => b2.start - a.start);
-  let out = text;
-  for (const e of edits) {
-    out = out.slice(0, e.start) + e.replacement + out.slice(e.end);
-  }
-  return out;
-}
-function assertRenamedManifestParses(originalEntries, candidateText, oldSlug, expected) {
-  const refuse = (why) => {
-    throw new Error(`Could not rename the module entry (${why}).`);
-  };
-  const arrEq = (a, b2) => a.length === b2.length && a.every((v, i2) => v === b2[i2]);
-  const candidate = parseManifestEntriesFromText(candidateText);
-  if (candidate === null)
-    return refuse("the result is not a valid module manifest");
-  if (candidate.length !== originalEntries.length) {
-    return refuse(
-      `entry count changed (${originalEntries.length} -> ${candidate.length})`
-    );
-  }
-  const targetIndex = originalEntries.findIndex((e) => e.slug === oldSlug);
-  if (targetIndex < 0)
-    return refuse(`the original had no "${oldSlug}" entry`);
-  for (let i2 = 0; i2 < originalEntries.length; i2++) {
-    const before = originalEntries[i2];
-    const after = candidate[i2];
-    if (i2 === targetIndex) {
-      if (after.slug !== expected.newSlug) {
-        return refuse(
-          `entry ${i2} slug is ${JSON.stringify(after.slug)}, expected ${JSON.stringify(expected.newSlug)}`
-        );
-      }
-      if (after.planPath !== before.planPath || !arrEq(after.codeRoots, before.codeRoots) || !arrEq(after.touches, before.touches)) {
-        return refuse(`entry ${i2} changed a field other than slug/title`);
-      }
-      if (expected.newTitle !== null) {
-        if (after.title !== expected.newTitle) {
-          return refuse(
-            `entry ${i2} title is ${JSON.stringify(after.title)}, expected ${JSON.stringify(expected.newTitle)}`
-          );
-        }
-      } else if (after.title !== before.title && after.title !== expected.newSlug) {
-        return refuse(
-          `entry ${i2} title changed unexpectedly to ${JSON.stringify(after.title)}`
-        );
-      }
-    } else if (!entriesEqual(after, before)) {
-      return refuse(`entry ${i2} (${before.slug}) changed unexpectedly`);
-    }
-  }
-  const newSlugCount = candidate.filter((e) => e.slug === expected.newSlug).length;
-  if (newSlugCount !== 1) {
-    return refuse(`the new slug appears ${newSlugCount} times`);
-  }
-  if (expected.newSlug !== oldSlug && candidate.some((e) => e.slug === oldSlug)) {
-    return refuse(`the old slug "${oldSlug}" still appears`);
-  }
-}
-var NODE_RENAME_IO = {
-  readFileSync: (p2) => fs11.readFileSync(p2, "utf8"),
-  writeFileSync: (p2, data) => {
-    const tmp = `${p2}.${process.pid}.${crypto3.randomBytes(6).toString("hex")}.dabbler-rename-tmp`;
-    try {
-      fs11.writeFileSync(tmp, data, { encoding: "utf8" });
-      fs11.renameSync(tmp, p2);
-    } catch (err) {
-      try {
-        fs11.rmSync(tmp, { force: true });
-      } catch {
-      }
-      throw err;
-    }
-  }
-};
-function inferLegacyStatus(dir) {
-  if (fs11.existsSync(path15.join(dir, "change-log.md")))
-    return "complete";
-  if (fs11.existsSync(path15.join(dir, "activity-log.json")))
-    return "in-progress";
-  return "not-started";
-}
-function hasRunningSessionAt(setDir, io) {
-  let raw;
-  try {
-    raw = io.readFileSync(path15.join(setDir, "session-state.json"));
-  } catch {
-    return inferLegacyStatus(setDir) === "in-progress";
-  }
-  let doc;
-  try {
-    doc = JSON.parse(raw);
-  } catch {
-    return inferLegacyStatus(setDir) === "in-progress";
-  }
-  if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
-    return inferLegacyStatus(setDir) === "in-progress";
-  }
-  const d = doc;
-  if (d.status === "in-progress")
-    return true;
-  if (Array.isArray(d.sessions)) {
-    return d.sessions.some(
-      (s) => s !== null && typeof s === "object" && s.status === "in-progress"
-    );
-  }
-  return false;
-}
-function renameModule(root, oldSlugRaw, changes, io = NODE_RENAME_IO) {
-  const oldSlug = (oldSlugRaw ?? "").trim();
-  const msg = (e) => e instanceof Error ? e.message : String(e);
-  const refuse = (reason) => ({
-    oldSlug,
-    newSlug: oldSlug,
-    newTitle: null,
-    slugChanged: false,
-    titleChanged: false,
-    restamped: [],
-    refused: { reason }
-  });
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid")
-    return refuse(INVALID_MANIFEST_MESSAGE);
-  const entries = classified.kind === "present" ? classified.entries : [];
-  const targetEntry = entries.find((e) => e.slug === oldSlug);
-  if (!targetEntry) {
-    return refuse(
-      `Module "${oldSlug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`
-    );
-  }
-  const requestedSlug = changes.newSlug === void 0 ? void 0 : changes.newSlug.trim();
-  const requestedTitle = changes.newTitle === void 0 ? void 0 : changes.newTitle.trim();
-  const slugChanging = requestedSlug !== void 0 && requestedSlug !== "" && requestedSlug !== oldSlug;
-  const newSlug = slugChanging ? requestedSlug : oldSlug;
-  const currentTitle = targetEntry.title;
-  const titleChanging = requestedTitle !== void 0 && requestedTitle !== "" && requestedTitle !== currentTitle;
-  const newTitle = titleChanging ? requestedTitle : null;
-  if (!slugChanging && !titleChanging) {
-    return refuse(
-      "no change requested \u2014 the new slug and title match the current module."
-    );
-  }
-  if (slugChanging) {
-    const declaredSlugs = entries.map((e) => e.slug);
-    const slugErr = validateNewModuleSlug(newSlug, declaredSlugs);
-    if (slugErr)
-      return refuse(slugErr);
-  }
-  const setsRoot = path15.join(root, SESSION_SETS_REL);
-  const affected = [];
-  const newSlugCollisions = [];
-  for (const name of listSessionSetDirNames(root)) {
-    const dir = path15.join(setsRoot, name);
-    const specAbs = path15.join(dir, "spec.md");
-    const mod = parseSessionSetConfig(specAbs).module;
-    if (mod === oldSlug)
-      affected.push({ name, dir, specAbs });
-    else if (slugChanging && mod === newSlug)
-      newSlugCollisions.push(name);
-  }
-  if (slugChanging && newSlugCollisions.length > 0) {
-    return refuse(
-      `Renaming to "${newSlug}" would merge histories: ${newSlugCollisions.length} set(s) already declare module: ${newSlug}, which is not a declared module (${newSlugCollisions.join(", ")}). Pick a different name.`
-    );
-  }
-  if (slugChanging) {
-    const running = affected.filter((a) => hasRunningSessionAt(a.dir, io));
-    if (running.length > 0) {
-      return refuse(
-        `Refusing to rename "${oldSlug}" while ${running.length} affected set(s) have a running session (${running.map((r2) => r2.name).join(", ")}). Finish or close them first.`
-      );
-    }
-  }
-  const writes = [];
-  const restampedNames = [];
-  if (slugChanging) {
-    for (const a of affected) {
-      let original;
-      try {
-        original = io.readFileSync(a.specAbs);
-      } catch (e) {
-        return refuse(`could not read ${a.name}'s spec.md: ${msg(e)}`);
-      }
-      const res = restampModuleInSpecText(original, oldSlug, newSlug);
-      if (res.kind === "noop")
-        continue;
-      if (res.kind === "refused")
-        return refuse(`${a.name}: ${res.reason}`);
-      try {
-        assertRestampedTextValid(original, res.text, oldSlug, newSlug);
-      } catch (e) {
-        return refuse(`${a.name}: ${msg(e)}`);
-      }
-      writes.push({ abs: a.specAbs, original, next: res.text, label: a.name });
-      restampedNames.push(a.name);
-    }
-  }
-  const manifestAbs = path15.join(root, MODULES_MANIFEST_REL);
-  let manifestOriginal;
-  try {
-    manifestOriginal = io.readFileSync(manifestAbs);
-  } catch (e) {
-    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  const manifestNext = rewriteManifestEntryText(manifestOriginal, oldSlug, {
-    newSlug: slugChanging ? newSlug : void 0,
-    newTitle: titleChanging ? newTitle : void 0
-  });
-  if (manifestNext === null) {
-    return refuse(
-      `could not rewrite the ${MODULES_MANIFEST_DISPLAY} entry for "${oldSlug}" while preserving formatting \u2014 edit the slug/title by hand.`
-    );
-  }
-  try {
-    assertRenamedManifestParses(entries, manifestNext, oldSlug, {
-      newSlug,
-      // null = title not explicitly changed — the guard then tolerates a
-      // slug-derived implicit default (a title-less entry's display name
-      // follows its slug), so a slug-only rename of a title-less entry is not
-      // spuriously refused.
-      newTitle: titleChanging ? newTitle : null
-    });
-  } catch (e) {
-    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  writes.push({
-    abs: manifestAbs,
-    original: manifestOriginal,
-    next: manifestNext,
-    label: MODULES_MANIFEST_DISPLAY
-  });
-  const written = [];
-  for (const w of writes) {
-    try {
-      io.writeFileSync(w.abs, w.next);
-      written.push({ abs: w.abs, original: w.original });
-      if (io.readFileSync(w.abs) !== w.next) {
-        throw new Error("did not verify after write");
-      }
-    } catch (e) {
-      let rolledBack = true;
-      for (const done of written) {
-        try {
-          io.writeFileSync(done.abs, done.original);
-        } catch {
-          rolledBack = false;
-        }
-      }
-      return {
-        oldSlug,
-        newSlug,
-        newTitle,
-        slugChanged: false,
-        titleChanged: false,
-        restamped: [],
-        writeFailed: { reason: `writing ${w.label} failed: ${msg(e)}`, rolledBack }
-      };
-    }
-  }
-  return {
-    oldSlug,
-    newSlug,
-    newTitle,
-    slugChanged: slugChanging,
-    titleChanged: titleChanging,
-    restamped: restampedNames
-  };
-}
 var EXECUTION_ARTIFACT_FILENAMES = [
   "activity-log.json",
   "session-events.jsonl",
@@ -19109,6 +18076,13 @@ var EXECUTION_ARTIFACT_FILENAMES = [
 ];
 function hasExecutionArtifacts(dir) {
   return EXECUTION_ARTIFACT_FILENAMES.some((f) => fs11.existsSync(path15.join(dir, f)));
+}
+function inferLegacyStatus(dir) {
+  if (fs11.existsSync(path15.join(dir, "change-log.md")))
+    return "complete";
+  if (fs11.existsSync(path15.join(dir, "activity-log.json")))
+    return "in-progress";
+  return "not-started";
 }
 function rawSessionSetStatus(dir) {
   let raw;
@@ -19160,305 +18134,300 @@ function classifyModuleSetsForDeletion(root, slug) {
   }
   return out;
 }
-function removeManifestEntryText(text, slug) {
-  const markerRe = /^([ \t]*)-([ \t]+)slug([ \t]*:[ \t]*)("[^"\r\n]*"|'[^'\r\n]*'|[^#\r\n \t][^#\r\n]*?)([ \t]*(?:#[^\r\n]*)?)$/gm;
-  let target = null;
-  for (const m of text.matchAll(markerRe)) {
-    if (unquoteScalar(m[4]) === slug) {
-      target = m;
-      break;
-    }
-  }
-  if (target === null)
-    return null;
-  const entryIndent = target[1].length;
-  const slugLineEnd = target.index + target[0].length;
-  let spanEnd = text.length;
-  const boundaryRe = /\r?\n([ \t]*)(?:-[ \t]|#|[^ \t\r\n#])/g;
-  boundaryRe.lastIndex = slugLineEnd;
-  let bm;
-  while ((bm = boundaryRe.exec(text)) !== null) {
-    if (bm[1].length <= entryIndent) {
-      spanEnd = bm.index;
-      break;
-    }
-  }
-  const nlMatch = /^\r?\n/.exec(text.slice(spanEnd));
-  const deleteEnd = spanEnd + (nlMatch ? nlMatch[0].length : 0);
-  return text.slice(0, target.index) + text.slice(deleteEnd);
+
+// src/utils/routerCli.ts
+var vscode11 = __toESM(require("vscode"));
+var cp3 = __toESM(require("child_process"));
+var ROUTER_OUTPUT_CHANNEL = "Dabbler Commands";
+function quoteForDisplay(arg) {
+  if (arg === "")
+    return '""';
+  if (!/[\s"'`$&|<>()^;,{}[\]@#]/.test(arg))
+    return arg;
+  return `"${arg.replace(/(["`$])/g, "`$1")}"`;
 }
-function assertManifestEntryRemoved(originalEntries, candidateText, slug) {
-  const refuse = (why) => {
-    throw new Error(`Could not remove the module entry (${why}).`);
+function buildCommandLine(pythonPath, invocation) {
+  const exe = quoteForDisplay(pythonPath);
+  const parts = [exe, "-m", invocation.module, ...invocation.args.map(quoteForDisplay)];
+  return (exe.startsWith('"') ? "& " : "") + parts.join(" ");
+}
+function buildArgv(invocation) {
+  return ["-m", invocation.module, ...invocation.args];
+}
+var sharedChannel;
+function routerOutputChannel() {
+  if (!sharedChannel) {
+    sharedChannel = vscode11.window.createOutputChannel(ROUTER_OUTPUT_CHANNEL);
+  }
+  return sharedChannel;
+}
+function defaultEcho() {
+  const channel = routerOutputChannel();
+  return {
+    append: (line) => channel.appendLine(line),
+    // `preserveFocus: true` — showing the developer the command must never
+    // steal focus from the editor mid-flow. They asked to see it, not to be
+    // taken to it.
+    reveal: () => channel.show(true)
   };
-  const candidate = parseManifestEntriesFromText(candidateText);
-  if (candidate === null)
-    return refuse("the result is not a valid module manifest");
-  if (candidate.length !== originalEntries.length - 1) {
-    return refuse(
-      `entry count changed (${originalEntries.length} -> ${candidate.length}, expected ${originalEntries.length - 1})`
+}
+function runRouterCli(invocation, deps = {}) {
+  const resolveInterpreter = deps.resolveInterpreter ?? resolvePythonInterpreter;
+  const interpreterExists = deps.interpreterExists ?? ((p2) => interpreterResolves(p2));
+  const spawn6 = deps.spawn ?? cp3.spawn;
+  const echo = deps.echo ?? defaultEcho();
+  const pythonPath = resolveInterpreter(invocation.cwd);
+  const commandLine = buildCommandLine(pythonPath, invocation);
+  echo.reveal();
+  echo.append(`[${(/* @__PURE__ */ new Date()).toLocaleTimeString()}] Running:`);
+  echo.append(commandLine);
+  const settleUnavailable = (message) => {
+    echo.append(`  ${message}`);
+    return {
+      outcome: "unavailable",
+      ok: false,
+      exitCode: null,
+      message,
+      commandLine,
+      raw: { stdout: "", stderr: "" }
+    };
+  };
+  if (!interpreterExists(pythonPath)) {
+    return Promise.resolve(
+      settleUnavailable(describeMissingPython(invocation.actionLabel))
     );
   }
-  if (candidate.some((e) => e.slug === slug)) {
-    return refuse(`the removed slug "${slug}" still appears`);
-  }
-  const remainingOriginal = originalEntries.filter(
-    (e) => e.slug !== slug
-  );
-  for (let i2 = 0; i2 < remainingOriginal.length; i2++) {
-    if (!entriesEqual(remainingOriginal[i2], candidate[i2])) {
-      return refuse(`entry ${i2} (${remainingOriginal[i2].slug}) changed unexpectedly`);
+  return new Promise((resolve7) => {
+    let settled = false;
+    const settle = (result) => {
+      if (settled)
+        return;
+      settled = true;
+      resolve7(result);
+    };
+    let child;
+    try {
+      child = spawn6(pythonPath, buildArgv(invocation), {
+        cwd: invocation.cwd,
+        windowsHide: true
+      });
+    } catch (err) {
+      settle(
+        settleUnavailable(
+          `could not spawn ${pythonPath}: ${err instanceof Error ? err.message : String(err)}`
+        )
+      );
+      return;
     }
+    let stdout = "";
+    let stderr = "";
+    const outDec = makeUtf8ChunkDecoder();
+    const errDec = makeUtf8ChunkDecoder();
+    child.stdout?.on("data", (c3) => stdout += outDec.write(c3));
+    child.stderr?.on("data", (c3) => stderr += errDec.write(c3));
+    child.on("error", (err) => {
+      settle(settleUnavailable(`could not spawn ${pythonPath}: ${err.message}`));
+    });
+    child.on("close", (code) => {
+      if (settled)
+        return;
+      stdout += outDec.end();
+      stderr += errDec.end();
+      for (const line of `${stdout}${stderr}`.split(/\r?\n/)) {
+        if (line.trim() !== "")
+          echo.append(`  ${line}`);
+      }
+      if (isAiRouterNotInstalled(stderr)) {
+        settle({
+          outcome: "unavailable",
+          ok: false,
+          exitCode: code,
+          message: describeAiRouterImportFailure(pythonPath),
+          commandLine,
+          raw: { stdout, stderr }
+        });
+        return;
+      }
+      const payload = parseJsonPayload(stdout);
+      settle({
+        ...classify(code, payload, stdout, stderr),
+        commandLine,
+        payload,
+        raw: { stdout, stderr }
+      });
+    });
+  });
+}
+function parseJsonPayload(stdout) {
+  const text = (stdout || "").trim();
+  if (!text)
+    return void 0;
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start < 0 || end <= start)
+    return void 0;
+  try {
+    const parsed = JSON.parse(text.slice(start, end + 1));
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : void 0;
+  } catch {
+    return void 0;
   }
 }
-async function deleteModule(root, slugRaw, io = NODE_RENAME_IO) {
-  const slug = (slugRaw ?? "").trim();
-  const msg = (e) => e instanceof Error ? e.message : String(e);
-  const refuse = (reason2) => ({
-    slug,
-    cancelled: [],
-    removed: [],
-    terminal: [],
-    refused: { reason: reason2 }
-  });
-  const classified = classifyModulesManifest(root);
-  if (classified.kind === "invalid")
-    return refuse(INVALID_MANIFEST_MESSAGE);
-  const entries = classified.kind === "present" ? classified.entries : [];
-  if (!entries.some((e) => e.slug === slug)) {
-    return refuse(`Module "${slug}" is not declared in ${MODULES_MANIFEST_DISPLAY}.`);
+function firstString(payload, key) {
+  const value = payload?.[key];
+  return typeof value === "string" && value.trim() !== "" ? value : void 0;
+}
+function classify(code, payload, stdout, stderr) {
+  const fallback = (stderr.trim() || stdout.trim() || `exit ${code}`).slice(
+    0,
+    600
+  );
+  if (code === 0) {
+    return { outcome: "ok", ok: true, exitCode: code, message: stdout.trim() };
   }
-  const classifications = classifyModuleSetsForDeletion(root, slug);
-  const running = classifications.filter((c3) => hasRunningSessionAt(c3.dir, io));
-  if (running.length > 0) {
-    return refuse(
-      `Refusing to delete "${slug}" while ${running.length} affected set(s) have a running session (${running.map((r2) => r2.name).join(", ")}). Finish or close them first.`
-    );
-  }
-  const terminalNames = classifications.filter((c3) => c3.disposition === "terminal").map((c3) => c3.name).sort();
-  const toCancel = classifications.filter((c3) => c3.disposition === "cancel");
-  const toRemove = classifications.filter((c3) => c3.disposition === "remove");
-  const manifestAbs = path15.join(root, MODULES_MANIFEST_REL);
-  let manifestOriginal;
-  try {
-    manifestOriginal = io.readFileSync(manifestAbs);
-  } catch (e) {
-    return refuse(`could not read ${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  const manifestNext = removeManifestEntryText(manifestOriginal, slug);
-  if (manifestNext === null) {
-    return refuse(
-      `could not remove the ${MODULES_MANIFEST_DISPLAY} entry for "${slug}" while preserving formatting \u2014 remove it by hand.`
-    );
-  }
-  try {
-    assertManifestEntryRemoved(entries, manifestNext, slug);
-  } catch (e) {
-    return refuse(`${MODULES_MANIFEST_DISPLAY}: ${msg(e)}`);
-  }
-  const cancelled = [];
-  const removed = [];
-  const reason = `module ${slug} deleted`;
-  for (const c3 of toCancel) {
-    try {
-      await cancelSessionSet(c3.dir, reason);
-      cancelled.push(c3.name);
-    } catch (e) {
-      return {
-        slug,
-        cancelled,
-        removed,
-        terminal: terminalNames,
-        partialFailure: { reason: `cancelling ${c3.name} failed: ${msg(e)}` }
-      };
-    }
-  }
-  for (const c3 of toRemove) {
-    try {
-      fs11.rmSync(c3.dir, { recursive: true, force: true });
-      removed.push(c3.name);
-    } catch (e) {
-      return {
-        slug,
-        cancelled,
-        removed,
-        terminal: terminalNames,
-        partialFailure: { reason: `removing ${c3.name} failed: ${msg(e)}` }
-      };
-    }
-  }
-  try {
-    io.writeFileSync(manifestAbs, manifestNext);
-  } catch (e) {
+  if (code === 3) {
     return {
-      slug,
-      cancelled,
-      removed,
-      terminal: terminalNames,
-      partialFailure: {
-        reason: `${cancelled.length} set(s) cancelled and ${removed.length} scaffold(s) removed, but writing ${MODULES_MANIFEST_DISPLAY} failed: ${msg(e)} \u2014 re-run to finish removing the manifest entry.`
-      }
+      outcome: "refused",
+      ok: false,
+      exitCode: code,
+      message: firstString(payload, "refused") ?? fallback
     };
   }
-  return { slug, cancelled, removed, terminal: terminalNames };
-}
-var MODULE_PLAN_SET_TEMPLATE_FILENAME = "module-plan-set.spec.md.template";
-var MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME = "module-decomposition-set.spec.md.template";
-function resolveModuleLifecycleTemplatesDir() {
-  const candidates = [
-    path15.join(__dirname, "templates", "consumer-bootstrap"),
-    path15.join(__dirname, "..", "..", "..", "..", "docs", "templates", "consumer-bootstrap")
-  ];
-  for (const c3 of candidates) {
-    if (fs11.existsSync(path15.join(c3, MODULE_PLAN_SET_TEMPLATE_FILENAME)))
-      return c3;
+  if (code === 4) {
+    return {
+      outcome: "writeFailed",
+      ok: false,
+      exitCode: code,
+      message: firstString(payload, "writeFailed") ?? fallback
+    };
   }
-  return candidates[candidates.length - 1];
+  return { outcome: "failed", ok: false, exitCode: code, message: fallback };
 }
-function loadModuleLifecycleTemplate(filename) {
-  const dir = resolveModuleLifecycleTemplatesDir();
-  return fs11.readFileSync(path15.join(dir, filename), "utf8").replace(/\r\n/g, "\n");
+
+// src/utils/moduleLifecycleCli.ts
+var MODULES_CLI = "ai_router.modules";
+function createArgs(root, args) {
+  const out = ["--repo-root", root, "--json", "create", "--slug", args.slug];
+  const title = (args.title ?? "").trim();
+  if (title !== "")
+    out.push("--title", title);
+  return out;
 }
-function substituteLifecycleTokens(text, table) {
-  return text.replace(
-    /{{([A-Z_]+)}}/g,
-    (whole, key) => Object.prototype.hasOwnProperty.call(table, key) ? table[key] : whole
-  );
+function renameArgs(root, args) {
+  const out = ["--repo-root", root, "--json", "rename", "--slug", args.slug];
+  if (args.newSlug !== void 0)
+    out.push("--new-slug", args.newSlug);
+  if (args.newTitle !== void 0)
+    out.push("--new-title", args.newTitle);
+  return out;
 }
-function assertNoUnsubstitutedTokens(rendered, filename) {
-  const leftover = rendered.match(/{{[A-Z_]+}}/g);
-  if (leftover) {
-    throw new Error(
-      `${filename}: unsubstituted token(s) ${leftover.join(", ")} \u2014 a template/writer token-table mismatch.`
-    );
-  }
+function deleteArgs(root, slug) {
+  return ["--repo-root", root, "--json", "delete", "--slug", slug];
 }
-function renderModulePlanSetSpec(ctx) {
-  const rendered = substituteLifecycleTokens(
-    loadModuleLifecycleTemplate(MODULE_PLAN_SET_TEMPLATE_FILENAME),
-    {
-      MODULE_TITLE: ctx.moduleTitle,
-      MODULE_SLUG: ctx.moduleSlug,
-      SLUG: ctx.slug,
-      CREATED: ctx.created,
-      PLAN_REL_PATH: ctx.planRelPath
-    }
-  );
-  assertNoUnsubstitutedTokens(rendered, MODULE_PLAN_SET_TEMPLATE_FILENAME);
-  return rendered;
-}
-function renderModuleDecompositionSetSpec(ctx) {
-  const rendered = substituteLifecycleTokens(
-    loadModuleLifecycleTemplate(MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME),
-    {
-      MODULE_TITLE: ctx.moduleTitle,
-      MODULE_SLUG: ctx.moduleSlug,
-      SLUG: ctx.slug,
-      CREATED: ctx.created,
-      PLAN_REL_PATH: ctx.planRelPath,
-      PLAN_SLUG: ctx.planSlug
-    }
-  );
-  assertNoUnsubstitutedTokens(rendered, MODULE_DECOMPOSITION_SET_TEMPLATE_FILENAME);
-  return rendered;
-}
-function findExistingLifecycleSetSlug(dirNames, moduleSlug, kind) {
-  const suffix = `-${moduleSlug}-${kind}`;
-  const matches = dirNames.filter((n) => n.endsWith(suffix) && numericPrefix(n) !== null).sort();
-  return matches.length > 0 ? matches[0] : null;
-}
-function writeSpecSkipExisting(abs, text) {
-  if (fs11.existsSync(abs))
-    return false;
-  fs11.mkdirSync(path15.dirname(abs), { recursive: true });
-  fs11.writeFileSync(abs, text, { encoding: "utf8" });
-  if (fs11.readFileSync(abs, "utf8") !== text) {
-    throw new Error(`${abs} did not verify after writing (concurrent modification?).`);
-  }
-  return true;
-}
-function assertLifecycleSpecWritten(abs, expectedKind, expectedPrereqSlug) {
-  const config = parseSessionSetConfig(abs);
-  if (config.kind !== expectedKind) {
-    throw new Error(
-      `${abs}: expected kind "${expectedKind}", parsed "${config.kind}" \u2014 refusing (template/parser drift).`
-    );
-  }
-  if (expectedPrereqSlug !== null) {
-    const prereqs = parsePrerequisites(abs);
-    const ok = prereqs !== null && prereqs.some(
-      (p2) => p2.slug === expectedPrereqSlug && p2.condition === "complete"
-    );
-    if (!ok) {
-      throw new Error(
-        `${abs}: expected a prerequisites: entry for "${expectedPrereqSlug}" \u2014 refusing (template/parser drift).`
-      );
-    }
-  }
-}
-function scaffoldModuleLifecycleSets(root, module2) {
-  const moduleSlug = (module2.slug ?? "").trim();
-  if (!MODULE_SLUG_RE.test(moduleSlug)) {
-    throw new Error(
-      `Cannot scaffold lifecycle sets: "${module2.slug}" is not a valid module slug.`
-    );
-  }
-  const dirNames = listSessionSetDirNames(root);
-  const existingPlanSlug = findExistingLifecycleSetSlug(dirNames, moduleSlug, "plan");
-  const existingDecompositionSlug = findExistingLifecycleSetSlug(
-    dirNames,
-    moduleSlug,
-    "decomposition"
-  );
-  const planSlug = existingPlanSlug ?? `${nextSessionSetNumberFrom(dirNames).padded}-${moduleSlug}-plan`;
-  const reservedDirNames = existingPlanSlug || dirNames.includes(planSlug) ? dirNames : [...dirNames, planSlug];
-  const decompositionSlug = existingDecompositionSlug ?? `${nextSessionSetNumberFrom(reservedDirNames).padded}-${moduleSlug}-decomposition`;
-  const created = (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
-  const planRelPath = modulePlanRelPath(module2);
-  const moduleTitle = (module2.title ?? "").trim() || moduleSlug;
-  const planAbs = path15.join(root, SESSION_SETS_REL, planSlug, "spec.md");
-  const decompositionAbs = path15.join(
+function assignSetsArgs(root, args) {
+  const out = [
+    "--repo-root",
     root,
-    SESSION_SETS_REL,
-    decompositionSlug,
-    "spec.md"
+    "--json",
+    "assign-sets",
+    "--slug",
+    args.slug
+  ];
+  for (const name of args.setNames)
+    out.push("--set", name);
+  return out;
+}
+function run(root, args, actionLabel, deps) {
+  return runRouterCli(
+    { module: MODULES_CLI, args, cwd: root, actionLabel },
+    deps
   );
-  let planCreated = false;
-  if (!existingPlanSlug) {
-    const planText = renderModulePlanSetSpec({
-      slug: planSlug,
-      moduleSlug,
-      moduleTitle,
-      created,
-      planRelPath
-    });
-    planCreated = writeSpecSkipExisting(planAbs, planText);
-    if (planCreated)
-      assertLifecycleSpecWritten(planAbs, "plan", null);
-  }
-  let decompositionCreated = false;
-  if (!existingDecompositionSlug) {
-    const decompositionText = renderModuleDecompositionSetSpec({
-      slug: decompositionSlug,
-      moduleSlug,
-      moduleTitle,
-      created,
-      planRelPath,
-      planSlug
-    });
-    decompositionCreated = writeSpecSkipExisting(decompositionAbs, decompositionText);
-    if (decompositionCreated) {
-      assertLifecycleSpecWritten(decompositionAbs, "decomposition", planSlug);
+}
+function runCreateModule(root, args, deps) {
+  return run(root, createArgs(root, args), "Creating a module", deps);
+}
+function runRenameModule(root, args, deps) {
+  return run(root, renameArgs(root, args), "Renaming a module", deps);
+}
+function runDeleteModule(root, slug, deps) {
+  return run(root, deleteArgs(root, slug), "Deleting a module", deps);
+}
+function runAssignSets(root, args, deps) {
+  return run(root, assignSetsArgs(root, args), "Assigning sets", deps);
+}
+function str(payload, key) {
+  const v = payload?.[key];
+  return typeof v === "string" ? v : "";
+}
+function bool(payload, key) {
+  return payload?.[key] === true;
+}
+function list(payload, key) {
+  const v = payload?.[key];
+  return Array.isArray(v) ? v.filter((x2) => typeof x2 === "string") : [];
+}
+function describeFailure(verb, result) {
+  const detail = result.message.trim() || `exit ${result.exitCode}`;
+  switch (result.outcome) {
+    case "refused":
+      return `${verb} refused \u2014 ${detail} Nothing was written.`;
+    case "writeFailed": {
+      const rolledBack = result.payload?.["rolledBack"];
+      if (rolledBack === true) {
+        return `${verb} failed: ${detail} Every touched file was rolled back \u2014 the workspace is unchanged.`;
+      }
+      if (rolledBack === false) {
+        return `${verb} failed: ${detail} A rollback write ALSO failed \u2014 reconcile docs/modules.yaml and the affected files from git before retrying.`;
+      }
+      if (bool(result.payload, "stillDeclared")) {
+        return `${verb} stopped partway: ${detail} The module is still declared \u2014 re-run the command to finish (already-applied steps are skipped).`;
+      }
+      return `${verb} failed: ${detail}`;
     }
+    case "unavailable":
+      return detail;
+    default:
+      return `${verb} failed: ${detail}`;
   }
-  return {
-    planSlug,
-    planSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${planSlug}/spec.md`,
-    planCreated,
-    decompositionSlug,
-    decompositionSpecRel: `${SESSION_SETS_REL.replace(/\\/g, "/")}/${decompositionSlug}/spec.md`,
-    decompositionCreated
-  };
+}
+function describeCreate(payload) {
+  const slug = str(payload, "slug");
+  const manifestRel = str(payload, "manifestRel");
+  const planRel = str(payload, "planRel");
+  const planSet = str(payload, "planSetSlug");
+  const decompSet = str(payload, "decompositionSetSlug");
+  return `Module "${slug}" ${bool(payload, "manifestCreated") ? `declared in a new ${manifestRel}` : `appended to ${manifestRel}`}. ` + (bool(payload, "planCreated") ? `Plan stub created at ${planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${planRel} kept.`) + (planSet || decompSet ? ` Next steps scaffolded: ${planSet} and ${decompSet}.` : "");
+}
+function describeRename(payload) {
+  const parts = [];
+  if (bool(payload, "slugChanged"))
+    parts.push(`slug \u2192 ${str(payload, "newSlug")}`);
+  if (bool(payload, "titleChanged"))
+    parts.push(`title \u2192 "${str(payload, "newTitle")}"`);
+  const restamped = list(payload, "restamped");
+  const tail = restamped.length ? ` Restamped ${restamped.length} set(s): ${restamped.join(", ")}.` : "";
+  return `Renamed module (${parts.join(", ")}).${tail}`;
+}
+function describeDelete(payload) {
+  return `Deleted module "${str(payload, "slug")}" \u2014 ${list(payload, "cancelled").length} set(s) cancelled, ${list(payload, "removed").length} scaffold(s) removed, ${list(payload, "terminal").length} left untouched.`;
+}
+function describeAssign(payload) {
+  const slug = str(payload, "slug");
+  const stamped = list(payload, "stamped");
+  const already = list(payload, "alreadyAssigned");
+  const parts = [];
+  if (stamped.length) {
+    parts.push(
+      `Stamped module: ${slug} into ${stamped.length} set(s) (${stamped.join(", ")})`
+    );
+  }
+  if (already.length) {
+    parts.push(`${already.length} already assigned (${already.join(", ")})`);
+  }
+  return parts.length ? `${parts.join("; ")}.` : `Nothing to change \u2014 the selected sets already declare module: ${slug}.`;
+}
+function assignedAny(payload) {
+  return list(payload, "stamped").length > 0;
 }
 
 // src/commands/gitScaffold.ts
@@ -19494,38 +18463,35 @@ async function scaffoldConsumerRepo(deps) {
     budgetOutcome
   };
 }
-function scaffoldDefaultModuleAndLifecycleSets(projectDir) {
+async function scaffoldDefaultModuleAndLifecycleSets(projectDir, cliDeps) {
   if (listSessionSetDirNames(projectDir).length > 0) {
     return {
       ran: false,
       note: " The default module was NOT scaffolded \u2014 this repo already has session sets under docs/session-sets/, so it is treated as an existing (legacy) repo, not a fresh scaffold."
     };
   }
-  try {
-    const newModule = scaffoldNewModule(projectDir, "default", "Default");
-    const declared = {
-      slug: "default",
-      title: "Default",
-      codeRoots: [],
-      planPath: newModule.planRel,
-      touches: []
-    };
-    const lifecycle = scaffoldModuleLifecycleSets(projectDir, declared);
-    return {
-      ran: true,
-      planSlug: lifecycle.planSlug,
-      decompositionSlug: lifecycle.decompositionSlug,
-      note: ` Default module scaffolded: ${lifecycle.planSlug} (plan) and ${lifecycle.decompositionSlug} (decomposition) \u2014 rename or delete "Default" any time from the Work Explorer.`
-    };
-  } catch (err) {
+  const result = await runCreateModule(
+    projectDir,
+    { slug: "default", title: "Default" },
+    cliDeps
+  );
+  if (!result.ok) {
     return {
       ran: false,
-      note: ` The default module's starter sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}).`
+      note: ` The default module's starter sets were NOT scaffolded (${describeFailure("Creating the default module", result)}).`
     };
   }
+  const planSlug = String(result.payload?.["planSetSlug"] ?? "");
+  const decompositionSlug = String(result.payload?.["decompositionSetSlug"] ?? "");
+  return {
+    ran: true,
+    planSlug,
+    decompositionSlug,
+    note: ` Default module scaffolded: ${planSlug} (plan) and ${decompositionSlug} (decomposition) \u2014 rename or delete "Default" any time from the Work Explorer.`
+  };
 }
 async function pickDirectory() {
-  const picked = await vscode11.window.showOpenDialog({
+  const picked = await vscode12.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -19540,16 +18506,16 @@ function isoDate() {
 }
 function registerGitScaffoldCommand(context) {
   context.subscriptions.push(
-    vscode11.commands.registerCommand("dabbler.setupNewProject", async () => {
-      const openRoot = vscode11.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    vscode12.commands.registerCommand("dabbler.setupNewProject", async () => {
+      const openRoot = vscode12.workspace.workspaceFolders?.[0]?.uri.fsPath;
       const projectDir = openRoot ?? await pickDirectory();
       if (!projectDir)
         return;
       await buildProjectStructureNoPrompt(context, projectDir);
       if (!openRoot) {
-        await vscode11.commands.executeCommand(
+        await vscode12.commands.executeCommand(
           "vscode.openFolder",
-          vscode11.Uri.file(projectDir)
+          vscode12.Uri.file(projectDir)
         );
       }
     })
@@ -19564,7 +18530,7 @@ function makeScaffoldInstallPrompts() {
 }
 async function buildProjectStructureNoPrompt(context, projectDir, budget, transportProfile, seams = {}) {
   if (!(seams.probePython ?? probePythonPresence)(projectDir)) {
-    vscode11.window.showErrorMessage(
+    vscode12.window.showErrorMessage(
       describeMissingPython("Build project structure")
     );
     return void 0;
@@ -19585,7 +18551,7 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
   try {
     bundle = seams.loadBundle ? seams.loadBundle() : loadTemplateBundle(resolveBundledTemplateDir(context.extensionPath));
   } catch (err) {
-    vscode11.window.showErrorMessage(
+    vscode12.window.showErrorMessage(
       `Could not load the consumer-bootstrap template bundle: ${err instanceof Error ? err.message : String(err)}`
     );
     return void 0;
@@ -19595,9 +18561,9 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
   const pythonPath = resolveScaffoldBootstrapPython(projectDir) ?? resolveExplicitPythonPath(projectDir);
   const runScaffold = seams.runScaffold ?? (async (scaffoldCtx, scaffoldBundle, scaffoldPython, scaffoldBudget) => {
     let installOutcome2 = null;
-    const scaffolded = await vscode11.window.withProgress(
+    const scaffolded = await vscode12.window.withProgress(
       {
-        location: vscode11.ProgressLocation.Notification,
+        location: vscode12.ProgressLocation.Notification,
         title: "Building project structure\u2026",
         cancellable: false
       },
@@ -19631,12 +18597,10 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
     effectiveBudget
   );
   const budgetNote = result.budgetOutcome === "written" ? " Budget saved to ai_router/budget.yaml." : result.budgetOutcome === "skipped-exists" ? " Existing ai_router/budget.yaml kept (budget input not applied)." : "";
-  const defaultModuleNote = result.written.includes(MODULES_MANIFEST_DISPLAY) ? (seams.scaffoldDefaultModule ?? scaffoldDefaultModuleAndLifecycleSets)(
-    projectDir
-  ).note : "";
+  const defaultModuleNote = result.written.includes(MODULES_MANIFEST_DISPLAY) ? (await (seams.scaffoldDefaultModule ?? scaffoldDefaultModuleAndLifecycleSets)(projectDir)).note : "";
   const summary = `Project structure built: ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote + defaultModuleNote;
-  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode12.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode12.window.showWarningMessage(m));
   if (result.installOk) {
     showInfo(summary);
   } else {
@@ -19688,7 +18652,7 @@ function decideCopilotSeatSetup(transportProfile, installOk, venvPath) {
     return "skip-install-incomplete";
   return "run";
 }
-function makeRealKillEffects(child, spawnFn = (cmd, args, opts) => cp3.spawn(cmd, args, opts)) {
+function makeRealKillEffects(child, spawnFn = (cmd, args, opts) => cp4.spawn(cmd, args, opts)) {
   return {
     taskkillTree: (pid) => {
       const tk = spawnFn("taskkill", ["/pid", String(pid), "/T", "/F"], {
@@ -19702,7 +18666,7 @@ function makeRealKillEffects(child, spawnFn = (cmd, args, opts) => cp3.spawn(cmd
 }
 function makeRefreshChildSpawner() {
   return (cmd, args, opts, callbacks) => {
-    const child = cp3.spawn(cmd, args, {
+    const child = cp4.spawn(cmd, args, {
       cwd: opts.cwd,
       env: process.env,
       windowsHide: true,
@@ -19743,15 +18707,15 @@ function makeRefreshChildSpawner() {
   };
 }
 async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, seams = {}) {
-  const withProgress = seams.withProgress ?? vscode11.window.withProgress.bind(vscode11.window);
+  const withProgress = seams.withProgress ?? vscode12.window.withProgress.bind(vscode12.window);
   const perform = seams.perform ?? performCopilotSeatSetup;
-  const showInfo = seams.showInfo ?? ((m) => void vscode11.window.showInformationMessage(m));
-  const showWarning = seams.showWarning ?? ((m) => void vscode11.window.showWarningMessage(m));
+  const showInfo = seams.showInfo ?? ((m) => void vscode12.window.showInformationMessage(m));
+  const showWarning = seams.showWarning ?? ((m) => void vscode12.window.showWarningMessage(m));
   const seatId = deriveSeatId(os3.hostname(), currentUsername());
   const seatLabel = deriveSeatLabel(projectDir);
   const outcome = await withProgress(
     {
-      location: vscode11.ProgressLocation.Notification,
+      location: vscode12.ProgressLocation.Notification,
       title: "Setting up the Copilot seat \u2014 probing the seat's models (about 1\u20132 minutes)\u2026",
       cancellable: true
     },
@@ -19765,7 +18729,7 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
       fileOps: makeFileOps(),
       cancellation: token,
       registerDisposal: (dispose) => {
-        const d = new vscode11.Disposable(dispose);
+        const d = new vscode12.Disposable(dispose);
         context.subscriptions.push(d);
         return {
           // S2 review Minor 4: also splice the Disposable back out of
@@ -19794,7 +18758,7 @@ async function runCopilotSeatSetupWithProgress(context, projectDir, venvPath, se
 // src/commands/trySampleProject.ts
 var fs12 = __toESM(require("fs"));
 var path18 = __toESM(require("path"));
-var vscode12 = __toESM(require("vscode"));
+var vscode13 = __toESM(require("vscode"));
 
 // src/utils/sampleProject.ts
 var path17 = __toESM(require("path"));
@@ -20172,23 +19136,23 @@ async function showPendingSampleLanding(context, io) {
 }
 function registerTrySampleProjectCommand(context) {
   context.subscriptions.push(
-    vscode12.commands.registerCommand("dabbler.trySampleProject", async () => {
+    vscode13.commands.registerCommand("dabbler.trySampleProject", async () => {
       await runTrySampleProject(context);
     })
   );
   void showPendingSampleLanding(context, {
-    openFolders: (vscode12.workspace.workspaceFolders ?? []).map(
+    openFolders: (vscode13.workspace.workspaceFolders ?? []).map(
       (f) => f.uri.fsPath
     ),
-    showInfo: (msg, ...actions) => Promise.resolve(vscode12.window.showInformationMessage(msg, ...actions)),
-    copyToClipboard: (text) => Promise.resolve(vscode12.env.clipboard.writeText(text)),
-    setStatus: (msg) => vscode12.window.setStatusBarMessage(msg, 5e3)
+    showInfo: (msg, ...actions) => Promise.resolve(vscode13.window.showInformationMessage(msg, ...actions)),
+    copyToClipboard: (text) => Promise.resolve(vscode13.env.clipboard.writeText(text)),
+    setStatus: (msg) => vscode13.window.setStatusBarMessage(msg, 5e3)
   });
 }
 var sampleChannel;
 function sampleOutputChannel() {
   if (!sampleChannel) {
-    sampleChannel = vscode12.window.createOutputChannel("Dabbler: Sample Project");
+    sampleChannel = vscode13.window.createOutputChannel("Dabbler: Sample Project");
   }
   return sampleChannel;
 }
@@ -20200,14 +19164,14 @@ async function runTrySampleProject(context) {
       listFilesRecursive: listFilesRecursiveSync
     });
   } catch (err) {
-    vscode12.window.showErrorMessage(
+    vscode13.window.showErrorMessage(
       `The sample project could not be loaded from the installed extension: ${describeError(err)}`
     );
     return;
   }
   const picked = await pickTargetFolder(bundle, {
     showOpenDialog: async () => {
-      const chosen = await vscode12.window.showOpenDialog({
+      const chosen = await vscode13.window.showOpenDialog({
         canSelectFiles: false,
         canSelectFolders: true,
         canSelectMany: false,
@@ -20216,7 +19180,7 @@ async function runTrySampleProject(context) {
       });
       return chosen?.[0]?.fsPath;
     },
-    showWarning: (msg, ...actions) => Promise.resolve(vscode12.window.showWarningMessage(msg, ...actions)),
+    showWarning: (msg, ...actions) => Promise.resolve(vscode13.window.showWarningMessage(msg, ...actions)),
     exists: (p2) => fs12.existsSync(p2),
     readFile: (p2) => fs12.readFileSync(p2, "utf8"),
     listDir: (p2) => fs12.readdirSync(p2),
@@ -20229,15 +19193,15 @@ async function runTrySampleProject(context) {
     return;
   const { folder, resumeFrom } = picked;
   if (!probePythonPresence(folder)) {
-    vscode12.window.showErrorMessage(
+    vscode13.window.showErrorMessage(
       describeMissingPython("Try a sample project")
     );
     return;
   }
   const bootstrapPython = resolveScaffoldBootstrapPython(folder) ?? resolveExplicitPythonPath(folder);
-  const result = await vscode12.window.withProgress(
+  const result = await vscode13.window.withProgress(
     {
-      location: vscode12.ProgressLocation.Notification,
+      location: vscode13.ProgressLocation.Notification,
       title: "Creating your sample project...",
       cancellable: false
     },
@@ -20278,31 +19242,31 @@ async function runTrySampleProject(context) {
     folder,
     slug: bundle.meta.sampleSetSlug
   });
-  const alreadyOpen = (vscode12.workspace.workspaceFolders ?? []).some(
+  const alreadyOpen = (vscode13.workspace.workspaceFolders ?? []).some(
     (f) => path18.resolve(f.uri.fsPath) === path18.resolve(folder)
   );
   if (alreadyOpen) {
     await showPendingSampleLanding(context, {
       openFolders: [folder],
-      showInfo: (msg, ...actions) => Promise.resolve(vscode12.window.showInformationMessage(msg, ...actions)),
-      copyToClipboard: (text) => Promise.resolve(vscode12.env.clipboard.writeText(text)),
-      setStatus: (msg) => vscode12.window.setStatusBarMessage(msg, 5e3)
+      showInfo: (msg, ...actions) => Promise.resolve(vscode13.window.showInformationMessage(msg, ...actions)),
+      copyToClipboard: (text) => Promise.resolve(vscode13.env.clipboard.writeText(text)),
+      setStatus: (msg) => vscode13.window.setStatusBarMessage(msg, 5e3)
     });
     return;
   }
-  await vscode12.commands.executeCommand(
+  await vscode13.commands.executeCommand(
     "vscode.openFolder",
-    vscode12.Uri.file(folder)
+    vscode13.Uri.file(folder)
   );
 }
 async function reportSampleFailure(folder, bootstrapPython, result) {
   const reason = result.failureReason ?? "no further detail available";
   if (result.failedStep === "git") {
-    vscode12.window.showErrorMessage(GIT_MISSING_MESSAGE);
+    vscode13.window.showErrorMessage(GIT_MISSING_MESSAGE);
     return;
   }
   if (result.failedStep !== "install") {
-    vscode12.window.showErrorMessage(
+    vscode13.window.showErrorMessage(
       `The sample project could not be created in '${folder}': ${reason}`
     );
     return;
@@ -20319,7 +19283,7 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
       )
     )
   );
-  const answer = await vscode12.window.showWarningMessage(
+  const answer = await vscode13.window.showWarningMessage(
     describeInstallFailure(folder, reason),
     INSTALL_FAILED_SHOW_LOG_ACTION,
     INSTALL_FAILED_RETRY_ACTION
@@ -20327,18 +19291,18 @@ async function reportSampleFailure(folder, bootstrapPython, result) {
   if (answer === INSTALL_FAILED_SHOW_LOG_ACTION) {
     channel.show(true);
   } else if (answer === INSTALL_FAILED_RETRY_ACTION) {
-    await vscode12.commands.executeCommand("dabbler.trySampleProject");
+    await vscode13.commands.executeCommand("dabbler.trySampleProject");
   }
 }
 
 // src/commands/gitWorkflow.ts
-var vscode15 = __toESM(require("vscode"));
-var cp4 = __toESM(require("child_process"));
+var vscode16 = __toESM(require("vscode"));
+var cp5 = __toESM(require("child_process"));
 var fs14 = __toESM(require("fs"));
 var path20 = __toESM(require("path"));
 
 // src/utils/gitHost.ts
-var vscode13 = __toESM(require("vscode"));
+var vscode14 = __toESM(require("vscode"));
 var GIT_SUFFIX = /\.git$/i;
 function stripGitSuffix(s) {
   return s.replace(GIT_SUFFIX, "");
@@ -20460,7 +19424,7 @@ function resolveGitHostFromUrl(url, setting) {
   return auto.kind === "azure-devops" ? auto : { kind: "unknown", host: auto.host, owner: "", repo: "" };
 }
 function gitHostSetting() {
-  const v = vscode13.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
+  const v = vscode14.workspace.getConfiguration("dabblerSessionSets").get("gitHost");
   return v === "github" || v === "azure-devops" ? v : "auto";
 }
 function createPrWebUrl(info, branch, targetBranch) {
@@ -20497,7 +19461,7 @@ function adoPrWebUrl(info, prId) {
 // src/utils/hostCli.ts
 var fs13 = __toESM(require("fs"));
 var path19 = __toESM(require("path"));
-var vscode14 = __toESM(require("vscode"));
+var vscode15 = __toESM(require("vscode"));
 var realExists2 = (p2) => {
   try {
     return fs13.statSync(p2).isFile();
@@ -20546,7 +19510,7 @@ function probeHostCliCore(command, explicitSetting, workspaceRoot2, env8 = proce
   return found ? { present: true, resolved: found } : { present: false, resolved: null };
 }
 function explicitCliPathSetting(key) {
-  const inspected = vscode14.workspace.getConfiguration("dabblerSessionSets").inspect(key);
+  const inspected = vscode15.workspace.getConfiguration("dabblerSessionSets").inspect(key);
   if (!inspected)
     return void 0;
   const value = inspected.workspaceFolderValue ?? inspected.workspaceValue ?? inspected.globalValue;
@@ -20588,7 +19552,7 @@ function describeHostCliAuthHint(kind) {
 // src/commands/gitWorkflow.ts
 function defaultRunner() {
   return (file, args, opts) => new Promise((resolve7) => {
-    cp4.execFile(
+    cp5.execFile(
       file,
       args,
       {
@@ -20608,24 +19572,24 @@ function defaultRunner() {
 function defaultUi() {
   return {
     confirm: async (message, detail, button) => {
-      const picked = await vscode15.window.showWarningMessage(
+      const picked = await vscode16.window.showWarningMessage(
         message,
         { modal: true, detail },
         button
       );
       return picked === button;
     },
-    showInputBox: vscode15.window.showInputBox,
+    showInputBox: vscode16.window.showInputBox,
     showQuickPickLabels: (labels, placeHolder) => Promise.resolve(
-      vscode15.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
+      vscode16.window.showQuickPick(labels, { placeHolder, ignoreFocusOut: true }).then((p2) => p2?.label)
     ),
-    showInfo: (m) => void vscode15.window.showInformationMessage(m),
-    showWarning: (m) => void vscode15.window.showWarningMessage(m),
-    showError: (m) => void vscode15.window.showErrorMessage(m),
+    showInfo: (m) => void vscode16.window.showInformationMessage(m),
+    showWarning: (m) => void vscode16.window.showWarningMessage(m),
+    showError: (m) => void vscode16.window.showErrorMessage(m),
     openExternal: async (url) => {
-      await vscode15.env.openExternal(vscode15.Uri.parse(url));
+      await vscode16.env.openExternal(vscode16.Uri.parse(url));
     },
-    workspaceRoot: () => vscode15.workspace.workspaceFolders?.[0]?.uri.fsPath
+    workspaceRoot: () => vscode16.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 var SESSION_BRANCH_PREFIX = "session-set/";
@@ -20724,19 +19688,19 @@ function buildPrTemplate(branch) {
   ];
   return { title, bodyLines };
 }
-async function git(run, cwd, ...args) {
-  return run("git", args, { cwd });
+async function git(run3, cwd, ...args) {
+  return run3("git", args, { cwd });
 }
-async function gitLine(run, cwd, ...args) {
-  const r2 = await git(run, cwd, ...args);
+async function gitLine(run3, cwd, ...args) {
+  const r2 = await git(run3, cwd, ...args);
   if (r2.code !== 0)
     return null;
   const line = r2.stdout.split(/\r?\n/).find((l) => l.trim() !== "");
   return line ? line.trim() : null;
 }
-async function detectTrunkBranch(run, cwd) {
+async function detectTrunkBranch(run3, cwd) {
   const head = await gitLine(
-    run,
+    run3,
     cwd,
     "symbolic-ref",
     "--short",
@@ -20745,19 +19709,19 @@ async function detectTrunkBranch(run, cwd) {
   if (head && head.startsWith("origin/"))
     return head.slice("origin/".length);
   for (const candidate of ["main", "master"]) {
-    const r2 = await git(run, cwd, "show-ref", "--verify", "--quiet", `refs/heads/${candidate}`);
+    const r2 = await git(run3, cwd, "show-ref", "--verify", "--quiet", `refs/heads/${candidate}`);
     if (r2.code === 0)
       return candidate;
   }
   return "main";
 }
-async function isDirty(run, cwd) {
-  const r2 = await git(run, cwd, "status", "--porcelain");
+async function isDirty(run3, cwd) {
+  const r2 = await git(run3, cwd, "status", "--porcelain");
   return r2.code === 0 ? r2.stdout.trim() !== "" : true;
 }
-async function primaryRoot(run, cwd) {
+async function primaryRoot(run3, cwd) {
   const common = await gitLine(
-    run,
+    run3,
     cwd,
     "rev-parse",
     "--path-format=absolute",
@@ -20767,8 +19731,8 @@ async function primaryRoot(run, cwd) {
     return null;
   return path20.dirname(common);
 }
-async function listLinkedWorktrees(run, cwd) {
-  const r2 = await git(run, cwd, "worktree", "list", "--porcelain");
+async function listLinkedWorktrees(run3, cwd) {
+  const r2 = await git(run3, cwd, "worktree", "list", "--porcelain");
   if (r2.code !== 0)
     return [];
   const entries = [];
@@ -20787,13 +19751,13 @@ async function listLinkedWorktrees(run, cwd) {
   return entries.slice(1);
 }
 async function runOpenPrFlow(deps) {
-  const { ui, run } = deps;
+  const { ui, run: run3 } = deps;
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showError("No workspace folder is open.");
     return;
   }
-  const remoteUrl = await gitLine(run, root, "config", "--get", "remote.origin.url") ?? await gitLine(run, root, "remote", "get-url", "origin");
+  const remoteUrl = await gitLine(run3, root, "config", "--get", "remote.origin.url") ?? await gitLine(run3, root, "remote", "get-url", "origin");
   if (!remoteUrl) {
     ui.showError(
       "This workspace has no `origin` remote \u2014 add one (git remote add origin <url>) before opening a PR."
@@ -20806,19 +19770,19 @@ async function runOpenPrFlow(deps) {
     ui.showError(describeMissingHostCli("unknown"));
     return;
   }
-  const branch = await gitLine(run, root, "rev-parse", "--abbrev-ref", "HEAD");
+  const branch = await gitLine(run3, root, "rev-parse", "--abbrev-ref", "HEAD");
   if (!branch || branch === "HEAD") {
     ui.showError("Could not resolve the current branch (detached HEAD?).");
     return;
   }
-  const trunk = await detectTrunkBranch(run, root);
+  const trunk = await detectTrunkBranch(run3, root);
   if (branch === trunk) {
     ui.showError(
       `You are on the trunk (${trunk}) \u2014 open PRs from a session branch (${SESSION_BRANCH_PREFIX}<slug>).`
     );
     return;
   }
-  if (await isDirty(run, root)) {
+  if (await isDirty(run3, root)) {
     const proceed = await ui.confirm(
       "Uncommitted changes",
       "The working tree has uncommitted changes; they will NOT be part of the pushed branch or the PR. Continue anyway?",
@@ -20869,7 +19833,7 @@ Target: ${info.kind} (${info.host}), base branch ${trunk}.`,
   );
   if (!confirmed)
     return;
-  const push = await git(run, root, "push", "-u", "origin", branch);
+  const push = await git(run3, root, "push", "-u", "origin", branch);
   if (push.code !== 0) {
     ui.showError(
       `git push failed:
@@ -20885,7 +19849,7 @@ ${(push.stderr || push.stdout).trim()}`
     );
     return;
   }
-  const created = await run(cliInvocation.file, cliInvocation.args, {
+  const created = await run3(cliInvocation.file, cliInvocation.args, {
     cwd: root,
     windowsVerbatimArguments: cliInvocation.windowsVerbatimArguments
   });
@@ -20913,25 +19877,25 @@ You can finish in the browser: ${webUrl ?? "(no URL derivable)"}`
   }
 }
 async function runFinalizeMergedSetFlow(deps) {
-  const { ui, run } = deps;
+  const { ui, run: run3 } = deps;
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showError("No workspace folder is open.");
     return;
   }
-  const primary = await primaryRoot(run, root);
+  const primary = await primaryRoot(run3, root);
   if (!primary) {
     ui.showError("This workspace is not inside a git repository.");
     return;
   }
-  const toplevel = await gitLine(run, root, "rev-parse", "--show-toplevel");
+  const toplevel = await gitLine(run3, root, "rev-parse", "--show-toplevel");
   if (!toplevel || path20.resolve(toplevel) !== path20.resolve(primary)) {
     ui.showError(
       `Finalize runs from the main checkout (${primary}), not from inside a worktree \u2014 open the main checkout and re-run, so the worktree you are in can be removed.`
     );
     return;
   }
-  const worktrees = await listLinkedWorktrees(run, primary);
+  const worktrees = await listLinkedWorktrees(run3, primary);
   const sessionWorktrees = worktrees.filter(
     (w) => w.branch?.startsWith(SESSION_BRANCH_PREFIX)
   );
@@ -20954,7 +19918,7 @@ async function runFinalizeMergedSetFlow(deps) {
     chosenBranch = picked;
   } else {
     const branches = await git(
-      run,
+      run3,
       primary,
       "for-each-ref",
       "--format=%(refname:short)",
@@ -20980,15 +19944,15 @@ async function runFinalizeMergedSetFlow(deps) {
     );
     return;
   }
-  const trunk = await detectTrunkBranch(run, primary);
-  const currentBranch = await gitLine(run, primary, "rev-parse", "--abbrev-ref", "HEAD");
+  const trunk = await detectTrunkBranch(run3, primary);
+  const currentBranch = await gitLine(run3, primary, "rev-parse", "--abbrev-ref", "HEAD");
   if (currentBranch !== trunk) {
     ui.showError(
       `The main checkout is on '${currentBranch ?? "?"}', not the trunk ('${trunk}'). Check out the trunk first (git checkout ${trunk}) \u2014 finalize pulls the merged trunk with --ff-only.`
     );
     return;
   }
-  if (await isDirty(run, primary)) {
+  if (await isDirty(run3, primary)) {
     ui.showError(
       "The main checkout has uncommitted changes \u2014 finalize refuses to run cleanup on a dirty tree. Commit or stash first."
     );
@@ -20998,7 +19962,7 @@ async function runFinalizeMergedSetFlow(deps) {
   steps.push({
     display: `git pull --ff-only`,
     exec: async () => {
-      const r2 = await git(run, primary, "pull", "--ff-only");
+      const r2 = await git(run3, primary, "pull", "--ff-only");
       if (r2.code !== 0)
         throw new Error((r2.stderr || r2.stdout).trim());
       return "trunk fast-forwarded";
@@ -21011,10 +19975,10 @@ async function runFinalizeMergedSetFlow(deps) {
       exec: async () => {
         const exists2 = (deps.fileExists ?? ((p2) => fs14.existsSync(p2)))(wtPath);
         if (!exists2) {
-          const prune = await git(run, primary, "worktree", "prune");
+          const prune = await git(run3, primary, "worktree", "prune");
           return prune.code === 0 ? "worktree already gone (pruned stale registration)" : "worktree already gone";
         }
-        const r2 = await git(run, primary, "worktree", "remove", wtPath);
+        const r2 = await git(run3, primary, "worktree", "remove", wtPath);
         if (r2.code !== 0) {
           throw new Error(
             `${(r2.stderr || r2.stdout).trim()}
@@ -21030,7 +19994,7 @@ async function runFinalizeMergedSetFlow(deps) {
     display: `git branch -d ${branchToDelete}`,
     exec: async () => {
       const exists2 = await git(
-        run,
+        run3,
         primary,
         "show-ref",
         "--verify",
@@ -21039,7 +20003,7 @@ async function runFinalizeMergedSetFlow(deps) {
       );
       if (exists2.code !== 0)
         return "branch already deleted";
-      const r2 = await git(run, primary, "branch", "-d", branchToDelete);
+      const r2 = await git(run3, primary, "branch", "-d", branchToDelete);
       if (r2.code !== 0) {
         throw new Error(
           `${(r2.stderr || r2.stdout).trim()}
@@ -21052,7 +20016,7 @@ async function runFinalizeMergedSetFlow(deps) {
   steps.push({
     display: `git fetch --prune`,
     exec: async () => {
-      const r2 = await git(run, primary, "fetch", "--prune");
+      const r2 = await git(run3, primary, "fetch", "--prune");
       if (r2.code !== 0)
         throw new Error((r2.stderr || r2.stdout).trim());
       return "remote-tracking refs pruned";
@@ -21092,17 +20056,17 @@ ${notes.join("\n")}`);
 }
 function registerGitWorkflowCommands(context) {
   context.subscriptions.push(
-    vscode15.commands.registerCommand("dabbler.openPrForSet", async () => {
+    vscode16.commands.registerCommand("dabbler.openPrForSet", async () => {
       await runOpenPrFlow({ ui: defaultUi(), run: defaultRunner() });
     }),
-    vscode15.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
+    vscode16.commands.registerCommand("dabbler.finalizeMergedSet", async () => {
       await runFinalizeMergedSetFlow({ ui: defaultUi(), run: defaultRunner() });
     })
   );
 }
 
 // src/commands/gitRelease.ts
-var vscode16 = __toESM(require("vscode"));
+var vscode17 = __toESM(require("vscode"));
 var HOTFIX_BRANCH_PREFIX = "hotfix/";
 var REF_VISIBLE_UNSAFE = /[ ~^:?*[\\]/;
 function refNameProblem(name, kind) {
@@ -21157,26 +20121,26 @@ function parseTagRefLines(stdout) {
   }
   return out;
 }
-async function git2(run, cwd, ...args) {
-  return run("git", args, { cwd });
+async function git2(run3, cwd, ...args) {
+  return run3("git", args, { cwd });
 }
-async function gitLine2(run, cwd, ...args) {
-  const r2 = await git2(run, cwd, ...args);
+async function gitLine2(run3, cwd, ...args) {
+  const r2 = await git2(run3, cwd, ...args);
   if (r2.code !== 0)
     return null;
   const line = r2.stdout.split(/\r?\n/).find((l) => l.trim() !== "");
   return line ? line.trim() : null;
 }
-async function isDirty2(run, cwd) {
-  const r2 = await git2(run, cwd, "status", "--porcelain");
+async function isDirty2(run3, cwd) {
+  const r2 = await git2(run3, cwd, "status", "--porcelain");
   return r2.code === 0 ? r2.stdout.trim() !== "" : true;
 }
-async function refExists(run, cwd, fullRef) {
-  const r2 = await git2(run, cwd, "rev-parse", "--verify", "--quiet", fullRef);
+async function refExists(run3, cwd, fullRef) {
+  const r2 = await git2(run3, cwd, "rev-parse", "--verify", "--quiet", fullRef);
   return r2.code === 0;
 }
-async function resolveCommit(run, cwd, ref) {
-  const r2 = await git2(run, cwd, "log", "-1", "--format=%h %s", ref);
+async function resolveCommit(run3, cwd, ref) {
+  const r2 = await git2(run3, cwd, "log", "-1", "--format=%h %s", ref);
   if (r2.code !== 0)
     return null;
   const line = r2.stdout.split(/\r?\n/).find((l) => l.trim() !== "");
@@ -21186,9 +20150,9 @@ async function resolveCommit(run, cwd, ref) {
   const idx = t2.indexOf(" ");
   return idx === -1 ? { sha: t2, subject: "" } : { sha: t2.slice(0, idx), subject: t2.slice(idx + 1) };
 }
-async function listTags(run, cwd) {
+async function listTags(run3, cwd) {
   const r2 = await git2(
-    run,
+    run3,
     cwd,
     "for-each-ref",
     "--sort=-creatordate",
@@ -21206,13 +20170,13 @@ async function pickTag(ui, tags, placeHolder) {
   );
 }
 async function runCutReleaseTagFlow(deps) {
-  const { ui, run } = deps;
+  const { ui, run: run3 } = deps;
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showError("No workspace folder is open.");
     return;
   }
-  const originUrl = await gitLine2(run, root, "remote", "get-url", "origin");
+  const originUrl = await gitLine2(run3, root, "remote", "get-url", "origin");
   if (!originUrl) {
     ui.showError(
       "This workspace has no `origin` remote (or is not a git repository) \u2014 a release tag is created and pushed to origin. Add one with: git remote add origin <url>."
@@ -21233,7 +20197,7 @@ async function runCutReleaseTagFlow(deps) {
     ui.showError(`Invalid tag name: ${nameProblem}.`);
     return;
   }
-  if (await refExists(run, root, `refs/tags/${tag}`)) {
+  if (await refExists(run3, root, `refs/tags/${tag}`)) {
     ui.showError(
       `Tag '${tag}' already exists. Pushed release tags are immutable by convention \u2014 choose a new version, or delete the old tag first (git tag -d ${tag}) if it was never pushed.`
     );
@@ -21248,7 +20212,7 @@ async function runCutReleaseTagFlow(deps) {
   if (rawRef === void 0)
     return;
   const ref = rawRef.trim() || "HEAD";
-  const commit = await resolveCommit(run, root, ref);
+  const commit = await resolveCommit(run3, root, ref);
   if (!commit) {
     ui.showError(`Could not resolve '${ref}' to a commit \u2014 check the ref and try again.`);
     return;
@@ -21262,7 +20226,7 @@ async function runCutReleaseTagFlow(deps) {
   if (rawMessage === void 0)
     return;
   const message = rawMessage.trim() || tag;
-  const dirtyNote = await isDirty2(run, root) ? "\n\nNote: the working tree has uncommitted changes \u2014 they are NOT part of the tagged commit." : "";
+  const dirtyNote = await isDirty2(run3, root) ? "\n\nNote: the working tree has uncommitted changes \u2014 they are NOT part of the tagged commit." : "";
   const confirmed = await ui.confirm(
     `Cut and push release tag '${tag}'?`,
     `This creates an annotated tag and PUSHES it to origin \u2014 a release action:
@@ -21276,13 +20240,13 @@ A pushed tag is immutable by convention \u2014 review the tag and commit above b
   );
   if (!confirmed)
     return;
-  const created = await git2(run, root, "tag", "-a", tag, commit.sha, "-m", message);
+  const created = await git2(run3, root, "tag", "-a", tag, commit.sha, "-m", message);
   if (created.code !== 0) {
     ui.showError(`git tag failed:
 ${(created.stderr || created.stdout).trim()}`);
     return;
   }
-  const pushed = await git2(run, root, "push", "origin", tag);
+  const pushed = await git2(run3, root, "push", "origin", tag);
   if (pushed.code !== 0) {
     ui.showError(
       `The tag '${tag}' was created locally but the push failed:
@@ -21298,13 +20262,13 @@ Or remove the local tag with: git tag -d ${tag}`
   );
 }
 async function runStartHotfixFromTagFlow(deps) {
-  const { ui, run } = deps;
+  const { ui, run: run3 } = deps;
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showError("No workspace folder is open.");
     return;
   }
-  const tags = await listTags(run, root);
+  const tags = await listTags(run3, root);
   if (tags === null) {
     ui.showError(
       "Could not read tags \u2014 is this folder inside a git repository? Open your repo and try again."
@@ -21317,7 +20281,7 @@ async function runStartHotfixFromTagFlow(deps) {
     );
     return;
   }
-  if (await isDirty2(run, root)) {
+  if (await isDirty2(run3, root)) {
     ui.showError(
       "The working tree has uncommitted changes \u2014 start the hotfix from a clean tree so the branch is exactly the tagged snapshot. Commit or stash first."
     );
@@ -21341,7 +20305,7 @@ async function runStartHotfixFromTagFlow(deps) {
     ui.showError(`Invalid branch name: ${nameProblem}.`);
     return;
   }
-  if (await refExists(run, root, `refs/heads/${branch}`)) {
+  if (await refExists(run3, root, `refs/heads/${branch}`)) {
     ui.showError(`Branch '${branch}' already exists \u2014 choose a different hotfix branch name.`);
     return;
   }
@@ -21356,7 +20320,7 @@ After this: make the fix, commit, push and open a PR, validate the full suite lo
   );
   if (!confirmed)
     return;
-  const switched = await git2(run, root, "switch", "-c", branch, tag);
+  const switched = await git2(run3, root, "switch", "-c", branch, tag);
   if (switched.code !== 0) {
     ui.showError(`git switch -c failed:
 ${(switched.stderr || switched.stdout).trim()}`);
@@ -21367,13 +20331,13 @@ ${(switched.stderr || switched.stdout).trim()}`);
   );
 }
 async function runRollBackToTagFlow(deps) {
-  const { ui, run } = deps;
+  const { ui, run: run3 } = deps;
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showError("No workspace folder is open.");
     return;
   }
-  const tags = await listTags(run, root);
+  const tags = await listTags(run3, root);
   if (tags === null) {
     ui.showError(
       "Could not read tags \u2014 is this folder inside a git repository? Open your repo and try again."
@@ -21386,7 +20350,7 @@ async function runRollBackToTagFlow(deps) {
     );
     return;
   }
-  if (await isDirty2(run, root)) {
+  if (await isDirty2(run3, root)) {
     ui.showError(
       "The working tree has uncommitted changes \u2014 a rollback redeploys the exact tagged snapshot. Commit or stash first."
     );
@@ -21395,8 +20359,8 @@ async function runRollBackToTagFlow(deps) {
   const tag = await pickTag(ui, tags, "Which release tag do you want to roll back to?");
   if (!tag)
     return;
-  const commit = await resolveCommit(run, root, tag);
-  const trunk = await detectTrunkBranch(run, root);
+  const commit = await resolveCommit(run3, root, tag);
+  const trunk = await detectTrunkBranch(run3, root);
   const confirmed = await ui.confirm(
     `Roll back to '${tag}'?`,
     `This checks out the release tag '${tag}' so you can run / redeploy exactly that snapshot \u2014 a rollback is redeploying the previous tag, not git surgery. You will be on a DETACHED HEAD:
@@ -21409,7 +20373,7 @@ Return to the trunk afterward with: git switch ${trunk}`,
   );
   if (!confirmed)
     return;
-  const checkedOut = await git2(run, root, "checkout", tag);
+  const checkedOut = await git2(run3, root, "checkout", tag);
   if (checkedOut.code !== 0) {
     ui.showError(`git checkout failed:
 ${(checkedOut.stderr || checkedOut.stdout).trim()}`);
@@ -21422,28 +20386,28 @@ ${(checkedOut.stderr || checkedOut.stdout).trim()}`);
 function registerGitReleaseCommands(context) {
   const deps = () => ({ ui: defaultUi(), run: defaultRunner() });
   context.subscriptions.push(
-    vscode16.commands.registerCommand("dabbler.cutReleaseTag", async () => {
+    vscode17.commands.registerCommand("dabbler.cutReleaseTag", async () => {
       await runCutReleaseTagFlow(deps());
     }),
-    vscode16.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
+    vscode17.commands.registerCommand("dabbler.startHotfixFromTag", async () => {
       await runStartHotfixFromTagFlow(deps());
     }),
-    vscode16.commands.registerCommand("dabbler.rollBackToTag", async () => {
+    vscode17.commands.registerCommand("dabbler.rollBackToTag", async () => {
       await runRollBackToTagFlow(deps());
     })
   );
 }
 
 // src/commands/troubleshoot.ts
-var vscode17 = __toESM(require("vscode"));
+var vscode18 = __toESM(require("vscode"));
 var fs15 = __toESM(require("fs"));
 var path21 = __toESM(require("path"));
-var cp5 = __toESM(require("child_process"));
+var cp6 = __toESM(require("child_process"));
 function workspaceRoot() {
-  return vscode17.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  return vscode18.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 function outputChannel() {
-  return vscode17.window.createOutputChannel("Dabbler Diagnostics");
+  return vscode18.window.createOutputChannel("Dabbler Diagnostics");
 }
 function checkActivation() {
   const ch = outputChannel();
@@ -21489,7 +20453,7 @@ function checkWorktrees() {
     return;
   }
   try {
-    const out = cp5.execFileSync("git", ["worktree", "list", "--porcelain"], {
+    const out = cp6.execFileSync("git", ["worktree", "list", "--porcelain"], {
       cwd: root,
       encoding: "utf8",
       windowsHide: true,
@@ -21557,7 +20521,7 @@ function checkLayout() {
 }
 function registerTroubleshootCommand(context) {
   context.subscriptions.push(
-    vscode17.commands.registerCommand("dabbler.troubleshoot", async () => {
+    vscode18.commands.registerCommand("dabbler.troubleshoot", async () => {
       const items = [
         {
           label: "$(warning) Extension not activating",
@@ -21590,7 +20554,7 @@ function registerTroubleshootCommand(context) {
           run: checkLayout
         }
       ];
-      const picked = await vscode17.window.showQuickPick(
+      const picked = await vscode18.window.showQuickPick(
         items.map((i2) => ({ label: i2.label, detail: i2.detail, _run: i2.run })),
         { placeHolder: "Select a troubleshooting topic" }
       );
@@ -21601,73 +20565,129 @@ function registerTroubleshootCommand(context) {
 }
 
 // src/commands/cancelLifecycleCommands.ts
-var vscode18 = __toESM(require("vscode"));
+var vscode19 = __toESM(require("vscode"));
+
+// src/utils/sessionLifecycleCli.ts
+var SESSION_LIFECYCLE_CLI = "ai_router.session_lifecycle";
+function cancelArgs(sessionSetDir, reason) {
+  return ["--json", "cancel", "--session-set-dir", sessionSetDir, "--reason", reason];
+}
+function restoreArgs(sessionSetDir, reason) {
+  return ["--json", "restore", "--session-set-dir", sessionSetDir, "--reason", reason];
+}
+function run2(repoRoot, args, actionLabel, deps) {
+  return runRouterCli(
+    { module: SESSION_LIFECYCLE_CLI, args, cwd: repoRoot, actionLabel },
+    deps
+  );
+}
+function runCancelSessionSet(repoRoot, sessionSetDir, reason, deps) {
+  return run2(
+    repoRoot,
+    cancelArgs(sessionSetDir, reason),
+    "Cancelling a session set",
+    deps
+  );
+}
+function runRestoreSessionSet(repoRoot, sessionSetDir, reason, deps) {
+  return run2(
+    repoRoot,
+    restoreArgs(sessionSetDir, reason),
+    "Restoring a session set",
+    deps
+  );
+}
+function describeLifecycleFailure(verb, setName, result) {
+  const detail = result.message.trim() || `exit ${result.exitCode}`;
+  if (result.outcome === "refused") {
+    return `${verb} "${setName}" refused \u2014 ${detail} Nothing was written.`;
+  }
+  if (result.outcome === "unavailable") {
+    return detail;
+  }
+  return `Failed to ${verb.toLowerCase()} "${setName}": ${detail} Re-run the command to finish.`;
+}
+
+// src/commands/cancelLifecycleCommands.ts
+function defaultUi2() {
+  return {
+    confirm: (summary, detail, affirmative, negative) => vscode19.window.showInformationMessage(
+      summary,
+      { modal: true, detail },
+      affirmative,
+      negative
+    ),
+    promptReason: (prompt, placeHolder) => vscode19.window.showInputBox({ prompt, placeHolder, ignoreFocusOut: true }),
+    showInformationMessage: (m) => vscode19.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode19.window.showErrorMessage(m)
+  };
+}
+async function runCancelSessionSetFlow(set, ui = defaultUi2(), cliDeps) {
+  const choice = await ui.confirm(
+    `Cancel session set "${set.name}"?`,
+    "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later.",
+    "Cancel Session Set",
+    "Keep"
+  );
+  if (choice !== "Cancel Session Set")
+    return false;
+  const reason = await ui.promptReason(
+    `Reason for cancelling "${set.name}" (optional)`,
+    "e.g. scope rolled into another set"
+  );
+  const result = await runCancelSessionSet(set.root, set.dir, reason ?? "", cliDeps);
+  if (!result.ok) {
+    ui.showErrorMessage(describeLifecycleFailure("Cancelling", set.name, result));
+    return false;
+  }
+  ui.showInformationMessage(
+    `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`
+  );
+  return true;
+}
+async function runRestoreSessionSetFlow(set, ui = defaultUi2(), cliDeps) {
+  const choice = await ui.confirm(
+    `Restore session set "${set.name}"?`,
+    "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status.",
+    "Restore",
+    "Keep Cancelled"
+  );
+  if (choice !== "Restore")
+    return false;
+  const reason = await ui.promptReason(
+    `Reason for restoring "${set.name}" (optional)`,
+    "e.g. scope is back in plan"
+  );
+  const result = await runRestoreSessionSet(set.root, set.dir, reason ?? "", cliDeps);
+  if (!result.ok) {
+    ui.showErrorMessage(describeLifecycleFailure("Restoring", set.name, result));
+    return false;
+  }
+  ui.showInformationMessage(
+    `Restored "${set.name}". RESTORED.md kept as audit trail.`
+  );
+  return true;
+}
 function registerCancelLifecycleCommands(context, deps) {
   context.subscriptions.push(
-    vscode18.commands.registerCommand(
+    vscode19.commands.registerCommand(
       "dabblerSessionSets.cancel",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode18.window.showInformationMessage(
-          `Cancel session set "${set.name}"?`,
-          { modal: true, detail: "This writes a CANCELLED.md audit file in the session-set folder. The set can be restored later." },
-          "Cancel Session Set",
-          "Keep"
-        );
-        if (choice !== "Cancel Session Set")
-          return;
-        const reason = await vscode18.window.showInputBox({
-          prompt: `Reason for cancelling "${set.name}" (optional)`,
-          placeHolder: "e.g. scope rolled into another set",
-          ignoreFocusOut: true
-        });
-        try {
-          await cancelSessionSet(set.dir, reason ?? "");
-        } catch (err) {
-          vscode18.window.showErrorMessage(
-            `Failed to cancel "${set.name}": ${err instanceof Error ? err.message : String(err)}`
-          );
-          return;
-        }
-        deps.refreshView();
-        vscode18.window.showInformationMessage(
-          `Cancelled "${set.name}". CANCELLED.md written to the session-set folder.`
-        );
+        if (await runCancelSessionSetFlow(set))
+          deps.refreshView();
       }
     ),
-    vscode18.commands.registerCommand(
+    vscode19.commands.registerCommand(
       "dabblerSessionSets.restore",
       async (item) => {
         const set = item?.set;
         if (!set)
           return;
-        const choice = await vscode18.window.showInformationMessage(
-          `Restore session set "${set.name}"?`,
-          { modal: true, detail: "This renames CANCELLED.md to RESTORED.md (history preserved) and returns the set to its prior status." },
-          "Restore",
-          "Keep Cancelled"
-        );
-        if (choice !== "Restore")
-          return;
-        const reason = await vscode18.window.showInputBox({
-          prompt: `Reason for restoring "${set.name}" (optional)`,
-          placeHolder: "e.g. scope is back in plan",
-          ignoreFocusOut: true
-        });
-        try {
-          await restoreSessionSet(set.dir, reason ?? "");
-        } catch (err) {
-          vscode18.window.showErrorMessage(
-            `Failed to restore "${set.name}": ${err instanceof Error ? err.message : String(err)}`
-          );
-          return;
-        }
-        deps.refreshView();
-        vscode18.window.showInformationMessage(
-          `Restored "${set.name}". RESTORED.md kept as audit trail.`
-        );
+        if (await runRestoreSessionSetFlow(set))
+          deps.refreshView();
       }
     )
   );
@@ -21676,26 +20696,26 @@ function registerCancelLifecycleCommands(context, deps) {
 // src/commands/copilotSeatSetupCommand.ts
 var fs16 = __toESM(require("fs"));
 var path22 = __toESM(require("path"));
-var vscode19 = __toESM(require("vscode"));
+var vscode20 = __toESM(require("vscode"));
 function registerCopilotSeatSetupCommand(context) {
   context.subscriptions.push(
-    vscode19.commands.registerCommand(
+    vscode20.commands.registerCommand(
       "dabblerSessionSets.setUpCopilotSeat",
       () => runSetUpCopilotSeat(context)
     )
   );
 }
 async function runSetUpCopilotSeat(context) {
-  const root = vscode19.workspace.workspaceFolders?.[0]?.uri.fsPath;
+  const root = vscode20.workspace.workspaceFolders?.[0]?.uri.fsPath;
   if (!root) {
-    vscode19.window.showErrorMessage(
+    vscode20.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Set Up Copilot Seat."
     );
     return;
   }
   const venvPath = path22.join(root, ".venv");
   if (!fs16.existsSync(venvPath)) {
-    vscode19.window.showErrorMessage(
+    vscode20.window.showErrorMessage(
       'No .venv found in this workspace \u2014 run "Dabbler: Set Up New Project" or "Dabbler: Install ai-router" first, then re-run this command.'
     );
     return;
@@ -21705,7 +20725,7 @@ async function runSetUpCopilotSeat(context) {
 }
 
 // src/commands/gettingStartedDoc.ts
-var vscode20 = __toESM(require("vscode"));
+var vscode21 = __toESM(require("vscode"));
 var fs17 = __toESM(require("fs"));
 var path23 = __toESM(require("path"));
 function workspaceGettingStartedDoc(workspaceRoot2) {
@@ -21731,11 +20751,11 @@ function materializeBundledDoc(context) {
 }
 async function openGettingStartedDoc(context) {
   try {
-    const root = vscode20.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const root = vscode21.workspace.workspaceFolders?.[0]?.uri.fsPath;
     const docPath = workspaceGettingStartedDoc(root) ?? materializeBundledDoc(context);
-    await vscode20.commands.executeCommand(
+    await vscode21.commands.executeCommand(
       "markdown.showPreview",
-      vscode20.Uri.file(docPath)
+      vscode21.Uri.file(docPath)
     );
   } catch (err) {
     console.warn("[gettingStarted] could not open the instructions doc", err);
@@ -21743,9 +20763,9 @@ async function openGettingStartedDoc(context) {
 }
 function registerGetStartedCommand(context) {
   context.subscriptions.push(
-    vscode20.commands.registerCommand("dabbler.getStarted", async () => {
+    vscode21.commands.registerCommand("dabbler.getStarted", async () => {
       try {
-        await vscode20.commands.executeCommand("dabblerSessionSets.focus");
+        await vscode21.commands.executeCommand("dabblerSessionSets.focus");
       } catch (err) {
         console.warn("[gettingStarted] could not focus the Work Explorer view", err);
       }
@@ -21755,7 +20775,7 @@ function registerGetStartedCommand(context) {
 }
 
 // src/commands/openModulePlan.ts
-var vscode21 = __toESM(require("vscode"));
+var vscode22 = __toESM(require("vscode"));
 var fs18 = __toESM(require("fs"));
 var path24 = __toESM(require("path"));
 
@@ -22066,15 +21086,15 @@ function computeVisibleModules(classification, allSets, opts) {
     if (raw === null) {
       unstamped.push(s);
     } else if (declaredSlugs.has(raw)) {
-      const list = declaredSets.get(raw);
-      if (list)
-        list.push(s);
+      const list2 = declaredSets.get(raw);
+      if (list2)
+        list2.push(s);
       else
         declaredSets.set(raw, [s]);
     } else {
-      const list = fallbackSets.get(raw);
-      if (list)
-        list.push(s);
+      const list2 = fallbackSets.get(raw);
+      if (list2)
+        list2.push(s);
       else
         fallbackSets.set(raw, [s]);
     }
@@ -22648,13 +21668,13 @@ function descriptorFor(node, supports) {
 
 // src/commands/openModulePlan.ts
 var PLAN_DEST_POSIX = "docs/planning/project-plan.md";
-function defaultUi2() {
+function defaultUi3() {
   return {
-    showInformationMessage: vscode21.window.showInformationMessage,
-    showErrorMessage: vscode21.window.showErrorMessage,
-    showQuickPick: (items, opts) => vscode21.window.showQuickPick(items, opts),
-    executeCommand: (command, ...args) => vscode21.commands.executeCommand(command, ...args),
-    workspaceRoot: () => vscode21.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: vscode22.window.showInformationMessage,
+    showErrorMessage: vscode22.window.showErrorMessage,
+    showQuickPick: (items, opts) => vscode22.window.showQuickPick(items, opts),
+    executeCommand: (command, ...args) => vscode22.commands.executeCommand(command, ...args),
+    workspaceRoot: () => vscode22.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 async function resolvePlanTarget(root, ui, opts) {
@@ -22677,7 +21697,7 @@ async function resolvePlanTarget(root, ui, opts) {
     destPosix: pick2.entry ? modulePlanRelPath(pick2.entry) : PLAN_DEST_POSIX
   };
 }
-async function openModulePlan(ui = defaultUi2(), opts) {
+async function openModulePlan(ui = defaultUi3(), opts) {
   const root = ui.workspaceRoot();
   if (!root) {
     void ui.showErrorMessage("No workspace folder is open.");
@@ -22700,11 +21720,11 @@ async function openModulePlan(ui = defaultUi2(), opts) {
     );
     return;
   }
-  await ui.executeCommand("vscode.open", vscode21.Uri.file(destPath));
+  await ui.executeCommand("vscode.open", vscode22.Uri.file(destPath));
 }
 function registerOpenModulePlanCommand(context) {
   context.subscriptions.push(
-    vscode21.commands.registerCommand(
+    vscode22.commands.registerCommand(
       "dabbler.openModulePlan",
       async (arg) => {
         await openModulePlan(void 0, preselectFromTreeNode(arg));
@@ -22714,18 +21734,18 @@ function registerOpenModulePlanCommand(context) {
 }
 
 // src/commands/newModule.ts
-var vscode22 = __toESM(require("vscode"));
+var vscode23 = __toESM(require("vscode"));
 var path25 = __toESM(require("path"));
-function defaultUi3() {
+function defaultUi4() {
   return {
-    showInputBox: vscode22.window.showInputBox,
-    showInformationMessage: (m) => vscode22.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode22.window.showErrorMessage(m),
-    openFile: (absPath) => vscode22.commands.executeCommand("vscode.open", vscode22.Uri.file(absPath)),
-    workspaceRoot: () => vscode22.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInputBox: vscode23.window.showInputBox,
+    showInformationMessage: (m) => vscode23.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode23.window.showErrorMessage(m),
+    openFile: (absPath) => vscode23.commands.executeCommand("vscode.open", vscode23.Uri.file(absPath)),
+    workspaceRoot: () => vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
-async function runNewModuleFlow(ui = defaultUi3()) {
+async function runNewModuleFlow(ui = defaultUi4(), cliDeps) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -22749,55 +21769,42 @@ async function runNewModuleFlow(ui = defaultUi3()) {
   });
   if (title === void 0)
     return false;
-  let result;
-  try {
-    result = scaffoldNewModule(root, slug, title);
-  } catch (err) {
-    ui.showErrorMessage(
-      `New module was not created: ${err instanceof Error ? err.message : String(err)}`
-    );
+  const result = await runCreateModule(
+    root,
+    { slug: slug.trim(), title: title.trim() },
+    cliDeps
+  );
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure("New module", result));
     return false;
   }
-  const declared = {
-    slug: slug.trim(),
-    title: title.trim() || slug.trim(),
-    codeRoots: [],
-    planPath: result.planRel,
-    touches: []
-  };
-  let lifecycleNote;
-  try {
-    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
-    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
-  } catch (err) {
-    lifecycleNote = ` The module's lifecycle sets were NOT scaffolded (${err instanceof Error ? err.message : String(err)}) \u2014 the module is still declared; scaffold them later.`;
+  const planRel = result.payload?.["planRel"];
+  if (typeof planRel === "string" && planRel !== "") {
+    await ui.openFile(path25.join(root, ...planRel.split("/")));
   }
-  await ui.openFile(path25.join(root, ...result.planRel.split("/")));
-  ui.showInformationMessage(
-    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` + (result.planCreated ? `Plan stub created at ${result.planRel} \u2014 fill it in, then decompose it into session sets.` : `Existing plan at ${result.planRel} kept.`) + lifecycleNote
-  );
+  ui.showInformationMessage(describeCreate(result.payload));
   return true;
 }
 function registerNewModuleCommand(context) {
   context.subscriptions.push(
-    vscode22.commands.registerCommand("dabbler.newModule", async () => {
+    vscode23.commands.registerCommand("dabbler.newModule", async () => {
       await runNewModuleFlow();
     })
   );
 }
 
 // src/commands/openModulesManifest.ts
-var vscode23 = __toESM(require("vscode"));
+var vscode24 = __toESM(require("vscode"));
 var path26 = __toESM(require("path"));
-function defaultUi4() {
+function defaultUi5() {
   return {
-    showInformationMessage: (m) => vscode23.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode23.window.showErrorMessage(m),
-    openFile: (absPath) => vscode23.commands.executeCommand("vscode.open", vscode23.Uri.file(absPath)),
-    workspaceRoot: () => vscode23.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: (m) => vscode24.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode24.window.showErrorMessage(m),
+    openFile: (absPath) => vscode24.commands.executeCommand("vscode.open", vscode24.Uri.file(absPath)),
+    workspaceRoot: () => vscode24.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
-async function openModulesManifestFlow(ui = defaultUi4()) {
+async function openModulesManifestFlow(ui = defaultUi5()) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -22830,14 +21837,14 @@ async function openModulesManifestFlow(ui = defaultUi4()) {
 }
 function registerOpenModulesManifestCommand(context) {
   context.subscriptions.push(
-    vscode23.commands.registerCommand("dabbler.openModulesManifest", async () => {
+    vscode24.commands.registerCommand("dabbler.openModulesManifest", async () => {
       await openModulesManifestFlow();
     })
   );
 }
 
 // src/commands/copyModuleDecompositionPrompt.ts
-var vscode24 = __toESM(require("vscode"));
+var vscode25 = __toESM(require("vscode"));
 var fs19 = __toESM(require("fs"));
 var path27 = __toESM(require("path"));
 function buildModuleDecompositionPrompt(planPresent) {
@@ -22864,17 +21871,17 @@ Hard invariants (do NOT violate):
 If the project is a single area of work, one module (or none \u2014 leave \`modules: []\`) is correct; do not invent modules to fill the file. Save \`${MODULES_MANIFEST_DISPLAY}\` when done \u2014 the Work Explorer regroups your session sets as soon as you save.
 `;
 }
-function defaultUi5() {
+function defaultUi6() {
   return {
-    workspaceRoot: () => vscode24.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    workspaceRoot: () => vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath,
     // fs.existsSync never throws — swallows errors, returns false.
     fileExists: (abs) => fs19.existsSync(abs),
-    copyToClipboard: (text) => vscode24.env.clipboard.writeText(text),
-    showInformationMessage: (m) => vscode24.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode24.window.showErrorMessage(m)
+    copyToClipboard: (text) => vscode25.env.clipboard.writeText(text),
+    showInformationMessage: (m) => vscode25.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode25.window.showErrorMessage(m)
   };
 }
-async function runCopyModuleDecompositionPromptFlow(ui = defaultUi5()) {
+async function runCopyModuleDecompositionPromptFlow(ui = defaultUi6()) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -22908,7 +21915,7 @@ async function runCopyModuleDecompositionPromptFlow(ui = defaultUi5()) {
 }
 function registerCopyModuleDecompositionPromptCommand(context) {
   context.subscriptions.push(
-    vscode24.commands.registerCommand(
+    vscode25.commands.registerCommand(
       "dabbler.copyModuleDecompositionPrompt",
       async () => {
         await runCopyModuleDecompositionPromptFlow();
@@ -22918,11 +21925,11 @@ function registerCopyModuleDecompositionPromptCommand(context) {
 }
 
 // src/commands/assignLegacySets.ts
-var vscode25 = __toESM(require("vscode"));
-function defaultUi6() {
+var vscode26 = __toESM(require("vscode"));
+function defaultUi7() {
   return {
     pickTargetModule: async (entries) => {
-      const picked = await vscode25.window.showQuickPick(
+      const picked = await vscode26.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -22936,7 +21943,7 @@ function defaultUi6() {
       return picked?.entry;
     },
     pickSets: async (candidates) => {
-      const picked = await vscode25.window.showQuickPick(
+      const picked = await vscode26.window.showQuickPick(
         candidates.map((s) => ({ label: s.name, set: s })),
         {
           placeHolder: "Select the legacy (unassigned) sets to assign",
@@ -22946,13 +21953,13 @@ function defaultUi6() {
       );
       return picked?.map((p2) => p2.set);
     },
-    showInformationMessage: (m) => vscode25.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode25.window.showErrorMessage(m),
-    workspaceRoot: () => vscode25.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode26.window.showErrorMessage(m),
+    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath,
     readSets: () => readAllSessionSets()
   };
 }
-async function runAssignLegacySetsFlow(ui = defaultUi6()) {
+async function runAssignLegacySetsFlow(ui = defaultUi7(), cliDeps) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -22983,44 +21990,21 @@ async function runAssignLegacySetsFlow(ui = defaultUi6()) {
   const chosen = await ui.pickSets(candidates);
   if (!chosen || chosen.length === 0)
     return false;
-  const report = assignLegacySetsToModule(
+  const result = await runAssignSets(
     root,
-    target.slug,
-    chosen.map((s) => ({ name: s.name, specAbs: s.specPath }))
+    { slug: target.slug, setNames: chosen.map((s) => s.name) },
+    cliDeps
   );
-  if (report.refused) {
-    ui.showErrorMessage(
-      `No sets were assigned \u2014 ${report.refused.reason}. Every spec.md was left untouched.`
-    );
-    return false;
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure(`Assigning to "${target.title}"`, result));
+    return assignedAny(result.payload);
   }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    const tail = wf.written.length ? `Already stamped before the failure: ${wf.written.join(", ")}.` : "No files were changed.";
-    ui.showErrorMessage(
-      `Assigning to "${target.title}" failed on ${wf.setName}: ${wf.reason}. ${tail}`
-    );
-    return wf.written.length > 0;
-  }
-  const parts = [];
-  if (report.stamped.length) {
-    parts.push(
-      `Stamped module: ${target.slug} into ${report.stamped.length} set(s) (${report.stamped.join(", ")})`
-    );
-  }
-  if (report.alreadyAssigned.length) {
-    parts.push(
-      `${report.alreadyAssigned.length} already assigned (${report.alreadyAssigned.join(", ")})`
-    );
-  }
-  ui.showInformationMessage(
-    parts.length ? `${parts.join("; ")}.` : `Nothing to change \u2014 the selected sets already declare module: ${target.slug}.`
-  );
-  return report.stamped.length > 0;
+  ui.showInformationMessage(describeAssign(result.payload));
+  return assignedAny(result.payload);
 }
 function registerAssignLegacySetsCommand(context) {
   context.subscriptions.push(
-    vscode25.commands.registerCommand(
+    vscode26.commands.registerCommand(
       "dabbler.assignLegacySetsToModule",
       async () => {
         await runAssignLegacySetsFlow();
@@ -23030,11 +22014,11 @@ function registerAssignLegacySetsCommand(context) {
 }
 
 // src/commands/renameModule.ts
-var vscode26 = __toESM(require("vscode"));
-function defaultUi7() {
+var vscode27 = __toESM(require("vscode"));
+function defaultUi8() {
   return {
     pickModule: async (entries) => {
-      const picked = await vscode26.window.showQuickPick(
+      const picked = await vscode27.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -23044,32 +22028,32 @@ function defaultUi7() {
       );
       return picked?.entry;
     },
-    promptNewSlug: (currentSlug, validate) => vscode26.window.showInputBox({
+    promptNewSlug: (currentSlug, validate) => vscode27.window.showInputBox({
       prompt: "New module slug (kebab-case) \u2014 leave unchanged to keep it",
       value: currentSlug,
       ignoreFocusOut: true,
       validateInput: (v) => validate(v) ?? null
     }),
-    promptNewTitle: (currentTitle) => vscode26.window.showInputBox({
+    promptNewTitle: (currentTitle) => vscode27.window.showInputBox({
       prompt: "New module title (display name) \u2014 leave unchanged to keep it",
       value: currentTitle,
       ignoreFocusOut: true
     }),
     confirm: async (summary, detail) => {
-      const choice = await vscode26.window.showWarningMessage(
+      const choice = await vscode27.window.showWarningMessage(
         summary,
         { modal: true, detail },
         "Rename Module"
       );
       return choice === "Rename Module";
     },
-    showInformationMessage: (m) => vscode26.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode26.window.showErrorMessage(m),
-    workspaceRoot: () => vscode26.workspace.workspaceFolders?.[0]?.uri.fsPath,
+    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
+    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath,
     readSets: () => readAllSessionSets()
   };
 }
-async function runRenameModuleFlow(ui = defaultUi7(), opts) {
+async function runRenameModuleFlow(ui = defaultUi8(), opts, cliDeps) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -23138,48 +22122,36 @@ Every file is rewritten transactionally; any failure rolls the whole change back
   );
   if (!confirmed)
     return false;
-  const report = renameModule(root, target.slug, {
-    newSlug: slugChanging ? newSlug : void 0,
-    newTitle: titleChanging ? newTitle : void 0
-  });
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Rename refused \u2014 ${report.refused.reason} Every file was left untouched.`
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    ui.showErrorMessage(
-      wf.rolledBack ? `Rename failed: ${wf.reason}. All changes were rolled back \u2014 the workspace is unchanged.` : `Rename failed: ${wf.reason}. Rollback ALSO failed \u2014 reconcile docs/modules.yaml and the affected spec.md files from git.`
-    );
-    return false;
-  }
-  const parts = [];
-  if (report.slugChanged)
-    parts.push(`slug \u2192 ${report.newSlug}`);
-  if (report.titleChanged)
-    parts.push(`title \u2192 "${report.newTitle}"`);
-  const restampSummary = report.restamped.length ? ` Restamped ${report.restamped.length} set(s): ${report.restamped.join(", ")}.` : "";
-  ui.showInformationMessage(
-    `Renamed module (${parts.join(", ")}).${restampSummary}`
+  const result = await runRenameModule(
+    root,
+    {
+      slug: target.slug,
+      newSlug: slugChanging ? newSlug : void 0,
+      newTitle: titleChanging ? newTitle : void 0
+    },
+    cliDeps
   );
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure("Rename", result));
+    return false;
+  }
+  ui.showInformationMessage(describeRename(result.payload));
   return true;
 }
 function registerRenameModuleCommand(context) {
   context.subscriptions.push(
-    vscode26.commands.registerCommand("dabbler.renameModule", async (arg) => {
+    vscode27.commands.registerCommand("dabbler.renameModule", async (arg) => {
       await runRenameModuleFlow(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
 // src/commands/deleteModule.ts
-var vscode27 = __toESM(require("vscode"));
-function defaultUi8() {
+var vscode28 = __toESM(require("vscode"));
+function defaultUi9() {
   return {
     pickModule: async (entries) => {
-      const picked = await vscode27.window.showQuickPick(
+      const picked = await vscode28.window.showQuickPick(
         entries.map((e) => ({
           label: e.title,
           description: e.slug,
@@ -23190,22 +22162,22 @@ function defaultUi8() {
       return picked?.entry;
     },
     confirm: async (summary, detail) => {
-      const choice = await vscode27.window.showWarningMessage(
+      const choice = await vscode28.window.showWarningMessage(
         summary,
         { modal: true, detail },
         "Delete Module"
       );
       return choice === "Delete Module";
     },
-    showInformationMessage: (m) => vscode27.window.showInformationMessage(m),
-    showErrorMessage: (m) => vscode27.window.showErrorMessage(m),
-    workspaceRoot: () => vscode27.workspace.workspaceFolders?.[0]?.uri.fsPath
+    showInformationMessage: (m) => vscode28.window.showInformationMessage(m),
+    showErrorMessage: (m) => vscode28.window.showErrorMessage(m),
+    workspaceRoot: () => vscode28.workspace.workspaceFolders?.[0]?.uri.fsPath
   };
 }
 function summarizeGroup(label, names) {
   return names.length > 0 ? `${label} (${names.length}): ${names.join(", ")}` : `${label}: none`;
 }
-async function runDeleteModuleFlow(ui = defaultUi8(), opts) {
+async function runDeleteModuleFlow(ui = defaultUi9(), opts, cliDeps) {
   const root = ui.workspaceRoot();
   if (!root) {
     ui.showErrorMessage("No workspace folder is open.");
@@ -23254,34 +22226,26 @@ Re-declaring "${target.slug}" later restores this grouping for any untouched his
   );
   if (!confirmed)
     return false;
-  const report = await deleteModule(root, target.slug);
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Delete refused \u2014 ${report.refused.reason} Every file was left untouched.`
-    );
-    return false;
+  const result = await runDeleteModule(root, target.slug, cliDeps);
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure("Delete", result));
+    const cancelled = result.payload?.["cancelled"];
+    const removed = result.payload?.["removed"];
+    return Array.isArray(cancelled) && cancelled.length > 0 || Array.isArray(removed) && removed.length > 0;
   }
-  if (report.partialFailure) {
-    ui.showErrorMessage(
-      `Delete stopped partway: ${report.partialFailure.reason} ${report.cancelled.length} set(s) cancelled and ${report.removed.length} scaffold(s) removed so far \u2014 re-run "Dabbler: Delete Module" to finish (already-applied steps are skipped on retry).`
-    );
-    return report.cancelled.length > 0 || report.removed.length > 0;
-  }
-  ui.showInformationMessage(
-    `Deleted module "${target.slug}" \u2014 ${report.cancelled.length} set(s) cancelled, ${report.removed.length} scaffold(s) removed, ${report.terminal.length} left untouched.`
-  );
+  ui.showInformationMessage(describeDelete(result.payload));
   return true;
 }
 function registerDeleteModuleCommand(context) {
   context.subscriptions.push(
-    vscode27.commands.registerCommand("dabbler.deleteModule", async (arg) => {
+    vscode28.commands.registerCommand("dabbler.deleteModule", async (arg) => {
       await runDeleteModuleFlow(void 0, preselectFromTreeNode(arg));
     })
   );
 }
 
 // src/commands/flagDecisionForReview.ts
-var vscode28 = __toESM(require("vscode"));
+var vscode29 = __toESM(require("vscode"));
 var path29 = __toESM(require("path"));
 
 // src/commands/decisionReviewQueue.ts
@@ -23305,17 +22269,17 @@ function findActiveSessionSetDir(provider) {
 // src/commands/flagDecisionForReview.ts
 function registerFlagDecisionForReview(context) {
   context.subscriptions.push(
-    vscode28.commands.registerCommand(
+    vscode29.commands.registerCommand(
       "dabbler.flagDecisionForReview",
       async () => {
         const activeDir = findActiveSessionSetDir(readAllSessionSets);
         if (!activeDir) {
-          vscode28.window.showInformationMessage(
+          vscode29.window.showInformationMessage(
             "No active session set to flag against. Start a session set first (its state must be 'in-progress' for the flag to attach to it)."
           );
           return;
         }
-        const reason = await vscode28.window.showInputBox({
+        const reason = await vscode29.window.showInputBox({
           title: "Flag Decision for Cross-Provider Review",
           prompt: "One-line reason this decision should get a second-engine read at the next session start.",
           placeHolder: "e.g. budget-tier defaulting choice \u2014 confirm with Gemini before shipping",
@@ -23337,13 +22301,13 @@ function registerFlagDecisionForReview(context) {
           appendQueueEntry(activeDir, entry);
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          vscode28.window.showErrorMessage(
+          vscode29.window.showErrorMessage(
             `Failed to append to decision-review queue: ${msg}`
           );
           return;
         }
         const slug = path29.basename(activeDir);
-        vscode28.window.showInformationMessage(
+        vscode29.window.showInformationMessage(
           `Flagged for cross-provider review in ${slug}/${QUEUE_FILENAME}. Will surface in the next session's planning checklist.`
         );
       }
@@ -23352,7 +22316,7 @@ function registerFlagDecisionForReview(context) {
 }
 
 // src/commands/scanAnnotationsForActiveSet.ts
-var vscode29 = __toESM(require("vscode"));
+var vscode30 = __toESM(require("vscode"));
 var fs23 = __toESM(require("fs"));
 var path31 = __toESM(require("path"));
 
@@ -23566,13 +22530,13 @@ function defaultReadYaml(absPath) {
 }
 function registerScanAnnotationsForActiveSet(context) {
   context.subscriptions.push(
-    vscode29.commands.registerCommand(
+    vscode30.commands.registerCommand(
       "dabbler.scanAnnotationsForActiveSet",
       async () => {
         const all = readAllSessionSets();
         const activeDir = findActiveSessionSetDir(() => all);
         if (!activeDir) {
-          vscode29.window.showInformationMessage(
+          vscode30.window.showInformationMessage(
             "No active session set to scan against. Start a session set first."
           );
           return;
@@ -23580,14 +22544,14 @@ function registerScanAnnotationsForActiveSet(context) {
         const activeSet = all.find((s) => s.dir === activeDir);
         const workspaceRoot2 = activeSet?.root ?? path31.dirname(path31.dirname(activeDir));
         if (!loadHonorAnnotationsToggle(workspaceRoot2, defaultReadYaml)) {
-          vscode29.window.showInformationMessage(
+          vscode30.window.showInformationMessage(
             "Annotation scanning is disabled for this project (local-overrides.yaml \u2192 decision_review.honor_annotations: false). No queue entries appended."
           );
           return;
         }
-        const uris = await vscode29.workspace.findFiles(
-          new vscode29.RelativePattern(workspaceRoot2, SCAN_GLOB),
-          new vscode29.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
+        const uris = await vscode30.workspace.findFiles(
+          new vscode30.RelativePattern(workspaceRoot2, SCAN_GLOB),
+          new vscode30.RelativePattern(workspaceRoot2, SCAN_EXCLUDE_GLOB)
         );
         const filePaths = uris.map((u) => u.fsPath);
         const annotations = scanFilesForAnnotations(
@@ -23598,7 +22562,7 @@ function registerScanAnnotationsForActiveSet(context) {
         const fresh = deduplicateAnnotations(annotations, existing);
         if (fresh.length === 0) {
           const msg = annotations.length === 0 ? "No `@dabbler:outsource-review` annotations found in workspace." : `All ${annotations.length} annotation(s) already in the queue \u2014 nothing new appended.`;
-          vscode29.window.showInformationMessage(msg);
+          vscode30.window.showInformationMessage(msg);
           return;
         }
         try {
@@ -23607,13 +22571,13 @@ function registerScanAnnotationsForActiveSet(context) {
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
-          vscode29.window.showErrorMessage(
+          vscode30.window.showErrorMessage(
             `Failed to append annotation(s) to queue: ${msg}`
           );
           return;
         }
         const slug = path31.basename(activeDir);
-        vscode29.window.showInformationMessage(
+        vscode30.window.showInformationMessage(
           `Appended ${fresh.length} new annotation(s) to ${slug}/${QUEUE_FILENAME}.`
         );
       }
@@ -23622,21 +22586,21 @@ function registerScanAnnotationsForActiveSet(context) {
 }
 
 // src/commands/regenerateNarrationTemplates.ts
-var cp6 = __toESM(require("child_process"));
+var cp7 = __toESM(require("child_process"));
 var fs24 = __toESM(require("fs"));
 var path32 = __toESM(require("path"));
-var vscode30 = __toESM(require("vscode"));
+var vscode31 = __toESM(require("vscode"));
 var COMMAND_ID = "dabbler.regenerateNarrationTemplates";
 function registerRegenerateNarrationTemplatesCommand(context) {
   context.subscriptions.push(
-    vscode30.commands.registerCommand(COMMAND_ID, async () => {
+    vscode31.commands.registerCommand(COMMAND_ID, async () => {
       await runRegenerate();
     })
   );
 }
 async function runRegenerate() {
-  if (!vscode30.workspace.workspaceFolders?.length) {
-    vscode30.window.showErrorMessage(
+  if (!vscode31.workspace.workspaceFolders?.length) {
+    vscode31.window.showErrorMessage(
       "Open a workspace folder before running Dabbler: Regenerate Narration Templates."
     );
     return;
@@ -23644,7 +22608,7 @@ async function runRegenerate() {
   const allSets = readAllSessionSets();
   const inProgress = allSets.filter((s) => s.state === "in-progress");
   if (inProgress.length === 0) {
-    vscode30.window.showInformationMessage(
+    vscode31.window.showInformationMessage(
       "No session set is in-progress. Start a session via `start_session` (or the orchestrator hook) before regenerating narration templates."
     );
     return;
@@ -23657,9 +22621,9 @@ async function runRegenerate() {
   fs24.mkdirSync(outDir, { recursive: true });
   const claudeOut = path32.join(outDir, "CLAUDE.md");
   const agentsOut = path32.join(outDir, "AGENTS.md");
-  const render = await vscode30.window.withProgress(
+  const render = await vscode31.window.withProgress(
     {
-      location: vscode30.ProgressLocation.Notification,
+      location: vscode31.ProgressLocation.Notification,
       title: `Regenerating narration templates for ${set.name}\u2026`,
       cancellable: false
     },
@@ -23684,7 +22648,7 @@ async function runRegenerate() {
     }
   );
   if (!render.ok) {
-    vscode30.window.showErrorMessage(
+    vscode31.window.showErrorMessage(
       `Failed to render narration templates: ${render.message}`
     );
     return;
@@ -23693,7 +22657,7 @@ async function runRegenerate() {
   const relAgents = path32.relative(set.root, agentsOut).replace(/\\/g, "/");
   const COPY_ACTION = "Copy to consumer workspace\u2026";
   const OPEN_ACTION = "Open Rendered CLAUDE.md";
-  const choice = await vscode30.window.showInformationMessage(
+  const choice = await vscode31.window.showInformationMessage(
     `Narration templates regenerated for ${set.name}: ${relClaude}, ${relAgents}.`,
     OPEN_ACTION,
     COPY_ACTION
@@ -23702,14 +22666,14 @@ async function runRegenerate() {
     await offerCopyToConsumerWorkspace(claudeOut, agentsOut);
   } else if (choice === OPEN_ACTION || choice === void 0) {
     try {
-      const doc = await vscode30.workspace.openTextDocument(claudeOut);
-      await vscode30.window.showTextDocument(doc, { preview: false });
+      const doc = await vscode31.workspace.openTextDocument(claudeOut);
+      await vscode31.window.showTextDocument(doc, { preview: false });
     } catch {
     }
   }
 }
 async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
-  const pick2 = await vscode30.window.showQuickPick(
+  const pick2 = await vscode31.window.showQuickPick(
     [
       { label: "Copy CLAUDE.md (for Claude Code consumers)", source: claudeOut, target: "CLAUDE.md" },
       { label: "Copy AGENTS.md (for Copilot CLI consumers)", source: agentsOut, target: "AGENTS.md" }
@@ -23718,7 +22682,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   );
   if (!pick2)
     return;
-  const dirUri = await vscode30.window.showOpenDialog({
+  const dirUri = await vscode31.window.showOpenDialog({
     canSelectFiles: false,
     canSelectFolders: true,
     canSelectMany: false,
@@ -23729,7 +22693,7 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   const destDir = dirUri[0].fsPath;
   const destPath = path32.join(destDir, pick2.target);
   if (fs24.existsSync(destPath)) {
-    const overwrite = await vscode30.window.showWarningMessage(
+    const overwrite = await vscode31.window.showWarningMessage(
       `${pick2.target} already exists in the chosen folder. Overwrite?`,
       { modal: true },
       "Overwrite"
@@ -23740,12 +22704,12 @@ async function offerCopyToConsumerWorkspace(claudeOut, agentsOut) {
   try {
     fs24.copyFileSync(pick2.source, destPath);
   } catch (err) {
-    vscode30.window.showErrorMessage(
+    vscode31.window.showErrorMessage(
       `Failed to copy ${pick2.target} to ${destDir}: ${err.message}`
     );
     return;
   }
-  vscode30.window.showInformationMessage(
+  vscode31.window.showInformationMessage(
     `Copied ${pick2.target} to ${destDir}. The assistant will emit the session-start marker on its next launch in that workspace.`
   );
 }
@@ -23758,7 +22722,7 @@ async function pickSet(inProgress) {
     detail: path32.relative(s.root, s.dir).replace(/\\/g, "/"),
     set: s
   }));
-  const picked = await vscode30.window.showQuickPick(choices, {
+  const picked = await vscode31.window.showQuickPick(choices, {
     placeHolder: "Select the session set to regenerate narration templates for"
   });
   return picked?.set;
@@ -23776,7 +22740,7 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
   ];
   let result;
   try {
-    result = cp6.spawnSync(pythonPath, cliArgs, {
+    result = cp7.spawnSync(pythonPath, cliArgs, {
       cwd: workspaceRoot2,
       encoding: "utf8"
     });
@@ -23812,14 +22776,44 @@ function renderTemplate(pythonPath, workspaceRoot2, args) {
 }
 
 // src/commands/resolveSetNumber.ts
-var vscode31 = __toESM(require("vscode"));
+var vscode32 = __toESM(require("vscode"));
+
+// src/utils/resolveSetNumber.ts
+var PREFIX_RE = /^(\d+)-/;
+function numericPrefix(slug) {
+  const m = PREFIX_RE.exec(slug);
+  return m ? parseInt(m[1], 10) : null;
+}
+function resolveSetNumber(slugs, n) {
+  const matches = slugs.filter((s) => numericPrefix(s) === n);
+  if (matches.length === 0) {
+    const available = Array.from(
+      new Set(
+        slugs.map(numericPrefix).filter((p2) => p2 !== null)
+      )
+    ).sort((a, b2) => a - b2);
+    return { kind: "no-match", available };
+  }
+  if (matches.length > 1) {
+    return { kind: "collision", matches: matches.slice().sort() };
+  }
+  return { kind: "match", slug: matches[0] };
+}
+function parseSetHandle(raw) {
+  const trimmed2 = raw.trim().replace(/^set\s+/i, "");
+  if (!/^\d+$/.test(trimmed2))
+    return null;
+  return parseInt(trimmed2, 10);
+}
+
+// src/commands/resolveSetNumber.ts
 function registerResolveSetNumberCommand(context, deps = {}) {
   const readSets = deps.readSets ?? readAllSessionSets;
   context.subscriptions.push(
-    vscode31.commands.registerCommand(
+    vscode32.commands.registerCommand(
       "dabblerSessionSets.resolveSetNumber",
       async () => {
-        const raw = await vscode31.window.showInputBox({
+        const raw = await vscode32.window.showInputBox({
           title: "Resolve session set by number",
           prompt: "Enter a session-set number (e.g. 50 or 050)",
           placeHolder: "50",
@@ -23830,7 +22824,7 @@ function registerResolveSetNumberCommand(context, deps = {}) {
           return;
         const n = parseSetHandle(raw);
         if (n === null) {
-          vscode31.window.showErrorMessage(
+          vscode32.window.showErrorMessage(
             `"${raw}" is not a session-set number. Enter a bare integer like 50.`
           );
           return;
@@ -23840,13 +22834,13 @@ function registerResolveSetNumberCommand(context, deps = {}) {
         const result = resolveSetNumber(slugs, n);
         if (result.kind === "no-match") {
           const avail = result.available.length > 0 ? result.available.join(", ") : "(none)";
-          vscode31.window.showErrorMessage(
+          vscode32.window.showErrorMessage(
             `No session set numbered ${n}. Available numbers: ${avail}.`
           );
           return;
         }
         if (result.kind === "collision") {
-          vscode31.window.showErrorMessage(
+          vscode32.window.showErrorMessage(
             `Number ${n} is ambiguous \u2014 it matches ${result.matches.join(
               " and "
             )}. Two session sets must not share a numeric prefix; rename one.`
@@ -23866,18 +22860,18 @@ async function presentActions(slug, set) {
       label: "$(clippy) Copy slug",
       description: slug,
       run: async () => {
-        await vscode31.env.clipboard.writeText(slug);
-        vscode31.window.setStatusBarMessage(`Copied: ${slug}`, 4e3);
+        await vscode32.env.clipboard.writeText(slug);
+        vscode32.window.setStatusBarMessage(`Copied: ${slug}`, 4e3);
       }
     },
     {
       label: "$(clippy) Copy \u201CStart the next session\u201D prompt",
       description: `Start the next session of \`${slug}\`.`,
       run: async () => {
-        await vscode31.env.clipboard.writeText(
+        await vscode32.env.clipboard.writeText(
           `Start the next session of \`${slug}\`.`
         );
-        vscode31.window.setStatusBarMessage("Copied: start next session", 4e3);
+        vscode32.window.setStatusBarMessage("Copied: start next session", 4e3);
       }
     }
   ];
@@ -23885,12 +22879,12 @@ async function presentActions(slug, set) {
     actions.push({
       label: "$(go-to-file) Open spec",
       description: slug,
-      run: () => void vscode31.commands.executeCommand("dabblerSessionSets.openSpec", {
+      run: () => void vscode32.commands.executeCommand("dabblerSessionSets.openSpec", {
         set
       })
     });
   }
-  const pick2 = await vscode31.window.showQuickPick(actions, {
+  const pick2 = await vscode32.window.showQuickPick(actions, {
     title: `Set ${slug}`,
     placeHolder: "What would you like to do with this set?"
   });
@@ -23899,8 +22893,8 @@ async function presentActions(slug, set) {
 }
 
 // src/commands/upgradeOlderSets.ts
-var vscode32 = __toESM(require("vscode"));
-var cp7 = __toESM(require("child_process"));
+var vscode33 = __toESM(require("vscode"));
+var cp8 = __toESM(require("child_process"));
 var path33 = __toESM(require("path"));
 var fs25 = __toESM(require("fs"));
 var BULK_UPGRADE_MODULES = [
@@ -23918,7 +22912,7 @@ function runMigrator2(pythonPath, module2, cwd) {
       "--in-place",
       "--json"
     ];
-    const child = cp7.spawn(pythonPath, args, { cwd, windowsHide: true });
+    const child = cp8.spawn(pythonPath, args, { cwd, windowsHide: true });
     let stdout = "";
     let stderr = "";
     let spawnErrored = false;
@@ -23971,28 +22965,28 @@ function summarizeJson(stdout) {
 }
 function registerUpgradeOlderSetsCommand(context, deps) {
   context.subscriptions.push(
-    vscode32.commands.registerCommand(
+    vscode33.commands.registerCommand(
       "dabblerSessionSets.upgradeOlderSets",
       async () => {
         const roots = discoverRoots().filter(
           (r2) => fs25.existsSync(path33.join(r2, SESSION_SETS_REL2))
         );
         if (roots.length === 0) {
-          vscode32.window.showInformationMessage(
+          vscode33.window.showInformationMessage(
             "No docs/session-sets directory found in the workspace \u2014 nothing to upgrade."
           );
           return;
         }
-        const confirm = await vscode32.window.showInformationMessage(
+        const confirm = await vscode33.window.showInformationMessage(
           "Upgrade all older session sets to the current schema? This runs the three schema migrators in sequence, in-place, across every set. Each migrator writes a backup alongside any file it rewrites and is a no-op on already-current sets.",
           { modal: true },
           "Upgrade"
         );
         if (confirm !== "Upgrade")
           return;
-        await vscode32.window.withProgress(
+        await vscode33.window.withProgress(
           {
-            location: vscode32.ProgressLocation.Notification,
+            location: vscode33.ProgressLocation.Notification,
             title: "Upgrading older session sets\u2026",
             cancellable: false
           },
@@ -24013,11 +23007,11 @@ function registerUpgradeOlderSetsCommand(context, deps) {
             }
             deps.refreshView();
             if (failures.length === 0) {
-              vscode32.window.showInformationMessage(
+              vscode33.window.showInformationMessage(
                 `Session sets upgraded. ${summaries.join("; ")}. The tree refreshes shortly; the schema markers clear on the next read.`
               );
             } else {
-              vscode32.window.showErrorMessage(
+              vscode33.window.showErrorMessage(
                 `Bulk upgrade hit ${failures.length} error(s): ${failures.join(
                   " | "
                 )}. If Python / dabbler-ai-router isn't installed, set dabblerSessionSets.pythonPath to a venv with the router, or run the migrator chain manually from the repo root.`
@@ -24031,15 +23025,15 @@ function registerUpgradeOlderSetsCommand(context, deps) {
 }
 
 // src/providers/WorkExplorerTreeProvider.ts
-var vscode34 = __toESM(require("vscode"));
+var vscode35 = __toESM(require("vscode"));
 
 // src/providers/moduleAssembly.ts
 var fs26 = __toESM(require("fs"));
 var path34 = __toESM(require("path"));
-var vscode33 = __toESM(require("vscode"));
+var vscode34 = __toESM(require("vscode"));
 function nodeModuleAssemblyIo() {
   return {
-    workspaceRoots: () => (vscode33.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
+    workspaceRoots: () => (vscode34.workspace.workspaceFolders ?? []).map((folder) => folder.uri.fsPath),
     classify: (root) => classifyModulesManifest(root),
     // Set 100 S1: the 093-era per-module plan-existence resolution retired
     // with the persistent `Plan` child node it fed. This probe stays — it
@@ -24145,7 +23139,7 @@ function emitIfRequested() {
 var WorkExplorerTreeProvider = class {
   constructor(extensionUri) {
     this.extensionUri = extensionUri;
-    this.onDidChangeEmitter = new vscode34.EventEmitter();
+    this.onDidChangeEmitter = new vscode35.EventEmitter();
     this.onDidChangeTreeData = this.onDidChangeEmitter.event;
     /** Memoised scan for the current refresh generation; cleared by `refresh()`. */
     this.scanCache = null;
@@ -24228,7 +23222,7 @@ var WorkExplorerTreeProvider = class {
   supports() {
     if (this.supportsCache)
       return this.supportsCache;
-    const cfg = vscode34.workspace.getConfiguration("dabblerSessionSets");
+    const cfg = vscode35.workspace.getConfiguration("dabblerSessionSets");
     const uatPref = cfg.get("uatSupport.enabled", "auto");
     const e2ePref = cfg.get("e2eSupport.enabled", "auto");
     const all = this.sets();
@@ -24239,15 +23233,15 @@ var WorkExplorerTreeProvider = class {
     return this.supportsCache;
   }
   toTreeItem(descriptor, node) {
-    const item = new vscode34.TreeItem(
+    const item = new vscode35.TreeItem(
       descriptor.label,
-      descriptor.collapsible === "collapsed" ? vscode34.TreeItemCollapsibleState.Collapsed : vscode34.TreeItemCollapsibleState.None
+      descriptor.collapsible === "collapsed" ? vscode35.TreeItemCollapsibleState.Collapsed : vscode35.TreeItemCollapsibleState.None
     );
     item.id = descriptor.id;
     item.description = descriptor.description;
     item.contextValue = descriptor.contextValue;
     if (descriptor.tooltip !== void 0) {
-      const md = new vscode34.MarkdownString(descriptor.tooltip, true);
+      const md = new vscode35.MarkdownString(descriptor.tooltip, true);
       item.tooltip = md;
     }
     if (descriptor.icon)
@@ -24270,11 +23264,11 @@ var WorkExplorerTreeProvider = class {
   }
   toIconPath(icon) {
     if (icon.kind === "theme") {
-      return icon.color ? new vscode34.ThemeIcon(icon.id, new vscode34.ThemeColor(icon.color)) : new vscode34.ThemeIcon(icon.id);
+      return icon.color ? new vscode35.ThemeIcon(icon.id, new vscode35.ThemeColor(icon.color)) : new vscode35.ThemeIcon(icon.id);
     }
     return {
-      light: vscode34.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
-      dark: vscode34.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
+      light: vscode35.Uri.joinPath(this.extensionUri, "media", "light", icon.slug),
+      dark: vscode35.Uri.joinPath(this.extensionUri, "media", "dark", icon.slug)
     };
   }
 };
@@ -24290,16 +23284,16 @@ function describeManifestFaults(faults) {
 // src/extension.ts
 var SESSION_SETS_REL3 = path36.join("docs", "session-sets");
 function evaluateSupportContextKeys(allSets) {
-  const cfg = vscode35.workspace.getConfiguration("dabblerSessionSets");
+  const cfg = vscode36.workspace.getConfiguration("dabblerSessionSets");
   const uatPref = cfg.get("uatSupport.enabled", "auto");
   const e2ePref = cfg.get("e2eSupport.enabled", "auto");
   const anyUat = allSets.some((s) => s.config?.requiresUAT);
   const anyE2e = allSets.some((s) => s.config?.requiresE2E);
   const uatActive = uatPref === "always" || uatPref === "auto" && anyUat;
   const e2eActive = e2ePref === "always" || e2ePref === "auto" && anyE2e;
-  vscode35.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
-  vscode35.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
-  vscode35.commands.executeCommand(
+  vscode36.commands.executeCommand("setContext", "dabblerSessionSets.uatSupportActive", uatActive);
+  vscode36.commands.executeCommand("setContext", "dabblerSessionSets.e2eSupportActive", e2eActive);
+  vscode36.commands.executeCommand(
     "setContext",
     "dabblerSessionSets.hasSubCurrentSets",
     hasSubCurrentSets(allSets)
@@ -24309,7 +23303,7 @@ function activate(context) {
   markActivateStart();
   const treeProvider = new WorkExplorerTreeProvider(context.extensionUri);
   context.subscriptions.push({ dispose: () => treeProvider.dispose() });
-  const treeView = vscode35.window.createTreeView(WorkExplorerTreeProvider.viewType, {
+  const treeView = vscode36.window.createTreeView(WorkExplorerTreeProvider.viewType, {
     treeDataProvider: treeProvider,
     showCollapseAll: true
   });
@@ -24330,7 +23324,7 @@ function activate(context) {
     );
   }
   context.subscriptions.push(
-    vscode35.workspace.onDidChangeConfiguration((e) => {
+    vscode36.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("dabblerSessionSets.uatSupport.enabled") || e.affectsConfiguration("dabblerSessionSets.e2eSupport.enabled")) {
         evaluateContextKeys();
       }
@@ -24350,11 +23344,11 @@ function activate(context) {
     boundRoots = want;
     for (const root of roots) {
       const sessionSetsAbs = path36.join(root, SESSION_SETS_REL3);
-      const pattern = new vscode35.RelativePattern(
+      const pattern = new vscode36.RelativePattern(
         sessionSetsAbs,
         "**/{spec.md,session-state.json,session-events.jsonl,activity-log.json,change-log.md,CANCELLED.md,*-uat-checklist.json,close-obligations.json}"
       );
-      const watcher = vscode35.workspace.createFileSystemWatcher(pattern);
+      const watcher = vscode36.workspace.createFileSystemWatcher(pattern);
       const onEvent = () => {
         treeProvider.refresh();
       };
@@ -24363,11 +23357,11 @@ function activate(context) {
       watcher.onDidChange(onEvent);
       watcherSubs.push(watcher);
       context.subscriptions.push(watcher);
-      const gsPattern = new vscode35.RelativePattern(
+      const gsPattern = new vscode36.RelativePattern(
         root,
         "{docs/modules.yaml,docs/planning/project-plan.md}"
       );
-      const gsWatcher = vscode35.workspace.createFileSystemWatcher(gsPattern);
+      const gsWatcher = vscode36.workspace.createFileSystemWatcher(gsPattern);
       gsWatcher.onDidCreate(onEvent);
       gsWatcher.onDidDelete(onEvent);
       gsWatcher.onDidChange(onEvent);
@@ -24388,11 +23382,11 @@ function activate(context) {
       err
     );
   }
-  context.subscriptions.push(vscode35.workspace.onDidChangeWorkspaceFolders(refreshAll));
+  context.subscriptions.push(vscode36.workspace.onDidChangeWorkspaceFolders(refreshAll));
   const pollHandle = setInterval(refreshAll, 3e4);
   context.subscriptions.push({ dispose: () => clearInterval(pollHandle) });
   context.subscriptions.push(
-    vscode35.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
+    vscode36.commands.registerCommand("dabblerSessionSets.refresh", refreshAll)
   );
   const safeRegister = (name, fn) => {
     try {
@@ -24486,7 +23480,7 @@ function activate(context) {
     () => registerUpgradeOlderSetsCommand(context, { refreshView: refreshAll })
   );
   const hasSeenOnboarding = context.workspaceState.get("hasSeenOnboarding", false);
-  if (!hasSeenOnboarding && (vscode35.workspace.workspaceFolders?.length ?? 0) > 0) {
+  if (!hasSeenOnboarding && (vscode36.workspace.workspaceFolders?.length ?? 0) > 0) {
     const roots = discoverRoots();
     const hasSessionSets = roots.some((r2) => {
       try {
@@ -24497,7 +23491,7 @@ function activate(context) {
     });
     if (!hasSessionSets) {
       context.workspaceState.update("hasSeenOnboarding", true);
-      vscode35.commands.executeCommand("dabbler.getStarted");
+      vscode36.commands.executeCommand("dabbler.getStarted");
     }
   }
   markActivateEnd();

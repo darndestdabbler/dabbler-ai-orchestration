@@ -1,15 +1,42 @@
 {
   "status": "completed",
-  "summary": "Session 1: shipped `python -m ai_router.modules create | rename | delete | assign-sets` -- the module lifecycle ported from the extension's moduleAuthoring.ts, against the unchanged docs/modules.yaml contract, with running-session refusals, next-set numbering, all-or-nothing rollback, and every session-state.json mutation routed through the sanctioned writer.",
+  "summary": "Session 2: the extension's module lifecycle is now thin launchers over `python -m ai_router.modules`, and the command is visible. All five context-menu commands (ids unchanged) run the CLI through the resolved workspace-venv interpreter, echo the exact copy-pasteable command line to a shared 'Dabbler Commands' output channel before spawning, and branch on the published exit codes (3 = refused, nothing written; 4 = write failure, with rolledBack distinguishing 'unchanged' from 'reconcile from git'). The TypeScript lifecycle they replaced is deleted, not left beside them: moduleAuthoring.ts 2601 -> 608 lines. Per operator decision the TypeScript session-state.json writer went too -- ai_router.session_lifecycle gained a cancel/restore CLI, cancelLifecycleCommands.ts routes through it, and cancelLifecycle.ts 549 -> 142 lines of readers -- so the invariant this whole set exists to restore is actually restored. Also: gitScaffold's default-module scaffold is Python-backed, copyModuleDecompositionPrompt is on the module context menu, residual S122-S1-R1 is closed, and start_session now ticks its own `register` step (operator-directed).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
+    "ai_router/session_lifecycle.py",
+    "ai_router/session_checklist.py",
+    "ai_router/start_session.py",
     "ai_router/modules.py",
+    "ai_router/tests/test_plan_seeding.py",
     "ai_router/tests/test_modules_lifecycle.py",
-    "ai_router/templates/module-plan-set.spec.md.template",
-    "ai_router/templates/module-decomposition-set.spec.md.template",
     "ai_router/CHANGELOG.md",
-    "pyproject.toml"
+    "tools/dabbler-ai-orchestration/src/utils/routerCli.ts",
+    "tools/dabbler-ai-orchestration/src/utils/moduleLifecycleCli.ts",
+    "tools/dabbler-ai-orchestration/src/utils/sessionLifecycleCli.ts",
+    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
+    "tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts",
+    "tools/dabbler-ai-orchestration/src/commands/newModule.ts",
+    "tools/dabbler-ai-orchestration/src/commands/renameModule.ts",
+    "tools/dabbler-ai-orchestration/src/commands/deleteModule.ts",
+    "tools/dabbler-ai-orchestration/src/commands/assignLegacySets.ts",
+    "tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/CHANGELOG.md",
+    "tools/dabbler-ai-orchestration/src/test/vscode-stub.js",
+    "tools/dabbler-ai-orchestration/src/test/suite/routerCli.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleCliFixture.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/cancelLifecycle.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/sessionStateV4Writers.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldDefaultModule.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/moduleLifecycleUi.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/visibleModules.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/renameModule.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/deleteModule.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/assignLegacySets.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -19,24 +46,40 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 wires the extension's five existing context-menu commands to the CLI this session shipped and deletes the TypeScript lifecycle it replaces. That is a same-surface continuation: the orchestrator that authored the Python contract knows which TypeScript call sites depend on which guarantee, and the exit codes, refusal messages and JSON shape the launchers must branch on. No provider switch is warranted; cross-provider independence is supplied by verification, which excludes the orchestrator's own provider."
+      "specifics": "Run SESSION 4 NEXT, not Session 3 (operator decision, 2026-08-13, journalled). Session 2 made the extension depend on `python -m ai_router.modules`, and the true cold-start walkthrough is red because a real PyPI install fetches 0.34.0, a wheel that predates that module. Session 4 owns the version floor, the upgrade-capable install and the capability probe that close it, and it is the release gate for both registries. The orchestrator that just made the extension depend on the router knows which call sites need the guarantee and what the walkthrough asserts, so this is same-surface continuation rather than fresh-eyes work; independence is supplied by verification, which excludes the orchestrator's own provider. Session 3 (append-file partitioning) is independent of both and can follow."
     }
   },
   "blockers": [],
   "lessons_cited": [
     "L-112-1",
-    "L-064-9"
+    "L-079-1",
+    "L-064-12",
+    "L-069-1"
   ],
   "residuals": [
     {
-      "id": "S122-S1-R1",
+      "id": "S122-S2-R1",
+      "severity": "major",
+      "source": "Full Layer 3 run of record (npm run test:playwright), 2026-08-13",
+      "description": "`vsix-first-run-walkthrough.spec.ts` is RED. It performs a real network `pip install`, which fetches `dabbler-ai-router` 0.34.0 from PyPI -- a wheel released before `ai_router.modules` existed. The default-module scaffold is Python-backed as of this session, so on a genuinely fresh project it cannot run and the tree stalls at `Default0 sets`. This is not a test defect: it is the exact regression Session 4 was added to prevent, reproduced faithfully by the set's own L-079-3 cold-start dogfood.",
+      "adjudication": "operator-attested-known-red",
+      "rationale": "Fixing it requires the version floor, the upgrade-capable install and the post-install capability probe -- all of which are Session 4's declared scope, split out from Session 2 by operator decision on 2026-08-13 precisely because folding them in would break the session-size cap. Session 4 is also the release gate: the operator publishes `dabbler-ai-router` to PyPI and the extension to the Marketplace only after it lands, so nothing ships while this is red. Skipping or weakening the test would have been a verification reduction, which the constitution makes operator-only; the operator was briefed with the failure named explicitly and chose to close with it recorded rather than hidden.",
+      "owner": "Set 122 Session 4",
+      "owner_rationale": "Session 4's Ends-with already promises exactly this: 'a project that finishes setup can run every module command ... each proven from a fresh empty folder.' This walkthrough turning green IS that proof."
+    },
+    {
+      "id": "S122-S2-R2",
       "severity": "nit",
-      "source": "s1-verification-round-3.md (remediation-review, non-blocking)",
-      "description": "`_existing_lifecycle_slug` matches an existing lifecycle set by basename suffix only, so creating module `api` would reuse `payment-api`'s `-api-plan` / `-api-decomposition` sets instead of minting its own. The correct identity test is that the name, minus its numeric prefix, equals `<slug>-<kind>` exactly.",
+      "source": "Full Layer 3 run of record, 2026-08-13",
+      "description": "Eight Layer 3 specs (blocked-by-prereqs x2, cancellation-state-file x2, default-module-scaffold-tree, icon-render-mechanism, manifest-diagnostic, migration-drift) failed in the full parallel run and pass when run in isolation. icon-render-mechanism was additionally confirmed green at HEAD and green again after a recompile, so the signature is startup contention on a four-vCPU box (rows not rendered inside a 20s wait), not a behavioural regression.",
       "adjudication": "deferred-residual",
-      "rationale": "Mirrors the TypeScript `findExistingLifecycleSetSlug` behaviour exactly, so it is inherited, not a regression this session introduced. The verifier graded it a non-blocking nit and the round returned VERIFIED. Fixing shipped code after a passing verification round would stale the verification stamp and owe another routed round for an edge case, which the loop-discipline rule against edge-case exhaustion (operator ruling, Set 086) exists to prevent.",
-      "owner": "Set 122 Session 2",
-      "owner_rationale": "Session 2 already edits this surface when it points the New Module command at the CLI, so the fix rides along at no extra verification cost."
+      "rationale": "Each was individually re-run and passes; the failure mode is a timeout waiting for the first tree row while the machine is saturated by other Playwright workers. Chasing it inside this session would be tuning test infrastructure the session did not touch. Recorded rather than silently re-run-until-green, because a suite that only passes when run one file at a time is a real cost even when it is not a product defect.",
+      "owner": "unassigned",
+      "owner_rationale": "Belongs with whoever next revisits Layer 3 runtime/parallelism; the Step 9 review should decide whether it earns its own set."
     }
-  ]
+  ],
+  "checklist": {
+    "status": "waived",
+    "attestation": "Operator-attested 2026-08-13. Two transitions left a record without a matching post: the operator-stop for the verification-reduction decision, and the last-logged-step. The orchestrator did post the checklist immediately before the operator brief, but the post landed before the decision was journalled, so the gate -- which looks for a post after the decision is recorded -- reads the window as missed. A passed window cannot be re-entered by a later post, so the honest exit is this waiver rather than a silent retry."
+  }
 }

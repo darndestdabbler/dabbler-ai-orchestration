@@ -511,6 +511,61 @@ def _seed_session_plan(
         )
 
 
+def _complete_register_step(
+    session_set_dir: str,
+    session_number: int,
+    total_sessions: Optional[int],
+    args: argparse.Namespace,
+) -> None:
+    """Set 122 (S2): log the ``register`` step this call just performed.
+
+    The description names the orchestrator identity, because that is the
+    fact registration actually established and the one a later reader of
+    ``activity-log.json`` wants from this row.
+
+    Best-effort and NAMED on failure, in the same shape as
+    :func:`_seed_session_plan` (L-079-1): a silently-missing tick looks
+    exactly like an orchestrator who forgot, which is the confusion this
+    exists to remove.
+    """
+    identity = " / ".join(
+        part
+        for part in (
+            getattr(args, "engine", None),
+            getattr(args, "model", None),
+        )
+        if part
+    )
+    effort = getattr(args, "effort", None)
+    description = (
+        f"Registered session {session_number}"
+        + (f" ({identity}" + (f", {effort}" if effort else "") + ")" if identity else "")
+        + "."
+    )
+    try:
+        try:
+            from .session_checklist import (  # type: ignore[import-not-found]
+                complete_register_step,
+            )
+        except ImportError:  # pragma: no cover - direct-script fallback
+            from session_checklist import (  # type: ignore[no-redef]
+                complete_register_step,
+            )
+        complete_register_step(
+            session_set_dir,
+            session_number,
+            description=description,
+            total_sessions=total_sessions or 0,
+        )
+    except Exception as exc:
+        print(
+            f"start_session: could not mark the register step complete "
+            f"({exc}); tick it yourself if the step checklist shows it "
+            f"pending for session {session_number}.",
+            file=sys.stderr,
+        )
+
+
 def _refuse_unresolvable_identity(args: argparse.Namespace) -> Optional[str]:
     """Set 084 (F1): the start-time identity boundary.
 
@@ -977,6 +1032,14 @@ def _run_under_lock(args: argparse.Namespace) -> int:
     # set its gate-policy records, and after the state write so the
     # session total is resolvable. Seeds once per session; never re-seeds.
     _seed_session_plan(session_set_dir, requested, total_sessions)
+
+    # Set 122 (S2, operator-directed): tick the `register` step the call
+    # just performed. `start_session` IS the registration, so leaving that
+    # row `pending` publishes a checklist that is wrong the moment it is
+    # written and stays wrong until an orchestrator logs a step the
+    # framework performed. Only this step -- every other one describes work
+    # only the orchestrator can know it finished.
+    _complete_register_step(session_set_dir, requested, total_sessions, args)
 
     # Set 049 (T5): best-effort observability log so a post-hoc
     # forensic walk can identify the most recent claimant without

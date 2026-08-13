@@ -87,14 +87,28 @@ const vscodeStub = {
     // practice (the change is visible immediately after the call
     // returns).
     const folderListeners = [];
+    // Set 122 S2: a few suites need an operator-set value (notably
+    // `dabblerSessionSets.pythonPath`, so a temp-root scaffold resolves an
+    // interpreter that actually has `ai_router`). Keyed `<section>.<key>`;
+    // empty by default, so every existing test still sees a workspace with
+    // no operator-set values.
+    const configOverrides = new Map();
     const ws = {
       workspaceFolders: undefined,
-      getConfiguration: () => ({
-        get: (_k, dflt) => dflt,
+      getConfiguration: (section) => ({
+        get: (k, dflt) => {
+          const key = `${section}.${k}`;
+          return configOverrides.has(key) ? configOverrides.get(key) : dflt;
+        },
         // Set 079 S2: the copilotCliPath reader distinguishes "operator
         // set it" from "default fired" via inspect(); the stub models a
-        // workspace with no operator-set values.
-        inspect: () => undefined,
+        // workspace with no operator-set values unless one is set below.
+        inspect: (k) => {
+          const key = `${section}.${k}`;
+          return configOverrides.has(key)
+            ? { globalValue: configOverrides.get(key) }
+            : undefined;
+        },
       }),
       onDidChangeConfiguration: () => ({ dispose: () => {} }),
       onDidChangeWorkspaceFolders: (cb) => {
@@ -138,6 +152,12 @@ const vscodeStub = {
         onDidChange: () => ({ dispose: () => {} }),
         dispose: () => {},
       }),
+      // Set 122 S2: test-only hooks for the override map above. Not part
+      // of the VS Code API — named with the stub's `__` prefix convention
+      // so a production import of one is obvious on sight.
+      __setConfig: (section, key, value) =>
+        configOverrides.set(`${section}.${key}`, value),
+      __clearConfig: () => configOverrides.clear(),
     };
     return ws;
   })(),
@@ -159,6 +179,26 @@ const vscodeStub = {
       ),
     createTreeView: () => ({ dispose: () => {} }),
     registerTreeDataProvider: () => ({ dispose: () => {} }),
+    // Set 122 S2: the router-CLI launcher echoes every command it runs to a
+    // shared output channel BEFORE spawning. The channel is created lazily
+    // on first use, so any flow that shells out to the router reaches this.
+    // Lines are retained on the fake so a test can assert what was echoed.
+    createOutputChannel: (name) => {
+      const lines = [];
+      return {
+        name,
+        lines,
+        appendLine: (line) => lines.push(line),
+        append: (text) => lines.push(text),
+        show: () => {},
+        hide: () => {},
+        clear: () => {
+          lines.length = 0;
+        },
+        replace: () => {},
+        dispose: () => {},
+      };
+    },
     // Set 059: the extension registers its Session Sets surface as a webview
     // VIEW (registerWebviewViewProvider), not a TreeDataProvider. The
     // activation regression test (activationNoFolder.test.ts) drives the real

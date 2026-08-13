@@ -129,6 +129,125 @@
       "dateTime": "2026-08-13T06:27:25.444536-04:00",
       "description": "disposition.json authored (VERIFIED, next_orchestrator, residual S122-S1-R1); lessons L-112-1 / L-064-9 cited; committed and pushed; close_session succeeded; notification fired. Logged retroactively at close-out.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "point-the-five-existing-context-menu",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "**Point the five existing context-menu commands at the CLI**, passing an explicit repo root and slug, showing output and refreshing the tree (verdict \u00a74). **Invoke the resolved workspace-venv interpreter, never a bare `python`** \u2014 the launcher must run the same interpreter the install flow targets (`venvPython(...)` / the `dabblerSessionSets.pythonPath` setting), because a bare `python` on `PATH` is the documented cause of the `No module named ai_router` mis-diagnosis (`describeAiRouterImportFailure`, and the constitution's own warning). Branch on the CLI's exit codes: `3` = refused, nothing written; `4` = write failure. Then **delete the lifecycle logic from `moduleAuthoring.ts`** rather than leaving two implementations \u2014 the duplication is the defect Set 120 spent a session removing elsewhere. **This reaches `gitScaffold.ts` whether or not it is named here:** `scaffoldDefaultModuleAndLifecycleSets` calls `scaffoldNewModule`, so the default-module scaffold becomes Python-backed in this session. **Do not change any command id:** renaming one breaks keybindings, `when`-clauses and Layer 3 fixtures, and the 2026-08-11 menu trim deliberately renamed titles only, verified against all 52 ids. Fold in residual **`S122-S1-R1`** while here (Session 1's `disposition.json`): `_existing_lifecycle_slug` matches a module's lifecycle sets by basename suffix, so creating module `api` reuses `payment-api`'s sets; the identity test should be that the name, minus its numeric prefix, equals `<slug>-<kind>` exactly.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "echo-the-command-before-running-it",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "**Echo the command before running it** (operator, 2026-08-11: *\"echoed... so developers know what commands are being executed\"*). Show the exact `python -m ai_router.modules \u2026` line the extension is about to run, in a surface the developer can read and copy, then run it with deterministic code per standing decision 2. A developer who wants to run it by hand should be able to copy what they just saw and get the same result.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "fix-src-utils-cancellifecycle-ts-296",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "**Fix `src/utils/cancelLifecycle.ts:296`** \u2014 it calls `atomicWriteFile(statePath, JSON.stringify(state, null, 2) + \"\\n\")`, so **TypeScript writes `session-state.json` today**, reached via `deleteModule`. Verified still present 2026-08-11. It is the concrete violation that justified this whole set. Also put **`copyModuleDecompositionPrompt` on the context menu**; it works and is palette-only, and it is the operator's *\"copy-prompt context menu items for modules\"* one manifest entry away. Use the `Copy X` label convention, no colon.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "**Required portion of the full test suite.** `package.json` is the extension MANIFEST, so **`L-064-12` applies**: the full `npm run test:playwright` is owed here alongside pytest, run after the last edit and never before.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T06:31:21.198011-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "point-the-five-existing-context-menu",
+      "dateTime": "2026-08-13T06:40:49.595027-04:00",
+      "description": "Wiring the five module commands to the Python CLI: surveyed the TypeScript surface, folded in residual S122-S1-R1 (exact-identity lifecycle-set match, mutation-checked falsifier).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T07:19:40.564309-04:00",
+      "description": "Registered session 2 of Set 122 (github-copilot / claude-opus-5, high); totalSessions moved 3 -> 4 through start_session --total-sessions per the spec amendment.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "point-the-five-existing-context-menu",
+      "dateTime": "2026-08-13T08:08:49.273624-04:00",
+      "description": "Five commands now launch python -m ai_router.modules through the resolved workspace-venv interpreter (utils/routerCli.ts + moduleLifecycleCli.ts), branching on exit 3 (refused) / 4 (write failure). Deleted the TypeScript lifecycle from moduleAuthoring.ts (2601 -> 608 lines); the gitScaffold default-module scaffold is Python-backed. Residual S122-S1-R1 folded in with a mutation-checked falsifier. No command id changed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "echo-the-command-before-running-it",
+      "dateTime": "2026-08-13T08:08:49.275801-04:00",
+      "description": "Every router CLI run echoes the exact, copy-pasteable command line to the shared 'Dabbler Commands' output channel BEFORE spawning, then the output. One builder feeds both the echoed line and the spawned argv, so what the developer sees and what runs cannot disagree.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "fix-src-utils-cancellifecycle-ts-296",
+      "dateTime": "2026-08-13T08:08:49.277995-04:00",
+      "description": "Removed the TypeScript session-state.json writer entirely (operator decision, journaled): added a cancel/restore CLI to ai_router/session_lifecycle.py, routed cancelLifecycleCommands.ts through it, trimmed cancelLifecycle.ts to readers (549 -> 142 lines). copyModuleDecompositionPrompt added to the module context menu. Also shipped the operator-directed start_session register-tick fix.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T08:33:06.997126-04:00",
+      "description": "Cross-provider verification (gpt-5.5; anthropic excluded as the orchestrator's effective provider). Discovery round 1 fanned out 2/2 and returned two blocking Majors, both against the command-echo promise: a '> ' prompt glyph welded onto the only visible command line, and PowerShell quoting that would not run (a leading quoted exe needs '&', and '\\\"' is not a PowerShell escape). Supplementary round 2 found nothing new. Both remediated once, with falsifiers; remediation-review round 3 returned VERIFIED, 2 accepted / 0 rejected. Artifacts: s2-conventions.md, s2-verification*.md, s2-issues.json, s2-remediation-round-1.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T09:13:01.885471-04:00",
+      "description": "Full pytest of record after the last code change: 4213 passed, 9 skipped in 906s. Layer 2 (npm run test:unit): 1421 passing, 2 pending. Full npm run test:playwright owed here because package.json is the extension MANIFEST (L-064-12): 20 passed / 11 failed. Eight of the eleven pass in isolation (parallel-load flake on a 4-vCPU box, confirmed spec by spec, and icon-render-mechanism additionally confirmed green at HEAD and green again after a recompile). Two were the deliberate register-tick behaviour change in work-explorer-steps.spec.ts and are updated and green. One is KNOWN-RED and operator-attested: vsix-first-run-walkthrough.spec.ts does a real network pip install, which fetches dabbler-ai-router 0.34.0 from PyPI -- a wheel that predates ai_router.modules -- so the now-Python-backed default-module scaffold cannot run on a true cold start. That is the exact regression Session 4 exists to prevent; it owns the fix and is the release gate, so neither registry publishes while it is red. All three runs recorded via run_of_record.",
+      "status": "complete"
     }
   ]
 }

@@ -50,11 +50,10 @@ import { BudgetChoice, BudgetWriteOutcome, writeBudgetYaml } from "../utils/budg
 import {
   MODULES_MANIFEST_DISPLAY,
   ensureModulesManifest,
-  scaffoldModuleLifecycleSets,
-  scaffoldNewModule,
 } from "../utils/moduleAuthoring";
+import { describeFailure, runCreateModule } from "../utils/moduleLifecycleCli";
+import { RunRouterCliDeps } from "../utils/routerCli";
 import { listSessionSetDirNames } from "../utils/fileSystem";
-import { ModuleManifestEntry } from "../types";
 import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 
 // ---------- pure scaffolding core (tested without VS Code) ----------
@@ -177,40 +176,32 @@ export interface DefaultModuleScaffoldOutcome {
 /**
  * Set 101 S1 (verdict P3): scaffold the real `default` module — the
  * "Class1" starter, rename-or-delete one action away via the Set 099/100
- * Work Explorer actions — and its two lifecycle sets (Set 098's `kind:
- * plan` / `kind: decomposition` scaffolder), into a docs/modules.yaml that
- * a Build call just created. Reuses the Set 087/100 writers verbatim: the
- * SAME manifest-entry + plan-stub shape `dabbler.newModule` produces, the
- * SAME lifecycle-set scaffold the module row's `Add` action triggers — no
- * new writer, no new template.
+ * Work Explorer actions — and its two lifecycle sets, into a
+ * docs/modules.yaml that a Build call just created.
  *
- * Real `fs` throughout (mirroring `scaffoldNewModule` /
- * `scaffoldModuleLifecycleSets` themselves, which are not
- * `deps.fileOps`-injectable) — called only from the VS Code wiring layer
- * (`buildProjectStructureNoPrompt`), on the real `projectDir`, never from
- * the pure `scaffoldConsumerRepo` core its in-memory `FileOps` tests drive.
+ * Set 122 S2: this now shells out to `python -m ai_router.modules create`,
+ * the SAME entry point `dabbler.newModule` uses — no new writer, no second
+ * implementation, and the manifest entry / plan stub / lifecycle-set shapes
+ * are whatever the router produces, by construction rather than by two
+ * codebases agreeing. It also gains the CLI's transaction: the TypeScript
+ * version wrote the module and its lifecycle sets as two separate steps and
+ * had to tolerate a half-done result between them.
  *
- * Set 101 S1 verification round 1 (Major x2): the caller's gate (a Build
- * call that just CREATED docs/modules.yaml) is necessary but not
- * sufficient evidence of a genuinely fresh repo — a legacy repo that
- * predates the manifest (real work already committed under
- * docs/session-sets/, no docs/modules.yaml yet) creates the manifest on
- * its first post-upgrade Build too, and must NOT receive an unsolicited
- * default module (the spec's contract: "a repo that already has modules
- * OR SETS makes no module/set writes"). This function checks the SETS
- * half of that contract directly — never trusting the manifest-creation
- * signal alone — so it stays correct regardless of what the caller
- * gates on.
+ * Ordering note: this runs AFTER the router install inside the same Build
+ * (`installRouter` is awaited within `scaffoldConsumerRepo`), so the venv
+ * exists by the time it is called. When the install did NOT succeed the CLI
+ * is unreachable and this reports that in its note rather than throwing —
+ * Session 4 owns turning that into a hard, retryable precondition.
  *
- * Never throws: a writer refusal (or the pre-existing-sets refusal above)
- * is caught/returned in the note rather than surfaced as an exception —
- * a module without its lifecycle sets beats undoing an already-landed
- * manifest write (the Set 100 S2 precedent: "module without sets beats
- * half-written sets").
+ * Never rejects: a refusal (or the pre-existing-sets refusal below) is
+ * returned in the note rather than surfaced as an exception — a module
+ * without its lifecycle sets beats undoing an already-landed manifest write
+ * (the Set 100 S2 precedent: "module without sets beats half-written sets").
  */
-export function scaffoldDefaultModuleAndLifecycleSets(
+export async function scaffoldDefaultModuleAndLifecycleSets(
   projectDir: string,
-): DefaultModuleScaffoldOutcome {
+  cliDeps?: RunRouterCliDeps,
+): Promise<DefaultModuleScaffoldOutcome> {
   if (listSessionSetDirNames(projectDir).length > 0) {
     return {
       ran: false,
@@ -220,33 +211,28 @@ export function scaffoldDefaultModuleAndLifecycleSets(
         "existing (legacy) repo, not a fresh scaffold.",
     };
   }
-  try {
-    const newModule = scaffoldNewModule(projectDir, "default", "Default");
-    const declared: ModuleManifestEntry = {
-      slug: "default",
-      title: "Default",
-      codeRoots: [],
-      planPath: newModule.planRel,
-      touches: [],
-    };
-    const lifecycle = scaffoldModuleLifecycleSets(projectDir, declared);
-    return {
-      ran: true,
-      planSlug: lifecycle.planSlug,
-      decompositionSlug: lifecycle.decompositionSlug,
-      note:
-        ` Default module scaffolded: ${lifecycle.planSlug} (plan) and ` +
-        `${lifecycle.decompositionSlug} (decomposition) — rename or delete ` +
-        `"Default" any time from the Work Explorer.`,
-    };
-  } catch (err) {
+  const result = await runCreateModule(
+    projectDir,
+    { slug: "default", title: "Default" },
+    cliDeps,
+  );
+  if (!result.ok) {
     return {
       ran: false,
-      note:
-        ` The default module's starter sets were NOT scaffolded ` +
-        `(${err instanceof Error ? err.message : String(err)}).`,
+      note: ` The default module's starter sets were NOT scaffolded (${describeFailure("Creating the default module", result)}).`,
     };
   }
+  const planSlug = String(result.payload?.["planSetSlug"] ?? "");
+  const decompositionSlug = String(result.payload?.["decompositionSetSlug"] ?? "");
+  return {
+    ran: true,
+    planSlug,
+    decompositionSlug,
+    note:
+      ` Default module scaffolded: ${planSlug} (plan) and ` +
+      `${decompositionSlug} (decomposition) — rename or delete ` +
+      `"Default" any time from the Work Explorer.`,
+  };
 }
 
 // ---------- VS Code wiring ----------
@@ -390,8 +376,13 @@ export interface BuildStructureSeams {
    * Set 101 S1: replaces the real default-module + lifecycle-set scaffold
    * ({@link scaffoldDefaultModuleAndLifecycleSets}). Production callers
    * omit it; Layer-2 tests inject a capture instead of touching real disk.
+   *
+   * Set 122 S2: async, because the real implementation now spawns the
+   * router CLI.
    */
-  scaffoldDefaultModule?: (projectDir: string) => DefaultModuleScaffoldOutcome;
+  scaffoldDefaultModule?: (
+    projectDir: string,
+  ) => Promise<DefaultModuleScaffoldOutcome> | DefaultModuleScaffoldOutcome;
 }
 
 export async function buildProjectStructureNoPrompt(
@@ -528,8 +519,9 @@ export async function buildProjectStructureNoPrompt(
   // check separates "already has modules" from "legacy repo, untouched" (no
   // forced migration onto a pre-existing, however empty, manifest).
   const defaultModuleNote = result.written.includes(MODULES_MANIFEST_DISPLAY)
-    ? (seams.scaffoldDefaultModule ?? scaffoldDefaultModuleAndLifecycleSets)(
-        projectDir,
+    ? (
+        await (seams.scaffoldDefaultModule ??
+          scaffoldDefaultModuleAndLifecycleSets)(projectDir)
       ).note
     : "";
   const summary =

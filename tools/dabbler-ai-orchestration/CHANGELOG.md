@@ -22,6 +22,73 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > its head, because it is the record of what was staged — what the
 > folded release actually ships is the Unreleased entries here.
 
+### Changed
+
+- **(Set 122 S2) Every module lifecycle operation now runs
+  `python -m ai_router.modules`, and the extension shows you the command.**
+  The five module context-menu commands — New / Rename / Delete / Open
+  Plan / Assign Sets — keep their ids, their titles, their `when` clauses
+  and their prompts; what changed is what happens behind them. Each now
+  launches the router CLI through the **resolved workspace-venv
+  interpreter** (`resolvePythonInterpreter`, never a bare `python` — a bare
+  `python` on `PATH` is the documented cause of the "No module named
+  ai_router" mis-diagnosis), and branches on the CLI's published exit
+  codes: `3` refused with nothing written, `4` write failure, with
+  `rolledBack` deciding between "the workspace is unchanged" and
+  "reconcile from git".
+
+  **The command is echoed before it runs** (operator, 2026-08-11:
+  *"echoed… so developers know what commands are being executed"*). The
+  exact, copy-pasteable line is appended to a shared **"Dabbler Commands"**
+  output channel *before* the process starts — so it appears even when it
+  is the command itself that could not start — followed by its output. One
+  builder produces both the echoed line and the spawned argv, so what a
+  developer reads and what actually ran cannot disagree. The interpreter is
+  shown as its resolved absolute path, because that is the load-bearing
+  part: the whole failure class here is a developer running the same
+  command against a *different* interpreter and getting a different answer.
+
+  The TypeScript lifecycle it replaces is **deleted**, not left beside it:
+  `utils/moduleAuthoring.ts` drops from 2,601 lines to 608 (readers,
+  validation, the module picker and the deletion classifier survive — the
+  Explorer renders synchronously and must not spawn a process per row).
+  `scaffoldDefaultModuleAndLifecycleSets` in `gitScaffold.ts` is
+  Python-backed too, so a fresh project's `default` module comes from the
+  same writer as every later one.
+
+  One behaviour genuinely improves: the TypeScript New Module wrote the
+  manifest entry and the two lifecycle sets as separate steps, so a
+  scaffold failure left a module declared without its sets. The CLI runs
+  the whole create in one transaction, so that failure now rolls the
+  manifest back too — asserted with an injected failure, not assumed.
+
+### Removed
+
+- **(Set 122 S2) The TypeScript writer of `session-state.json` is gone.**
+  `utils/cancelLifecycle.ts` cancelled and restored session sets in
+  TypeScript, which meant it opened `session-state.json` and wrote it —
+  the line the Set 122 spec names as *"the concrete violation that
+  justified this whole set"*. Only the router's sanctioned writers may
+  touch that file. **Cancel Session Set** and **Restore Session Set** now
+  run `python -m ai_router.session_lifecycle`, with the same confirm →
+  optional reason → refresh flow as before; the module-delete path reaches
+  the same writer through `ai_router.modules`. The module trimmed from 549
+  lines to 142, all readers (`isCancelled`, `wasRestored`,
+  `readCancellationState`), and `sessionStateV4Writers.test.ts` lost its
+  cancel/restore suites — they existed to police shape drift between two
+  writers of one file, and there is now only one.
+
+  Operator decision, 2026-08-13, journalled in the set's `decisions.jsonl`:
+  severing only the module-delete path (the narrow reading of the spec
+  step) was considered and rejected, because it leaves a second writer
+  shipping.
+
+### Added
+
+- **(Set 122 S2) `Copy Module Decomposition Prompt` is on the module
+  context menu.** It worked and was palette-only; it was one manifest entry
+  away from the operator's *"copy-prompt context menu items for modules"*.
+
 ### Fixed
 
 - **(Set 128 S1) The step list stopped showing a policy record as a

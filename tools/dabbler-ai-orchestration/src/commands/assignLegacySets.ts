@@ -14,9 +14,15 @@ import * as vscode from "vscode";
 import {
   MODULES_MANIFEST_DISPLAY,
   INVALID_MANIFEST_MESSAGE,
-  assignLegacySetsToModule,
   classifyModulesManifest,
 } from "../utils/moduleAuthoring";
+import {
+  assignedAny,
+  describeAssign,
+  describeFailure,
+  runAssignSets,
+} from "../utils/moduleLifecycleCli";
+import { RunRouterCliDeps } from "../utils/routerCli";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { ModuleManifestEntry, SessionSet } from "../types";
 
@@ -76,6 +82,7 @@ function defaultUi(): AssignLegacyUi {
  */
 export async function runAssignLegacySetsFlow(
   ui: AssignLegacyUi = defaultUi(),
+  cliDeps?: RunRouterCliDeps,
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -116,49 +123,23 @@ export async function runAssignLegacySetsFlow(
   const chosen = await ui.pickSets(candidates);
   if (!chosen || chosen.length === 0) return false; // cancelled / none
 
-  const report = assignLegacySetsToModule(
+  // The CLI takes set NAMES and resolves each spec.md itself, rather than
+  // the absolute paths the TypeScript writer took. One side owning the
+  // path resolution is the point: a caller that passes a path the writer
+  // did not derive can stamp a file outside docs/session-sets/.
+  const result = await runAssignSets(
     root,
-    target.slug,
-    chosen.map((s) => ({ name: s.name, specAbs: s.specPath })),
+    { slug: target.slug, setNames: chosen.map((s) => s.name) },
+    cliDeps,
   );
 
-  if (report.refused) {
-    ui.showErrorMessage(
-      `No sets were assigned — ${report.refused.reason}. Every spec.md was left untouched.`,
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    // Each write is atomic (temp → verify → rename), so the failed file is
-    // ALWAYS intact — the only files that changed are those in `written`.
-    const tail = wf.written.length
-      ? `Already stamped before the failure: ${wf.written.join(", ")}.`
-      : "No files were changed.";
-    ui.showErrorMessage(
-      `Assigning to "${target.title}" failed on ${wf.setName}: ${wf.reason}. ${tail}`,
-    );
-    return wf.written.length > 0;
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure(`Assigning to "${target.title}"`, result));
+    return assignedAny(result.payload);
   }
 
-  const parts: string[] = [];
-  if (report.stamped.length) {
-    parts.push(
-      `Stamped module: ${target.slug} into ${report.stamped.length} set(s) ` +
-        `(${report.stamped.join(", ")})`,
-    );
-  }
-  if (report.alreadyAssigned.length) {
-    parts.push(
-      `${report.alreadyAssigned.length} already assigned (${report.alreadyAssigned.join(", ")})`,
-    );
-  }
-  ui.showInformationMessage(
-    parts.length
-      ? `${parts.join("; ")}.`
-      : `Nothing to change — the selected sets already declare module: ${target.slug}.`,
-  );
-  return report.stamped.length > 0;
+  ui.showInformationMessage(describeAssign(result.payload));
+  return assignedAny(result.payload);
 }
 
 export function registerAssignLegacySetsCommand(

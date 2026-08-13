@@ -11,14 +11,14 @@
 
 import * as vscode from "vscode";
 import * as path from "path";
+import { validateNewModuleSlug } from "../utils/moduleAuthoring";
 import {
-  MODULES_MANIFEST_DISPLAY,
-  scaffoldModuleLifecycleSets,
-  scaffoldNewModule,
-  validateNewModuleSlug,
-} from "../utils/moduleAuthoring";
+  describeCreate,
+  describeFailure,
+  runCreateModule,
+} from "../utils/moduleLifecycleCli";
+import { RunRouterCliDeps } from "../utils/routerCli";
 import { readModulesManifest } from "../utils/fileSystem";
-import { ModuleManifestEntry } from "../types";
 
 export interface NewModuleUi {
   showInputBox: typeof vscode.window.showInputBox;
@@ -47,6 +47,7 @@ function defaultUi(): NewModuleUi {
  */
 export async function runNewModuleFlow(
   ui: NewModuleUi = defaultUi(),
+  cliDeps?: RunRouterCliDeps,
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -54,9 +55,9 @@ export async function runNewModuleFlow(
     return false;
   }
 
-  // Existing slugs for live validation; the scaffold re-reads and
-  // re-validates at write time (fail-loud), so a stale read here can
-  // only make the input box friendlier, never corrupt the manifest.
+  // Existing slugs for live validation; the CLI re-reads and re-validates
+  // at write time (fail-loud), so a stale read here can only make the input
+  // box friendlier, never corrupt the manifest.
   const existingSlugs = (readModulesManifest(root) ?? []).map((e) => e.slug);
 
   const slug = await ui.showInputBox({
@@ -78,52 +79,27 @@ export async function runNewModuleFlow(
   });
   if (title === undefined) return false; // Esc cancels; empty = default to slug
 
-  let result;
-  try {
-    result = scaffoldNewModule(root, slug, title);
-  } catch (err) {
-    ui.showErrorMessage(
-      `New module was not created: ${err instanceof Error ? err.message : String(err)}`,
-    );
+  // Set 122 S2: one call does the manifest entry, the plan stub AND the two
+  // lifecycle sets, inside one transaction. The TypeScript version did the
+  // scaffold and the lifecycle sets as two separate writes and had to
+  // explain, at length, why a failure between them left a module without
+  // its sets. That whole failure mode is gone: the CLI rolls the lot back.
+  const result = await runCreateModule(
+    root,
+    { slug: slug.trim(), title: title.trim() },
+    cliDeps,
+  );
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure("New module", result));
     return false;
   }
 
-  // Set 100 Session 2 (spec: "Add module now scaffolds the module's two
-  // lifecycle sets"): scaffold from the manifest entry `scaffoldNewModule`
-  // JUST wrote — built directly from its known return shape rather than
-  // re-reading docs/modules.yaml (which would race against the `await
-  // ui.openFile(...)` below: an external edit in that window could leave
-  // the re-read entry missing and the promised scaffolding silently
-  // skipped). A writer refusal REPORTS but never fails the whole flow —
-  // the module is already declared at this point, and a module without its
-  // lifecycle sets beats a half-written manifest entry.
-  const declared: ModuleManifestEntry = {
-    slug: slug.trim(),
-    title: title.trim() || slug.trim(),
-    codeRoots: [],
-    planPath: result.planRel,
-    touches: [],
-  };
-  let lifecycleNote: string;
-  try {
-    const lifecycle = scaffoldModuleLifecycleSets(root, declared);
-    lifecycleNote = ` Next steps scaffolded: ${lifecycle.planSlug} and ${lifecycle.decompositionSlug}.`;
-  } catch (err) {
-    lifecycleNote =
-      ` The module's lifecycle sets were NOT scaffolded ` +
-      `(${err instanceof Error ? err.message : String(err)}) — the module is ` +
-      `still declared; scaffold them later.`;
+  const planRel = result.payload?.["planRel"];
+  if (typeof planRel === "string" && planRel !== "") {
+    await ui.openFile(path.join(root, ...planRel.split("/")));
   }
 
-  await ui.openFile(path.join(root, ...result.planRel.split("/")));
-
-  ui.showInformationMessage(
-    `Module "${slug.trim()}" ${result.manifestCreated ? `declared in a new ${MODULES_MANIFEST_DISPLAY}` : `appended to ${MODULES_MANIFEST_DISPLAY}`}. ` +
-      (result.planCreated
-        ? `Plan stub created at ${result.planRel} — fill it in, then decompose it into session sets.`
-        : `Existing plan at ${result.planRel} kept.`) +
-      lifecycleNote,
-  );
+  ui.showInformationMessage(describeCreate(result.payload));
   return true;
 }
 

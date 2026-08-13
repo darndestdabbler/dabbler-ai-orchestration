@@ -1085,10 +1085,19 @@ def _existing_lifecycle_slug(
     Re-running the scaffold for a module that already has one must reuse it
     rather than mint a duplicate; the sorted pick keeps the pathological
     multi-match case deterministic.
+
+    Set 122 S2 (residual ``S122-S1-R1``): the identity test is the name minus
+    its numeric prefix equalling ``<slug>-<kind>`` EXACTLY. A suffix match --
+    which is what the TypeScript ``findExistingLifecycleSetSlug`` did, and what
+    the Session 1 port inherited -- makes module ``api`` reuse ``payment-api``'s
+    sets, so the new module silently never gets its own.
     """
-    suffix = f"-{module_slug}-{kind}"
+    expected = f"{module_slug}-{kind}"
     matches = sorted(
-        n for n in names if n.endswith(suffix) and _SET_PREFIX_RE.match(n)
+        n
+        for n in names
+        for m in (_SET_PREFIX_RE.match(n),)
+        if m and n[m.end() :] == expected
     )
     return matches[0] if matches else None
 

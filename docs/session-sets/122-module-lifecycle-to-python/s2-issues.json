@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The echoed router command is not reliably copy-pasteable as the exact command that ran.\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/routerCli.ts:108-129`\n- **Failure scenario:** On Windows, a workspace/interpreter path containing spaces is common. `buildCommandLine()` emits a quoted executable path, but in PowerShell a quoted command path must be invoked with `&`; arguments containing `\"`, `$`, or backticks are also not escaped for PowerShell. A developer copying the “Dabbler Commands” line can therefore fail to run it or pass different argv than the extension spawned.\n- **Acceptance criterion:** `JUDGMENT - The displayed command must be shell-correct for the supported Windows copy/paste surface, including an interpreter path with spaces and args containing quotes/dollar/backtick, while still deriving display and spawned argv from the same invocation data.`\n- **Details:** **Violation:** the task requires “A developer who wants to run it by hand should be able to copy what they just saw and get the same result,” and specifically calls out `quoteForDisplay`. **Impact:** the main transparency deliverable fails for a realistic Windows path/title case. **Evidence:** `quoteForDisplay()` wraps metacharacter args in double quotes and only backslash-escapes quotes/backslashes; `buildCommandLine()` then joins that as the only visible command.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "On Windows, a workspace/interpreter path containing spaces is common. `buildCommandLine()` emits a quoted executable path, but in PowerShell a quoted command path must be invoked with `&`; arguments containing `\"`, `$`, or backticks are also not escaped for PowerShell. A developer copying the “Dabbler Commands” line can therefore fail to run it or pass different argv than the extension spawned.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/src/utils/routerCli.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The displayed command must be shell-correct for the supported Windows copy/paste surface, including an interpreter path with spaces and args containing quotes/dollar/backtick, while still deriving display and spawned argv from the same invocation data."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** The echoed command is prefixed with `> `, so the visible line is not the exact copy-pasteable command that ran.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/routerCli.ts:207-214`\n  - **Failure scenario:** Every router-backed command writes the only visible command line as `> <python> -m ...`; a developer copying what the output channel shows gets a leading shell redirection token, not the command that was spawned. This is probable because it happens on the main path for all new launchers.\n  - **Acceptance criterion:** `JUDGMENT - The output channel must display a bare, copy-pasteable command line equal to the spawned command, with any prompt/label moved to a separate non-command line or removed, and a launcher test must assert the first command echo equals commandLine exactly.`\n  - **Details:** Violation: the spec requires “Show the exact `python -m ai_router.modules …` line” and says a developer should be able to “copy what they just saw and get the same result.” Impact: this breaks the core visibility/reproducibility deliverable for every CLI-backed mutation. Evidence: `buildCommandLine()` builds the bare command, but `runRouterCli()` appends ``> ${commandLine}`` to the output channel.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Every router-backed command writes the only visible command line as `> <python> -m ...`; a developer copying what the output channel shows gets a leading shell redirection token, not the command that was spawned. This is probable because it happens on the main path for all new launchers.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/src/utils/routerCli.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The output channel must display a bare, copy-pasteable command line equal to the spawned command, with any prompt/label moved to a separate non-command line or removed, and a launcher test must assert the first command echo equals commandLine exactly."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "47699e7960a2eb7653cd2853956b2da9746fac00"
+}

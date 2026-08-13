@@ -91,7 +91,7 @@ whose trigger moment is situational, moved full-text to
 | L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
 
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
-<!-- lesson: id="L-079-1" added-set="079" last-used-set="128" status="active" scope="portable" -->
+<!-- lesson: id="L-079-1" added-set="079" last-used-set="122" status="active" scope="portable" -->
 
 - The child Python's stdout text layer defaults to `cp1252` on Windows,
   so any non-ASCII payload crossing a pipe *as text* is a latent crash in

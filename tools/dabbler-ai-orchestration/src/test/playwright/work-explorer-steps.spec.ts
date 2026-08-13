@@ -109,10 +109,16 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     // fixture painted three identical not-started rows and could not tell
     // "step 1 has not been started" from "step 1 has been running for
     // forty minutes".
-    await expectFileIcon(treeRow(pane, "Register"), "in-progress.svg");
-    // EXACTLY one, and only that one. A second derived row would be the
+    //
+    // Set 122 S2 moved WHICH row that is, and the move is the point:
+    // `start_session` now logs the `register` step complete, because
+    // `start_session` IS the registration. So `Register` is genuinely done
+    // the moment the session exists, and the first row nothing has been
+    // logged against — the session's real position — is step 2.
+    await expectFileIcon(treeRow(pane, "Register"), "done.svg");
+    // EXACTLY one derived row, and only that one. A second would be the
     // two-current-rows defect the removed `<- here` marker produced.
-    await expectFileIcon(treeRow(pane, "Build the thing"), "not-started.svg");
+    await expectFileIcon(treeRow(pane, "Build the thing"), "in-progress.svg");
     await expectFileIcon(treeRow(pane, "Verify close"), "not-started.svg");
     // And the marker itself is still gone — what replaced it is a glyph
     // and a timestamp, not a text arrow in the description column.
@@ -120,7 +126,7 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     // The follow-up question the operator asked next: SINCE WHEN. The
     // active row shows the session's own start in the dimmed description
     // slot, `HH:MM-` — a start, not a completion.
-    await expect(treeRow(pane, "Register")).toContainText(/\d{2}:\d{2}-/);
+    await expect(treeRow(pane, "Build the thing")).toContainText(/\d{2}:\d{2}-/);
     // A row that has not started shows no time at all. A seeded row's
     // `dateTime` is REGISTRATION time, identical across every row, and
     // rendering it would be a fresh wrong signal (operator ruling 3).
@@ -162,10 +168,13 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await revealSetRow(pane, { bucket: "In Progress", set: "114-live-refresh" });
     await expandTreeRow(pane, "114-live-refresh");
     await expandTreeRow(pane, "Fixture session 1");
-    // Set 127 S2: nothing is logged yet, so the derived active step is
-    // the first planned row. This is the "before" half of the assertion
-    // below — the signal has to MOVE when the ledger moves.
-    await expectFileIcon(treeRow(pane, "Register"), "in-progress.svg");
+    // Set 127 S2: nothing is logged for the WORK steps yet, so the derived
+    // active step is the first planned row without a logged entry. Set 122
+    // S2 made that step 2 rather than step 1, because `start_session` logs
+    // its own `register` step complete. This is the "before" half of the
+    // assertion below — the signal has to MOVE when the ledger moves.
+    await expectFileIcon(treeRow(pane, "Register"), "done.svg");
+    await expectFileIcon(treeRow(pane, "Build the thing"), "in-progress.svg");
 
     // A real logged step lands in `activity-log.json` — written by the
     // shipping fixture path, not hand-rolled. It is logged as the spec's
@@ -193,10 +202,12 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await expectFileIcon(logged, "in-progress.svg");
     await expect(treeRows(pane).filter({ hasText: "<- here" })).toHaveCount(0);
     // Set 127 S2: the record now answers "where is this session", so the
-    // DERIVATION stands down — "Register" goes back to not-started rather
-    // than staying lit beside the logged step. Exactly one row is ever
-    // current, and this is the moment the answer changes hands.
-    await expectFileIcon(treeRow(pane, "Register"), "not-started.svg");
+    // DERIVATION stands down — the previously-derived row goes back to
+    // not-started rather than staying lit beside the logged step. Exactly
+    // one row is ever current, and this is the moment the answer changes
+    // hands. `Register` stays DONE throughout: it is a recorded fact, not
+    // a derivation (Set 122 S2).
+    await expectFileIcon(treeRow(pane, "Register"), "done.svg");
     // Nothing was dropped in either direction, and expansion survived the
     // refresh: stable row ids, proven in the host.
     await expect(treeRow(pane, "Verify close")).toBeVisible();

@@ -663,6 +663,38 @@ def test_create_reuses_an_existing_lifecycle_set_rather_than_minting_a_duplicate
     assert "004-payment-api-plan" in (decomp / "spec.md").read_text(encoding="utf-8")
 
 
+def test_create_does_not_reuse_a_different_modules_lifecycle_set(tmp_path):
+    """FALSIFIER for residual S122-S1-R1 (Set 122 S2).
+
+    ``payment-api`` and ``api`` share a basename suffix, so a suffix match --
+    the TypeScript behaviour Session 1 ported verbatim -- makes the new module
+    ``api`` adopt ``payment-api``'s lifecycle sets and never get its own. The
+    identity test is the name minus its numeric prefix, exactly.
+    """
+    root = make_repo(tmp_path, POPULATED_MANIFEST)
+    sets_root = root / "docs" / "session-sets"
+    _write(sets_root / "004-payment-api-plan" / "spec.md", "# payment-api's plan\n")
+    _write(
+        sets_root / "005-payment-api-decomposition" / "spec.md",
+        "# payment-api's decomposition\n",
+    )
+
+    result = modules.create_module(str(root), "api", "API")
+
+    assert result.exit_code == 0, result.refused or result.write_failed
+    assert result.details["planSetSlug"] == "006-api-plan"
+    assert result.details["planSetCreated"] is True
+    assert result.details["decompositionSetSlug"] == "007-api-decomposition"
+    assert result.details["decompositionSetCreated"] is True
+    # The other module's sets are untouched.
+    assert (sets_root / "004-payment-api-plan" / "spec.md").read_text(
+        encoding="utf-8"
+    ) == "# payment-api's plan\n"
+    assert modules.read_spec_module_and_kind(
+        str(sets_root / "006-api-plan" / "spec.md")
+    ) == ("api", "plan")
+
+
 def test_create_rolls_back_the_lifecycle_sets_too(tmp_path):
     """FALSIFIER: the scaffold runs inside the same transaction as the
     manifest write, so a failure must leave no half-created module behind."""

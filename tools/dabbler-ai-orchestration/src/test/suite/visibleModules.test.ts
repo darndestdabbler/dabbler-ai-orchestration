@@ -34,8 +34,8 @@ import {
   modulePlanRelPath,
   pickModuleForAuthoring,
   resolveModulePlanRelPath,
-  scaffoldNewModule,
 } from "../../utils/moduleAuthoring";
+import { createModuleFixture } from "./moduleCliFixture";
 import { readSessionSets } from "../../utils/fileSystem";
 import {
   BootstrapContext,
@@ -594,7 +594,7 @@ suite("Set 091 S2 — never-persist `module: default` guard", () => {
   test("no writer path synthesizes a `default` manifest entry: the scaffold appends only the operator's slug", () => {
     const root = fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-guard-scaffold-"));
     try {
-      scaffoldNewModule(root, "greeter", "Greeter");
+      createModuleFixture(root, "greeter", "Greeter");
       const manifest = fs.readFileSync(path.join(root, "docs", "modules.yaml"), "utf8");
       assert.ok(!manifest.includes("slug: default"));
       const classified = classifyModulesManifest(root);

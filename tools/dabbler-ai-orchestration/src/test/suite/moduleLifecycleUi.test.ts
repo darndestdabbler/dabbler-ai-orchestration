@@ -30,8 +30,8 @@ import {
 } from "../../providers/SessionSetsModel";
 import {
   classifyModulesManifest,
-  scaffoldModuleLifecycleSets,
 } from "../../utils/moduleAuthoring";
+import { createModuleFixture } from "./moduleCliFixture";
 import { readSessionSets } from "../../utils/fileSystem";
 import { ModuleManifestEntry, SessionSet, SessionState } from "../../types";
 import { RowPayload } from "../../types/explorerPayloads";
@@ -256,11 +256,12 @@ suite("Set 100 S1 — prerequisite badge carries the plan gate", () => {
   test("a scaffolded decomposition set is blocked while its plan set is incomplete, and unblocks when it completes", () => {
     const root = makeTmpDir("dabbler-plangate-");
     try {
-      writeManifest(root, ["greeter"]);
-      const result = scaffoldModuleLifecycleSets(root, entry("greeter", "Greeter"));
+      // The CLI declares the module itself, so pre-writing the manifest
+      // would make it refuse the slug as already-present.
+      const result = createModuleFixture(root, "greeter", "Greeter");
 
       let byName = new Map(readSessionSets(root).map((s) => [s.name, s]));
-      const decomp = byName.get(result.decompositionSlug)!;
+      const decomp = byName.get(result.decompositionSetSlug)!;
       assert.strictEqual(decomp.kind, "decomposition");
       assert.strictEqual(decomp.blockedByPrereqs, true);
       assert.strictEqual(blockedMarker(decomp), BLOCKED_MARKER);
@@ -268,20 +269,20 @@ suite("Set 100 S1 — prerequisite badge carries the plan gate", () => {
       // the full wording is contractual, not just the slug substring.
       assert.strictEqual(
         blockedTooltip(decomp),
-        `Blocked by prerequisites: ${result.planSlug} (not started) — all must complete first.`,
+        `Blocked by prerequisites: ${result.planSetSlug} (not started) — all must complete first.`,
       );
       // The plan set itself is first in line — never blocked.
-      const plan = byName.get(result.planSlug)!;
+      const plan = byName.get(result.planSetSlug)!;
       assert.strictEqual(plan.kind, "plan");
       assert.strictEqual(blockedMarker(plan), "");
 
       // Completing the plan set clears the gate on the next scan.
       writeState(
-        path.join(root, "docs", "session-sets", result.planSlug),
+        path.join(root, "docs", "session-sets", result.planSetSlug),
         "complete",
       );
       byName = new Map(readSessionSets(root).map((s) => [s.name, s]));
-      const unblocked = byName.get(result.decompositionSlug)!;
+      const unblocked = byName.get(result.decompositionSetSlug)!;
       assert.strictEqual(unblocked.blockedByPrereqs, false);
       assert.strictEqual(blockedMarker(unblocked), "");
     } finally {

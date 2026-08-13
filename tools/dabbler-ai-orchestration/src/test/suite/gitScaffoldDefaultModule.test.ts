@@ -37,6 +37,28 @@ import {
   buildVisibleModulePayloads,
   computeVisibleModules,
 } from "../../providers/SessionSetsModel";
+import { RunRouterCliDeps } from "../../utils/routerCli";
+import { fixturePython } from "./moduleCliFixture";
+
+/**
+ * Set 122 S2: the default-module scaffold shells out to the router CLI now,
+ * so these tests need an interpreter that has `ai_router`. A temp projectDir
+ * has no `.venv`, so production resolution would correctly fall through to
+ * bare `python` — which is exactly the machine-dependent thing this injects
+ * around.
+ */
+function cliDeps(): RunRouterCliDeps {
+  return {
+    resolveInterpreter: () => fixturePython(),
+    echo: { append: () => undefined, reveal: () => undefined },
+  };
+}
+
+/** The stub's test-only configuration hooks (see `src/test/vscode-stub.js`). */
+interface VscodeConfigStub {
+  __setConfig(section: string, key: string, value: string): void;
+  __clearConfig(): void;
+}
 import { InstallOutcome } from "../../utils/aiRouterInstall";
 import {
   TemplateBundle,
@@ -108,11 +130,11 @@ function fakeContext(): vscode.ExtensionContext {
 }
 
 suite("gitScaffold — scaffoldDefaultModuleAndLifecycleSets (Set 101 S1, real fs)", () => {
-  test("fresh manifest: declares 'default' + scaffolds both lifecycle sets at 001/002", () => {
+  test("fresh manifest: declares 'default' + scaffolds both lifecycle sets at 001/002", async () => {
     const root = tmpRoot("default-module-fresh-");
     try {
       ensureModulesManifest(root);
-      const outcome = scaffoldDefaultModuleAndLifecycleSets(root);
+      const outcome = await scaffoldDefaultModuleAndLifecycleSets(root, cliDeps());
 
       assert.strictEqual(outcome.ran, true);
       assert.strictEqual(outcome.planSlug, "001-default-plan");
@@ -157,10 +179,10 @@ suite("gitScaffold — scaffoldDefaultModuleAndLifecycleSets (Set 101 S1, real f
     }
   });
 
-  test("a repo with no modules.yaml at all still succeeds (scaffoldNewModule creates it)", () => {
+  test("a repo with no modules.yaml at all still succeeds (the CLI creates it)", async () => {
     const root = tmpRoot("default-module-nomanifest-");
     try {
-      const outcome = scaffoldDefaultModuleAndLifecycleSets(root);
+      const outcome = await scaffoldDefaultModuleAndLifecycleSets(root, cliDeps());
       assert.strictEqual(outcome.ran, true);
       assert.deepStrictEqual(listSetDirs(root), [
         "001-default-plan",
@@ -171,7 +193,7 @@ suite("gitScaffold — scaffoldDefaultModuleAndLifecycleSets (Set 101 S1, real f
     }
   });
 
-  test("a repo with existing session sets but no prior manifest is NOT seeded with Default (Set 101 S1 verification round 1, Major x2)", () => {
+  test("a repo with existing session sets but no prior manifest is NOT seeded with Default (Set 101 S1 verification round 1, Major x2)", async () => {
     const root = tmpRoot("default-module-legacy-sets-");
     try {
       // A legacy repo: real pre-existing work under docs/session-sets/,
@@ -180,7 +202,7 @@ suite("gitScaffold — scaffoldDefaultModuleAndLifecycleSets (Set 101 S1, real f
       specWith(root, "047-existing-work", LEGACY_SPEC);
       ensureModulesManifest(root); // mirrors what Build's ensureModulesManifest call does
 
-      const outcome = scaffoldDefaultModuleAndLifecycleSets(root);
+      const outcome = await scaffoldDefaultModuleAndLifecycleSets(root, cliDeps());
       assert.strictEqual(outcome.ran, false);
       assert.ok(/already has session sets/i.test(outcome.note));
 
@@ -197,15 +219,15 @@ suite("gitScaffold — scaffoldDefaultModuleAndLifecycleSets (Set 101 S1, real f
     }
   });
 
-  test("a second direct call reports a caught refusal, never a throw, and changes nothing", () => {
+  test("a second direct call reports a caught refusal, never a throw, and changes nothing", async () => {
     const root = tmpRoot("default-module-already-");
     try {
       ensureModulesManifest(root);
-      scaffoldDefaultModuleAndLifecycleSets(root); // first call succeeds
+      await scaffoldDefaultModuleAndLifecycleSets(root, cliDeps()); // first call succeeds
       const before = readModulesManifest(root)!;
       const beforeDirs = listSetDirs(root);
 
-      const outcome = scaffoldDefaultModuleAndLifecycleSets(root); // direct re-call
+      const outcome = await scaffoldDefaultModuleAndLifecycleSets(root, cliDeps()); // direct re-call
       assert.strictEqual(outcome.ran, false);
       assert.ok(outcome.note.includes("NOT scaffolded"));
       // Nothing was duplicated or corrupted by the refused re-call — the
@@ -307,6 +329,14 @@ suite(
       const root = fs.mkdtempSync(
         path.join(os.tmpdir(), "default-module-real-build-"),
       );
+      // The production path resolves its own interpreter, so point the
+      // operator setting at one that has `ai_router` — a temp root has no
+      // `.venv` and would otherwise fall through to bare `python`.
+      (vscode.workspace as unknown as VscodeConfigStub).__setConfig(
+        "dabblerSessionSets",
+        "pythonPath",
+        fixturePython(),
+      );
       try {
         const seams = baseSeams(true, []);
         delete seams.scaffoldDefaultModule; // exercise the production default
@@ -337,6 +367,7 @@ suite(
         );
         assert.ok(infos[0].includes("Default module scaffolded"));
       } finally {
+        (vscode.workspace as unknown as VscodeConfigStub).__clearConfig();
         fs.rmSync(root, { recursive: true, force: true });
       }
     });
@@ -369,11 +400,11 @@ suite(
 );
 
 suite("gitScaffold — Work Explorer tree end-state (Set 101 S1 verification finding)", () => {
-  test("fresh Build: exactly one declared module (default), two pending sets, no pseudo-module", () => {
+  test("fresh Build: exactly one declared module (default), two pending sets, no pseudo-module", async () => {
     const root = tmpRoot("default-module-tree-");
     try {
       ensureModulesManifest(root);
-      scaffoldDefaultModuleAndLifecycleSets(root);
+      await scaffoldDefaultModuleAndLifecycleSets(root, cliDeps());
 
       const modules = visibleModules(root);
       assert.strictEqual(modules.length, 1, "exactly one visible module");

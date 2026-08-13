@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -377,3 +378,131 @@ def restore_session_set(session_set_dir: str, reason: str = "") -> None:
         os.remove(cancelled_path)
     except OSError:
         pass
+
+
+# ---------------------------------------------------------------------------
+# CLI (Set 122 Session 2)
+# ---------------------------------------------------------------------------
+#
+# Why this entry point exists
+# ---------------------------
+#
+# The functions above were reachable only from Python. The extension carried
+# its own TypeScript port of them in ``src/utils/cancelLifecycle.ts``, whose
+# ``writeSessionState`` opened ``session-state.json`` for writing directly --
+# the invariant violation Set 122 exists to remove (spec preamble; operator
+# decision 2026-08-13, ``decisions.jsonl``). Deleting that port needs
+# somewhere for the extension's Cancel / Restore commands to go, and the
+# answer is the same one Set 124 S3 reached for ``verify_type``: spawn the
+# router's own entry point rather than keep a second writer. The port already
+# existed here in full; only the entry point was missing.
+#
+# Exit codes (stable -- the extension's launcher branches on them, and they
+# match ``ai_router.modules`` so both surfaces read the same way):
+#
+# * ``0`` -- the operation succeeded.
+# * ``2`` -- usage error (argparse).
+# * ``3`` -- **refused**: a precondition rejected the call and NOTHING was
+#   written (restoring a set that was never cancelled; a missing directory).
+# * ``4`` -- **write failure**: the write phase raised. Unlike
+#   ``ai_router.modules`` there is no rollback here; cancel/restore are
+#   ordered to be re-runnable, so the remedy is always to re-run.
+
+
+def _lifecycle_payload(command: str, session_set_dir: str, **extra) -> dict:
+    payload = {
+        "command": command,
+        "sessionSetDir": session_set_dir,
+        "ok": True,
+        "exitCode": 0,
+    }
+    payload.update(extra)
+    return payload
+
+
+def main(argv: Optional[list] = None) -> int:
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        prog="ai_router.session_lifecycle",
+        description=(
+            "Cancel or restore a session set through the sanctioned writer. "
+            "Exit 3 = refused (nothing written); exit 4 = write failure "
+            "(re-run to finish -- both operations are ordered to be "
+            "safely re-runnable)."
+        ),
+    )
+    parser.add_argument("--json", action="store_true", help="Machine-readable JSON output.")
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    for name, help_text in (
+        ("cancel", "Cancel a session set."),
+        ("restore", "Restore a cancelled session set."),
+    ):
+        sub = subparsers.add_parser(name, help=help_text)
+        sub.add_argument(
+            "--session-set-dir",
+            required=True,
+            help="Path to the session-set directory.",
+        )
+        sub.add_argument(
+            "--reason",
+            default="",
+            help="Operator-supplied reason. The empty string is valid.",
+        )
+
+    args = parser.parse_args(argv)
+    set_dir = os.path.abspath(args.session_set_dir)
+
+    def emit(payload: dict, lines: list) -> int:
+        code = payload["exitCode"]
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            stream = sys.stdout if code == 0 else sys.stderr
+            for line in lines:
+                print(line, file=stream)
+        return code
+
+    def refuse(reason: str) -> int:
+        payload = _lifecycle_payload(args.command, set_dir)
+        payload.update({"ok": False, "exitCode": 3, "refused": reason})
+        return emit(payload, [f"[!] Refused: {reason}", "    Nothing was written."])
+
+    if not os.path.isdir(set_dir):
+        return refuse(f"{set_dir} is not a directory.")
+    # Checked here rather than left to the writer's FileNotFoundError so a
+    # never-cancelled set is a REFUSAL (nothing written) and not a write
+    # failure -- the two mean different things to the caller, and only one
+    # of them is the operator's mistake.
+    if args.command == "restore" and not is_cancelled(set_dir):
+        return refuse(
+            f"{os.path.basename(set_dir)} is not cancelled; there is nothing to restore."
+        )
+
+    try:
+        if args.command == "cancel":
+            cancel_session_set(set_dir, args.reason)
+        else:
+            restore_session_set(set_dir, args.reason)
+    except Exception as exc:  # noqa: BLE001 -- report, never traceback at a UI boundary
+        detail = str(exc) or exc.__class__.__name__
+        payload = _lifecycle_payload(args.command, set_dir)
+        payload.update({"ok": False, "exitCode": 4, "writeFailed": detail})
+        return emit(
+            payload,
+            [
+                f"[!] {args.command} failed: {detail}",
+                "    Re-run the command to finish; already-applied steps are skipped.",
+            ],
+        )
+
+    name = os.path.basename(set_dir)
+    verb = "Cancelled" if args.command == "cancel" else "Restored"
+    payload = _lifecycle_payload(
+        args.command, set_dir, sessionSetName=name, reason=args.reason
+    )
+    return emit(payload, [f"[x] {verb} {name}."])
+
+
+if __name__ == "__main__":  # pragma: no cover
+    sys.exit(main())

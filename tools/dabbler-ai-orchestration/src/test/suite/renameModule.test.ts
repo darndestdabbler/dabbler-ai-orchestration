@@ -9,6 +9,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { runRenameModuleFlow, RenameModuleUi } from "../../commands/renameModule";
+import { useFixturePython } from "./moduleCliFixture";
 import { ModuleManifestEntry, SessionSet } from "../../types";
 
 function tmpRoot(prefix: string): string {
@@ -67,6 +68,9 @@ function makeUi(over: Partial<RenameModuleUi>, log: Log, root: string): RenameMo
 }
 
 suite("runRenameModuleFlow (Set 099 S1)", () => {
+  // Set 122 S2: this flow spawns the router CLI through production
+  // interpreter resolution, and a temp root has no .venv.
+  useFixturePython();
   test("renames slug end-to-end and reports success", async () => {
     const root = tmpRoot("renameflow-ok-");
     try {
@@ -188,6 +192,9 @@ suite("runRenameModuleFlow (Set 099 S1)", () => {
 // is the "targeting parity" contract (row/context resolve identically to
 // the palette's own pick, minus the interactive step).
 suite("runRenameModuleFlow — preselectedSlug (Set 100 S2)", () => {
+  // Set 122 S2: this flow spawns the router CLI through production
+  // interpreter resolution, and a temp root has no .venv.
+  useFixturePython();
   test("a preselected slug skips pickModule and renames that module", async () => {
     const root = tmpRoot("renameflow-preselect-ok-");
     try {

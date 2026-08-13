@@ -10,6 +10,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { runDeleteModuleFlow, DeleteModuleUi } from "../../commands/deleteModule";
+import { useFixturePython } from "./moduleCliFixture";
 import { ModuleManifestEntry } from "../../types";
 
 function tmpRoot(prefix: string): string {
@@ -63,6 +64,9 @@ function makeUi(over: Partial<DeleteModuleUi>, log: Log, root: string): DeleteMo
 }
 
 suite("runDeleteModuleFlow (Set 099 S2)", () => {
+  // Set 122 S2: this flow spawns the router CLI through production
+  // interpreter resolution, and a temp root has no .venv.
+  useFixturePython();
   test("deletes end-to-end and reports the actual disposition", async () => {
     const root = tmpRoot("deleteflow-ok-");
     try {
@@ -186,6 +190,9 @@ suite("runDeleteModuleFlow (Set 099 S2)", () => {
 // is the "targeting parity" contract (row/context resolve identically to
 // the palette's own pick, minus the interactive step).
 suite("runDeleteModuleFlow — preselectedSlug (Set 100 S2)", () => {
+  // Set 122 S2: this flow spawns the router CLI through production
+  // interpreter resolution, and a temp root has no .venv.
+  useFixturePython();
   test("a preselected slug skips pickModule and deletes that module", async () => {
     const root = tmpRoot("deleteflow-preselect-ok-");
     try {

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "47699e7960a2eb7653cd2853956b2da9746fac00",
+  "fixedTree": "b4c2423b91ade7fa6ed74dc25f8da8b67d1e0d7c",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T12:31:22.373068+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The echoed router command is not reliably copy-pasteable as the exact command that ran. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/src/u ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The displayed command must be shell-correct for the supported Windows copy/paste surface, including an interpreter path with spaces and args containing quotes/dollar/backtick, while still deriving display and spawned argv from the same invocation data.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The echoed command is prefixed with `> `, so the visible line is not the exact copy-pasteable command that ran. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabble ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The output channel must display a bare, copy-pasteable command line equal to the spawned command, with any prompt/label moved to a separate non-command line or removed, and a launcher test must assert the first command echo equals commandLine exactly.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

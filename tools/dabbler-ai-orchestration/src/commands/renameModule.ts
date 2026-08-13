@@ -14,10 +14,15 @@ import {
   MODULES_MANIFEST_DISPLAY,
   INVALID_MANIFEST_MESSAGE,
   classifyModulesManifest,
-  renameModule,
   unknownModuleMessage,
   validateNewModuleSlug,
 } from "../utils/moduleAuthoring";
+import {
+  describeFailure,
+  describeRename,
+  runRenameModule,
+} from "../utils/moduleLifecycleCli";
+import { RunRouterCliDeps } from "../utils/routerCli";
 import { readAllSessionSets } from "../utils/fileSystem";
 import { ModuleManifestEntry, SessionSet } from "../types";
 import { preselectFromTreeNode } from "../providers/workExplorerTreeModel";
@@ -102,6 +107,7 @@ export interface RenameModuleOptions {
 export async function runRenameModuleFlow(
   ui: RenameModuleUi = defaultUi(),
   opts?: RenameModuleOptions,
+  cliDeps?: RunRouterCliDeps,
 ): Promise<boolean> {
   const root = ui.workspaceRoot();
   if (!root) {
@@ -184,38 +190,22 @@ export async function runRenameModuleFlow(
   );
   if (!confirmed) return false;
 
-  const report = renameModule(root, target.slug, {
-    newSlug: slugChanging ? newSlug : undefined,
-    newTitle: titleChanging ? newTitle : undefined,
-  });
-
-  if (report.refused) {
-    ui.showErrorMessage(
-      `Rename refused — ${report.refused.reason} Every file was left untouched.`,
-    );
-    return false;
-  }
-  if (report.writeFailed) {
-    const wf = report.writeFailed;
-    ui.showErrorMessage(
-      wf.rolledBack
-        ? `Rename failed: ${wf.reason}. All changes were rolled back — the ` +
-            `workspace is unchanged.`
-        : `Rename failed: ${wf.reason}. Rollback ALSO failed — reconcile ` +
-            `docs/modules.yaml and the affected spec.md files from git.`,
-    );
-    return false;
-  }
-
-  const parts: string[] = [];
-  if (report.slugChanged) parts.push(`slug → ${report.newSlug}`);
-  if (report.titleChanged) parts.push(`title → "${report.newTitle}"`);
-  const restampSummary = report.restamped.length
-    ? ` Restamped ${report.restamped.length} set(s): ${report.restamped.join(", ")}.`
-    : "";
-  ui.showInformationMessage(
-    `Renamed module (${parts.join(", ")}).${restampSummary}`,
+  const result = await runRenameModule(
+    root,
+    {
+      slug: target.slug,
+      newSlug: slugChanging ? newSlug : undefined,
+      newTitle: titleChanging ? newTitle : undefined,
+    },
+    cliDeps,
   );
+
+  if (!result.ok) {
+    ui.showErrorMessage(describeFailure("Rename", result));
+    return false;
+  }
+
+  ui.showInformationMessage(describeRename(result.payload));
   return true;
 }
 

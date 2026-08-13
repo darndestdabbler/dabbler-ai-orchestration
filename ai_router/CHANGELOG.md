@@ -13,6 +13,23 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **(Set 122 S2) `python -m ai_router.session_lifecycle cancel | restore` —
+  an entry point for the cancel/restore writers.** The functions were
+  complete and had been since Set 047; they simply could not be reached
+  from outside Python, so the extension carried its own TypeScript port of
+  them in `src/utils/cancelLifecycle.ts` — and that port wrote
+  `session-state.json` directly, which only the router's sanctioned writers
+  may do. Set 122 exists to remove exactly that violation. Session 2 added
+  the entry point and the extension deleted its writer, so there is now one
+  implementation of cancel/restore rather than two mirrors held in sync by
+  a parity test. Exit codes match `ai_router.modules` deliberately, so both
+  surfaces read the same way: `0` ok, `3` refused with nothing written
+  (restoring a set that was never cancelled reaches this), `4` write
+  failure. `--json` for machine callers. Operator decision of 2026-08-13,
+  journalled: severing only the module-delete path was considered and
+  rejected, because it leaves a second writer shipping and the two
+  implementations drifting.
+
 - **(Set 122 S1) `python -m ai_router.modules create | rename | delete |
   assign-sets` — the module lifecycle, in Python, transactional.** The
   verdict-adopted port (`docs/proposals/2026-08-11-multi-module-architecture/
@@ -114,6 +131,33 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
   mutation probe gutting the checker fails 12 of its 19 cases.
 
 ### Fixed
+
+- **(Set 122 S2) `start_session` now ticks the `register` step it just
+  performed.** `start_session` *is* the registration, so seeding that row
+  `pending` published a step checklist that was wrong the instant it was
+  written, and it stayed wrong until an orchestrator remembered to log a
+  step the framework had performed. That tax was real, not theoretical:
+  Set 122 Session 1 logged four of its seven steps "retroactively at
+  close-out", `register` among them. `session_checklist.
+  complete_register_step` closes the one case that needs no judgement, and
+  deliberately touches **no other step** — every other one describes work
+  only the orchestrator can know it finished, and a writer that guessed
+  would replace an honestly-empty checklist with a confidently-wrong one.
+  Idempotent (a re-registration after a context reset writes nothing),
+  best-effort, and NAMED on stderr when it skips (L-079-1).
+  Operator-directed 2026-08-13 as a release blocker for the Set 122
+  publish. Shipped with falsifiers that plant each failure — tick any
+  step, tick twice, invent a row where the spec has no `register` step —
+  and a mutation probe confirms removing each guard fails its own case
+  (L-112-1).
+
+- **(Set 122 S2) `_existing_lifecycle_slug` matched a module's lifecycle
+  sets by basename suffix.** Creating module `api` reused `payment-api`'s
+  `-api-plan` / `-api-decomposition` sets instead of minting its own. The
+  identity test is now the set name minus its numeric prefix equalling
+  `<slug>-<kind>` **exactly**. Inherited from the TypeScript
+  `findExistingLifecycleSetSlug` rather than introduced by the port, and
+  carried as residual `S122-S1-R1` from Session 1's disposition.
 
 - **(Set 128 S2) A one-line test fix after the full suite no longer buys a
   fresh metered verification round.** Operator ruling of 2026-08-12,

@@ -1213,6 +1213,104 @@ def seed_session_plan(
     return written
 
 
+#: The plan step every session's spec opens with, and the one step whose
+#: completion is not a judgement call.
+REGISTER_STEP_KEY = "register"
+
+#: Statuses that already mean "done". ``complete`` is the only token
+#: ``log_step`` will accept today (Set 120 S1 made it fail closed), but Set
+#: 120 S2 deliberately left the historical synonyms on disk rather than
+#: rewriting entries it was asked not to touch -- so a reader must still
+#: recognise them.
+_COMPLETE_TOKENS = frozenset({"complete", "completed", "done"})
+
+
+def complete_register_step(
+    session_set_dir: str,
+    session_number: int,
+    *,
+    description: Optional[str] = None,
+    total_sessions: int = 0,
+) -> bool:
+    """Log this session's ``register`` step complete. Returns True if it wrote.
+
+    Why this exists (Set 122 S2, operator-directed)
+    -----------------------------------------------
+
+    ``start_session`` **is** the registration. A ``register`` row it seeds
+    as ``pending`` is therefore a checklist that is wrong the instant it is
+    written, and it stays wrong until an orchestrator remembers to log a
+    step it did not perform -- the framework did. Every session paid that
+    tax, and the evidence that it is a real tax rather than a theoretical
+    one is in the ledger: Set 122 Session 1 logged four of its seven steps
+    "retroactively at close-out", ``register`` among them.
+
+    This closes the one case that needs no judgement. It deliberately does
+    NOT touch any other step: those describe work only the orchestrator can
+    know it finished, and a writer that guessed at them would replace an
+    honestly-empty checklist with a confidently-wrong one.
+
+    Idempotent, because ``start_session`` is: a second registration after a
+    context reset finds the step already terminal and writes nothing.
+
+    Never raises into ``start_session``. A checklist is an affordance; the
+    boundary write is not, and failing the latter over the former would be
+    the wrong trade.
+    """
+    try:
+        log_data = read_activity_log(session_set_dir)
+        entries = (log_data or {}).get("entries")
+        if not isinstance(entries, list):
+            return False
+
+        planned: Optional[dict] = None
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("sessionNumber") != session_number:
+                continue
+            if entry.get("stepKey") != REGISTER_STEP_KEY:
+                continue
+            if entry.get("kind") == PLAN_STEP_KIND:
+                planned = entry
+                continue
+            status = entry.get("status")
+            if isinstance(status, str) and status.strip().lower() in _COMPLETE_TOKENS:
+                # Already logged complete -- by a previous registration, or
+                # by an orchestrator doing it the long way round. The legacy
+                # synonyms are honoured because Set 120 S2 deliberately left
+                # already-written ones on disk.
+                return False
+        if planned is None:
+            # A spec whose session does not open with a `register` step.
+            # Nothing to complete, and nothing to invent.
+            return False
+
+        try:
+            from .session_log import (  # type: ignore[import-not-found]
+                STEP_STATUS_COMPLETE,
+                SessionLog,
+            )
+        except ImportError:
+            from session_log import (  # type: ignore[no-redef]
+                STEP_STATUS_COMPLETE,
+                SessionLog,
+            )
+        step_number = planned.get("stepNumber")
+        if not isinstance(step_number, int):
+            return False
+        SessionLog(session_set_dir, total_sessions=total_sessions).log_step(
+            session_number,
+            step_number,
+            REGISTER_STEP_KEY,
+            description or f"Registered session {session_number}.",
+            STEP_STATUS_COMPLETE,
+        )
+        return True
+    except (OSError, ValueError, KeyError, TypeError, ImportError):
+        return False
+
+
 def _resolve_set_dir(explicit: Optional[str]) -> Optional[str]:
     if explicit:
         return explicit

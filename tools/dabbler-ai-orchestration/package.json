@@ -352,6 +352,11 @@
           "group": "1_module@1"
         },
         {
+          "command": "dabbler.copyModuleDecompositionPrompt",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
+          "group": "1_module@2"
+        },
+        {
           "command": "dabbler.newModule",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
           "group": "2_module_lifecycle@1"

@@ -9,6 +9,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { runAssignLegacySetsFlow, AssignLegacyUi } from "../../commands/assignLegacySets";
+import { useFixturePython } from "./moduleCliFixture";
 import { ModuleManifestEntry, SessionSet } from "../../types";
 
 function tmpRoot(prefix: string): string {
@@ -71,6 +72,9 @@ function fresh(): Log {
 }
 
 suite("assignLegacySets flow (Set 093 S2)", () => {
+  // Set 122 S2: this flow spawns the router CLI through production
+  // interpreter resolution, and a temp root has no .venv.
+  useFixturePython();
   test("stamps the chosen unassigned sets and reports success", async () => {
     const root = tmpRoot("assignflow-ok-");
     const log = fresh();

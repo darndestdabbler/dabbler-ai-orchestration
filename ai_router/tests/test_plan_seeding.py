@@ -1034,3 +1034,119 @@ class TestSessionLogAppendEntry:
         SessionLog(set_dir).append_entry(entry)
         entry["status"] = "tampered"
         assert _entries(set_dir)[0]["status"] == "complete"
+
+
+# ---------------------------------------------------------------------------
+# Set 122 S2: `start_session` ticks the step it just performed
+# ---------------------------------------------------------------------------
+
+
+class TestCompleteRegisterStep:
+    """`start_session` IS the registration.
+
+    Leaving that row `pending` published a checklist that was wrong the
+    instant it was written, and every session paid the tax of remembering to
+    log a step the framework performed -- Set 122 S1 logged four of its seven
+    steps "retroactively at close-out", `register` among them.
+
+    The falsifiers matter more than the happy path here: a writer that ticked
+    the WRONG step, or ticked one twice, would be worse than the omission it
+    replaces. So each is planted (L-112-1) rather than reasoned about.
+    """
+
+    def test_ticks_the_register_step_after_seeding(self, tmp_path):
+        set_dir = _make_set(tmp_path)
+        sc.seed_session_plan(set_dir, 1, total_sessions=2)
+
+        assert sc.complete_register_step(set_dir, 1) is True
+
+        rows = sc.build_rows(set_dir, 1)
+        register = [r for r in rows if r.step_key == "register"]
+        assert len(register) == 1, "the tick reconciles onto the planned row"
+        assert register[0].status == "complete"
+        # The tick must carry the PLANNED step's own number. A writer that
+        # ticked the right key at the wrong position would still render a
+        # plausible checklist, so position is asserted, not assumed.
+        logged = [
+            e
+            for e in _entries(set_dir)
+            if e["stepKey"] == "register" and e.get("kind") != sc.PLAN_STEP_KIND
+        ]
+        assert len(logged) == 1
+        assert logged[0]["stepNumber"] == 1
+
+    def test_it_ticks_ONLY_register_and_leaves_real_work_pending(self, tmp_path):
+        """FALSIFIER: the one thing a writer must never do here is guess.
+
+        Every other step describes work only the orchestrator knows it
+        finished; a writer that marked them would replace an honestly-empty
+        checklist with a confidently-wrong one.
+        """
+        set_dir = _make_set(tmp_path)
+        sc.seed_session_plan(set_dir, 1, total_sessions=2)
+        sc.complete_register_step(set_dir, 1)
+
+        rows = sc.build_rows(set_dir, 1)
+        states = {r.step_key: r.status for r in rows}
+        assert states["register"] == "complete"
+        assert [s for k, s in states.items() if k != "register"] == [
+            "pending",
+            "pending",
+        ]
+
+    def test_it_is_idempotent_across_a_re_registration(self, tmp_path):
+        """FALSIFIER: `start_session` is idempotent, so this must be too.
+
+        A context reset mid-session re-runs registration; a second tick would
+        append a duplicate row and double-count the step.
+        """
+        set_dir = _make_set(tmp_path)
+        sc.seed_session_plan(set_dir, 1, total_sessions=2)
+        assert sc.complete_register_step(set_dir, 1) is True
+
+        before = _entries(set_dir)
+        assert sc.complete_register_step(set_dir, 1) is False
+        assert _entries(set_dir) == before
+
+    def test_an_orchestrator_who_already_logged_it_is_not_duplicated(self, tmp_path):
+        """The long way round still works, and does not earn a second row."""
+        set_dir = _make_set(tmp_path)
+        sc.seed_session_plan(set_dir, 1, total_sessions=2)
+        SessionLog(set_dir).log_step(
+            1, 1, "register", "Registered by hand.", "complete"
+        )
+
+        assert sc.complete_register_step(set_dir, 1) is False
+        rows = sc.build_rows(set_dir, 1)
+        assert len([r for r in rows if r.step_key == "register"]) == 1
+
+    def test_a_spec_with_no_register_step_is_left_alone(self, tmp_path):
+        """FALSIFIER: nothing to complete means nothing to invent."""
+        spec = SPEC.replace("1. Register.\n2. **Build the thing.**", "1. **Build the thing.**")
+        set_dir = _make_set(tmp_path, spec=spec)
+        sc.seed_session_plan(set_dir, 1, total_sessions=2)
+        before = _entries(set_dir)
+
+        assert sc.complete_register_step(set_dir, 1) is False
+        assert _entries(set_dir) == before
+
+    def test_it_writes_nothing_when_the_plan_was_never_seeded(self, tmp_path):
+        """A plan-less session has no row to reconcile onto, so a tick here
+        would be an unplanned row claiming work the checklist never showed."""
+        set_dir = _make_set(tmp_path)
+        assert sc.complete_register_step(set_dir, 1) is False
+
+    def test_the_description_carries_the_orchestrator_identity(self, tmp_path):
+        set_dir = _make_set(tmp_path)
+        sc.seed_session_plan(set_dir, 1, total_sessions=2)
+        sc.complete_register_step(
+            set_dir, 1, description="Registered session 1 (github-copilot / x, high)."
+        )
+        logged = [
+            e
+            for e in _entries(set_dir)
+            if e["stepKey"] == "register" and e.get("kind") != sc.PLAN_STEP_KIND
+        ]
+        assert logged[0]["description"] == (
+            "Registered session 1 (github-copilot / x, high)."
+        )

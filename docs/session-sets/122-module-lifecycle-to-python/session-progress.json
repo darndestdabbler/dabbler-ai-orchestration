@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-13T06:16:20.101610-04:00",
+  "generatedAt": "2026-08-13T06:27:25.863872-04:00",
   "sessionSetDir": "122-module-lifecycle-to-python",
   "inputs": {
-    "activity-log.json": "4bdd8c4d84260545f71a0bf770a36a20f3cf0ba2ef3f4bcc84891b15626d6aaa",
+    "activity-log.json": "f531b27543184fe08a19338a4a7f1fec590ddf81f5018b20f86d441d4d008777",
     "session-state.json": "6ff280fc58c26c1f2a2ae7872bf31b4d8acebd0cca5e92662df555e401e2302e",
-    "spec.md": "1c964cce329fdfa996d4a8c7a55bf0d6c46afaa3e43c2474bf6ffda6aa065bc7"
+    "spec.md": "075bab8541bc03df0776634f7be32cae51818c9878316d3e26c88782166ad842"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -67,54 +67,50 @@
         {
           "stepNumber": 5,
           "stepKey": "cross-provider-verification",
-          "description": "**Cross-provider verification.**",
-          "status": "pending",
-          "state": "pending",
-          "box": "[ ]",
-          "isPlanned": true,
+          "description": "Cross-provider verification (gpt-5.5, anthropic excluded): discovery round 1 and supplementary round 2 each returned one blocking Major; remediated once; remediation-review round 3 returned VERIFIED (1 accepted, 1 accepted-with-modification). Artifacts s1-verification*.md / s1-issues*.json / s1-remediation-round-*.md. Logged retroactively at close-out.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
           "isActive": false,
-          "startedAt": null,
-          "isTerminal": false
+          "startedAt": "2026-08-13T05:34:05.056028-04:00",
+          "isTerminal": true
         },
         {
           "stepNumber": 6,
           "stepKey": "required-portion-of-the-full-test",
-          "description": "**Required portion of the full test suite.**",
-          "status": "pending",
-          "state": "pending",
-          "box": "[ ]",
-          "isPlanned": true,
+          "description": "Full pytest run of record after the last code change: 4205 passed, 9 skipped in 570.6s; recorded via run_of_record (digest 7cc75e424828). No Layer 2/3 owed - covers is by path and this session touched no extension surface. Logged retroactively at close-out.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
           "isActive": false,
-          "startedAt": null,
-          "isTerminal": false
+          "startedAt": "2026-08-13T06:27:25.441578-04:00",
+          "isTerminal": true
         },
         {
           "stepNumber": 7,
           "stepKey": "close-out",
-          "description": "**Close-out.**",
-          "status": "pending",
-          "state": "pending",
-          "box": "[ ]",
-          "isPlanned": true,
+          "description": "disposition.json authored (VERIFIED, next_orchestrator, residual S122-S1-R1); lessons L-112-1 / L-064-9 cited; committed and pushed; close_session succeeded; notification fired. Logged retroactively at close-out.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
           "isActive": false,
-          "startedAt": null,
-          "isTerminal": false
+          "startedAt": "2026-08-13T06:27:25.443290-04:00",
+          "isTerminal": true
         }
       ],
       "counts": {
-        "pending": 3,
+        "pending": 0,
         "in-progress": 0,
-        "complete": 4,
+        "complete": 7,
         "blocked": 0,
         "unknown": 0,
         "total": 7
       },
       "current": [],
-      "remaining": [
-        "cross-provider-verification",
-        "required-portion-of-the-full-test",
-        "close-out"
-      ]
+      "remaining": []
     },
     {
       "number": 2,

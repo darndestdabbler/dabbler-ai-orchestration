@@ -105,6 +105,30 @@
       "dateTime": "2026-08-13T05:34:05.056028-04:00",
       "description": "_Transaction records every effect and undoes all of them; four injected-failure falsifiers (create/rename/assign-sets rollback, delete stays declared). Mutation-checked: disabling rollback fails 3 of them.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T06:27:25.441578-04:00",
+      "description": "Cross-provider verification (gpt-5.5, anthropic excluded): discovery round 1 and supplementary round 2 each returned one blocking Major; remediated once; remediation-review round 3 returned VERIFIED (1 accepted, 1 accepted-with-modification). Artifacts s1-verification*.md / s1-issues*.json / s1-remediation-round-*.md. Logged retroactively at close-out.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T06:27:25.443290-04:00",
+      "description": "Full pytest run of record after the last code change: 4205 passed, 9 skipped in 570.6s; recorded via run_of_record (digest 7cc75e424828). No Layer 2/3 owed - covers is by path and this session touched no extension surface. Logged retroactively at close-out.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T06:27:25.444536-04:00",
+      "description": "disposition.json authored (VERIFIED, next_orchestrator, residual S122-S1-R1); lessons L-112-1 / L-064-9 cited; committed and pushed; close_session succeeded; notification fired. Logged retroactively at close-out.",
+      "status": "complete"
     }
   ]
 }

@@ -830,12 +830,12 @@ prerequisites.
 
 ---
 
-## The test-run policy (Set 111 S4; A1–A4 added by Set 128 S2)
+## The test-run policy (Set 111 S4; A1–A4 added by Set 128 S2, A5 by Set 129 S2)
 
 Canonizes the policy piloted in Set 110's operator notes. The waste
 pattern being eliminated is **invalidated runs**, not full runs.
 
-### A1–A4: what runs when, relative to verification
+### A1–A5: what runs when, relative to verification — and which suites you owe
 
 The canonical order is **targeted tests → verify → remediate → full
 suites → close**. Set 116 S3 established it after Set 112 S3 obeyed the
@@ -864,7 +864,9 @@ four rules are what the shape protects.
   and permits the wasteful one. "Required portion" is carried by
   `covers`: `run_of_record check` reports *"session touched none of
   this suite's surfaces"*, and a step that overstates its own
-  obligation is a step that gets improvised around.
+  obligation is a step that gets improvised around. **A5 below says how
+  that portion resolves, and what `covers` has to contain for the
+  answer to be trustworthy.**
 - **A4 — what a fix made AFTER the suite owes.** Operator ruling,
   2026-08-12, journalled as an **operator-attested
   verification-reduction** (the constitution's hard carve-out;
@@ -933,6 +935,148 @@ re-verified.
 remediation-review cycle like any other: it is ledgered in
 `sN-rounds.jsonl` and counts against the machine-enforced cap of two.
 At the cap the resolution is the operator's, exactly as before.
+
+### A5 — which suites a change owes: the suite declares, the intersection decides, the module groups
+
+Set 129, from
+[`docs/proposals/2026-08-12-multi-module-retesting/verdict.md`](../proposals/2026-08-12-multi-module-retesting/verdict.md)
+§3–§4 — an operator-supplied proposal reviewed independently by
+`gpt-5.6-sol` and `gemini-3.1-pro`. A3 says a session owes the *required
+portion*. A5 says how that portion resolves, and the answer is
+mechanical, in three parts.
+
+**1. The suite declares its inputs.** `covers` is the suite's **input
+set**: the complete allowlist of repo-relative path prefixes that can
+affect the suite's **result** — product source, test source, fixtures,
+contracts, mocks, shared libraries, **lockfiles, build and test
+configuration, and checked-in toolchain configuration**. This is
+stronger than the older reading ("the product paths the suite is
+about"), and the difference has teeth: under the old one a lockfile or a
+CI config outside `covers` was merely out of scope; under this one it is
+a **declaration bug**, because a dependency bump or an unpinned GitHub
+action can turn a suite red without touching a line the declaration
+names.
+
+Derive a declaration from **evidence, not from the suite's command**.
+Set 129 S1 re-derived this repo's three suites by tracing a full pytest
+run under an audit hook — 1,655 distinct repo paths the suite actually
+opened — and every addition it made was one the trace named. Its first
+draft derived Layers 2 and 3 from their npm commands instead, which name
+the *build* inputs and not what the specs read at runtime, and routed
+verification caught the gap. A path that looks like an input and is
+never read (`MANIFEST.in`, here) is correctly absent: evidence keeps a
+declaration from growing as fast as imagination does.
+
+**2. The intersection decides the obligation.** Which suites a change
+set owes is the intersection of the change set with the declared input
+sets, and nothing else. Ask it by name rather than by eye:
+
+```bash
+python -m ai_router.run_of_record affected \
+    --session-set-dir docs/session-sets/<slug>   # defaults to the disposition's files_changed
+```
+
+It reports each affected suite **and the inputs that made it affected**,
+because a session told only *that* it owes a 14-minute suite cannot check
+the claim, and a wrong declaration is invisible from a yes/no answer.
+`evaluate_freshness()` consumes the same `affected_suites()` rather than
+re-deriving the intersection per suite, so the report and the close gate
+cannot disagree (L-069-1).
+
+**3. Modules group and assign ownership; they do not select suites.**
+In a repo with a declared module tier (`docs/modules.yaml`), a session in
+module Y that touches module X's declared inputs still owes X's suite.
+There is deliberately **no `SuiteSpec.module`**, for three reasons:
+
+- A suite that declares its complete input set has **already answered the
+  question**. A module axis adds nothing an intersection does not give.
+- A module axis can only **subtract**. A session that genuinely touches
+  another module's inputs would stop owing that module's suite because of
+  a *label* — a verification reduction wearing an organizational costume,
+  and one that fails open, the direction this repo refuses (L-125-1).
+- **The label is not enforced.** There is no module-manifest reader in
+  `run_of_record.py`, no dependency graph, and no check that a module's
+  declared `codeRoots` match its real imports
+  (`module-organized-projects-recommendation.md` §6.4 says the scope
+  check does not exist). Routing test selection through an unenforced
+  label is exactly the "declared graph differs from the real import
+  graph" failure the source proposal's own risk register warns about.
+
+**A malformed suite declaration blocks the close; it does not disarm the
+gate.** `load_suites()` was tolerant — a malformed entry was dropped in
+silence, and `check_test_run_fresh()` read the resulting empty tuple as
+*"no expensive suites declared"* and **passed**. One typo in a consumer's
+`testing.suites` block therefore disarmed the close gate governing every
+expensive suite in the repo, and nothing said so. Since Set 129 S1,
+`load_suites_checked()` carries every unusable entry, every unusable
+value and every unrecognised **key**, and the gate blocks on any of them.
+Tolerance is right for a *reader* and wrong for the input to a *gate*: if
+the information a skip needs is missing or unverifiable, do not skip. An
+explicit `suites: []` is untouched — that is the deliberate operator
+disarm, a declaration rather than a typo.
+
+**What unchanged inputs do and do not prove.** Adopted verbatim
+(`verdict.md` §2a):
+
+> Unchanged declared inputs provide evidence that a rerun is likely
+> redundant within a qualified execution environment; they do not prove
+> identical outcomes for non-hermetic or flaky suites.
+
+The stronger claim — that skipping an unaffected suite is *"provably
+redundant work being removed"* rather than a risk trade-off — was
+proposed, rejected independently by both reviewers, and is **refused
+here; do not reintroduce it.** Real pytest, Electron/mocha and Playwright
+suites are not pure functions of their declared inputs: scheduler
+interleaving, browser and VS Code runtime, dependency resolution,
+environment variables, filesystem timing, service state, network
+responses and random seed all sit outside any file digest, and `covers`
+is a path prefix list, not a dependency graph.
+
+The refusal is load-bearing rather than pedantic. Under the stronger
+framing a future orchestrator could skip a suite **without** an
+operator-attested verification reduction, on the grounds that nothing was
+being reduced — and that reasoning must not be available. Skipping an
+owed suite is a verification reduction and stays inside the
+constitution's hard carve-out, which `decision_journal` refuses to write
+without the operator's attestation.
+
+**A5 authorizes no new skip.** It makes an obligation that already
+existed explicit and auditable, and adds a fail-closed path where one was
+missing. Nothing a session owes today becomes optional because of it.
+
+### Refused, and not to be re-proposed (Set 129)
+
+The proposal Set 129 answers is a good document written for an
+architecture no consumer here has demonstrated, and a rejection nobody
+wrote down gets re-proposed by the next reader of a persuasive one. These
+eight are **rejected on the merits**, not deferred. Reasons in full:
+`verdict.md` §6.
+
+| Refused | Why |
+| :--- | :--- |
+| Unchanged hashes make skipping risk-free or *proven* | Suites are not pure functions of their declared inputs, and `covers` is a prefix list, not a dependency graph. A skip stays a risk trade-off needing operator attestation (A5 above). |
+| Full-suite retest after every change | Recreates the Set 112 S3 incident — 15 runs, 186 minutes — that A1–A3 exist to prevent. |
+| Replacing session close with the integration/merge event | Merge verification is an **additional** boundary, never a substitute; discarding branch-local evidence makes an unfinished session depend on external merge timing. |
+| A single application-centered star topology as a framework invariant | `domain <- application <- API` is equally legitimate. The framework does not own a consumer's dependency shape. |
+| Prohibiting corrections to tests, mocks or contracts | A4.1 exists precisely for legitimate test-only fixes. Privileged review, yes; prohibition, no. |
+| Prohibiting all cross-module calls | The correct rule is "do not create **undeclared** dependencies". |
+| Mandatory E2E as an unconditional core rule | It would override `requiresE2E: false` as a permanent valid default and reverse a deliberately selective Playwright declaration. |
+| Module identity as an input to suite selection | A5, part 3: it can only subtract, and the label is unenforced. |
+
+### Deferred, with named triggers (Set 129)
+
+Each row is a **trigger condition, not a schedule**: none of this is
+authored until its row is true. Bringing one back without its trigger is
+the same proposal, re-dressed.
+
+| Deferred | Reconsider when |
+| :--- | :--- |
+| Contract locks / mock pinning / provider-side conformance cascades | A named consumer has ≥2 leaf modules, one mock-based integration module, versioned executable behavioural contracts, provider **and mock** conformance tests, and *measured* redundant downstream cost. Pinning a mock to a contract **hash** buys provenance, not conformance (`verdict.md` §2b carries the worked failure). |
+| Mechanical dependency graph + boundary linting | A consumer has ≥2 non-empty `codeRoots` and an actual cross-module or hidden-coupling incident. The graph must be checked against real imports before it may authorize any skip. |
+| New test-skipping enforcement | A machine-derived integration baseline exists, shadow selection has been compared against full runs over real merges, falsifiers have demonstrated the failures, and the operator journals the reduction. |
+| Smoke/full E2E tiering | A consumer has two independently executable named commands with measured runtimes. Represent them as separate `SuiteSpec` entries first. |
+| Repo-wide last-green cache | Repeated unchanged-input reruns across integration events, with saved runtime materially exceeding the evidence complexity. |
+| Environment fingerprinting | A suite shows environment-dependent results under unchanged digests — then fingerprint the demonstrated variables only. |
 
 ### The mechanics
 
@@ -1018,16 +1162,20 @@ of that error are unacceptable in a gate.
 The gate is inert where it should be: a suite whose surfaces this session
 did not touch is not required.
 
-Read `covers` literally — it is a **path prefix, not a file type**. A
-session that changed only documentation owes nothing *if that
-documentation sits outside every suite's `covers`*. In this repo
-`pytest` covers `ai_router/`, so editing `ai_router/docs/close-out.md`
-owes a pytest run even though no code changed. That is deliberate: a
-prefix is cheap to evaluate and impossible to argue with at close, and
-it errs toward running a suite you did not need rather than skipping one
-you did.
+Read `covers` literally — it is a **path prefix, not a file type**, and
+under A5 it is the suite's complete **input set** rather than the product
+paths the suite is about. A session that changed only documentation owes
+nothing *if that documentation sits outside every suite's `covers`*. In
+this repo `pytest` covers `ai_router/`, so editing
+`ai_router/docs/close-out.md` owes a pytest run even though no code
+changed. That is deliberate: a prefix is cheap to evaluate and impossible
+to argue with at close, and it errs toward running a suite you did not
+need rather than skipping one you did.
 Suites are declared in `router-config.yaml` under `testing.suites`
-(`name`, `command`, `covers`, `expensive`).
+(`name`, `command`, `covers`, `expensive`, `tests`) — an **allowlist** of
+keys, so an unrecognised one is a configuration error that blocks the
+close rather than a silent default (A5). A repo with no `testing:` block
+inherits `run_of_record.DEFAULT_SUITES`.
 
 ---
 

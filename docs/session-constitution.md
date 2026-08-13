@@ -104,8 +104,10 @@ Run every router CLI through the workspace venv
   session touched and record each (`python -m ai_router.run_of_record
   record --suite <s> --outcome passed --duration-seconds <n>`, required)
   or `test_run_fresh` refuses the close. All three layers are governed
-  (Set 116 S3); the **required portion** is carried by `covers`, which
-  is by path — so docs under `ai_router/` owe pytest, and a suite this
+  (Set 116 S3); the **required portion** is the intersection of your
+  change set with each suite's declared inputs — `run_of_record affected`
+  names it and what matched (A5) — and `covers` is by path, so docs under
+  `ai_router/` owe pytest, and a suite this
   session did not touch is not owed at all. Recording does **not** stale the verification that just passed
   (Set 116 S2) — a last step, not a loop. A fix made AFTER the suite
   (A4, operator-attested): test-only owes nothing; shipped code owes one

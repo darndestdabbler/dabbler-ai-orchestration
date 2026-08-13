@@ -558,7 +558,7 @@ def test_the_real_repo_changelog_partition_round_trips():
 
 
 def test_changelog_round_trip_flags_a_planted_reorder(tmp_path: Path):
-    """FALSIFIER: swap two fragments' order keys in a copy of the real corpus."""
+    """FALSIFIER: swap two BASELINE fragments' order keys in a copy of the real corpus."""
     import os
     import shutil
 
@@ -575,7 +575,20 @@ def test_changelog_round_trip_flags_a_planted_reorder(tmp_path: Path):
     )
     assert drift_guard.check_changelog_partition_round_trips(root) == []
 
-    fragments = cl.load_fragments(target, str(root))
+    # L-112-1: plant into the corpus the gate actually reads. `check`
+    # re-renders from the BASELINE fragment set alone, so a reorder of two
+    # post-partition contributions is not a violation at all -- it is the
+    # hand-slotting the order gap exists for. Taking `load_fragments(...)[0]`
+    # here retargeted the plant onto whichever fragments were added most
+    # recently, and this falsifier passed only while at most one such
+    # fragment existed above the baseline. Set 129 S2's own changelog
+    # fragment made it two, and the plant stopped firing. The sibling
+    # falsifiers in `test_changelog_partition.py` already select this way
+    # (`baseline_fragments`); this one did not (L-069-1).
+    recorded = {e["file"] for e in cl.load_baseline(target, str(root))["fragments"]}
+    fragments = [f for f in cl.load_fragments(target, str(root)) if f.filename in recorded]
+    assert len(fragments) >= 2, "the reorder falsifier had no frozen corpus to plant into"
+
     directory = target.fragments_dir(str(root))
     first, second = fragments[0], fragments[1]
     tmp = os.path.join(directory, "tmp.md")

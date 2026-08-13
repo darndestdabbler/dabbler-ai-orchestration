@@ -127,7 +127,7 @@ full text in `lessons-archive.md`:
   verification.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="122" status="active" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="129" status="active" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and

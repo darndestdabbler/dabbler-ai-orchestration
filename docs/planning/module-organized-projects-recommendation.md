@@ -306,6 +306,21 @@ sets: the union of their `touches` modules' roots). The natural seam is
 alongside `blast_radius.py` / the gate-check family. Phase 2 scope; warn
 first, block later.
 
+> **A module label may never select tests (Set 129).** When this check is
+> built, it stays a *scope* check: it may say "this session edited
+> outside its declared module", and it may never be read as "this session
+> therefore does not owe another module's suite". Which suites a change
+> owes is the intersection of the change set with each suite's declared
+> input set (`session-set-authoring-guide.md` → **A5**); there is
+> deliberately no `SuiteSpec.module`. A module axis on suite selection can
+> only **subtract** — a session in module Y that genuinely touches module
+> X's inputs would stop owing X's suite because of a *label* — and,
+> per this very section, nothing checks that a module's declared
+> `codeRoots` match its real imports, so the subtraction would fail open
+> (L-125-1). Until the graph is checked against real imports it may not
+> authorize any skip; that is the named trigger under which the question
+> may return.
+
 ---
 
 ## 7. Phasing summary (what Opus should implement, in order)

@@ -6,16 +6,17 @@
 > happening after the full test run. I thought that we fixed that. Only
 > targeted runs before verification."*
 >
-> **Status: FIXED.** Closed by **Set 128** across three sessions —
-> Session 1 shipped Component B (the step skeleton and the
+> **Status: FIXED, and fully closed.** Closed by **Set 128** across three
+> sessions — Session 1 shipped Component B (the step skeleton and the
 > `spec_admission` shape check, with the budget re-baselined to
 > `N = 3`), Session 2 shipped Component A (A1–A3 in
 > `docs/session-constitution.md` and the authoring guide, and A4
 > journalled under the verification-reduction carve-out and mechanized
 > as `ai_router/post_round_delta.py`), and Session 3 re-authored the
 > four unstarted specs (113, 118, 121, 122) so none is executed under
-> the assumptions this note describes. **A5 remains open and is owned
-> by Set 129** — see that heading below.
+> the assumptions this note describes. **A5 was the last open item and
+> is closed by Set 129** — see that heading below. **No open items
+> remain in this note.**
 >
 > This note is kept as the diagnosis record. Every "open question" and
 > "recommendation" below carries an inline **RESOLVED** marker naming
@@ -157,8 +158,41 @@ a late suite failure strands a stale verdict **by construction**. A
 reviewer who reads A4 alone will read it as cost-cutting; it is the
 other half of A2.
 
-### A5. Open — how "the required portion" resolves per module
+### A5. RESOLVED — how "the required portion" resolves per module
 
+> **RESOLVED — Set 129.** The suite declares its inputs; the
+> intersection decides the obligation; modules group and assign
+> ownership. Canonical text now lives in
+> `docs/planning/session-set-authoring-guide.md` → *The test-run policy*
+> → **A5**, beside A1–A4, together with the eight refusals and the six
+> trigger-gated deferrals. Session 1 shipped the mechanism —
+> `covers` redefined as the complete input allowlist and this repo's
+> three suites re-derived against it under an audit hook,
+> `affected_suites()` reporting **which** inputs made a suite affected
+> and consumed by `evaluate_freshness()`, and `load_suites_checked()`
+> making a malformed `testing.suites` block **block the close** instead
+> of silently disarming the gate it governs. Session 2 wrote the
+> doctrine and the record.
+>
+> The three sub-questions below, answered in order: **(1)** No — a
+> module declares no `covers`; the suite does, and modules stay grouping
+> and ownership metadata. **(2)** Every suite whose declared input set
+> contains the touched surface; module membership is irrelevant to the
+> question. **(3)** To the **diff**, regardless of module —
+> `post_round_delta.classify_delta()` already had the correct scope and
+> nothing changed.
+>
+> There is deliberately no `SuiteSpec.module`. A module axis can only
+> **subtract** — a session in module Y that genuinely touches module X's
+> inputs would stop owing X's suite because of a *label* — and nothing
+> checks that a module's declared `codeRoots` match its real imports, so
+> the subtraction would fail open (L-125-1). And the claim that skipping
+> an unaffected suite is *"provably redundant work being removed"* is
+> **refused**: unchanged declared inputs are evidence a rerun is likely
+> redundant within a qualified execution environment, not proof of
+> identical outcomes for non-hermetic or flaky suites. A skip stays a
+> verification reduction, and stays operator-attested.
+>
 > **OWNED — Set 129**, assigned by the operator on 2026-08-12 during Set
 > 128 Session 2, from an operator-supplied proposal reviewed
 > independently by `gpt-5.6-sol` and `gemini-3.1-pro`. Both converged:
@@ -358,7 +392,12 @@ session that already has one is the same mistake this note is about.
 
 - `docs/session-constitution.md` — Steps 5/6/8, the canonical ordering.
 - `docs/planning/session-set-authoring-guide.md` — the session-size cap
-  (Set 111 S4) and the test-run / run-of-record policy.
+  (Set 111 S4) and the test-run / run-of-record policy, which now carries
+  **A1–A5** plus Set 129's refusals and trigger-gated deferrals.
+- `docs/proposals/2026-08-12-multi-module-retesting/verdict.md` — the
+  source of record for A5: what was adopted, what was rejected outright
+  with reasons, and what is deferred behind named triggers. Read the
+  verdict before the proposal it judges.
 - `ai_router/spec_admission.py` — parses step texts; enforces the count
   today, and is where a shape check belongs.
 - `ai_router/run_of_record.py` — `covers`-by-path and the surface

@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-13T12:03:17.947110-04:00",
+  "generatedAt": "2026-08-13T14:01:57.208786-04:00",
   "sessionSetDir": "122-module-lifecycle-to-python",
   "inputs": {
-    "activity-log.json": "c814710ad5a7e7f6acf3a5cf8f187a422704852c7a5b93c5409d2afeea485735",
-    "session-state.json": "72e546dc7583ff46bead80232d0bd83ec4a6906112abc1d953a7ce2f4696937d",
+    "activity-log.json": "9c9e882af0b387167344454cf67eceb4a8ff0505f622737b2cb8961c022be077",
+    "session-state.json": "76283e2415374bcf393c20bfc9dc858abcce11c15f3dbbfa35bcadb545c49f79",
     "spec.md": "276af0900f3fa4124ff1717355343a5900fe50b39b9f62a1ba00f290b4ef2163"
   },
   "orphanEntries": 0,
@@ -322,19 +322,106 @@
     },
     {
       "number": 4,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 4 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T12:17:31.591254-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "partition-the-append-only-files",
+          "description": "Shipped ai_router/changelog.py and partitioned both tracked append-only changelogs: ai_router/CHANGELOG.md -> ai_router/changelog.d/ (9 fragments) and tools/dabbler-ai-orchestration/CHANGELOG.md -> its changelog.d/ (10 fragments). A fragment stores the VERBATIM slice of the pending region, so concatenation equals the original by construction rather than by care. Scope decision journaled: router-metrics.jsonl is gitignored and untracked (cannot conflict) so it is out of scope; lessons-learned/-archive are exempt per verdict 7. Render splices fragments at the END of the pending region - the round-trip assertion caught the first version splicing after the preamble, which silently dropped the extension's 1086-byte Unreleased lead.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T12:17:31.695767-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "keep-the-concatenated-view-byte",
+          "description": "Byte-identity proven against HEAD: render() reproduces both pre-session changelogs exactly (306974 and 237977 chars, LF-normalized because core.autocrlf=true makes a raw-byte digest a platform assertion). changelog.d/.baseline.json freezes partitionPendingSha256 + per-fragment digests + order; restamp can move originalSha256 for a deliberate frozen-prose edit but REFUSES when a fragment moved or changed. 40 tests in test_changelog_partition.py, falsifier-paired per L-112-1: planted reorder / dropped fragment / edited fragment / edited released history / empty baseline / missing baseline all fail the check, and a heading inside a fenced code block is NOT a split point while a real sibling heading still is. Mutation-checked by flipping the fragment sort to ascending: 10 tests fail. That mutation first exposed a real gap - check() re-sorted internally, so it was self-consistent and blind to an ordering bug in the production render path; check() now asserts against the order load_fragments actually returns.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T12:33:00.804432-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "refuse-a-duplicate-set-number",
+          "description": "resolve_set gained find_collisions / describe_collisions / assert_no_collisions / assert_number_available plus a --check sweep (exit 3, --json), wired into start_session (refuses BEFORE the work starts, scoped to THIS set's number so an unrelated collision elsewhere does not block registration) and into ai_router/scripts/drift_guard.py as set-number-collision + changelog-round-trip, which CI already runs as a fast gate - the right home because both defects are introduced by a MERGE. A scaffold-time check inside modules.py was written, then REMOVED: create_module mints max(existing)+1 from a live listing so it cannot self-collide, making that gate one that could only ever pass (L-112-1). Replaced with an assertion proving the property. Falsifier-paired throughout: planted duplicate / leading-zero duplicate flagged; bare descriptive slugs, _archived dirs, and an idempotent re-scaffold of a set's own number NOT flagged.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T12:40:24.771665-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Cross-provider verification (gpt-5.5; anthropic excluded as the orchestrator's effective provider). Discovery round 1 fanned out 2/2 (spec-conformance + failure-scenario) and returned VERIFIED with ZERO blocking findings and three nits, all real: (1) add --target router emitted '## Added', a heading shape Keep a Changelog does not have and that render would place where a VERSION heading goes - both lenses found it independently; (2) the new drift_guard check returned clean on any import exception, the silent fail-open branch L-079-3 names, so the gate could skip itself; (3) a test docstring named a wiring point the code does not have (L-064-8 class). All three fixed with paired falsifiers rather than deferred, since all landed before the run of record. Remediation-review round 2 (delta-scoped): VERIFIED, 3 accepted / 0 rejected / 0 accepted-with-modification, 0 new findings. Artifacts s4-conventions.md, s4-verification.md, s4-verification-fanout-2.md, s4-remediation-round-1.md, s4-verification-round-2.md. Cost $0.00 (Copilot CLI seat).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T12:50:28.480994-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three layers run after the last code change and recorded via run_of_record; all three report fresh+green. Layer 1 pytest: 4295 passed, 9 skipped in 740.8s (digest 35d3549fbb94). Layer 2 mocha: 1450 passing, 2 pending in 45s (digest 035018dc03c4). Layer 3 Playwright FULL, owed because playwright.covers names ai_router/start_session.py and this session modified it: 31/31 passed in 448s at 2 workers (digest 88f0eda6b493). The first Layer 3 attempt (4 workers, the local default) failed 2: (a) work-explorer-tree 'two in-progress sets both render' was a REAL regression from this session - the new duplicate-set-number refusal fired on a fixture naming two sets 033-set-a/033-set-b; the refusal is correct and the shared number was incidental to what the test asserts, so the fixture was renumbered to 034-set-b rather than the check weakened. (b) vsix-first-run-walkthrough timed out waiting for 'Default 2 sets' at 4 workers and passed at 2 - another data point for residual S122-S2-R2, not a new defect. Test-only fix after the suite, so A4 owes no re-verification round.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T13:13:08.575243-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     }
   ]
 }

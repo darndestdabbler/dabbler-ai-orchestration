@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The new `launcherPython` is resolved before cold-start setup creates `.venv`, so the capability probe can target bare `python` while later module launchers would use the newly created venv.\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts:62-68`, `tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts:563-570`, `tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts:356-369`, `tools/dabbler-ai-orchestration/src/utils/pythonInterpreter.ts:120-126`\n- **Failure scenario:** A typical fresh project has no explicit `dabblerSessionSets.pythonPath` and no existing `.venv`. The install command/scaffold computes `launcherPython` as bare `python`, then `installAiRouter` creates `<workspace>/.venv` and installs the router there, but `verifyRouterCapability` probes bare `python`. On a normal machine where global Python does not have `dabbler-ai-router`, setup reports install failure and skips default-module creation even though the actual launchers would resolve the new `.venv` after creation.\n- **Acceptance criterion:** `JUDGMENT - In a fresh workspace with no explicit pythonPath and no existing .venv, the post-install capability probe must target the newly-created workspace .venv interpreter, while an explicit non-venv pythonPath must still be probed as the launcher interpreter.`\n- **Details:** Violation: the task requires probing “the same venv interpreter the launcher will use.” Impact: this blocks the main cold-start setup path and would change the merge decision because the release gate can ship a setup that falsely reports router failure. Evidence: `resolvePythonInterpreter` returns bare `python` when no `.venv` exists, but it is called before `installAiRouter`; `verifyRouterCapability` then trusts that stale value instead of re-resolving after venv creation.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical fresh project has no explicit `dabblerSessionSets.pythonPath` and no existing `.venv`. The install command/scaffold computes `launcherPython` as bare `python`, then `installAiRouter` creates `<workspace>/.venv` and installs the router there, but `verifyRouterCapability` probes bare `python`. On a normal machine where global Python does not have `dabbler-ai-router`, setup reports install failure and skips default-module creation even though the actual launchers would resolve the new `.venv` after creation.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts",
+        "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+        "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
+        "tools/dabbler-ai-orchestration/src/utils/pythonInterpreter.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "In a fresh workspace with no explicit pythonPath and no existing .venv, the post-install capability probe must target the newly-created workspace .venv interpreter, while an explicit non-venv pythonPath must still be probed as the launcher interpreter."
+      }
+    },
+    {
+      "description": "** The remediation dogfood still bypasses the production setup path that Issue 1 breaks.\n- **Category:** Completeness / False Positive\n- **Severity:** Major\n- **Evidence paths:** `tools/dabbler-ai-orchestration/src/test/dogfood/routerFloorProvisioning.test.ts:168-178`, `tools/dabbler-ai-orchestration/src/test/dogfood/routerFloorProvisioning.test.ts:207-212`, `tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts:563-570`\n- **Failure scenario:** `npm run test:dogfood` can pass while real fresh setup fails: the dogfood calls `installAiRouter` directly without `launcherPython`, so the probe falls back to the venv, and it scaffolds the default module with an injected `resolveInterpreter: () => venvPy`. Production `buildProjectStructureNoPrompt` passes the pre-created stale `launcherPython`, causing the main setup path to fail before default-module scaffolding.\n- **Acceptance criterion:** `JUDGMENT - The dogfood or equivalent coverage must exercise the production cold-start setup interpreter handoff, including the launcher interpreter value supplied by the scaffold/install command, and fail if that value is stale bare python instead of the created .venv.`\n- **Details:** Violation: the dogfood was supposed to prove a clean project “finishes setup with ai_router.modules importable from the created venv and the default module present.” Impact: the lane remains false-green for the exact setup regression it is meant to release-gate. Evidence: the dogfood omits `launcherPython` and forces module creation through `venvPy`, while production supplies `launcherPython: resolvePythonInterpreter(projectDir)` before the install creates `.venv`.",
+      "category": "Completeness / False Positive",
+      "severity": "Major",
+      "failureScenario": "`npm run test:dogfood` can pass while real fresh setup fails: the dogfood calls `installAiRouter` directly without `launcherPython`, so the probe falls back to the venv, and it scaffolds the default module with an injected `resolveInterpreter: () => venvPy`. Production `buildProjectStructureNoPrompt` passes the pre-created stale `launcherPython`, causing the main setup path to fail before default-module scaffolding.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/src/test/dogfood/routerFloorProvisioning.test.ts",
+        "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The dogfood or equivalent coverage must exercise the production cold-start setup interpreter handoff, including the launcher interpreter value supplied by the scaffold/install command, and fail if that value is stale bare python instead of the created .venv."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 launcher interpreter probe",
+      "verdict": "fix-rejected",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 dogfood full setup/default-module proof",
+      "verdict": "fix-rejected",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5 dogfood CI host interpreter provisioning",
+      "verdict": "fix-accepted",
+      "ledgerId": "L5"
+    }
+  ]
+}

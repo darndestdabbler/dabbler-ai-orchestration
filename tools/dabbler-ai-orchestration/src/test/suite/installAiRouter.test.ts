@@ -17,6 +17,11 @@ import {
   ProcessSpawner,
   SpawnResult,
   PYPI_PACKAGE_NAME,
+  PYPI_REQUIREMENT,
+  MINIMUM_ROUTER_VERSION,
+  ROUTER_CAPABILITY_PROBE_CODE,
+  compareReleaseVersions,
+  probeRouterCapability,
   READ_BUNDLED_ROUTER_CONFIG_CODE,
   ROUTER_CONFIG_REL,
   INSTALL_METHOD_REL,
@@ -301,7 +306,16 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
     assert.strictEqual(outcome.source, "pypi");
     assert.strictEqual(outcome.venvPath, venv);
     assert.strictEqual(calls[0].cmd, venvPython(venv));
-    assert.deepStrictEqual(calls[0].args, ["-m", "pip", "install", PYPI_PACKAGE_NAME]);
+    // Set 122 S3: `--upgrade` and the pinned floor. Without BOTH, pip
+    // reports an existing older install as already-satisfied and the
+    // developer's venv keeps a router with no `ai_router.modules`.
+    assert.deepStrictEqual(calls[0].args, [
+      "-m",
+      "pip",
+      "install",
+      "--upgrade",
+      PYPI_REQUIREMENT,
+    ]);
     // Marker file written
     const marker = path.join(ws, INSTALL_METHOD_REL);
     assert.ok(fs.existsSync(marker), "expected install-method marker to be written");
@@ -330,7 +344,13 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
 
     assert.strictEqual(outcome.ok, true, outcome.message);
     assert.deepStrictEqual(calls[0].args, ["-m", "venv", path.join(ws, ".venv")]);
-    assert.deepStrictEqual(calls[1].args, ["-m", "pip", "install", PYPI_PACKAGE_NAME]);
+    assert.deepStrictEqual(calls[1].args, [
+      "-m",
+      "pip",
+      "install",
+      "--upgrade",
+      PYPI_REQUIREMENT,
+    ]);
     fs.rmSync(ws, { recursive: true, force: true });
   });
 
@@ -408,7 +428,7 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
       "--upgrade",
       "--force-reinstall",
       "--no-cache-dir",
-      PYPI_PACKAGE_NAME,
+      PYPI_REQUIREMENT,
     ]);
     fs.rmSync(ws, { recursive: true, force: true });
   });
@@ -444,8 +464,10 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
     const workspaceConfig = path.join(ws, ROUTER_CONFIG_REL);
     assert.ok(fs.existsSync(workspaceConfig));
     assert.strictEqual(fs.readFileSync(workspaceConfig, "utf8"), seedYaml);
-    // pip install + the importlib.resources read = 2 calls.
-    assert.strictEqual(calls.length, 2);
+    // pip install + the importlib.resources read + the Set 122 S3
+    // capability probe = 3 calls.
+    assert.strictEqual(calls.length, 3);
+    assert.deepStrictEqual(calls[2].args, ["-c", ROUTER_CAPABILITY_PROBE_CODE]);
     assert.match(outcome.message, /Seeded ai_router\/router-config\.yaml/);
     fs.rmSync(ws, { recursive: true, force: true });
   });
@@ -538,8 +560,9 @@ suite("aiRouterInstall — PyPI install (happy path)", () => {
       "no materialization should occur when the file already exists");
     assert.match(fs.readFileSync(workspaceConfig, "utf8"), /operator-tuned/);
     assert.doesNotMatch(fs.readFileSync(workspaceConfig, "utf8"), /UPSTREAM/);
-    // Only the pip install ran — no importlib.resources read.
-    assert.strictEqual(calls.length, 1);
+    // The pip install + the capability probe — no importlib.resources read.
+    assert.strictEqual(calls.length, 2);
+    assert.deepStrictEqual(calls[1].args, ["-c", ROUTER_CAPABILITY_PROBE_CODE]);
     fs.rmSync(ws, { recursive: true, force: true });
   });
 
@@ -713,8 +736,12 @@ suite("aiRouterInstall — GitHub install (happy path)", () => {
     assert.strictEqual(outcome.source, "github");
     assert.strictEqual(outcome.resolvedRef, "v0.1.0",
       "expected the latest released tag to be resolved (v0.1.0 in the stub ls-remote payload)");
-    // 4 spawn calls: ls-remote → clone → sparse-checkout → pip install -e <stable>
-    assert.strictEqual(calls.length, 4);
+    // 5 spawn calls: ls-remote → clone → sparse-checkout → pip install -e
+    // <stable> → the Set 122 S3 capability probe. The GitHub path is
+    // probed too: an editable install of a stale checkout can miss the
+    // capability just as easily as a registry install.
+    assert.strictEqual(calls.length, 5);
+    assert.deepStrictEqual(calls[4].args, ["-c", ROUTER_CAPABILITY_PROBE_CODE]);
     assert.strictEqual(calls[0].cmd, "git");
     assert.strictEqual(calls[0].args[0], "ls-remote");
     assert.strictEqual(calls[1].cmd, "git");
@@ -784,9 +811,10 @@ suite("aiRouterInstall — GitHub install (happy path)", () => {
 
     assert.strictEqual(outcome.ok, true, outcome.message);
     assert.strictEqual(outcome.resolvedRef, "v0.1.0");
-    // 3 calls when an explicit ref is provided: clone → sparse-checkout → pip install -e
-    // (ls-remote is skipped — no need to resolve "latest" when the user named it).
-    assert.strictEqual(calls.length, 3);
+    // 4 calls when an explicit ref is provided: clone → sparse-checkout →
+    // pip install -e → capability probe (ls-remote is skipped — no need to
+    // resolve "latest" when the user named it).
+    assert.strictEqual(calls.length, 4);
     const cloneCall = calls[0];
     assert.strictEqual(cloneCall.cmd, "git");
     assert.strictEqual(cloneCall.args[0], "clone");
@@ -1138,11 +1166,30 @@ suite("aiRouterInstall — routerInstallSpec / routerInstallRequirement", () => 
   const neverADir = () => false;
   const alwaysADir = () => true;
 
-  test("production installs the published package name", () => {
-    assert.strictEqual(routerInstallSpec({}), "dabbler-ai-router");
+  test("production installs the published package pinned to the version floor", () => {
+    // Set 122 S3: the floor is what makes an existing older install
+    // UNSATISFIED, so `pip install --upgrade` actually moves it instead of
+    // reporting already-satisfied. A bare package name is the regression.
+    assert.strictEqual(routerInstallSpec({}), PYPI_REQUIREMENT);
+    assert.strictEqual(PYPI_REQUIREMENT, `dabbler-ai-router>=${MINIMUM_ROUTER_VERSION}`);
     assert.deepStrictEqual(routerInstallRequirement({}, neverADir), [
-      "dabbler-ai-router",
+      PYPI_REQUIREMENT,
     ]);
+  });
+
+  test("the floor is declared in exactly one place", () => {
+    // L-069-1: two independently-maintained version constants is the drift
+    // defect this repo keeps re-finding. The requirement string must be
+    // DERIVED from the floor, not a second copy that happens to agree —
+    // this fails the moment someone hard-codes a version beside it.
+    assert.ok(
+      PYPI_REQUIREMENT.endsWith(`>=${MINIMUM_ROUTER_VERSION}`),
+      `PYPI_REQUIREMENT (${PYPI_REQUIREMENT}) must derive from MINIMUM_ROUTER_VERSION (${MINIMUM_ROUTER_VERSION})`,
+    );
+    assert.ok(
+      PYPI_REQUIREMENT.startsWith(`${PYPI_PACKAGE_NAME}>`),
+      `PYPI_REQUIREMENT (${PYPI_REQUIREMENT}) must derive from PYPI_PACKAGE_NAME (${PYPI_PACKAGE_NAME})`,
+    );
   });
 
   test("an unset or blank override is not an override", () => {
@@ -1151,7 +1198,7 @@ suite("aiRouterInstall — routerInstallSpec / routerInstallRequirement", () => 
     for (const value of [undefined, "", "   "]) {
       assert.strictEqual(
         routerInstallSpec({ DABBLER_ROUTER_INSTALL_SPEC: value }),
-        "dabbler-ai-router",
+        PYPI_REQUIREMENT,
         JSON.stringify(value),
       );
     }
@@ -1186,7 +1233,312 @@ suite("aiRouterInstall — routerInstallSpec / routerInstallRequirement", () => 
     // A `dabbler-ai-router/` folder in the cwd must not silently convert a
     // registry install into an editable one.
     assert.deepStrictEqual(routerInstallRequirement({}, alwaysADir), [
-      "dabbler-ai-router",
+      PYPI_REQUIREMENT,
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Set 122 S3 — the capability precondition.
+//
+// pip's exit code says a wheel was placed on disk. It does NOT say the
+// interpreter the launcher will use can `import ai_router.modules`
+// (L-125-1: compare what a transport CAN DO, not what it returns), and
+// provisioning is exactly where a silent fail-open hides (L-079-3). Every
+// test below is a falsifier for one way this could quietly pass.
+// ---------------------------------------------------------------------------
+
+suite("aiRouterInstall — compareReleaseVersions", () => {
+  test("orders releases numerically, not lexically", () => {
+    // The lexical trap: "0.34.0" > "1.0.0" as strings. A string compare
+    // here would accept exactly the wheel this session exists to reject.
+    assert.ok((compareReleaseVersions("0.34.0", "1.0.0") ?? 0) < 0);
+    assert.ok((compareReleaseVersions("1.0.0", "0.34.0") ?? 0) > 0);
+    assert.strictEqual(compareReleaseVersions("1.0.0", "1.0.0"), 0);
+    assert.ok((compareReleaseVersions("1.0.1", "1.0.0") ?? 0) > 0);
+    assert.ok((compareReleaseVersions("2.0", "1.9.9") ?? 0) > 0);
+  });
+
+  test("a missing segment reads as zero, not as absent", () => {
+    assert.strictEqual(compareReleaseVersions("1.0", "1.0.0"), 0);
+    assert.ok((compareReleaseVersions("1.0", "1.0.1") ?? 0) < 0);
+  });
+
+  test("a pre-release of the floor still meets the floor", () => {
+    // The import probe is the real gate: a developer on 1.0.0rc1 HAS
+    // ai_router.modules, so refusing them would be a false negative.
+    assert.strictEqual(compareReleaseVersions("1.0.0rc1", "1.0.0"), 0);
+    assert.strictEqual(compareReleaseVersions("1.0.0.dev3+local", "1.0.0"), 0);
+  });
+
+  test("declines to judge an unparseable version rather than guessing", () => {
+    assert.strictEqual(compareReleaseVersions("unknown", "1.0.0"), null);
+    assert.strictEqual(compareReleaseVersions("1.0.0", ""), null);
+  });
+});
+
+suite("aiRouterInstall — probeRouterCapability", () => {
+  test("probes the CAPABILITY MODULE with the venv interpreter it was given", () => {
+    // The probe body must import the module the launchers actually run.
+    // A probe that imported plain `ai_router` would pass against the very
+    // 0.34.0 wheel that has no `ai_router.modules`.
+    assert.ok(
+      ROUTER_CAPABILITY_PROBE_CODE.includes("ai_router.modules"),
+      ROUTER_CAPABILITY_PROBE_CODE,
+    );
+  });
+
+  test("a clean import at or above the floor passes", async () => {
+    const seen: Array<{ cmd: string; args: string[] }> = [];
+    const probe = await probeRouterCapability(
+      async (cmd, args) => {
+        seen.push({ cmd, args: [...args] });
+        return { exitCode: 0, stdout: MINIMUM_ROUTER_VERSION, stderr: "" };
+      },
+      "/ws/.venv/bin/python",
+    );
+    assert.strictEqual(probe.ok, true, probe.message);
+    assert.strictEqual(probe.reason, "ok");
+    assert.strictEqual(probe.version, MINIMUM_ROUTER_VERSION);
+    assert.strictEqual(seen[0].cmd, "/ws/.venv/bin/python");
+    assert.deepStrictEqual(seen[0].args, ["-c", ROUTER_CAPABILITY_PROBE_CODE]);
+  });
+
+  test("FALSIFIER: a non-importable module fails even though pip exited 0", async () => {
+    const probe = await probeRouterCapability(
+      async () => ({
+        exitCode: 1,
+        stdout: "",
+        stderr: "ModuleNotFoundError: No module named 'ai_router.modules'",
+      }),
+      "/ws/.venv/bin/python",
+    );
+    assert.strictEqual(probe.ok, false);
+    assert.strictEqual(probe.reason, "not-importable");
+    // The message must break the "missing API keys" mis-diagnosis.
+    assert.ok(/interpreter \/ installation problem/.test(probe.message), probe.message);
+  });
+
+  test("FALSIFIER: the exact 0.34.0 regression is refused by version, not just by import", async () => {
+    // The concrete failure this session prevents. Suppose a future wheel
+    // ships `ai_router.modules` but predates the floor — the import
+    // succeeds and only the floor catches it.
+    const probe = await probeRouterCapability(
+      async () => ({ exitCode: 0, stdout: "0.34.0", stderr: "" }),
+      "/ws/.venv/bin/python",
+    );
+    assert.strictEqual(probe.ok, false);
+    assert.strictEqual(probe.reason, "below-floor");
+    assert.strictEqual(probe.version, "0.34.0");
+    assert.ok(probe.message.includes(MINIMUM_ROUTER_VERSION), probe.message);
+    assert.ok(/Update ai-router/.test(probe.message), probe.message);
+  });
+
+  test("FALSIFIER: a spawn that throws is a FAILED probe, never a pass", async () => {
+    // No fail-open branch: "could not confirm" and "is missing" lead to
+    // the same operator action and neither may read as success.
+    const probe = await probeRouterCapability(
+      async () => {
+        throw new Error("ENOENT: interpreter vanished");
+      },
+      "/ws/.venv/bin/python",
+    );
+    assert.strictEqual(probe.ok, false);
+    assert.strictEqual(probe.reason, "probe-failed");
+    assert.ok(probe.message.includes("ENOENT"), probe.message);
+  });
+
+  test("an undeterminable version does NOT fail a capability that imported cleanly", async () => {
+    // A failed metadata lookup is not a failed capability. Treating it as
+    // one would refuse working installs (e.g. an editable checkout with no
+    // distribution metadata) — the false-positive mirror of the above.
+    const probe = await probeRouterCapability(
+      async () => ({ exitCode: 0, stdout: "", stderr: "" }),
+      "/ws/.venv/bin/python",
+    );
+    assert.strictEqual(probe.ok, true, probe.message);
+    assert.strictEqual(probe.version, null);
+  });
+});
+
+suite("aiRouterInstall — the probe gates the install outcome", () => {
+  function venvWorkspace(): { ws: string; venv: string } {
+    const ws = makeTmpWorkspace();
+    const venv = path.join(ws, ".venv");
+    fs.mkdirSync(venv, { recursive: true });
+    return { ws, venv };
+  }
+
+  test("FALSIFIER: pip succeeds but the module is unimportable — the install reports FAILURE", async () => {
+    // The whole point. Before this session an install like this returned
+    // ok:true, the scaffold shelled out to a CLI that was not there, and
+    // the developer learned about it one failing module command at a time.
+    const { ws } = venvWorkspace();
+    const outcome = await installAiRouter({
+      workspaceRoot: ws,
+      pythonPath: "python",
+      spawner: async (_cmd, args) => {
+        const isProbe = args[0] === "-c" && args[1] === ROUTER_CAPABILITY_PROBE_CODE;
+        return isProbe
+          ? {
+              exitCode: 1,
+              stdout: "",
+              stderr: "ModuleNotFoundError: No module named 'ai_router.modules'",
+            }
+          : { exitCode: 0, stdout: "", stderr: "" };
+      },
+      fileOps: realFileOps(),
+      prompts: autoPrompts({ source: "pypi" }),
+    });
+    assert.strictEqual(outcome.ok, false, outcome.message);
+    assert.strictEqual(outcome.capability?.ok, false);
+    assert.strictEqual(outcome.capability?.reason, "not-importable");
+    fs.rmSync(ws, { recursive: true, force: true });
+  });
+
+  test("a capable install carries the probe result and stays ok", async () => {
+    const { ws } = venvWorkspace();
+    const outcome = await installAiRouter({
+      workspaceRoot: ws,
+      pythonPath: "python",
+      spawner: async (_cmd, args) =>
+        args[0] === "-c" && args[1] === ROUTER_CAPABILITY_PROBE_CODE
+          ? { exitCode: 0, stdout: MINIMUM_ROUTER_VERSION, stderr: "" }
+          : { exitCode: 0, stdout: "", stderr: "" },
+      fileOps: realFileOps(),
+      prompts: autoPrompts({ source: "pypi" }),
+    });
+    assert.strictEqual(outcome.ok, true, outcome.message);
+    assert.strictEqual(outcome.capability?.ok, true);
+    assert.strictEqual(outcome.capability?.version, MINIMUM_ROUTER_VERSION);
+    fs.rmSync(ws, { recursive: true, force: true });
+  });
+
+  test("the probe runs against the VENV interpreter, not the configured pythonPath", async () => {
+    // `pythonPath` may be a bare `python` on PATH — the documented cause
+    // of the "No module named ai_router" mis-diagnosis. Probing it instead
+    // of the venv would answer a question nobody asked.
+    const { ws, venv } = venvWorkspace();
+    const probeCmds: string[] = [];
+    await installAiRouter({
+      workspaceRoot: ws,
+      pythonPath: "python",
+      spawner: async (cmd, args) => {
+        if (args[0] === "-c" && args[1] === ROUTER_CAPABILITY_PROBE_CODE) {
+          probeCmds.push(cmd);
+        }
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+      fileOps: realFileOps(),
+      prompts: autoPrompts({ source: "pypi" }),
+    });
+    assert.deepStrictEqual(probeCmds, [venvPython(venv)]);
+    fs.rmSync(ws, { recursive: true, force: true });
+  });
+
+  test("FALSIFIER: the probe follows the LAUNCHER interpreter when it diverges from the venv", async () => {
+    // Set 122 S3 verification round 1, Majors 1 and 3. `ensureVenv` only
+    // honours a venv-shaped `pythonPath`, so an operator who points
+    // `dabblerSessionSets.pythonPath` at a base interpreter — a supported
+    // configuration — gets the router installed into `<ws>/.venv` while
+    // every module command resolves the base interpreter. Probing only the
+    // venv would report success for a setup in which every single module
+    // command fails.
+    const { ws } = venvWorkspace();
+    const launcher = "C:\\Python311\\python.exe";
+    const probeCmds: string[] = [];
+    const outcome = await installAiRouter({
+      workspaceRoot: ws,
+      pythonPath: "python",
+      resolveLauncherPython: () => launcher,
+      spawner: async (cmd, args) => {
+        if (args[0] === "-c" && args[1] === ROUTER_CAPABILITY_PROBE_CODE) {
+          probeCmds.push(cmd);
+          // The launcher's interpreter does NOT have the router.
+          return {
+            exitCode: 1,
+            stdout: "",
+            stderr: "ModuleNotFoundError: No module named 'ai_router'",
+          };
+        }
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+      fileOps: realFileOps(),
+      prompts: autoPrompts({ source: "pypi" }),
+    });
+    assert.deepStrictEqual(
+      probeCmds,
+      [launcher],
+      "the probe must ask the interpreter the launchers will use",
+    );
+    assert.strictEqual(
+      outcome.ok,
+      false,
+      "an install whose launcher interpreter cannot import the router is not a success",
+    );
+    assert.strictEqual(outcome.capability?.reason, "not-importable");
+    assert.strictEqual(outcome.capability?.interpreter, launcher);
+    fs.rmSync(ws, { recursive: true, force: true });
+  });
+
+  test("FALSIFIER: the launcher interpreter is resolved AFTER the venv exists, not before", async () => {
+    // Set 122 S3 verification round 3, Major 1 — a defect introduced by
+    // the round-1 fix and caught before it shipped.
+    //
+    // On the MAIN cold-start path there is no explicit `pythonPath` and no
+    // `.venv`, so `resolvePythonInterpreter` answers bare `python` BEFORE
+    // the install and the newly-created `.venv` AFTER it. Capturing that
+    // answer eagerly made setup probe bare `python` — which on a normal
+    // machine has no router — and report a perfectly good install as
+    // failed, skipping default-module creation.
+    //
+    // The resolver is therefore a thunk, and this pins WHEN it is called:
+    // the venv must already exist at resolution time.
+    const ws = makeTmpWorkspace(); // no .venv — the fresh-project shape
+    const venv = path.join(ws, ".venv");
+    let venvExistedAtResolveTime = false;
+    const probeCmds: string[] = [];
+    const outcome = await installAiRouter({
+      workspaceRoot: ws,
+      pythonPath: "python",
+      resolveLauncherPython: () => {
+        // Exactly what `resolvePythonInterpreter` does with no explicit
+        // setting: the workspace venv if it is there, else bare `python`.
+        venvExistedAtResolveTime = fs.existsSync(venv);
+        return venvExistedAtResolveTime ? venvPython(venv) : "python";
+      },
+      spawner: async (cmd, args) => {
+        if (args[0] === "-m" && args[1] === "venv") {
+          fs.mkdirSync(args[2], { recursive: true });
+          return { exitCode: 0, stdout: "", stderr: "" };
+        }
+        if (args[0] === "-c" && args[1] === ROUTER_CAPABILITY_PROBE_CODE) {
+          probeCmds.push(cmd);
+          // Only the venv has the router; bare `python` does not.
+          return cmd === venvPython(venv)
+            ? { exitCode: 0, stdout: MINIMUM_ROUTER_VERSION, stderr: "" }
+            : {
+                exitCode: 1,
+                stdout: "",
+                stderr: "ModuleNotFoundError: No module named 'ai_router'",
+              };
+        }
+        return { exitCode: 0, stdout: "", stderr: "" };
+      },
+      fileOps: realFileOps(),
+      prompts: autoPrompts({ source: "pypi", createVenv: true }),
+    });
+    assert.strictEqual(
+      venvExistedAtResolveTime,
+      true,
+      "the launcher interpreter must be resolved after the venv is created",
+    );
+    assert.deepStrictEqual(probeCmds, [venvPython(venv)]);
+    assert.strictEqual(
+      outcome.ok,
+      true,
+      `a normal cold start must not report failure: ${outcome.message}`,
+    );
+    fs.rmSync(ws, { recursive: true, force: true });
   });
 });

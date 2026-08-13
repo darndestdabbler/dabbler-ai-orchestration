@@ -16659,6 +16659,8 @@ var esm_default = gitInstanceFactory;
 var fs9 = __toESM(require("fs"));
 var path9 = __toESM(require("path"));
 var PYPI_PACKAGE_NAME = "dabbler-ai-router";
+var MINIMUM_ROUTER_VERSION = "1.0.0";
+var PYPI_REQUIREMENT = `${PYPI_PACKAGE_NAME}>=${MINIMUM_ROUTER_VERSION}`;
 var REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
 var ROUTER_CONFIG_REL = path9.posix.join("ai_router", "router-config.yaml");
 var LOCAL_OVERRIDES_REL = path9.posix.join("ai_router", "local-overrides.yaml");
@@ -16718,9 +16720,32 @@ async function doInstall(deps, opts) {
   }
   const venvPath = venvResult.venvPath;
   if (source === "pypi") {
-    return await runPyPiInstall(deps, { venvPath, mode: opts.mode, report });
+    return await verifyRouterCapability(
+      deps,
+      await runPyPiInstall(deps, { venvPath, mode: opts.mode, report })
+    );
   }
-  return await runGitHubInstall(deps, { venvPath, report });
+  return await verifyRouterCapability(
+    deps,
+    await runGitHubInstall(deps, { venvPath, report })
+  );
+}
+async function verifyRouterCapability(deps, outcome) {
+  if (!outcome.ok || !outcome.venvPath)
+    return outcome;
+  const resolved = deps.resolveLauncherPython?.()?.trim();
+  const target = resolved ? resolved : venvPython(outcome.venvPath);
+  const capability = await probeRouterCapability(deps.spawner, target, {
+    cwd: deps.workspaceRoot
+  });
+  if (capability.ok)
+    return { ...outcome, capability };
+  return {
+    ...outcome,
+    ok: false,
+    capability,
+    message: `${outcome.message} ${capability.message}`
+  };
 }
 async function ensureVenv(deps) {
   const fromPythonPath = deriveVenvFromPythonPath(deps.pythonPath);
@@ -16783,7 +16808,7 @@ function venvPython(venvPath) {
 }
 function routerInstallSpec(env8 = process.env) {
   const override = (env8.DABBLER_ROUTER_INSTALL_SPEC ?? "").trim();
-  return override === "" ? PYPI_PACKAGE_NAME : override;
+  return override === "" ? PYPI_REQUIREMENT : override;
 }
 function routerInstallRequirement(env8 = process.env, isDirectory = (p2) => {
   try {
@@ -16793,16 +16818,16 @@ function routerInstallRequirement(env8 = process.env, isDirectory = (p2) => {
   }
 }) {
   const spec = routerInstallSpec(env8);
-  return spec !== PYPI_PACKAGE_NAME && isDirectory(spec) ? ["-e", spec] : [spec];
+  return spec !== PYPI_REQUIREMENT && isDirectory(spec) ? ["-e", spec] : [spec];
 }
 async function runPyPiInstall(deps, opts) {
   const requirement = routerInstallRequirement();
   const spec = routerInstallSpec();
-  const source = spec === PYPI_PACKAGE_NAME ? "PyPI" : spec;
+  const source = spec === PYPI_REQUIREMENT ? "PyPI" : spec;
   opts.report(
-    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from ${source}\u2026` : `Installing ${PYPI_PACKAGE_NAME} from ${source}\u2026`
+    opts.mode === "update" ? `Force-refreshing ${PYPI_PACKAGE_NAME} from ${source}\u2026` : `Installing ${PYPI_PACKAGE_NAME} (>=${MINIMUM_ROUTER_VERSION}) from ${source}\u2026`
   );
-  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", ...requirement] : ["-m", "pip", "install", ...requirement];
+  const pipArgs = opts.mode === "update" ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", ...requirement] : ["-m", "pip", "install", "--upgrade", ...requirement];
   const venvPy = venvPython(opts.venvPath);
   const result = await deps.spawner(venvPy, pipArgs, {
     cwd: deps.workspaceRoot,
@@ -16853,6 +16878,84 @@ async function readBundledRouterConfig(deps, venvPy) {
   if (result.exitCode !== 0 || !result.stdout)
     return null;
   return result.stdout;
+}
+var ROUTER_CAPABILITY_MODULE = "ai_router.modules";
+var ROUTER_CAPABILITY_PROBE_CODE = [
+  "import importlib, sys",
+  `importlib.import_module(${JSON.stringify(ROUTER_CAPABILITY_MODULE)})`,
+  "try:",
+  "    from importlib.metadata import version",
+  `    v = version(${JSON.stringify(PYPI_PACKAGE_NAME)})`,
+  "except Exception:",
+  '    v = ""',
+  "sys.stdout.write(v)"
+].join("\n");
+function compareReleaseVersions(a, b2) {
+  const parse2 = (v) => {
+    const m = /^\s*(\d+(?:\.\d+)*)/.exec(v);
+    if (!m)
+      return null;
+    return m[1].split(".").map((n) => Number(n));
+  };
+  const pa = parse2(a);
+  const pb = parse2(b2);
+  if (pa === null || pb === null)
+    return null;
+  const len = Math.max(pa.length, pb.length);
+  for (let i2 = 0; i2 < len; i2 += 1) {
+    const d = (pa[i2] ?? 0) - (pb[i2] ?? 0);
+    if (d !== 0)
+      return d;
+  }
+  return 0;
+}
+async function probeRouterCapability(spawner, venvPythonPath, opts = {}) {
+  let result;
+  try {
+    result = await spawner(venvPythonPath, ["-c", ROUTER_CAPABILITY_PROBE_CODE], {
+      cwd: opts.cwd,
+      timeoutMs: opts.timeoutMs ?? 6e4
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      interpreter: venvPythonPath,
+      version: null,
+      reason: "probe-failed",
+      message: `Could not verify ${PYPI_PACKAGE_NAME} in '${venvPythonPath}': ${oneLine(detail)}. ` + describeAiRouterImportFailure(venvPythonPath)
+    };
+  }
+  if (result.exitCode !== 0) {
+    const detail = oneLine(result.stderr || result.stdout);
+    return {
+      ok: false,
+      interpreter: venvPythonPath,
+      version: null,
+      reason: "not-importable",
+      message: `${ROUTER_CAPABILITY_MODULE} could not be imported after installing ${PYPI_PACKAGE_NAME}${detail ? ` (${detail})` : ""}. ` + describeAiRouterImportFailure(venvPythonPath)
+    };
+  }
+  const version = result.stdout.trim() || null;
+  if (version !== null) {
+    const cmp = compareReleaseVersions(version, MINIMUM_ROUTER_VERSION);
+    if (cmp !== null && cmp < 0) {
+      return {
+        ok: false,
+        interpreter: venvPythonPath,
+        version,
+        reason: "below-floor",
+        message: `${PYPI_PACKAGE_NAME} ${version} is installed in '${venvPythonPath}', but this extension requires >=${MINIMUM_ROUTER_VERSION}. Run "Dabbler: Update ai-router" to upgrade it, then try again.`
+      };
+    }
+  }
+  return {
+    ok: true,
+    interpreter: venvPythonPath,
+    version,
+    reason: "ok",
+    message: `${ROUTER_CAPABILITY_MODULE} is importable${version ? ` (${PYPI_PACKAGE_NAME} ${version})` : ""}.`
+  };
 }
 async function resolveLatestReleaseTag(deps) {
   const repo = deps.repoUrl ?? REPO_URL;
@@ -17251,6 +17354,9 @@ async function runInstallFlow(mode) {
       const deps = {
         workspaceRoot: root,
         pythonPath,
+        // Set 122 S3: resolved AFTER the install, so a venv created by
+        // this very run is what the probe targets.
+        resolveLauncherPython: () => resolvePythonInterpreter(root),
         repoUrl,
         spawner: makeSpawner(),
         fileOps: makeFileOps(),
@@ -18508,6 +18614,27 @@ async function scaffoldDefaultModuleAndLifecycleSets(projectDir, cliDeps) {
     note: ` Default module scaffolded: ${planSlug} (plan) and ${decompositionSlug} (decomposition) \u2014 rename or delete "Default" any time from the Work Explorer.`
   };
 }
+function decideDefaultModuleScaffold(classification, routerCapable) {
+  if (classification.kind === "invalid")
+    return "skip-manifest-invalid";
+  if (classification.kind === "present" && classification.entries.length > 0) {
+    return "skip-modules-declared";
+  }
+  if (!routerCapable)
+    return "skip-router-unavailable";
+  return "scaffold";
+}
+function describeDefaultModuleSkip(gate) {
+  switch (gate) {
+    case "skip-router-unavailable":
+      return ' The default module was NOT scaffolded because the ai-router install did not complete \u2014 creating it runs `python -m ai_router.modules` in the scaffolded .venv. Finish the install ("Dabbler: Install ai-router"), then run "Dabbler: Set Up New Project" again \u2014 it will pick up where it left off, and you do NOT need to delete docs/modules.yaml.';
+    case "skip-manifest-invalid":
+      return ` The default module was NOT scaffolded \u2014 ${INVALID_MANIFEST_MESSAGE}`;
+    case "skip-modules-declared":
+    case "scaffold":
+      return "";
+  }
+}
 async function pickDirectory() {
   const picked = await vscode12.window.showOpenDialog({
     canSelectFiles: false,
@@ -18597,6 +18724,10 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
           installOutcome2 = await installAiRouter({
             workspaceRoot: projectDir,
             pythonPath: scaffoldPython,
+            // Set 122 S3: resolved AFTER the install, so a fresh
+            // project's newly-created .venv is what gets probed — the
+            // same call `runRouterCli` makes when a command runs.
+            resolveLauncherPython: () => resolvePythonInterpreter(projectDir),
             spawner: makeSpawner(),
             fileOps: makeFileOps(),
             prompts: makeScaffoldInstallPrompts(),
@@ -18615,7 +18746,11 @@ async function buildProjectStructureNoPrompt(context, projectDir, budget, transp
     effectiveBudget
   );
   const budgetNote = result.budgetOutcome === "written" ? " Budget saved to ai_router/budget.yaml." : result.budgetOutcome === "skipped-exists" ? " Existing ai_router/budget.yaml kept (budget input not applied)." : "";
-  const defaultModuleNote = result.written.includes(MODULES_MANIFEST_DISPLAY) ? (await (seams.scaffoldDefaultModule ?? scaffoldDefaultModuleAndLifecycleSets)(projectDir)).note : "";
+  const defaultModuleGate = (seams.decideDefaultModule ?? decideDefaultModuleScaffold)(
+    classifyModulesManifest(projectDir),
+    result.installOk
+  );
+  const defaultModuleNote = defaultModuleGate === "scaffold" ? (await (seams.scaffoldDefaultModule ?? scaffoldDefaultModuleAndLifecycleSets)(projectDir)).note : describeDefaultModuleSkip(defaultModuleGate);
   const summary = `Project structure built: ${result.written.length} file(s) written` + (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") + `. ${result.installOk ? "ai-router installed." : `Router install needs attention: ${result.installMessage}`}` + budgetNote + defaultModuleNote;
   const showInfo = seams.showInfo ?? ((m) => void vscode12.window.showInformationMessage(m));
   const showWarning = seams.showWarning ?? ((m) => void vscode12.window.showWarningMessage(m));

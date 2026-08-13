@@ -11,7 +11,7 @@ import {
   ProcessSpawner,
   ROUTER_CONFIG_REL,
 } from "../utils/aiRouterInstall";
-import { resolveExplicitPythonPath } from "../utils/pythonInterpreter";
+import { resolveExplicitPythonPath, resolvePythonInterpreter } from "../utils/pythonInterpreter";
 import { makeUtf8ChunkDecoder } from "../utils/utf8ChunkDecoder";
 import { writeFileExclusiveSync } from "../utils/fileSystem";
 
@@ -62,6 +62,9 @@ async function runInstallFlow(mode: "install" | "update"): Promise<void> {
       const deps = {
         workspaceRoot: root,
         pythonPath,
+        // Set 122 S3: resolved AFTER the install, so a venv created by
+        // this very run is what the probe targets.
+        resolveLauncherPython: () => resolvePythonInterpreter(root),
         repoUrl,
         spawner: makeSpawner(),
         fileOps: makeFileOps(),

@@ -24,6 +24,50 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **(Set 122 S3) Project setup now guarantees the router the module
+  commands need — and refuses to half-finish when it cannot.** Session 2
+  made every module command shell out to `python -m ai_router.modules`.
+  Nothing yet guaranteed that module was present, or new enough, and the
+  gap had a known victim: a developer whose `.venv` already held an older
+  `dabbler-ai-router` would take the Marketplace update and then fail
+  *every* module command with `No module named ai_router.modules`.
+  Re-running **Dabbler: Set Up New Project** did not help, because the
+  install was a plain `pip install`, which pip reports as
+  already-satisfied against an existing installation.
+
+  Three things close it:
+
+  - **A version floor, declared once.** `MINIMUM_ROUTER_VERSION` and the
+    pinned requirement derived from it are the single place the minimum is
+    stated; the install path and the capability precondition both read it,
+    rather than keeping version constants that drift apart. The install
+    now requests that floor and passes `--upgrade`, so an existing older
+    installation is **upgraded rather than accepted**. (`Dabbler: Update
+    ai-router` is unchanged — it additionally force-reinstalls from a cold
+    cache to repair a corrupt install.)
+  - **A capability probe, not a pip exit code.** After installing, setup
+    asks *the same venv interpreter the commands will use* to import
+    `ai_router.modules`. Success is that import, never pip's return value.
+    A failure is reported as a failed install — with the existing
+    "this is an interpreter/installation problem, NOT missing API keys"
+    guidance — and no Python-backed module creation is attempted.
+  - **A setup you can re-run.** Default-module creation used to be gated
+    on whether *that same call* created `docs/modules.yaml`. Since the
+    manifest is written before the install runs, a failed install consumed
+    the only chance to create the module, and the only recovery was
+    deleting a file nobody had told the user about. It is now gated on the
+    module being **absent**, so re-running setup after a failed install
+    picks up where it left off. Repos that already declare modules, and
+    repos with an invalid manifest, are untouched as before.
+
+  Proven from a genuinely empty folder by a new `npm run test:dogfood`
+  lane (real `python -m venv`, real network `pip install`, real install
+  code — no seams): a clean project finishes setup with the module
+  importable; a `.venv` seeded with a real historical
+  `dabbler-ai-router==0.34.0` is upgraded past the floor; a failed install
+  creates no module and a re-run recovers without deleting anything. It
+  runs in CI on Linux and Windows.
+
 - **(Set 122 S2) Every module lifecycle operation now runs
   `python -m ai_router.modules`, and the extension shows you the command.**
   The five module context-menu commands — New / Rename / Delete / Open

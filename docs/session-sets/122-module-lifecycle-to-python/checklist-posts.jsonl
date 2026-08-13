@@ -18,3 +18,12 @@
 {"sessionNumber": 2, "postedAt": "2026-08-13T09:06:28.014692-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
 {"sessionNumber": 2, "postedAt": "2026-08-13T09:15:24.016178-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["close-out"]}
 {"sessionNumber": 2, "postedAt": "2026-08-13T09:45:34.232357-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["close-out"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T10:09:10.082580-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["declare-the-floor-and-make-the"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T10:45:38.674624-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T10:53:19.506015-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T10:57:22.614258-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T11:11:43.776994-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T11:21:10.765232-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T11:21:33.862158-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T11:36:42.083983-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 3, "postedAt": "2026-08-13T12:01:11.554764-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["close-out"]}

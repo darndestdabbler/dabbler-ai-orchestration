@@ -56,6 +56,42 @@ def test_the_guard_scans_something():
     assert "spec_config.py" in names
 
 
+def test_build_output_is_excluded_but_real_source_is_not(tmp_path):
+    """Set 122 S3: ``build/`` is skipped, and only because it is build output.
+
+    A ``pip install`` of this checkout materializes ``build/lib/`` — a
+    verbatim copy of the package source, including this guard's own
+    pattern table — so the scan reported the copy's regexes as live
+    declarations and a green tree went red purely because someone had run
+    an install.
+
+    The exclusion has to be narrow, though: a directory named ``build``
+    is skipped, but an identically-named FILE, and any real source path,
+    must still be scanned. Otherwise the fix for a false positive becomes
+    a blanket that hides real violations — the failure mode this whole
+    module exists to prevent.
+    """
+    pkg = tmp_path / "ai_router"
+    pkg.mkdir()
+    (pkg / "real.py").write_text("x = 1\n", encoding="utf-8")
+    (pkg / "build.py").write_text("y = 2\n", encoding="utf-8")
+
+    generated = tmp_path / "build" / "lib" / "ai_router"
+    generated.mkdir(parents=True)
+    (generated / "copy.py").write_text("z = 3\n", encoding="utf-8")
+
+    eggs = tmp_path / ".eggs" / "ai_router"
+    eggs.mkdir(parents=True)
+    (eggs / "egg.py").write_text("w = 4\n", encoding="utf-8")
+
+    scanned = {p.name for p in guard.iter_scanned_files(tmp_path)}
+    assert "real.py" in scanned
+    # A FILE called build.py is source, not build output.
+    assert "build.py" in scanned
+    assert "copy.py" not in scanned
+    assert "egg.py" not in scanned
+
+
 # ---------------------------------------------------------------------------
 # Falsifiers: each rule must fire on a planted resurrection
 # ---------------------------------------------------------------------------

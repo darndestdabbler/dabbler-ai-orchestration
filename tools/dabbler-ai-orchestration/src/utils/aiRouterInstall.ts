@@ -20,6 +20,26 @@ import * as path from "path";
  */
 
 export const PYPI_PACKAGE_NAME = "dabbler-ai-router";
+/**
+ * The minimum `dabbler-ai-router` the extension requires — the ONE place
+ * the floor is declared.
+ *
+ * Set 122 S3. Session 2 made every module command shell out to `python -m
+ * ai_router.modules`, which did not exist before `1.0.0`. Two
+ * independently-maintained version constants is the drift defect this repo
+ * keeps re-finding (L-069-1), so the install requirement
+ * ({@link PYPI_REQUIREMENT}) and the capability precondition
+ * ({@link probeRouterCapability}) both derive from this single value —
+ * neither hard-codes a version of its own.
+ */
+export const MINIMUM_ROUTER_VERSION = "1.0.0";
+/**
+ * The pip requirement the registry path installs: the package name pinned
+ * to the floor above. Passing the floor to pip is what makes an existing
+ * older installation *unsatisfied*, so `pip install --upgrade` actually
+ * moves it instead of reporting already-satisfied.
+ */
+export const PYPI_REQUIREMENT = `${PYPI_PACKAGE_NAME}>=${MINIMUM_ROUTER_VERSION}`;
 export const REPO_URL = "https://github.com/darndestdabbler/dabbler-ai-orchestration.git";
 export const ROUTER_CONFIG_REL = path.posix.join("ai_router", "router-config.yaml");
 export const LOCAL_OVERRIDES_REL = path.posix.join("ai_router", "local-overrides.yaml");
@@ -111,6 +131,31 @@ export interface InstallDeps {
   /** Configured Python interpreter path (e.g. ``"python"`` or ``".venv/Scripts/python.exe"``). */
   pythonPath: string;
   /**
+   * Set 122 S3: resolve the interpreter the MODULE LAUNCHERS will use.
+   *
+   * A THUNK, not a string, and that is the whole point. The launchers call
+   * `resolvePythonInterpreter(workspaceRoot)`, whose precedence is
+   * (1) the explicit `dabblerSessionSets.pythonPath` setting,
+   * (2) the auto-detected workspace `.venv`, (3) bare `python`. On a fresh
+   * project that answer CHANGES DURING THIS INSTALL: before the install
+   * there is no `.venv`, so it resolves to bare `python`; afterwards it
+   * resolves to the venv just created. Capturing it eagerly would probe
+   * bare `python` on the main cold-start path and report a perfectly good
+   * setup as failed (verification round 3, Major 1). Calling it AFTER the
+   * install gives the right answer in both directions:
+   *
+   *   - no explicit setting -> the newly-created `.venv`, which is what
+   *     the launchers will resolve;
+   *   - an explicit non-venv setting (e.g. `C:\Python311\python.exe`, a
+   *     supported configuration) -> that interpreter, which is what the
+   *     launchers will resolve even though `ensureVenv` installed into
+   *     `<workspace>/.venv` — the divergence this exists to catch.
+   *
+   * Optional so existing callers and test fakes keep compiling; when
+   * omitted the probe falls back to the venv interpreter.
+   */
+  resolveLauncherPython?: () => string;
+  /**
    * Repo URL the GitHub fallback path clones from. Defaults to the
    * upstream when omitted; the install command threads
    * ``dabblerSessionSets.aiRouterRepoUrl`` through here so fork-trackers
@@ -141,6 +186,14 @@ export interface InstallOutcome {
    * want to assert the latest-tag resolution worked.
    */
   resolvedRef?: string | null;
+  /**
+   * Set 122 S3: the post-install capability probe. Present whenever an
+   * install got far enough to have a venv to probe. When the probe fails,
+   * `ok` is false even though pip itself succeeded — pip's exit code is
+   * not evidence that the launcher's interpreter can run
+   * `python -m ai_router.modules`.
+   */
+  capability?: RouterCapabilityProbe;
 }
 
 const DEFAULT_GITHUB_REF = "<latest released tag>";
@@ -281,9 +334,51 @@ async function doInstall(deps: InstallDeps, opts: DoInstallOpts): Promise<Instal
   const venvPath = venvResult.venvPath;
 
   if (source === "pypi") {
-    return await runPyPiInstall(deps, { venvPath, mode: opts.mode, report });
+    return await verifyRouterCapability(
+      deps,
+      await runPyPiInstall(deps, { venvPath, mode: opts.mode, report }),
+    );
   }
-  return await runGitHubInstall(deps, { venvPath, report });
+  return await verifyRouterCapability(
+    deps,
+    await runGitHubInstall(deps, { venvPath, report }),
+  );
+}
+
+/**
+ * Turn "pip said 0" into "the launcher's interpreter can actually do it".
+ *
+ * Set 122 S3. Both install sources funnel through here so neither can
+ * grow its own answer to the same question. An install that placed a
+ * wheel but left `ai_router.modules` unimportable is reported as a FAILED
+ * install, because that is what it is from the caller's point of view:
+ * every downstream consumer already branches on `ok` (the scaffold's
+ * `installOk`, the seat-setup gate, the UI's success/warning split), and
+ * the Copilot seat refresh imports `ai_router` from this same venv, so it
+ * cannot succeed either.
+ */
+async function verifyRouterCapability(
+  deps: InstallDeps,
+  outcome: InstallOutcome,
+): Promise<InstallOutcome> {
+  if (!outcome.ok || !outcome.venvPath) return outcome;
+  // Set 122 S3: probe the interpreter the LAUNCHERS resolve, not merely
+  // the venv this install wrote to — and resolve it NOW, after the venv
+  // exists, because that answer changes during the install (round 3,
+  // Major 1). A resolver that returns nothing usable falls back to the
+  // venv interpreter rather than probing an empty string.
+  const resolved = deps.resolveLauncherPython?.()?.trim();
+  const target = resolved ? resolved : venvPython(outcome.venvPath);
+  const capability = await probeRouterCapability(deps.spawner, target, {
+    cwd: deps.workspaceRoot,
+  });
+  if (capability.ok) return { ...outcome, capability };
+  return {
+    ...outcome,
+    ok: false,
+    capability,
+    message: `${outcome.message} ${capability.message}`,
+  };
 }
 
 // ---------- venv detection / creation ----------
@@ -441,13 +536,14 @@ interface PyPiOpts {
  * and then publishing the extension, which is exactly the ordering this
  * set's spec already mandates and which only the operator can execute.
  *
- * Unset in production, where the value is simply the package name.
+ * Unset in production, where the value is simply the pinned package
+ * requirement ({@link PYPI_REQUIREMENT}).
  */
 export function routerInstallSpec(
   env: Record<string, string | undefined> = process.env,
 ): string {
   const override = (env.DABBLER_ROUTER_INSTALL_SPEC ?? "").trim();
-  return override === "" ? PYPI_PACKAGE_NAME : override;
+  return override === "" ? PYPI_REQUIREMENT : override;
 }
 
 /**
@@ -473,7 +569,7 @@ export function routerInstallRequirement(
   },
 ): string[] {
   const spec = routerInstallSpec(env);
-  return spec !== PYPI_PACKAGE_NAME && isDirectory(spec) ? ["-e", spec] : [spec];
+  return spec !== PYPI_REQUIREMENT && isDirectory(spec) ? ["-e", spec] : [spec];
 }
 
 async function runPyPiInstall(
@@ -482,16 +578,26 @@ async function runPyPiInstall(
 ): Promise<InstallOutcome> {
   const requirement = routerInstallRequirement();
   const spec = routerInstallSpec();
-  const source = spec === PYPI_PACKAGE_NAME ? "PyPI" : spec;
+  const source = spec === PYPI_REQUIREMENT ? "PyPI" : spec;
   opts.report(
     opts.mode === "update"
       ? `Force-refreshing ${PYPI_PACKAGE_NAME} from ${source}…`
-      : `Installing ${PYPI_PACKAGE_NAME} from ${source}…`,
+      : `Installing ${PYPI_PACKAGE_NAME} (>=${MINIMUM_ROUTER_VERSION}) from ${source}…`,
   );
+  // Set 122 S3: `install` carries `--upgrade` too. It used to be
+  // `update`-only, and that was the concrete regression this session
+  // exists to prevent: a developer whose `.venv` already holds an older
+  // `dabbler-ai-router` takes the Marketplace update, re-runs "Dabbler:
+  // Set Up New Project", and pip reports the existing install as
+  // already-satisfied — leaving every module command failing with
+  // `No module named ai_router.modules`. Widening the existing path is
+  // deliberate: the spec prefers it over adding a third mode, and the
+  // two modes stay meaningfully different (`update` additionally
+  // force-reinstalls from a cold cache to repair a corrupt install).
   const pipArgs =
     opts.mode === "update"
       ? ["-m", "pip", "install", "--upgrade", "--force-reinstall", "--no-cache-dir", ...requirement]
-      : ["-m", "pip", "install", ...requirement];
+      : ["-m", "pip", "install", "--upgrade", ...requirement];
   const venvPy = venvPython(opts.venvPath);
   const result = await deps.spawner(venvPy, pipArgs, {
     cwd: deps.workspaceRoot,
@@ -592,6 +698,159 @@ async function readBundledRouterConfig(
   });
   if (result.exitCode !== 0 || !result.stdout) return null;
   return result.stdout;
+}
+
+// ---------- Set 122 S3: the capability precondition ----------
+
+/**
+ * The module every Session-2 launcher shells out to. Probing THIS is the
+ * point: pip's exit code says a wheel was placed on disk, not that the
+ * interpreter the launcher will use can do the thing the extension needs
+ * (L-125-1 — compare what a transport CAN DO, not what it returns).
+ */
+export const ROUTER_CAPABILITY_MODULE = "ai_router.modules";
+
+/**
+ * The probe body. Imports the capability module first — that is the hard
+ * gate — then reports the installed distribution version, or the empty
+ * string when the metadata lookup fails. A failed *version* lookup must
+ * not read as a failed *capability*, which is why it is caught separately.
+ *
+ * ASCII-only by construction: the only thing written to stdout is a
+ * version string, so the child's cp1252 text layer on Windows has nothing
+ * it cannot encode (L-079-1). Real newlines are safe here — the spawner
+ * calls `cp.spawn` with an args array and no shell.
+ */
+export const ROUTER_CAPABILITY_PROBE_CODE = [
+  "import importlib, sys",
+  `importlib.import_module(${JSON.stringify(ROUTER_CAPABILITY_MODULE)})`,
+  "try:",
+  "    from importlib.metadata import version",
+  `    v = version(${JSON.stringify(PYPI_PACKAGE_NAME)})`,
+  "except Exception:",
+  '    v = ""',
+  "sys.stdout.write(v)",
+].join("\n");
+
+export interface RouterCapabilityProbe {
+  /** True only when the capability module imported AND the floor is met. */
+  ok: boolean;
+  /**
+   * The interpreter that was actually asked. Carried because "which
+   * interpreter answered?" is the question behind this whole precondition
+   * — a probe that silently asks the wrong one looks identical to one that
+   * asks the right one.
+   */
+  interpreter: string;
+  /** The installed distribution version, or null when undeterminable. */
+  version: string | null;
+  /** Which check failed, for callers that branch (never for display). */
+  reason: "ok" | "not-importable" | "below-floor" | "probe-failed";
+  /** An operator-facing single-line explanation. Always non-empty. */
+  message: string;
+}
+
+/**
+ * Compare two dotted release strings numerically.
+ *
+ * Returns a negative number when `a < b`, 0 when equal, positive when
+ * `a > b`. Only the leading numeric release segment is compared; any
+ * suffix (`1.0.0rc1`, `1.0.0.dev3+local`) is ignored, which deliberately
+ * treats a pre-release of the floor as meeting it — a developer running
+ * `1.0.0rc1` has `ai_router.modules`, and the import probe is the real
+ * gate regardless.
+ *
+ * Returns `null` when either side has no parseable release segment, so
+ * the caller can decline to judge rather than guess.
+ */
+export function compareReleaseVersions(a: string, b: string): number | null {
+  const parse = (v: string): number[] | null => {
+    const m = /^\s*(\d+(?:\.\d+)*)/.exec(v);
+    if (!m) return null;
+    return m[1].split(".").map((n) => Number(n));
+  };
+  const pa = parse(a);
+  const pb = parse(b);
+  if (pa === null || pb === null) return null;
+  const len = Math.max(pa.length, pb.length);
+  for (let i = 0; i < len; i += 1) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return d;
+  }
+  return 0;
+}
+
+/**
+ * Ask the venv interpreter the launcher will use whether it can actually
+ * run the module lifecycle, and whether it meets {@link
+ * MINIMUM_ROUTER_VERSION}.
+ *
+ * Never throws: a spawn failure is reported as a failed probe, because
+ * "we could not confirm the capability" and "the capability is missing"
+ * lead to the same operator action and neither may be treated as success.
+ * Provisioning is exactly where a silent fail-open hides (L-079-3), so
+ * this has no fail-open branch at all — every path that is not a clean
+ * import returns `ok: false`.
+ */
+export async function probeRouterCapability(
+  spawner: ProcessSpawner,
+  venvPythonPath: string,
+  opts: { cwd?: string; timeoutMs?: number } = {},
+): Promise<RouterCapabilityProbe> {
+  let result: SpawnResult;
+  try {
+    result = await spawner(venvPythonPath, ["-c", ROUTER_CAPABILITY_PROBE_CODE], {
+      cwd: opts.cwd,
+      timeoutMs: opts.timeoutMs ?? 60_000,
+    });
+  } catch (err) {
+    const detail = err instanceof Error ? err.message : String(err);
+    return {
+      ok: false,
+      interpreter: venvPythonPath,
+      version: null,
+      reason: "probe-failed",
+      message:
+        `Could not verify ${PYPI_PACKAGE_NAME} in '${venvPythonPath}': ${oneLine(detail)}. ` +
+        describeAiRouterImportFailure(venvPythonPath),
+    };
+  }
+  if (result.exitCode !== 0) {
+    const detail = oneLine(result.stderr || result.stdout);
+    return {
+      ok: false,
+      interpreter: venvPythonPath,
+      version: null,
+      reason: "not-importable",
+      message:
+        `${ROUTER_CAPABILITY_MODULE} could not be imported after installing ` +
+        `${PYPI_PACKAGE_NAME}${detail ? ` (${detail})` : ""}. ` +
+        describeAiRouterImportFailure(venvPythonPath),
+    };
+  }
+  const version = result.stdout.trim() || null;
+  if (version !== null) {
+    const cmp = compareReleaseVersions(version, MINIMUM_ROUTER_VERSION);
+    if (cmp !== null && cmp < 0) {
+      return {
+        ok: false,
+        interpreter: venvPythonPath,
+        version,
+        reason: "below-floor",
+        message:
+          `${PYPI_PACKAGE_NAME} ${version} is installed in '${venvPythonPath}', but this ` +
+          `extension requires >=${MINIMUM_ROUTER_VERSION}. Run "Dabbler: Update ai-router" ` +
+          `to upgrade it, then try again.`,
+      };
+    }
+  }
+  return {
+    ok: true,
+    interpreter: venvPythonPath,
+    version,
+    reason: "ok",
+    message: `${ROUTER_CAPABILITY_MODULE} is importable${version ? ` (${PYPI_PACKAGE_NAME} ${version})` : ""}.`,
+  };
 }
 
 // ---------- GitHub sparse-checkout path ----------

@@ -216,6 +216,63 @@ jobs:
           'src/test/suite/sampleProjectCore.test.ts'
           'src/test/suite/sampleProjectSmoke.test.ts'
 
+  provisioning-dogfood:
+    name: Provisioning dogfood (Set 122)
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    # Set 122 S3: the L-079-3 cold-start dogfood for the router version
+    # floor. Layer 2 as a whole is skipped in CI (see the note at the
+    # bottom of this file) and this lane is not part of it anyway, so
+    # without this job the dogfood would be local-only and would rot
+    # silently — the exact failure L-064-12 records, and the same
+    # reasoning that gave the sample-project smoke its own job.
+    #
+    # What it guards is a REGRESSION WITH A KNOWN VICTIM: the extension
+    # shells out to `python -m ai_router.modules`, and a plain
+    # `pip install` reports an existing older router as already-satisfied.
+    # These scenarios install a real historical `dabbler-ai-router==0.34.0`
+    # from PyPI and assert setup upgrades past the floor, so a future edit
+    # that drops `--upgrade` or the pinned requirement fails here rather
+    # than in a developer's venv after a Marketplace update.
+    #
+    # It needs BOTH runtimes (real `python -m venv` + real `pip install`,
+    # driven from Node) and the network. Both OSes run it because the venv
+    # interpreter path shape and the base-interpreter resolution are
+    # platform-sensitive.
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0
+        with:
+          python-version: "3.11"
+
+      # The lane's venv-isolation check asserts that an EMPTY venv cannot
+      # import `ai_router.modules` while the HOST interpreter can — which
+      # is what makes that assertion a real discrimination rather than a
+      # universally-true statement. On a clean runner there is no repo-root
+      # `.venv`, so the host interpreter is this one and it must carry the
+      # checkout's own package. Same step, same reason, as the
+      # sample-project smoke job.
+      - name: Install ai_router into the host interpreter
+        run: pip install -e .
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: "20"
+
+      - name: Install extension dependencies
+        run: npm ci
+        working-directory: tools/dabbler-ai-orchestration
+
+      - name: Run the provisioning dogfoods
+        working-directory: tools/dabbler-ai-orchestration
+        run: npm run test:dogfood
+
   python-tests:
     name: Python tests
     runs-on: ${{ matrix.os }}

@@ -248,6 +248,157 @@
       "dateTime": "2026-08-13T09:13:01.885471-04:00",
       "description": "Full pytest of record after the last code change: 4213 passed, 9 skipped in 906s. Layer 2 (npm run test:unit): 1421 passing, 2 pending. Full npm run test:playwright owed here because package.json is the extension MANIFEST (L-064-12): 20 passed / 11 failed. Eight of the eleven pass in isolation (parallel-load flake on a 4-vCPU box, confirmed spec by spec, and icon-render-mechanism additionally confirmed green at HEAD and green again after a recompile). Two were the deliberate register-tick behaviour change in work-explorer-steps.spec.ts and are updated and green. One is KNOWN-RED and operator-attested: vsix-first-run-walkthrough.spec.ts does a real network pip install, which fetches dabbler-ai-router 0.34.0 from PyPI -- a wheel that predates ai_router.modules -- so the now-Python-backed default-module scaffold cannot run on a true cold start. That is the exact regression Session 4 exists to prevent; it owns the fix and is the release gate, so neither registry publishes while it is red. All three runs recorded via run_of_record.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "declare-the-floor-and-make-the",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "**Declare the floor, and make the install satisfy it.** Define the minimum router the extension requires (`dabbler-ai-router>=1.0.0` if `ai_router.modules` ships in the staged `1.0.0`) in ONE place both the install path and the precondition read \u2014 two independently-maintained version constants is the drift defect this repo keeps re-finding (L-069-1). The setup install must **upgrade an existing older installation** rather than accept it: today only `mode: \"update\"` passes `--upgrade` (`aiRouterInstall.ts:431`), and `mode: \"install\"` does not. Prefer widening the existing install path over adding a third mode.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "probe-the-capability-and-refuse-to",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "**Probe the capability, and refuse to proceed without it.** After installing, probe **the same venv interpreter the launcher will use** by importing `ai_router.modules` \u2014 never infer success from pip's exit code alone (L-125-1: compare what the transport CAN DO, not what it returns; L-079-3: provisioning is exactly where silent fail-open paths hide). On failure, do **not** run Python-backed default-module creation; report it and leave a supported retry path \u2014 `describeAiRouterImportFailure` is already the right message and the Copilot-seat gate (`skip-install-incomplete`, `gitScaffold.ts:638`) is already the right pattern. Then **fix retryability**: `gitScaffold.ts:530` gates default-module creation on the manifest having been created *in that call*, so a second setup attempt after a failed install can never produce the default module \u2014 the user's only recovery is deleting a `docs/modules.yaml` nobody told them about. Gate on the module being absent, not on who created the manifest.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "dogfood-the-true-cold-start-and",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "**Dogfood the true cold start, and the upgrade.** L-079-3 is binding for any set shipping provisioning: at least one walk must begin from a **fresh empty folder** with no pre-seeded config and assert the provisioned artifacts exist. Two scenarios, both automated \u2014 the set declares `requiresUAT: false` and that flag is immutable, so this is a scripted/Layer 3 dogfood, **not** an operator walk: (a) a clean project with no `.venv` finishes setup with `ai_router.modules` importable from the created venv and the default module present; (b) a project whose `.venv` holds `dabbler-ai-router==0.34.0` is upgraded to a compatible release by setup. Assert the failure path too: an unavailable install attempts no Python-backed module mutation, and re-running setup after that failure succeeds **without** deleting the already-created `docs/modules.yaml`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "**Required portion of the full test suite.** This session touches the scaffold and install surfaces the Explorer renders from; if it edits `package.json`, **`L-064-12` applies** and the full `npm run test:playwright` is owed alongside pytest, run after the last edit and never before.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T10:07:38.624590-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-13T10:07:38.644945-04:00",
+      "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "declare-the-floor-and-make-the",
+      "dateTime": "2026-08-13T10:11:36.550252-04:00",
+      "description": "Declaring the router version floor in one place and widening the install path to upgrade an existing older installation.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "declare-the-floor-and-make-the",
+      "dateTime": "2026-08-13T10:31:51.966568-04:00",
+      "description": "MINIMUM_ROUTER_VERSION + PYPI_REQUIREMENT declared once in aiRouterInstall.ts; the install requirement and the capability precondition both derive from it (L-069-1), pinned by a test that fails if either is hard-coded. mode:install now passes --upgrade, so an existing older venv is upgraded rather than reported already-satisfied.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "probe-the-capability-and-refuse-to",
+      "dateTime": "2026-08-13T10:31:51.968739-04:00",
+      "description": "probeRouterCapability imports ai_router.modules with the VENV interpreter the launcher uses (L-125-1), never inferring success from pip exit codes; a failed probe flips the install outcome to ok:false with no fail-open branch. gitScaffold gates default-module creation on decideDefaultModuleScaffold (module ABSENT, not manifest provenance), which fixes retryability: a retry after a failed install now scaffolds without deleting docs/modules.yaml.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "dogfood-the-true-cold-start-and",
+      "dateTime": "2026-08-13T10:31:51.970740-04:00",
+      "description": "Authoring the cold-start and upgrade dogfoods (L-079-3).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "dogfood-the-true-cold-start-and",
+      "dateTime": "2026-08-13T10:43:29.876976-04:00",
+      "description": "New lane npm run test:dogfood (src/test/dogfood/), 4 scenarios, real venv + real network pip, no seams: (a) clean project with no .venv finishes setup with ai_router.modules importable and the scaffold gate saying scaffold; (b) a venv holding a REAL dabbler-ai-router==0.34.0 from PyPI is upgraded past the floor, with the vacuity premise asserted first (0.34.0 must NOT provide ai_router.modules); (c) an unresolvable install attempts no Python-backed mutation and a re-run recovers with docs/modules.yaml untouched; (d) the probe answers for the venv it is given, not the host. Caught a real defect while authoring: passing a venv-shaped pythonPath made ensureVenv provision into the REPO venv, so the cold-start scenario had been passing vacuously (13s vs 38s). Fixed by resolving sys.base_prefix and asserting the venv lands under the temp project.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T10:45:37.879853-04:00",
+      "description": "Running the phased cross-provider verification loop.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-13T11:21:33.405666-04:00",
+      "description": "Cross-provider verification (gpt-5.5; anthropic excluded as the orchestrator effective provider). Discovery round 1 fanned out 2/2 and returned 4 blocking Majors reducing to 2 classes: the capability probe answered for the install venv rather than the interpreter the launchers resolve, and the dogfood asserted the GATE instead of the outcome. Supplementary round 2 added 1 more: the new CI lane depended on untracked local Python state. Remediation-review round 3 accepted 1 and REJECTED 2, catching a regression the round-1 fix introduced (the launcher interpreter was resolved eagerly, before .venv existed, which would have made the ordinary cold start report a good install as failed). Fixed by making it a thunk resolved after install, plus a mutation-checked falsifier. Round 4: VERIFIED, 5 accepted / 0 rejected, 0 findings.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T11:21:33.407941-04:00",
+      "description": "Running the full suites owed by covers: pytest (Layer 1) and full Playwright (Layer 3, owed because package.json is the extension MANIFEST - L-064-12), after the last code change.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-13T11:57:44.424658-04:00",
+      "description": "All three layers run after the last code change and recorded via run_of_record. Layer 1 pytest: 4214 passed, 9 skipped in 662s (digest 1a94cea85bbf). Layer 2 mocha: 1450 passing, 2 pending in 63s (digest f440dafe1fe1). Layer 3 Playwright FULL, owed because package.json is the extension MANIFEST (L-064-12): 31/31 passed in 6.7m at 2 workers, the count CI uses per residual S122-S2-R2 - including vsix-first-run-walkthrough, which Session 2 closed out as KNOWN-RED. The first pytest attempt failed one test: the anti-resurrection guard scanned build/lib, a pip-generated copy of its own source. Fixed by excluding build/ and .eggs from the shared scan with a narrow falsifier; classified A4.2 by post_round_delta and settled by a delta-scoped remediation-review (round 5, VERIFIED).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-13T11:57:44.429315-04:00",
+      "description": "Authoring disposition.json, committing and pushing, running close_session.",
+      "status": "in-progress"
     }
   ]
 }

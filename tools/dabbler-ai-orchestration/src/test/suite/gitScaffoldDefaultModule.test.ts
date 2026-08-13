@@ -15,9 +15,12 @@ import * as path from "path";
 import * as vscode from "vscode";
 import {
   BuildStructureSeams,
+  DefaultModuleGate,
   DefaultModuleScaffoldOutcome,
   ScaffoldResult,
   buildProjectStructureNoPrompt,
+  decideDefaultModuleScaffold,
+  describeDefaultModuleSkip,
   scaffoldConsumerRepo,
   scaffoldDefaultModuleAndLifecycleSets,
 } from "../../commands/gitScaffold";
@@ -247,14 +250,14 @@ suite(
     const projectDir = path.join("/tmp", "default-module-proj");
     const fakeBundle = { engineFiles: {}, templates: {} } as unknown as TemplateBundle;
 
-    function scaffoldResult(manifestJustCreated: boolean): ScaffoldResult {
+    function scaffoldResult(manifestJustCreated: boolean, installOk = true): ScaffoldResult {
       return {
         written: manifestJustCreated
           ? ["CLAUDE.md", MODULES_MANIFEST_DISPLAY]
           : ["CLAUDE.md"],
         skipped: manifestJustCreated ? [] : [MODULES_MANIFEST_DISPLAY],
-        installOk: true,
-        installMessage: "installed",
+        installOk,
+        installMessage: installOk ? "installed" : "pip install failed",
         budgetOutcome: null,
       };
     }
@@ -272,18 +275,25 @@ suite(
     function baseSeams(
       manifestJustCreated: boolean,
       scaffoldDefaultModuleCalls: string[],
+      gate: DefaultModuleGate = "scaffold",
+      installOk = true,
     ): BuildStructureSeams {
       return {
         probePython: () => true,
         gitInit: async () => {},
         loadBundle: () => fakeBundle,
         runScaffold: async () => ({
-          result: scaffoldResult(manifestJustCreated),
+          result: scaffoldResult(manifestJustCreated, installOk),
           installOutcome: fakeInstallOutcome(),
         }),
         showInfo: () => {},
         showWarning: () => {},
         recordSeatChoice: () => {},
+        // Set 122 S3: the gate is a seam so the wiring tests below drive
+        // each branch without arranging a real manifest on disk. The gate's
+        // own decision logic is pinned by the pure-function suite further
+        // down, against real classifications.
+        decideDefaultModule: () => gate,
         scaffoldDefaultModule: (dir: string): DefaultModuleScaffoldOutcome => {
           scaffoldDefaultModuleCalls.push(dir);
           return {
@@ -296,7 +306,7 @@ suite(
       };
     }
 
-    test("fresh manifest (written): the default-module seam runs exactly once, on projectDir", async () => {
+    test("gate says scaffold: the default-module seam runs exactly once, on projectDir", async () => {
       const calls: string[] = [];
       const seams = baseSeams(true, calls);
       const infos: string[] = [];
@@ -312,9 +322,11 @@ suite(
       assert.ok(infos[0].includes("Default module scaffolded."));
     });
 
-    test("pre-existing manifest (skipped): the default-module seam never runs", async () => {
+    test("gate says modules already declared: the default-module seam never runs", async () => {
       const calls: string[] = [];
-      const seams = baseSeams(false, calls);
+      const seams = baseSeams(false, calls, "skip-modules-declared");
+      const infos: string[] = [];
+      seams.showInfo = (m) => infos.push(m);
       await buildProjectStructureNoPrompt(
         fakeContext(),
         projectDir,
@@ -323,8 +335,42 @@ suite(
         seams,
       );
       assert.deepStrictEqual(calls, []);
+      // A repo that already has modules is not told anything about the
+      // default module — silence is the correct note here.
+      assert.ok(
+        !infos[0].includes("default module"),
+        `unexpected default-module note: ${infos[0]}`,
+      );
     });
 
+    test("gate says the router is unavailable: nothing is scaffolded and the retry path is named", async () => {
+      // Set 122 S3. The old flow shelled out to `python -m ai_router.modules`
+      // regardless and reported the failure after the fact; worse, the
+      // attempt consumed the only chance to create the module. Both halves
+      // are asserted here: no Python-backed mutation is attempted, AND the
+      // operator is told the retry works without deleting anything.
+      const calls: string[] = [];
+      const warnings: string[] = [];
+      const seams = baseSeams(true, calls, "skip-router-unavailable", false);
+      seams.showWarning = (m) => warnings.push(m);
+      await buildProjectStructureNoPrompt(
+        fakeContext(),
+        projectDir,
+        undefined,
+        undefined,
+        seams,
+      );
+      assert.deepStrictEqual(calls, [], "no Python-backed module mutation may be attempted");
+      const note = warnings.join(" ");
+      assert.ok(
+        note.includes("was NOT scaffolded"),
+        `expected an explicit not-scaffolded note, got: ${note}`,
+      );
+      assert.ok(
+        /do NOT need to delete/i.test(note),
+        `expected the retry path to be named, got: ${note}`,
+      );
+    });
     test("without a seam override, the REAL writer runs against the real projectDir", async () => {
       const root = fs.mkdtempSync(
         path.join(os.tmpdir(), "default-module-real-build-"),
@@ -473,5 +519,84 @@ suite("gitScaffold — Work Explorer tree end-state (Set 101 S1 verification fin
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+suite("gitScaffold — decideDefaultModuleScaffold (Set 122 S3)", () => {
+  const capable = true;
+  test("an absent manifest with a working router scaffolds", () => {
+    assert.strictEqual(
+      decideDefaultModuleScaffold({ kind: "absent" }, capable),
+      "scaffold",
+    );
+  });
+
+  test("RETRYABILITY: a manifest that already exists but declares NO modules still scaffolds", () => {
+    // This is the regression falsifier for the Set 122 S3 fix. The manifest
+    // is written BEFORE the install runs, so under the old
+    // "did this call create docs/modules.yaml?" gate the first attempt
+    // always consumed the only chance to create the module: a retry after a
+    // failed install found the file present and declined forever, and the
+    // user's only recovery was deleting a file nobody told them about.
+    assert.strictEqual(
+      decideDefaultModuleScaffold({ kind: "present", entries: [] }, capable),
+      "scaffold",
+    );
+  });
+
+  test("a manifest that declares modules is left alone", () => {
+    assert.strictEqual(
+      decideDefaultModuleScaffold(
+        {
+          kind: "present",
+          entries: [{ slug: "api", title: "API" } as never],
+        },
+        capable,
+      ),
+      "skip-modules-declared",
+    );
+  });
+
+  test("an invalid manifest is never written through", () => {
+    assert.strictEqual(
+      decideDefaultModuleScaffold({ kind: "invalid" }, capable),
+      "skip-manifest-invalid",
+    );
+  });
+
+  test("an unavailable router refuses BEFORE any Python-backed mutation", () => {
+    // L-079-3: provisioning is exactly where silent fail-open paths hide.
+    assert.strictEqual(
+      decideDefaultModuleScaffold({ kind: "absent" }, false),
+      "skip-router-unavailable",
+    );
+    assert.strictEqual(
+      decideDefaultModuleScaffold({ kind: "present", entries: [] }, false),
+      "skip-router-unavailable",
+    );
+  });
+
+  test("a repo that already has modules is NOT told the router is missing", () => {
+    // Reporting an install problem to a repo that needed no install is a
+    // false alarm; the declared-modules answer wins over the router one.
+    assert.strictEqual(
+      decideDefaultModuleScaffold(
+        {
+          kind: "present",
+          entries: [{ slug: "api", title: "API" } as never],
+        },
+        false,
+      ),
+      "skip-modules-declared",
+    );
+  });
+
+  test("every declining branch that has a retry path names it", () => {
+    assert.strictEqual(describeDefaultModuleSkip("scaffold"), "");
+    assert.strictEqual(describeDefaultModuleSkip("skip-modules-declared"), "");
+    assert.ok(describeDefaultModuleSkip("skip-manifest-invalid").length > 0);
+    const unavailable = describeDefaultModuleSkip("skip-router-unavailable");
+    assert.ok(/Dabbler: Install ai-router/.test(unavailable), unavailable);
+    assert.ok(/do NOT need to delete/i.test(unavailable), unavailable);
   });
 });

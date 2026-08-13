@@ -1,0 +1,17 @@
+ISSUES FOUND
+
+**Issue 1:** The capability probe is not guaranteed to probe the interpreter the launchers will actually use.
+- **Category:** Correctness
+- **Severity:** Major
+- **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts:340`, `tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts:596`, `tools/dabbler-ai-orchestration/src/utils/routerCli.ts:222`, `tools/dabbler-ai-orchestration/src/utils/pythonInterpreter.ts:120`, `tools/dabbler-ai-orchestration/package.json:483`
+- **Failure scenario:** A developer has explicitly set `dabblerSessionSets.pythonPath` to a system/base interpreter such as `C:\Python311\python.exe`, which is a supported configuration surface. Setup creates and probes the workspace `.venv`, returns `installOk: true`, then default-module creation and every later module launcher resolve the explicit base interpreter instead of `.venv`, so `python -m ai_router.modules` can still fail with `No module named ai_router.modules`.
+- **Acceptance criterion:** `JUDGMENT - A reviewer can see that setup’s post-install probe and all module launchers use the same resolved interpreter, including when pythonPath is explicitly set to a non-venv bootstrap interpreter.`
+- **Details:** Violation: the plan requires probing “the same venv interpreter the launcher will use.” Impact: the release-gate guarantee is false for a supported interpreter configuration; setup can claim the router is capable while module commands still fail. Evidence: `verifyRouterCapability` probes `venvPython(outcome.venvPath)`, while `runRouterCli` resolves launchers through `resolvePythonInterpreter`, whose first precedence is the explicit `pythonPath`, not the installed/probed venv.
+
+**Issue 2:** The new dogfood lane does not prove the promised full setup outcome or default-module recovery.
+- **Category:** Completeness / False Positive
+- **Severity:** Major
+- **Evidence paths:** `tools/dabbler-ai-orchestration/src/test/dogfood/routerFloorProvisioning.test.ts:193`, `tools/dabbler-ai-orchestration/src/test/dogfood/routerFloorProvisioning.test.ts:301`, `tools/dabbler-ai-orchestration/CHANGELOG.md:612`
+- **Failure scenario:** A regression in the Python-backed default-module scaffold, or in the install-to-launcher interpreter handoff above, can leave fresh setup without the `default` module/lifecycle sets while `npm run test:dogfood` still passes, because the dogfood only runs `installAiRouter`, creates/checks `docs/modules.yaml`, and asserts `decideDefaultModuleScaffold(...) === "scaffold"`.
+- **Acceptance criterion:** `JUDGMENT - The dogfood drives the real setup path from a fresh empty folder and asserts the default module entry, module plan, and two lifecycle session-set specs exist; its failure/retry scenario must assert those artifacts are created on rerun without deleting the existing manifest.`
+- **Details:** Violation: the plan requires a clean project to finish setup with “the default module present” and retry to recover after failed install. Impact: the release-gate evidence is overstated and would not catch a missing default module before Marketplace release. Evidence: the cold-start dogfood stops after `realInstall`, `ensureModulesManifest`, and a pure gate check; the retry dogfood likewise never calls `buildProjectStructureNoPrompt` or `scaffoldDefaultModuleAndLifecycleSets`, yet the changelog claims the lane proves the module recovery.

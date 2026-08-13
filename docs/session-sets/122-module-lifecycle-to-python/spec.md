@@ -60,6 +60,28 @@ prerequisites:
 > fail every module command with `No module named ai_router.modules`. The
 > operator publishes both registries immediately after this set lands, which
 > makes the guarantee a release blocker rather than a follow-up.
+>
+> **Amended again 2026-08-13 (after Session 2 closed): the two remaining
+> sessions SWAPPED NUMBERS.** The router guarantee is now **Session 3**;
+> the append-file partitioning is now **Session 4**. The content of both
+> is unchanged — only the numbers moved.
+>
+> **Why.** Session 2's close journaled an operator decision to *"run
+> Session 4 next, before Session 3."* `start_session` **refuses to skip
+> ahead** (`start_session.py:948`, exit 3): contiguous closure is a
+> structural assumption of the extension's in-flight predicate and of
+> `compute_effective_completed_sessions`, so a gap is not a shape the
+> protocol models. Renumbering is therefore the only way to express the
+> operator's ordering through the sanctioned writer. Operator-confirmed
+> 2026-08-13 and journaled in `decisions.jsonl`.
+>
+> **Reading the older records.** Session 2's `disposition.json` and the
+> 2026-08-13 decision entry both say *"Session 4"* where they mean the
+> router guarantee, and residual **`S122-S2-R3`** names its owner as
+> *"Set 122 Session 4"* for the same reason. Those artifacts are raw
+> records and are **not** rewritten; read them as naming the router
+> guarantee, which is the session numbered **3** from here on. The
+> partitioning session inherited the number 4 and none of that history.
 
 ---
 
@@ -119,7 +141,7 @@ rather than three.
 - **Not enforcing module boundaries.** Verdict §9 notes they are
   descriptive; the enforcement lint belongs with guidance candidate
   C-001.
-- **Not re-engineering `lessons-learned.md`** in the Session 3
+- **Not re-engineering `lessons-learned.md`** in the Session 4
   partitioning. Verdict §7 exempts it explicitly — it is already headed
   for deletion under the executable-or-drop rule.
 - **Not building anything for the next-week protocol.** Verdict §6.
@@ -221,42 +243,7 @@ changes **what happens behind them** and **what the developer sees**.
 
 ---
 
-### Session 3 of 4: Remove the guaranteed merge conflicts
-
-Verdict §7, adopted. The one genuine conflict Option A has, with a fix
-that needs no architecture change.
-
-**Steps:**
-
-1. Register.
-2. **Partition the append-only files.** Instead of every session appending
-   to one file, sessions write their own (`changelogs/121.md`,
-   `metrics/121.json`), and a small script concatenates on demand. This is
-   the same shape as Set 120's projection — **partitioned sources, one
-   computed view** — and it removes a guaranteed conflict from every
-   concurrent session. **`lessons-learned.md` is exempt** (verdict §7).
-3. **Keep the concatenated view byte-identical** to what the unpartitioned
-   file produced for the same inputs, and ship a falsifier proving the
-   round trip. A partitioning that quietly reorders history is worse than
-   the conflict it removes.
-4. **Refuse a duplicate set number at scaffold time.** The protocol
-   currently asks developers to reserve numbers in chat (verdict §6.4); a
-   check that refuses the collision is worth more than a convention nobody
-   remembers, and is far smaller than a reservation system. `resolve_set.py`
-   already treats the collision as a bug — surface it before the work
-   starts, not after.
-5. **Cross-provider verification.**
-6. **Required portion of the full test suite.**
-7. **Close-out.**
-
-**Creates:** the partitioned layout, the concatenation script, the collision refusal
-**Touches:** `ai_router/`, `ai_router/tests/`, `docs/`
-**Ends with:** two developers running concurrent sessions no longer collide on an append-only file or a set number.
-**Progress keys:** `filesPartitioned`, `roundTripFalsified`, `collisionRefused`
-
----
-
-### Session 4 of 4: Guarantee the router the launchers require
+### Session 3 of 4: Guarantee the router the launchers require
 
 Session 2 made the extension depend on a Python module. Nothing yet
 guarantees that module is *there*, or is new enough. This session closes
@@ -333,6 +320,41 @@ already-satisfied.
 
 ---
 
+### Session 4 of 4: Remove the guaranteed merge conflicts
+
+Verdict §7, adopted. The one genuine conflict Option A has, with a fix
+that needs no architecture change.
+
+**Steps:**
+
+1. Register.
+2. **Partition the append-only files.** Instead of every session appending
+   to one file, sessions write their own (`changelogs/121.md`,
+   `metrics/121.json`), and a small script concatenates on demand. This is
+   the same shape as Set 120's projection — **partitioned sources, one
+   computed view** — and it removes a guaranteed conflict from every
+   concurrent session. **`lessons-learned.md` is exempt** (verdict §7).
+3. **Keep the concatenated view byte-identical** to what the unpartitioned
+   file produced for the same inputs, and ship a falsifier proving the
+   round trip. A partitioning that quietly reorders history is worse than
+   the conflict it removes.
+4. **Refuse a duplicate set number at scaffold time.** The protocol
+   currently asks developers to reserve numbers in chat (verdict §6.4); a
+   check that refuses the collision is worth more than a convention nobody
+   remembers, and is far smaller than a reservation system. `resolve_set.py`
+   already treats the collision as a bug — surface it before the work
+   starts, not after.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite.**
+7. **Close-out.**
+
+**Creates:** the partitioned layout, the concatenation script, the collision refusal
+**Touches:** `ai_router/`, `ai_router/tests/`, `docs/`
+**Ends with:** two developers running concurrent sessions no longer collide on an append-only file or a set number.
+**Progress keys:** `filesPartitioned`, `roundTripFalsified`, `collisionRefused`
+
+---
+
 > **Irony budget: 30 new test functions across all three sessions.**
 > Below Set 120's 40 because Session 2 is mostly replacement behind
 > existing commands, already covered by the menu-parity test. Session 1
@@ -348,7 +370,7 @@ already-satisfied.
 > session can take, and verification then added a whole capability
 > (lifecycle-set scaffolding + numbering) the budget never priced. Sessions
 > 2–4 should **not** try to claw the overrun back by under-testing;
-> Session 4 in particular ships provisioning, where L-079-3 requires a
+> Session 3 in particular ships provisioning, where L-079-3 requires a
 > cold-start walk. Carry this to the Step 9 review as evidence that a
 > per-set count is the wrong unit — the cap the authoring guide actually
 > enforces is session SIZE, and Session 1 met that.

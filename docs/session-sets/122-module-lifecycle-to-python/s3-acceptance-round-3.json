@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "0e16602eecf3c9f3f5113b78317a57f03ae11333",
+  "fixedTree": "d8919dde4169b4f704f1d8a76e2e8f0bce89ae9a",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T15:18:55.392334+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The new `launcherPython` is resolved before cold-start setup creates `.venv`, so the capability probe can target bare `python` while later module launchers would use the newly created venv. - **Cat ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In a fresh workspace with no explicit pythonPath and no existing .venv, the post-install capability probe must target the newly-created workspace .venv interpreter, while an explicit non-venv pythonPath must still be probed as the launcher interpreter.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The remediation dogfood still bypasses the production setup path that Issue 1 breaks. - **Category:** Completeness / False Positive - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orc ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The dogfood or equivalent coverage must exercise the production cold-start setup interpreter handoff, including the launcher interpreter value supplied by the scaffold/install command, and fail if that value is stale bare python instead of the created .venv.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

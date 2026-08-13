@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "0e16602eecf3c9f3f5113b78317a57f03ae11333",
+  "fixedTree": "b3160575e79f1e0a94a49f2543b422751199038f",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-13T15:09:42.651706+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The new dogfood CI lane depends on untracked local Python state and will fail in a clean runner. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestrat ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "In a clean checkout with no repo-root .venv, the provisioning-dogfood workflow either explicitly makes the host interpreter able to import this checkout's ai_router package or removes the host-import premise, so the dogfood lane no longer depends on untracked local Python state.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

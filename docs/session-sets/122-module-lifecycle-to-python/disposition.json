@@ -1,45 +1,21 @@
 {
   "status": "completed",
-  "summary": "Session 2: the extension's module lifecycle is now thin launchers over `python -m ai_router.modules`, and the command is visible. All five context-menu commands (ids unchanged) run the CLI through the resolved workspace-venv interpreter, echo the exact copy-pasteable command line to a shared 'Dabbler Commands' output channel before spawning, and branch on the published exit codes (3 = refused, nothing written; 4 = write failure, with rolledBack distinguishing 'unchanged' from 'reconcile from git'). The TypeScript lifecycle they replaced is deleted, not left beside them: moduleAuthoring.ts 2601 -> 608 lines. Per operator decision the TypeScript session-state.json writer went too -- ai_router.session_lifecycle gained a cancel/restore CLI, cancelLifecycleCommands.ts routes through it, and cancelLifecycle.ts 549 -> 142 lines of readers -- so the invariant this whole set exists to restore is actually restored. Also: gitScaffold's default-module scaffold is Python-backed, copyModuleDecompositionPrompt is on the module context menu, residual S122-S1-R1 is closed, and start_session now ticks its own `register` step (operator-directed).",
+  "summary": "Session 3 (renumbered from 4 by operator decision): the extension now GUARANTEES the router its module launchers require, and refuses to half-finish when it cannot. Session 2 made every module command shell out to `python -m ai_router.modules`; nothing guaranteed that module was present or new enough, and the gap had a named victim -- a developer whose .venv held an older `dabbler-ai-router` would take the Marketplace update and then fail every module command, with re-running setup unable to help because a plain `pip install` reports an existing install as already-satisfied. Three things close it. (1) A version floor declared ONCE: `MINIMUM_ROUTER_VERSION` + the `PYPI_REQUIREMENT` derived from it, read by both the install path and the precondition (L-069-1), with `mode: install` now passing `--upgrade` so an older installation is upgraded rather than accepted. (2) A capability precondition that asks the interpreter the LAUNCHERS resolve to import `ai_router.modules`, never inferring success from pip's exit code (L-125-1), with no fail-open branch: a failed probe makes the install report failure. (3) A retryable scaffold: default-module creation is gated on the module being ABSENT rather than on whether that call created docs/modules.yaml, so a retry after a failed install recovers instead of being locked out behind a file nobody told the user about. Proven from a genuinely empty folder by a new `npm run test:dogfood` lane (real venv, real network pip, production handoff verbatim), wired into CI on Linux and Windows.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "files_changed": [
-    "ai_router/session_lifecycle.py",
-    "ai_router/session_checklist.py",
-    "ai_router/start_session.py",
-    "ai_router/modules.py",
-    "ai_router/tests/test_plan_seeding.py",
-    "ai_router/tests/test_modules_lifecycle.py",
-    "ai_router/CHANGELOG.md",
-    "tools/dabbler-ai-orchestration/src/utils/routerCli.ts",
-    "tools/dabbler-ai-orchestration/src/utils/moduleLifecycleCli.ts",
-    "tools/dabbler-ai-orchestration/src/utils/sessionLifecycleCli.ts",
-    "tools/dabbler-ai-orchestration/src/utils/moduleAuthoring.ts",
-    "tools/dabbler-ai-orchestration/src/utils/cancelLifecycle.ts",
-    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
-    "tools/dabbler-ai-orchestration/src/commands/newModule.ts",
-    "tools/dabbler-ai-orchestration/src/commands/renameModule.ts",
-    "tools/dabbler-ai-orchestration/src/commands/deleteModule.ts",
-    "tools/dabbler-ai-orchestration/src/commands/assignLegacySets.ts",
-    "tools/dabbler-ai-orchestration/src/commands/cancelLifecycleCommands.ts",
-    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
-    "tools/dabbler-ai-orchestration/package.json",
+    ".github/workflows/test.yml",
+    "ai_router/scripts/drift_guard.py",
+    "ai_router/tests/test_lightweight_resurrection_guard.py",
+    "docs/session-sets/122-module-lifecycle-to-python/spec.md",
     "tools/dabbler-ai-orchestration/CHANGELOG.md",
-    "tools/dabbler-ai-orchestration/src/test/vscode-stub.js",
-    "tools/dabbler-ai-orchestration/src/test/suite/routerCli.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/moduleCliFixture.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/moduleAuthoring.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/cancelLifecycle.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/sessionStateV4Writers.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldDefaultModule.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/moduleLifecycleUi.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/visibleModules.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/renameModule.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/deleteModule.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/assignLegacySets.test.ts",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/src/utils/aiRouterInstall.ts",
+    "tools/dabbler-ai-orchestration/src/commands/gitScaffold.ts",
+    "tools/dabbler-ai-orchestration/src/commands/installAiRouterCommands.ts",
+    "tools/dabbler-ai-orchestration/src/test/dogfood/routerFloorProvisioning.test.ts",
     "tools/dabbler-ai-orchestration/src/test/suite/installAiRouter.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/vsix-first-run-walkthrough.spec.ts"
+    "tools/dabbler-ai-orchestration/src/test/suite/gitScaffoldDefaultModule.test.ts"
   ],
   "verification_message_ids": [],
   "next_orchestrator": {
@@ -48,51 +24,47 @@
     "model": "claude-opus-5",
     "effort": "high",
     "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Run SESSION 4 NEXT, not Session 3 (operator decision, 2026-08-13, journalled). Session 2 made the extension depend on `python -m ai_router.modules`, and Session 4 owns the guarantee that the module is there and new enough -- the version floor, the upgrade-capable install, the capability probe and the retryability fix. It is also the release gate for both registries. Two carry-ins make it same-surface continuation rather than fresh-eyes work: residual S122-S2-R3 (nothing now asserts the PUBLISHED wheel is compatible; that check moved to the release walk and needs building there), and the `DABBLER_ROUTER_INSTALL_SPEC` seam this session added, which is exactly where a registry-versus-local install assertion belongs. Session 3 (append-file partitioning) is independent of both and can follow."
+      "code": "other",
+      "specifics": "FRESH EYES PREFERRED. Session 4 (the append-file partitioning, renumbered from 3) is INDEPENDENT of Sessions 1-3: it touches ai_router/ and docs/ rather than the extension's install and scaffold surfaces, and it carries no residual from this session. Nothing about it is continuation work, so there is no same-surface argument for continuity. Its risk is concentrated in one place the spec already names: the concatenated view must stay BYTE-IDENTICAL to what the unpartitioned file produced, with a round-trip falsifier -- a partitioning that quietly reorders history is worse than the conflict it removes. Whoever runs it should read this session's round-3 finding as a cautionary tale: the first fix for a real defect introduced a worse one, and only a falsifier pinning WHEN a value was resolved caught it."
     }
   },
   "blockers": [],
   "lessons_cited": [
+    "L-069-1",
     "L-112-1",
     "L-079-1",
-    "L-064-12",
-    "L-069-1"
+    "L-064-9"
   ],
   "residuals": [
     {
-      "id": "S122-S2-R1",
-      "severity": "major",
-      "source": "Full Layer 3 run of record (npm run test:playwright), 2026-08-13",
-      "description": "`vsix-first-run-walkthrough.spec.ts` went RED when the default-module scaffold became Python-backed. It performs a real `pip install` from a genuinely empty folder, but it resolved `dabbler-ai-router` from live PyPI -- 0.34.0, a wheel released before `ai_router.modules` existed -- so the scaffold could not run and the tree stalled at `Default0 sets`.",
-      "adjudication": "fixed",
-      "rationale": "Diagnosed as structural rather than incidental: a test that installs from the registry can only ever validate the LAST PUBLISHED wheel against the CURRENT extension, so once the extension depended on unreleased router code the walk was red until a publish it is itself supposed to gate -- Session 4 could not have fixed it either. Operator decision 2026-08-13 (journalled): split the two questions. `DABBLER_ROUTER_INSTALL_SPEC` (harness-only, the `DABBLER_STARTUP_TIMING_PATH` precedent) points the walk at this repo, so it still starts from an empty folder with a real git init, a real venv and a real pip install -- L-079-3 intact -- and now proves the code actually being shipped. The local tree is installed EDITABLE: a non-editable install copies the whole checkout (node_modules included) into a PEP 517 build sandbox, which turned a 9-second install into one still unfinished after 20 minutes.",
-      "owner": "Set 122 Session 2",
-      "owner_rationale": "Closed in this session; the walk passes in 47.6s standalone and inside a fully green 31/31 suite."
-    },
-    {
       "id": "S122-S2-R3",
       "severity": "major",
-      "source": "Adjudication of S122-S2-R1, 2026-08-13",
-      "description": "Nothing in the automated suite now asserts that the PUBLISHED `dabbler-ai-router` wheel is compatible with the shipping extension. That coverage did not lapse silently -- it moved from a pre-release test (where it was unanswerable) to a release-time check (where it is answerable), and it needs an owner there.",
+      "source": "Carried in from Session 2's disposition (where it names its owner as 'Session 4' under the pre-renumbering numbering)",
+      "description": "Nothing in the automated suite asserts that the PUBLISHED `dabbler-ai-router` wheel is compatible with the shipping extension. The pre-release lanes install THIS checkout via the harness-only `DABBLER_ROUTER_INSTALL_SPEC` override, because a wheel cannot contain code that has not been published yet.",
       "adjudication": "deferred-residual",
-      "rationale": "A pre-release test cannot know whether an unpublished version is on PyPI. The question belongs to the release walk, whose ordering this set's spec already mandates: publish `dabbler-ai-router` first, CONFIRM THE WHEEL IS LIVE, then publish the extension. Session 4 already owns the version floor and the post-install capability probe that make the check executable; what it should add is the post-publish half -- probe the registry wheel, not just the local one.",
-      "owner": "Set 122 Session 4",
-      "owner_rationale": "Session 4 is the release gate and already declares the version floor and the capability probe. Asserting the floor against the PUBLISHED wheel is one step further along the same path, and it is the step that protects every existing project taking the Marketplace update."
+      "rationale": "Partially discharged, deliberately not fully. This session made the check EXECUTABLE and gave it one source of truth: `MINIMUM_ROUTER_VERSION` is the floor, `probeRouterCapability` is the check, and both are exported. What remains is the half only the operator can run, because it depends on an act only the operator performs. The set's spec already mandates the ordering -- publish `dabbler-ai-router` first, CONFIRM THE WHEEL IS LIVE, then publish the extension -- and the post-publish step is now one command: create a throwaway venv, `pip install dabbler-ai-router` from the real registry, and run the probe body (`ROUTER_CAPABILITY_PROBE_CODE`) against it. If that import fails, the extension must not be published. Automating it pre-release is impossible; automating it post-publish would gate a release on a job that can only run after the release.",
+      "owner": "operator (release walk, immediately after this set lands)",
+      "owner_rationale": "Publishing is operator-only authority in every case, and this is the one assertion that can only be made once the wheel exists. It protects every existing project taking the Marketplace update."
     },
     {
       "id": "S122-S2-R2",
       "severity": "nit",
-      "source": "Full Layer 3 runs of record, 2026-08-13",
-      "description": "Layer 3 is worker-count sensitive on this hardware. At the local default of 4 workers, specs intermittently fail waiting for the first tree row (icon-render-mechanism, blocked-by-prereqs, cancellation-state-file, manifest-diagnostic, migration-drift, default-module-scaffold-tree). At 2 workers -- the count CI uses -- the same suite is 31/31 green in 6.1 minutes. Each failure also passes when its spec is run alone, and icon-render-mechanism was additionally confirmed green at HEAD.",
+      "source": "Carried in from Session 2; re-observed this session",
+      "description": "Layer 3 is worker-count sensitive on this hardware: at the local default of 4 workers specs intermittently fail waiting for the first tree row, while at 2 workers -- the count CI uses -- the suite is green.",
       "adjudication": "deferred-residual",
-      "rationale": "Not a behavioural regression: every affected spec passes in isolation and the whole suite passes at 2 workers, so the signature is Electron startup contention (each worker launches a full VS Code) rather than product behaviour. The run of record was taken at 2 workers and is recorded as such. Recorded rather than silently re-run-until-green, because a suite whose result depends on the worker count is a real cost even when it is not a defect.",
+      "rationale": "Unchanged this session and not re-litigated. The run of record was taken at 2 workers and is recorded as such: 31/31 in 6.7 minutes with no failures, so this session adds a clean data point rather than new evidence of the flake. Still worth deciding whether the local default should simply match CI.",
       "owner": "unassigned",
-      "owner_rationale": "Belongs with whoever next revisits Layer 3 runtime/parallelism; the Step 9 review should decide whether lowering the local default to match CI earns its own change."
+      "owner_rationale": "Belongs with whoever next revisits Layer 3 runtime/parallelism; the Step 9 review should decide whether lowering the local default earns its own change."
+    },
+    {
+      "id": "S122-S3-R1",
+      "severity": "nit",
+      "source": "Full pytest run of record, 2026-08-13",
+      "description": "The shared doc-walk in `ai_router/scripts/drift_guard.py` had no exclusion for setuptools build output, so `build/lib/` -- a verbatim copy of the package source that any `pip install` of this checkout materializes -- was scanned, and the anti-resurrection guard reported its OWN copied pattern table as live declarations. A green tree went red purely because someone had run an install.",
+      "adjudication": "fixed",
+      "rationale": "Fixed here rather than deferred: this session's dogfood lane runs `pip install -e <repo>`, so it recreates the condition on every run, which makes the defect tightly coupled to the change rather than an unrelated pre-existing bug. `build` and `.eggs` join the existing `dist` / `out` / `test-results` entries -- the same class -- and a falsifier pins the exclusion narrow: a DIRECTORY named `build` is skipped, a FILE named `build.py` is still scanned, so the fix for a false positive cannot become a blanket that hides real violations.",
+      "owner": "Set 122 Session 3",
+      "owner_rationale": "Closed here; classified A4.2 by `post_round_delta` and settled by a delta-scoped remediation-review (round 5, VERIFIED)."
     }
-  ],
-  "checklist": {
-    "status": "waived",
-    "attestation": "Operator-attested 2026-08-13. Two transitions left a record without a matching post: the operator-stop for the verification-reduction decision, and the last-logged-step. The orchestrator did post the checklist immediately before the operator brief, but the post landed before the decision was journalled, so the gate -- which looks for a post after the decision is recorded -- reads the window as missed. A passed window cannot be re-entered by a later post, so the honest exit is this waiver rather than a silent retry."
-  }
+  ]
 }

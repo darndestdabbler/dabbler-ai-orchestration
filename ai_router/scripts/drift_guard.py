@@ -85,12 +85,24 @@ class Violation:
 # ---------------------------------------------------------------------------
 
 # Directories never scanned (relative to repo root, matched on any path part).
+#
+# Set 122 S3 added ``build`` and ``.eggs``: setuptools' build output. A
+# ``pip install`` of this checkout (the Layer 3 cold-start walkthrough and
+# the provisioning dogfood both do one) materializes ``build/lib/`` — a
+# verbatim COPY of the package source, including this guard's own pattern
+# table. The scan then reported the copy's regexes as live declarations,
+# so a green tree went red purely because someone had run an install.
+# Both are gitignored build products with no tracked content, and both are
+# the same class as the ``dist`` / ``out`` / ``test-results`` entries that
+# were already here.
 _EXCLUDED_DIR_PARTS: frozenset[str] = frozenset(
     {
         ".git",
         ".venv",
         "node_modules",
         "__pycache__",
+        "build",
+        ".eggs",
         "dist",
         "out",
         ".vscode-test",

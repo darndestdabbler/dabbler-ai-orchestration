@@ -35,6 +35,7 @@ import {
   describeMissingPython,
   probePythonPresence,
   resolveExplicitPythonPath,
+  resolvePythonInterpreter,
   resolveScaffoldBootstrapPython,
 } from "../utils/pythonInterpreter";
 import {
@@ -48,7 +49,9 @@ import {
 } from "../utils/consumerBootstrap";
 import { BudgetChoice, BudgetWriteOutcome, writeBudgetYaml } from "../utils/budgetYaml";
 import {
-  MODULES_MANIFEST_DISPLAY,
+  INVALID_MANIFEST_MESSAGE,
+  ModulesManifestClassification,
+  classifyModulesManifest,
   ensureModulesManifest,
 } from "../utils/moduleAuthoring";
 import { describeFailure, runCreateModule } from "../utils/moduleLifecycleCli";
@@ -189,9 +192,12 @@ export interface DefaultModuleScaffoldOutcome {
  *
  * Ordering note: this runs AFTER the router install inside the same Build
  * (`installRouter` is awaited within `scaffoldConsumerRepo`), so the venv
- * exists by the time it is called. When the install did NOT succeed the CLI
- * is unreachable and this reports that in its note rather than throwing —
- * Session 4 owns turning that into a hard, retryable precondition.
+ * exists by the time it is called. Set 122 S3 made the router a hard,
+ * retryable precondition upstream of here — `decideDefaultModuleScaffold`
+ * refuses to call this at all when the post-install capability probe
+ * failed, and a later retry is no longer locked out — so the
+ * install-unreachable note below is now a backstop rather than the
+ * primary path.
  *
  * Never rejects: a refusal (or the pre-existing-sets refusal below) is
  * returned in the note rather than surfaced as an exception — a module
@@ -233,6 +239,74 @@ export async function scaffoldDefaultModuleAndLifecycleSets(
       `${decompositionSlug} (decomposition) — rename or delete ` +
       `"Default" any time from the Work Explorer.`,
   };
+}
+
+/**
+ * Should this Build scaffold the `default` module?
+ *
+ * Set 122 S3 — the retryability fix. The gate used to be "did THIS call
+ * create docs/modules.yaml?", which made a failed install unrecoverable:
+ * the manifest lands before the install runs, so the first attempt always
+ * consumed the only chance to create the module. A second "Set Up New
+ * Project" found the manifest already present, scored it `skipped`, and
+ * silently declined forever — the user's only recovery was deleting a
+ * `docs/modules.yaml` nobody had told them about.
+ *
+ * Gating on the module being ABSENT instead makes the whole flow
+ * idempotent: retry after a failed install scaffolds the module, and a
+ * re-run over a repo that already has one still does nothing. The
+ * "already has modules" and "invalid manifest" cases are preserved
+ * exactly; a legacy repo is additionally protected by the caller's own
+ * `listSessionSetDirNames` guard.
+ *
+ * `routerCapable` is the caller's `installOk`, which since this session
+ * folds in the post-install capability probe — so a wheel that installed
+ * but cannot `import ai_router.modules` refuses here rather than shelling
+ * out to a CLI that is not there (L-079-3: provisioning is where silent
+ * fail-open paths hide).
+ */
+export type DefaultModuleGate =
+  | "scaffold"
+  | "skip-modules-declared"
+  | "skip-manifest-invalid"
+  | "skip-router-unavailable";
+
+export function decideDefaultModuleScaffold(
+  classification: ModulesManifestClassification,
+  routerCapable: boolean,
+): DefaultModuleGate {
+  if (classification.kind === "invalid") return "skip-manifest-invalid";
+  if (classification.kind === "present" && classification.entries.length > 0) {
+    return "skip-modules-declared";
+  }
+  // Checked LAST so an unavailable router is only reported when a module
+  // would actually have been scaffolded — a repo that already has one
+  // needs no router and should not be told the router is missing.
+  if (!routerCapable) return "skip-router-unavailable";
+  return "scaffold";
+}
+
+/**
+ * The operator-facing note for a gate that declined. Every declining
+ * branch names WHY and, where there is one, the retry path — the honest
+ * two-states rule the rest of this flow already follows.
+ */
+export function describeDefaultModuleSkip(gate: DefaultModuleGate): string {
+  switch (gate) {
+    case "skip-router-unavailable":
+      return (
+        " The default module was NOT scaffolded because the ai-router install " +
+        "did not complete — creating it runs `python -m ai_router.modules` in " +
+        'the scaffolded .venv. Finish the install ("Dabbler: Install ai-router"), ' +
+        'then run "Dabbler: Set Up New Project" again — it will pick up where it ' +
+        "left off, and you do NOT need to delete docs/modules.yaml."
+      );
+    case "skip-manifest-invalid":
+      return ` The default module was NOT scaffolded — ${INVALID_MANIFEST_MESSAGE}`;
+    case "skip-modules-declared":
+    case "scaffold":
+      return "";
+  }
 }
 
 // ---------- VS Code wiring ----------
@@ -383,6 +457,12 @@ export interface BuildStructureSeams {
   scaffoldDefaultModule?: (
     projectDir: string,
   ) => Promise<DefaultModuleScaffoldOutcome> | DefaultModuleScaffoldOutcome;
+  /**
+   * Set 122 S3: replaces {@link decideDefaultModuleScaffold} so the
+   * Layer-2 suite can drive each gate branch without arranging a real
+   * manifest on disk. Production callers omit it.
+   */
+  decideDefaultModule?: typeof decideDefaultModuleScaffold;
 }
 
 export async function buildProjectStructureNoPrompt(
@@ -483,6 +563,10 @@ export async function buildProjectStructureNoPrompt(
               installOutcome = await installAiRouter({
                 workspaceRoot: projectDir,
                 pythonPath: scaffoldPython,
+                // Set 122 S3: resolved AFTER the install, so a fresh
+                // project's newly-created .venv is what gets probed — the
+                // same call `runRouterCli` makes when a command runs.
+                resolveLauncherPython: () => resolvePythonInterpreter(projectDir),
                 spawner: makeSpawner(),
                 fileOps: makeFileOps(),
                 prompts: makeScaffoldInstallPrompts(),
@@ -509,21 +593,22 @@ export async function buildProjectStructureNoPrompt(
       : result.budgetOutcome === "skipped-exists"
         ? " Existing ai_router/budget.yaml kept (budget input not applied)."
         : "";
-  // Set 101 S1 (verdict P3): a Build call that just CREATED docs/modules.yaml
-  // (reported in `written`, never `skipped` — MODULES_YAML_TEMPLATE always
-  // starts `modules: []`) also declares the real `default` module and
-  // scaffolds its two lifecycle sets — the Class1 starter. Gated strictly on
-  // the manifest write having landed IN THIS CALL, never on emptiness alone:
-  // a Build re-run always finds docs/modules.yaml already present (`skipped`,
-  // not `written`) and makes no module/set writes of its own — the SAME
-  // check separates "already has modules" from "legacy repo, untouched" (no
-  // forced migration onto a pre-existing, however empty, manifest).
-  const defaultModuleNote = result.written.includes(MODULES_MANIFEST_DISPLAY)
-    ? (
-        await (seams.scaffoldDefaultModule ??
-          scaffoldDefaultModuleAndLifecycleSets)(projectDir)
-      ).note
-    : "";
+  // Set 101 S1 (verdict P3): a Build call declares the real `default`
+  // module — the Class1 starter — and scaffolds its two lifecycle sets.
+  // Set 122 S3 replaced the original "did this call create the manifest?"
+  // gate with `decideDefaultModuleScaffold`, so a retry after a failed
+  // install can still produce the module. See that function for why.
+  const defaultModuleGate = (seams.decideDefaultModule ?? decideDefaultModuleScaffold)(
+    classifyModulesManifest(projectDir),
+    result.installOk,
+  );
+  const defaultModuleNote =
+    defaultModuleGate === "scaffold"
+      ? (
+          await (seams.scaffoldDefaultModule ??
+            scaffoldDefaultModuleAndLifecycleSets)(projectDir)
+        ).note
+      : describeDefaultModuleSkip(defaultModuleGate);
   const summary =
     `Project structure built: ${result.written.length} file(s) written` +
     (result.skipped.length ? `, ${result.skipped.length} existing kept` : "") +

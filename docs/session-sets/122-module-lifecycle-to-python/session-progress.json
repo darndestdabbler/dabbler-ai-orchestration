@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-13T06:27:25.863872-04:00",
+  "generatedAt": "2026-08-13T09:49:08.140412-04:00",
   "sessionSetDir": "122-module-lifecycle-to-python",
   "inputs": {
-    "activity-log.json": "f531b27543184fe08a19338a4a7f1fec590ddf81f5018b20f86d441d4d008777",
-    "session-state.json": "6ff280fc58c26c1f2a2ae7872bf31b4d8acebd0cca5e92662df555e401e2302e",
+    "activity-log.json": "8bb37a6361bc6dea11894bae987b8605e9b68431b1746a9cae51477df03d99fe",
+    "session-state.json": "490f0016479f1b577f4208bd58abb51dbecc0596de473230e1570fbfb8ab2a4d",
     "spec.md": "075bab8541bc03df0776634f7be32cae51818c9878316d3e26c88782166ad842"
   },
   "orphanEntries": 0,
@@ -114,6 +114,109 @@
     },
     {
       "number": 2,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 of Set 122 (github-copilot / claude-opus-5, high); totalSessions moved 3 -> 4 through start_session --total-sessions per the spec amendment.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T06:31:21.173508-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "point-the-five-existing-context-menu",
+          "description": "Five commands now launch python -m ai_router.modules through the resolved workspace-venv interpreter (utils/routerCli.ts + moduleLifecycleCli.ts), branching on exit 3 (refused) / 4 (write failure). Deleted the TypeScript lifecycle from moduleAuthoring.ts (2601 -> 608 lines); the gitScaffold default-module scaffold is Python-backed. Residual S122-S1-R1 folded in with a mutation-checked falsifier. No command id changed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T07:19:40.564309-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "echo-the-command-before-running-it",
+          "description": "Every router CLI run echoes the exact, copy-pasteable command line to the shared 'Dabbler Commands' output channel BEFORE spawning, then the output. One builder feeds both the echoed line and the spawned argv, so what the developer sees and what runs cannot disagree.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T08:08:49.273624-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "fix-src-utils-cancellifecycle-ts-296",
+          "description": "Removed the TypeScript session-state.json writer entirely (operator decision, journaled): added a cancel/restore CLI to ai_router/session_lifecycle.py, routed cancelLifecycleCommands.ts through it, trimmed cancelLifecycle.ts to readers (549 -> 142 lines). copyModuleDecompositionPrompt added to the module context menu. Also shipped the operator-directed start_session register-tick fix.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T08:08:49.275801-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Cross-provider verification (gpt-5.5; anthropic excluded as the orchestrator's effective provider). Discovery round 1 fanned out 2/2 and returned two blocking Majors, both against the command-echo promise: a '> ' prompt glyph welded onto the only visible command line, and PowerShell quoting that would not run (a leading quoted exe needs '&', and '\\\"' is not a PowerShell escape). Supplementary round 2 found nothing new. Both remediated once, with falsifiers; remediation-review round 3 returned VERIFIED, 2 accepted / 0 rejected. Artifacts: s2-conventions.md, s2-verification*.md, s2-issues.json, s2-remediation-round-1.md.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T08:08:49.277995-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "Full pytest of record after the last code change: 4213 passed, 9 skipped in 906s. Layer 2 (npm run test:unit): 1421 passing, 2 pending. Full npm run test:playwright owed here because package.json is the extension MANIFEST (L-064-12): 20 passed / 11 failed. Eight of the eleven pass in isolation (parallel-load flake on a 4-vCPU box, confirmed spec by spec, and icon-render-mechanism additionally confirmed green at HEAD and green again after a recompile). Two were the deliberate register-tick behaviour change in work-explorer-steps.spec.ts and are updated and green. One is KNOWN-RED and operator-attested: vsix-first-run-walkthrough.spec.ts does a real network pip install, which fetches dabbler-ai-router 0.34.0 from PyPI -- a wheel that predates ai_router.modules -- so the now-Python-backed default-module scaffold cannot run on a true cold start. That is the exact regression Session 4 exists to prevent; it owns the fix and is the release gate, so neither registry publishes while it is red. All three runs recorded via run_of_record.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T08:33:06.997126-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 1,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 7
+      },
+      "current": [],
+      "remaining": [
+        "close-out"
+      ]
+    },
+    {
+      "number": 3,
       "status": "not-started",
       "evidence": "read",
       "steps": [],
@@ -129,7 +232,7 @@
       "remaining": []
     },
     {
-      "number": 3,
+      "number": 4,
       "status": "not-started",
       "evidence": "read",
       "steps": [],

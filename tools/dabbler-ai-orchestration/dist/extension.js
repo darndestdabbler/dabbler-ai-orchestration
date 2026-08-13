@@ -21330,41 +21330,68 @@ function stepNodes(node) {
   const ledger = node.set.stepLedger;
   if (!ledger || ledger.sessionNumber !== node.session.number)
     return [];
-  return buildStepRows(
+  const rows = buildStepRows(
     ledger.entries,
     ledger.sessionNumber,
     ledger.specSteps,
     ledger.flight
-  ).map((row, position) => ({
+  );
+  const closeOutAt = closeOutStepIndex(rows);
+  const obligations = closeOutAt < 0 ? null : resolveCloseObligations(node);
+  return rows.map((row, position) => ({
     kind: "step",
     set: node.set,
     session: node.session,
     row,
-    position
+    position,
+    ...obligations && position === closeOutAt ? { closeOut: obligations } : {}
   }));
 }
-function closeOutNodes(node) {
+var CLOSE_OUT_STEP_RE = [
+  /\bclos(?:e|ing)[-\s]?out\b/i,
+  /\bclose\b\s*(?:[.;,)\]]|$)/i,
+  /\bclos(?:e|es|ing)\s+(?:the\s+|this\s+)?(?:session|set)\b/i,
+  /\bclose_session\b/i
+];
+function isCloseOutStep(row) {
+  const haystacks = [
+    stepRowLabel(row),
+    String(row.stepKey || "").replace(/[-_]/g, " ")
+  ];
+  return haystacks.some(
+    (text) => CLOSE_OUT_STEP_RE.some((re) => re.test(text))
+  );
+}
+function closeOutStepIndex(rows) {
+  for (let i2 = rows.length - 1; i2 >= 0; i2 -= 1) {
+    if (isCloseOutStep(rows[i2]))
+      return i2;
+  }
+  return -1;
+}
+function resolveCloseObligations(node) {
   if (node.session.status !== "in-progress")
-    return [];
+    return null;
   const obligations = node.set.closeObligations;
   if (!obligations)
-    return [];
+    return null;
   if (obligations.sessionNumber !== null && obligations.sessionNumber !== node.session.number) {
-    return [
-      {
-        kind: "closeout",
-        set: node.set,
-        session: node.session,
-        obligations: {
-          state: "absent",
-          sessionNumber: null,
-          verdict: null,
-          generatedAt: null,
-          obligations: []
-        }
-      }
-    ];
+    return {
+      state: "absent",
+      sessionNumber: null,
+      verdict: null,
+      generatedAt: null,
+      obligations: []
+    };
   }
+  return obligations;
+}
+function closeOutNodes(node) {
+  if (stepNodes(node).some((s) => s.closeOut !== void 0))
+    return [];
+  const obligations = resolveCloseObligations(node);
+  if (!obligations)
+    return [];
   return [
     { kind: "closeout", set: node.set, session: node.session, obligations }
   ];
@@ -21392,6 +21419,11 @@ function childrenOf(node) {
     case "closeout":
       return obligationNodes(node);
     case "step":
+      return node.closeOut ? obligationNodes({
+        set: node.set,
+        session: node.session,
+        obligations: node.closeOut
+      }) : [];
     case "obligation":
       return [];
   }
@@ -21614,12 +21646,18 @@ function stepDescriptor(node) {
   if (description)
     tooltipLines.push("", description);
   const started = stepStartLabel(row.startedAt);
+  const closeOut = node.closeOut;
+  const readiness = closeOut ? closeOutSummary(closeOut) : "";
+  const rowDescription = [started, readiness].filter(Boolean).join("  ");
+  if (closeOut) {
+    tooltipLines.push("", closeOutTooltip(closeOut));
+  }
   return {
     // `position` disambiguates: an unplanned logged step can append
     // alongside a planned row that carries the same key.
     id: `step:${node.set.name}/${node.session.number}/${node.position}`,
     label: stepRowLabel(row),
-    ...started ? { description: started } : {},
+    ...rowDescription ? { description: rowDescription } : {},
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[glyph] },
     contextValue: tokenString([
@@ -21628,9 +21666,12 @@ function stepDescriptor(node) {
       row.isPlanned ? "step-planned" : "step-logged",
       // A derived active step is planned AND running; a `when` clause that
       // wants one or the other can say so without re-deriving anything.
-      ...row.isActive ? ["step-active"] : []
+      ...row.isActive ? ["step-active"] : [],
+      // The folded close-out step answers to the close-out tokens too, so
+      // anything that could target the old standalone row still can.
+      ...closeOut ? [NODE_TOKEN.closeout, `closeout-${closeOut.state}`] : []
     ]),
-    collapsible: "none"
+    collapsible: closeOut && closeOut.obligations.length > 0 ? "collapsed" : "none"
   };
 }
 function stepStartLabel(startedAt) {
@@ -21696,8 +21737,7 @@ function closeOutGlyph(projection) {
     return "not-started";
   return projection.verdict === VERDICT_WOULD_CLOSE ? "complete" : "not-started";
 }
-function closeOutTooltip(node) {
-  const p2 = node.obligations;
+function closeOutTooltip(p2) {
   const lines = ["**Close-out obligations**"];
   switch (p2.state) {
     case "absent":
@@ -21748,7 +21788,7 @@ function closeOutDescriptor(node) {
     id: `closeout:${node.set.name}/${node.session.number}`,
     label: CLOSE_OUT_GROUP_LABEL,
     description: closeOutSummary(p2),
-    tooltip: closeOutTooltip(node),
+    tooltip: closeOutTooltip(p2),
     icon: { kind: "file", slug: ICON_FILES[closeOutGlyph(p2)] },
     contextValue: tokenString([NODE_TOKEN.closeout, `closeout-${p2.state}`]),
     collapsible: p2.obligations.length > 0 ? "collapsed" : "none"

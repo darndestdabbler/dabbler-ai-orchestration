@@ -32,7 +32,9 @@ import {
   closeOutGlyph,
   closeOutNodes,
   closeOutSummary,
+  descriptorFor,
   hasToken,
+  isCloseOutStep,
   moduleDescriptor,
   moduleNodes,
   obligationDescriptor,
@@ -1151,6 +1153,120 @@ suite("Set 115 S4 — the close-out obligations under the in-flight session", ()
     const d = closeOutDescriptor(closeOut(liveSet()));
     assert.notStrictEqual(d.label, "Close-out");
     assert.strictEqual(d.label, CLOSE_OUT_GROUP_LABEL);
+  });
+
+  // -------------------------------------------------------------------
+  // Set 129 — the duplicate close row, fixed structurally
+  // -------------------------------------------------------------------
+
+  /** A plan that declares the Set 128 skeleton's close-out step. */
+  const SKELETON_PLAN = [
+    { sessionNumber: 2, stepNumber: 1, stepKey: "register", description: "Register.", status: "complete", kind: "plan-step" },
+    { sessionNumber: 2, stepNumber: 2, stepKey: "build-it", description: "Build it.", status: "pending", kind: "plan-step" },
+    { sessionNumber: 2, stepNumber: 3, stepKey: "close-out", description: "Close-out.", status: "pending", kind: "plan-step" },
+  ];
+
+  function skeletonSet(over: Partial<SessionSet> = {}): SessionSet {
+    return liveSet({
+      stepLedger: {
+        sessionNumber: 2,
+        entries: SKELETON_PLAN,
+        specSteps: ["Register.", "Build it.", "Close-out."],
+        flight: { inFlight: true, startedAt: "2026-08-11T13:00:00-04:00" },
+      },
+      ...over,
+    });
+  }
+
+  test("a session declaring a close-out step renders ONE close row, not two", () => {
+    // The duplicate, planted. Set 115 S4 put the obligations in their own
+    // row under the session; Set 128 S1 then made `Close-out` a mandatory
+    // skeleton step. Both landed, and every session grew a `Close out`
+    // step immediately followed by a `Close-out readiness` row. The Set
+    // 128 rename made them distinguishable, not singular — the
+    // duplication was structural and survived it.
+    const children = childrenOf(sessionNode(skeletonSet(), 2));
+    assert.deepStrictEqual(
+      children.map((n) => n.kind),
+      ["step", "step", "step"],
+      "the standalone group row must stand down when a step absorbs it",
+    );
+    const closeRows = children.filter((n) =>
+      /clos/i.test(descriptorFor(n, SUPPORTS).label),
+    );
+    assert.strictEqual(closeRows.length, 1, "exactly one row about closing");
+  });
+
+  test("the close-out STEP carries the readiness summary and the obligations", () => {
+    const steps = stepNodes(sessionNode(skeletonSet(), 2));
+    const folded = steps.filter((s) => s.closeOut !== undefined);
+    assert.strictEqual(folded.length, 1, "exactly one step owns them");
+    assert.strictEqual(folded[0].row.stepKey, "close-out");
+
+    const d = descriptorFor(folded[0], SUPPORTS);
+    assert.ok(
+      String(d.description).includes("1 blocking, 1 advisory"),
+      `readiness missing from the step row: ${d.description}`,
+    );
+    assert.strictEqual(d.collapsible, "collapsed");
+    assert.ok(
+      String(d.tooltip).includes("Close-out obligations"),
+      "the step tooltip must carry the obligations",
+    );
+    // Anything that could target the old standalone row still can.
+    assert.ok(String(d.contextValue).includes("dabblerCloseOut"));
+
+    assert.deepStrictEqual(
+      childrenOf(folded[0]).map((n) => n.kind),
+      ["obligation", "obligation", "obligation"],
+    );
+  });
+
+  test("an ordinary step is still a leaf with no readiness text", () => {
+    const steps = stepNodes(sessionNode(skeletonSet(), 2));
+    const build = steps.find((s) => s.row.stepKey === "build-it");
+    assert.ok(build);
+    assert.strictEqual(build.closeOut, undefined);
+    assert.deepStrictEqual(childrenOf(build), []);
+    assert.strictEqual(descriptorFor(build, SUPPORTS).collapsible, "none");
+  });
+
+  test("a spec that names no close-out step keeps the standalone row", () => {
+    // The fallback, and the reason the group row was not simply deleted:
+    // 46 sets predate the Set 128 skeleton, and a session with no
+    // close-out step must not lose the obligations entirely.
+    const children = childrenOf(sessionNode(liveSet(), 2));
+    assert.deepStrictEqual(
+      children.map((n) => n.kind),
+      ["step", "closeout"],
+    );
+  });
+
+  test("the close-out step is recognised by intent, not by exact label", () => {
+    const row = (stepKey: string, description: string) => ({
+      sessionNumber: 2, stepNumber: 1, stepKey, description,
+      status: "pending", isPlanned: true, isActive: false, startedAt: null,
+    });
+    for (const [key, text] of [
+      ["close-out", "Close-out."],
+      ["closing-out", "Closing out the session."],
+      ["close", "Fix it; verify; close."],
+      ["close-the-session", "Close the session."],
+      ["run-close-session", "Run close_session."],
+      ["close-out-and-review", "Close-out, including the Step 9 review."],
+    ]) {
+      assert.ok(isCloseOutStep(row(key, text)), `should match: ${text}`);
+    }
+    // The look-alike the Python admission parser learned about in its own
+    // round 2: an arbitrary final work step must not absorb the
+    // obligations just because it contains the word "close".
+    for (const [key, text] of [
+      ["close-the-tracking-issue", "Close the tracking issue."],
+      ["build-it", "Build it."],
+      ["review-closely", "Review the diff closely."],
+    ]) {
+      assert.ok(!isCloseOutStep(row(key, text)), `should NOT match: ${text}`);
+    }
   });
 
   test("a fresh projection whose CLOSE IS SETTLED is the only way to read done", () => {

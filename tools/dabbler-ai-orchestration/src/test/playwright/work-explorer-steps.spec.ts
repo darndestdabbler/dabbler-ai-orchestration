@@ -213,7 +213,7 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await expect(treeRow(pane, "Verify close")).toBeVisible();
   });
 
-  test("the close-out obligations render under the session, from the recorded projection", async () => {
+  test("the close-out obligations render on the close step, from the recorded projection", async () => {
     // Set 115 S4. The projection is written by the SHIPPING
     // `close_preflight --write` (the harness calls the real function), so
     // this proves the whole path end to end: Python computes and digests,
@@ -234,15 +234,26 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     await expandTreeRow(pane, "115-closeout");
     await expandTreeRow(pane, "Fixture session 1");
 
-    // One row on the surface the operator watches, summarizing what still
-    // stands between here and close. Named `Close-out readiness` since Set
-    // 128 S1, because every session now declares a step called `Close-out`
-    // and two rows of the same name under one session read as a duplicate.
-    const group = treeRow(pane, "Close-out readiness");
-    await expect(group).toBeVisible();
-    await expect(group).toContainText("blocking");
+    // Set 129 — ONE row about closing, not two.
+    //
+    // Set 115 S4 gave the obligations their own row under the session;
+    // Set 128 S1 then made a step named `Close-out` part of the skeleton
+    // every session declares. Both shipped, and every session grew a
+    // close step immediately followed by a close-out row. Set 128 S1
+    // renamed the second to `Close-out readiness`, which made the two
+    // distinguishable without making them singular — the duplication was
+    // structural and survived the rename, and the operator kept
+    // reporting it.
+    //
+    // The obligations now hang off the step that closes. This fixture's
+    // last step is `Verify, close.`, so that is the row that owns them.
+    await expect(treeRow(pane, "Close-out readiness")).toHaveCount(0);
 
-    await expandTreeRow(pane, "Close-out readiness");
+    const closeStep = treeRow(pane, "Verify close");
+    await expect(closeStep).toBeVisible();
+    await expect(closeStep).toContainText("blocking");
+
+    await expandTreeRow(pane, "Verify close");
 
     // The obligations themselves, named as the close names them. A
     // mid-session preflight always has an unmet UAT/disposition row and a

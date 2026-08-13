@@ -144,6 +144,26 @@ export interface StepNode {
   readonly session: SessionRecord;
   readonly row: StepRow;
   readonly position: number;
+  /**
+   * The close-out projection, present on exactly ONE step row per in-flight
+   * session: the step that closes.
+   *
+   * Set 115 S4 gave the obligations their own row under the session, and
+   * Set 128 S1 then made a step literally named **Close-out** part of the
+   * skeleton every session declares. The two landed independently and
+   * collided: every session rendered a `Close out` step immediately
+   * followed by a `Close-out` obligations row, and the operator read them
+   * as one thing duplicated. Set 128 S1 renamed the second to `Close-out
+   * readiness`, which made the rows *distinguishable* without making them
+   * *singular* — the duplication was structural, not lexical, and it
+   * survived the rename.
+   *
+   * So the obligations now hang off the close-out STEP instead of sitting
+   * beside it. One row per session, and "what still stands between here
+   * and close" is attached to the step that closes, which is where an
+   * operator looks for it.
+   */
+  readonly closeOut?: CloseObligations;
 }
 
 /**
@@ -275,35 +295,83 @@ export function stepNodes(node: SessionNode): StepNode[] {
   if (node.session.status !== "in-progress") return [];
   const ledger = node.set.stepLedger;
   if (!ledger || ledger.sessionNumber !== node.session.number) return [];
-  return buildStepRows(
+  const rows = buildStepRows(
     ledger.entries,
     ledger.sessionNumber,
     ledger.specSteps,
     ledger.flight,
-  ).map((row, position) => ({
+  );
+  const closeOutAt = closeOutStepIndex(rows);
+  const obligations = closeOutAt < 0 ? null : resolveCloseObligations(node);
+  return rows.map((row, position) => ({
     kind: "step",
     set: node.set,
     session: node.session,
     row,
     position,
+    ...(obligations && position === closeOutAt
+      ? { closeOut: obligations }
+      : {}),
   }));
 }
 
 /**
- * The close-out group row (Set 115 S4) — at most one, under the in-flight
- * session and after its steps.
+ * The close-out intents, mirrored from ``spec_admission.CLOSE_OUT``.
  *
- * Present whenever the session is in flight, INCLUDING when no projection
- * has been written: "nobody has computed this yet" is a state the operator
- * is told about, with the command to fix it in the tooltip, because the
- * alternative is a feature that is invisible until it happens to be
- * populated. Every other session gets nothing — a closed session's
- * obligations are answered by the fact that it closed.
+ * The extension cannot ask the admission parser: the step ledger records a
+ * key, a description and a status, and nothing about which skeleton intent
+ * a step serves. So the same four phrasings are recognised here, and they
+ * are the ones this repo's specs actually use — including the deliberately
+ * narrow bare `close`, which matches only where it stands as the
+ * instruction itself. An unqualified `\bclose\b` would swallow "Close the
+ * tracking issue", and the Python side already learned that in its round 2.
  */
-export function closeOutNodes(node: SessionNode): CloseOutNode[] {
-  if (node.session.status !== "in-progress") return [];
+const CLOSE_OUT_STEP_RE: readonly RegExp[] = [
+  /\bclos(?:e|ing)[-\s]?out\b/i,
+  /\bclose\b\s*(?:[.;,)\]]|$)/i,
+  /\bclos(?:e|es|ing)\s+(?:the\s+|this\s+)?(?:session|set)\b/i,
+  /\bclose_session\b/i,
+];
+
+/** True when *row* is the step that closes the session. */
+export function isCloseOutStep(row: StepRow): boolean {
+  const haystacks = [
+    stepRowLabel(row),
+    String(row.stepKey || "").replace(/[-_]/g, " "),
+  ];
+  return haystacks.some((text) =>
+    CLOSE_OUT_STEP_RE.some((re) => re.test(text)),
+  );
+}
+
+/**
+ * Which row the obligations belong to, or `-1` when this session has no
+ * close-out step at all.
+ *
+ * The LAST match wins, because the skeleton puts close-out at position −1
+ * and an unplanned logged step can append beside a planned row. A spec
+ * predating the Set 128 skeleton may name no close-out step whatsoever;
+ * that is what `-1` is for, and it is why the standalone group row still
+ * exists rather than being deleted outright.
+ */
+export function closeOutStepIndex(rows: readonly StepRow[]): number {
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    if (isCloseOutStep(rows[i])) return i;
+  }
+  return -1;
+}
+
+/**
+ * The projection as it applies to THIS session, or `null` when there is
+ * none to show.
+ *
+ * Extracted so the folded step row and the standalone group row cannot
+ * disagree about which projection they are describing (L-069-1).
+ */
+function resolveCloseObligations(node: SessionNode): CloseObligations | null {
+  if (node.session.status !== "in-progress") return null;
   const obligations = node.set.closeObligations;
-  if (!obligations) return [];
+  if (!obligations) return null;
   // A projection about a DIFFERENT session says nothing about this one.
   // Rendering it here would attach one session's obligations to another's
   // row, which is worse than showing nothing: it is showing something
@@ -312,28 +380,57 @@ export function closeOutNodes(node: SessionNode): CloseOutNode[] {
     obligations.sessionNumber !== null &&
     obligations.sessionNumber !== node.session.number
   ) {
-    return [
-      {
-        kind: "closeout",
-        set: node.set,
-        session: node.session,
-        obligations: {
-          state: "absent",
-          sessionNumber: null,
-          verdict: null,
-          generatedAt: null,
-          obligations: [],
-        },
-      },
-    ];
+    return {
+      state: "absent",
+      sessionNumber: null,
+      verdict: null,
+      generatedAt: null,
+      obligations: [],
+    };
   }
+  return obligations;
+}
+
+/**
+ * The standalone close-out group row (Set 115 S4) — the FALLBACK, since
+ * Set 129.
+ *
+ * Sessions whose spec declares a close-out step get their obligations
+ * folded onto that step instead ({@link StepNode.closeOut}), which is the
+ * whole point: two rows about closing, under one session, is the duplicate
+ * the operator kept reporting. This row is what remains for the cases the
+ * fold cannot reach — a session with no step ledger at all, or a spec
+ * predating the Set 128 skeleton that names no close-out step.
+ *
+ * Present in those cases whenever the session is in flight, INCLUDING when
+ * no projection has been written: "nobody has computed this yet" is a
+ * state the operator is told about, with the command to fix it in the
+ * tooltip, because the alternative is a feature that is invisible until it
+ * happens to be populated. Every other session gets nothing — a closed
+ * session's obligations are answered by the fact that it closed.
+ */
+export function closeOutNodes(node: SessionNode): CloseOutNode[] {
+  if (stepNodes(node).some((s) => s.closeOut !== undefined)) return [];
+  const obligations = resolveCloseObligations(node);
+  if (!obligations) return [];
   return [
     { kind: "closeout", set: node.set, session: node.session, obligations },
   ];
 }
 
+/**
+ * What a set of obligation rows hangs from. Structural, so both the folded
+ * step row and the standalone group row can produce children through one
+ * function rather than two that drift.
+ */
+interface ObligationHost {
+  readonly set: SessionSet;
+  readonly session: SessionRecord;
+  readonly obligations: CloseObligations;
+}
+
 /** The obligation rows, in the order the preflight reported them. */
-export function obligationNodes(node: CloseOutNode): ObligationNode[] {
+export function obligationNodes(node: ObligationHost): ObligationNode[] {
   return node.obligations.obligations.map((obligation, position) => ({
     kind: "obligation",
     set: node.set,
@@ -357,6 +454,15 @@ export function childrenOf(node: WorkExplorerNode): WorkExplorerNode[] {
     case "closeout":
       return obligationNodes(node);
     case "step":
+      // Set 129: the close-out STEP owns the obligations now. Every other
+      // step is still a leaf.
+      return node.closeOut
+        ? obligationNodes({
+            set: node.set,
+            session: node.session,
+            obligations: node.closeOut,
+          })
+        : [];
     case "obligation":
       return [];
   }
@@ -799,12 +905,23 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
   if (description) tooltipLines.push("", description);
 
   const started = stepStartLabel(row.startedAt);
+  // Set 129: on the close-out step, the readiness answer rides in the
+  // description beside the start time, and the obligations become this
+  // row's children. The row keeps its own STEP glyph — whether the step
+  // has been executed and what still stands between here and close are
+  // different questions, and the icon has always answered the first.
+  const closeOut = node.closeOut;
+  const readiness = closeOut ? closeOutSummary(closeOut) : "";
+  const rowDescription = [started, readiness].filter(Boolean).join("  ");
+  if (closeOut) {
+    tooltipLines.push("", closeOutTooltip(closeOut));
+  }
   return {
     // `position` disambiguates: an unplanned logged step can append
     // alongside a planned row that carries the same key.
     id: `step:${node.set.name}/${node.session.number}/${node.position}`,
     label: stepRowLabel(row),
-    ...(started ? { description: started } : {}),
+    ...(rowDescription ? { description: rowDescription } : {}),
     tooltip: tooltipLines.join("\n"),
     icon: { kind: "file", slug: ICON_FILES[glyph] },
     contextValue: tokenString([
@@ -814,8 +931,14 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
       // A derived active step is planned AND running; a `when` clause that
       // wants one or the other can say so without re-deriving anything.
       ...(row.isActive ? ["step-active"] : []),
+      // The folded close-out step answers to the close-out tokens too, so
+      // anything that could target the old standalone row still can.
+      ...(closeOut
+        ? [NODE_TOKEN.closeout, `closeout-${closeOut.state}`]
+        : []),
     ]),
-    collapsible: "none",
+    collapsible:
+      closeOut && closeOut.obligations.length > 0 ? "collapsed" : "none",
   };
 }
 
@@ -973,8 +1096,7 @@ export function closeOutGlyph(projection: CloseObligations): SessionStatus {
     : "not-started";
 }
 
-function closeOutTooltip(node: CloseOutNode): string {
-  const p = node.obligations;
+function closeOutTooltip(p: CloseObligations): string {
   const lines = ["**Close-out obligations**"];
   switch (p.state) {
     case "absent":
@@ -1047,7 +1169,7 @@ export function closeOutDescriptor(node: CloseOutNode): RowDescriptor {
     id: `closeout:${node.set.name}/${node.session.number}`,
     label: CLOSE_OUT_GROUP_LABEL,
     description: closeOutSummary(p),
-    tooltip: closeOutTooltip(node),
+    tooltip: closeOutTooltip(p),
     icon: { kind: "file", slug: ICON_FILES[closeOutGlyph(p)] },
     contextValue: tokenString([NODE_TOKEN.closeout, `closeout-${p.state}`]),
     collapsible: p.obligations.length > 0 ? "collapsed" : "none",

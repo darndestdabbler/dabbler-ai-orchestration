@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The reader that refuses to guess",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T02:37:00.005297-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T04:29:30.255993-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "asserted"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

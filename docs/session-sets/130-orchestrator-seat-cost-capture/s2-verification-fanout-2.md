@@ -1,0 +1,5 @@
+**VERIFIED** — I tried to break the changed state-writer, metrics-writer, transport metadata, schema, v4 preservation, close preservation, and extension-reader paths and found no blocking correctness or completeness defect. The implementation captures the env id through `start_session`, accumulates/omits it correctly, and persists Copilot CLI child `sessionId` values into metrics rows.
+
+**NITS**
+- The new routed-id tests cover `record_call()` and `_copilot_session_id()` separately, but not the actual `_route_via_copilot_cli` / verifier call-site pass-through; the code is correct today, but that specific regression would be easier to miss.
+- Copilot auth preflight still creates a separate CLI conversation whose id is not recorded. That is outside Session 2’s stated routed-call scope, but Session 3 should account for it if “true cost” means every cost-bearing seat conversation.

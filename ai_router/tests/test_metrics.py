@@ -338,3 +338,114 @@ def test_record_call_new_fields_default_to_none_for_old_callers(
     assert record["local_invocations"] is None
     assert record["attempts"] is None
     assert record["billed_usage_unavailable"] is None
+
+
+# --- Set 130 S2: the routed child's conversation id ------------------------
+#
+# The join key that turns a copilot-cli row from "real spend, unmeasurable"
+# into "real spend, priceable". Both falsifiers plant a value and read the
+# written line back; neither inspects record_call's source.
+
+
+def test_record_call_persists_the_routed_child_conversation_id(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The transport's reported sessionId lands verbatim on the row.
+
+    Verbatim matters: this string is the primary key of
+    ``assistant_usage_events`` in the Copilot CLI's store, so any
+    normalization here (casing, trimming to a prefix, wrapping) makes the
+    row join to nothing while still looking captured.
+    """
+    import json
+
+    log = tmp_path / "router-metrics.jsonl"
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(log))
+    metrics_mod.record_call(
+        {"metrics": {"enabled": True}},
+        call_type="verify",
+        task_type="session-verification",
+        model="gpt-5.5",
+        provider="openai",
+        tier=0,
+        complexity_score=None,
+        generation_params={},
+        input_tokens=0,
+        output_tokens=10,
+        cost_usd=0.0,
+        elapsed_seconds=1.0,
+        escalated=False,
+        stop_reason="end_turn",
+        transport="copilot-cli",
+        billed_usage_unavailable=True,
+        transport_session_id="4e3a296a-c59a-43cf-b192-b4a8b380a8cd",
+    )
+    record = json.loads(log.read_text(encoding="utf-8").strip())
+    assert (
+        record["transport_session_id"]
+        == "4e3a296a-c59a-43cf-b192-b4a8b380a8cd"
+    )
+
+
+def test_record_call_writes_a_null_join_key_for_pre_set130_callers(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A caller that never learned the kwarg still writes the COLUMN, null.
+
+    Present-and-null, not missing: a jq-style reader must not have to tell
+    "old row" from "api row" from "seat row we failed to capture" by the
+    shape of the object (the argument Set 123 S2 made for the optional
+    stamp keys). Null reads as "not captured"; that is true of every
+    historical row and permanently true of the api profile, whose cost_usd
+    is already authoritative and which spawns no child conversation.
+    """
+    import json
+
+    log = tmp_path / "router-metrics.jsonl"
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(log))
+    metrics_mod.record_call(
+        {"metrics": {"enabled": True}},
+        call_type="route",
+        task_type="general",
+        model="gpt-5.4",
+        provider="openai",
+        tier=2,
+        complexity_score=20,
+        generation_params={},
+        input_tokens=5,
+        output_tokens=5,
+        cost_usd=0.02,
+        elapsed_seconds=0.5,
+        escalated=False,
+        stop_reason="end_turn",
+    )
+    record = json.loads(log.read_text(encoding="utf-8").strip())
+    assert "transport_session_id" in record
+    assert record["transport_session_id"] is None
+
+
+def test_copilot_session_id_helper_refuses_a_wrong_typed_wire_value() -> None:
+    """The shape guard, driven with the shapes the wire can actually produce.
+
+    ``transport_metadata`` is an open diagnostic dict filled from arbitrary
+    JSON, so the id can arrive as a number, a null, a nested object or an
+    empty string. Every one of those must become ``None`` -- a wrong-typed
+    value written into the metrics row would either break a reader or,
+    worse, join to nothing while looking captured. A real id passes through
+    untouched.
+    """
+    import ai_router as router_pkg
+
+    class _Result:
+        def __init__(self, metadata):
+            self.transport_metadata = metadata
+
+    for bad in (7, 0, None, "", "   ", ["id"], {"id": "x"}, True):
+        assert router_pkg._copilot_session_id(_Result({"session_id": bad})) is None
+    assert router_pkg._copilot_session_id(_Result({})) is None
+    assert router_pkg._copilot_session_id(_Result(None)) is None
+    assert router_pkg._copilot_session_id(object()) is None
+    assert (
+        router_pkg._copilot_session_id(_Result({"session_id": "conv-9"}))
+        == "conv-9"
+    )

@@ -114,6 +114,9 @@ try:
     )
     from check_migrations import summarize_drift  # type: ignore[import-not-found]
     from guidance_report import summarize_overhead  # type: ignore[import-not-found]
+    from seat_cost import (  # type: ignore[import-not-found]
+        seat_session_id_from_env,
+    )
 except ImportError:
     from .progress import (  # type: ignore[no-redef]
         SessionStateInvariantError,
@@ -139,6 +142,9 @@ except ImportError:
     )
     from .check_migrations import summarize_drift  # type: ignore[no-redef]
     from .guidance_report import summarize_overhead  # type: ignore[no-redef]
+    from .seat_cost import (  # type: ignore[no-redef]
+        seat_session_id_from_env,
+    )
 
 # Set 048 modules must never be bare-imported in production code (the
 # test_production_imports guard): the bare form only resolves under the
@@ -1050,6 +1056,15 @@ def _run_under_lock(args: argparse.Namespace) -> int:
         orchestrator_model=args.model,
         orchestrator_effort=args.effort,
         orchestrator_provider=args.provider,
+        # Set 130 (S2): the join key that makes this session's seat cost
+        # recoverable. Read HERE, at the CLI boundary, because this is
+        # the process the seat actually spawned -- the variable names the
+        # conversation running the session, so its presence is evidence,
+        # not an inference from --engine. None off a seat, and the writer
+        # then omits the field rather than recording an empty list.
+        # Accumulates: a re-run after a context reset is a NEW
+        # conversation on the same workflow session.
+        seat_session_id=seat_session_id_from_env(),
     )
 
     # Set 066 (S1): capture the pathAwareCritique policy

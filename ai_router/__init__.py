@@ -680,6 +680,30 @@ def _copilot_echoed_model(result) -> Optional[str]:
     return None
 
 
+def _copilot_session_id(result) -> Optional[str]:
+    """The conversation id the Copilot CLI reported for this call, or None.
+
+    The exact sibling of :func:`_copilot_echoed_model` and shape-checked
+    for the identical reason (L-069-1): ``transport_metadata`` is an open
+    diagnostic dict populated straight off the wire, so a non-string must
+    not cross into the metrics row and must not be able to break a call
+    that has already run and already been billed.
+
+    Set 130 (S2): this value is the join key. ``cli_transport`` has been
+    reading the result event's ``sessionId`` into
+    ``transport_metadata["session_id"]`` since Set 078 and nothing ever
+    consumed it; ``record_call`` now persists it as
+    ``transport_session_id``, which is what lets
+    :mod:`ai_router.seat_cost` price the ``routed_seat`` component
+    exactly instead of by wall clock (which cannot attribute at all).
+    """
+    metadata = getattr(result, "transport_metadata", None) or {}
+    session_id = metadata.get("session_id")
+    if isinstance(session_id, str) and session_id.strip():
+        return session_id
+    return None
+
+
 def _copilot_provider_of(model_id: str) -> Optional[str]:
     """Look up ``model_id``'s provider from the seat catalog's CONFIRMED
     entries only. Returns ``None`` when the model isn't there.
@@ -890,6 +914,11 @@ def _route_via_copilot_cli(
         # profile's served id so "what actually answered" is one query, not two.
         requested_model_id=model_id,
         served_model_id=_copilot_echoed_model(result),
+        # Set 130 S2: the child conversation's id, from the same
+        # transport_metadata dict as served_model_id above. This is the
+        # only place it can be captured -- it exists nowhere else once
+        # the dispatch returns.
+        transport_session_id=_copilot_session_id(result),
         stamp=completed_stamp,
     )
 
@@ -1053,6 +1082,11 @@ def _run_verification_via_copilot_cli(
         billed_usage_unavailable=True,
         requested_model_id=selection.model_id,
         served_model_id=_copilot_echoed_model(result),
+        # Set 130 S2 (L-069-1 sibling parity with the route() site above):
+        # a verification round is a routed child conversation like any
+        # other, and it is the one that dominates a session's routed_seat
+        # cost -- Set 118 S1's five rounds were 866.4 credits.
+        transport_session_id=_copilot_session_id(result),
     )
 
     return VerificationResult(

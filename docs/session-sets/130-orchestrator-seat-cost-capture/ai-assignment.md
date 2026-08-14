@@ -31,3 +31,37 @@ parts. The separation is this session's step 2 deliverable and is
 structural, not presentational: the reader returns a **per-component
 breakdown**, and a total exists only when every component in it is
 measured.
+
+## Session 2 of 3 — The join key, recorded instead of dropped
+
+**Orchestrator:** GitHub Copilot CLI (`github-copilot`), Claude Opus 5
+(`claude-opus-5`), effort `high`, provider `anthropic` — continuing
+Session 1's trajectory, which is what Session 1's disposition recommended.
+**Transport:** `COPILOT_CLI` (`project-verify-type.txt`), so no provider
+API keys are carried and none are required.
+
+**Verifier:** must be a non-`anthropic` effective provider, resolved by
+model-registry lookup and enforced by the exclusion — same constraint as
+Session 1, which resolved `gpt-5.5`.
+
+**Why the same orchestrator.** Session 2 consumes Session 1's vocabulary
+directly: `seat_cost.SEAT_SESSION_ID_ENV`,
+`seat_cost.seat_session_id_from_env()`, and the `--orchestrator` /
+`--routed` id split the reader's CLI already takes. The two ids this
+session records are precisely the two the reader already asks its caller
+to supply by hand, so continuity is worth more here than a fresh
+perspective — and the fresh perspective arrives anyway, on a different
+provider, at Step 6.
+
+**The join key is live in this conversation.** `COPILOT_AGENT_SESSION_ID`
+is set in the seat environment at registration time, which is the fact
+the whole session rests on. It is read here, not guessed.
+
+**Scope discipline.** This session is plumbing into existing writers and
+creates nothing. The two authored steps touch two sanctioned writers
+(`register_session_start`, `record_call`) plus the state-schema doc and
+the `metrics.py` schema docstring; the disposition contract and every
+report surface belong to Session 3 and are deliberately not started here.
+The one hazard worth naming up front is L-064-8 in miniature: a
+state-shape change whose schema doc, JSON Schema and writer do not move
+in the same pass.

@@ -136,6 +136,132 @@
       "dateTime": "2026-08-14T03:57:33.336897-04:00",
       "description": "Close-out",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T04:48:08.559902-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "record-the-orchestrator-s-own-conversation",
+      "dateTime": "2026-08-14T04:48:08.559902-04:00",
+      "description": "**Record the orchestrator's own conversation at registration.** `start_session` reads `COPILOT_AGENT_SESSION_ID` and writes it into the session's record through the sanctioned writer \u2014 **appending, not replacing**, because `start_session` is idempotent by design and is re-run after a context reset, which starts a *new* conversation on the *same* workflow session. Absent on a Direct-API seat means the field is absent, not empty. `docs/session-state-schema.md` moves in the same pass \u2014 a state-shape change that does not update the schema doc is the L-064-8 hazard by construction.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "persist-the-routed-child-s-conversation",
+      "dateTime": "2026-08-14T04:48:08.559902-04:00",
+      "description": "**Persist the routed child's conversation id.** `record_call()` gains the column and `route()` passes through the value `cli_transport` already captured. Additive-null: every historical row and every Direct-API row records `null`, which correctly reads as *\"not captured\"* rather than a false claim. Update the `metrics.py` module docstring, which is that file's schema of record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T04:48:08.559902-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T04:48:08.559902-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-14T04:48:08.559902-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T04:48:08.570597-04:00",
+      "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "seatIdCaptured",
+      "dateTime": "2026-08-14T04:58:41.674895-04:00",
+      "description": "start_session records COPILOT_AGENT_SESSION_ID as orchestrator.seatSessionIds (array, omit-null, deduped, accumulating across re-registers). Writer: session_state.build_orchestrator_block + new normalize_seat_session_ids / accumulate_seat_session_ids; env read at the CLI boundary via seat_cost.seat_session_id_from_env(). Schema doc, JSON Schema and writer moved in the same pass (L-064-8).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "routedIdPersisted",
+      "dateTime": "2026-08-14T04:58:41.677515-04:00",
+      "description": "record_call() gains transport_session_id and route()/verify() pass the sessionId cli_transport already captured; shape-checked once in __init__._copilot_session_id, the sibling of _copilot_echoed_model (L-069-1). Additive-null on every historical and api-profile row. metrics.py module docstring (the file's schema of record) updated.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "routedIdPersisted",
+      "dateTime": "2026-08-14T05:09:28.156874-04:00",
+      "description": "record_call() gains transport_session_id; route() and the seat verify() path pass the sessionId cli_transport already captured, shape-checked once in __init__._copilot_session_id (sibling of _copilot_echoed_model, L-069-1). Additive-null on every historical and api row. metrics.py module docstring updated. 13 falsifiers added (10 in test_start_session.py, 3 in test_metrics.py); all five planted defects proved to fire selectively. Live dogfood: this session's own id was captured on re-register and priced at 962.8 credits / $9.63.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "crossProviderVerification",
+      "dateTime": "2026-08-14T05:09:28.158598-04:00",
+      "description": "Cross-provider verification",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "crossProviderVerification",
+      "dateTime": "2026-08-14T05:19:16.335396-04:00",
+      "description": "Discovery round, fan-out 2 (spec-conformance + failure-scenario lenses), verifier gpt-5.5 on both, anthropic excluded: VERIFIED, 0 findings, non-blocking. Live proof of the metrics half: both routed calls of that round carry transport_session_id (73273cde..., 5d9238fd...), while Session 1's rows correctly carry null.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "requiredTestPortion",
+      "dateTime": "2026-08-14T05:19:16.337484-04:00",
+      "description": "Required portion of the full test suite",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "requiredTestPortion",
+      "dateTime": "2026-08-14T05:41:33.459127-04:00",
+      "description": "All three suites owed (covers ai_router/) and recorded: pytest 4411 passed / 9 skipped (586s, +13 = exactly this session's new tests), mocha 1455 passing / 2 pending (41s), playwright 31/31 (composite: 30 in the declared 4-worker run + vsix-first-run-walkthrough.spec.ts standalone in 43.9s, 513s). The Playwright failure was checked for regression FIRST -- this session changes a state-file writer -- and ruled out by the isolated pass matching Session 1's 43.6s on the identical signature.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "closeOut",
+      "dateTime": "2026-08-14T05:41:33.461691-04:00",
+      "description": "Close-out",
+      "status": "in-progress"
     }
   ]
 }

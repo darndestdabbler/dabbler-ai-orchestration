@@ -917,3 +917,297 @@ def test_preflight_direct_engine_unaffected_when_identity_raises(
     assert start_session._run_copilot_preflight_or_block(
         args, run_live_probe=True
     ) is None
+
+
+# =========================================================================
+# Set 130 Session 2 — the join key, recorded instead of dropped
+#
+# Every falsifier below PLANTS its input (an environment variable, a prior
+# on-disk block, a wire-shaped metadata dict) and asserts what the writer
+# then produced. None of them reads the writer's source and agrees with it
+# (L-112-1): the two failures this session can ship both return a
+# plausible-looking state file, so only a planted run separates a reader
+# that captured the id from one that quietly did not.
+#
+# The two directions:
+#   FIRES        — the id lands, accumulates, and stays per-session.
+#   DOES NOT FIRE— its absence is an ABSENT KEY, never [] and never a
+#                  silently-erased prior value. Set 130's whole thesis is
+#                  that an unmeasured quantity must not be reported as a
+#                  measured zero (T2); an empty list here is that defect
+#                  one level up in the schema.
+# =========================================================================
+
+SEAT_ENV = "COPILOT_AGENT_SESSION_ID"
+
+
+def _orchestrator_block_for(set_dir: Path, session_number: int) -> dict:
+    """The on-disk orchestrator block for *session_number*.
+
+    Reads the RAW file rather than the normalized view so the assertions
+    below are about what was actually written, not about what a shim
+    could re-derive.
+    """
+    state = json.loads(
+        (set_dir / "session-state.json").read_text(encoding="utf-8")
+    )
+    for entry in state.get("sessions") or []:
+        if entry.get("number") == session_number:
+            return entry.get("orchestrator") or {}
+    return state.get("orchestrator") or {}
+
+
+# --- FIRES: the id lands --------------------------------------------------
+
+
+def test_seat_conversation_id_is_captured_from_the_environment(
+    tmp_path: Path, monkeypatch
+):
+    """The CLI reads COPILOT_AGENT_SESSION_ID and records it.
+
+    Driven through ``start_session.run`` rather than
+    ``register_session_start`` on purpose: a unit test of the writer alone
+    passes even when nothing ever reads the variable, which is exactly the
+    defect this session exists to close.
+
+    The engine here is ``claude``, not a Copilot seat, and the id is still
+    recorded. That is deliberate and load-bearing: the variable is exported
+    by the conversation that actually spawned this process, so its presence
+    is evidence of which conversation is running the session -- gating
+    capture on ``--engine`` would discard a true id to satisfy a label.
+    """
+    monkeypatch.setenv(SEAT_ENV, "conv-alpha")
+    set_dir = _fresh_set(tmp_path)
+    assert start_session.run(_args(set_dir)) == 0
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == [
+        "conv-alpha"
+    ]
+
+
+def test_a_context_reset_appends_a_second_conversation(
+    tmp_path: Path, monkeypatch
+):
+    """Re-registering from a NEW conversation appends; it does not replace.
+
+    This is the case the whole array shape exists for. ``start_session`` is
+    idempotent by design and is re-run after a context reset -- and a reset
+    starts a new conversation on the same workflow session. A
+    last-writer-wins scalar would drop the first conversation's cost from
+    precisely the sessions that were hard enough to need a reset.
+    """
+    monkeypatch.setenv(SEAT_ENV, "conv-before-reset")
+    set_dir = _fresh_set(tmp_path)
+    assert start_session.run(_args(set_dir)) == 0
+    monkeypatch.setenv(SEAT_ENV, "conv-after-reset")
+    assert start_session.run(_args(set_dir)) == 0
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == [
+        "conv-before-reset",
+        "conv-after-reset",
+    ]
+
+
+def test_re_registering_from_the_same_conversation_does_not_duplicate(
+    tmp_path: Path, monkeypatch
+):
+    """Idempotency extends to the ids: a second call from one conversation
+    is a no-op, so a retried or resumed register cannot inflate the count
+    of conversations that produced the session."""
+    monkeypatch.setenv(SEAT_ENV, "conv-same")
+    set_dir = _fresh_set(tmp_path)
+    for _ in range(3):
+        assert start_session.run(_args(set_dir)) == 0
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == [
+        "conv-same"
+    ]
+
+
+def test_seat_ids_are_per_session_and_survive_the_next_register(
+    tmp_path: Path, monkeypatch
+):
+    """Session 2's register does not inherit, move or erase session 1's ids.
+
+    The ids are attribution, and attribution that leaks across sessions
+    bills one session's conversations to another -- the same error the
+    spec's T6 names for time windows, arriving by a different route.
+    """
+    monkeypatch.setenv(SEAT_ENV, "conv-s1")
+    set_dir = _fresh_set(tmp_path, total_sessions=3)
+    assert start_session.run(_args(set_dir)) == 0
+
+    state_path = set_dir / "session-state.json"
+    state = json.loads(state_path.read_text(encoding="utf-8"))
+    for session in state.get("sessions", []):
+        if session.get("number") == 1:
+            session["status"] = "complete"
+    state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
+
+    monkeypatch.setenv(SEAT_ENV, "conv-s2")
+    assert start_session.run(_args(set_dir, session_number=2)) == 0
+
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == ["conv-s1"]
+    assert _orchestrator_block_for(set_dir, 2)["seatSessionIds"] == ["conv-s2"]
+
+
+def test_ids_recorded_plan_less_survive_the_arrival_of_a_plan(
+    tmp_path: Path, monkeypatch
+):
+    """A plan-less register keeps its block at the TOP level; the first
+    planned register moves to a per-session block. The ids must cross that
+    boundary.
+
+    Without the carry-forward this is a silent partial loss: the state file
+    still looks correct afterwards and simply prices one conversation
+    short.
+    """
+    monkeypatch.setenv(SEAT_ENV, "conv-planless")
+    set_dir = _planless_set(tmp_path)
+    assert start_session.run(_args(set_dir)) == 0
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == [
+        "conv-planless"
+    ]
+
+    monkeypatch.setenv(SEAT_ENV, "conv-planned")
+    assert start_session.run(_args(set_dir, total_sessions=2)) == 0
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == [
+        "conv-planless",
+        "conv-planned",
+    ]
+
+
+# --- DOES NOT FIRE: absence is an absent key, never a zero ----------------
+
+
+def test_direct_api_run_omits_the_key_entirely(tmp_path: Path, monkeypatch):
+    """No variable in the environment -> the key is ABSENT.
+
+    Not ``[]``, not ``null``. An empty list is a claim ("I looked, and this
+    session was produced by no conversations") that is false on a
+    Direct-API seat, where the honest statement is "not captured". This is
+    T2 applied to the schema instead of to a dollar figure, and it is
+    asserted structurally -- against the raw file -- because an equality
+    check on the block would pass for either shape.
+    """
+    monkeypatch.delenv(SEAT_ENV, raising=False)
+    set_dir = _fresh_set(tmp_path)
+    assert start_session.run(_args(set_dir)) == 0
+    block = _orchestrator_block_for(set_dir, 1)
+    assert "seatSessionIds" not in block
+    raw = (set_dir / "session-state.json").read_text(encoding="utf-8")
+    assert "seatSessionIds" not in raw
+
+
+def test_a_later_register_without_the_variable_does_not_erase_prior_ids(
+    tmp_path: Path, monkeypatch
+):
+    """A run from a shell that does not carry the variable is a no-op on
+    the recorded ids, not a wipe.
+
+    This is the expensive direction of the same fail-open: a mid-session
+    re-register from a plain terminal would otherwise erase the join key
+    and leave a state file that still validates, still looks complete, and
+    can no longer be priced.
+    """
+    monkeypatch.setenv(SEAT_ENV, "conv-real")
+    set_dir = _fresh_set(tmp_path)
+    assert start_session.run(_args(set_dir)) == 0
+    monkeypatch.delenv(SEAT_ENV, raising=False)
+    assert start_session.run(_args(set_dir)) == 0
+    assert _orchestrator_block_for(set_dir, 1)["seatSessionIds"] == [
+        "conv-real"
+    ]
+
+
+def test_a_blank_variable_records_nothing_rather_than_an_empty_id(
+    tmp_path: Path, monkeypatch
+):
+    """An exported-but-empty variable is 'not captured', not an id.
+
+    A whitespace-only value is the shape a shell produces when the variable
+    is exported unset, and ``[""]`` or ``["   "]`` would be an
+    unresolvable id that the store can never match -- a plausible-looking
+    entry that prices to nothing.
+    """
+    monkeypatch.setenv(SEAT_ENV, "   ")
+    set_dir = _fresh_set(tmp_path)
+    assert start_session.run(_args(set_dir)) == 0
+    assert "seatSessionIds" not in _orchestrator_block_for(set_dir, 1)
+
+
+def test_a_bare_string_is_not_exploded_into_one_id_per_character():
+    """``normalize_seat_session_ids`` refuses a bare string.
+
+    A string is iterable, so the obvious implementation silently turns
+    ``"abc"`` into ``["a", "b", "c"]`` -- three unresolvable ids that look
+    exactly like a captured list. Asserted here on the helper rather than
+    through the CLI because the CLI cannot produce this input; a future
+    caller passing the scalar directly can.
+    """
+    from session_state import (  # type: ignore[import-not-found]
+        normalize_seat_session_ids,
+    )
+
+    assert normalize_seat_session_ids("abc") == ()
+    assert normalize_seat_session_ids(b"abc") == ()
+    assert normalize_seat_session_ids(None) == ()
+    assert normalize_seat_session_ids(["a", 7, None, "", "  b  ", "a"]) == (
+        "a",
+        "b",
+    )
+
+
+def test_the_environment_variable_is_spelled_in_exactly_one_module():
+    """STRUCTURAL: only ``seat_cost`` names the variable in executable code.
+
+    A textual assertion that some module reads the right variable holds
+    however many modules read it; this one holds however the reading is
+    spelled. It fires the moment a second production module hardcodes
+    ``COPILOT_AGENT_SESSION_ID`` instead of importing
+    ``seat_cost.SEAT_SESSION_ID_ENV`` -- the sibling-drift class L-069-1
+    names, and the reason a rename would otherwise half-land.
+
+    Docstrings are excluded (prose may name the variable freely); the scan
+    asserts its own corpus is non-empty so a discovery bug cannot pass by
+    examining nothing.
+    """
+    import ast
+
+    ai_router_dir = Path(start_session.__file__).resolve().parent
+    scanned: list[Path] = []
+    offenders: list[str] = []
+    for py_file in sorted(ai_router_dir.rglob("*.py")):
+        if "tests" in py_file.relative_to(ai_router_dir).parts:
+            continue
+        try:
+            tree = ast.parse(py_file.read_text(encoding="utf-8"))
+        except (SyntaxError, UnicodeDecodeError):  # pragma: no cover
+            continue
+        scanned.append(py_file)
+        docstrings = set()
+        for node in ast.walk(tree):
+            if isinstance(
+                node,
+                (ast.Module, ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef),
+            ):
+                body = getattr(node, "body", None) or []
+                if (
+                    body
+                    and isinstance(body[0], ast.Expr)
+                    and isinstance(body[0].value, ast.Constant)
+                    and isinstance(body[0].value.value, str)
+                ):
+                    docstrings.add(id(body[0].value))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and SEAT_ENV in node.value
+                and id(node) not in docstrings
+            ):
+                offenders.append(py_file.name)
+                break
+
+    assert scanned, "corpus scan found no production modules"
+    assert offenders == ["seat_cost.py"], (
+        f"{SEAT_ENV} must be spelled once, in seat_cost.SEAT_SESSION_ID_ENV; "
+        f"found it in executable code in {sorted(set(offenders))}"
+    )

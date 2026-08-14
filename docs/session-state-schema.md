@@ -214,7 +214,7 @@ Each entry is an object with these fields:
 | `type` | enum or absent | Session type: `work` (default) \| `verification` \| `remediation` (Set 057). RETIRED with the Lightweight tier (Set 112). **Absent means `work`**, which is now every entry; readers stay tolerant for archived ledgers and nothing writes it. See **Per-session `type`** below. |
 | `startedAt` | ISO 8601 or null | Set on `start_session`. Null until the session begins. |
 | `completedAt` | ISO 8601 or null | Set on `close_session`. Null until the session closes. |
-| `orchestrator` | object or null | Engine / provider / model / effort for the holder of THIS session, omit-null on disk. Null when this session has not yet started; populated by `start_session`; **preserved across `close_session`** as historical attribution on closed sessions. See **Per-session orchestrator block** below. |
+| `orchestrator` | object or null | Engine / provider / model / effort (plus `identityProvenance` and `seatSessionIds`) for the holder of THIS session, omit-null on disk. Null when this session has not yet started; populated by `start_session`; **preserved across `close_session`** as historical attribution on closed sessions. See **Per-session orchestrator block** below. |
 | `verificationVerdict` | string \| null | Set by `close_session` after gate checks via `resolve_close_verdict()`. Three-level precedence: (1) `disposition.verification_verdict` verbatim (wins even under `--force`); (2) for `verification_method == "api"` only, a status-derived fallback (`completed`→`"VERIFIED"`, `failed`/`requires_review`→`"ISSUES_FOUND"`) when no explicit field is set (backward compat for pre-Set-054 dispositions); (3) `null` for manual / skipped / `--no-router` / missing disposition when neither source applies. The canonical tokens are `"VERIFIED"`, `"ISSUES_FOUND"`, and `"WAIVED"`. **Set 086 (S1) added writer-side enforcement** on the active-set close path: the sanctioned writer accepts *only* an exact (case-insensitively normalized) allowlist — the three canonical tokens plus the intentionally-shipped extension token `"ISSUES_FOUND_RESOLVED_IN_FLIGHT"` — and **rejects anything else**, including a free-form non-verdict (`"manual-override-development"`, the 2026-07-08 confabulation incident) *and* an invented prefix look-alike (`"VERIFIED_NOT_REALLY"`). `null` remains valid (no verdict recorded: manual / skipped / `--no-router` / a mid-set session with no routed verifier). The writer/reader contract is deliberately **asymmetric**: the writer is *strict* (exact allowlist, fail-closed — see `ai_router/session_state.py` `_ALLOWED_VERDICT_TOKENS` / `validate_verification_verdict`), while *readers stay lenient* and match on prefix when bucketing, so a genuinely new extension token added to the writer allowlist is forward-compatible with existing readers. Shipping a new extension token is therefore a deliberate vocabulary change in `session_state.py`. Readers that surface the verdict to a human (e.g. the Session Set Explorer) additionally **flag an unrecognized token** rather than rendering it as a clean verdict (Set 086 S2). |
 
 ### Per-session `type` — REMOVED (Set 112)
@@ -239,7 +239,7 @@ instead of being overwritten by the next session's start.
 
 ### Per-session orchestrator block — historical attribution
 
-A populated `sessions[N].orchestrator` block carries up to 5 fields:
+A populated `sessions[N].orchestrator` block carries up to 6 fields:
 
 | Field | Type | Purpose |
 |---|---|---|
@@ -248,6 +248,7 @@ A populated `sessions[N].orchestrator` block carries up to 5 fields:
 | `model` | string | Model id (`claude-opus-4-7`, `gpt-5.4`, etc.). **Set 084 (F1): required at `start_session` for multi-provider engines** (`github-copilot`, `copilot`) and validated against the model registry (`router-config.yaml` `models:` keys/model_ids plus the Copilot CLI's documented model universe). This is the identity-bearing field. |
 | `effort` | string | Effort level: `low` / `medium` / `high` / `fast` / `normal`. |
 | `identityProvenance` | string or absent | **Set 084 (F1, additive, omit-null).** How identity was established, derived from the engine and never a free choice: `asserted` for multi-provider engines (a Copilot seat relays whatever model the picker selected, so the model claim is the orchestrator's assertion), `direct` for single-vendor engines. Absent on every pre-084 block and when no engine is derivable. Readers treat absence as "unlabeled (pre-084)". The enum is exactly `direct \| asserted` — writer-validated (`session_state.build_orchestrator_block`) and mirrored in the schema example, per the L-066-1 both-directions parity rule. |
+| `seatSessionIds` | array of strings, or absent | **Set 130 (S2, additive, omit-null).** The seat conversation ids (`COPILOT_AGENT_SESSION_ID`) that produced this session, in first-seen order — the join key `ai_router/seat_cost.py` prices the `orchestrator_seat` component from. **The one field that accumulates** (see the writer contract below). Absent — never `[]`, never `null` — on every pre-130 block and on every Direct-API run, because "not captured" and "captured, and there were none" are different claims and only the first is true there. Deduped and order-preserving; the schema mirrors both with `uniqueItems` and `minItems: 1`, per the L-066-1 both-directions parity rule. |
 
 **Omit-null on disk (Set 049 T3).** Writers MUST omit any field they
 cannot declare authoritatively rather than writing `null` or a
@@ -298,7 +299,39 @@ derived from the engine via the shared
 - Same-holder re-attach (subsequent `start_session` calls on the
   same in-progress session) replaces the block atomically with the
   new write. There is no per-field merge; the caller is the source
-  of truth for whatever it declares.
+  of truth for whatever it declares. **One documented exception, Set
+  130 (S2): `seatSessionIds` accumulates.** Every other field is
+  replaced, but the seat conversation ids are *appended* to whatever
+  the prior block carried, because the re-attach case this contract
+  exists for — a context reset — is precisely the case where the second
+  call comes from a **different conversation** than the first. Replacing
+  would drop the first conversation's cost, and only from the sessions
+  that were hard enough to need a reset. Already-present ids are not
+  duplicated, so a second call from the same conversation is a no-op,
+  and a call that supplies no id (Direct API, or a shell that does not
+  carry the variable) leaves the recorded ids untouched rather than
+  erasing them. Accumulation is implemented in
+  `session_state.accumulate_seat_session_ids`, the single writer-side
+  home of the rule.
+
+### `seatSessionIds` — where the value comes from (Set 130 S2)
+
+The value is read at the **CLI boundary**, by `ai_router/start_session.py`,
+via `seat_cost.seat_session_id_from_env()` — never inside
+`register_session_start`, which takes it as an explicit `seat_session_id`
+argument so the writer stays pure and deterministic under test.
+
+Reading it there is deliberate: `COPILOT_AGENT_SESSION_ID` is exported by
+the conversation that actually spawned the process, so its presence is
+**evidence** of which conversation is running the session rather than an
+inference from `--engine`. Capture is therefore *not* gated on the engine
+being a Copilot seat; a Direct-API run simply has no such variable and
+the field is omitted.
+
+The ids are conversation ids in the Copilot CLI's local session store,
+not workflow-session numbers. What they are worth, what they cost, and how
+`immutable=1` silently undercounts them are covered in
+[`ai_router/docs/seat-cost.md`](../ai_router/docs/seat-cost.md).
 
 **Legacy CLI flag.** `start_session --chat-session-id <id>` is
 accepted by `argparse` and ignored by the writer logic (with one
@@ -1234,8 +1267,9 @@ surfaces on the next check).
 is the JSON-Schema contract for what a v4 writer may emit — the
 canonical known-plan shape, the plan-less carve-out, the per-session
 enums, and the orchestrator block including the `identityProvenance`
-enum (`direct | asserted`). Parity with the live writer and the
-pure-Python validation is pinned in both directions by
+enum (`direct | asserted`) and the `seatSessionIds` array
+(`minItems: 1`, `uniqueItems`, Set 130 S2). Parity with the live writer
+and the pure-Python validation is pinned in both directions by
 `ai_router/tests/test_orchestrator_identity.py::TestSessionStateSchemaParity`
 (writer output validates against the schema; the schema rejects the
 enum values the writer refuses — L-066-1).

@@ -74,6 +74,24 @@ Schema per line:
     "billed_usage_unavailable":   bool or null  (true whenever cost_usd
          is not billing-authoritative for this record -- always true for
          "copilot-cli" records, always null/absent for "api" ones)
+    # Set 130 S2 — the join key that makes a copilot-cli row's real cost
+    # recoverable. Null on every historical row and on every api-profile
+    # row, which reads as "not captured" rather than a false claim.
+    "transport_session_id":       str or null
+         the CONVERSATION id the transport reported for this call's child
+         process -- the Copilot CLI result event's "sessionId", which
+         cli_transport already captures into transport_metadata and which
+         had nowhere to land until now. Named for the transport, not
+         bare "session_id", because "session_set" / "session_number"
+         above are the WORKFLOW session and the two are unrelated
+         numbers. It is the primary key of
+         ~/.copilot/session-store.db's assistant_usage_events, so a row
+         carrying it can be priced exactly by ai_router/seat_cost.py
+         (the "routed_seat" component); a row without it can only be
+         attributed by wall clock, which cannot attribute at all --
+         see ai_router/docs/seat-cost.md section 5.3. Null on the api
+         profile is correct and permanent: that path's cost_usd is
+         already authoritative and no child conversation exists.
     # Set 084 S2 (F3) -- the verification-evidence stamp (one key per
     # verification_stamp.STAMP_FIELDS entry -- that tuple is the
     # authoritative field list). All are null on every historical row
@@ -199,6 +217,16 @@ def record_call(
     local_invocations: Optional[int] = None,
     attempts: Optional[int] = None,
     billed_usage_unavailable: Optional[bool] = None,
+    # Set 130 S2 addition — the routed child's CONVERSATION id, as the
+    # transport reported it. Additive and optional on the same terms as
+    # everything above: every historical row and every caller that omits
+    # it records null, which is "not captured", never a claim that no
+    # conversation existed. The api profile omits it permanently (no
+    # child conversation exists there, and its cost_usd is already
+    # authoritative). Callers pass a shape-checked value -- see
+    # ai_router/__init__.py::_copilot_session_id, which owns that check
+    # for both seat call sites.
+    transport_session_id: Optional[str] = None,
     # Set 109 S1 additions — requested-vs-served model truth. Additive and
     # optional: every historical row and every caller that omits them records
     # null, which is correct ("we did not capture this"), never a false
@@ -284,6 +312,11 @@ def record_call(
         "local_invocations": local_invocations,
         "attempts": attempts,
         "billed_usage_unavailable": billed_usage_unavailable,
+        # Set 130 S2 — the join key. Always present as a column so a
+        # jq-style reader never has to tell "old row" from "api row"
+        # (the shape argument Set 123 S2 made for the optional stamp
+        # keys); null on both.
+        "transport_session_id": transport_session_id,
     }
 
     # Set 084 S2 (F3) — the verification-evidence stamp. Written as

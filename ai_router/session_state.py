@@ -679,11 +679,79 @@ def _validate_sessions_or_raise(
     )
 
 
+#: Set 130 (S2). The orchestrator-block key carrying the seat
+#: conversation ids that produced a session -- the join key
+#: :mod:`ai_router.seat_cost` prices ``orchestrator_seat`` from. Lives on
+#: the orchestrator block rather than beside it because it IS orchestrator
+#: identity: which conversation ran the session, in the same block as
+#: which engine and model ran it.
+SEAT_SESSION_IDS_KEY = "seatSessionIds"
+
+
+def normalize_seat_session_ids(value: object) -> Tuple[str, ...]:
+    """Return *value* as a deduped, order-preserving tuple of id strings.
+
+    Deliberately tolerant, because one of its inputs is a block read back
+    off disk: a malformed prior value (a hand edit, an older writer, a
+    partially-restored file) must not be able to break a boundary write.
+    Non-string and blank entries are dropped rather than raised on --
+    nothing that is not a non-empty string can be a conversation id under
+    any reading -- and first-seen order is preserved so the conversation
+    that opened the session stays first.
+
+    A bare string is NOT accepted as a one-element sequence: iterating it
+    would silently record one id per character.
+    """
+    if isinstance(value, (str, bytes)) or not isinstance(value, Iterable):
+        return ()
+    out: List[str] = []
+    for entry in value:
+        if not isinstance(entry, str):
+            continue
+        cleaned = entry.strip()
+        if cleaned and cleaned not in out:
+            out.append(cleaned)
+    return tuple(out)
+
+
+def accumulate_seat_session_ids(
+    prior_block: object,
+    seat_session_id: Optional[str],
+) -> Tuple[str, ...]:
+    """Append *seat_session_id* to the ids already on *prior_block*.
+
+    Appending, not replacing, is the whole point.
+    :func:`register_session_start` is idempotent by design and is re-run
+    after a context reset -- and a context reset starts a **new**
+    conversation on the **same** workflow session. A last-writer-wins
+    scalar would therefore drop every conversation but the last,
+    undercounting exactly the sessions that were hard enough to need a
+    reset. An id already present is not appended again, so re-running
+    ``start_session`` twice from one conversation is a no-op.
+
+    *prior_block* is whatever was on disk (a dict, ``None``, or garbage);
+    a non-dict contributes nothing. A missing or blank *seat_session_id*
+    -- the Direct-API case -- returns the prior ids unchanged, so a seat
+    id already recorded is never erased by a later run from a shell that
+    does not carry the variable.
+    """
+    prior: Tuple[str, ...] = ()
+    if isinstance(prior_block, dict):
+        prior = normalize_seat_session_ids(prior_block.get(SEAT_SESSION_IDS_KEY))
+    if not isinstance(seat_session_id, str):
+        return prior
+    cleaned = seat_session_id.strip()
+    if not cleaned or cleaned in prior:
+        return prior
+    return prior + (cleaned,)
+
+
 def build_orchestrator_block(
     orchestrator_engine: str,
     orchestrator_provider: Optional[str] = None,
     orchestrator_model: Optional[str] = None,
     orchestrator_effort: Optional[str] = None,
+    seat_session_ids: Optional[Iterable[str]] = None,
 ) -> dict:
     """Build the per-session orchestrator block (single writer surface).
 
@@ -698,6 +766,17 @@ def build_orchestrator_block(
     pure-Python half of the schema parity contract, L-066-1). All three
     writer sites (work start, typed start, typed handoff) build their
     block here so the field can never drift per-site (L-069-1).
+
+    Set 130 (S2): ``seatSessionIds`` carries the seat conversation ids
+    that produced this session — the join key
+    :mod:`ai_router.seat_cost` needs to price ``orchestrator_seat`` and
+    that nothing recorded before. Omit-null applies unchanged: a
+    Direct-API run supplies nothing and the key is **absent**, never an
+    empty list, because "not captured" and "captured, and there were
+    none" are different claims. Deduped and order-preserving (see
+    :func:`normalize_seat_session_ids`), which the schema mirrors with
+    ``uniqueItems`` / ``minItems: 1`` per the both-directions parity
+    rule.
     """
     try:
         from .orchestrator_identity import (
@@ -727,6 +806,9 @@ def build_orchestrator_block(
                 "writer/schema drift (L-066-1).",
             )
         block["identityProvenance"] = provenance
+    seat_ids = normalize_seat_session_ids(seat_session_ids)
+    if seat_ids:
+        block[SEAT_SESSION_IDS_KEY] = list(seat_ids)
     return block
 
 
@@ -738,6 +820,7 @@ def register_session_start(
     orchestrator_model: Optional[str] = None,
     orchestrator_effort: Optional[str] = None,
     orchestrator_provider: Optional[str] = None,
+    seat_session_id: Optional[str] = None,
 ) -> str:
     """Write ``session-state.json`` marking *session_number* as in-progress.
 
@@ -751,6 +834,17 @@ def register_session_start(
     Callers that cannot authoritatively declare a field pass None and
     let omit-null drop the key, rather than guessing or emitting
     ``"unknown"``.
+
+    Set 130 (S2): *seat_session_id* is the id of the conversation making
+    this call — ``COPILOT_AGENT_SESSION_ID`` on a Copilot seat, absent
+    everywhere else. It is **accumulated** onto the session's existing
+    ``orchestrator.seatSessionIds`` rather than replacing them, because
+    this function is idempotent by design and a re-run after a context
+    reset comes from a different conversation than the first run did.
+    ``None`` (the Direct-API case) adds nothing and erases nothing. The
+    parameter is explicit rather than read from the environment here so
+    the writer stays pure and deterministic under test; the CLI boundary
+    (:mod:`ai_router.start_session`) is what reads the variable.
 
     Events emission
     ---------------
@@ -1013,11 +1107,34 @@ def register_session_start(
     # without "unknown" fallbacks. Set 084: built via the shared
     # build_orchestrator_block so identityProvenance is stamped
     # identically at every writer site.
+    #
+    # Set 130 (S2): the seat conversation ids accumulate across the
+    # rewrite. The prior block is read from the per-session v4 metadata;
+    # the plan-less carve-out below keeps its block at the TOP level, so
+    # a set that was plan-less on its first register and gains a plan
+    # before its second would otherwise drop the ids it had already
+    # recorded at exactly that boundary. The fallback is scoped to that
+    # case alone -- no sessions[] ledger on disk AND an in-progress
+    # snapshot -- because only there is a top-level block unambiguously
+    # the in-flight session's.
+    prior_orchestrator: object = None
+    prior_meta = prior_v4_metadata.get(session_number)
+    if isinstance(prior_meta, dict):
+        prior_orchestrator = prior_meta.get("orchestrator")
+    if prior_orchestrator is None and isinstance(existing, dict):
+        if (
+            not existing.get("sessions")
+            and existing.get("status") == SESSION_STATUS_IN_PROGRESS
+        ):
+            prior_orchestrator = existing.get("orchestrator")
     orchestrator_block = build_orchestrator_block(
         orchestrator_engine,
         orchestrator_provider=orchestrator_provider,
         orchestrator_model=orchestrator_model,
         orchestrator_effort=orchestrator_effort,
+        seat_session_ids=accumulate_seat_session_ids(
+            prior_orchestrator, seat_session_id
+        ),
     )
 
     if sessions is None:

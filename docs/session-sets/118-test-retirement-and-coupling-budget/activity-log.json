@@ -1,7 +1,7 @@
 {
   "sessionSetName": "118-test-retirement-and-coupling-budget",
   "createdDate": "2026-08-14T00:34:08.039722+00:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -122,6 +122,85 @@
       "stepKey": "required-portion-of-the-full-test",
       "dateTime": "2026-08-14T01:17:58.905720-04:00",
       "description": "A3: run_of_record affected named ALL THREE suites owed -- pytest, mocha and playwright -- because mocha's and playwright's covers both include ai_router/ (Set 129 S1 derived that empirically: Layer 3 pip-installs this tree rather than the published wheel). No suite was saved this time. pytest 4,374 passed / 9 skipped in 607.1s. mocha 1,455 passing / 2 pending in 44s. PLAYWRIGHT NEEDED AN OPERATOR DECISION: 30 passed / 1 failed under the declared command, the failure being vsix-first-run-walkthrough.spec.ts stuck on 'Default0 sets' for its full 300s wait. Attribution was established rather than assumed -- the spec passes STANDALONE in 45s and the whole suite passes at --workers=1 (31/31, 8.4m), while workers=4 fails it twice at 5.2m each. Cause is parallel contention: four VS Code instances each doing a real venv + network pip install starve the walkthrough past its budget. Independently confirmed the change cannot reach an extension surface by building the wheel (clean) and inspecting it: suite_inventory.py present, ZERO test modules -- which also re-proves the packaging invariant that forced the module rename. Operator attested to recording green from the serial run with the provenance disclosed; journaled under the verification-reduction carve-out with authority=human, because a green row under the declared command is exactly what the gate asks about and only the operator may relax it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "Register. Confirm Set 116 is complete and **read what its Session 3 shipped** \u2014 it changed `gate_checks.py`, `run_of_record.py` and `docs/session-constitution.md`, and this session edits the last of those. Read Set 128's A1\u2013A4 in the authoring guide before writing a rule in their vocabulary.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "operator-decision-journaled-this-is-the",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "**Operator decision, journaled \u2014 this is the hard carve-out.** Retiring tests is a **verification reduction**. `decision_journal.py` refuses it under AI authority (`VerificationReductionRefused`). Present the Session 1 inventory and record the attestation with `authority=\"human\"`, `rubric_line=\"verification-reduction\"` and `verification_effect=\"reduces\"`, plus a non-empty operator attestation. **No retirement is implemented before this record exists.** The record must carry the **A4.1 ordering constraint** as part of what is attested \u2014 a retirement lands before verification, never after the full suite \u2014 because the exemption that would otherwise swallow it is machine-enforced and would fire silently.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "ship-the-guard-expiry-convention",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "**Ship the guard-expiry convention.** A `guard` pytest marker registered in `pytest.ini`, carrying what the guard protects, the set that removed it, and a review-after horizon in sets. Applying the marker changes no behaviour \u2014 it makes the guard's *purpose* machine-readable so it can be reviewed instead of inherited.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "report-expired-guards-at-the-set",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "**Report expired guards at the set boundary.** `test_inventory` surfaces guards past their horizon as a list with a recommendation. **Report only \u2014 it never blocks a close**, per this set's fourth standing decision. A guard that is also the **sole cover** for a production module (A1) is reported as such and is never recommended for a bulk pass.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-14T01:58:40.099931-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T01:58:40.118576-04:00",
+      "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "operator-decision-journaled-this-is-the",
+      "dateTime": "2026-08-14T02:19:13.602073-04:00",
+      "description": "OPERATOR STOP -- and the ruling was to STOP THE SET. Three questions arrived at this stop: the spec s scheduled verification-reduction attestation, the scope question Session 1 handed forward (re-scope or retire the coupling half), and the operator s own framing -- I wanted to streamline the tests. The third governed the other two and git answered it: REMOVED FUNCTIONALITY ALREADY TAKES ITS TESTS WITH IT IN THE SAME COMMIT (Set 112 S1 deleted 5 production modules + 9 test files together; Set 119 S3 deleted 4 and 4), and a test importing a deleted module fails to COLLECT, so the suite goes red at once rather than accruing dead mass. There is none. The whole un-retired residue is guards: 122 test functions, 2.8 percent of 4,374 collected, ~0.2 percent of wall clock at Set 112 s measured rate -- the CEILING on everything retirement could ever buy here. All seven candidates reviewed individually (the four the heuristic finds, the two the spec names that no mechanical signal can see, plus test_no_legacy_field_reads.py at 100 sets which the heuristic misses): NONE retirable -- each either covers a feature that still ships or hedges a defect class that can still recur, and two (test_drift_guard.py, test_set111_close_gates.py) are not guards at all but the test suites of live gates, flagged on their filenames. Operator ruled the guard marker + expiry report is administrative overhead without guaranteed benefit. Journaled under value-trade-off, human authority, effect NONE not REDUCES -- the ruling REMOVES a planned retirement rather than authorising one, so the spec s verification-reduction attestation was never reached and is deliberately left unmade. Steps 3-7 not executed. Set cancelled via the sanctioned writer, mid-session and deliberately: the operator was offered the alternative of formally closing Session 2 first (one cross-provider round plus a mandatory ~10-minute pytest run of record for a session whose only content is the ruling) and declined it as exactly the overhead being ruled against. Reversible -- restore_session_set returns Session 2 mid-flight, untouched. Records: s2-scope-ruling.md, decisions.jsonl, ai-assignment.md, spec.md banner, CANCELLED.md.",
       "status": "complete"
     }
   ]

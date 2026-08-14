@@ -1,5 +1,32 @@
 # Test Retirement and Coupling Budget Spec
 
+> ## [!] CANCELLED 2026-08-14 — this set stops after Session 1
+>
+> Session 1 completed and is VERIFIED; its deliverable,
+> `ai_router/suite_inventory.py`, is merged and stays shipped. **Sessions
+> 2 and 3 were not run.** At Session 2's scheduled operator stop the
+> measurement retired the set's own premise: removed functionality
+> already takes its tests with it in the same commit, so there is no
+> orphaned test mass, and the entire un-retired residue is 122 guard test
+> functions — 2.8% of the suite and ~0.2% of wall clock.
+>
+> **Read [`s2-scope-ruling.md`](s2-scope-ruling.md) before anything below
+> it.** Everything from here down is the spec as authored, preserved
+> unedited so the ruling can be checked against what it ruled on. The
+> retirement rule, the `guard` marker convention and the expiry report
+> described in Sessions 2 and 3 **do not exist**, and this spec's
+> scheduled verification-reduction attestation was never made — a future
+> set that wants to retire a test must obtain it fresh.
+>
+> Reversible: `session_lifecycle.restore_session_set` returns the set and
+> its mid-flight Session 2 exactly as they are. See `CANCELLED.md`.
+>
+> **Two corrections that outlive the set**, both from Session 1 and both
+> already recorded in [`inventory-findings.md`](inventory-findings.md):
+> this spec's coupling figure of 47 files / 1,485 tests is **superseded**
+> (strong coupling is 222 test functions at `ab47a3e7`), and every
+> `test_inventory` below should be read as **`suite_inventory`**.
+
 > **Purpose:** The test suite grows linearly and nothing in the framework
 > ever retires a test. Set 116 proved that *deleting* tests does not buy
 > wall clock (0.4% for a 6.1% cut) and correctly refused a pruning

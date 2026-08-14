@@ -112,3 +112,104 @@ release artifact — and Session 2 will change `ai_router/` again anyway.
 The repo files one fragment per set at the set-terminal session. Session
 3 should extend this draft with Sessions 2 and 3 and move it to
 `ai_router/changelog.d/0120-set-118-the-suite-as-a-query.md`.
+
+---
+
+## Session 2 of 3 — The retirement rule, ruled and journaled — NOT COMPLETED
+
+**Orchestrator:** GitHub Copilot CLI (`github-copilot`), Claude Opus 5
+(`claude-opus-5`), effort `high`, provider `anthropic` — the
+`continue-current-trajectory` recommendation above was followed.
+**Transport:** `COPILOT_CLI`, so no provider API keys are carried and
+none are required.
+
+**Verifier:** none. No cross-provider round was run and none is owed:
+the session reached its step-2 operator stop, the operator ruled that
+the set stops there, and steps 3-7 were never executed. Nothing shipped
+for a verifier to review — the session's entire output is records
+(`decisions.jsonl`, `s2-scope-ruling.md`, this block, `CANCELLED.md`)
+and a spec banner. No production code, no test, no gate changed.
+
+**What happened.** Step 2 was scheduled as this set's single operator
+stop — retiring a test is a verification reduction and
+`decision_journal` refuses it under AI authority. Three questions
+arrived at it: the spec's scheduled attestation, the scope question
+Session 1 handed forward, and the operator's own framing of what they
+wanted (*"I wanted to streamline the tests"*). The third governed the
+other two, and git answered it: **removed functionality already takes
+its tests with it in the same commit** (Set 112 S1 deleted 5 production
+modules and 9 test files together; Set 119 S3 deleted 4 and 4), and a
+test importing a deleted module fails to *collect*, so the suite goes
+red at once rather than accruing dead mass. There is none.
+
+The whole un-retired residue is guards: **122 test functions, 2.8% of
+4,374 collected, ~0.2% of wall clock** at Set 112's measured rate. That
+is the ceiling on everything retirement could ever buy here — deleting
+every guard, protections and all. Reviewing the seven candidates
+individually (the four the heuristic finds, the two the spec names that
+no mechanical signal can see, and `test_no_legacy_field_reads.py` at
+**100 sets** which the heuristic misses) found **none** retirable: each
+either covers a feature that still ships or hedges a defect class that
+can still recur, and two are not guards at all — they are the test
+suites of live gates, flagged on their filenames.
+
+The operator ruled the set stops: a marker convention plus a horizon
+plus a periodic review report is administrative overhead whose benefit
+is not guaranteed against that population. Journaled under
+`value-trade-off`, human authority, with the full brief in the
+attestation. Recorded as **effect `none`, not `reduces`** — the ruling
+*removes* a planned retirement rather than authorising one, so the
+spec's verification-reduction attestation was never reached and is
+deliberately left unmade.
+
+**Why the cancel is mid-session and that was deliberate.** The
+cancel-to-pause recipe requires a session boundary; a *real*
+cancellation is what the same doc points at for the non-boundary case,
+and this is one. The operator was offered the alternative — formally
+close Session 2 first, buying one cross-provider round plus a mandatory
+~10-minute full pytest run of record for a session whose only content is
+the ruling itself — and declined it as exactly the overhead being ruled
+against. `restore_session_set` round-trips `preCancelStatus` and leaves
+every session entry untouched, so Session 2 comes back mid-flight,
+exactly as it is, if the set is ever restored.
+
+**What Session 1's verification bought, in hindsight.** The five Majors
+it found were all in `suite_inventory`'s approximations, and the tool
+they hardened is the reason this ruling could be made on evidence in a
+single stop rather than argued. The set's premise did not survive its
+own instrument — which is the instrument working.
+
+## Recommendation for the next set
+
+**Do not open a successor to this one.** The retirement question is
+answerable on demand (`python -m ai_router.suite_inventory --guards`)
+and the answer today is "nothing". Re-ask it when the guard population
+is materially larger; the instrument makes that cheap, which is what
+made stopping cheap.
+
+**If the goal is a faster suite, that is a different set and a different
+quantity.** 4,374 tests run in 607s; the slowest ~25 are about a quarter
+of serial runtime and the rest average 0.16s; parallelism already
+collected the 3.61x that was available. Set 116 and Set 112 both
+measured that cutting test *count* does not buy wall clock (−6.1% of
+count bought 0.4%). The live levers are the slow tail and the Layer 3
+worker policy, which **Set 117** already owns.
+
+**One residual finding, recorded and not acted on.** Session 1 found
+five production modules with no test file importing them at all
+(`close_out.py`, `notifications.py`, `prompting.py`,
+`scripts/backfill_session_state.py`, `validate_guidance_meta.py`). That
+points the opposite way from this set's premise, which is why this set
+did not act on it — it retires tests, it does not add them.
+
+## The artifact left over
+
+`changelog-fragment-draft.md` in this folder was written for Session 1
+and was never filed, on purpose: `ai_router/changelog.d/` sits under
+`ai_router/`, which is in all three suites' `covers`, so filing it would
+have staled three green runs for a release artifact. With the set
+cancelled there is no set-terminal session to file it. **Whoever next
+releases `ai_router` should file it** — Session 1's `suite_inventory` is
+a real, shipped, user-visible addition and belongs in the changelog even
+though its set stopped early.
+

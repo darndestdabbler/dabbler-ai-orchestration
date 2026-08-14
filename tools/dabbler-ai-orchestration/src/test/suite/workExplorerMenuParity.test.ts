@@ -29,6 +29,15 @@ import { actionToken, tokenMatcher } from "../../providers/workExplorerTreeModel
 
 const PKG_PATH = path.resolve(__dirname, "..", "..", "..", "package.json");
 const VIEW = "dabblerWorkExplorerTree";
+const CONTAINER = "dabblerSessionSetsContainer";
+// Set 132 S1. The sidebar header is COMPOSED from the container title and
+// the view name: a single-view container joins them with `: ` unless they
+// are identical. The rendered outcome is asserted in Layer 3
+// (`src/test/playwright/sidebar-caption.spec.ts`), which is the only place
+// that can tell `AI Work Explorer` from `AI Work Explorer: Work Explorer`.
+// What belongs HERE is the manifest-level invariant that produces it —
+// that the three contributed strings are one string.
+const CAPTION = "AI Work Explorer";
 const SUBMENU_OPEN = "dabblerWorkExplorer.openFile";
 const SUBMENU_COPY = "dabblerWorkExplorer.copyPrompt";
 
@@ -43,9 +52,19 @@ interface Pkg {
   contributes: {
     commands: { command: string; title: string; icon?: string }[];
     submenus?: { id: string; label: string }[];
+    viewsContainers: {
+      activitybar: { id: string; title: string; icon?: string }[];
+    };
     views: Record<
       string,
-      { id: string; name: string; type?: string; visibility?: string; when?: string }[]
+      {
+        id: string;
+        name: string;
+        contextualTitle?: string;
+        type?: string;
+        visibility?: string;
+        when?: string;
+      }[]
     >;
     menus: Record<string, MenuEntry[]>;
   };
@@ -68,14 +87,40 @@ suite("Set 110 S3 — the native tree is the shipping Work Explorer", () => {
   // and none of them had to change in the commit that flipped it.
   const views = pkg.contributes.views.dabblerSessionSetsContainer;
 
-  test("the tree is named Work Explorer and is unconditionally present", () => {
+  test("the tree is named AI Work Explorer and is unconditionally present", () => {
     const native = views.find((v) => v.id === VIEW);
     assert.ok(native, "the native tree view is not contributed");
-    assert.strictEqual(native.name, "Work Explorer");
+    assert.strictEqual(native.name, CAPTION);
     // No `visibility: collapsed` (Session 2's preview posture) and no `when`
     // clause: the tree is the surface, and it is always there.
     assert.strictEqual(native.visibility, undefined);
     assert.strictEqual(native.when, undefined);
+  });
+
+  test("the container title, the view name and contextualTitle are ONE string", () => {
+    // Set 132 S1, and the structural half of a rendered assertion
+    // (L-112-1). VS Code merges a single-view container into the sidebar
+    // title and joins the two names with `: ` UNLESS they are identical,
+    // so these three strings being equal is what makes the header read
+    // `AI Work Explorer` once instead of `AI Work Explorer: Work
+    // Explorer` — the exact defect Set 123 S3 shipped a rename to escape.
+    //
+    // Asserting EQUALITY rather than three literals is deliberate: it
+    // survives a future caption change, and it fails on precisely the
+    // mistake that is easy to make, which is editing one of the three.
+    const container = pkg.contributes.viewsContainers.activitybar.find(
+      (c) => c.id === CONTAINER,
+    );
+    assert.ok(container, "the activity-bar container is not contributed");
+    const native = views.find((v) => v.id === VIEW);
+    assert.ok(native, "the native tree view is not contributed");
+    assert.strictEqual(container.title, native.name, "container title != view name");
+    assert.strictEqual(
+      native.contextualTitle,
+      native.name,
+      "contextualTitle != view name",
+    );
+    assert.strictEqual(container.title, CAPTION);
   });
 
   test("the tree is the ONLY view in the container — no webview stacks above it", () => {

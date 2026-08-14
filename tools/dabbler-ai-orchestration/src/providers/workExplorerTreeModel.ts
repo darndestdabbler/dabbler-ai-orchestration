@@ -1045,10 +1045,20 @@ export const CLOSE_OUT_GROUP_LABEL = "Close-out readiness";
  * a recorded verdict of `undecided` means the close turns on a routed
  * round that has not run — so "nothing outstanding" alone would be an
  * all-clear the projection cannot support.
+ *
+ * `absent` says nothing at all, and that is the point (operator ruling,
+ * 2026-08-14). The gray slot this string renders into is where the
+ * projection's own "as of" timestamp appears, so an EMPTY slot already
+ * says "there is no answer here" — the phrase `not computed` was a second
+ * rendering of a fact the row was already carrying. Set 127 S2's rule
+ * that "no answer" and "nothing remains" are opposite facts is untouched:
+ * the all-clear is dated and takes the done glyph, an absent projection
+ * is undated and cannot, and the tooltip still names the command that
+ * resolves it.
  */
 export function closeOutSummary(projection: CloseObligations): string {
   const { state } = projection;
-  if (state === "absent") return "not computed";
+  if (state === "absent") return "";
   if (state === "unreadable") return "unreadable — regenerate";
   const { blocking, advisory } = obligationCounts(projection);
   const parts: string[] = [];

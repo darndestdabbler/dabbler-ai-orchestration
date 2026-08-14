@@ -1,0 +1,110 @@
+{
+  "status": "completed",
+  "summary": "Two unrelated string changes to the extension, merged into one session so a queued UI fix did not wait behind this set's research half and so both shared one expensive Layer 3 run. (1) The sidebar header now reads AI Work Explorer once. The header is COMPOSED, not stored, so the combination was found by PROBING a real workbench rather than by reading the manifest: a single-view container merges its one view into the sidebar title and joins the two names with a colon UNLESS they are identical -- observed 'AI Orch: Work Explorer' at baseline, 'AI Work Explorer: Work Explorer' when only the container title was restored (the exact Set 123 S3 defect the spec warned about), and 'AI Work Explorer' when container title, view name and contextualTitle are all one string. Layer 3 (src/test/playwright/sidebar-caption.spec.ts, new) therefore asserts the RENDERED header, not the manifest fields, which is the only assertion that can tell those three outcomes apart. (2) closeOutSummary returns an empty string for an absent projection instead of 'not computed' (operator ruling, 2026-08-14): the readiness answer renders in the same gray slot as the projection's own 'as of HH:MM' timestamp, so an empty slot already says no answer exists. Set 127 S2's rule that 'no answer' and 'nothing remains' are opposite facts survives as an ENFORCED distinction rather than a phrase -- the rewritten (not deleted) unit test asserts the absent row carries neither the phrase nor a timestamp while a settled all-met projection is dated and takes done.svg. Verification's decisive catch: round 1 found a Major sibling site I missed -- workExplorerMenuParity.test.ts, the file that calls itself 'the ONE place the shipping identity is asserted', still pinned the retired view name and would have left the whole extension suite red. My sibling sweep had searched for the container title and never for the view NAME. Fixed by more than the literal: a second test now asserts the three manifest strings are EQUAL to each other, which closes the class instead of re-arming it for the next rename. Round 2 (supplementary) clean, round 3 (remediation-review) VERIFIED with the fix accepted. Every falsifier was proven by PLANTING into the real tree, not by reading (L-112-1): reverting the view name reproduced 'AI Work Explorer: Work Explorer'; reverting the container title timed out openDabblerContainer on its aria-label selector, proving the harness-selector coupling; drifting contextualTitle failed the new equality test. The Set 123 changelog fragment claiming the container is 'AI Orch' is still PENDING in this same unreleased section, and it is a frozen migrated fragment that `changelog check` forbids editing -- so the new Set 132 fragment supersedes it by name rather than rewriting it (journaled, defer-to-existing-gate). Suites: pytest 4490 passed / 9 skipped (19.6m); mocha 1456 passing / 0 failing / 2 pending; playwright 32/32 executed and passed as a disclosed COMPOSITE -- a full run went 29/3 and all three failures passed in isolation immediately afterward (native-tree, session-plan-reveal, and the vsix-first-run-walkthrough chronic flake the spec already names as residual R2, 71s in isolation against a 300s timeout under load). No test was skipped, weakened or accepted red; the composition is journaled. The end-of-set path-aware critique is NOT run here: it is a once-per-set stage before the set-terminal close, which is Session 3.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    "docs/session-sets/132-session-length-and-explorer-captions/activity-log.json",
+    "docs/session-sets/132-session-length-and-explorer-captions/checklist-posts.jsonl",
+    "docs/session-sets/132-session-length-and-explorer-captions/decisions.jsonl",
+    "docs/session-sets/132-session-length-and-explorer-captions/disposition.json",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-acceptance-round-1.json",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-conventions.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-issues.json",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-remediation-round-1.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-rounds.jsonl",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification-fanout-2.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification-round-2.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification-round-3.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/session-events.jsonl",
+    "docs/session-sets/132-session-length-and-explorer-captions/session-state.json",
+    "docs/session-sets/132-session-length-and-explorer-captions/test-runs.jsonl",
+    "tools/dabbler-ai-orchestration/README.md",
+    "tools/dabbler-ai-orchestration/changelog.d/0130-set-132-s1-changed.md",
+    "tools/dabbler-ai-orchestration/dist/extension.js",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/sidebar-caption.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts"
+  ],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 fixes ai_router/spec_admission.py -- the parser that hoists nested ordered lists into top-level steps (D1) and classifies ceremony by mention rather than role (D2) -- and then re-runs the Set 131 measurement on the corrected instrument. It shares no file with Session 1, so there is no continuity of code context to preserve, but it is careful reasoning over a gate that the spec deliberately makes MORE permissive, which is the case for keeping a high-effort orchestrator rather than trading down. The one thing to carry forward is this session's lesson, not its code: sweep for every string a rename moves, not just the one named in the spec, and run the full owning suite rather than the module's own file."
+    }
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-069-1",
+    "L-112-1",
+    "L-064-8",
+    "L-064-9"
+  ],
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 1637.1693,
+        "usd": 16.371693,
+        "event_count": 134,
+        "session_ids": [
+          "4771184e-ac47-482b-9c0e-652c6759cfbd"
+        ],
+        "measured_session_ids": [
+          "4771184e-ac47-482b-9c0e-652c6759cfbd"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 628.3883,
+        "usd": 6.283882999999999,
+        "event_count": 64,
+        "session_ids": [
+          "57262972-2591-4a8d-b25f-98a62c77b9ca",
+          "7bad32e0-014f-4332-850d-42c46f42eec0",
+          "d14c57a0-187d-4370-9fda-ec64db84414b",
+          "9ddba796-2007-41a6-b0b2-441ac39636a1"
+        ],
+        "measured_session_ids": [
+          "57262972-2591-4a8d-b25f-98a62c77b9ca",
+          "7bad32e0-014f-4332-850d-42c46f42eec0",
+          "d14c57a0-187d-4370-9fda-ec64db84414b",
+          "9ddba796-2007-41a6-b0b2-441ac39636a1"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 2265.5576,
+    "total_usd": 22.655576,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
+}

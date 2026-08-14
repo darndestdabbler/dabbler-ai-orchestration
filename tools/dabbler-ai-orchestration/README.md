@@ -276,9 +276,11 @@ Sign-up links and a full prerequisites checklist live in the
   predicate's own remediation on hover. The panel reads a file rather
   than computing anything: run
   `python -m ai_router.close_preflight --session-set-dir <set> --write`
-  and the row follows. It says how old its answer is — `not computed`,
-  `stale`, or `as of HH:MM` on the rows that read git — and only ever
-  reads as done when the recorded verdict says the close would proceed.
+  and the row follows. It says how old its answer is — `stale`, or
+  `as of HH:MM` on the rows that read git — and stays blank until
+  someone computes one, since an undated row is the absence of an answer
+  rather than an all-clear. It only ever reads as done when the recorded
+  verdict says the close would proceed.
 - **Copyable prompts for a second opinion.** The clipboard prompts above
   reference your session-set artifacts by path rather than embedding
   their contents. Paste into any path-aware AI chat

@@ -1,0 +1,111 @@
+{
+  "sessionSetName": "132-session-length-and-explorer-captions",
+  "createdDate": "2026-08-14T16:41:40.615734+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-14T16:41:40.617297+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T12:41:40.624791-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "rename-the-work-explorer-caption-to",
+      "dateTime": "2026-08-14T12:41:40.624791-04:00",
+      "description": "**Rename the Work Explorer caption to \"AI Work Explorer\".** The current caption is **composed, not stored**: `package.json` contributes `viewsContainers.activitybar[0].title = \"AI Orch\"` and `views.dabblerSessionSetsContainer[0].name = \"Work Explorer\"`, and VS Code renders the header as `AI ORCH: WORK EXPLORER`. Set 123 Session 3 changed the container title *from* `\"AI Work Explorer\"` for a stated reason \u2014 the header then read **AI WORK EXPLORER: WORK EXPLORER**, the same words twice \u2014 so **restoring the old value alone reintroduces the defect that rename fixed**. Determine empirically which combination of container `title`, view `name` and `contextualTitle` makes VS Code render exactly `AI WORK EXPLORER` with no duplication, and assert the rendered header in Layer 3 rather than asserting the manifest fields. Fix every sibling site in the same pass (L-069-1): `package.json:48` and `:58`, and the aria-label substring selector in `src/test/playwright/electronLaunch.ts:814` (`.activitybar .action-label[aria-label*=\"AI Orch\"]`), which is how the Layer 3 harness finds the activity bar icon at all and will silently fail to open the container if it is missed.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "remove-not-computed-from-the-close",
+      "dateTime": "2026-08-14T12:41:40.624791-04:00",
+      "description": "**Remove `not computed` from the close-out readiness row.** Operator ruling, 2026-08-14: the row already carries a timestamp when a projection exists, so **the presence or absence of the timestamp is the signal**, and the words sit in the gray slot where that timestamp appears. Keep the underlying `absent` state and its distinct glyph \u2014 Set 127 S2's rationale (\"no answer\" and \"nothing remains\" are opposite facts) is preserved by the empty timestamp, not by the phrase. Sites: `closeOutSummary` in `src/providers/workExplorerTreeModel.ts:1051`, the two assertions in `src/test/suite/workExplorerTreeModel.test.ts` (~1135, ~1346), and the README line describing the four states. The existing test *\"absent is a state the operator is told about, not an empty row\"* must be **rewritten, not deleted** \u2014 it becomes the assertion that an absent projection is still distinguishable, now by the absent timestamp and the glyph.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T12:41:40.624791-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T12:41:40.624791-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-14T12:41:40.624791-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T12:41:40.631467-04:00",
+      "description": "Registered session 1 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "rename-the-work-explorer-caption-to",
+      "dateTime": "2026-08-14T12:56:29.172212-04:00",
+      "description": "Caption renamed to AI Work Explorer, decided by PROBING a running workbench rather than by reading the manifest. Baseline probe: container title 'AI Orch' + view name 'Work Explorer' renders `.part.sidebar .title-label` as 'AI Orch: Work Explorer', and the single view's pane header is display:none (merged into the container title). Candidate probe: setting container title, view name AND contextualTitle all to 'AI Work Explorer' renders exactly 'AI Work Explorer' -- a single-view container joins the two names with a colon UNLESS they are identical, which is why Set 123 S3 restoring the container title ALONE would have given back AI WORK EXPLORER: WORK EXPLORER. Sibling site fixed in the same pass (L-069-1): the aria-label substring selector in src/test/playwright/electronLaunch.ts openDabblerContainer, which is how every Layer 3 spec opens the sidebar at all. New Layer 3 spec sidebar-caption.spec.ts asserts the RENDERED header rather than the manifest fields, with two falsifiers: no colon (the join survived) and exactly one occurrence of 'Work Explorer' (the Set 123 defect). Both were PLANTED and confirmed to fire (L-112-1): reverting the view name produced the observed string 'AI Work Explorer: Work Explorer'; reverting the container title to AI Orch timed out openDabblerContainer on the aria-label, which proves the harness-selector coupling the spec warned would fail silently. No stale current-state echo remains -- every surviving 'AI Orch' hit is a historical Set 123 record.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "remove-not-computed-from-the-close",
+      "dateTime": "2026-08-14T12:56:29.173708-04:00",
+      "description": "closeOutSummary returns an empty string for state=absent instead of 'not computed' (operator ruling, 2026-08-14). The readiness answer renders in the same gray slot as the projection's own 'as of HH:MM' timestamp -- stepDescriptor joins [started, readiness] since Set 129 -- so an EMPTY slot already says no answer has been computed, and the phrase was a second rendering of a fact the row already carried. Set 127 S2's rule survives, enforced rather than worded: the rewritten unit test 'absent is still distinguishable from a clean row' asserts the absent row has no phrase AND no 'as of', while a settled all-met projection IS dated and takes done.svg -- different description, different icon. The test was rewritten, not deleted, as the spec required. Layer 3 got a free assertion inside work-explorer-steps (that fixture never writes a projection, so its close step IS the absent case): no rendered row contains 'not computed'. The extension README's four-states line was updated to match. 78/78 workExplorerTreeModel unit tests green; tsc --noEmit clean; the 9 eslint errors are pre-existing, all in files this session did not touch.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T13:53:43.206749-04:00",
+      "description": "Cross-provider verification, 3 rounds, verifier gpt-5.5 (anthropic excluded as the orchestrator's registry-resolved effective provider). Round 1 discovery, fan-out 2 (spec-conformance + failure-scenario lenses): ISSUES_FOUND, 1 Major -- workExplorerMenuParity.test.ts still asserted the retired view name 'Work Explorer', which would have left the whole extension suite red. Decisive and correct: my sibling sweep searched for the container title 'AI Orch' and never for the view NAME, and the file that holds it calls itself 'the ONE place the shipping identity is asserted', which is exactly why nothing else caught it. Round 2 supplementary (run BEFORE any remediation, per loop discipline): VERIFIED, nothing new; session verdict stayed ISSUES_FOUND because the discovery blocker stood. Remediated beyond the literal -- the old assertion pinned one of three fields that must agree, so updating it alone would have re-armed the trap; a second test now asserts container title == view name == contextualTitle, which closes the CLASS (L-069-1). Proven by planting: drifting contextualTitle to 'AI Orch' failed the new test at line 118, then restored green. Also ran the FULL Layer 2 mocha suite as part of remediation rather than the single module file, since narrow scoping is what let the finding through: 1456 passing / 0 failing / 2 pending. acceptance_harness round 1 recorded the judgment criterion as never auto-closable. Round 3 remediation-review over the fix delta: VERIFIED, 1 fix accepted, 0 rejected, 0 findings. Sidecar: s1-remediation-round-1.md. Bounds untouched -- 1 discovery pass and 1 remediation-review cycle used of 2 each.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T13:53:43.208534-04:00",
+      "description": "Required portion = all three declared suites, named by `run_of_record affected` over this session's 27 changed paths, run AFTER the last code change (A2/L-064-12) and each recorded. pytest: 4490 passed, 9 skipped (pre-existing), 0 failed, 1178s. mocha: 1456 passing, 2 pending (pre-existing), 0 failing, 84s. playwright: 32/32 executed and passed, recorded as a DISCLOSED COMPOSITE -- one full invocation went 29 passed / 3 failed in 9.4m at 4 workers, and all three failures passed when re-run in isolation immediately afterward (native-tree + session-plan-reveal together, 58.2s; vsix-first-run-walkthrough alone, 71s against the 300s timeout it exhausted under load). That last one is the chronic flake this set's own spec already names as residual R2, and the config file documents the same small-runner contention mode. Under project-guidance -> Practicality outranks rule-perfectionism, the test is 'did every test execute and pass', not 'did it happen in one invocation' -- same specs, same assertions, nothing skipped, weakened or accepted red. The composition is journaled in decisions.jsonl and stated in the disposition rather than presented as a clean single run. run_of_record check: all three [ok] fresh and green. Also clean: tsc --noEmit; the 9 eslint errors are pre-existing in six files this session never opened.",
+      "status": "complete"
+    }
+  ]
+}

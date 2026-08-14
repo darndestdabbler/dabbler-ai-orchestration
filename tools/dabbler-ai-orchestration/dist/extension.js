@@ -21709,7 +21709,7 @@ var CLOSE_OUT_GROUP_LABEL = "Close-out readiness";
 function closeOutSummary(projection) {
   const { state } = projection;
   if (state === "absent")
-    return "not computed";
+    return "";
   if (state === "unreadable")
     return "unreadable \u2014 regenerate";
   const { blocking, advisory } = obligationCounts(projection);

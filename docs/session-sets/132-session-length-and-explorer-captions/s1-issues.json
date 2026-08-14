@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The existing manifest identity/parity unit test still asserts the retired view name `Work Explorer`.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/package.json:54-58`, `tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts:64-75`\n  - **Failure scenario:** A normal full extension Mocha/CI run reaches `workExplorerMenuParity.test.ts`; it reads the updated `package.json`, finds `native.name === \"AI Work Explorer\"`, then fails `assert.strictEqual(native.name, \"Work Explorer\")`. This is probable because the test is an existing suite file and the manifest value was changed in this session.\n  - **Acceptance criterion:** JUDGMENT - The Work Explorer identity/parity test no longer asserts the retired `Work Explorer` manifest name and is updated consistently with the new `AI Work Explorer` contribution while preserving the unconditional-presence/single-view checks.\n  - **Details:** **Violation:** the task required “Fix every sibling site in the same pass (L-069-1),” and this test says it is “the ONE place the shipping identity is asserted.” **Impact:** the work leaves the full extension test suite red, which changes the merge decision. **Evidence:** `package.json` now contributes `\"name\": \"AI Work Explorer\"`, while `workExplorerMenuParity.test.ts` still asserts `\"Work Explorer\"`.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A normal full extension Mocha/CI run reaches `workExplorerMenuParity.test.ts`; it reads the updated `package.json`, finds `native.name === \"AI Work Explorer\"`, then fails `assert.strictEqual(native.name, \"Work Explorer\")`. This is probable because the test is an existing suite file and the manifest value was changed in this session.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/package.json",
+        "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The Work Explorer identity/parity test no longer asserts the retired `Work Explorer` manifest name and is updated consistently with the new `AI Work Explorer` contribution while preserving the unconditional-presence/single-view checks."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "bbb3a8ad8914730a634186c027d6e0078bb9b825"
+}

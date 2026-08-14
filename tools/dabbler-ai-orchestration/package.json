@@ -45,7 +45,7 @@
       "activitybar": [
         {
           "id": "dabblerSessionSetsContainer",
-          "title": "AI Orch",
+          "title": "AI Work Explorer",
           "icon": "media/activity-bar-icon.svg"
         }
       ]
@@ -54,8 +54,8 @@
       "dabblerSessionSetsContainer": [
         {
           "id": "dabblerWorkExplorerTree",
-          "name": "Work Explorer",
-          "contextualTitle": "AI Orch"
+          "name": "AI Work Explorer",
+          "contextualTitle": "AI Work Explorer"
         }
       ]
     },

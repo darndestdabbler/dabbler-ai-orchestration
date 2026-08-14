@@ -211,6 +211,11 @@ test.describe("Set 114 S3 — an in-flight session's steps in the tree", () => {
     // Nothing was dropped in either direction, and expansion survived the
     // refresh: stable row ids, proven in the host.
     await expect(treeRow(pane, "Verify close")).toBeVisible();
+    // Set 132 S1, and free here: this fixture never wrote a projection, so
+    // the close step's readiness slot is the `absent` case. It renders
+    // EMPTY — the missing "as of" is the absence of an answer — where it
+    // used to render the phrase `not computed` beside the start time.
+    await expect(treeRows(pane).filter({ hasText: "not computed" })).toHaveCount(0);
   });
 
   test("the close-out obligations render on the close step, from the recorded projection", async () => {

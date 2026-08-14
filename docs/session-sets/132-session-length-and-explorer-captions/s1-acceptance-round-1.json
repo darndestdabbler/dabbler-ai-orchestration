@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "bbb3a8ad8914730a634186c027d6e0078bb9b825",
+  "fixedTree": "69e55a966b820c6215e1d5848c6374c22ba8cdd7",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T17:14:20.988334+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The existing manifest identity/parity unit test still asserts the retired view name `Work Explorer`. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orche ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The Work Explorer identity/parity test no longer asserts the retired `Work Explorer` manifest name and is updated consistently with the new `AI Work Explorer` contribution while preserving the unconditional-presence/single-view checks.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

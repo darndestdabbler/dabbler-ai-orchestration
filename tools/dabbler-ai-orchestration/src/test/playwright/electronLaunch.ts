@@ -744,6 +744,11 @@ export async function triggerRefresh(page: Page): Promise<void> {
 // every spec's locator. That is the sequencing gap the step-3.5 analyst named:
 // suites written before the switchover prove the provider works, not that it
 // is what the container shows.
+//
+// Set 132 S1 renamed the pane again — it is "AI Work Explorer" now — and not
+// one locator here had to change, which is the reasoning above collecting its
+// second dividend. The rendered CAPTION is a separate question and has its own
+// spec (`sidebar-caption.spec.ts`); this file's helpers stay title-blind.
 // ---------------------------------------------------------------------------
 
 /**
@@ -811,7 +816,7 @@ export function stampModule(h: FixtureHandle, moduleSlug: string): void {
  */
 export async function openDabblerContainer(page: Page): Promise<void> {
   const activityIcon = page.locator(
-    '.activitybar .action-label[aria-label*="AI Orch"]',
+    '.activitybar .action-label[aria-label*="AI Work Explorer"]',
   );
   await activityIcon.waitFor({ state: "visible", timeout: 30_000 });
   await activityIcon.click();

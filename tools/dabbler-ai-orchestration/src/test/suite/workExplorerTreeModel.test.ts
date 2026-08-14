@@ -1132,7 +1132,7 @@ suite("Set 115 S4 — the close-out obligations under the in-flight session", ()
     // this row exists to answer.
     const set = liveSet({ closeObligations: obligations({ sessionNumber: 1 }) });
     const d = closeOutDescriptor(closeOut(set));
-    assert.strictEqual(d.description, "not computed");
+    assert.strictEqual(d.description, "");
     assert.strictEqual(d.collapsible, "none");
   });
 
@@ -1330,9 +1330,17 @@ suite("Set 115 S4 — the close-out obligations under the in-flight session", ()
     assert.ok(d.tooltip?.includes("close_preflight"), d.tooltip);
   });
 
-  test("absent is a state the operator is told about, not an empty row", () => {
-    // "Nobody has computed this" and "there is nothing to compute" are
-    // opposite facts. The row names the command that resolves it.
+  test("absent is still distinguishable from a clean row — by the missing timestamp and the glyph", () => {
+    // Set 127 S2 made this row say `not computed`, on the rule that
+    // "nobody has computed this" and "there is nothing to compute" are
+    // opposite facts. The RULE survives; the phrase does not (operator
+    // ruling, 2026-08-14). The description slot is where a projection's
+    // "as of" timestamp renders, so an empty slot is already the absence
+    // of an answer, and the phrase was saying it a second time.
+    //
+    // This test is therefore the falsifier for the rule rather than for
+    // the wording: it asserts the two states stay TELLABLE APART. Delete
+    // the glyph distinction or start dating the absent row and it fails.
     const set = liveSet({
       closeObligations: {
         state: "absent",
@@ -1343,10 +1351,28 @@ suite("Set 115 S4 — the close-out obligations under the in-flight session", ()
       },
     });
     const d = closeOutDescriptor(closeOut(set));
-    assert.strictEqual(d.description, "not computed");
+
+    // No phrase, and — the operator's actual signal — no timestamp.
+    assert.strictEqual(d.description, "");
+    assert.ok(!d.description?.includes("as of"), d.description);
     assert.strictEqual(d.collapsible, "none", "a twisty onto nothing");
+
+    // The row still names the command that resolves it, and still carries
+    // the state a menu can act on.
     assert.ok(d.tooltip?.includes("--write"), d.tooltip);
     assert.ok(hasToken(d.contextValue, "closeout-absent"), d.contextValue);
+
+    // The other half of the distinction: a settled, all-met projection IS
+    // dated and DOES take the done glyph. Absent takes neither.
+    const clean = obligations({
+      obligations: obligations().obligations.map((o) => ({ ...o, met: true })),
+      verdict: "would-close",
+    });
+    const cleanRow = closeOutDescriptor(closeOut(liveSet({ closeObligations: clean })));
+    assert.ok(cleanRow.description?.includes("as of"), cleanRow.description);
+    assert.notStrictEqual(d.description, cleanRow.description);
+    assert.notDeepStrictEqual(d.icon, cleanRow.icon);
+    assert.deepStrictEqual(cleanRow.icon, { kind: "file", slug: "done.svg" });
   });
 
   test("an unreadable projection takes the fault glyph, not the quiet one", () => {

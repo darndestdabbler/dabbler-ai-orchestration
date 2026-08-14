@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-14T13:55:33.423691-04:00",
+  "generatedAt": "2026-08-14T15:35:10.471677-04:00",
   "sessionSetDir": "132-session-length-and-explorer-captions",
   "inputs": {
-    "activity-log.json": "d95679f065c7514355be375048803a5d63228b91d23b52b1d3320b2d179b6c49",
-    "session-state.json": "c7f9c54813c2fbebbd5fccd5518c599b3f090e699ff8f253144ade19e9f43e9d",
+    "activity-log.json": "84c2d0b41b561760e4ece2cd0e050c35bc90f24e685f04fcb145304021dfa157",
+    "session-state.json": "a455ac7c5c4abe460814a2fd6593deaafa0a8356a1189a8b1e67e16a7d75b2e3",
     "spec.md": "16544e9a976a9b820d9bb3a97b605aa67fb3921c18cdad0349eb7d3f597dc491"
   },
   "orphanEntries": 0,
@@ -104,19 +104,108 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T14:00:48.630825-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "fix-d1-nested-ordered-lists-must",
+          "description": "Fix D1: replaced the 0-3-space indent cap in _STEP_RE with _top_level_step_starts, a CommonMark nesting scan (a marker at or past the innermost open item's content column is a sub-step). Set 131 S1 now parses at its declared 6, not 11. Corpus-wide: 374 sessions, 2030 -> 2005 steps, 5 sessions changed (002 S4 6->0, 022 S1 9->6, 022 S2 10->6, 107 S1 16->9, 131 S1 11->6), all verified correct by hand. Also decided and shipped the exit-code half: --spec now exits non-zero on a failed admission, --all stays a census unless --check (journaled).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T14:00:48.675558-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "fix-d2-classify-ceremony-by-role",
+          "description": "Fix D2: added classify_steps()/work_step_count() and SessionPlan.work_step_count. Ceremony is a role the skeleton assigns by POSITION (first slot, last three) CONFIRMED BY naming; everything else is work however much of a stage it quotes. intents_named stays the mention primitive check_step_shape needs. Corrected N: Set 132 = 2/3/3, Set 131 = 2/2/2, exactly as the spec asserts. 28 falsifiers in ai_router/tests/test_spec_admission_step_counting.py; 9 planted defects, all 9 caught (L-112-1).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T14:22:47.759471-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "re-run-the-measurement-on-the",
+          "description": "Re-ran the Set 131 probe on the fixed instrument over 225 qualifying sessions (both instruments on identical rows). Published docs/session-sets/132-.../s2-measurement.md. Direction held but weakly: corr(N,total) +0.202 -> +0.224; corr(N,min/step) -0.191 -> -0.107. N changed in 90 of 225 (mean 2.83 -> 3.26). PRIMARY RESULT (the tail): duration is elapsed CALENDAR time, 15 sessions crossed a night and ALL 15 are in the 23 longest; p90 falls 301 -> 147 excluding them, 311 -> 140 idle-trimmed, robust across idle caps 20-120m with zero ceiling hits. Call it D3. Also: refitting total = F + N*wbar on corrected N gives POSITIVE F everywhere (OLS 20-41, Theil-Sen 35-39), so the spec's 'constant wbar does not fit the data' argument (which rested on an impossible F = -16) does not survive; F=39/wbar=8.4 predicts observed per-step medians within ~1 min for N=2..4. Cap unchanged. Corrected the now-false 'longest sessions on record (591,562,544,509)' claim in both echoes (module docstring + authoring guide) and shipped an ai_router changelog fragment.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T14:22:48.633082-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Round 1 discovery, fan-out 2/2 (gpt-5.5, both lenses; anthropic excluded as the orchestrator provider): VERIFIED, 0 blocking, 3 Minor nits. All three were accuracy defects in my own prose and all three were fixed before the suite ran: (1) the measurement's Short Version credited the fixed instrument for overturning the spec's 'constant wbar does not fit' argument, when Section 4 shows the old instrument's N also fits positive F -- the artifact was the two-point band-median fit, not the deflated N; (2) the over-cap count was inconsistent (48 vs 50) and BOTH were wrong -- a precise recount gives 51->48 raw, 50->47 without a declared exception, across 32->31 specs, and every shipping surface now says 47/31; (3) 's2-measurement.md' told a re-runner to use 'git show HEAD:' for the pre-fix module, which is only true while uncommitted -- it now names the parent revision. s2-conventions.md was corrected in place with the correction called out inline; the raw verification artifacts were not touched.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T14:33:31.587941-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "run_of_record affected named all three suites (pytest, mocha and playwright each declare ai_router/ in covers), so all three were fully run after the last code change and recorded. pytest 4519 passed / 9 skipped (12m18s) -- up 29 from S1's 4490, which is the new falsifier module. mocha 1456 passing / 0 failing / 2 pending (50s). playwright recorded as a DISCLOSED COMPOSITE: the full run went 30 passed / 2 failed and both failures passed in isolation immediately after (session-plan-reveal 2/2 in 33s; vsix-first-run-walkthrough 1/1 in 1.2m against the 300s timeout it had exhausted under load) -- the same load-sensitive flakes S1 disclosed, on extension code this session does not touch. All 32 executed and passed; composition journaled. No test skipped, weakened or accepted red.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T14:46:46.580640-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "Disposition authored and validated; next_orchestrator routed (gpt-5.5, anthropic excluded) -> continue-current-trajectory with claude-opus-5/high, panel and verification on OpenAI+Gemini for independence. Rounds 1-3 all VERIFIED; at the round cap with 2 adjudicated-minor residuals recorded. All three suites fresh and green. Committing, pushing, then close_session.",
+          "status": "in-progress",
+          "state": "in-progress",
+          "box": "[~]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T15:13:34.803121-04:00",
+          "isTerminal": false
+        }
+      ],
       "counts": {
         "pending": 0,
-        "in-progress": 0,
-        "complete": 0,
+        "in-progress": 1,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
-      "current": [],
-      "remaining": []
+      "current": [
+        "close-out"
+      ],
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 3,

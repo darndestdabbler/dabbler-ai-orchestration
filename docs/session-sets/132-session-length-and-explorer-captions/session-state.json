@@ -24,9 +24,9 @@
     {
       "number": 2,
       "title": "Fix the instrument before trusting it",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T14:00:48.630825-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T15:35:10.466896-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -37,7 +37,7 @@
           "e9e541c3-35e3-4b56-b619-ca7d78acd763"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

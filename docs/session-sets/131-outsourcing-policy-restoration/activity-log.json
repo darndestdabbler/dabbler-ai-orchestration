@@ -291,6 +291,14 @@
       "dateTime": "2026-08-14T10:47:24.780982-04:00",
       "description": "pytest 4490 passed / 9 skipped (758s, one invocation; +8 over S1's 4482, exactly this session's new module); mocha 1455 passing / 2 pending (35s, one invocation); playwright 30 passed in the declared invocation (7.9m) plus vsix-first-run-walkthrough re-run in isolation green at 56.6s after a 300s load-induced timeout - the same spec and the same cause S1 hit. All three recorded via run_of_record; the Layer 3 composition is journaled in decisions.jsonl and stated in the disposition.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-14T11:14:15.591944-04:00",
+      "description": "close_session succeeded; all 10 gates PASS. Cost at close (a floor): orchestrator seat 1401.0 credits / \\.01 lower_bound, routed CLI 280.7 credits / \\.81 measured, routed API not applicable; TOTAL LOWER BOUND 1681.7 credits / \\.82. Two verification rounds (discovery VERIFIED 0 blocking; A4 delta-scoped remediation-review VERIFIED 0 findings) and two full pytest runs of record, the second because the A4 round's artifacts staled the first.",
+      "status": "complete"
     }
   ]
 }

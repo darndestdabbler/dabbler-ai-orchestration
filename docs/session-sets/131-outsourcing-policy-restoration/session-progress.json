@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-14T09:42:10.758034-04:00",
+  "generatedAt": "2026-08-14T11:13:59.162738-04:00",
   "sessionSetDir": "131-outsourcing-policy-restoration",
   "inputs": {
-    "activity-log.json": "0b0542af9cf47a71023587c6e54ac9e608fdfaac68463607caed0bfe6257927d",
-    "session-state.json": "1f15afa674111c0c00ae61515de2b01c21d82d32daac7812a638c945646d16ce",
+    "activity-log.json": "b48f7ee3c33944b70a2823dda15b3768add8db5832a69866223862fbe705fa6d",
+    "session-state.json": "2d7a4e726cb0b1e839c58aeb6220aeaf11f788dae008fc231314ea86797f7127",
     "spec.md": "e93563519d3b2615dfbbe8238fca342f797b61d5de1eeae9ccf73265af734071"
   },
   "orphanEntries": 0,
@@ -164,19 +164,94 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T09:57:07.816734-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "disarm-premium-request-weight-t2",
+          "description": "premium_request_weight renamed to probe_premium_requests (ModelEntry, loads(), discover_catalog()), lockfile schema v1->v2 with LOCKFILE_SCHEMA_VERSION, legacy key read via _LEGACY_PROBE_PREMIUM_KEY so a v1 seat lock keeps its sample, NOT-A-PRICE rationale + the measured OpenAI-family disagreement pinned above the declaration, module docstring and the workflow doc rule-5 echo updated. The live seat lockfile (schema 1, 18 models) reloads with values intact: gpt-5.5 -> 0, claude-haiku-4.5 -> None.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T09:57:07.871298-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "falsify-by-planting-not-by-reading",
+          "description": "New ai_router/tests/test_catalog_weight_not_a_price.py: 8 falsifiers (prohibition with a corpus-non-empty guard; the cli_transport/copilot_preflight premium_requests look-alike asserted NOT to fire; rename structural; default-None absent-is-unknown; rationale-on-the-declaration; measured probes/bills regression fixture; credit-axis decoupling; v1-lockfile legacy load + rewrite). All 9 planted defects fired and the tree was restored (plants included widening the scan to a naive substring, which the look-alike test caught). Targeted suite 327 passed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T10:09:44.145151-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "cross-provider-verification",
+          "description": "Round 1 discovery, 2-way fan-out (spec-conformance + failure-scenario lenses), verifier gpt-5.5 both calls, anthropic excluded as the orchestrator's effective provider. VERDICT: VERIFIED, 0 blocking, 0 Major/Critical. Five Nits recorded and adjudicated in the disposition; two of them were items this session flagged for adversarial attention itself (the zero-is-not-coerced reading, and the basename allowlist). Fixed the two zero-risk ones post-round (test-only allowlist now path-relative, plus two comment-only qualifiers); deferred the dumps() fixpoint nit with its reasoning written into the schema-version comment. Plants re-run after the edits: 10/10 fired, including a new plant proving the basename hole is closed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T10:09:44.569036-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "pytest 4490 passed / 9 skipped (758s, one invocation; +8 over S1's 4482, exactly this session's new module); mocha 1455 passing / 2 pending (35s, one invocation); playwright 30 passed in the declared invocation (7.9m) plus vsix-first-run-walkthrough re-run in isolation green at 56.6s after a 300s load-induced timeout - the same spec and the same cause S1 hit. All three recorded via run_of_record; the Layer 3 composition is journaled in decisions.jsonl and stated in the disposition.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T10:20:01.603908-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 3,

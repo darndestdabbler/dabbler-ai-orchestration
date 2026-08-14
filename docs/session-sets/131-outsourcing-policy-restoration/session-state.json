@@ -24,9 +24,9 @@
     {
       "number": 2,
       "title": "The number that is not a price",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T09:57:07.816734-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T11:13:59.145632-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -37,7 +37,7 @@
           "1fc540e6-ba73-4059-b4c0-9b686d061d14"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

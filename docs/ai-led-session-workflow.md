@@ -3022,6 +3022,38 @@ threshold is crossed.** The trigger is a token count, not a feeling.
   54K, ~42 if it settles at the 25–75K band average — and one fired above 300K
   repays in roughly **13–15**.
 
+**Threshold-crossing boundaries only — never every boundary** (Set 132 S3).
+The boundary rule says *when* it is safe to flush; the threshold says
+*whether* it is worth flushing, and both conditions are required. The
+arithmetic that forbids the every-boundary policy is self-defeating in a way
+worth naming: a flush **resets** the transcript to ~54K, which is inside the
+cheap 25–75K plateau, so a second flush at the next boundary pays the full
+400 credits to save approximately **nothing** — there is no elevated cost left
+to remove. A session declaring N = 3 has 7 steps and 6 internal boundaries;
+firing at all six would cost 2,400 credits, of which at most the first could
+ever repay.
+
+### N and the threshold are one setting, not two
+
+> **N determines how many boundaries exist. The threshold determines which of
+> them fire.**
+
+They cannot be tuned independently (Set 132 S3). Fewer steps means fewer
+chances to flush a transcript that is growing anyway, so a *lower* N pushes
+the first eligible boundary later and lets the transcript run expensive for
+longer. More steps means more candidate boundaries, which is only ever a
+benefit because the threshold is what stops them all from firing.
+
+The obligation this creates on a future set: **one that lowers N must check
+that the remaining boundaries still land near the 150K crossing, and one that
+lowers the threshold must check it is not recreating the every-boundary policy
+above.** Set 132 S3 also measured a mild positive `corr(N, F) = +0.267`
+between step count and per-session ceremony time, which is the shape you would
+expect if a longer, more context-heavy session pays more at its close —
+rotation attacks that directly, and without touching N at all. Method and full
+tables:
+[`docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md`](session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md).
+
 Rotation is **manual and orchestrator-initiated**. Set 131 deliberately shipped
 no automatic trigger: wiring a writer that flushes an orchestrator's transcript
 on its behalf, in the same set that first measured the effect, is how a cost

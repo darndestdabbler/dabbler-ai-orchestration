@@ -233,6 +233,125 @@
       "dateTime": "2026-08-14T15:35:29.321695-04:00",
       "description": "close_session succeeded at 15:41. All blocking gates PASS (working_tree_clean, pushed_to_remote, verification_integrity, test_run_fresh, uat_walk_recorded, activity_log_entry, next_orchestrator_present, change_log_fresh, verification_method_vocabulary); one advisory WARN on checklist_posted for the close-out transition, cleared by the post recorded immediately after. session-state.json flipped to complete/closed by the sanctioned writer; progress projection regenerated. Cost at close (floor): 2560.7 credits / \\.61 -- orchestrator seat 2244.8 (lower bound, this conversation still in flight), routed Copilot CLI 315.9 measured, Direct API not applicable.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "design-the-causal-question-with-a",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "**Design the causal question, with a cross-provider panel.** The author chooses N knowing the work, so N and duration share a common cause and the correlation cannot settle it. This is oracle-free and genuinely divergent \u2014 the two conditions `project-guidance.md` sets for a panel to earn its cost \u2014 so consult at least two distinct providers on the identification strategy. **The leading candidate is already on the table and the panel's job is to attack it, not to reinvent it** (operator design, 2026-08-14): hold **one spec fixed**, vary only the declared step budget (N=3, N=5, N=unconstrained), have engines generate **only the plan** plus a per-step effort estimate, and compare planned scope across arms. Because the work is constant by construction, the author-chooses-N confound is broken \u2014 any scope difference is attributable to the budget. It is cheap because nothing is executed. Have the panel probe its weak points: estimate-vs-actual bias, whether a single spec generalizes, arm contamination if one engine sees all three budgets, and how many spec/engine pairs are needed to say anything. Alongside it, evaluate the observational fallback \u2014 estimate `F` from timestamped ceremony steps in `activity-log.json` and test `w\u0304(N)` directly, which only becomes possible once Session 2 fixes D2. **The descriptive question is not panel work** and must not be sent: it was answered deterministically for free, and asking advisors to opine on an unconditioned average is the exact error Set 131 named as trap T1. Focus the panel on the **p90 tail**, which the median-calibrated cap does not address.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "answer-the-operator-s-prevention-question",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "**Answer the operator's prevention question inside the existing rubric.** The operator proposed gating unnecessary work by \"probability \u00d7 impact of *not* doing it\". That is L-095-1's consequence rubric, already promoted into `project-guidance.md`. Extend the existing rubric to the plan-authoring moment rather than adding a parallel gate (*Prefer removal over addition*), and say explicitly whether anything is being added at all.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "fix-the-compaction-trigger-to-a",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "**Fix the compaction trigger to a threshold, and tie it to N.** Using Set 131 Session 3's rotation section as the base, name the token threshold, keep the boundary rule (first step boundary after the threshold is crossed), and show the payback arithmetic that forbids firing at every boundary \u2014 the measured 400-credit cost against a ~14-inference payback. State the coupling in one place: N determines how many boundaries exist, the threshold determines which of them fire. Produce the **education-mode brief** on N (recommendation, confidence, and the default if the operator does not answer); the number moves only on the operator's word.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out-including-the-step-9",
+      "dateTime": "2026-08-14T15:42:46.519897-04:00",
+      "description": "Close-out, including the Step 9 reorganization review.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T15:42:46.540261-04:00",
+      "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "design-the-causal-question-with-a",
+      "dateTime": "2026-08-14T15:45:35.109239-04:00",
+      "description": "Designing the causal question; dispatching the cross-provider panel (openai + google, anthropic excluded).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "design-the-causal-question-with-a",
+      "dateTime": "2026-08-14T16:12:15.218616-04:00",
+      "description": "Panel run in two rounds (generate-diverse then adversarial cross-critique) across two GENUINE providers -- openai gpt-5.5 and google gemini-3.1-pro-preview -- after discovering that route(prefer_model=) is silently dropped by the copilot-cli transport (it resolves one generator ROLE, not a tier ladder), which had sent all four first-attempt generations to gpt-5.5. Repaired via exclude_providers=[anthropic, openai], the lever that path DOES honour; the two mislabeled artifacts were renamed -openai-sample-2, not edited. Both providers independently: the candidate design is sound-with-modifications but must not use self-reported effort (primary outcome becomes a blinded Extra Work Score over atomized obligations), the uncapped arm is CONFOUNDED not merely less relevant (cap-4 if a third point is wanted), one spec is not evidence, and nobody knows the paired SD until a pilot runs. Both then said the same unprompted thing: given the observational numbers, do not fund the generative experiment at all yet. The observational fallback was RUN rather than merely evaluated (97 sessions): F = 41 min measured directly from ceremony-step timestamps against a regression intercept of 39 from an independent method, w-bar = 6.4 min, corr(N, w-bar) = -0.03 to -0.17. Fixed overhead is 5-7x a work step, which makes N second-order. The composition artifact both were asked to attack was confirmed (skeleton-era share falls 59% -> 0% as N rises) and the skeleton-era cut is honestly reported as able to validate F but NOT the N slope, because the cap itself removed the variance.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "answer-the-operator-s-prevention-question",
+      "dateTime": "2026-08-14T16:18:17.208314-04:00",
+      "description": "Answered inside the existing rubric, and the answer is that NOTHING is added: no gate, no config key, no CLI, no close-out predicate. L-095-1's consequence test (probability x impact), already promoted into project-guidance.md and already preload, IS the operator's question -- evaluated about a proposed step instead of a reported finding. Shipped as a scope statement in the authoring guide's *Other sizing signals*, beside the sizing rules it modifies: name the failure scenario that follows from NOT doing a step; no nameable scenario means it is a nit and does not belong in the plan. It is a removal tool by construction -- no branch of it can add a step -- which makes it an instance of *Prefer removal over addition*, not an exception. project-guidance.md was deliberately NOT edited: the spec made that touch conditional ('only if the rubric genuinely extends') and the rule does not change, only its application point, which belongs where plan authoring is documented. That call also kept the file under its preload ceiling -- a first draft that did edit it breached by 126 tokens, and ceilings ratchet down only. Priced honestly against this session's own measurement: ~7 min per step removed, real and an order below the ceremony beside it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "fix-the-compaction-trigger-to-a",
+      "dateTime": "2026-08-14T16:18:17.210430-04:00",
+      "description": "Compaction trigger fixed at ~150K retained input tokens, first step boundary after the crossing -- Set 131 S3's numbers, unmoved. What this session ADDS is the half that stops it being every boundary, and the coupling. The arithmetic is self-defeating rather than merely unprofitable: a flush RESETS the transcript to ~54K, inside the cheap 25-75K plateau, so a second flush at the next boundary pays the full 400 credits to save approximately nothing. A session at N=3 has 7 steps and 6 internal boundaries; firing at all six costs 2,400 credits of which at most the first can repay. Stated as a contract: the boundary says WHEN it is safe to flush, the threshold says WHETHER it is worth flushing, and both are required. The coupling now lives in one place (workflow doc, new subsection): N determines how many boundaries EXIST, the threshold determines which of them FIRE, with the obligation named in both directions -- a set that lowers N must check the remaining boundaries still land near 150K, one that lowers the threshold must check it has not recreated the every-boundary policy. Tied to this session's own measurement: corr(N, F) = +0.267 is the shape you would expect if a longer context-heavy session pays more at its close, and rotation attacks that without touching N. Education-mode brief on N delivered in s3-causality-and-compaction.md section 7: recommendation KEEP N=3, high confidence the evidence does not support raising it and that N is the wrong lever at all (F is 5-7x a work step), low confidence 3 is optimal because the cap itself removed the variance needed to find an optimum; default on no answer is that N stays 3.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T16:52:06.686084-04:00",
+      "description": "Round 1 discovery, fan-out 2/2 (gpt-5.5, spec-conformance + failure-scenario lenses; anthropic excluded as the orchestrator's registry-resolved provider): VERIFIED, 0 findings. Then the set-terminal PATH-AWARE CRITIQUE, which is armed advisory and is code-changing, so it ran BEFORE the suites per the Step 8 ordering. The automated producer refused -- pull_verifier has no transport awareness and hard-requires DABBLER_* keys -- so the manual flow the template calls the default was used, driven through routed children, which on this transport carry --available-tools view,grep,glob and are therefore genuinely path-aware. Two distinct providers forced by exclusion (gpt-5.5; gemini-3.1-pro-preview). BOTH returned ISSUES_FOUND and both independently found the same two Majors, which is what makes them credible: (1) the claim that per-role totals are robust to batch logging holds only WITHIN a role -- a batch crossing work/ceremony misattributes; (2) the two F estimates are NOT independent, and gemini's version was decisive arithmetic: my work+ceremony totals sum by construction to completedAt-startedAt, exactly the interval S2 regressed. gpt-5.5 added two more: the 129-session step_number_outside_parse exclusion was undisclosed, and the causal wording in the short version, the operator brief, the authoring guide and the change-log outran the document's own section 8. All four remediated by MEASURING rather than rewording where possible: the probe now counts mixed-role batches (10 of 97) and reports the cut without them -- w-bar unchanged at 6.4, corr -0.029 -> -0.027, F rising 41.1 -> 47.0, so the conclusion survives -- and counts exclusions by reason, which also showed the drop is NOT era-concentrated (050s-130s). Independence claim corrected everywhere including the changelog fragment; causal wording downgraded to 'strongest observed discriminator' in all four echoes. path-aware-critique.json assembled from the raw verdicts and validates (code=valid, 2 distinct providers). post_round_delta then classified the remediation as A4.2 shipped-code, so ONE delta-scoped remediation-review was run: VERIFIED, 3 fix-accepted + 1 accepted-with-modification, 0 rejected, 2 Minor nits (stale docstring echo; 'same-second' vs exact-timestamp grouping) both fixed in place. Bounds: 1 discovery and 1 remediation-review used of 2 each.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T17:28:40.558871-04:00",
+      "description": "Required portion = all three suites. run_of_record affected named them because this session's changelog fragment lands under ai_router/, which mocha and playwright both declare in covers, and pytest additionally covers docs/session-sets/. Each run AFTER the last code change and recorded. pytest 4519 passed / 9 skipped (pre-existing) / 0 failed. mocha 1456 passing / 0 failing / 2 pending (pre-existing), 37s. playwright recorded as a DISCLOSED COMPOSITE: the full invocation went 31 passed / 1 failed in 8.2m, the failure being vsix-first-run-walkthrough exhausting its 300s budget waiting on a tree row under load; re-run alone immediately afterward it passed in 43.3s. All 32 scenarios executed and passed; nothing skipped, weakened or accepted red. That spec is this set's own named residual R2 and this is the third consecutive session to record the same composition on it, which is the argument for retiring or de-flaking it rather than for re-litigating it here. Journaled as goal-over-letter. pytest was then RE-RUN and re-recorded: the operator's N ruling arrived after the first recording and edited s3-causality-and-compaction.md, which lives under docs/session-sets/ and therefore binds pytest's surface digest (change-log.md and the lifecycle ledgers are exempt as bookkeeping; session WORK is not). Paying an 12-minute re-run is the honest cost of a late decision -- the alternative was to let a recorded run predate the content it covers. All three now report fresh and green.",
+      "status": "complete"
     }
   ]
 }

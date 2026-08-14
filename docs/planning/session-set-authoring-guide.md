@@ -290,6 +290,30 @@ the budget is about.
 not the **tail**. A green result is a floor on obvious oversizing, not a
 promise of a short session.
 
+**Set 132 S3 measured what the cap is competing against, and N lost.**
+Per-session fixed overhead `F` was estimated two ways — as a regression
+intercept over 199–225 sessions (39 min) and as a direct partition of
+ceremony-step time over 97 sessions (41 min) — against a median work step `w̄`
+of **6–9 minutes**. (The two are not independent confirmations: they regress
+and partition the same `startedAt`/`completedAt` interval, so what agrees is a
+fitted intercept and a measured split.) **Fixed overhead is 5–7× the cost of a
+work step.** Cutting one work step saves ~7 minutes; the ceremony skeleton
+costs ~40–60 on every session regardless of N. Directly measured `w̄` does
+**not** rise with N (`corr(N, w̄)` = −0.03 to −0.40 across every cut), which is
+the test the `F/N + w̄` ratio could not perform. And the residual tail's
+strongest observed correlate is not step count: among sets 111+, the count of
+verification artifacts a session produced correlates with its duration at
+**+0.767** against N's **+0.228** — a ranking of unmodelled correlations whose
+causal direction is unresolved, not an effect size.
+
+Two things follow for a spec author. **Do not expect a step-budget change to
+buy much** — the measured lever is ceremony and the verification loop. And
+**the cap is not an optimum**: nothing identifies one, because the cap has
+already removed the variance that would be needed to find it (no skeleton-era
+session declares N > 3). Full method, the panel that designed the causal test,
+and the operator brief:
+[`docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md`](../session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md).
+
 **Set 132 S2 re-measured this and the old wording here was wrong twice
 over.** It used to name "the longest sessions on record (591, 562, 544,
 509 min)". There are longer ones (1498, 1414, 1028, 934 min), and the
@@ -302,6 +326,23 @@ disclaims was sleep. The disclaimer still holds — a passing spec can
 still run long — but do not quote the old figures. Method and full
 tables:
 [`docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md`](../session-sets/132-session-length-and-explorer-captions/s2-measurement.md).
+
+> **Operator ruling, 2026-08-14: the ceiling moves to N = 4, and 3 stays the
+> target.** Set 132 S3 measured the split-cost asymmetry and the operator
+> reversed the 2026-08-12 ratification on it: forcing work into an extra
+> session costs a whole `F` (~40–60 min, i.e. 6–7 work steps), while a
+> ceiling one step too generous costs ~7–9 min and only when a spec actually
+> uses it. The original case for 3 — the median stepping up between N = 3 and
+> N = 4–5 — is confounded, because the author picks N knowing the work.
+> **Aim for 3.** Take the fourth work step when the alternative is splitting
+> the session, not as a matter of course: a ceiling read as a quota is the one
+> Parkinson mechanism the measurement could not rule out.
+>
+> **Not yet in force.** `WORK_STEP_BUDGET` is still 3 and the admission test
+> still refuses above 7 declared steps; implementation is the first act of the
+> follow-on set. Until then a fourth work step needs the `sessionSizeException`
+> below, and an author who wants the reasoning should read
+> [`s3-causality-and-compaction.md`](../session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md) §7.1.
 
 **Declaring an exception.** When a session genuinely must exceed the cap,
 say so *in the spec* so the justification survives review:
@@ -324,6 +365,18 @@ session cannot except itself out of the skeleton. The cap itself lives in
   notify, commit) is fixed, so a session with a single trivial step is
   dominated by overhead. That is an argument for *merging tiny steps*,
   not for padding a session toward the cap.
+- **Apply the consequence rubric to each candidate step before it enters the
+  spec** (Set 132 S3, answering an operator question). This is not a new
+  rule — it is `project-guidance.md`'s existing severity rubric ("probability
+  × impact"), evaluated about a *proposed step* rather than a *reported
+  finding*. Name the failure scenario that follows from **not** doing the
+  step. No nameable scenario → it is a nit and does not belong in the plan.
+  Low probability **or** low impact → it is Minor, and Minor work is the first
+  thing cut when a session is over budget. The test can only ever **delete** a
+  step — it has no branch that adds one — which is why it is an instance of
+  *Prefer removal over addition* rather than an exception to it. Worth ~7
+  minutes per step removed, on the measurement above: real, and smaller than
+  the ceremony it sits beside.
 
 Sessions per set:
 

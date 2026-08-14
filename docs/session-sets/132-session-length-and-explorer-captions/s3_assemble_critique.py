@@ -1,0 +1,203 @@
+"""Assemble path-aware-critique.json from the two raw critic verdicts.
+
+The artifact is built from what the critics actually returned; the raw files
+are the source of record and are never edited. Findings are transcribed with
+their own severities. Remediation is recorded in the session disposition, not
+here -- this artifact says what the critique found, not what was done about it.
+"""
+import json
+import pathlib
+from datetime import datetime
+
+SET_DIR = pathlib.Path("docs/session-sets/132-session-length-and-explorer-captions")
+
+CRITIQUES = [
+    {
+        "provider": "openai",
+        "model": "gpt-5.5",
+        "verdict": "ISSUES_FOUND",
+        "rawVerdictPath": "s3-path-aware-critique-openai.md",
+        "summary": (
+            "Read the Session 3 change set with read-only repo access: the "
+            "deliverable, both probe scripts, the workflow-doc and "
+            "authoring-guide edits, the changelog fragment, and Session 2's "
+            "measurement for cross-checking. Traced every quoted number back "
+            "to the code that would produce it. Four Major false-confidence "
+            "findings, all about the document claiming more than the probes "
+            "establish: the batch-logging robustness claim does not hold "
+            "across a role boundary; the population filter drops sessions "
+            "whose step numbers fall outside today's parse and did not "
+            "disclose it; the two F estimates are not independent because "
+            "both rest on the same boundary writes; and the causal wording in "
+            "the short version, the operator brief, the authoring guide and "
+            "the change log outruns the document's own section 8 disclaimer."
+        ),
+        "findings": [
+            {
+                "severity": "Major",
+                "category": "false-confidence",
+                "description": (
+                    "Violation: the document claimed per-role totals are "
+                    "'robust to batch logging' because every member of a "
+                    "same-second batch shares a role. Impact: a batch that "
+                    "crosses the work/ceremony boundary charges the whole "
+                    "interval to whichever member sorts first, so F and w-bar "
+                    "can both be wrong. Evidence: the attribution loop in "
+                    "s3_probe_overhead.py charges each interval to the "
+                    "current mark's role, and the skeleton places work and "
+                    "ceremony steps adjacently. Fix: detect mixed-role "
+                    "batches and report the cut without them."
+                ),
+                "evidencePaths": [
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_overhead.py",
+                    "ai_router/spec_admission.py",
+                    "docs/planning/session-set-authoring-guide.md",
+                ],
+            },
+            {
+                "severity": "Major",
+                "category": "false-confidence",
+                "description": (
+                    "Violation: the population was described as 'sessions "
+                    "carrying both a parseable plan and logged marks', which "
+                    "understates the filter. Impact: the largest exclusion is "
+                    "undisclosed and is not neutral by construction. "
+                    "Evidence: s3_probe_overhead.py drops any session with a "
+                    "logged step number outside the current parse. Fix: count "
+                    "exclusions by reason and disclose them."
+                ),
+                "evidencePaths": [
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_overhead.py",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_tail.py",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md",
+                ],
+            },
+            {
+                "severity": "Major",
+                "category": "false-confidence",
+                "description": (
+                    "Violation: the two F estimates were called independent "
+                    "and said to 'share no arithmetic'. Impact: the agreement "
+                    "was offered as validation of the ~40-minute conclusion, "
+                    "but both inherit the D3 boundary-write confound. "
+                    "Evidence: Session 2 defines duration as completedAt - "
+                    "startedAt; the S3 probe starts at startedAt and charges "
+                    "the trailing gap to ceremony. Fix: reword as different "
+                    "formulas over the same timestamp source."
+                ),
+                "evidencePaths": [
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_overhead.py",
+                ],
+            },
+            {
+                "severity": "Major",
+                "category": "false-confidence",
+                "description": (
+                    "Violation: section 8 says the tail finding 'cannot "
+                    "orient its own arrow', but earlier sections state 'the "
+                    "answer is: they went round the verification loop more "
+                    "times'. Impact: an operator reading only the short "
+                    "version or the brief could act on a causal claim the "
+                    "evidence does not support. Evidence: s3_probe_tail.py "
+                    "computes correlation rankings only, with no multivariate "
+                    "control; the same wording is echoed in the authoring "
+                    "guide and change log. Fix: replace causal wording with "
+                    "'strongest observed discriminator' in every echo."
+                ),
+                "evidencePaths": [
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_tail.py",
+                    "docs/planning/session-set-authoring-guide.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/change-log.md",
+                ],
+            },
+        ],
+    },
+    {
+        "provider": "google",
+        "model": "gemini-3.1-pro-preview",
+        "verdict": "ISSUES_FOUND",
+        "rawVerdictPath": "s3-path-aware-critique-google.md",
+        "summary": (
+            "Read the changed files with read-only repo access -- the "
+            "deliverable, both probes, the workflow doc, the changelog "
+            "fragment and ai_router/__init__.py -- verified the document's "
+            "attribution claims against the probe loops, traced the F "
+            "estimate back to its boundary timestamps, and checked the "
+            "transport implementation for the claimed dropped parameter. Two "
+            "blocking flaws, both where the evidence on disk contradicts the "
+            "document's confidence: the two F estimates are not independent "
+            "(the sum of all gaps is strictly completedAt - startedAt, the "
+            "same quantity Session 2 regressed), and the batch-logging "
+            "robustness claim fails across the work/ceremony boundary. One "
+            "nit on an unguarded accumulator in the tail probe."
+        ),
+        "findings": [
+            {
+                "severity": "Major",
+                "category": "false-confidence",
+                "description": (
+                    "Violation: the document and changelog claim the two F "
+                    "estimates 'share no arithmetic' and are independent. "
+                    "Impact: the operator is led to believe two separate "
+                    "measures independently validated the ~40-minute fixed "
+                    "overhead, when both carry the same D3 artifact. "
+                    "Evidence: the probe computes the first delta from "
+                    "startedAt and adds the tail up to completedAt, so the "
+                    "sum of all gaps is strictly completedAt - startedAt -- "
+                    "exactly the elapsed duration used in Session 2's "
+                    "regression. Fix: remove the independence claim from both "
+                    "the document and the changelog fragment."
+                ),
+                "evidencePaths": [
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_overhead.py",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md",
+                ],
+            },
+            {
+                "severity": "Major",
+                "category": "correctness",
+                "description": (
+                    "Violation: the document claims the attribution rule is "
+                    "robust to batch logging within a role, illustrated with "
+                    "'steps 3-8'. Impact: a batch spanning work and ceremony "
+                    "misassigns ceremony time to work, inflating w-bar and "
+                    "deflating F. Evidence: the loop assigns the entire delta "
+                    "to roles[step_no - 1] and only the first member of a "
+                    "same-timestamp batch receives it; the four-step ceremony "
+                    "skeleton means steps 3-8 do not all share a role. Fix: "
+                    "state that the rule is not robust across role "
+                    "boundaries."
+                ),
+                "evidencePaths": [
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+                    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_overhead.py",
+                ],
+            },
+        ],
+    },
+]
+
+artifact = {
+    "schemaVersion": 1,
+    "sessionSetName": "132-session-length-and-explorer-captions",
+    "pathAwareCritique": "advisory",
+    "critiquedAt": datetime.now().astimezone().isoformat(),
+    "critiques": CRITIQUES,
+}
+
+out = SET_DIR / "path-aware-critique.json"
+out.write_text(json.dumps(artifact, indent=1) + "\n", encoding="utf-8")
+print(f"wrote {out}")
+
+from ai_router.path_aware_critique import validate_path_aware_critique_artifact
+
+result = validate_path_aware_critique_artifact(out)
+print(f"valid={result.ok} code={result.code}")
+for reason in result.reasons:
+    print(f"  {reason}")

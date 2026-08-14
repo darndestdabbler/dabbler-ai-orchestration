@@ -1,61 +1,58 @@
 {
   "status": "completed",
-  "summary": "Fixed both defects in ai_router/spec_admission.py, the authoring-time gate that enforces the per-session step cap, then re-ran on the corrected instrument the measurement Set 131 had built on the broken one. D1: the step parser capped a marker's indent at three characters, on the reasoning that '4+ spaces is a nested list in Markdown' -- true under a bullet, but under the ordinary '2. ' parent the content column is 3, which is exactly where CommonMark nests a child list, so every nested ordered list this repo's specs actually write was hoisted into the top-level count. Set 131 S1 declared six steps, nested five precedence rules under step 2, and was reported OVER CAP at eleven. Replaced by _top_level_step_starts, which resolves depth the way Markdown does -- comparing each marker's indent against the content column of the items still open above it -- keeping the indented-code-block guard for a marker with nothing open, and keeping sub-steps inside their parent's TEXT so the activity-log seed loses nothing. D2: ceremony was counted by MENTION, so 'Independence requirement. Work whose value is an independent perspective is always routed: session-verification, code review, security review' was tallied as a verification step and N was deflated. New classify_steps()/work_step_count() decide by ROLE: the first slot and the last three are the ceremony positions, a step there is ceremony only when it also NAMES the stage, everything else is work. Requiring the naming as well as the position is load-bearing for the pre-skeleton corpus -- a session that compressed its whole tail into one step is charged one ceremony step, not four -- and intents_named was deliberately left unchanged as the mention primitive check_step_shape needs at a fixed position. Corrected N is exactly what the spec asserts: Set 132 = 2/3/3, Set 131 = 2/2/2. The exit-code half was decided and shipped: --spec now exits non-zero on a failed admission, --all stays a census unless --check, journaled as goal-over-letter with the asymmetry's reason (47 legacy over-cap sessions across 31 of 131 specs would make an enforcing --all a gate that always fires). The code also records what was NOT the cause: start_session never consults the admission test, so those eleven rows would have been seeded whatever --spec returned. Evidence discipline throughout: both parsers were run over IDENTICAL rows by importing the pre-fix module from git, which showed the corpus loses 25 phantom steps in exactly five sessions, every one checked by hand (002 S4 going 6 -> 0 is correct -- that pre-skeleton spec has no step list at all, only test scenarios nested under a bullet). Falsifiers were proven by PLANTING, not by reading (L-112-1): 28 new tests, then nine defects planted back into the module, all nine caught, module restored byte-identical -- and the harness earned its keep by catching MY OWN bad plant, where changing only the regex left a second guard still refusing the paren form, so the plant had not planted the defect; it was corrected and the fixture rewritten to the real Set 023 line. The re-measurement (s2-measurement.md, 225 sessions) found the direction held but weakly (corr(N,total) +0.202 -> +0.224; corr(N,min/step) -0.191 -> -0.107) -- and found something the spec did not anticipate. Treating the p90 tail as the primary result, as the spec demanded, the tail is mostly a MEASUREMENT ARTIFACT: duration is completedAt - startedAt, elapsed CALENDAR time, and 15 of 225 sessions crossed a night. All 15 sit in the 23 longest sessions on record. p90 falls 301 -> 147 excluding them, and 311 -> 140 idle-trimmed from activity-log step stamps, robust across idle caps of 20-120 minutes with zero sessions at the structural ceiling. Call it D3; unlike D1 and D2 it is not a code defect but a defect in what the timestamps MEAN, and nothing here changes them. Refitting total = F + N*wbar on every row (OLS and Theil-Sen) gives POSITIVE fixed overhead on every measure and estimator, which removes the spec's own argument that 'constant wbar does not fit the data' -- that argument rested on an impossible F = -16 from a two-point fit on band medians, and the fits come out positive on the OLD instrument's N too, so the error was the two-point fit, not the deflated N. The cap did not move and was not asked to. Two now-false echoes of 'the longest sessions on record (591, 562, 544, 509 min)' were corrected in both places they were printed (module docstring and authoring guide) rather than left to drift (L-064-8). Verification: round 1 discovery fan-out 2/2 (gpt-5.5, spec-conformance and failure-scenario lenses) VERIFIED with 3 Minor nits, all three accuracy defects in my own prose, all three fixed before the suite ran; that staled the evidence stamp, so round 2 remediation-review was run on the fix delta -- VERIFIED, 3 fixes accepted, 0 findings. Suites, all three owed because pytest, mocha and playwright each declare ai_router/ in covers: pytest 4519 passed / 9 skipped (12m18s, up 29 on the new falsifier module); mocha 1456 passing / 0 failing / 2 pending; playwright recorded as a DISCLOSED COMPOSITE -- a full run went 30/2 and both failures passed in isolation immediately after (the same load-sensitive flakes S1 disclosed, on extension code this session does not touch), so all 32 executed and passed. No test was skipped, weakened or accepted red; the composition is journaled. Named residuals, decided rather than overlooked: --all's SIZE check still ignores set status while the SHAPE check scopes itself to unstarted sets on the operator's Set 128 ruling, which is a real inconsistency left alone because fixing it would change passed semantics on ratified scoping; and start_session still consults no admission test at all.   The end-of-set path-aware critique is NOT run here -- it is a once-per-set stage before the set-terminal close, which is Session 3. Round 3 raised two Minor nits, both adjudicated at the round cap (1 discovery + 2 remediation-reviews is the machine-enforced bound) and both addressed without another round because they live in freshness-exempt bookkeeping files. (a) The Playwright test-runs.jsonl row carried no `detail` disclosing the composite; all three suite rows were re-recorded with a detail line, so the ledger now discloses the composition where a reader meets it rather than only in this disposition and decisions.jsonl. (b) decisions.jsonl still says '50 legacy over-cap sessions' where every shipping surface now says 47 across 31 specs. That entry is left BYTE-IDENTICAL on purpose: it is an append-only record of a decision as it was actually made, and both numbers are true of different instruments -- 50 is the pre-fix count without a declared exception, 47 is the post-fix one. Rewriting a journaled decision to match a later recount would make the audit trail agree with the present at the cost of no longer recording the past, which is the opposite of what the journal is for. The reconciliation is stated here instead.",
+  "summary": "Set-terminal session. Shipped no production code by design: it reasons, recommends, and stops to the operator.\n\nSTEP 2 -- the causal design, via a two-provider panel run as generate-diverse then adversarial cross-critique. The panel nearly failed silently: pinned with route(prefer_model=...), all four generations came back served by gpt-5.5, because _route_via_copilot_cli does not accept that parameter at all -- the profile resolves ONE generator role from the seat catalog rather than walking a tier ladder, so a documented preference is dropped without warning on one transport and honoured on the other. Undetectable from the call site: the metrics row records served_model_mismatch: false, because the model that answered IS the one the transport asked for. Repaired with exclude_providers, the lever that path does honour ([anthropic] -> gpt-5.5; [anthropic, openai] -> gemini-3.1-pro-preview); the two mislabeled artifacts were RENAMED to -openai-sample-2, not edited or deleted. Both providers then killed the same things independently: self-reported effort as the primary outcome ('models are text predictors'), step count as an outcome (it is the treatment), the single-spec design, and -- from opposite round-A positions -- the uncapped arm as CONFOUNDED rather than merely less relevant, since 'use the minimal sufficient number of steps' changes the instruction's semantics instead of raising the dose. Both concluded nobody can compute n until a pilot estimates the SD, and both then said unprompted that the experiment should not be funded at all yet. The operator independently ruled the same way on cost mid-session; both are journalled.\n\nThe observational fallback was RUN, not merely evaluated (97 sessions). F = 41 min measured by partitioning ceremony-step time, beside S2's regression intercept of 39; w-bar = 6-9 min; corr(N, w-bar) = -0.03 to -0.40 across every cut, which is the direct test the F/N + w-bar composite was algebraically unable to perform. Fixed overhead is 5-7x a work step. The composition artifact the panel was asked to attack was confirmed (skeleton-era share falls 59% -> 0% as N rises), and its consequence is reported honestly: it biases w-bar UPWARD at high N, so the flat result is a conservative bound -- while the skeleton-era cut can validate F but CANNOT estimate the N slope, because every skeleton-era session has N <= 3. The cap censored the evidence that would identify its own optimum.\n\nTAIL: among sets 111+, verification-artifact count correlates with duration at +0.767 against N's +0.228, and largest-gap SHARE correlates negatively, so the residual tail is neither idle nor step count. Reported as a ranking of unmodelled correlations whose arrow is unresolved. Both providers predicted this ranking before seeing it.\n\nSTEP 3 -- the operator's prevention question answered by ADDING NOTHING: no gate, no config key, no CLI, no close-out predicate. L-095-1's consequence rubric already IS that question, asked about a proposed step instead of a reported finding; the authoring guide gained the application point. project-guidance.md was deliberately not edited -- the spec made that touch conditional and a first draft breached its preload ceiling by 126 tokens, which ratchets down only.\n\nSTEP 4 -- the compaction trigger keeps Set 131's ~150K threshold and first-boundary-after-crossing rule, and gains the half that forbids every-boundary firing: a flush RESETS the transcript to ~54K, inside the cheap plateau, so a second flush pays 400 credits to save approximately nothing. The coupling now lives in one place -- N determines how many boundaries EXIST, the threshold determines which FIRE -- with the obligation named in both directions.\n\nVERIFICATION: round 1 discovery, fan-out 2/2, VERIFIED with 0 findings. The set-terminal PATH-AWARE CRITIQUE (advisory) then ran BEFORE the suites per the Step 8 ordering. The automated producer refused: pull_verifier has no transport awareness and hard-requires DABBLER_* keys. The obvious reading of that -- 'path-aware review needs provider keys' -- is WRONG and the operator caught the orchestrator stating it that way; routed children on this transport carry --available-tools view,grep,glob and are path-aware by construction. It is a producer WIRING gap, recorded as R4 in the same family as R3. The manual flow (the template's documented default) was used: both critics returned ISSUES_FOUND and both independently found the SAME two Majors -- the batch-logging robustness claim holds only WITHIN a role, and the two F estimates are NOT independent (gemini's version was decisive arithmetic: work + ceremony sum by construction to completedAt - startedAt, exactly the interval S2 regressed). gpt-5.5 added the undisclosed 129-session exclusion and causal overstatement across four echoes. All remediated by MEASURING where possible rather than rewording: the probe now counts mixed-role batches (10 of 97) and reports the cut without them -- w-bar unchanged at 6.4, corr -0.029 -> -0.027, F rising 41.1 -> 47.0, so the conclusion survives its own correction -- and counts exclusions by reason, which showed the big drop is not era-concentrated. post_round_delta then classified the remediation A4.2 shipped-code, so one delta-scoped remediation-review ran: VERIFIED, 3 fix-accepted + 1 accepted-with-modification, 0 rejected, 2 Minor nits both fixed. Bounds: 1 discovery and 1 remediation-review used of 2 each.\n\nOPERATOR RULING ON N, received after the brief and after two suites had been recorded: allow three or four -- a CEILING of 4 with 3 retained as the stated TARGET, reversing the 2026-08-12 ratification. It overrides the orchestrator's own recommendation to keep 3, on an argument this session's measurement supplies but the brief failed to follow through: the brief priced a raise (~7-9 min) and never priced the opposite error, which is a forced session split costing a whole F (~40-60 min, 6-7 work steps). Implementation is DEFERRED to the follow-on set by agreement -- WORK_STEP_BUDGET sits under ai_router/, which all three suites cover, so moving it here would discard recorded runs and a Layer 3 run in flight, and this set's Ends-with promises a recommendation, not a changed number. Recorded in the brief (7.1), the change log and the authoring guide, each stating plainly that it is ruled and NOT yet in force.\n\nSUITES: all three owed (the changelog fragment lands under ai_router/, which mocha and playwright declare; pytest also covers docs/session-sets/). pytest 4519 passed / 9 skipped; mocha 1456 passing / 0 failing / 2 pending; playwright recorded as a DISCLOSED COMPOSITE -- full run 31/32 with vsix-first-run-walkthrough exhausting its 300s budget under load, then 1/1 in 43.3s alone, all 32 executed and passed. That is R2, the third consecutive session in this set to record the same composition on the same spec. pytest was then re-run because the operator's N ruling arrived after the first recording and edited a file under docs/session-sets/, which pytest covers -- an honest cost of a late decision, not a shortcut around one.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/changelog.d/0140-set-132-s2-the-instrument-that-counted-wrong.md",
-    "ai_router/spec_admission.py",
-    "ai_router/tests/test_spec_admission.py",
-    "ai_router/tests/test_spec_admission_step_counting.py",
+    "docs/ai-led-session-workflow.md",
     "docs/planning/session-set-authoring-guide.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/activity-log.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/checklist-posts.jsonl",
-    "docs/session-sets/132-session-length-and-explorer-captions/decisions.jsonl",
-    "docs/session-sets/132-session-length-and-explorer-captions/disposition.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-conventions.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-next-orchestrator-routed.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-rounds.jsonl",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification-fanout-2.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification-round-2.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification-round-3.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/session-events.jsonl",
-    "docs/session-sets/132-session-length-and-explorer-captions/session-state.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/test-runs.jsonl"
+    "ai_router/changelog.d/0150-set-132-s3-why-long-sessions-are-long.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-causality-and-compaction.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/change-log.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-conventions.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-critique-prompt.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-prompt-round-a.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-prompt-round-b.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-round-a-openai.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-round-a-openai-sample-2.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-round-a-google.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-round-b-openai.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-round-b-openai-sample-2.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-panel-round-b-google.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-path-aware-critique-openai.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3-path-aware-critique-google.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/path-aware-critique.json",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_overhead.py",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_probe_tail.py",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_panel_round_a.py",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_panel_round_b.py",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_panel_google.py",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_path_aware_critique.py",
+    "docs/session-sets/132-session-length-and-explorer-captions/s3_assemble_critique.py"
   ],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Routed to gpt-5.5 with anthropic excluded so the advice could not be self-interested (s2-next-orchestrator-routed.md, verbatim; the router's own verify pass by gemini-3.1-pro-preview returned VERIFIED). Its reasoning: keep the current orchestrator for continuity through the set-terminal policy session and do not make a cost-driven downgrade, because this repo's measured lever is compaction, not model substitution. Preserve adjudication independence by running Session 3's causal-design panel and its cross-provider verification on OpenAI and Gemini, so the Anthropic orchestrator is not judging its own provider's critique. Session 3 is mostly canonical workflow/policy writing plus careful causal framing, where continuity from this session's corrected measurement and its restatement of the tail question matters more than changing models."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": [],
   "lessons_cited": [
+    "L-125-1",
     "L-112-1",
+    "L-069-1",
     "L-064-8",
-    "L-064-9",
-    "L-079-1"
+    "L-064-9"
   ],
   "cost": {
     "components": [
       {
         "component": "orchestrator_seat",
         "status": "lower_bound",
-        "credits": 2244.77345,
-        "usd": 22.447734500000003,
-        "event_count": 160,
+        "credits": 3918.2491,
+        "usd": 39.182491,
+        "event_count": 225,
         "session_ids": [
-          "e9e541c3-35e3-4b56-b619-ca7d78acd763"
+          "16d995b6-f56b-4fd3-bb9a-ac8b5ea4e446"
         ],
         "measured_session_ids": [
-          "e9e541c3-35e3-4b56-b619-ca7d78acd763"
+          "16d995b6-f56b-4fd3-bb9a-ac8b5ea4e446"
         ],
         "unmeasured_session_ids": [],
         "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
@@ -63,18 +60,44 @@
       {
         "component": "routed_seat",
         "status": "measured",
-        "credits": 315.945,
-        "usd": 3.15945,
-        "event_count": 25,
+        "credits": 941.50004,
+        "usd": 9.4150004,
+        "event_count": 99,
         "session_ids": [
-          "dd668f75-4743-4e1f-b11f-29d8d37df75a",
-          "6ecf408d-9271-4437-a1b3-e2ea5a81c968",
-          "3bda8cb3-2f3d-492c-b352-958b9fe954ca"
+          "c39aa0d7-2bbe-4368-8737-a05fc758c60f",
+          "ece8fba8-bd93-4a5f-aca6-41c6b01dbc8a",
+          "f3b406e9-9875-439f-a872-1e8ebf099ac8",
+          "b72ac722-8036-4a1e-a468-3a6b04f34c09",
+          "f4340592-aa48-41da-8123-0b391c1c14b5",
+          "9c0a757e-9b0d-482e-a597-970c08eb8958",
+          "8e2284c2-ccbb-44f7-911e-1c2b1d7e9712",
+          "8deffbcb-57e5-40e3-b165-af0884033d6c",
+          "d4dd4ec4-4763-4eca-8578-3571fe63dd31",
+          "27ffe324-d12a-44e1-9b01-93cac387b1ce",
+          "61a83a44-3f1c-4fd6-b37f-5063f2ac56ad",
+          "4456e24a-7ac2-483e-a553-6d5f37c1cf84",
+          "f0661349-2176-4ac0-ad96-419a84e11cd5",
+          "d8d9af3c-fef3-421c-adef-d14fa16ed1bc",
+          "e60ab9c7-ab0f-4da2-a44c-5bfd51ddf9d3",
+          "bcdd4db5-5971-44e7-926a-6b0663cf9e93"
         ],
         "measured_session_ids": [
-          "dd668f75-4743-4e1f-b11f-29d8d37df75a",
-          "6ecf408d-9271-4437-a1b3-e2ea5a81c968",
-          "3bda8cb3-2f3d-492c-b352-958b9fe954ca"
+          "c39aa0d7-2bbe-4368-8737-a05fc758c60f",
+          "ece8fba8-bd93-4a5f-aca6-41c6b01dbc8a",
+          "f3b406e9-9875-439f-a872-1e8ebf099ac8",
+          "b72ac722-8036-4a1e-a468-3a6b04f34c09",
+          "f4340592-aa48-41da-8123-0b391c1c14b5",
+          "9c0a757e-9b0d-482e-a597-970c08eb8958",
+          "8e2284c2-ccbb-44f7-911e-1c2b1d7e9712",
+          "8deffbcb-57e5-40e3-b165-af0884033d6c",
+          "d4dd4ec4-4763-4eca-8578-3571fe63dd31",
+          "27ffe324-d12a-44e1-9b01-93cac387b1ce",
+          "61a83a44-3f1c-4fd6-b37f-5063f2ac56ad",
+          "4456e24a-7ac2-483e-a553-6d5f37c1cf84",
+          "f0661349-2176-4ac0-ad96-419a84e11cd5",
+          "d8d9af3c-fef3-421c-adef-d14fa16ed1bc",
+          "e60ab9c7-ab0f-4da2-a44c-5bfd51ddf9d3",
+          "bcdd4db5-5971-44e7-926a-6b0663cf9e93"
         ],
         "unmeasured_session_ids": [],
         "reason": null
@@ -92,8 +115,8 @@
       }
     ],
     "total_status": "lower_bound",
-    "total_credits": 2560.7184500000003,
-    "total_usd": 25.607184500000002,
+    "total_credits": 4859.74914,
+    "total_usd": 48.597491399999996,
     "unmeasured": [],
     "store_schema_version": 6,
     "measured_at": "close"

@@ -160,7 +160,7 @@ full text in `lessons-archive.md`:
   each half; name the field.
 
 ## Compare What A Transport CAN DO, Not What It Returns
-<!-- lesson: id="L-125-1" added-set="125" last-used-set="129" status="active" scope="portable" -->
+<!-- lesson: id="L-125-1" added-set="125" last-used-set="132" status="active" scope="portable" -->
 
 - Backends behind one interface differ in **capability**, not output. Under
   one `route()` contract, direct-API sends no `tools` key and cannot touch

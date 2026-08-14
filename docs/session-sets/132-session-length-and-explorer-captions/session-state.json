@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "132-session-length-and-explorer-captions",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -42,9 +42,9 @@
     {
       "number": 3,
       "title": "Why the tail, what N should be, and where compaction fires",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T15:42:46.509650-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T17:33:26.794535-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -55,7 +55,7 @@
           "16d995b6-f56b-4fd3-bb9a-ac8b5ea4e446"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

@@ -35,10 +35,18 @@ def test_all_test_modules_live_under_tests_dir():
     """No stray ``test_*.py`` outside ai_router/tests/ (collision + wheel guard)."""
     ai_router = _ai_router_dir()
     tests_dir = ai_router / "tests"
+    scanned = [
+        path
+        for path in ai_router.rglob("test_*.py")
+        if "__pycache__" not in path.parts
+    ]
+    # L-112-1: an empty corpus would pass having examined nothing.
+    assert scanned, (
+        "the stray-test-module scan found no test modules at all -- it is "
+        "reading the wrong tree"
+    )
     strays = []
-    for path in ai_router.rglob("test_*.py"):
-        if "__pycache__" in path.parts:
-            continue
+    for path in scanned:
         try:
             path.relative_to(tests_dir)
         except ValueError:

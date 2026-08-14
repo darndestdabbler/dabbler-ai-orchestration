@@ -1,0 +1,118 @@
+{
+  "status": "completed",
+  "summary": "Set 121 Session 1: applied the operator's encode-or-drop rule to every active lesson, encoded the half of L-112-1 that can be enforced, and took lessons-learned.md 264 tokens lighter.\n\n(1) THE SPEC'S NUMBERS HAD EXPIRED AND WERE RE-DERIVED, NOT INHERITED. Preload: the spec's +144 tokens of headroom is now -141 (ceilings were raised under the standing authorization and the corpus grew), so the total ceiling was already breached at session start. Active lessons: still five, but a DIFFERENT five -- L-075-1 was archived by Set 125 S9 and L-125-1 admitted in its place; L-069-1 did not return. Both are findings about the SPEC. Path citation: the spec's '0 of 581 across sets 057-117' is false keyed on SET NUMBER (115 and 118 cite paths) and exactly right keyed on EXECUTION TIME -- 0 of 572 before Set 119 S1 landed, 85 of 85 after. Sets 115/118 ran after 119; set numbers are allocation order, not execution order. That one is a finding about the QUERY, and the spec's claim now rests on a 6.5x larger sample. Doc-only findings remain 0 of 85 (the cap has never fired); mixed doc+code is 38 of 85 (45%), up from 5 of 13, which sharpens what Session 4 measures.\n\n(2) SIX DISPOSITIONS JOURNALED, ONE A DELIBERATE DEVIATION. L-064-9 and L-125-1 were already enforced by shipped code carrying TRUE falsifiers (tests that redden when the guard is deleted), so criterion 4 disqualified them from preload and they archived behind encoded-in pointers. L-064-8 became a one-liner, agreeing with proposal 5.2. L-079-1 became a one-liner AGAINST 5.2's 'code', journaled: its data-loss half is already encoded so a lint there scans a clean corpus, and its subprocess half is 29 sites whose correct fix is not uniform (git/podman emit UTF-8; the seven powershell/tasklist children emit the console codepage, so a blanket encoding='utf-8' would newly break them). Those 29 sites are a NAMED RESIDUAL owned by a future set.\n\n(3) L-112-1 SPLIT, AND THE ENFORCEABLE HALF SHIPPED. 5.2's meta-gate over every pattern gate is unbuildable -- the gates have no registry, and a meta-gate blind to its own population is the defect the lesson names. But corpus scans are recognisable by shape, so ai_router/corpus_scan_guard.py refuses any test_* function that walks the checked-out repo without asserting the walk matched anything. It is structural (AST, following assignment through helpers, path providers, fixtures, accumulators and intermediate variables) and it distinguishes the repo from fixture trees, so the legitimate 'assert this wrote nothing' class stays legal. It found SIX real vacuous-pass tests, all fixed.\n\n(4) VERIFICATION FOUND SIX MAJORS, ALL GENUINE, ALL THE SAME MISTAKE. Non-transitive helper resolution (a shape this session CREATED while fixing an offender), generator truthiness accepted as non-empty proof, local Path(__file__) roots, pytest fixture injection including the conftest case, and laziness that did not cross a call boundary. Every one existed because the guard had been calibrated against the corpus that exists today -- L-112-1's own error, committed while encoding L-112-1. Fixed across rounds 1-3; round 4 VERIFIED with 5 fix verdicts accepted and 0 findings. 25 falsifiers now pin every closed shape, each paired with the look-alike that must stay silent.\n\n(5) THE ACCEPTANCE CRITERIA WERE UNRUNNABLE AND WERE PROVEN EQUIVALENTLY. The verifier's generated python -c \"exec('...')\" one-liners lose an escaping level at the shell and raise SyntaxError before testing anything, so the harness reported 'still failing' on substance it never evaluated. The artifacts were NOT edited; each criterion's intent was reproduced as a runnable equivalent and executed against both trees, pre-fix trees taken from the git index and from the harness's own recorded round-2 tree. All seven fail pre-fix and pass post-fix; every paired look-alike is silent on both. Tables are in s1-remediation-round-1.md and s1-remediation-round-3.md.\n\n(6) TOKENS FREED, MEASURED. lessons-learned.md 2,493 -> 2,229 (264 freed, 89% of ceiling); preload total 12,741 -> 12,477, clearing the 12,600 ceiling it was breaching. The lessons-learned ceiling was deliberately NOT ratcheted down (journaled): Session 4 promotes the candidate queue into exactly this headroom. AGENTS.md remains 177 over its ceiling -- pre-existing, outside this session's Touches, retired by Session 4 Step 3.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    "ai_router/corpus_scan_guard.py",
+    "ai_router/tests/test_corpus_scan_guard.py",
+    "ai_router/tests/test_no_legacy_field_reads.py",
+    "ai_router/tests/test_packaging_hygiene.py",
+    "ai_router/tests/test_production_imports.py",
+    "ai_router/tests/test_spec_config.py",
+    "ai_router/tests/test_step_status_vocabulary.py",
+    "docs/planning/lessons-archive.md",
+    "docs/planning/lessons-learned.md",
+    "docs/session-sets/121-guidance-becomes-executable/activity-log.json",
+    "docs/session-sets/121-guidance-becomes-executable/ai-assignment.md",
+    "docs/session-sets/121-guidance-becomes-executable/checklist-posts.jsonl",
+    "docs/session-sets/121-guidance-becomes-executable/decisions.jsonl",
+    "docs/session-sets/121-guidance-becomes-executable/disposition.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-acceptance-round-1.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-acceptance-round-2.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-acceptance-round-3.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-issues-round-2.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-issues-round-3.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-issues.json",
+    "docs/session-sets/121-guidance-becomes-executable/s1-remediation-round-1.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-remediation-round-2.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-remediation-round-3.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-rounds.jsonl",
+    "docs/session-sets/121-guidance-becomes-executable/s1-verification-fanout-2.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-verification-round-2.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-verification-round-3.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-verification-round-4.md",
+    "docs/session-sets/121-guidance-becomes-executable/s1-verification.md",
+    "docs/session-sets/121-guidance-becomes-executable/session-events.jsonl",
+    "docs/session-sets/121-guidance-becomes-executable/session-state.json",
+    "docs/session-sets/121-guidance-becomes-executable/test-runs.jsonl"
+  ],
+  "lessons_cited": [
+    "L-112-1",
+    "L-069-1",
+    "L-064-9"
+  ],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Routed recommendation, reproduced verbatim in ai-assignment.md: Session 2 requires careful multi-file refactoring of an existing metadata module and its call sites, plus sanctioned-writer and file-locking discipline -- the precise, context-heavy Python work claude-opus-5 at high effort handled well here. Switch only on a context-window blocker or a measurable cost ceiling."
+    }
+  },
+  "blockers": [],
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 2733.073455,
+        "usd": 27.330734550000003,
+        "event_count": 174,
+        "session_ids": [
+          "db17efc0-e9a1-44a7-84cf-126da2c2e705"
+        ],
+        "measured_session_ids": [
+          "db17efc0-e9a1-44a7-84cf-126da2c2e705"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 530.6063,
+        "usd": 5.306063,
+        "event_count": 37,
+        "session_ids": [
+          "535106fb-3fdf-4184-8000-5d66e2f190fc",
+          "cbefc833-518f-4de7-a210-553f5fe0f772",
+          "5776f05f-db10-470e-bcb2-8fd3aa16823d",
+          "47b52e7b-c328-45c1-aebd-33a92da260d0",
+          "277be9d9-e4be-4c18-9385-1e65156e9879",
+          "50a32792-1f39-40c2-b7d0-93c383c5e1f4"
+        ],
+        "measured_session_ids": [
+          "535106fb-3fdf-4184-8000-5d66e2f190fc",
+          "cbefc833-518f-4de7-a210-553f5fe0f772",
+          "5776f05f-db10-470e-bcb2-8fd3aa16823d",
+          "47b52e7b-c328-45c1-aebd-33a92da260d0",
+          "277be9d9-e4be-4c18-9385-1e65156e9879",
+          "50a32792-1f39-40c2-b7d0-93c383c5e1f4"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 3263.679755,
+    "total_usd": 32.636797550000004,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
+}

@@ -82,7 +82,14 @@ def _bare_offenders(py_file: Path) -> list[tuple[int, str]]:
 
 def test_no_bare_imports_of_set048_modules_in_production_code():
     bad: list[tuple[str, int, str]] = []
-    for py_file in _production_py_files():
+    files = _production_py_files()
+    # L-112-1: a scan whose corpus comes back empty passes having
+    # examined nothing.
+    assert files, (
+        "_production_py_files() returned no modules -- the import scan is "
+        "reading the wrong tree and would pass having examined nothing"
+    )
+    for py_file in files:
         rel = py_file.relative_to(AI_ROUTER_DIR)
         for lineno, source in _bare_offenders(py_file):
             bad.append((str(rel), lineno, source))
@@ -172,6 +179,9 @@ def test_scanner_walks_subpackages() -> None:
 def test_scanner_excludes_tests_directory() -> None:
     """Test files (which use the bare-import convention) must not be scanned."""
     files = _production_py_files()
+    # L-112-1: ``all()`` over an empty corpus is True, so this guard would
+    # pass having examined nothing.
+    assert files, "_production_py_files() returned no modules to check"
     assert all(TESTS_DIR not in p.parents for p in files), (
         f"_production_py_files() should exclude {TESTS_DIR} but did not"
     )

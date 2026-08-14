@@ -99,6 +99,18 @@ def _ai_router_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def _scanned_sources() -> list[Path]:
+    """The corpus the lint actually reads: ``ai_router/*.py`` minus the
+    allowlist. Named separately so the gate can assert its input set is
+    non-empty by the gate's OWN corpus definition (L-112-1)."""
+    root = _ai_router_root()
+    return [
+        py_path
+        for py_path in root.rglob("*.py")
+        if not _is_allowlisted(py_path.relative_to(root).as_posix())
+    ]
+
+
 def _scan_for_violations() -> list[tuple[str, int, str]]:
     """Walk ``ai_router/*.py`` and collect lint violations.
 
@@ -106,10 +118,8 @@ def _scan_for_violations() -> list[tuple[str, int, str]]:
     """
     root = _ai_router_root()
     violations: list[tuple[str, int, str]] = []
-    for py_path in root.rglob("*.py"):
+    for py_path in _scanned_sources():
         rel = py_path.relative_to(root).as_posix()
-        if _is_allowlisted(rel):
-            continue
         try:
             text = py_path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
@@ -138,6 +148,14 @@ def test_no_application_reader_accesses_legacy_fields():
     ``total_sessions``, ``completed_sessions``).
     """
     violations = _scan_for_violations()
+    # L-112-1: a scan whose corpus comes back empty passes having
+    # examined nothing. Assert the input set by the gate's own corpus
+    # definition, so a mistargeted root fails loudly instead of green.
+    sources = _scanned_sources()
+    assert sources, (
+        "the D13 lint scanned no Python sources at all -- it is reading "
+        "the wrong tree and would pass having examined nothing"
+    )
     if violations:
         formatted = "\n".join(
             f"  {rel}:{lineno}: {content}" for rel, lineno, content in violations

@@ -93,17 +93,13 @@ whose trigger moment is situational, moved full-text to
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
 <!-- lesson: id="L-079-1" added-set="079" last-used-set="132" status="active" scope="portable" -->
 
-- The child Python's stdout text layer defaults to `cp1252` on Windows,
-  so any non-ASCII payload crossing a pipe *as text* is a latent crash in
-  both directions — and a fail-open branch can swallow it silently (the
-  Set 079 config-seed defect shipped exactly that way). Pass **bytes**
-  end-to-end (`sys.stdout.buffer.write(...)`), decode once at the
-  consumer with a streaming-safe decoder, and when touching spawn code
-  grep for the sibling sites (L-069-1). Same class (merged L-064-3):
-  never `print(result.content)` before writing routed output to disk with
-  `encoding="utf-8"` — a mid-print crash loses the paid output. A
-  fail-open branch around such I/O must NAME the skip in operator-facing
-  output.
+- Pass **bytes** end-to-end across a subprocess pipe and decode once at
+  the consumer with an explicit codec, and write routed output to disk
+  with `encoding="utf-8"` **before** printing it — a text-mode pipe with
+  no `encoding=` decodes as cp1252 on Windows, and a mid-print crash
+  loses the paid output. (Set 121 S1: the routed-output half is encoded
+  in `cli_transport`; **29 production call sites still pass `text=True`
+  with no `encoding=`** and are an open residual.)
 
 ## Archived lessons (Set 095 preload-ceiling triage)
 <!-- lesson-pointer: archived-set="095" -->
@@ -119,56 +115,46 @@ full text in `lessons-archive.md`:
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
 <!-- lesson: id="L-064-8" added-set="063" last-used-set="132" status="active" scope="portable" -->
 
-- Prose carried over from a superseded doc was true (or tolerated) in the
-  old context and reads authoritative in the new one — a defect class of
-  its own. When authoring a replacement or successor doc, grep the new
-  text for claims of *current* behavior (reads, writes, enforcement,
-  defaults) and re-verify each against the code before routing
-  verification.
-
-## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="132" status="active" scope="portable" -->
-
-- `git diff` shows only tracked changes, so an evidence bundle that
-  presents a diffstat as "the change set" silently omits new files and
-  earns a Major completeness finding. `git add` new deliverables before
-  generating diff-based evidence, or include `git status --short`
-  alongside the diff so additions are visible.
+- When authoring a replacement or successor doc, grep the new text for
+  claims of *current* behavior (reads, writes, enforcement, defaults) and
+  re-verify each against the code before routing verification — prose
+  carried over from a superseded doc was true in the old context and
+  reads authoritative in the new one.
 
 
-## A Gate That Only Ever Passes Proves Nothing — Ship It With Falsifiers
-<!-- lesson: id="L-112-1" added-set="112" last-used-set="132" status="active" scope="portable" -->
+## Ship Every Pattern Gate With A Falsifier That Plants The Violation
+<!-- lesson: id="L-112-1" added-set="112" last-used-set="121" status="active" scope="portable" -->
 
-- A pattern-matching gate (grep guard, banned-phrase scan) that matches
-  nothing looks **identical** to one that finds nothing, and reviewing
-  its regexes reads as confirmation. Only a **planted violation**
-  separates them: per rule, one falsifier that plants the defect and
-  asserts the gate fires, one that plants the legitimate look-alike and
-  asserts it does not. Set 112's gate passed its own repo cleanly and
-  still missed six declaration shapes over four rounds — every one found
-  by planting, none by reading. Add a **structural** assertion beside the
-  textual one; it holds however a thing is spelled.
-- **Assert the INPUT SET is non-empty, and PLANT INTO THE CORPUS THE
-  GATE READS.** A scan whose corpus comes back empty passes having
-  examined nothing (Set 128 S3: a corpus check with no
-  `assert discovered`). Select by the gate's own corpus definition, never
-  by position: Set 129 S2's plant, chosen by **recency**, fired only
-  until repo growth moved its target off it.
-- **Assert the RULE, not a substring a SIBLING rule also emits.** Set 130
-  S3 matched `"must be null when status is"`, which the neighbouring
-  `usd` check also emits, so deleting half the rule left it green. Plant
-  each half; name the field.
+- Per rule: one falsifier that plants the defect and asserts the gate
+  fires, one that plants the legitimate look-alike and asserts it does
+  not. Assert the **rule**, not a substring a sibling rule also emits,
+  and add a structural assertion beside the textual one. A gate that
+  matches nothing looks identical to one that finds nothing, and reading
+  its regexes reads as confirmation. (Set 121 S1: the *assert your
+  corpus is non-empty* half is now enforced —
+  `ai_router/corpus_scan_guard.py`.)
 
-## Compare What A Transport CAN DO, Not What It Returns
-<!-- lesson: id="L-125-1" added-set="125" last-used-set="132" status="active" scope="portable" -->
+## Encoded lessons (Set 121 encode-or-drop pass)
+<!-- lesson-pointer: archived-set="121" -->
 
-- Backends behind one interface differ in **capability**, not output. Under
-  one `route()` contract, direct-API sends no `tools` key and cannot touch
-  disk; the CLI transport dispatches an **agentic** process with shell and
-  file-write. The gap lived in one subprocess flag, surfacing when routed
-  calls silently edited 23 files, and a reviewer able to edit what it judges
-  can VERIFY its own edit. **Refusal is not a control:** grant least
-  privilege as an **allowlist** (denylists fail open).---
+Set 121 S1 applied the operator's rule — *a lesson becomes executable
+code or a single instruction line, or it is dropped* — to every active
+lesson. These two were **already enforced by shipped code with true
+falsifiers**, so criterion 4 of the admission test (no executable-gate
+equivalent) disqualified them from preload. Full text in
+`lessons-archive.md`; the per-lesson dispositions and their reasoning are
+in the set's `decisions.jsonl`.
+
+| id | the gate that now enforces it |
+| :--- | :--- |
+| L-064-9 | `ai_router/verify_session.py` — `EvidenceBundle.git_status` renders `git status --short` ahead of the diff (`test_verify_session.py::TestEvidenceAssembly`) |
+| L-125-1 | `ai_router/cli_transport.py` — `READ_ONLY_TOOLS` / `_tool_grant_argv()` on both dispatch paths (`test_routed_calls_cannot_mutate.py`) |
+
+The three surviving lessons above were **condensed to one instruction
+line each**; their pre-condensation full text is preserved in
+`lessons-archive.md` without trailers, since the live ids stay here.
+
+---
 
 ## Repo-Specific Lessons
 

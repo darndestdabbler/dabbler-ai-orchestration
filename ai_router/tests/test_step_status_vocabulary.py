@@ -367,9 +367,20 @@ def test_no_production_writer_hardcodes_a_non_canonical_status():
     holds for a writer nobody has written yet.
     """
     offenders = []
-    for py_file in AI_ROUTER_DIR.rglob("*.py"):
-        if (AI_ROUTER_DIR / "tests") in py_file.parents:
-            continue
+    scanned = [
+        py_file
+        for py_file in AI_ROUTER_DIR.rglob("*.py")
+        if (AI_ROUTER_DIR / "tests") not in py_file.parents
+    ]
+    # L-112-1: an empty corpus satisfies ``offenders == []`` having
+    # examined nothing. Assert the input set, and name a member that must
+    # be in it so a mistargeted root cannot look like a clean tree.
+    assert scanned, "the writer scan found no production modules at all"
+    assert any(p.name == "session_log.py" for p in scanned), (
+        "session_log.py is not in the scanned corpus; the scan is reading "
+        "the wrong tree"
+    )
+    for py_file in scanned:
         offenders.extend(_non_canonical_status_writes(py_file))
     assert offenders == [], (
         "activity-log writers must use the step vocabulary:\n  "

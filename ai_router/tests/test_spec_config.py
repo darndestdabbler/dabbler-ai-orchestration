@@ -237,7 +237,10 @@ def test_repo_session_sets_all_parse() -> None:
     root = Path(__file__).resolve().parents[2] / "docs" / "session-sets"
     if not root.is_dir():
         pytest.skip("docs/session-sets not present")
-    for spec in sorted(root.glob("*/spec.md")):
+    specs = sorted(root.glob("*/spec.md"))
+    # L-112-1: an empty corpus would pass having parsed nothing.
+    assert specs, "the spec-parse guard found no session-set specs at all"
+    for spec in specs:
         parse_session_set_config(spec)  # must not raise
 
 

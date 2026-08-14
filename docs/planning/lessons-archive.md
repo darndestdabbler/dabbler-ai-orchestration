@@ -141,7 +141,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   per-session routed verification had missed.
 
 ## A Bug Is A Bug CLASS — Fix Every Sibling Site, Not Just The Reported One
-<!-- lesson: id="L-069-1" added-set="069" last-used-set="132" status="archived" scope="portable" -->
+<!-- lesson: id="L-069-1" added-set="069" last-used-set="121" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-19**
   after application across Sets 068 (origin: the `contract_gate` `UnicodeError` fix),
@@ -838,3 +838,135 @@ Set 110 S4 proved the extension MANIFEST belongs in the trigger list. Its
 — dropping the entire activity-bar container — and it reached a staged VSIX
 because no build, typecheck or unit test reads a manifest icon. The canonical
 rule, with the manifest clause, now lives in `project-guidance.md`.
+
+---
+
+## Archived by Set 121 (the encode-or-drop pass)
+
+Set 121 S1 applied the operator's standing rule of 2026-08-10 — *a lesson
+must become executable code or a single instruction line, or it is
+dropped* — to every lesson then in the active tier. The two below were
+found to be **already enforced by shipped code carrying true falsifiers**
+(a test that goes red when the guard is deleted, not one that merely
+observes it), so preload-admission criterion 4 disqualified them. Each
+archives with an `encoded-in` pointer; nothing is lost, and `cite_lessons`
+reactivates either one. The per-lesson dispositions, the options weighed
+and the reasoning are journaled in
+`docs/session-sets/121-guidance-becomes-executable/decisions.jsonl`.
+
+## `git diff`-Based Verification Evidence Omits Untracked Files
+<!-- lesson: id="L-064-9" added-set="063" last-used-set="121" status="archived" encoded-in="ai_router/verify_session.py::EvidenceBundle.as_response_under_review" scope="portable" -->
+
+- `git diff` shows only tracked changes, so an evidence bundle that
+  presents a diffstat as "the change set" silently omits new files and
+  earns a Major completeness finding. `git add` new deliverables before
+  generating diff-based evidence, or include `git status --short`
+  alongside the diff so additions are visible.
+- **Archived Set 121:** `assemble_evidence()` populates
+  `EvidenceBundle.git_status` from `git status --short`, and
+  `as_response_under_review()` renders that section *ahead* of the diff.
+  `test_verify_session.py::TestEvidenceAssembly::`
+  `test_untracked_files_visible_via_git_status` plants an untracked
+  deliverable and asserts it is absent from `.diff` and present in both
+  `.git_status` and the rendered bundle, so deleting either the data
+  population or the rendering turns the suite red.
+
+## Compare What A Transport CAN DO, Not What It Returns
+<!-- lesson: id="L-125-1" added-set="125" last-used-set="132" status="archived" scope="portable" encoded-in="ai_router/cli_transport.py::READ_ONLY_TOOLS" -->
+
+- Backends behind one interface differ in **capability**, not output. Under
+  one `route()` contract, direct-API sends no `tools` key and cannot touch
+  disk; the CLI transport dispatches an **agentic** process with shell and
+  file-write. The gap lived in one subprocess flag, surfacing when routed
+  calls silently edited 23 files, and a reviewer able to edit what it judges
+  can VERIFY its own edit. **Refusal is not a control:** grant least
+  privilege as an **allowlist** (denylists fail open).
+- **Archived Set 121:** `READ_ONLY_TOOLS` and the explicit
+  `MUTATING_TOOLS` set are enforced through one `_tool_grant_argv()`
+  helper used by both the inline and handoff dispatch paths.
+  `test_routed_calls_cannot_mutate.py` is defence-in-depth: removing
+  `--available-tools` reddens the per-path test, gutting the helper
+  reddens `test_the_grant_helper_is_the_single_source`, and emptying the
+  allowlist reddens the `assert granted` tripwire that exists precisely
+  because an empty grant would satisfy a disjointness check vacuously.
+
+## Full texts of Set-121 condensed active lessons
+
+The three lessons below stayed in the active tier as **one instruction
+line each**. Their pre-condensation full text is preserved here for
+grep, deliberately **without metadata trailers** — the live ids remain in
+`lessons-learned.md`, and cross-file id uniqueness is the D2 lock.
+
+### A Gate That Only Ever Passes Proves Nothing — Ship It With Falsifiers (full text of L-112-1)
+
+- A pattern-matching gate (grep guard, banned-phrase scan) that matches
+  nothing looks **identical** to one that finds nothing, and reviewing
+  its regexes reads as confirmation. Only a **planted violation**
+  separates them: per rule, one falsifier that plants the defect and
+  asserts the gate fires, one that plants the legitimate look-alike and
+  asserts it does not. Set 112's gate passed its own repo cleanly and
+  still missed six declaration shapes over four rounds — every one found
+  by planting, none by reading. Add a **structural** assertion beside the
+  textual one; it holds however a thing is spelled.
+- **Assert the INPUT SET is non-empty, and PLANT INTO THE CORPUS THE
+  GATE READS.** A scan whose corpus comes back empty passes having
+  examined nothing (Set 128 S3: a corpus check with no
+  `assert discovered`). Select by the gate's own corpus definition, never
+  by position: Set 129 S2's plant, chosen by **recency**, fired only
+  until repo growth moved its target off it.
+- **Assert the RULE, not a substring a SIBLING rule also emits.** Set 130
+  S3 matched `"must be null when status is"`, which the neighbouring
+  `usd` check also emits, so deleting half the rule left it green. Plant
+  each half; name the field.
+- **Set 121 S1 encoded the middle bullet.**
+  `ai_router/corpus_scan_guard.py` parses every `test_*` function and
+  refuses one that walks the checked-out repo without asserting the walk
+  matched anything. It found five such tests on the day it shipped
+  (`test_no_legacy_field_reads`, `test_packaging_hygiene`,
+  `test_production_imports` twice, `test_step_status_vocabulary`), all
+  since fixed. The other two bullets could not be encoded: the repo's
+  pattern gates carry no registry, marker or naming convention, so a
+  meta-gate over *them* could not enumerate its own population — which
+  would make it the very thing this lesson warns about.
+
+### Windows cp1252 Is A Standing Bug Class (full text of L-079-1)
+
+- The child Python's stdout text layer defaults to `cp1252` on Windows,
+  so any non-ASCII payload crossing a pipe *as text* is a latent crash in
+  both directions — and a fail-open branch can swallow it silently (the
+  Set 079 config-seed defect shipped exactly that way). Pass **bytes**
+  end-to-end (`sys.stdout.buffer.write(...)`), decode once at the
+  consumer with a streaming-safe decoder, and when touching spawn code
+  grep for the sibling sites (L-069-1). Same class (merged L-064-3):
+  never `print(result.content)` before writing routed output to disk with
+  `encoding="utf-8"` — a mid-print crash loses the paid output. A
+  fail-open branch around such I/O must NAME the skip in operator-facing
+  output.
+- **Set 121 S1 declined to encode this, and recorded why.** The
+  routed-output half is already encoded (`cli_transport` passes bytes
+  end-to-end and decodes with an explicit utf-8/replace decoder, covered
+  by `test_default_spawner_decodes_utf8_bytes_cp1252_cannot`), so a lint
+  over it would scan a clean corpus and pass having found nothing. The
+  subprocess-pipe half has **29 production call sites** using `text=True`
+  with no `encoding=`, and the correct fix is not uniform: git and podman
+  children emit UTF-8, but the seven powershell/tasklist/taskkill
+  children emit the console codepage, so a blanket `encoding="utf-8"`
+  would newly break output that decodes correctly today. Those 29 sites
+  are a named open residual owned by a future Windows-encoding set.
+
+### A Replacement Doc Inherits The Retired Doc's Claims At Its Peril (full text of L-064-8)
+
+- Prose carried over from a superseded doc was true (or tolerated) in the
+  old context and reads authoritative in the new one — a defect class of
+  its own. When authoring a replacement or successor doc, grep the new
+  text for claims of *current* behavior (reads, writes, enforcement,
+  defaults) and re-verify each against the code before routing
+  verification.
+- **Set 121 S1 confirmed no mechanical encoding is plausible.** The
+  lesson targets a semantic property — a carried-over sentence describing
+  behaviour that is no longer current — and the docs carry prose
+  narrative with no extraction convention that would make such claims
+  machine-comparable against code. The nearest analogue,
+  `test_close_session_skeleton.py::test_parser_accepts_every_documented_flag`,
+  is a hand-maintained argparse cross-check for one module; generalising
+  it would cover flag names only, never the class of claim at issue.

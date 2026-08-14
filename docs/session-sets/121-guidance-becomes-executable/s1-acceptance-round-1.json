@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "8cb4a600507d7fe961eb1207376ed164e1b67341",
+  "fixedTree": "20f9b91dfd423b8d69ecad7d3ff404d9d8b2df12",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T22:27:03.864085+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The new corpus-scan guard misses repo scans hidden behind a second helper layer, including the helper-chain shape introduced in this same change. - **Category:** Correctness - **Severity:** Major - ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A reviewer can plant a module where `_sources()` walks a `Path(__file__)` root, `_scan()` calls `_sources()`, and `test_*()` only calls `_scan()` with an empty-offenders assertion; `scan()` reports that test as an offender, and a paired version with a real non-empty assertion over the same corpus is not reported.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `assert files` on a `Path.rglob()` iterator is accepted as a non-empty corpus proof even though iterator truthiness is always true. - **Category:** Correctness - **Severity:** Major - **Evidence pa ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\\\"guard\\\", \\\"ai_router/corpus_scan_guard.py\\\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \\\"test_lazy_iterator_assert.py\\\"\\n    path.write_text(\\\"from pathlib import Path\\\\nROOT = Path(__file__).resolve().parent\\\\ndef test_scan():\\\\n    files = ROOT.rglob(\\\\\\\"*.py\\\\\\\")\\\\n    assert files\\\\n    offenders = [p for p in files if False]\\\\n    assert not offenders\\\\n\\\", encoding=\\\"utf-8\\\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\"",
+      "criterionSha256": "d66274500afc1314a396e5457624fb7b979ea5b9c83421c44da0541731f4fb2f",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_lazy_iterator_assert.py\"\\n    path.write_text(\"from pathlib import Path\\nROOT = Path(__file__).resolve().parent\\ndef test_scan():\\n    files = ROOT.rglob(\\\"*.py\\\")\\n    assert files\\n    offenders = [p for p in files if False]\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec('import importlib.util, pathlib, sys, tempfile/nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")/nguard = importlib.util.module_from_spec(spec)/nsys.modules[spec.name] = guard/nspec.loader.exec_module(guard)/nwith tempfile.TemporaryDirectory() as d:/n    path = pathlib.Path(d) / \"test_lazy_iterator_assert.py\"/n    path.write_text(\"from pathlib import Path/nROOT = Path(__file__).resolve().parent/ndef test_scan():/n    files = ROOT.rglob(/\"*.py/\")/n    assert files/n    offenders = [p for p in files if False]/n    assert not offenders/n\", encoding=\"utf-8\")/n    offenders = guard.offenders_in_module(path)/n    raise SystemExit(0 if offenders else 1)')"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 1642,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_lazy_iterator_assert.py\"\\n    path.write_text(\"from pathlib import Path\\nROOT = Path(__file__).resolve().parent\\ndef test_scan():\\n    files = ROOT.rglob(\\\"*.py\\\")\\n    assert files\\n    offenders = [p for p in files if False]\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    path.write_text(\"from pathlib import Path\n                    ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "fixed": {
+        "exitCode": 1,
+        "outputChars": 1642,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_lazy_iterator_assert.py\"\\n    path.write_text(\"from pathlib import Path\\nROOT = Path(__file__).resolve().parent\\ndef test_scan():\\n    files = ROOT.rglob(\\\"*.py\\\")\\n    assert files\\n    offenders = [p for p in files if False]\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    path.write_text(\"from pathlib import Path\n                    ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "baselinePassed": false,
+      "fixedPassed": false,
+      "outcome": "still-failing",
+      "reason": "the criterion still FAILS on the fixed tree: the fix does not satisfy the verifier's own acceptance condition"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** Repo scans rooted in a local `Path(__file__)` assignment are not detected at all. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/corpus_scan_guard.py:122`, `ai_r ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\\\"guard\\\", \\\"ai_router/corpus_scan_guard.py\\\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \\\"test_local_root.py\\\"\\n    path.write_text(\\\"from pathlib import Path\\\\ndef test_scan():\\\\n    root = Path(__file__).resolve().parent\\\\n    offenders = [p for p in root.rglob(\\\\\\\"*.py\\\\\\\") if False]\\\\n    assert not offenders\\\\n\\\", encoding=\\\"utf-8\\\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\"",
+      "criterionSha256": "e152ee8004342544b7e5c51b8c7062135c504b4550758f9d431349fdb3573d1e",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_local_root.py\"\\n    path.write_text(\"from pathlib import Path\\ndef test_scan():\\n    root = Path(__file__).resolve().parent\\n    offenders = [p for p in root.rglob(\\\"*.py\\\") if False]\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec('import importlib.util, pathlib, sys, tempfile/nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")/nguard = importlib.util.module_from_spec(spec)/nsys.modules[spec.name] = guard/nspec.loader.exec_module(guard)/nwith tempfile.TemporaryDirectory() as d:/n    path = pathlib.Path(d) / \"test_local_root.py\"/n    path.write_text(\"from pathlib import Path/ndef test_scan():/n    root = Path(__file__).resolve().parent/n    offenders = [p for p in root.rglob(/\"*.py/\") if False]/n    assert not offenders/n\", encoding=\"utf-8\")/n    offenders = guard.offenders_in_module(path)/n    raise SystemExit(0 if offenders else 1)')"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 1556,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_local_root.py\"\\n    path.write_text(\"from pathlib import Path\\ndef test_scan():\\n    root = Path(__file__).resolve().parent\\n    offenders = [p for p in root.rglob(\\\"*.py\\\") if False]\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    path.write_text(\"from pathlib import Path\n                    ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "fixed": {
+        "exitCode": 1,
+        "outputChars": 1556,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_local_root.py\"\\n    path.write_text(\"from pathlib import Path\\ndef test_scan():\\n    root = Path(__file__).resolve().parent\\n    offenders = [p for p in root.rglob(\\\"*.py\\\") if False]\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    path.write_text(\"from pathlib import Path\n                    ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "baselinePassed": false,
+      "fixedPassed": false,
+      "outcome": "still-failing",
+      "reason": "the criterion still FAILS on the fixed tree: the fix does not satisfy the verifier's own acceptance condition"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "** Helper detection is not transitive, so a test that calls a scanner helper through one wrapper bypasses the guard. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/ ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\\\"guard\\\", \\\"ai_router/corpus_scan_guard.py\\\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \\\"test_layered_helper.py\\\"\\n    path.write_text(\\\"from pathlib import Path\\\\nROOT = Path(__file__).resolve().parent\\\\ndef _sources():\\\\n    return list(ROOT.rglob(\\\\\\\"*.py\\\\\\\"))\\\\ndef _violations():\\\\n    return [p for p in _sources() if False]\\\\ndef test_scan():\\\\n    offenders = _violations()\\\\n    assert not offenders\\\\n\\\", encoding=\\\"utf-8\\\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\"",
+      "criterionSha256": "02274ba8363b0a9a501b35cd3450c1624c2f29725a38aa43b0748b0342c81ef7",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_layered_helper.py\"\\n    path.write_text(\"from pathlib import Path\\nROOT = Path(__file__).resolve().parent\\ndef _sources():\\n    return list(ROOT.rglob(\\\"*.py\\\"))\\ndef _violations():\\n    return [p for p in _sources() if False]\\ndef test_scan():\\n    offenders = _violations()\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec('import importlib.util, pathlib, sys, tempfile/nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")/nguard = importlib.util.module_from_spec(spec)/nsys.modules[spec.name] = guard/nspec.loader.exec_module(guard)/nwith tempfile.TemporaryDirectory() as d:/n    path = pathlib.Path(d) / \"test_layered_helper.py\"/n    path.write_text(\"from pathlib import Path/nROOT = Path(__file__).resolve().parent/ndef _sources():/n    return list(ROOT.rglob(/\"*.py/\"))/ndef _violations():/n    return [p for p in _sources() if False]/ndef test_scan():/n    offenders = _violations()/n    assert not offenders/n\", encoding=\"utf-8\")/n    offenders = guard.offenders_in_module(path)/n    raise SystemExit(0 if offenders else 1)')"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 1740,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_layered_helper.py\"\\n    path.write_text(\"from pathlib import Path\\nROOT = Path(__file__).resolve().parent\\ndef _sources():\\n    return list(ROOT.rglob(\\\"*.py\\\"))\\ndef _violations():\\n    return [p for p in _sources() if False]\\ndef test_scan():\\n    offenders = _violations()\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    path.write_text(\"from pathlib import Path\n                    ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "fixed": {
+        "exitCode": 1,
+        "outputChars": 1740,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\n    exec('import importlib.util, pathlib, sys, tempfile\\nspec = importlib.util.spec_from_file_location(\"guard\", \"ai_router/corpus_scan_guard.py\")\\nguard = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = guard\\nspec.loader.exec_module(guard)\\nwith tempfile.TemporaryDirectory() as d:\\n    path = pathlib.Path(d) / \"test_layered_helper.py\"\\n    path.write_text(\"from pathlib import Path\\nROOT = Path(__file__).resolve().parent\\ndef _sources():\\n    return list(ROOT.rglob(\\\"*.py\\\"))\\ndef _violations():\\n    return [p for p in _sources() if False]\\ndef test_scan():\\n    offenders = _violations()\\n    assert not offenders\\n\", encoding=\"utf-8\")\\n    offenders = guard.offenders_in_module(path)\\n    raise SystemExit(0 if offenders else 1)')\n    ~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"<string>\", line 8\n    path.write_text(\"from pathlib import Path\n                    ^\nSyntaxError: unterminated string literal (detected at line 8)\n"
+      },
+      "baselinePassed": false,
+      "fixedPassed": false,
+      "outcome": "still-failing",
+      "reason": "the criterion still FAILS on the fixed tree: the fix does not satisfy the verifier's own acceptance condition"
+    }
+  ]
+}

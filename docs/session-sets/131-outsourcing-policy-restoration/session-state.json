@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The pin comes out, and the rule that replaces it",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T07:44:41.410692-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T09:42:10.746970-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -19,7 +19,7 @@
           "e2af3ac5-6957-459b-859a-893737cae0e7"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

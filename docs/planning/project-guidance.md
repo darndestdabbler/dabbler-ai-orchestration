@@ -84,6 +84,35 @@ suspending the Set 077 UAT over instruction quality):
   dedicated session set will evaluate it. Until then, apply the two rules
   above manually to every checklist.
 
+### Practicality outranks rule-perfectionism
+
+A workflow rule exists to protect an outcome. When following its letter costs
+real time or money and protects nothing, the rule has stopped doing its job —
+name that and take the practical path (operator ruling, 2026-08-14). The
+benchmark is what a highly skilled developer would do manually without
+thinking twice about it.
+
+Two worked cases, both from the test-run policy, both rulings:
+
+- **Falling back to serial execution is not a verification reduction.** Serial
+  was the default *before* parallelism was introduced, so the fallback is a
+  return to baseline, not a compromise: it runs the identical specs with the
+  identical assertions. Parallelism is an optimization, never part of the
+  contract under test — by the opposite logic, `pytest -n auto` would make the
+  Python suite a claim about its own parallelizability, which nobody makes.
+- **Re-running what has already passed buys nothing.** When the declared
+  command executes every test and one fails, re-running *that one* in
+  isolation and finding it green means every test has executed and passed.
+  Re-running the other thirty adds no coverage, only wall clock.
+
+**The line this must not cross.** The test is *"did every test execute and
+pass"*, not *"did it happen in one invocation"*. This principle licenses a
+different **route to the same evidence** — never less evidence. Skipping a
+test, dropping an assertion, or accepting a failure nobody re-ran is still a
+verification reduction and still needs the operator. Record the route taken in
+`decisions.jsonl` so the evidence stays auditable, and state the composition
+in the disposition rather than presenting a composite as a single clean run.
+
 ### Prefer removal over addition when fixing
 
 When considering any fix, first look for something to **remove** — a state, a

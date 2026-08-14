@@ -17,6 +17,16 @@ Contents:
 - [Section 6 — The sanctioned local-only close path](#section-6--the-sanctioned-local-only-close-path)
 - [Section 7 — Troubleshooting](#section-7--troubleshooting)
 
+> **Reporting cost at Step 10:** see
+> [`seat-cost.md`](seat-cost.md) — the three cost measurements
+> (`routed_api`, `routed_seat`, `orchestrator_seat`), which surface shows
+> which, and why an unmeasured component must report `unknown` rather
+> than `$0.00`. On a Copilot seat the routed rows in
+> `router-metrics.jsonl` are correctly flagged
+> `billed_usage_unavailable: true` and their `cost_usd: 0.0` is **not** a
+> measurement. Set 130 Session 3 wires the field and the report; until
+> then `python -m ai_router.seat_cost` is the manual path.
+
 ---
 
 ## Section 0 — Session-boundary writes (start and close)

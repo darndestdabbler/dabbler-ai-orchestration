@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The public component identifiers do not match the session’s literal measurement-name contract.\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `docs/session-sets/130-orchestrator-seat-cost-capture/spec.md:186`, `ai_router/seat_cost.py:127`, `ai_router/docs/seat-cost.md:17`, `ai_router/docs/close-out.md:20`\n- **Failure scenario:** Session 2/3 or a caller follows the authored spec and expects the wire/API component names `routed_call_cost`, `routed_seat_cost`, and `orchestrator_seat_cost`, but the reader emits/documents `routed_api`, `routed_seat`, and `orchestrator_seat`. That is probable because these identifiers are the reader’s public `CostReport.to_dict()` component values and the next sessions are explicitly planned to wire them into persistent reporting.\n- **Acceptance criterion:** `JUDGMENT - The three literal component identifiers in ai_router/seat_cost.py, ai_router/docs/seat-cost.md, ai_router/docs/close-out.md, and the Session 1 spec all agree on the same public measurement names.`\n- **Details:** **Violation:** the spec says `seat-cost.md` defines `routed_call_cost`, `routed_seat_cost`, and `orchestrator_seat_cost`; the implementation defines `COMPONENT_ORCHESTRATOR_SEAT = \"orchestrator_seat\"`, `COMPONENT_ROUTED_SEAT = \"routed_seat\"`, and `COMPONENT_ROUTED_API = \"routed_api\"`. **Impact:** this changes the public/wire vocabulary before the later disposition schema and close-out wiring consume it, creating avoidable schema drift. **Evidence:** the code and docs use the shorter names while the authored session plan uses the `_cost` names.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Session 2/3 or a caller follows the authored spec and expects the wire/API component names `routed_call_cost`, `routed_seat_cost`, and `orchestrator_seat_cost`, but the reader emits/documents `routed_api`, `routed_seat`, and `orchestrator_seat`. That is probable because these identifiers are the reader’s public `CostReport.to_dict()` component values and the next sessions are explicitly planned to wire them into persistent reporting.",
+      "evidencePaths": [
+        "docs/session-sets/130-orchestrator-seat-cost-capture/spec.md",
+        "ai_router/seat_cost.py",
+        "ai_router/docs/seat-cost.md",
+        "ai_router/docs/close-out.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The three literal component identifiers in ai_router/seat_cost.py, ai_router/docs/seat-cost.md, ai_router/docs/close-out.md, and the Session 1 spec all agree on the same public measurement names."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "7e61869dbe3149bb90bdacc33955f6470fbee2ca"
+}

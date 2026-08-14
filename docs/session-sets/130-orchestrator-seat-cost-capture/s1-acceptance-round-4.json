@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 4,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "eb735885dd9f12fe163ead91a405b7c35d681ece",
+  "fixedTree": "4a518ddd30fb9a8a9d82f4357a3952360f5fb7d7",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T08:22:06.278429+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The recorded full-suite runs are stale after the fix-delta guidance/config change. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/session-sets/130-orchestrator-seat- ...",
+      "severity": "Major",
+      "outcome": "baseline-mismatch",
+      "criterion": "python ai_router/run_of_record.py check --session-set-dir docs/session-sets/130-orchestrator-seat-cost-capture --files-changed ai_router/router-config.yaml docs/planning/project-guidance.md --check",
+      "reason": "the only pre-fix tree available belongs to an earlier round than the one that raised this finding, so a fails-before result would not be attributable to this fix. The finding stays judgment-based."
+    }
+  ]
+}

@@ -1348,7 +1348,14 @@ guidance:
     # recorded above: raised 12000 -> 12200 to fit the A1-A4 test-ordering
     # rules written into the constitution. Set 121 ratchets it back down
     # to the slimmed corpus's measurement.
-    total_ceiling_tokens: 12200
+    #
+    # Set 130 S1, 2026-08-14: raised 12200 -> 12600 to fit the
+    # "Practicality outranks rule-perfectionism" principle. Operator
+    # authorized it explicitly and in the same breath as the standing
+    # authorization above -- "I authorize you to change the ceiling on
+    # guiding principles to accommodate this -- because it is very
+    # important. We will fix the ceiling more permanently in set 121."
+    total_ceiling_tokens: 12600
     files:
       - path: docs/session-constitution.md
         # Set 128 S2: raised 4000 -> 4200 under the same authorization.
@@ -1356,7 +1363,15 @@ guidance:
         # doc; no other preload file can carry them.
         ceiling_tokens: 4200
       - path: docs/planning/project-guidance.md
-        ceiling_tokens: 3499
+        # Set 130 S1, 2026-08-14: raised 3499 -> 3930 TO FIT the measured
+        # size after adding "Practicality outranks rule-perfectionism" --
+        # the operator's ruling that a workflow rule protecting nothing
+        # has stopped doing its job, with the serial-fallback and
+        # do-not-re-run-what-passed cases worked, and the line it must not
+        # cross (a different route to the same evidence, never less
+        # evidence). It is a PRINCIPLE, so project-guidance.md is the only
+        # preload file that can carry it. Set 121 ratchets this back down.
+        ceiling_tokens: 3930
       - path: docs/planning/lessons-learned.md
         # Set 128 S3: raised 2385 -> 2504 under the standing operator
         # authorization of 2026-08-12 (docs/guidance-lifecycle.md ->

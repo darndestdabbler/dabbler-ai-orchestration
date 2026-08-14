@@ -200,9 +200,36 @@ class TestCli:
         spec = _write(tmp_path, _session(1, 1, "Fine", 4))
         assert sa.run(["--spec", spec, "--check", "--max-steps", "5"]) == 0
 
-    def test_without_check_a_violation_still_exits_zero(self, tmp_path):
+    def test_a_violation_exits_nonzero_in_spec_mode_without_check(
+        self, tmp_path, capsys
+    ):
+        """Set 132 S2, journaled: ``--spec`` is a verdict, not a report.
+
+        This asserted the opposite until Set 132 S2. The old contract let
+        the admission test print ``OVER CAP`` and return success, so the
+        documented single-spec authoring command could not fail. It is
+        rewritten rather than deleted because the behaviour is still under
+        test -- the expectation moved, the coverage did not.
+        """
         spec = _write(tmp_path, _session(1, 1, "Too big", 9))
-        assert sa.run(["--spec", spec, "--max-steps", "5"]) == 0
+        assert sa.run(["--spec", spec, "--max-steps", "5"]) == 1
+        assert "OVER CAP" in capsys.readouterr().out
+
+    def test_all_mode_stays_a_census_without_check(self, tmp_path, capsys):
+        """The asymmetry, and why it is not an oversight.
+
+        ``--all`` reads a corpus that is mostly history nobody is
+        authoring -- 47 sessions across 31 of this repo's 131 specs are
+        over cap with no declared exception -- so an enforcing default
+        would be a gate that always fires.
+        """
+        set_dir = tmp_path / "docs" / "session-sets" / "001-too-big"
+        set_dir.mkdir(parents=True)
+        _write(set_dir, _session(1, 1, "Too big", 9))
+        argv = ["--all", "--repo-root", str(tmp_path), "--max-steps", "5"]
+        assert sa.run(argv) == 0
+        assert "OVER CAP" in capsys.readouterr().out
+        assert sa.run(argv + ["--check"]) == 1
 
     def test_no_target_is_a_usage_error(self, capsys):
         assert sa.run([]) == 2

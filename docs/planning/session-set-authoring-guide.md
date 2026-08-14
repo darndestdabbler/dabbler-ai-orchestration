@@ -263,18 +263,45 @@ rejecting their own opening suggestion of N = 4 as a deliberate loosening
 rather than an artifact of re-counting. Do not compare a new spec's "7"
 to the old "5"; compare its **N** to 3.
 
+**Re-measured at Set 132 S2, and the cap held.** Both tables above were
+built with a parser that hoisted nested ordered lists into the step count
+and charged any step *mentioning* verification, registration or close-out
+as ceremony. Both defects are fixed, and the probe was re-run over 225
+sessions: N rose in 40% of them (mean 2.83 → 3.26), and the median still
+steps up between `N = 3` (49 min) and `N = 4–5` (71 min). The knee is
+where it was. What the re-run *did* overturn is the tail story below.
+
 Check it before the set starts — the whole point is that an oversized or
 mis-shaped session is fixed at authoring, not discovered at hour three:
 
 ```bash
+# One spec: exits non-zero if it fails admission.
 python -m ai_router.spec_admission --spec docs/session-sets/<slug>/spec.md
-python -m ai_router.spec_admission --all --check   # every spec, CI-friendly
+# Every spec: a census, since most of the corpus predates the cap.
+python -m ai_router.spec_admission --all
+# ... and the same sweep as a gate.
+python -m ai_router.spec_admission --all --check
 ```
 
+The report names `N` beside the declared step count, because `N` is what
+the budget is about.
+
 **What the cap does not promise.** Step count predicts the **median**,
-not the **tail**. The longest sessions on record (591, 562, 544, 509 min)
-all declared 5–8 steps — within or barely over the cap. A green result is
-a floor on obvious oversizing, not a promise of a short session.
+not the **tail**. A green result is a floor on obvious oversizing, not a
+promise of a short session.
+
+**Set 132 S2 re-measured this and the old wording here was wrong twice
+over.** It used to name "the longest sessions on record (591, 562, 544,
+509 min)". There are longer ones (1498, 1414, 1028, 934 min), and the
+reason is not step count: duration is `completedAt − startedAt`, elapsed
+*calendar* time, and 15 of 225 sessions were registered on one day and
+closed the next. All 15 are in the 23 longest sessions on record.
+Excluding them takes the p90 from 301 to **147** minutes; trimming idle
+gaps instead takes it from 311 to **140**. Most of the tail the cap
+disclaims was sleep. The disclaimer still holds — a passing spec can
+still run long — but do not quote the old figures. Method and full
+tables:
+[`docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md`](../session-sets/132-session-length-and-explorer-captions/s2-measurement.md).
 
 **Declaring an exception.** When a session genuinely must exceed the cap,
 say so *in the spec* so the justification survives review:

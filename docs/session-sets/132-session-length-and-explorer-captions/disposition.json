@@ -1,37 +1,30 @@
 {
   "status": "completed",
-  "summary": "Two unrelated string changes to the extension, merged into one session so a queued UI fix did not wait behind this set's research half and so both shared one expensive Layer 3 run. (1) The sidebar header now reads AI Work Explorer once. The header is COMPOSED, not stored, so the combination was found by PROBING a real workbench rather than by reading the manifest: a single-view container merges its one view into the sidebar title and joins the two names with a colon UNLESS they are identical -- observed 'AI Orch: Work Explorer' at baseline, 'AI Work Explorer: Work Explorer' when only the container title was restored (the exact Set 123 S3 defect the spec warned about), and 'AI Work Explorer' when container title, view name and contextualTitle are all one string. Layer 3 (src/test/playwright/sidebar-caption.spec.ts, new) therefore asserts the RENDERED header, not the manifest fields, which is the only assertion that can tell those three outcomes apart. (2) closeOutSummary returns an empty string for an absent projection instead of 'not computed' (operator ruling, 2026-08-14): the readiness answer renders in the same gray slot as the projection's own 'as of HH:MM' timestamp, so an empty slot already says no answer exists. Set 127 S2's rule that 'no answer' and 'nothing remains' are opposite facts survives as an ENFORCED distinction rather than a phrase -- the rewritten (not deleted) unit test asserts the absent row carries neither the phrase nor a timestamp while a settled all-met projection is dated and takes done.svg. Verification's decisive catch: round 1 found a Major sibling site I missed -- workExplorerMenuParity.test.ts, the file that calls itself 'the ONE place the shipping identity is asserted', still pinned the retired view name and would have left the whole extension suite red. My sibling sweep had searched for the container title and never for the view NAME. Fixed by more than the literal: a second test now asserts the three manifest strings are EQUAL to each other, which closes the class instead of re-arming it for the next rename. Round 2 (supplementary) clean, round 3 (remediation-review) VERIFIED with the fix accepted. Every falsifier was proven by PLANTING into the real tree, not by reading (L-112-1): reverting the view name reproduced 'AI Work Explorer: Work Explorer'; reverting the container title timed out openDabblerContainer on its aria-label selector, proving the harness-selector coupling; drifting contextualTitle failed the new equality test. The Set 123 changelog fragment claiming the container is 'AI Orch' is still PENDING in this same unreleased section, and it is a frozen migrated fragment that `changelog check` forbids editing -- so the new Set 132 fragment supersedes it by name rather than rewriting it (journaled, defer-to-existing-gate). Suites: pytest 4490 passed / 9 skipped (19.6m); mocha 1456 passing / 0 failing / 2 pending; playwright 32/32 executed and passed as a disclosed COMPOSITE -- a full run went 29/3 and all three failures passed in isolation immediately afterward (native-tree, session-plan-reveal, and the vsix-first-run-walkthrough chronic flake the spec already names as residual R2, 71s in isolation against a 300s timeout under load). No test was skipped, weakened or accepted red; the composition is journaled. The end-of-set path-aware critique is NOT run here: it is a once-per-set stage before the set-terminal close, which is Session 3.",
+  "summary": "Fixed both defects in ai_router/spec_admission.py, the authoring-time gate that enforces the per-session step cap, then re-ran on the corrected instrument the measurement Set 131 had built on the broken one. D1: the step parser capped a marker's indent at three characters, on the reasoning that '4+ spaces is a nested list in Markdown' -- true under a bullet, but under the ordinary '2. ' parent the content column is 3, which is exactly where CommonMark nests a child list, so every nested ordered list this repo's specs actually write was hoisted into the top-level count. Set 131 S1 declared six steps, nested five precedence rules under step 2, and was reported OVER CAP at eleven. Replaced by _top_level_step_starts, which resolves depth the way Markdown does -- comparing each marker's indent against the content column of the items still open above it -- keeping the indented-code-block guard for a marker with nothing open, and keeping sub-steps inside their parent's TEXT so the activity-log seed loses nothing. D2: ceremony was counted by MENTION, so 'Independence requirement. Work whose value is an independent perspective is always routed: session-verification, code review, security review' was tallied as a verification step and N was deflated. New classify_steps()/work_step_count() decide by ROLE: the first slot and the last three are the ceremony positions, a step there is ceremony only when it also NAMES the stage, everything else is work. Requiring the naming as well as the position is load-bearing for the pre-skeleton corpus -- a session that compressed its whole tail into one step is charged one ceremony step, not four -- and intents_named was deliberately left unchanged as the mention primitive check_step_shape needs at a fixed position. Corrected N is exactly what the spec asserts: Set 132 = 2/3/3, Set 131 = 2/2/2. The exit-code half was decided and shipped: --spec now exits non-zero on a failed admission, --all stays a census unless --check, journaled as goal-over-letter with the asymmetry's reason (47 legacy over-cap sessions across 31 of 131 specs would make an enforcing --all a gate that always fires). The code also records what was NOT the cause: start_session never consults the admission test, so those eleven rows would have been seeded whatever --spec returned. Evidence discipline throughout: both parsers were run over IDENTICAL rows by importing the pre-fix module from git, which showed the corpus loses 25 phantom steps in exactly five sessions, every one checked by hand (002 S4 going 6 -> 0 is correct -- that pre-skeleton spec has no step list at all, only test scenarios nested under a bullet). Falsifiers were proven by PLANTING, not by reading (L-112-1): 28 new tests, then nine defects planted back into the module, all nine caught, module restored byte-identical -- and the harness earned its keep by catching MY OWN bad plant, where changing only the regex left a second guard still refusing the paren form, so the plant had not planted the defect; it was corrected and the fixture rewritten to the real Set 023 line. The re-measurement (s2-measurement.md, 225 sessions) found the direction held but weakly (corr(N,total) +0.202 -> +0.224; corr(N,min/step) -0.191 -> -0.107) -- and found something the spec did not anticipate. Treating the p90 tail as the primary result, as the spec demanded, the tail is mostly a MEASUREMENT ARTIFACT: duration is completedAt - startedAt, elapsed CALENDAR time, and 15 of 225 sessions crossed a night. All 15 sit in the 23 longest sessions on record. p90 falls 301 -> 147 excluding them, and 311 -> 140 idle-trimmed from activity-log step stamps, robust across idle caps of 20-120 minutes with zero sessions at the structural ceiling. Call it D3; unlike D1 and D2 it is not a code defect but a defect in what the timestamps MEAN, and nothing here changes them. Refitting total = F + N*wbar on every row (OLS and Theil-Sen) gives POSITIVE fixed overhead on every measure and estimator, which removes the spec's own argument that 'constant wbar does not fit the data' -- that argument rested on an impossible F = -16 from a two-point fit on band medians, and the fits come out positive on the OLD instrument's N too, so the error was the two-point fit, not the deflated N. The cap did not move and was not asked to. Two now-false echoes of 'the longest sessions on record (591, 562, 544, 509 min)' were corrected in both places they were printed (module docstring and authoring guide) rather than left to drift (L-064-8). Verification: round 1 discovery fan-out 2/2 (gpt-5.5, spec-conformance and failure-scenario lenses) VERIFIED with 3 Minor nits, all three accuracy defects in my own prose, all three fixed before the suite ran; that staled the evidence stamp, so round 2 remediation-review was run on the fix delta -- VERIFIED, 3 fixes accepted, 0 findings. Suites, all three owed because pytest, mocha and playwright each declare ai_router/ in covers: pytest 4519 passed / 9 skipped (12m18s, up 29 on the new falsifier module); mocha 1456 passing / 0 failing / 2 pending; playwright recorded as a DISCLOSED COMPOSITE -- a full run went 30/2 and both failures passed in isolation immediately after (the same load-sensitive flakes S1 disclosed, on extension code this session does not touch), so all 32 executed and passed. No test was skipped, weakened or accepted red; the composition is journaled. Named residuals, decided rather than overlooked: --all's SIZE check still ignores set status while the SHAPE check scopes itself to unstarted sets on the operator's Set 128 ruling, which is a real inconsistency left alone because fixing it would change passed semantics on ratified scoping; and start_session still consults no admission test at all.   The end-of-set path-aware critique is NOT run here -- it is a once-per-set stage before the set-terminal close, which is Session 3. Round 3 raised two Minor nits, both adjudicated at the round cap (1 discovery + 2 remediation-reviews is the machine-enforced bound) and both addressed without another round because they live in freshness-exempt bookkeeping files. (a) The Playwright test-runs.jsonl row carried no `detail` disclosing the composite; all three suite rows were re-recorded with a detail line, so the ledger now discloses the composition where a reader meets it rather than only in this disposition and decisions.jsonl. (b) decisions.jsonl still says '50 legacy over-cap sessions' where every shipping surface now says 47 across 31 specs. That entry is left BYTE-IDENTICAL on purpose: it is an append-only record of a decision as it was actually made, and both numbers are true of different instruments -- 50 is the pre-fix count without a declared exception, 47 is the post-fix one. Rewriting a journaled decision to match a later recount would make the audit trail agree with the present at the cost of no longer recording the past, which is the opposite of what the journal is for. The reconciliation is stated here instead.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
+    "ai_router/changelog.d/0140-set-132-s2-the-instrument-that-counted-wrong.md",
+    "ai_router/spec_admission.py",
+    "ai_router/tests/test_spec_admission.py",
+    "ai_router/tests/test_spec_admission_step_counting.py",
+    "docs/planning/session-set-authoring-guide.md",
     "docs/session-sets/132-session-length-and-explorer-captions/activity-log.json",
     "docs/session-sets/132-session-length-and-explorer-captions/checklist-posts.jsonl",
     "docs/session-sets/132-session-length-and-explorer-captions/decisions.jsonl",
     "docs/session-sets/132-session-length-and-explorer-captions/disposition.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-acceptance-round-1.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-conventions.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-issues.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-remediation-round-1.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-rounds.jsonl",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification-fanout-2.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification-round-2.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification-round-3.md",
-    "docs/session-sets/132-session-length-and-explorer-captions/s1-verification.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-conventions.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-next-orchestrator-routed.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-rounds.jsonl",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification-fanout-2.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification-round-2.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification-round-3.md",
+    "docs/session-sets/132-session-length-and-explorer-captions/s2-verification.md",
     "docs/session-sets/132-session-length-and-explorer-captions/session-events.jsonl",
     "docs/session-sets/132-session-length-and-explorer-captions/session-state.json",
-    "docs/session-sets/132-session-length-and-explorer-captions/test-runs.jsonl",
-    "tools/dabbler-ai-orchestration/README.md",
-    "tools/dabbler-ai-orchestration/changelog.d/0130-set-132-s1-changed.md",
-    "tools/dabbler-ai-orchestration/dist/extension.js",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/src/providers/workExplorerTreeModel.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/electronLaunch.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/sidebar-caption.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/work-explorer-steps.spec.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerMenuParity.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/suite/workExplorerTreeModel.test.ts"
+    "docs/session-sets/132-session-length-and-explorer-captions/test-runs.jsonl"
   ],
   "next_orchestrator": {
     "engine": "github-copilot",
@@ -40,29 +33,29 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 fixes ai_router/spec_admission.py -- the parser that hoists nested ordered lists into top-level steps (D1) and classifies ceremony by mention rather than role (D2) -- and then re-runs the Set 131 measurement on the corrected instrument. It shares no file with Session 1, so there is no continuity of code context to preserve, but it is careful reasoning over a gate that the spec deliberately makes MORE permissive, which is the case for keeping a high-effort orchestrator rather than trading down. The one thing to carry forward is this session's lesson, not its code: sweep for every string a rename moves, not just the one named in the spec, and run the full owning suite rather than the module's own file."
+      "specifics": "Routed to gpt-5.5 with anthropic excluded so the advice could not be self-interested (s2-next-orchestrator-routed.md, verbatim; the router's own verify pass by gemini-3.1-pro-preview returned VERIFIED). Its reasoning: keep the current orchestrator for continuity through the set-terminal policy session and do not make a cost-driven downgrade, because this repo's measured lever is compaction, not model substitution. Preserve adjudication independence by running Session 3's causal-design panel and its cross-provider verification on OpenAI and Gemini, so the Anthropic orchestrator is not judging its own provider's critique. Session 3 is mostly canonical workflow/policy writing plus careful causal framing, where continuity from this session's corrected measurement and its restatement of the tail question matters more than changing models."
     }
   },
   "blockers": [],
   "lessons_cited": [
-    "L-069-1",
     "L-112-1",
     "L-064-8",
-    "L-064-9"
+    "L-064-9",
+    "L-079-1"
   ],
   "cost": {
     "components": [
       {
         "component": "orchestrator_seat",
         "status": "lower_bound",
-        "credits": 1637.1693,
-        "usd": 16.371693,
-        "event_count": 134,
+        "credits": 2244.77345,
+        "usd": 22.447734500000003,
+        "event_count": 160,
         "session_ids": [
-          "4771184e-ac47-482b-9c0e-652c6759cfbd"
+          "e9e541c3-35e3-4b56-b619-ca7d78acd763"
         ],
         "measured_session_ids": [
-          "4771184e-ac47-482b-9c0e-652c6759cfbd"
+          "e9e541c3-35e3-4b56-b619-ca7d78acd763"
         ],
         "unmeasured_session_ids": [],
         "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
@@ -70,20 +63,18 @@
       {
         "component": "routed_seat",
         "status": "measured",
-        "credits": 628.3883,
-        "usd": 6.283882999999999,
-        "event_count": 64,
+        "credits": 315.945,
+        "usd": 3.15945,
+        "event_count": 25,
         "session_ids": [
-          "57262972-2591-4a8d-b25f-98a62c77b9ca",
-          "7bad32e0-014f-4332-850d-42c46f42eec0",
-          "d14c57a0-187d-4370-9fda-ec64db84414b",
-          "9ddba796-2007-41a6-b0b2-441ac39636a1"
+          "dd668f75-4743-4e1f-b11f-29d8d37df75a",
+          "6ecf408d-9271-4437-a1b3-e2ea5a81c968",
+          "3bda8cb3-2f3d-492c-b352-958b9fe954ca"
         ],
         "measured_session_ids": [
-          "57262972-2591-4a8d-b25f-98a62c77b9ca",
-          "7bad32e0-014f-4332-850d-42c46f42eec0",
-          "d14c57a0-187d-4370-9fda-ec64db84414b",
-          "9ddba796-2007-41a6-b0b2-441ac39636a1"
+          "dd668f75-4743-4e1f-b11f-29d8d37df75a",
+          "6ecf408d-9271-4437-a1b3-e2ea5a81c968",
+          "3bda8cb3-2f3d-492c-b352-958b9fe954ca"
         ],
         "unmeasured_session_ids": [],
         "reason": null
@@ -101,8 +92,8 @@
       }
     ],
     "total_status": "lower_bound",
-    "total_credits": 2265.5576,
-    "total_usd": 22.655576,
+    "total_credits": 2560.7184500000003,
+    "total_usd": 25.607184500000002,
     "unmeasured": [],
     "store_schema_version": 6,
     "measured_at": "close"

@@ -1,8 +1,9 @@
 """Authoring-time session admission test: size (Set 111 S4) and shape (Set 128 S1).
 
 **Who uses this:** a spec author, before a set starts —
-``python -m ai_router.spec_admission --spec docs/session-sets/<slug>/spec.md``.
-Also runnable across every spec (``--all``) as a CI-friendly report.
+``python -m ai_router.spec_admission --spec docs/session-sets/<slug>/spec.md``,
+which exits non-zero if that spec fails. Also runnable across every spec
+(``--all``) as a census, with ``--check`` to make the census a gate.
 **See also:** ``docs/planning/session-set-authoring-guide.md`` →
 *Sizing a session set* (the prose this check enforces); ``spec_config.py``
 (the configuration-block parser, a different concern).
@@ -49,23 +50,62 @@ rather than a re-count). So :data:`DEFAULT_MAX_STEPS` = **7** — four
 baked-in ceremony steps plus three authored ones — and it is a tripwire
 the author answers at authoring time.
 
+Both measurements above were taken with the parser this module shipped
+with, which hoisted nested ordered lists into the step count (D1) and
+charged any step *mentioning* a stage as ceremony (D2). Set 132 S2 fixed
+both and re-ran the probe over 225 sessions: N rose in 40% of them, the
+median still steps up between ``N = 3`` and ``N = 4-5``, and the cap did
+not move. The re-run's own headline is in the next section.
+
 What this check does NOT claim
 ------------------------------
-Step count predicts the **median**, not the **tail**. The longest sessions
-on record (591, 562, 544, 509 min) all declared 5-8 steps — within or
-barely over the cap. Something other than step count drives the tail, and
-this check does not pretend to catch it; a session can pass the admission
-test and still run long. Treating a green result as a promise of a short
-session is a misreading. It is a floor on obvious oversizing, nothing more.
+Step count predicts the **median**, not the **tail**; a session can pass
+the admission test and still run long, and treating a green result as a
+promise of a short session is a misreading. It is a floor on obvious
+oversizing, nothing more.
 
-Reporting, not blocking, by default
------------------------------------
-``--check`` exits non-zero so CI or a pre-commit hook can gate on it.
-Without it the CLI reports and exits 0. An author who has a real reason to
-exceed the cap records it in the spec with an explicit
-``sessionSizeException:`` line naming the session number and the reason
-(see :func:`parse_size_exceptions`) — the exception is *declared in the
-spec*, so it survives review, rather than being argued at hour three.
+**Set 132 S2 re-measured this on the fixed parser and corrected two
+claims that used to stand here.** The first was a list of "the longest
+sessions on record (591, 562, 544, 509 min)". There are longer ones
+(1498, 1414, 1028, 934), and three of those four original figures belong
+to sessions that were registered on one day and closed the next. Duration
+is ``completedAt - startedAt``, which is elapsed *calendar* time: 15 of
+225 sessions crossed a night, **all 15 sit in the 23 longest**, and
+excluding them takes the population p90 from 301 to 147 minutes. So the
+second corrected claim is the framing itself — most of the "tail" this
+check disclaims responsibility for was sleep, not work. The disclaimer
+stands; the numbers behind it did not.
+
+Full method, tables and caveats:
+``docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md``.
+
+Reporting or blocking, by mode (Set 132 S2)
+-------------------------------------------
+``--spec <path>`` **exits non-zero** when that spec fails admission. It
+names one spec, which the caller is authoring and wants a verdict on, and
+a command whose whole purpose is an admission test must not print
+``OVER CAP`` and return success — which is what it used to do.
+
+``--all`` stays a **census** and exits 0 unless ``--check`` is passed,
+because the sweep reads a corpus that is mostly history nobody is
+authoring: **47 sessions across 31 of this repo's 131 specs** are over cap
+with no declared exception, so an enforcing default would be a gate that
+always fires, and a gate that always fires is ignored. ``--check`` means
+"enforce" in either mode.
+
+Do not read the old exit code as the cause of the Set 131 incident. Its
+Session 1 was reported ``OVER CAP`` (wrongly — see
+:func:`_top_level_step_starts`) and its eleven mis-parsed steps were
+seeded into ``activity-log.json`` anyway, but not because the command
+returned 0: ``start_session`` does not consult this admission test at all,
+so those rows would have been seeded whatever it returned. The parse was
+the defect. The exit code is a separate, smaller honesty fix.
+
+An author who has a real reason to exceed the cap records it in the spec
+with an explicit ``sessionSizeException:`` line naming the session number
+and the reason (see :func:`parse_size_exceptions`) — the exception is
+*declared in the spec*, so it survives review, rather than being argued at
+hour three.
 
 The step SHAPE, beside the step count (Set 128 S1)
 ---------------------------------------------------
@@ -106,6 +146,25 @@ work step that merely *describes* verification and a full suite (this
 module's own set spec has one) is prose, not ceremony; a work step that
 *orders* an early full suite is an A2 ordering concern owned by Set 128
 Session 2, not a shape concern.
+
+What a step IS, and what it merely mentions (Set 132 S2)
+---------------------------------------------------------
+The skeleton is also what makes ``N`` — the authored work-step count the
+budget is about — computable, and getting that wrong was the second of
+the two defects this module shipped with. Ceremony was being counted by
+**mention**: any step containing "verification", "register" or "close"
+was charged as ceremony, so a work step reading *"Independence
+requirement. Work whose value is an independent perspective is always
+routed: session-verification, code review, security review"* was tallied
+as a verification step, and every N built on that was deflated.
+
+:func:`classify_steps` decides the question the way the skeleton already
+poses it — by **role**: the first slot and the last three are the ceremony
+positions, a step in one of them is ceremony when it also names the stage
+it stands for, and everything else is work no matter which stage it
+discusses. :func:`intents_named` is left as what it always was, a mention
+primitive, which is the right test at a fixed position and the wrong one
+anywhere else.
 
 Requires restructuring, or an informational note
 ------------------------------------------------
@@ -160,10 +219,32 @@ _SESSION_HEAD_RE = re.compile(
     re.MULTILINE,
 )
 
-# A top-level ordered step. Indented list items (sub-steps) are excluded by
-# capping the leading whitespace at 3 characters — 4+ spaces is a nested
-# list in Markdown.
-_STEP_RE = re.compile(r"^\s{0,3}(\d+)\.\s+\S", re.MULTILINE)
+# Any list marker — ordered (``1.``) or bullet — with its indentation and
+# the run of spaces after it. Nesting is NOT decided by this pattern: it
+# deliberately matches at any depth, because capping the indent was the D1
+# defect, not the fix. See :func:`_top_level_step_starts` for how depth is
+# actually resolved.
+#
+# The lookahead for a non-space character is what keeps ``---`` (a
+# horizontal rule), ``**Steps:**`` and ``*emphasis*`` out: each needs a
+# space between the marker and its content to be a list item at all.
+#
+# ``1)`` is a legal CommonMark ordered marker and is still deliberately not
+# one here. Four specs in this repo wrap a sentence onto a line beginning
+# ``023) that clamps the union to ...``; admitting the paren form would
+# turn those continuations into list items and inflate the very count this
+# fix exists to correct.
+_LIST_MARKER_RE = re.compile(r"^([ \t]*)(\d+\.|[-*+])([ \t]+)(?=\S)")
+
+# A marker indented this far with no enclosing list item above it is a
+# Markdown *indented code block*, not a step. Four spaces is the code-block
+# threshold, so 3 is the last column a bare top-level marker can start in.
+_MAX_TOP_LEVEL_INDENT = 3
+
+# Tab width used when measuring indentation. Markdown treats a tab as
+# advancing to the next 4-column stop; specs in this repo use spaces, so
+# this only ever matters for a hand-typed outlier.
+_TAB_WIDTH = 4
 
 # A fenced code block. Steps inside a fence are documentation samples (the
 # authoring guide's own spec template is a fenced block full of numbered
@@ -190,6 +271,10 @@ REGISTER = "register"
 VERIFICATION = "cross-provider verification"
 FULL_SUITE = "required portion of the full test suite"
 CLOSE_OUT = "close-out"
+
+# The role of every step that is not one of the four ceremony slots: the
+# session's authored work, which is what WORK_STEP_BUDGET budgets.
+WORK = "work"
 
 _INTENT_RE: Dict[str, Tuple[re.Pattern[str], ...]] = {
     REGISTER: (
@@ -265,6 +350,16 @@ class SessionPlan:
     step_count: int
     steps: Tuple[str, ...] = ()
 
+    @property
+    def work_step_count(self) -> int:
+        """N: the authored work steps, i.e. everything but the ceremony.
+
+        Derived rather than stored so it cannot drift from ``steps``, and
+        a property rather than a field so a consumer-repo caller that
+        constructs a ``SessionPlan`` positionally keeps working.
+        """
+        return work_step_count(self.steps)
+
 
 @dataclass(frozen=True)
 class ShapeFinding:
@@ -290,17 +385,88 @@ class ShapeFinding:
 
 
 def intents_named(step_text: str) -> Tuple[str, ...]:
-    """Return every skeleton intent *step_text* names, in a stable order.
+    """Return every skeleton intent *step_text* **mentions**, in a stable order.
 
-    A step naming more than one tail intent is the compression this check
-    exists to make unwriteable; returning the whole set (rather than a
-    first match) is what lets the caller say so.
+    This is a mention primitive, not a classifier, and Set 132 S2 (defect
+    D2) is the reason the distinction is spelled out here. Mention is
+    exactly the right test at a skeleton *position* — :func:`check_step_shape`
+    asks "does the step in the close-out slot say close-out?" — and exactly
+    the wrong test everywhere else, because a work step that *references* a
+    stage names it just as plainly as one that *is* that stage. Run against
+    Set 132's own spec, this function tags "Remove ``not computed`` from the
+    close-out readiness row", "classify ceremony by role, not by mention"
+    and "Design the causal question, with a cross-provider panel" — three of
+    eight work steps, misread on the words they quote.
+
+    Whether a step *is* ceremony is a question about its role in the
+    skeleton, and :func:`classify_steps` is the function that answers it.
+
+    A step naming more than one tail intent is the compression
+    :func:`check_step_shape` exists to make unwriteable; returning the whole
+    set (rather than a first match) is what lets the caller say so.
     """
     return tuple(
         intent
         for intent in (REGISTER, VERIFICATION, FULL_SUITE, CLOSE_OUT)
         if any(p.search(step_text) for p in _INTENT_RE[intent])
     )
+
+
+def classify_steps(steps: Sequence[str]) -> Tuple[str, ...]:
+    """Return each step's **role**: one skeleton intent, or :data:`WORK`.
+
+    Set 132 S2 (defect D2). Counting ceremony by mention deflated N — the
+    authored work-step count the budget is actually about — for every
+    session containing a work step that discussed verification,
+    registration or close-out. The measurement that motivated this set was
+    built on that deflated N, so no causal claim could rest on it.
+
+    Ceremony is a **role the skeleton assigns by position**, confirmed by
+    naming: the first step is the register slot, the last three are the
+    verification / full-suite / close-out tail, and a step in one of those
+    slots is ceremony only when it also names the stage it stands for.
+    Everything else is the session's authored work, however much of a
+    stage it happens to discuss.
+
+    Requiring the naming as well as the position is what keeps this
+    honest on the specs that predate the skeleton (Set 128). Those
+    sessions routinely compress the tail — Set 127 S2 wrote
+    "Full pytest ... recorded as runs of record; verify; close." as one
+    step — and a position-only rule would charge such a session for four
+    ceremony steps it never declared, understating N by two. Here the
+    compressed step is ceremony, the two work steps beside it are work,
+    and N comes out right.
+
+    The tail is aligned to the **end** of the plan rather than counted
+    forward, so a session shorter than the skeleton still gets close-out
+    in its last slot instead of an off-by-one. Position 0 is only ever the
+    register slot.
+    """
+    total = len(steps)
+    roles: List[str] = []
+    for index, text in enumerate(steps):
+        named = intents_named(text)
+        if index == 0:
+            roles.append(REGISTER if REGISTER in named else WORK)
+            continue
+        from_end = total - index
+        if from_end > len(TAIL_INTENTS):
+            roles.append(WORK)
+            continue
+        expected = TAIL_INTENTS[-from_end]
+        tail_named = [intent for intent in named if intent in TAIL_INTENTS]
+        if expected in tail_named:
+            roles.append(expected)
+        elif tail_named:
+            roles.append(tail_named[0])
+        else:
+            roles.append(WORK)
+    return tuple(roles)
+
+
+def work_step_count(steps: Sequence[str]) -> int:
+    """Return N: how many of *steps* are the session's authored work."""
+    return sum(1 for role in classify_steps(steps) if role == WORK)
 
 
 def _describe(intents: Sequence[str]) -> str:
@@ -484,6 +650,70 @@ def parse_size_exceptions(text: str) -> Dict[int, str]:
     return out
 
 
+def _top_level_step_starts(segment: str) -> List[int]:
+    """Return the offset of each **top-level** ordered marker in *segment*.
+
+    Set 132 S2 (defect D1). The old rule was a leading-whitespace cap of
+    three characters, on the reasoning that "4+ spaces is a nested list in
+    Markdown". That is true only under a *bullet*: a list item's content
+    begins at ``indent + len(marker) + len(spaces)``, so under the ordinary
+    ``2. `` parent the content column is **3**, and CommonMark nests a
+    child list at exactly that column. Every nested ordered list this
+    repo's specs actually write therefore sat at indent 3 and was hoisted
+    to top level. Set 131's Session 1 declared six steps, nested five
+    precedence rules under step 2, and was counted as **eleven** — reported
+    ``OVER CAP`` against a spec that was inside the budget, and seeded into
+    ``activity-log.json`` as five plan rows that could never be logged as
+    steps in their own right.
+
+    So depth is resolved the way Markdown resolves it, by comparing a
+    marker's indent against the content column of the items still open
+    above it:
+
+    * a marker indented **at or past** the innermost open item's content
+      column is inside that item — a sub-step, never counted;
+    * a marker indented **before** it closes that item, and the test
+      repeats against the item above;
+    * a marker left with nothing open is top level.
+
+    Two rules keep the scan honest at the edges. A non-blank line starting
+    in column 0 that is not itself a marker ends every open list, which is
+    how a Markdown list ends and is already how :func:`parse_step_texts`
+    decides where a step's text stops. And a marker indented four or more
+    columns with nothing open is an indented code block rather than a
+    step — the one case the old whitespace cap got right, kept.
+
+    Bullets participate in the nesting stack (an ordered list nested under
+    a bullet is a sub-step too) but are never returned: only an ordered
+    marker can be a step.
+    """
+    starts: List[int] = []
+    open_content_cols: List[int] = []
+    offset = 0
+    for line in segment.split("\n"):
+        line_start = offset
+        offset += len(line) + 1
+        match = _LIST_MARKER_RE.match(line)
+        if match is None:
+            if line.strip() and not line[:1].isspace():
+                open_content_cols.clear()
+            continue
+        indent = len(match.group(1).expandtabs(_TAB_WIDTH))
+        while open_content_cols and indent < open_content_cols[-1]:
+            open_content_cols.pop()
+        depth = len(open_content_cols)
+        marker = match.group(2)
+        spaces = len(match.group(3).expandtabs(_TAB_WIDTH))
+        open_content_cols.append(indent + len(marker) + spaces)
+        if (
+            depth == 0
+            and indent <= _MAX_TOP_LEVEL_INDENT
+            and marker.endswith(".")
+        ):
+            starts.append(line_start)
+    return starts
+
+
 def parse_step_texts(segment: str) -> List[str]:
     """Return the text of each top-level step in a session's *segment*.
 
@@ -494,22 +724,18 @@ def parse_step_texts(segment: str) -> List[str]:
     the primitive and :func:`parse_session_plans` counts what it finds —
     the two cannot disagree about what a step is.
 
-    A step runs from its ``N.`` marker to the next one, and ends early at
-    the first following line that starts in **column 0** — that is how a
-    Markdown list ends, and it is what keeps the ``**Creates:**`` /
-    ``**Touches:**`` trailer out of the last step's text. Continuation
-    lines and nested bullets (all indented) stay with their step.
-    Internal whitespace is collapsed to single spaces so the result is
-    one line fit for a log entry's description.
-
-    Spans are cut at the marker's own **line start**, not at
-    ``match.start()``: ``_STEP_RE``'s leading ``\\s{0,3}`` can consume the
-    preceding newline, so a step introduced by a blank line matches from
-    that blank line. Counting never noticed (the match count is the
-    same); slicing did — the first step of every session came out empty.
+    A step runs from its marker to the next **top-level** one
+    (:func:`_top_level_step_starts` decides which markers those are), and
+    ends early at the first following line that starts in **column 0** —
+    that is how a Markdown list ends, and it is what keeps the
+    ``**Creates:**`` / ``**Touches:**`` trailer out of the last step's
+    text. Continuation lines, nested bullets and nested ordered sub-steps
+    (all indented) stay with their step, which is the point of the Set 132
+    S2 fix: a sub-step is part of what its parent step says, not a step
+    beside it. Internal whitespace is collapsed to single spaces so the
+    result is one line fit for a log entry's description.
     """
-    marks = list(_STEP_RE.finditer(segment))
-    bounds = [segment.rfind("\n", 0, m.start(1)) + 1 for m in marks]
+    bounds = _top_level_step_starts(segment)
     texts: List[str] = []
     for i, start in enumerate(bounds):
         end = bounds[i + 1] if i + 1 < len(bounds) else len(segment)
@@ -647,7 +873,8 @@ def format_report(result: SpecAdmission) -> str:
             mark = "[ok]"
         title = _ascii_safe(plan.title)[:52]
         lines.append(
-            f"  {mark:<4} Session {plan.number}: {plan.step_count} steps  {title}"
+            f"  {mark:<4} Session {plan.number}: {plan.step_count} steps "
+            f"(N={plan.work_step_count})  {title}"
         )
     for plan in result.excepted:
         lines.append(
@@ -728,7 +955,8 @@ def build_parser() -> argparse.ArgumentParser:
         "--check",
         action="store_true",
         help="Exit non-zero when any session exceeds the cap without a "
-        "declared exception.",
+        "declared exception. Implied by --spec, which enforces by default; "
+        "for --all it is the opt-in that turns the census into a gate.",
     )
     return p
 
@@ -796,7 +1024,23 @@ def run(argv: Optional[Sequence[str]] = None) -> int:
         for r in results:
             print(format_report(r))
 
-    if args.check and any(not r.passed for r in results):
+    # Set 132 S2, journaled: --spec names ONE spec, which the caller is
+    # authoring and wants a verdict on, so it enforces by default the way
+    # any linter does. --all sweeps a corpus that is mostly history the
+    # caller is not authoring -- 47 sessions across 31 of this repo's 131
+    # specs are over cap with no declared exception -- so an enforcing
+    # default there would be a gate that always fires, which proves
+    # nothing (L-112-1, inverted). --check still means "enforce" in both
+    # modes.
+    #
+    # Worth recording because it was the obvious suspect and it is wrong:
+    # the exit code was never the control that failed when Set 131's
+    # Session 1 was reported OVER CAP and its eleven mis-parsed steps were
+    # seeded anyway. `start_session` does not consult this module's
+    # admission test at all, so those rows would have been seeded whatever
+    # --spec returned. The parse was the defect; the exit code is a
+    # separate, smaller honesty fix.
+    if (args.check or not args.all) and any(not r.passed for r in results):
         return 1
     return 0
 
@@ -817,12 +1061,14 @@ __all__ = [
     "REGISTER",
     "TAIL_INTENTS",
     "VERIFICATION",
+    "WORK",
     "WORK_STEP_BUDGET",
     "SessionPlan",
     "ShapeFinding",
     "SpecAdmission",
     "check_spec",
     "check_step_shape",
+    "classify_steps",
     "format_report",
     "intents_named",
     "load_max_steps",
@@ -830,6 +1076,7 @@ __all__ = [
     "parse_size_exceptions",
     "parse_step_texts",
     "resolve_set_status",
+    "work_step_count",
     "main",
     "run",
 ]

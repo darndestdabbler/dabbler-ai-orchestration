@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Two captions, said plainly",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T12:41:40.611993-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T13:55:33.419498-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -19,7 +19,7 @@
           "4771184e-ac47-482b-9c0e-652c6759cfbd"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

@@ -57,7 +57,11 @@ the SessionLog class:
 
 __version__ = "1.0.0"
 
-from .config import load_config, resolve_generation_params
+from .config import (
+    INDEPENDENCE_REQUIRED_TASK_TYPES,
+    load_config,
+    resolve_generation_params,
+)
 from .models import estimate_complexity, pick_model
 from .providers import call_model
 from .call_trace import HttpCall, trace_provider_calls, record_http_request
@@ -817,17 +821,30 @@ def _route_via_copilot_cli(
     )
     if model_id is None:
         if exclusion:
+            if task_type == SESSION_VERIFICATION_TASK_TYPE:
+                _seat_remedy = (
+                    "This is the hard verification_unavailable outcome — "
+                    "no verdict is written and the close stays blocked. "
+                    "The sanctioned resolution is the operator-attested "
+                    "manual path: close_session --manual-verify with an "
+                    "attestation naming the verifying surface, model, "
+                    "effective provider, template used, timestamp, and "
+                    "raw artifact."
+                )
+            else:
+                _seat_remedy = (
+                    f"{task_type!r} is in the independence floor "
+                    "(Delegation Discipline rule 2), so it may not run on "
+                    "the orchestrator's own effective provider. Confirm a "
+                    "catalog entry from a different provider, or have the "
+                    "orchestrator do the work directly and record that it "
+                    "is NOT an independent review."
+                )
             raise VerificationUnavailableError(
                 f"copilot-cli profile: no confirmed catalog entry "
                 f"resolves to a provider outside the exclusion "
                 f"{sorted(exclusion)!r} (the session orchestrator's "
-                f"effective provider): {failure_reason}. This is the "
-                "hard verification_unavailable outcome — no verdict is "
-                "written and the close stays blocked. The sanctioned "
-                "resolution is the operator-attested manual path: "
-                "close_session --manual-verify with an attestation "
-                "naming the verifying surface, model, effective "
-                "provider, template used, timestamp, and raw artifact."
+                f"effective provider): {failure_reason}. {_seat_remedy}"
             )
         raise CopilotCliRoutingError(
             f"copilot-cli profile: could not resolve a generator role: "
@@ -1218,21 +1235,34 @@ def route(
 
     _init()
 
-    # Set 084 (F2): dynamic verifier exclusion. A session-verification
-    # call that carries session context ALWAYS resolves the session
-    # orchestrator's EFFECTIVE provider (registry lookup on the
-    # orchestrator block's model — orchestrator_identity) and excludes
-    # it from selection, replacing the static task_type_overrides pin
-    # as the cross-provider guarantee. route() applies this itself so a
-    # bare call and the verify_session CLI cannot diverge. A
-    # caller-supplied exclude_providers is UNIONED with the
+    # Set 084 (F2): dynamic verifier exclusion. A call that carries session
+    # context ALWAYS resolves the session orchestrator's EFFECTIVE provider
+    # (registry lookup on the orchestrator block's model —
+    # orchestrator_identity) and excludes it from selection, replacing the
+    # static task_type_overrides pin as the cross-provider guarantee. route()
+    # applies this itself so a bare call and the verify_session CLI cannot
+    # diverge. A caller-supplied exclude_providers is UNIONED with the
     # session-derived exclusion, never substituted for it (R1
     # remediation I-084-S1-3: an explicit list that omitted the
     # orchestrator's provider would reopen same-provider verification
     # at the bare API boundary). Unresolvable identity FAILS CLOSED
-    # (IdentityResolutionError) — never a verification whose exclusion
+    # (IdentityResolutionError) — never a review whose exclusion
     # target is unknown.
-    if task_type == SESSION_VERIFICATION_TASK_TYPE and session_set:
+    #
+    # Set 131 S1: the gate is the WHOLE independence set, not
+    # session-verification alone. Precedence rule 2 of Delegation Discipline
+    # says work whose value IS an independent perspective must run on a
+    # different effective provider, and it names three task types. While
+    # this read `== SESSION_VERIFICATION_TASK_TYPE`, the shipped
+    # `code-review: sonnet` pin meant an Anthropic orchestrator routing a
+    # mandatory code-review got an Anthropic reviewer — a same-provider
+    # "independent" review on the normal supported path. The doc claimed an
+    # enforcement the code did not have (L-064-8), and both discovery
+    # lenses found it independently. pick_model already treats an exclusion
+    # as a hard constraint that outranks the pin, and the copilot-cli body
+    # applies it against the seat catalog, so widening the DERIVATION is the
+    # whole fix.
+    if task_type in INDEPENDENCE_REQUIRED_TASK_TYPES and session_set:
         identity = resolve_session_orchestrator_identity(
             session_set, session_number
         )
@@ -1253,7 +1283,27 @@ def route(
         # project's own resolved answer plus the machine's actual key set
         # can produce it, and it stays loud when it does.
         _precondition = _direct_api_precondition(identity.effective_provider)
-        if _precondition is not None and _precondition.degraded:
+        # Set 131 S1: the degradation carve-out stays scoped to
+        # session-verification, which is the ONLY task type the operator
+        # authorized it for (2026-08-11, journaled to Set 123's
+        # decisions.jsonl AS A VERIFICATION-REDUCTION). Widening the
+        # independence guard to code-review and security-review would
+        # otherwise have carried this permission along with it, silently
+        # extending an operator-authorized reduction to two task types the
+        # operator never ruled on -- which is the hard carve-out the
+        # orchestrator may never self-authorize. Round-3 remediation-review
+        # finding; the reviewer also noted the first fix's tests patched
+        # this branch out entirely, so it now has its own falsifiers.
+        #
+        # For the other two floor task types the exclusion STANDS, no model
+        # survives, and the call fails closed -- which is exactly what the
+        # workflow doc promises.
+        _degradation_authorized = (
+            _precondition is not None
+            and _precondition.degraded
+            and task_type == SESSION_VERIFICATION_TASK_TYPE
+        )
+        if _degradation_authorized:
             print(
                 "[dabbler] WARNING: same-provider verification. This "
                 f"project's verify type is {DIRECT_API_VERIFY_TYPE} but "
@@ -1274,7 +1324,7 @@ def route(
             }
             | ({_verifier_exclusion} if _verifier_exclusion else set())
         )
-        if _precondition is not None and _precondition.degraded:
+        if _degradation_authorized:
             # The caller's own list must not silently re-impose what the
             # router just lifted. verify_session passes the orchestrator's
             # provider explicitly (it computes the same exclusion for its
@@ -1334,16 +1384,31 @@ def route(
         prefer_model=prefer_model,
     )
     if model_name is None:
+        if task_type == SESSION_VERIFICATION_TASK_TYPE:
+            _no_candidate_remedy = (
+                "This is the hard verification_unavailable outcome — no "
+                "verdict is written and the close stays blocked. The "
+                "sanctioned resolution is the operator-attested manual "
+                "path: close_session --manual-verify with an attestation "
+                "naming the verifying surface, model, effective provider, "
+                "template used, timestamp, and raw artifact."
+            )
+        else:
+            # Set 131 S1: independence work fails CLOSED rather than
+            # quietly falling back to the orchestrator's own provider.
+            _no_candidate_remedy = (
+                f"{task_type!r} is in the independence floor "
+                "(Delegation Discipline rule 2), so it may not run on the "
+                "orchestrator's own effective provider. Enable a model "
+                "from a different provider, or have the orchestrator do "
+                "the work directly and record that it is NOT an "
+                "independent review."
+            )
         raise VerificationUnavailableError(
             f"no enabled model in router-config.yaml survives the "
             f"provider exclusion {sorted(set(exclude_providers or []))!r} "
-            f"(task_type={task_type!r}, max_tier={max_tier}). This is "
-            "the hard verification_unavailable outcome — no verdict is "
-            "written and the close stays blocked. The sanctioned "
-            "resolution is the operator-attested manual path: "
-            "close_session --manual-verify with an attestation naming "
-            "the verifying surface, model, effective provider, template "
-            "used, timestamp, and raw artifact."
+            f"(task_type={task_type!r}, max_tier={max_tier}). "
+            f"{_no_candidate_remedy}"
         )
     model_cfg = _config["models"][model_name]
 

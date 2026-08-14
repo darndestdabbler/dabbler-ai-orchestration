@@ -565,11 +565,19 @@ models:
 routing:
   # outsourcing_mode: controls when cross-provider calls are made.
   # whenever-helpful (default) | verification-only | disabled
-  # Temporary operator policy (2026-08-05): for Set 110 Session 4 and Sets
-  # 111-112, the active orchestrator owns implementation and architecture.
-  # Only session-verification is outsourced; Set 111 is expected to revisit
-  # the routing rules after its verification-loop simplification.
-  outsourcing_mode: verification-only
+  #
+  # Set 131 S1 restored the default. The 2026-08-05 operator policy pinned
+  # this to verification-only "until Set 111 revisits the routing rules";
+  # Set 111 shipped the decision-rights rubric and never lifted the pin, so
+  # a three-set window silently became twenty sets of policy. Temporary
+  # narrowings now carry the set that OWNS THEIR REMOVAL in the comment,
+  # and Set 131 Session 1 is the set that owned this line.
+  #
+  # This value does NOT widen authority. The decision-rights rubric and the
+  # verification-reduction carve-out are evaluated BEFORE any delegation
+  # rule; see docs/ai-led-session-workflow.md "Delegation Discipline" for
+  # the precedence order, which is a contract rather than a preference.
+  outsourcing_mode: whenever-helpful
   tier1_max_complexity: 30    # score ≤ 30 → tier 1 (Flash)
   tier2_max_complexity: 65    # score 31–65 → tier 2 (Pro or Sonnet)
   default_tier: 2             # fallback when estimation is uncertain
@@ -650,15 +658,98 @@ routing:
     spec-title-extraction: gemini-flash
 
 # --- Delegation ---
-# Guidance for orchestrators (Claude Code / Codex / Gemini) on which
-# task types must always go through route() rather than being handled
-# directly. The orchestrator reads this list at session start.
+# Guidance for orchestrators (Claude Code / Codex / Gemini) on which task
+# types must always go through route() rather than being handled directly,
+# and on what it costs to decide either way. The orchestrator reads this
+# block at session start. Canonical prose, including the PRECEDENCE ORDER
+# that makes these keys safe to read in isolation:
+# docs/ai-led-session-workflow.md -> "Delegation Discipline".
 delegation:
-  # Temporary operator policy (2026-08-05): implementation, architecture,
-  # analysis, documentation, and test authoring stay with the orchestrator.
-  # The list is intentionally verification-only until Set 111 changes it.
+  # Work whose VALUE IS an independent perspective. These are not "expensive
+  # tasks" -- they are tasks where the orchestrator doing them destroys the
+  # thing being bought. Routing is mandatory and the effective provider must
+  # differ from the orchestrator's.
+  #
+  # Set 131 S1: that provider requirement is ENFORCED, for all three, by
+  # route() -- a call carrying session context resolves the orchestrator's
+  # effective provider (registry lookup, ai_router/orchestrator_identity.py)
+  # and excludes it from selection on both transports. The task_type_overrides
+  # pin below is a PREFERENCE only and loses to the exclusion. Before Set 131
+  # the exclusion was derived for session-verification alone, so the
+  # `code-review: sonnet` pin handed an Anthropic orchestrator an Anthropic
+  # reviewer.
+  #
+  # This list is a FLOOR, not a free field. load_config() unions
+  # config.INDEPENDENCE_REQUIRED_TASK_TYPES into whatever the file says, so
+  # deleting an entry here cannot remove the requirement -- an economic edit
+  # may never overrule precedence rule 2. Adding entries is allowed; the
+  # restraint of keeping it to three is deliberate (see the workflow doc).
   always_route_task_types:
     - session-verification
+    - code-review
+    - security-review
+
+  # Set 131 S1: the reason codes that replace the old "~50 lines of reasoned
+  # output" threshold. That threshold measured the WRONG END -- emitted
+  # output is not what gets re-billed; RETAINED INPUT is. An orchestrator at
+  # 631K input tokens paid ~33-35 credits per inference; the same
+  # conversation immediately after a compaction, at 54K, paid ~3.6-5.0
+  # (conversation a9f211a7, 2026-08-11, measured).
+  #
+  # The operator's "don't spend more deciding than doing" clause survives
+  # here and ONLY here: classification must be CONSTANT-TIME. Pick a code or
+  # route -- no narrative justification, and no reading files to decide. If
+  # determining which code applies requires opening a file, that IS the
+  # answer: route it. Anything not covered by a code is routed by default.
+  #
+  # The list is a CLOSED ENUM (config._DIRECT_WORK_REASON_CODES): an unknown
+  # code is refused at load, because inventing a code is inventing a new way
+  # to keep work. These are audited in aggregate (which codes fire, how
+  # often), not debated per call. A code that dominates is either a real
+  # pattern or the "I'll just do this directly" trap wearing a label.
+  direct_work_reason_codes:
+    - direct-mechanical            # rename, import, formatting, boilerplate the spec dictates verbatim
+    - direct-current-pass          # completable now, from what is already in context
+    - direct-context-packaging-dominates  # explaining it costs more than doing it (see transport note)
+    - direct-authority-retained    # decision-rights rubric assigns it to the orchestrator or the human
+
+  # Set 131 S1: a routed child's cost is driven by its INFERENCE COUNT, which
+  # is unbounded, not by its rate. Measured over true sub-agent children
+  # (initiator='sub-agent'): gemini-3.1-pro 70.2 credits/child over 17
+  # inferences, sonnet-4.6 39.7 over 18, haiku-4.5 47.1 over 34 -- but
+  # gpt-5.5 721.8 credits/child over 89 inferences, which is more than
+  # twenty orchestrator inferences at a >300K context. An unbounded agentic
+  # child can cost MORE than the orchestrator doing the work, which inverts
+  # the delegation posture exactly where it is most confident.
+  #
+  # A child that would exceed its budget is a task that should have been
+  # SPLIT, not a task that should quietly cost 721 credits. ADVISORY in
+  # Set 131 (this repo measures before it gates) and derived from only 11
+  # child conversations -- a starting point, not a calibration. A set that
+  # REFUSES work on cost grounds is a later one with an operator
+  # attestation behind it.
+  child_budget:
+    max_inferences_per_child: 30
+    warn_at_credits: 100
+
+  # Thresholds differ by transport because the CHILD'S CAPABILITY differs,
+  # not because the money does. On copilot-cli a child holds a read-only
+  # tool allowlist (view, grep, glob) and can explore the repo itself, so
+  # delegating exploration is cheap. On the api transport a child gets NO
+  # tools and the orchestrator must package every byte of context into the
+  # prompt, so context-packaging cost frequently dominates and
+  # direct-context-packaging-dominates is legitimately common.
+  #
+  # One philosophy (quarantine retained context), two thresholds. Keyed on
+  # transport.profile, which is derived from project-verify-type.txt; an
+  # unknown profile key is refused at load rather than silently ignored.
+  thresholds:
+    copilot-cli:
+      route_when_files_exceed: 1
+      route_when_exploration_unbounded: true
+    api:
+      route_when_files_exceed: 3
+      route_when_exploration_unbounded: false
 
   # decision_consensus: opt-in cross-engine consult for in-session design /
   # architecture / process decisions. Set 111 S3 re-drew what this IS: it is

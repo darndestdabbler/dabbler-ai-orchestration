@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "f084352c66bbf5504b8f2aa484cde9371a539b94",
+  "fixedTree": "df3568e7cc33c7b0a536c2fae378c78f1a3d0bc7",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T12:54:05.738557+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Direct-API degradation still allows same-provider `code-review` / `security-review`. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/__init__.py:1265-1351`, `ai_r ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "For `code-review` and `security-review`, `route()` must keep the orchestrator effective provider excluded even when the DIRECT_API precondition is degraded, and must raise `VerificationUnavailableError` when no different-provider candidate survives; only the previously authorized `session-verification` qualification path may clear that exclusion.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

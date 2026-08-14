@@ -49,10 +49,9 @@ Run every router CLI through the workspace venv
   at runtime, never re-litigate them mid-session; a wrong flag is fixed
   in the spec and surfaced at Step 9.
 - **3. Prerequisites.** Confirm prior sessions' Creates/Touches exist.
-  - **3.5:** append this session's `ai-assignment.md` block; record the
-    next-orchestrator / next-set recommendations directly during the temporary
-    verification-only policy window. Set 111 owns the next routing-policy
-    revision, so do not expand outsourcing before that set decides it.
+  - **3.5:** append this session's `ai-assignment.md` block and the
+    next-orchestrator / next-set recommendations via routed analysis —
+    never self-opine.
   - **4. Execute.** Do the plan's steps; log every step to
     `activity-log.json` (`log_step`) **using the spec's own step
     numbers** — `start_session` seeded the plan there as `pending`
@@ -66,11 +65,10 @@ Run every router CLI through the workspace venv
     `verify_session` posts the round transitions itself (Set 127 S3).
     Rendering it records it, and the `checklist_posted` gate compares
     that record against your own — a session that never posted cannot
-    close quietly. The active orchestrator owns implementation,
-    architecture, analysis, documentation and test authoring for the
-    temporary policy window; route only `session-verification`, on a
-    different effective provider, and own the mechanics (file edits,
-    shell, git, mechanical single-file edits under ~50 lines).
+    close quietly. Delegate by the **precedence order** (authority veto →
+    independence → risk gate → context footprint → model choice); keep work
+    only under a `delegation.direct_work_reason_codes` code, and own the
+    mechanics (file edits, shell, git) unconditionally.
 - **5. Build + test — targeted only** (A1). Run the tests covering what
   you just changed; log the result. **No FULL suite before ANY
   cross-provider stage** (A2) — the path-aware critique is one, and

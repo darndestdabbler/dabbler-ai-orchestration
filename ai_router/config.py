@@ -322,6 +322,12 @@ def load_config(path: str | None = None, *,
     # for V1.5/V2 additions); only known-bad values are rejected.
     _validate_decision_consensus(config)
 
+    # Validate the Set 131 delegation policy keys and enforce the
+    # independence floor. Runs AFTER the local-overrides merge for the same
+    # reason every check above does: the floor must hold on the FINAL
+    # effective config, not the pre-override one.
+    _validate_delegation_policy(config)
+
     # Validate transport.profile + transports.copilot-cli (Set 078).
     # Default profile "api" (absent block is fine); an unknown profile or a
     # copilot-cli profile missing its own config block fails loud rather
@@ -574,6 +580,179 @@ def _validate_decision_consensus(config: dict) -> None:
 
 
 _VALID_TRANSPORT_PROFILES: frozenset[str] = frozenset({"api", "copilot-cli"})
+
+# Set 131 S1: task types whose VALUE IS an independent perspective. These are
+# precedence rule 2 of Delegation Discipline, and rule 2 outranks every
+# economic rule below it, so the config may ADD to this set but can never
+# remove from it -- load_config unions these in. A config edit is an economic
+# act; letting one delete `code-review` would let cost overrule authority,
+# which is exactly what the precedence order exists to forbid (spec trap T5).
+INDEPENDENCE_REQUIRED_TASK_TYPES: tuple[str, ...] = (
+    "session-verification",
+    "code-review",
+    "security-review",
+)
+
+# The COMPLETE list of ways an orchestrator may keep work rather than route
+# it. Closed on purpose: an unknown code is a newly-invented excuse to hoard,
+# and the whole point of the codes is that classification is constant-time
+# and audited in aggregate. Adding one is a deliberate policy change here,
+# not a config edit in a consumer repo.
+_DIRECT_WORK_REASON_CODES: frozenset[str] = frozenset({
+    "direct-mechanical",
+    "direct-current-pass",
+    "direct-context-packaging-dominates",
+    "direct-authority-retained",
+})
+
+_CHILD_BUDGET_FIELDS: tuple[str, ...] = (
+    "max_inferences_per_child",
+    "warn_at_credits",
+)
+
+_THRESHOLD_INT_FIELDS: tuple[str, ...] = ("route_when_files_exceed",)
+_THRESHOLD_BOOL_FIELDS: tuple[str, ...] = ("route_when_exploration_unbounded",)
+
+
+def _positive_number(value: object) -> bool:
+    """True for a real, positive int/float. Bools are rejected explicitly:
+    ``True == 1`` in Python, so a bare ``isinstance(x, int)`` admits them
+    (project-guidance, validator-parity convention).
+    """
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    return value > 0
+
+
+def _validate_delegation_policy(config: dict) -> None:
+    """Validate the Set 131 ``delegation:`` policy keys and enforce the
+    independence floor.
+
+    Absent keys are fine — an older consumer-repo config predates all of
+    them and must keep loading. What is present is checked, and
+    ``always_route_task_types`` is UNIONED with
+    :data:`INDEPENDENCE_REQUIRED_TASK_TYPES` so the effective config always
+    satisfies precedence rule 2 no matter what the file says.
+
+    The union is deliberately not a refusal: rejecting the load would break
+    every config written before this key had a floor, and the requirement is
+    satisfiable without anyone's intervention. An unknown *reason code*, by
+    contrast, IS refused — nothing can repair that automatically, and a
+    silently-dropped code reads as an accepted one.
+    """
+    delegation = config.get("delegation")
+    if delegation is None:
+        delegation = {}
+        config["delegation"] = delegation
+    if not isinstance(delegation, dict):
+        raise ValueError(
+            f"delegation must be a mapping, got {type(delegation).__name__}"
+        )
+
+    # --- always_route_task_types: validated, then floored ---
+    routed = delegation.get("always_route_task_types")
+    if routed is None:
+        routed = []
+    if not isinstance(routed, list) or not all(
+        isinstance(t, str) for t in routed
+    ):
+        raise ValueError(
+            "delegation.always_route_task_types must be a list of task-type "
+            f"strings, got {type(routed).__name__}"
+        )
+    merged = list(routed)
+    for required in INDEPENDENCE_REQUIRED_TASK_TYPES:
+        if required not in merged:
+            merged.append(required)
+    delegation["always_route_task_types"] = merged
+
+    # --- direct_work_reason_codes: closed enum ---
+    codes = delegation.get("direct_work_reason_codes")
+    if codes is not None:
+        if not isinstance(codes, list) or not all(
+            isinstance(c, str) for c in codes
+        ):
+            raise ValueError(
+                "delegation.direct_work_reason_codes must be a list of "
+                f"strings, got {type(codes).__name__}"
+            )
+        unknown = [c for c in codes if c not in _DIRECT_WORK_REASON_CODES]
+        if unknown:
+            raise ValueError(
+                f"delegation.direct_work_reason_codes has unknown codes: "
+                f"{unknown}. Known: {sorted(_DIRECT_WORK_REASON_CODES)}. "
+                "The list is closed — inventing a code invents a new way to "
+                "keep work, so a new one is a deliberate policy change in "
+                "ai_router/config.py, not a config edit."
+            )
+
+    # --- child_budget: advisory, but a nonsense value is still refused ---
+    budget = delegation.get("child_budget")
+    if budget is not None:
+        if not isinstance(budget, dict):
+            raise ValueError(
+                "delegation.child_budget must be a mapping, "
+                f"got {type(budget).__name__}"
+            )
+        for field in _CHILD_BUDGET_FIELDS:
+            if field not in budget:
+                continue
+            if not _positive_number(budget[field]):
+                raise ValueError(
+                    f"delegation.child_budget.{field} must be a positive "
+                    f"number, got {budget[field]!r}. A zero or negative "
+                    "budget reads as 'no child may run' rather than as the "
+                    "advisory cap it is meant to be."
+                )
+
+    # --- thresholds: keyed by transport profile ---
+    thresholds = delegation.get("thresholds")
+    if thresholds is not None:
+        if not isinstance(thresholds, dict):
+            raise ValueError(
+                "delegation.thresholds must be a mapping keyed by transport "
+                f"profile, got {type(thresholds).__name__}"
+            )
+        unknown_profiles = [
+            p for p in thresholds if p not in _VALID_TRANSPORT_PROFILES
+        ]
+        if unknown_profiles:
+            raise ValueError(
+                f"delegation.thresholds has unknown transport profiles: "
+                f"{sorted(unknown_profiles)}. "
+                f"Known: {sorted(_VALID_TRANSPORT_PROFILES)}. A threshold "
+                "under a profile nothing resolves to is dead config that "
+                "reads as active policy."
+            )
+        for profile, block in thresholds.items():
+            if not isinstance(block, dict):
+                raise ValueError(
+                    f"delegation.thresholds.{profile} must be a mapping, "
+                    f"got {type(block).__name__}"
+                )
+            for field in _THRESHOLD_INT_FIELDS:
+                if field not in block:
+                    continue
+                value = block[field]
+                if isinstance(value, bool) or not isinstance(value, int):
+                    raise ValueError(
+                        f"delegation.thresholds.{profile}.{field} must be an "
+                        f"integer, got {value!r}"
+                    )
+                if value < 0:
+                    raise ValueError(
+                        f"delegation.thresholds.{profile}.{field} must be "
+                        f">= 0, got {value!r}"
+                    )
+            for field in _THRESHOLD_BOOL_FIELDS:
+                if field not in block:
+                    continue
+                if not isinstance(block[field], bool):
+                    raise ValueError(
+                        f"delegation.thresholds.{profile}.{field} must be a "
+                        f"boolean, got {block[field]!r}"
+                    )
+
 
 # Required keys in transports.copilot-cli when transport.profile is set to
 # copilot-cli. Validated as PRESENT, not deep-shape-checked here — the

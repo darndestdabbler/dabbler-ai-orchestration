@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Direct-API degradation still allows same-provider `code-review` / `security-review`.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/__init__.py:1265-1351`, `ai_router/config.py:150-159`, `ai_router/models.py:164-171`, `ai_router/router-config.yaml:591-595`, `docs/ai-led-session-workflow.md:2818-2826`, `ai_router/tests/test_independence_provider_exclusion.py:75-80`\n  - **Failure scenario:** On a supported DIRECT_API machine with only the Anthropic key available, an Anthropic-orchestrated session routes mandatory `task_type=\"code-review\"`. `validate_provider_api_keys()` intentionally permits that single-key setup by disabling keyless providers; `route()` enters the independence branch, sees `_direct_api_precondition(...).degraded`, clears the orchestrator-provider exclusion, removes unreachable providers, and `pick_model()` then honors the shipped `code-review: sonnet` Anthropic pin. The caller receives a normal same-provider routed review even though the policy says this work must be independent. This is probable for the supported single-key DIRECT_API population the code explicitly accommodates, and it materially defeats the safety condition that made widening delegation acceptable.\n  - **Acceptance criterion:** JUDGMENT - For `code-review` and `security-review`, `route()` must keep the orchestrator effective provider excluded even when the DIRECT_API precondition is degraded, and must raise `VerificationUnavailableError` when no different-provider candidate survives; only the previously authorized `session-verification` qualification path may clear that exclusion.\n  - **Details:** **Violation:** the workflow says “the effective provider must differ from the orchestrator’s” and “When no different-provider candidate exists the call fails closed.” **Impact:** the remediation still ships a successful same-provider independent-review path, so the original blocker is not fully fixed. **Evidence:** `route()` widened the independence guard to all floor task types, but the degraded DIRECT_API branch then sets `_verifier_exclusion = None` and strips the orchestrator provider from `exclude_providers`; the new tests explicitly patch `_direct_api_precondition` to `None`, so they do not exercise this path.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "On a supported DIRECT_API machine with only the Anthropic key available, an Anthropic-orchestrated session routes mandatory `task_type=\"code-review\"`. `validate_provider_api_keys()` intentionally permits that single-key setup by disabling keyless providers; `route()` enters the independence branch, sees `_direct_api_precondition(...).degraded`, clears the orchestrator-provider exclusion, removes unreachable providers, and `pick_model()` then honors the shipped `code-review: sonnet` Anthropic pin. The caller receives a normal same-provider routed review even though the policy says this work must be independent. This is probable for the supported single-key DIRECT_API population the code explicitly accommodates, and it materially defeats the safety condition that made widening delegation acceptable.",
+      "evidencePaths": [
+        "ai_router/__init__.py",
+        "ai_router/config.py",
+        "ai_router/models.py",
+        "ai_router/router-config.yaml",
+        "docs/ai-led-session-workflow.md",
+        "ai_router/tests/test_independence_provider_exclusion.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "For `code-review` and `security-review`, `route()` must keep the orchestrator effective provider excluded even when the DIRECT_API precondition is degraded, and must raise `VerificationUnavailableError` when no different-provider candidate survives; only the previously authorized `session-verification` qualification path may clear that exclusion."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 independence provider enforcement",
+      "verdict": "fix-rejected",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L2"
+    }
+  ]
+}

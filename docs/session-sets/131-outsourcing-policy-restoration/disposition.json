@@ -1,0 +1,114 @@
+{
+  "status": "completed",
+  "summary": "Set 131 Session 1 of 3, 'The pin comes out, and the rule that replaces it'. Removed the 2026-08-05 verification-only outsourcing pin that Set 111 was named to lift and never did, and replaced it with a precedence-ordered Delegation Discipline in docs/ai-led-session-workflow.md: authority veto -> independence requirement -> risk gate -> context footprint -> model choice, in that order, with the order itself stated as the contract. Encoded the machine-readable half in router-config.yaml (outsourcing_mode: whenever-helpful, direct_work_reason_codes as a closed enum, an advisory child_budget, transport-keyed thresholds) and validated all four in config.py. Deleted the phantom delegation.direct_work_max_lines / direct_work_max_files knobs the doc had promised for twenty sets and that never existed. Replaced the '~50 lines of reasoned output' threshold, which measured emitted output, with a retained-input context-footprint trigger. Cross-provider verification then caught the defect that mattered: the new rule 2 claimed independence work must run on a different effective provider, but route() derived that exclusion only for session-verification, so the shipped code-review: sonnet pin handed an Anthropic orchestrator an Anthropic reviewer. Fixed by widening the derivation to the whole independence floor; round 3 then rejected that fix for over-widening the Set 123 S2 DIRECT_API degradation carve-out (an operator-authorized verification reduction scoped to session-verification alone) to code-review and security-review, which would have been the orchestrator self-authorizing a reduction. Re-scoped, and round 4 VERIFIED with both fixes accepted. TEST COMPOSITION (project-guidance requires this be stated, not presented as one clean run): pytest 4482 passed / 9 skipped in one invocation; mocha 1455 passing / 2 pending in one invocation; playwright 30 passed in the declared invocation plus vsix-first-run-walkthrough passing in a subsequent isolated run (57.6s, against the 300s budget it exhausted under load). Every test in all three suites executed and passed.",
+  "files_changed": [
+    "ai_router/__init__.py",
+    "ai_router/config.py",
+    "ai_router/router-config.yaml",
+    "ai_router/tests/test_config_delegation_policy.py",
+    "ai_router/tests/test_independence_provider_exclusion.py",
+    "docs/ai-led-session-workflow.md",
+    "docs/session-constitution.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/activity-log.json",
+    "docs/session-sets/131-outsourcing-policy-restoration/checklist-posts.jsonl",
+    "docs/session-sets/131-outsourcing-policy-restoration/decisions.jsonl",
+    "docs/session-sets/131-outsourcing-policy-restoration/disposition.json",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-acceptance-round-1.json",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-conventions.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-issues-round-3.json",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-issues.json",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-remediation-round-1.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-remediation-round-3.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-rounds.jsonl",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-verification-fanout-2.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-verification-round-2.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-verification-round-3.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/s1-verification.md",
+    "docs/session-sets/131-outsourcing-policy-restoration/session-events.jsonl",
+    "docs/session-sets/131-outsourcing-policy-restoration/session-state.json",
+    "docs/session-sets/131-outsourcing-policy-restoration/spec.md"
+  ],
+  "verification_method": "api",
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Routed recommendation (s1-next-orchestrator-routed.md) said switch-due-to-cost to claude-sonnet-4.6. Not adopted, and the artifact is kept so the disagreement is auditable. Three reasons. (1) Its rationale is the naive substitution argument this set's own evidence corrected: at MATCHED input context the model-substitution lever is ~1.7-2x, not the 8.5x an uncontrolled per-model average suggests, and the dominant lever is transcript rotation at ~7-8x. (2) Spec trap T3: the orchestrator is the only actor holding write, shell and network rights, so downgrading the privileged seat to save money buys a confused-deputy path that the routed children's read-only sandbox does not close. The spec lists 'no orchestrator model change' as an explicit non-goal on exactly this reasoning. (3) The recommendation was produced BY claude-sonnet-4.6 recommending claude-sonnet-4.6; task_type=architecture is not in the independence floor, so no provider exclusion applied, which is correct behaviour but does make the advice self-interested. Session 2 is narrow, but narrowness is an argument about scope, not about who should hold the write bit."
+    }
+  },
+  "blockers": [],
+  "verification_verdict": "VERIFIED",
+  "lessons_cited": [
+    "L-064-8",
+    "L-112-1",
+    "L-064-9",
+    "L-079-1"
+  ],
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 2158.3722,
+        "usd": 21.583721999999998,
+        "event_count": 146,
+        "session_ids": [
+          "e2af3ac5-6957-459b-859a-893737cae0e7"
+        ],
+        "measured_session_ids": [
+          "e2af3ac5-6957-459b-859a-893737cae0e7"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 855.491205,
+        "usd": 8.55491205,
+        "event_count": 88,
+        "session_ids": [
+          "4e251168-f844-49cf-8fd1-8eec506564c5",
+          "e853f0d2-38ae-45f2-ae94-f973a6529c71",
+          "c495524b-db98-4459-bce2-cacc8a77044e",
+          "583cef65-b835-420c-b953-42027cdb8abb",
+          "8f380881-6c6c-4ec6-810b-4a9d6d8a191e",
+          "aa6e42e8-337e-4ab2-9fff-0f939fb48b24",
+          "c39d54dd-96e8-4d01-ad21-e3ae8948b1a5"
+        ],
+        "measured_session_ids": [
+          "4e251168-f844-49cf-8fd1-8eec506564c5",
+          "e853f0d2-38ae-45f2-ae94-f973a6529c71",
+          "c495524b-db98-4459-bce2-cacc8a77044e",
+          "583cef65-b835-420c-b953-42027cdb8abb",
+          "8f380881-6c6c-4ec6-810b-4a9d6d8a191e",
+          "aa6e42e8-337e-4ab2-9fff-0f939fb48b24",
+          "c39d54dd-96e8-4d01-ad21-e3ae8948b1a5"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 3013.863405,
+    "total_usd": 30.13863405,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
+}

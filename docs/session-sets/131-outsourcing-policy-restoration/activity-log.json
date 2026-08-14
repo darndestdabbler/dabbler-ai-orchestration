@@ -1,0 +1,194 @@
+{
+  "sessionSetName": "131-outsourcing-policy-restoration",
+  "createdDate": "2026-08-14T07:44:41.420357-04:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "write-the-delegation-model-then-encode",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Write the delegation model, then encode it.** `docs/ai-led-session-workflow.md` \u2192 *Delegation Discipline* loses the \"Temporary verification-only policy (Set 110 S4 through Set 112)\" section and gains the replacement, in this precedence order \u2014 the order is the contract, not decoration:",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "authority-veto",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Authority veto.** Decision-rights rubric first: the four human-required classes and the verification-reduction carve-out are checked before any economics. Never overridden by cost.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "independence-requirement",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Independence requirement.** Work whose *value is* an independent perspective is always routed and must use a different effective provider: `session-verification`, code review, security review.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "risk-gate-the-operator-s-gate",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Risk gate (the operator's gate, made precise).** Work is outsourceable when its failure mode is caught by an oracle that is *already independent* of the producer \u2014 existing tests, static checks, schema validation, the cross-provider round. Tests authored by the same delegate are not an independent oracle.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "context-footprint-trigger",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Context-footprint trigger.** This replaces the \"~50 lines of reasoned output\" threshold, which measured the wrong end: output is not what gets re-billed, **retained input is**. Route when the work would add materially to the transcript \u2014 unbounded exploration, several files, large evidence bundles, output destined to be discarded.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "model-choice-last",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Model choice, last.** Only after eligibility. Never a bare multiplier ratio: `gpt-5.6-sol` and `claude-sonnet-4.6` are both multiplier 1.0 and differ ~3x in observed credits. `ai_router/router-config.yaml`: `routing.outsourcing_mode` \u2192 `whenever-helpful`; the `delegation:` block loses the temporary-policy comment and gains `direct_work_reason_codes`, `child_budget`, and the transport-conditioned thresholds. `always_route_task_types` regains the independence-requirement entries and **only** those.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "bound-the-child-t-new",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Bound the child (T-new).** `delegation.child_budget` caps a routed child's inferences, with the measured justification in the comment. A child that would exceed its budget is a task that should have been split, not a task that should quietly cost 721 credits.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 11,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-14T07:44:41.420165-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T07:44:41.432054-04:00",
+      "description": "Registered session 1 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "write-the-delegation-model-then-encode",
+      "dateTime": "2026-08-14T07:47:36.936639-04:00",
+      "description": "Writing the replacement delegation model: workflow-doc section + router-config.yaml delegation block.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "write-the-delegation-model-then-encode",
+      "dateTime": "2026-08-14T08:18:44.002082-04:00",
+      "description": "Delegation Discipline section replaced in docs/ai-led-session-workflow.md; router-config.yaml outsourcing_mode -> whenever-helpful and the delegation: block rewritten.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "authority-veto",
+      "dateTime": "2026-08-14T08:18:44.004576-04:00",
+      "description": "Precedence rule 1 authored: rubric + verification-reduction carve-out checked before any economics.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "independence-requirement",
+      "dateTime": "2026-08-14T08:18:44.007465-04:00",
+      "description": "Precedence rule 2 authored; encoded as a FLOOR in config.INDEPENDENCE_REQUIRED_TASK_TYPES (union at load, cannot be deleted by config).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "risk-gate-the-operator-s-gate",
+      "dateTime": "2026-08-14T08:18:44.009724-04:00",
+      "description": "Precedence rule 3 authored, incl. the statefulness + verifier-synthesis carve-outs the reference omitted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "context-footprint-trigger",
+      "dateTime": "2026-08-14T08:18:44.011525-04:00",
+      "description": "Precedence rule 4 authored; replaces the ~50-lines-of-output threshold with retained-input footprint.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "model-choice-last",
+      "dateTime": "2026-08-14T08:18:44.013291-04:00",
+      "description": "Precedence rule 5 authored; bare multiplier ratios refused as a selection signal.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 8,
+      "stepKey": "bound-the-child-t-new",
+      "dateTime": "2026-08-14T08:18:44.015082-04:00",
+      "description": "delegation.child_budget added (advisory) with its measured justification; validated in config.py.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 9,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T09:00:34.890331-04:00",
+      "description": "Rounds 1-4: discovery (2-way fan-out) ISSUES_FOUND 2 blocking; supplementary clean; remediation-review r3 rejected the fix (degradation carve-out over-widened); remediation-review r4 VERIFIED, 2 fixes accepted, 0 findings.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 10,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T09:31:35.342834-04:00",
+      "description": "pytest 4482P/9S (662s); mocha 1455P/2pending (46s); playwright 30P + 1 isolated re-run green (545s). All three recorded via run_of_record; check reports fresh+green.",
+      "status": "complete"
+    }
+  ]
+}

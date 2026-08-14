@@ -1,0 +1,3 @@
+{"suite": "pytest", "command": ".venv/Scripts/python.exe -m pytest ai_router/tests -q -n auto", "outcome": "passed", "surfaceDigest": "891b320fa7445b38d1beb06cad18f6ee6052318cdc776a3ebbe314287776500c", "recordedAt": "2026-08-14T09:18:07.305274-04:00", "durationSeconds": 662.0}
+{"suite": "mocha", "command": "npm run test:unit", "outcome": "passed", "surfaceDigest": "ff1c2782056e7b5f8f4995a3b456a1f07f1cc29fe63b3595e399c041ccd694f2", "recordedAt": "2026-08-14T09:19:07.071313-04:00", "durationSeconds": 46.0}
+{"suite": "playwright", "command": "npm run test:playwright", "outcome": "passed", "surfaceDigest": "84437efd52195ea43b35136b9ef70d4efbee4d38b98a067c92b750800fa6a7f1", "recordedAt": "2026-08-14T09:31:07.281071-04:00", "durationSeconds": 545.0}

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "90e907cdf72f71ac1684f518fa8880026bca0c80",
+  "fixedTree": "032d3ef9860b9c212a11f502c6560b5449e30f79",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T12:46:00.533459+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The independence requirement is only enforced as “must route,” not as “must use a different effective provider” for `code-review` and `security-review`. - **Category:** Completeness - **Severity:** ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "For every task type in config.INDEPENDENCE_REQUIRED_TASK_TYPES, a session-context route excludes the session orchestrator's effective provider or fails closed when no different-provider candidate exists, with code-review and security-review coverage proving the same-provider path cannot occur.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The new independence-provider requirement is not enforced for `code-review` or `security-review`. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `ai_router/config.py:590`, ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Every task type in config.INDEPENDENCE_REQUIRED_TASK_TYPES resolves the session orchestrator effective provider when session context is supplied and excludes it from generator selection, including task-type overrides, tier fallback, escalation, and copilot-cli role selection; coverage proves code-review and security-review cannot select Anthropic for an Anthropic orchestrator.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

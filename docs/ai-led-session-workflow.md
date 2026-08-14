@@ -2862,7 +2862,8 @@ is not re-billed; **retained input is, on every subsequent turn.**
 **5 — Model choice, last.** Only after eligibility is settled. Never a bare
 multiplier ratio: `gpt-5.6-sol` and `claude-sonnet-4.6` are both
 `request_multiplier` 1.0 and differ roughly 3x in observed credits, and
-`premium_request_weight` in the catalog lockfile is not a price at all.
+`probe_premium_requests` in the catalog lockfile (Set 078's
+`premium_request_weight`, renamed by Set 131) is not a price at all.
 
 ### The default posture, and the one clause that survives
 

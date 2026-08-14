@@ -2,6 +2,9 @@
 
 Full schema + rationale: ``docs/session-sets/078-copilot-cli-hybrid-tier/
 s1-design-adjudication.md`` Section 1 (routed, ``task_type: architecture``).
+That document is a v1-era session artifact and is never edited, so it still
+spells the probe sample ``premium_request_weight``; the v2 rename and the
+reason for it are recorded on :class:`ModelEntry` below, which wins.
 
 The GitHub Copilot CLI has no discovery/list-models command and no
 first-party ``provider`` field (S1 finding): a model's underlying provider is
@@ -22,6 +25,11 @@ never a global or assumed catalog:
   ``[[models]]`` tables, scalar values only) — this module is the lockfile's
   only writer, so a small hand-rolled reader/writer avoids adding a TOML
   library dependency to the base package for one optional transport.
+  Schema v2 (Set 131) renamed the probe sample ``premium_request_weight``
+  to ``probe_premium_requests``; v1 files still load. **No field in this
+  lockfile is a price, a rate, or a cost signal** — see
+  :class:`ModelEntry`; real spend is read from the seat store by
+  ``ai_router/seat_cost.py``.
 - :func:`validate_catalog` runs the four fail-closed rules every routed
   dispatch must check before using a lock (version drift, missing
   provenance, same-provider-only, seat mismatch) and returns a result
@@ -54,6 +62,23 @@ except ImportError:  # pragma: no cover - test/bare context
 
 DEFAULT_LOCKFILE_PATH = "ai_router/copilot-catalog.lock"
 DEFAULT_CLI_NAME = "GitHub Copilot CLI"
+
+# Lockfile schema version this module writes. v1 (Set 078) spelled the probe
+# sample ``premium_request_weight``; v2 (Set 131) renamed it to
+# ``probe_premium_requests`` because the old name asserted a rate the value
+# never was — see :class:`ModelEntry`. Both shapes still load: the key below
+# is read as a fallback, and neither reader branches on the version, so an
+# older ai_router reading a v2 lock simply finds the field absent, which is
+# the correct fail-closed direction (absent means unknown).
+#
+# ``discover_catalog()`` is the only stamper of this constant. ``dumps()``
+# is a faithful serializer and round-trips whatever ``meta`` it is handed,
+# so a hand-rolled load-then-write migration would emit v2 field names under
+# a v1 label; no such path exists in this repo (``main()`` always writes a
+# freshly discovered catalog), and a migration that ever gets written must
+# restamp the version itself.
+LOCKFILE_SCHEMA_VERSION = 2
+_LEGACY_PROBE_PREMIUM_KEY = "premium_request_weight"
 
 ENABLEMENT_CONFIRMED = "confirmed"
 ENABLEMENT_UNCONFIRMED = "unconfirmed"
@@ -112,7 +137,42 @@ class ModelEntry:
     enablement: str = ENABLEMENT_UNCONFIRMED
     confirmed_at: Optional[str] = None
     confirmed_on_cli_version: Optional[str] = None
-    premium_request_weight: Optional[int] = None
+    # NOT A PRICE. NOT A RATE. NOT A COST SIGNAL. See Set 131.
+    #
+    # This is the premium-request count the CLI reported for the ONE short
+    # probe call that confirmed the model — per-call consumption, not the
+    # model's multiplier. Set 078 shipped it as `premium_request_weight`,
+    # and that name was the defect: "weight" reads as a rate and the value
+    # is a sample. Set 131 renamed it; `_LEGACY_PROBE_PREMIUM_KEY` keeps
+    # v1 lockfiles readable, because the measurement is real — only its
+    # name and its use were wrong.
+    #
+    # Measured against the seat store on 2026-08-14, the probe disagrees
+    # with the authoritative `request_multiplier` for the ENTIRE OpenAI
+    # family:
+    #
+    #     gpt-5.5        probes 0   bills 7.5
+    #     gpt-5.4        probes 0   bills 1.0
+    #     gpt-5.3-codex  probes 0   bills 1.0
+    #     gpt-5.4-mini   probes 0   bills 0.33
+    #
+    # A selector reading this field as "cheapest" would pick gpt-5.5
+    # believing it free and pay the second-highest multiplier on the seat.
+    # The Anthropic and Google entries happen to agree, which is exactly
+    # what makes the field look trustworthy.
+    #
+    # It would not be a cost signal even if every number agreed. A
+    # fractional multiplier cannot survive the int coercion in
+    # discover_catalog() (0.33 and 7.5 both land as None), and the CREDIT
+    # axis (`total_nano_aiu`) is decoupled from the premium-request axis:
+    # at matched context claude-opus-5 (multiplier 15.0) and gpt-5.5 (7.5)
+    # cost the same per inference. "Fix the OpenAI numbers" is therefore
+    # not a repair that makes this field usable for selection.
+    #
+    # None means UNKNOWN, never free (L-112-1) — claude-haiku-4.5 was
+    # never probed and still bills 0.33. For real spend, read the seat
+    # store through ai_router/seat_cost.py.
+    probe_premium_requests: Optional[int] = None
     echoed_model: Optional[str] = None
 
 
@@ -305,7 +365,12 @@ def loads(text: str) -> Catalog:
             enablement=md.get("enablement", ENABLEMENT_UNCONFIRMED),
             confirmed_at=md.get("confirmed_at"),
             confirmed_on_cli_version=md.get("confirmed_on_cli_version"),
-            premium_request_weight=md.get("premium_request_weight"),
+            # v1 lockfiles carry the pre-Set-131 key; read it rather than
+            # silently dropping a real measurement on upgrade. Absent under
+            # both names stays None, which is UNKNOWN and never "free".
+            probe_premium_requests=md.get(
+                "probe_premium_requests", md.get(_LEGACY_PROBE_PREMIUM_KEY)
+            ),
             echoed_model=md.get("echoed_model"),
         )
         for md in model_dicts
@@ -388,7 +453,7 @@ def discover_catalog(
         if result.ok:
             # transport_metadata is an open diagnostic dict (cli_transport.py
             # does not strictly type every key in it), but
-            # ModelEntry.premium_request_weight is a typed Optional[int]
+            # ModelEntry.probe_premium_requests is a typed Optional[int]
             # that write_lockfile()'s hand-rolled TOML serializer must be
             # able to render. A wrong-shaped premiumRequests (a float, a
             # list, a dict -- round-4 verification finding) would otherwise
@@ -396,10 +461,17 @@ def discover_catalog(
             # _toml_value, which only supports bool/int/str. Coerce any
             # non-plain-int value to None here, at the boundary, rather
             # than trusting the transport layer's opaque metadata.
-            raw_weight = result.transport_metadata.get("premium_requests")
-            premium_request_weight = (
-                raw_weight
-                if isinstance(raw_weight, int) and not isinstance(raw_weight, bool)
+            #
+            # Set 131: None here means UNKNOWN, never "free". The coercion
+            # is correct and stays -- but note it is also why a fractional
+            # rate (0.33, 7.5) could never land in this field even if the
+            # CLI reported one, which is one of the reasons it must not be
+            # read as a price. See ModelEntry.probe_premium_requests.
+            raw_probe_premium = result.transport_metadata.get("premium_requests")
+            probe_premium_requests = (
+                raw_probe_premium
+                if isinstance(raw_probe_premium, int)
+                and not isinstance(raw_probe_premium, bool)
                 else None
             )
             entries.append(ModelEntry(
@@ -409,7 +481,7 @@ def discover_catalog(
                 enablement=ENABLEMENT_CONFIRMED,
                 confirmed_at=probed_at,
                 confirmed_on_cli_version=resolved_version,
-                premium_request_weight=premium_request_weight,
+                probe_premium_requests=probe_premium_requests,
                 echoed_model=result.transport_metadata.get("echoed_model"),
             ))
         else:
@@ -421,7 +493,7 @@ def discover_catalog(
             ))
 
     meta = CatalogMeta(
-        schema_version=1,
+        schema_version=LOCKFILE_SCHEMA_VERSION,
         cli_name=DEFAULT_CLI_NAME,
         cli_version=resolved_version,
         cli_version_pin_required=True,

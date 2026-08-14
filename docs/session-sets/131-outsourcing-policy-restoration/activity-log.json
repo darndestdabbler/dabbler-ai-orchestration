@@ -1,7 +1,7 @@
 {
   "sessionSetName": "131-outsourcing-policy-restoration",
   "createdDate": "2026-08-14T07:44:41.420357-04:00",
-  "totalSessions": 0,
+  "totalSessions": 3,
   "entries": [
     {
       "sessionNumber": 1,
@@ -188,6 +188,108 @@
       "stepKey": "required-portion-of-the-full-test",
       "dateTime": "2026-08-14T09:31:35.342834-04:00",
       "description": "pytest 4482P/9S (662s); mocha 1455P/2pending (46s); playwright 30P + 1 isolated re-run green (545s). All three recorded via run_of_record; check reports fresh+green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T09:57:07.843322-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "disarm-premium-request-weight-t2",
+      "dateTime": "2026-08-14T09:57:07.843322-04:00",
+      "description": "**Disarm `premium_request_weight` (T2).** Rename it in the lockfile schema to what it is \u2014 per-probe premium-request *consumption*, not a rate \u2014 document that it is **not** a billing signal and must never be used for model selection, and make an absent or zero value read as *unknown* rather than *free* (L-112-1: fail-open zero is worse than no answer). The store's `request_multiplier` is named as the authoritative rate axis, and the credit axis is named as decoupled from it. `ai_router/copilot_catalog.py` and the lockfile writer move together with `ai_router/docs/` wherever the field is described.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "falsify-by-planting-not-by-reading",
+      "dateTime": "2026-08-14T09:57:07.843322-04:00",
+      "description": "**Falsify by planting, not by reading (L-112-1).** FIRES: a lockfile whose weight is `0` must not be selectable as \"cheapest\"; a probe returning a float (`7.5`) must not silently become `None`-then-`0`; a selector asked for cost must refuse the field outright. DOES NOT FIRE: a genuine `0.0` multiplier read from the *store* is a real zero. STRUCTURAL: the OpenAI-family disagreement is asserted as a regression fixture so the probe cannot re-acquire it silently.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T09:57:07.843322-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T09:57:07.843322-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-14T09:57:07.843322-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T09:57:07.871298-04:00",
+      "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "disarm-premium-request-weight-t2",
+      "dateTime": "2026-08-14T10:02:47.847878-04:00",
+      "description": "Disarming premium_request_weight: renaming it to probe_premium_requests (spec step 2 asked for the rename; the reference only commented it), with a legacy-key read, a lockfile schema_version bump, and the not-a-price rationale pinned above the declaration.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "disarm-premium-request-weight-t2",
+      "dateTime": "2026-08-14T10:09:44.145151-04:00",
+      "description": "premium_request_weight renamed to probe_premium_requests (ModelEntry, loads(), discover_catalog()), lockfile schema v1->v2 with LOCKFILE_SCHEMA_VERSION, legacy key read via _LEGACY_PROBE_PREMIUM_KEY so a v1 seat lock keeps its sample, NOT-A-PRICE rationale + the measured OpenAI-family disagreement pinned above the declaration, module docstring and the workflow doc rule-5 echo updated. The live seat lockfile (schema 1, 18 models) reloads with values intact: gpt-5.5 -> 0, claude-haiku-4.5 -> None.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "falsify-by-planting-not-by-reading",
+      "dateTime": "2026-08-14T10:09:44.569036-04:00",
+      "description": "New ai_router/tests/test_catalog_weight_not_a_price.py: 8 falsifiers (prohibition with a corpus-non-empty guard; the cli_transport/copilot_preflight premium_requests look-alike asserted NOT to fire; rename structural; default-None absent-is-unknown; rationale-on-the-declaration; measured probes/bills regression fixture; credit-axis decoupling; v1-lockfile legacy load + rewrite). All 9 planted defects fired and the tree was restored (plants included widening the scan to a naive substring, which the look-alike test caught). Targeted suite 327 passed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T10:20:01.603908-04:00",
+      "description": "Round 1 discovery, 2-way fan-out (spec-conformance + failure-scenario lenses), verifier gpt-5.5 both calls, anthropic excluded as the orchestrator's effective provider. VERDICT: VERIFIED, 0 blocking, 0 Major/Critical. Five Nits recorded and adjudicated in the disposition; two of them were items this session flagged for adversarial attention itself (the zero-is-not-coerced reading, and the basename allowlist). Fixed the two zero-risk ones post-round (test-only allowlist now path-relative, plus two comment-only qualifiers); deferred the dumps() fixpoint nit with its reasoning written into the schema-version comment. Plants re-run after the edits: 10/10 fired, including a new plant proving the basename hole is closed.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T10:47:24.780982-04:00",
+      "description": "pytest 4490 passed / 9 skipped (758s, one invocation; +8 over S1's 4482, exactly this session's new module); mocha 1455 passing / 2 pending (35s, one invocation); playwright 30 passed in the declared invocation (7.9m) plus vsix-first-run-walkthrough re-run in isolation green at 56.6s after a 300s load-induced timeout - the same spec and the same cause S1 hit. All three recorded via run_of_record; the Layer 3 composition is journaled in decisions.jsonl and stated in the disposition.",
       "status": "complete"
     }
   ]

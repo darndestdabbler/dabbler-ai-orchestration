@@ -38,7 +38,7 @@ MODEL_ENTRIES = [
         enablement=copilot_catalog.ENABLEMENT_CONFIRMED,
         confirmed_at="2024-01-01T00:00:00Z",
         confirmed_on_cli_version="1.2.3",
-        premium_request_weight=2,
+        probe_premium_requests=2,
     ),
     copilot_catalog.ModelEntry(
         id="gemini-3.1-pro-preview",
@@ -246,7 +246,7 @@ def test_discover_catalog():
     assert model_map["gpt-5.4"].confirmed_at == probed_at_str
     assert model_map["gpt-5.4"].confirmed_on_cli_version == "9.9.9"
     assert model_map["gpt-5.4"].echoed_model == "echoed-gpt-5.4"
-    assert model_map["gpt-5.4"].premium_request_weight == 1
+    assert model_map["gpt-5.4"].probe_premium_requests == 1
 
     assert model_map["claude-sonnet-4.6"].enablement == copilot_catalog.ENABLEMENT_CONFIRMED
     assert model_map["gemini-3.5-flash"].enablement == copilot_catalog.ENABLEMENT_UNCONFIRMED
@@ -259,7 +259,7 @@ def test_discover_catalog_coerces_malformed_premium_weight_to_none(
 ):
     # Round-4 verification finding: a wrong-shaped premiumRequests value in
     # the transport's diagnostic metadata (a float, list, dict, numeric
-    # string, or bool) must never cross into ModelEntry.premium_request_weight
+    # string, or bool) must never cross into ModelEntry.probe_premium_requests
     # (a typed Optional[int]) un-coerced -- write_lockfile()'s TOML
     # serializer only supports bool/int/str and would otherwise crash on
     # --refresh. Confirm both the coercion AND that the lockfile still
@@ -283,12 +283,12 @@ def test_discover_catalog_coerces_malformed_premium_weight_to_none(
         transport=_WeirdWeightTransport(),
         model_universe=["gpt-5.4"], cli_version="1.0.0",
     )
-    assert catalog.models[0].premium_request_weight is None
+    assert catalog.models[0].probe_premium_requests is None
 
     out_file = tmp_path / "catalog.lock"
     copilot_catalog.write_lockfile(out_file, catalog)  # must not raise
     reloaded = copilot_catalog.load_lockfile(out_file)
-    assert reloaded.models[0].premium_request_weight is None
+    assert reloaded.models[0].probe_premium_requests is None
 
 
 def test_get_cli_version_success(monkeypatch):

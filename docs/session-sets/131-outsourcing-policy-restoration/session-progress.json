@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-14T11:13:59.162738-04:00",
+  "generatedAt": "2026-08-14T12:35:00.976187-04:00",
   "sessionSetDir": "131-outsourcing-policy-restoration",
   "inputs": {
-    "activity-log.json": "b48f7ee3c33944b70a2823dda15b3768add8db5832a69866223862fbe705fa6d",
-    "session-state.json": "2d7a4e726cb0b1e839c58aeb6220aeaf11f788dae008fc231314ea86797f7127",
+    "activity-log.json": "67f31d25d530428dc636dbd892c2c9c823494df4d95371e333a49a14074a87d1",
+    "session-state.json": "08dd78c6caa3ad3b0f1a4dca6ac38fc09812e611beb97adbc35d9940ffc97041",
     "spec.md": "e93563519d3b2615dfbbe8238fca342f797b61d5de1eeae9ccf73265af734071"
   },
   "orphanEntries": 0,
@@ -230,44 +230,119 @@
         {
           "stepNumber": 6,
           "stepKey": "close-out",
-          "description": "**Close-out.**",
-          "status": "pending",
-          "state": "pending",
-          "box": "[ ]",
-          "isPlanned": true,
+          "description": "close_session succeeded; all 10 gates PASS. Cost at close (a floor): orchestrator seat 1401.0 credits / \\.01 lower_bound, routed CLI 280.7 credits / \\.81 measured, routed API not applicable; TOTAL LOWER BOUND 1681.7 credits / \\.82. Two verification rounds (discovery VERIFIED 0 blocking; A4 delta-scoped remediation-review VERIFIED 0 findings) and two full pytest runs of record, the second because the A4 round's artifacts staled the first.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
           "isActive": false,
-          "startedAt": null,
-          "isTerminal": false
+          "startedAt": "2026-08-14T10:47:24.780982-04:00",
+          "isTerminal": true
         }
       ],
       "counts": {
-        "pending": 1,
+        "pending": 0,
         "in-progress": 0,
-        "complete": 5,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
         "total": 6
       },
       "current": [],
-      "remaining": [
-        "close-out"
-      ]
+      "remaining": []
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T11:39:27.926061-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "document-transcript-rotation-as-the-dominant",
+          "description": "Wrote 'Rotation, and the trade we declined' in docs/ai-led-session-workflow.md (a9f211a7 measurement, the opus-5 context bands, a ~150K token trigger taken at the first step boundary, the survival contract, and the repeat-an-abandoned-path failure mode). Added the reciprocal citation to Delegation Discipline rule 3's statefulness carve-out and pointed the 'Child output is untrusted data' declined-trade paragraph at the new section. Added rotation as the fourth cost lever in docs/planning/orchestration-strategy.md (section 2 and the section 7 summary).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T11:39:27.959607-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "record-the-declined-trade",
+          "description": "Wrote 'The trade we declined' with the naive table reproduced beside the matched-context table and the T3 confused-deputy reasoning. Replaced the Delegation Discipline pointer in AGENTS.md, CLAUDE.md and GEMINI.md with one byte-identical block (verified: 1129 bytes, identical sha256 in all three) - CLAUDE.md and GEMINI.md still named Sets 110-112 as a live window and all three pointed at thresholds Session 1 deleted. Authored change-log.md and ai_router/changelog.d/0130-set-131-outsourcing-policy-restoration.md via the sanctioned changelog writer. Journaled the ~150K rotation threshold.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T11:45:41.752090-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "cross-provider-verification",
+          "description": "Round 1 (discovery, 2-way fan-out, both gpt-5.5, anthropic excluded as the orchestrator's effective provider): VERIFIED, 0 blocking, 2 Nits (one per lens) - an optimistic 150-300K payback figure and a matched-context table narrower than its source. Both fixed rather than merely recorded; sidecar in s3-remediation-round-1.md. post_round_delta classified the delta as shipped-code (A4.2) because docs/ai-led-session-workflow.md sits outside every declared test surface, so round 2 ran as a delta-scoped remediation-review (gpt-5.5, anthropic excluded): VERIFIED, 0 findings.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T11:49:50.795026-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three expensive suites re-run after the last change and recorded. pytest 4490 passed / 9 skipped in one invocation (753s) - identical to Sessions 1 and 2, which is the spec's zero-new-tests budget showing up as a flat count. mocha 1455 passing / 2 pending (42s). playwright 30 passed in the declared invocation (7.4m) with vsix-first-run-walkthrough.spec.ts:218 timing out at 300s, then that one spec re-run in isolation and passing in 45.3s - the third consecutive session of this set to hit the identical spec for the identical load-induced reason; journaled. run_of_record check: all three fresh and green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T12:07:31.870249-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "close-out-including-the-step-9",
+          "description": "Authoring disposition.json, committing and pushing, running close_session, then the Step 9 reorganization review of project-guidance.md / lessons-learned.md.",
+          "status": "in-progress",
+          "state": "in-progress",
+          "box": "[~]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T12:31:31.990781-04:00",
+          "isTerminal": false
+        }
+      ],
       "counts": {
         "pending": 0,
-        "in-progress": 0,
-        "complete": 0,
+        "in-progress": 1,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
-      "current": [],
-      "remaining": []
+      "current": [
+        "close-out-including-the-step-9"
+      ],
+      "remaining": [
+        "close-out-including-the-step-9"
+      ]
     }
   ]
 }

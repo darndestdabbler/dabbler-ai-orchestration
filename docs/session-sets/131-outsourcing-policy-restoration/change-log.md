@@ -239,3 +239,67 @@ starting point, never a patch to trust: nothing in it had been through
 cross-provider verification or any workflow gate. Its four embedded
 design decisions were **re-decided and journaled** rather than inherited,
 and Session 2 departed from it outright on the rename.
+
+---
+
+## Step 9 — reorganization review of the guidance corpus
+
+**Outcome: no changes to `project-guidance.md` or `lessons-learned.md`
+this session, and one named residual.** Both parts have reasons.
+
+### The two candidate lessons this set produced — recommended, not admitted
+
+The spec predicted at least two: **role/context confounding reads as a
+price signal**, and **an unbounded child can cost more than the
+orchestrator doing the work**. Both are real and both were expensive to
+learn. Neither is admitted to the active tier, on the Set 085 admission
+test rather than on space:
+
+- Both already have a **canonical home outside preload**. Role/context
+  confounding is written into `docs/ai-led-session-workflow.md` →
+  *Rotation, and the trade we declined*, where the naive table sits
+  directly above the table that refutes it — the rule is stated where a
+  reader meets the evidence that provokes it. Unbounded child cost is in
+  the same document under *Bound the child*, and its numbers are in
+  `router-config.yaml` under `delegation.child_budget`, which the
+  orchestrator reads at session start.
+- Neither has **recurred outside this set**. The admission test asks for
+  recent *recurrence*, and one set is not a pattern. A lesson admitted on
+  its first occurrence spends preload budget on a hypothesis.
+- `lessons-learned.md` is at **100% of its 2,504-token ceiling**. Ceilings
+  ratchet down only, so admitting either rule requires demoting something
+  else — a trade that should be made when the rule has earned it, not to
+  clear a set's paperwork.
+
+If either rule recurs in a later set, `cite_lessons` reactivating it from
+the archive is cheaper than the demotion this session would have forced.
+
+### Residual: `AGENTS.md` is over its preload ceiling, and this session put it there
+
+Session 3 replaced the drifted Delegation Discipline pointer in all three
+engine files with one byte-identical block. The block is 1,129 bytes;
+`AGENTS.md` grew by ~189 tokens and now sits **177 tokens over its
+2,031-token ceiling**, carrying the total preload 141 tokens over 12,600.
+`python -m ai_router.guidance_report --check` fails on both counts.
+
+This was found by the Step 9 review, not by verification — neither
+cross-provider round looks at preload budgets, and no test asserts them.
+Worth noting on its own: **the ceiling check is the only gate that caught
+a regression this session shipped**, and it runs at Step 9, after close.
+
+The fix is a removal, never a ceiling raise (a raise is an
+operator-authorized config edit). A tightened pointer plus deletion of the
+engine files' `## Decision rights (pointer)` section — which is strictly
+redundant, since it points at `session-constitution.md`, itself preload,
+which already names the canonical doc — was drafted and measured at 1,957
+tokens for `AGENTS.md` (74 tokens of headroom) and 12,490 total. It was
+**reverted unapplied**: the operator assigned the guidance-ceiling work to
+**Set 121**, and the state that shipped is the state cross-provider
+verification actually reviewed.
+
+**Owner: Set 121.** The measured fix above is the starting point, and the
+structural observation behind it is the more useful half — `AGENTS.md` was
+already at 99.4% of its ceiling before this session touched it, so *any*
+addition breaches it. A file with 13 tokens of headroom is not a file with
+a budget; it is a file that will fail on the next edit whoever makes it.
+

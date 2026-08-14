@@ -195,6 +195,29 @@ measured that cutting test *count* does not buy wall clock (−6.1% of
 count bought 0.4%). The live levers are the slow tail and the Layer 3
 worker policy, which **Set 117** already owns.
 
+> **Set 117 is paused and its resume condition is already met — this is
+> the actionable handoff.** `117-bounded-test-parallelism` was cancelled
+> on 2026-08-10 as a *pause*, not an abandonment: *"restore with
+> `restore_session_set` once Set 119 is complete"* (`preCancelStatus:
+> in-progress`, Sessions 2-3 pending). **Set 119 completed on
+> 2026-08-11**, so 117 has been restorable for three days and nothing
+> announces it — paused sets are invisible to the D6 one-active-set
+> guard by design, so the discipline that finds them is human review of
+> the Cancelled bucket. Restoring 117 is the move that serves the goal
+> this set could not:
+>
+> ```
+> python -m ai_router.session_lifecycle restore \
+>     --session-set-dir docs/session-sets/117-bounded-test-parallelism \
+>     --reason "Set 119 complete; resume condition met"
+> ```
+>
+> Set 117 also owns the Layer 3 worker-contention failure Session 1 of
+> this set hit and had to route around under an operator attestation
+> (`vsix-first-run-walkthrough.spec.ts` starves at `--workers=4` and
+> passes at `--workers=1`). That is a standing cost on every session's
+> close, not a one-off.
+
 **One residual finding, recorded and not acted on.** Session 1 found
 five production modules with no test file importing them at all
 (`close_out.py`, `notifications.py`, `prompting.py`,

@@ -155,3 +155,12 @@ cost of running it — which is the argument that made stopping cheap.
 faster suite, the lever is the slowest ~25 tests and the Layer 3 worker
 policy (Set 117), not the test count. Set 116 and Set 112 both measured
 that, and this set's spec records it as a decision not to reopen.
+
+> **Set 117 is paused with its resume condition already met.**
+> `117-bounded-test-parallelism` was cancelled on 2026-08-10 as a pause —
+> *"restore once Set 119 is complete"*, `preCancelStatus: in-progress`,
+> Sessions 2-3 pending. Set 119 completed on 2026-08-11. Paused sets are
+> invisible to the D6 one-active-set guard by design, so nothing
+> announces this; restoring 117 is the move that serves the goal Set 118
+> could not. It also owns the Layer 3 worker-contention failure Session 1
+> of this set had to route around under an operator attestation.

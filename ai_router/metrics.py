@@ -122,6 +122,20 @@ payload (see record_adjudication for the schema).
 
 Analysis is done by reading the file; no query layer is needed for the
 data volumes this workflow produces. See print_metrics_report().
+
+Set 130 S3 -- what ``cost_usd`` is a measurement OF
+---------------------------------------------------
+``cost_usd`` is billing-authoritative only on rows where
+``billed_usage_unavailable`` is not true. On a ``copilot-cli`` row it is a
+placeholder beside a flag that says as much, and the spend is real:
+Set 118 Session 1's five routed rounds recorded ``$0.0000`` here and
+consumed 866.4 AI credits ($8.66). ``print_metrics_report`` therefore
+reports the priced calls as priced, names the unpriced ones instead of
+adding them in as zeros, and renders ``-`` rather than ``$0.0000`` for a
+group with nothing priced in it. The seat measurement lives in
+``ai_router/seat_cost.py`` and is keyed by ``transport_session_id``;
+``ai_router/docs/seat-cost.md`` is canonical for the three measurements
+and the rule that a report must say which one it is showing.
 """
 
 import json
@@ -485,6 +499,98 @@ def load_metrics(config: dict) -> list[dict]:
     return records
 
 
+def transport_session_ids(
+    session_set,
+    session_number: Optional[int] = None,
+    *,
+    config: Optional[dict] = None,
+    records: Optional[list] = None,
+) -> list:
+    """The routed children's CONVERSATION ids for one workflow session.
+
+    Set 130 S3. ``transport_session_id`` (Set 130 S2) is the join key that
+    makes a ``copilot-cli`` row's real cost recoverable, and this is the
+    only sanctioned way to ask for a session's worth of them: the log is
+    keyed by the normalized set slug (:func:`_session_set_name`), so a
+    caller filtering on a raw path would silently match nothing against the
+    historical mixed-shape rows.
+
+    Deduped and order-preserving. Rows with no id contribute nothing --
+    every pre-Set-130 row and every ``api``-profile row is null there, and
+    null means "not captured", never "no conversation existed". A caller
+    that gets back fewer ids than it made calls therefore holds a **floor**,
+    not a complete set, which is exactly what ``seat_cost`` labels
+    ``lower_bound``.
+
+    *session_number* of ``None`` means every session of the set.
+    """
+    if records is None:
+        records = load_metrics(config or {})
+    wanted = _session_set_name(session_set)
+    out: list = []
+    for record in records:
+        if not isinstance(record, dict):
+            continue
+        if _session_set_name(record.get("session_set")) != wanted:
+            continue
+        if (
+            session_number is not None
+            and record.get("session_number") != session_number
+        ):
+            continue
+        value = record.get("transport_session_id")
+        if not isinstance(value, str):
+            continue
+        cleaned = value.strip()
+        if cleaned and cleaned not in out:
+            out.append(cleaned)
+    return out
+
+
+def priced_and_unpriced(records: list) -> tuple:
+    """Split *records* into (billing-authoritative, not-priced-here).
+
+    Set 130 S3. ``cost_usd`` is only a measurement on rows whose
+    ``billed_usage_unavailable`` is not true; on a ``copilot-cli`` row it is
+    a placeholder sitting beside a flag that says so. Summing the two
+    together and printing one dollar figure is how this report came to say
+    ``Total cost: $0.0000`` for a session that consumed $8.66 of AI credits
+    (``ai_router/docs/seat-cost.md``, measurement ``routed_seat``). Every
+    cost cell below goes through this split, so no table can drift from the
+    header (L-069-1).
+    """
+    priced: list = []
+    unpriced: list = []
+    for record in records:
+        if isinstance(record, dict) and record.get("billed_usage_unavailable") is True:
+            unpriced.append(record)
+        else:
+            priced.append(record)
+    return priced, unpriced
+
+
+def _priced_sum(records: list) -> float:
+    """The billing-authoritative cost of *records*, used only for ordering."""
+    priced, _ = priced_and_unpriced(records)
+    return sum(r.get("cost_usd", 0) or 0 for r in priced)
+
+
+def _cost_cell(records: list, width: int = 8) -> str:
+    """Render a cost cell that never presents unpriced calls as ``$0.0000``.
+
+    A group with no billing-authoritative row at all renders ``-``: printing
+    ``$0.0000`` there is the fail-open defect, because zero looks like a
+    measurement (L-112-1). A mixed group prints the priced sum with a ``+``
+    suffix, which says out loud that something in that row is not in the
+    number. ASCII only (project-guidance Code Style).
+    """
+    priced, unpriced = priced_and_unpriced(records)
+    if not priced:
+        return f"{'-':>{width + 2}}"
+    total = sum(r.get("cost_usd", 0) or 0 for r in priced)
+    return f"${total:>{width}.4f}" + ("+" if unpriced else " ")
+
+
 def served_model_mismatches(records: list) -> dict:
     """Group rows where the provider served something other than what was
     asked for, keyed by ``"<requested> -> <served>"`` with the call count.
@@ -542,27 +648,44 @@ def print_metrics_report(config: dict) -> None:
     print(f"AI ROUTER — METRICS REPORT  ({len(records)} calls logged)")
     print("=" * 68)
 
-    # Overall totals
-    total_cost = sum(r.get("cost_usd", 0) or 0 for r in records)
+    # Overall totals. Set 130 S3: cost_usd is a measurement only on rows
+    # that do not carry billed_usage_unavailable, so the header says which
+    # measurement it is showing and names what it could not measure --
+    # ai_router/docs/seat-cost.md section 2, the rule this report used to
+    # break by printing an authoritative "Total cost: $0.0000".
+    priced, unpriced = priced_and_unpriced(records)
+    total_cost = sum(r.get("cost_usd", 0) or 0 for r in priced)
     total_input = sum(r.get("input_tokens", 0) or 0 for r in records)
     total_output = sum(r.get("output_tokens", 0) or 0 for r in records)
-    print(f"Total cost:           ${total_cost:.4f}")
+    if priced:
+        print(f"Routed cost (Direct APIs, priced):  ${total_cost:.4f} "
+              f"over {len(priced)} call(s)")
+    else:
+        print("Routed cost (Direct APIs, priced):  none -- no call in this "
+              "log was priced")
+    if unpriced:
+        with_id = sum(1 for r in unpriced if r.get("transport_session_id"))
+        print(f"NOT PRICED HERE:                    {len(unpriced)} call(s) "
+              "on a seat transport (billed_usage_unavailable)")
+        print(f"                                    real spend in AI credits; "
+              f"{with_id} carry the conversation id that prices them")
+        print("                                    -> python -m ai_router.seat_cost "
+              "--routed <id> ...  (ai_router/docs/seat-cost.md)")
     print(f"Total input tokens:   {total_input:,}")
     print(f"Total output tokens:  {total_output:,}")
 
     print_served_model_mismatches(records)
 
-    # By model: call count, total cost, escalation rate
+    # By model: call count, cost, escalation rate
     print("\n--- By model ---")
     by_model: dict[str, dict] = {}
     for r in records:
         m = r.get("model", "?")
         slot = by_model.setdefault(m, {
-            "calls": 0, "cost": 0.0, "escalated": 0,
+            "records": [], "escalated": 0,
             "provider": r.get("provider", "?"),
         })
-        slot["calls"] += 1
-        slot["cost"] += r.get("cost_usd", 0) or 0
+        slot["records"].append(r)
         if r.get("escalated"):
             slot["escalated"] += 1
 
@@ -570,10 +693,11 @@ def print_metrics_report(config: dict) -> None:
           f"{'cost':>10} {'esc%':>6}"
     print(hdr)
     print(f"  {'-'*18} {'-'*11} {'-'*6} {'-'*10} {'-'*6}")
-    for m, s in sorted(by_model.items(), key=lambda kv: -kv[1]["cost"]):
-        esc_pct = (100.0 * s["escalated"] / s["calls"]) if s["calls"] else 0
-        print(f"  {m:<18} {s['provider']:<11} {s['calls']:>6} "
-              f"${s['cost']:>8.4f} {esc_pct:>5.1f}%")
+    for m, s in sorted(by_model.items(), key=lambda kv: -_priced_sum(kv[1]["records"])):
+        calls = len(s["records"])
+        esc_pct = (100.0 * s["escalated"] / calls) if calls else 0
+        print(f"  {m:<18} {s['provider']:<11} {calls:>6} "
+              f"{_cost_cell(s['records'])} {esc_pct:>5.1f}%")
 
     # By task type: cost concentration and escalation signal
     print("\n--- By task type ---")
@@ -581,11 +705,10 @@ def print_metrics_report(config: dict) -> None:
     for r in records:
         t = r.get("task_type", "?")
         slot = by_task.setdefault(t, {
-            "calls": 0, "cost": 0.0, "escalated": 0,
+            "records": [], "escalated": 0,
             "models_used": {},
         })
-        slot["calls"] += 1
-        slot["cost"] += r.get("cost_usd", 0) or 0
+        slot["records"].append(r)
         if r.get("escalated"):
             slot["escalated"] += 1
         m = r.get("model", "?")
@@ -595,14 +718,15 @@ def print_metrics_report(config: dict) -> None:
            f"{'esc%':>6}  model distribution"
     print(hdr2)
     print(f"  {'-'*24} {'-'*6} {'-'*10} {'-'*6}  {'-'*36}")
-    for t, s in sorted(by_task.items(), key=lambda kv: -kv[1]["cost"]):
-        esc_pct = (100.0 * s["escalated"] / s["calls"]) if s["calls"] else 0
+    for t, s in sorted(by_task.items(), key=lambda kv: -_priced_sum(kv[1]["records"])):
+        calls = len(s["records"])
+        esc_pct = (100.0 * s["escalated"] / calls) if calls else 0
         dist = ", ".join(
             f"{m}:{n}" for m, n in sorted(
                 s["models_used"].items(), key=lambda kv: -kv[1]
             )[:3]
         )
-        print(f"  {t:<24} {s['calls']:>6} ${s['cost']:>8.4f} "
+        print(f"  {t:<24} {calls:>6} {_cost_cell(s['records'])} "
               f"{esc_pct:>5.1f}%  {dist}")
 
     # Verifier agreement: verification calls only
@@ -641,15 +765,21 @@ def print_metrics_report(config: dict) -> None:
         ss = _session_set_name(r.get("session_set"))
         if not ss:
             continue
-        slot = sets.setdefault(ss, {"calls": 0, "cost": 0.0})
-        slot["calls"] += 1
-        slot["cost"] += r.get("cost_usd", 0) or 0
+        slot = sets.setdefault(ss, {"records": []})
+        slot["records"].append(r)
 
     if sets:
         print("\n--- By session set ---")
         print(f"  {'session_set':<40} {'calls':>6} {'cost':>10}")
         print(f"  {'-'*40} {'-'*6} {'-'*10}")
         for ss, s in sorted(sets.items()):
-            print(f"  {ss:<40} {s['calls']:>6} ${s['cost']:>8.4f}")
+            print(f"  {ss:<40} {len(s['records']):>6} "
+                  f"{_cost_cell(s['records'])}")
+
+    if unpriced:
+        print("\n  '-' means no call in that row was priced here; a trailing "
+              "'+' means some were not.")
+        print("  Neither is zero spend. Seat cost is measured by conversation "
+              "id, not by this column.")
 
     print("=" * 68 + "\n")

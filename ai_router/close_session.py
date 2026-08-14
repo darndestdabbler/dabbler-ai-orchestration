@@ -242,6 +242,13 @@ class CloseoutOutcome:
     gate_results: List[GateResult] = field(default_factory=list)
     verification_method: str = "skipped"
     events_emitted: List[str] = field(default_factory=list)
+    # Set 130 S3: what the session cost, as the disposition recorded it,
+    # plus a note naming the absence when it recorded nothing. Both are
+    # reported: "no cost block" is a statement about the measurement, not
+    # an absence of spend, and printing nothing was how a session's real
+    # cost stayed invisible.
+    cost: Optional[dict] = None
+    cost_note: Optional[str] = None
 
     @property
     def exit_code(self) -> int:
@@ -266,6 +273,8 @@ class CloseoutOutcome:
             "verification": {
                 "method": self.verification_method,
             },
+            "cost": dict(self.cost) if self.cost is not None else None,
+            "cost_note": self.cost_note,
             "events_emitted": list(self.events_emitted),
         }
 
@@ -1390,6 +1399,67 @@ def _emit_event(
 # Output emission
 # ---------------------------------------------------------------------------
 
+def _format_cost_lines(cost: dict) -> List[str]:
+    """Render a recorded cost block, or say why it cannot be rendered."""
+    try:
+        from seat_cost import format_cost_block  # type: ignore[import-not-found]
+    except ImportError:  # pragma: no cover - packaged context
+        from .seat_cost import format_cost_block  # type: ignore[no-redef]
+    return list(format_cost_block(cost))
+
+
+#: What the close prints when the disposition recorded no cost block. Named
+#: rather than silent: Step 10 reports cost, and "not measured" is a
+#: different statement from "nothing was spent" -- the difference this whole
+#: set exists to make visible (ai_router/docs/seat-cost.md).
+COST_NOT_RECORDED_NOTE = (
+    "not recorded -- disposition.cost is absent, so this session's spend is "
+    "UNMEASURED, not zero. On a Copilot seat: python -m ai_router.seat_cost "
+    "--session-set-dir <dir> --cost-block"
+)
+
+
+def _apply_cost_report(
+    outcome: CloseoutOutcome,
+    disposition: Optional[Disposition],
+) -> None:
+    """Attach the disposition's cost block (or the note naming its absence).
+
+    The block is **validated before it is reported**. ``read_disposition``
+    reconstructs whatever is on disk without checking it, and the close is
+    the one place a recorded cost block is shown to a human -- so a block
+    that was hand-edited, pasted from an older producer, or written by a
+    future one is refused here rather than rendered. Refusing is named, not
+    silent: the operator gets the errors, because "this record is not
+    trustworthy" is itself the measurement result.
+    """
+    block = getattr(disposition, "cost", None) if disposition is not None else None
+    if not isinstance(block, dict) or not block:
+        outcome.cost = None
+        outcome.cost_note = COST_NOT_RECORDED_NOTE
+        return
+    errors = _validate_cost_block(block)
+    if errors:
+        outcome.cost = None
+        outcome.cost_note = (
+            "recorded, but REFUSED -- disposition.cost does not satisfy its "
+            "own contract, so nothing from it is reported as a measurement: "
+            + "; ".join(errors)
+        )
+        return
+    outcome.cost = dict(block)
+    outcome.cost_note = None
+
+
+def _validate_cost_block(block: dict) -> List[str]:
+    """Contract errors for a recorded cost block, via the one validator."""
+    try:
+        from disposition import _validate_cost  # type: ignore[import-not-found]
+    except ImportError:  # pragma: no cover - packaged context
+        from .disposition import _validate_cost  # type: ignore[no-redef]
+    return list(_validate_cost(block))
+
+
 def _emit_output(outcome: CloseoutOutcome, *, json_mode: bool) -> None:
     """Write the outcome to stdout in either JSON or human-readable form.
 
@@ -1428,6 +1498,15 @@ def _emit_output(outcome: CloseoutOutcome, *, json_mode: bool) -> None:
             if not g.passed and g.remediation:
                 line += f" — {g.remediation}"
             print(line)
+    # Set 130 S3: Step 10 reports cost, and it says which measurement it is
+    # showing. A session that recorded none says so out loud rather than
+    # letting the omission read as "nothing was spent".
+    if outcome.cost is not None:
+        print("  cost:")
+        for line in _format_cost_lines(outcome.cost):
+            print(f"    {line}")
+    elif outcome.cost_note:
+        print(f"  cost: {outcome.cost_note}")
     if outcome.events_emitted:
         print(f"  events_emitted: {', '.join(outcome.events_emitted)}")
 
@@ -1630,6 +1709,12 @@ def run(
     no_router = _resolve_no_router_for_run(args, session_set_dir)
 
     disposition = _read_disposition_or_none(session_set_dir)
+
+    # Set 130 S3: record what the session cost as early as the disposition
+    # is in hand, so the figure reaches the operator on every exit below --
+    # including a refused close, which is exactly when a session has spent
+    # money and has the least to show for it.
+    _apply_cost_report(outcome, disposition)
 
     # ``--force`` accepts a missing disposition. By the time we reach
     # this branch ``_validate_args`` has confirmed ``--force`` is
@@ -1912,6 +1997,7 @@ def run(
             backstop_written_paths = list(backstop.written_paths)
             if backstop.status == STATUS_VERIFIED:
                 disposition = _read_disposition_or_none(session_set_dir)
+                _apply_cost_report(outcome, disposition)
                 verdict = resolve_close_verdict(disposition)
                 _emit_event(
                     session_set_dir,

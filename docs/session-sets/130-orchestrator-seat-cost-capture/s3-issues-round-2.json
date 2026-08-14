@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The documented whole-session cost command misclassifies `routed_api` on Copilot-seat sessions.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/seat_cost.py:1038`, `ai_router/seat_cost.py:1090`, `ai_router/docs/seat-cost.md:184`, `docs/disposition-schema.md:72`, `ai_router/close_session.py:1415`\n  - **Failure scenario:** A typical Copilot-seat operator follows the exact command printed by close output or documented as the producer for `disposition.cost`: `python -m ai_router.seat_cost --session-set-dir <dir> --cost-block`. Because the CLI passes `routed_api_not_applicable=args.no_api_calls` and `--no-api-calls` defaults false, that path treats Direct-API routed cost as `UNKNOWN` instead of `not_applicable`. This is probable because the no-flag command is the advertised path, and it materially breaks the session objective by suppressing the total for the normal Copilot-seat case.\n  - **Acceptance criterion:** `JUDGMENT - The advertised --session-set-dir --cost-block path for a Copilot-seat session either marks routed_api as not_applicable by default or the advertised command/close note includes the required flag, so a planted session with measured orchestrator and routed seat ids produces a total instead of a bogus routed_api UNKNOWN component.`\n  - **Details:** **Violation:** the docs say `cost` is “Produced by python -m ai_router.seat_cost --session-set-dir <dir> --cost-block,” and the close note says “On a Copilot seat” to run that same command; `measure_session()` also states the Copilot-seat default is `routed_api_not_applicable=True`. **Impact:** the main documented producer path yields a structurally incomplete cost block and close report for the common Copilot transport, naming a component as unmeasured even though Direct-API cost cannot exist there. **Evidence:** the parser defines `--no-api-calls` as `store_true` default false, and the `--session-set-dir` branch passes that false directly into `measure_session()`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical Copilot-seat operator follows the exact command printed by close output or documented as the producer for `disposition.cost`: `python -m ai_router.seat_cost --session-set-dir <dir> --cost-block`. Because the CLI passes `routed_api_not_applicable=args.no_api_calls` and `--no-api-calls` defaults false, that path treats Direct-API routed cost as `UNKNOWN` instead of `not_applicable`. This is probable because the no-flag command is the advertised path, and it materially breaks the session objective by suppressing the total for the normal Copilot-seat case.",
+      "evidencePaths": [
+        "ai_router/seat_cost.py",
+        "ai_router/docs/seat-cost.md",
+        "docs/disposition-schema.md",
+        "ai_router/close_session.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The advertised --session-set-dir --cost-block path for a Copilot-seat session either marks routed_api as not_applicable by default or the advertised command/close note includes the required flag, so a planted session with measured orchestrator and routed seat ids produces a total instead of a bogus routed_api UNKNOWN component."
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "b641fdda84ac55abefd887c0e9ac981b1e6afaae"
+}

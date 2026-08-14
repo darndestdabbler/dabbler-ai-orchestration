@@ -55,6 +55,39 @@
     "lessons_cited": {
       "type": "array",
       "items": { "type": "string" }
+    },
+    "uat": {
+      "description": "Set 111 S4 (added to this schema in Set 130 S3). How a requiresUAT session discharged its guided-look walk. The uat_walk_recorded close gate reads it; a session that owes a walk and carries no block does not close. Omit-null on sets that declare no UAT. It was omitted here when it shipped, so this schema rejected -- under additionalProperties: false -- exactly the dispositions the gate requires.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "attestation"],
+      "properties": {
+        "status": { "enum": ["walked", "waived"] },
+        "attestation": { "type": "string", "minLength": 1 },
+        "walkArtifact": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "status": { "const": "walked" } },
+            "required": ["status"]
+          },
+          "then": { "required": ["walkArtifact"] }
+        }
+      ]
+    },
+    "checklist": {
+      "description": "Set 114 S1 (added to this schema in Set 130 S3). The operator-attested waiver for a step-checklist post that was missed. status is closed to 'waived' -- the block exists only to put a name against an omission; a session that posted on cadence needs no block, because the ledger already proves it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "attestation"],
+      "properties": {
+        "status": { "const": "waived" },
+        "attestation": { "type": "string", "minLength": 1 }
+      }
+    },
+    "cost": {
+      "$ref": "#/$defs/Cost"
     }
   },
   "allOf": [
@@ -103,6 +136,140 @@
     }
   ],
   "$defs": {
+    "Cost": {
+      "description": "Set 130 S3. What the session cost, by component, with a per-component status. Produced by seat_cost.CostReport.to_cost_block(); ai_router/docs/seat-cost.md is canonical for the three measurements and for the rule this shape encodes -- a report must say which measurement it is showing and name what it could not measure. Three cross-field rules below are the contract rather than shape, and each is also enforced by validate_disposition() so the two halves cannot drift (project-guidance Code Style: validator/schema parity in BOTH directions). One rule is validator-only because draft 2020-12 cannot express it: a component name may not appear twice.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["measured_at", "components"],
+      "properties": {
+        "measured_at": {
+          "description": "'close' = taken by the session about itself, whose closing turns are not in the store yet, so the figure is a floor. 'retrospective' = taken afterwards, exact.",
+          "enum": ["close", "retrospective"]
+        },
+        "store_schema_version": {
+          "description": "The local usage store's schema_version the number was read against, or null when nothing was read. The store path itself is deliberately NOT carried here: it is an absolute path on one operator's machine and this artifact is committed.",
+          "type": ["integer", "null"]
+        },
+        "components": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/CostComponent" }
+        },
+        "total_status": {
+          "enum": [
+            "measured",
+            "lower_bound",
+            "unknown",
+            "unavailable",
+            "schema_unrecognized",
+            "not_applicable"
+          ]
+        },
+        "total_credits": { "type": ["number", "null"] },
+        "total_usd": { "type": ["number", "null"] },
+        "unmeasured": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "allOf": [
+        {
+          "description": "Rule 2: a report containing an unmeasured component has no total. A total that quietly drops one reports unmeasured spend as zero.",
+          "if": {
+            "properties": {
+              "components": {
+                "contains": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "enum": ["unknown", "unavailable", "schema_unrecognized"]
+                    }
+                  },
+                  "required": ["status"]
+                }
+              }
+            },
+            "required": ["components"]
+          },
+          "then": {
+            "properties": {
+              "total_credits": { "type": "null" },
+              "total_usd": { "type": "null" }
+            }
+          }
+        },
+        {
+          "description": "Rule 3: an as-of-close figure cannot claim to be exact (spec T5 -- a session cannot measure itself).",
+          "if": {
+            "properties": { "measured_at": { "const": "close" } },
+            "required": ["measured_at"]
+          },
+          "then": {
+            "properties": {
+              "total_status": { "not": { "const": "measured" } }
+            }
+          }
+        }
+      ]
+    },
+    "CostComponent": {
+      "description": "One separately-labelled component. Rule 1 lives here: credits and usd are null for every non-numeric status, because 0.0 beside status 'unknown' reads as a measurement and a later reader cannot tell it from a real zero (L-112-1).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component", "status"],
+      "properties": {
+        "component": {
+          "enum": ["orchestrator_seat", "routed_seat", "routed_api"]
+        },
+        "status": {
+          "enum": [
+            "measured",
+            "lower_bound",
+            "unknown",
+            "unavailable",
+            "schema_unrecognized",
+            "not_applicable"
+          ]
+        },
+        "credits": { "type": ["number", "null"] },
+        "usd": { "type": ["number", "null"] },
+        "event_count": { "type": "integer", "minimum": 0 },
+        "session_ids": { "type": "array", "items": { "type": "string" } },
+        "measured_session_ids": { "type": "array", "items": { "type": "string" } },
+        "unmeasured_session_ids": { "type": "array", "items": { "type": "string" } },
+        "reason": { "type": ["string", "null"] }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": ["unknown", "unavailable", "schema_unrecognized"]
+              }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": {
+              "credits": { "type": "null" },
+              "usd": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": { "enum": ["measured", "lower_bound", "not_applicable"] }
+            },
+            "required": ["status"]
+          },
+          "then": {
+            "properties": { "credits": { "type": "number" } },
+            "required": ["credits"]
+          }
+        }
+      ]
+    },
     "NextOrchestrator": {
       "type": "object",
       "additionalProperties": false,

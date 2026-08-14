@@ -473,3 +473,346 @@ def test_cli_output_is_ascii_only(tmp_path, capsys):
     out = capsys.readouterr().out
     out.encode("cp1252")
     assert out == out.encode("ascii", "strict").decode("ascii")
+
+
+# ==========================================================================
+# Set 130 Session 3 -- the join: ids the repo recorded, priced by the reader
+#
+# Sessions 1 and 2 built the two halves; this is the seam between them, and
+# a seam is where a plausible wrong number gets in. Every test below plants
+# BOTH artifacts a real run writes -- a session-state.json and a
+# router-metrics.jsonl -- and drives the public entrypoint against them.
+# ==========================================================================
+
+
+def _plant_state(session_set_dir: Path, sessions):
+    """Write a v4 session-state.json. ``sessions`` is (number, status, ids)."""
+    import json
+
+    session_set_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schemaVersion": 4,
+        "sessionSetName": session_set_dir.name,
+        "status": "in-progress",
+        "sessions": [],
+    }
+    for number, status, ids in sessions:
+        orchestrator = {"engine": "github-copilot", "model": "claude-opus-5"}
+        if ids is not None:
+            orchestrator["seatSessionIds"] = list(ids)
+        payload["sessions"].append(
+            {"number": number, "status": status, "orchestrator": orchestrator}
+        )
+    (session_set_dir / "session-state.json").write_text(
+        json.dumps(payload, indent=2), encoding="utf-8"
+    )
+    return session_set_dir
+
+
+def _plant_metrics(path: Path, rows):
+    """Write a router-metrics.jsonl. ``rows`` is (session_number, id)."""
+    import json
+
+    lines = []
+    for number, transport_session_id in rows:
+        lines.append(json.dumps({
+            "session_set": path.parent.name,
+            "session_number": number,
+            "call_type": "route",
+            "transport": "copilot-cli",
+            "billed_usage_unavailable": True,
+            "cost_usd": 0.0,
+            "transport_session_id": transport_session_id,
+        }))
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return path
+
+
+def test_measure_session_joins_recorded_ids_from_both_writers(tmp_path, monkeypatch):
+    """The whole chain: start_session's ids + record_call's ids -> one report."""
+    store = _plant_store(tmp_path / "s.db", [
+        ("orch-a", 40_000_000_000),
+        ("orch-b", 2_000_000_000),
+        ("child-1", 8_000_000_000),
+    ])
+    set_dir = _plant_state(
+        tmp_path / "130-set",
+        [(1, "complete", ["earlier"]), (2, "in-progress", ["orch-a", "orch-b"])],
+    )
+    metrics_path = _plant_metrics(
+        set_dir / "router-metrics.jsonl",
+        [(2, "child-1"), (2, None), (1, "not-this-session")],
+    )
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
+    monkeypatch.delenv(seat_cost.SEAT_SESSION_ID_ENV, raising=False)
+
+    report = seat_cost.measure_session(
+        str(set_dir), 2, live=False, store_path=str(store)
+    )
+
+    orch = report.get(ORCH)
+    assert orch.session_ids == ("orch-a", "orch-b"), (
+        "session 1's conversation must not be billed to session 2"
+    )
+    assert orch.credits == pytest.approx(42.0)
+    assert orch.status == seat_cost.STATUS_MEASURED
+    routed = report.get(ROUTED)
+    assert routed.session_ids == ("child-1",), "a null id is not a conversation"
+    assert routed.credits == pytest.approx(8.0)
+    assert routed.status == seat_cost.STATUS_LOWER_BOUND, (
+        "the log records 2 routed calls for this session and only 1 carries "
+        "an id, so the priced figure is a floor -- measure() cannot know "
+        "that, because it only ever sees the ids it was handed"
+    )
+    assert "2 routed call(s)" in (routed.reason or "")
+    assert report.get(API).status == seat_cost.STATUS_NOT_APPLICABLE
+    assert report.total_credits == pytest.approx(50.0)
+    assert report.total_status == seat_cost.STATUS_LOWER_BOUND
+
+
+def test_a_session_measuring_itself_reports_a_floor_and_counts_itself(
+    tmp_path, monkeypatch
+):
+    """T5. Live means in-flight, and the closing conversation is included even
+    when a context reset started it without a re-register."""
+    store = _plant_store(tmp_path / "s.db", [
+        ("orch-a", 40_000_000_000),
+        ("mid-reset", 5_000_000_000),
+        ("child-1", 1_000_000_000),
+    ])
+    set_dir = _plant_state(tmp_path / "130-set", [(1, "in-progress", ["orch-a"])])
+    metrics_path = _plant_metrics(set_dir / "router-metrics.jsonl", [(1, "child-1")])
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
+    monkeypatch.setenv(seat_cost.SEAT_SESSION_ID_ENV, "mid-reset")
+
+    report = seat_cost.measure_session(
+        str(set_dir), 1, live=True, store_path=str(store)
+    )
+    orch = report.get(ORCH)
+    assert orch.status == seat_cost.STATUS_LOWER_BOUND, (
+        "a session cannot claim an exact figure about itself"
+    )
+    assert set(orch.session_ids) == {"orch-a", "mid-reset"}
+    assert orch.credits == pytest.approx(45.0)
+    assert report.total_status == seat_cost.STATUS_LOWER_BOUND
+    assert report.total_credits == pytest.approx(46.0)
+
+
+def test_a_session_that_recorded_no_ids_is_unknown_not_zero(tmp_path, monkeypatch):
+    """The Direct-API shape: no seatSessionIds key at all."""
+    store = _plant_store(tmp_path / "s.db", [("someone-else", 9_000_000_000)])
+    set_dir = _plant_state(tmp_path / "130-set", [(1, "in-progress", None)])
+    metrics_path = _plant_metrics(set_dir / "router-metrics.jsonl", [])
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
+    monkeypatch.delenv(seat_cost.SEAT_SESSION_ID_ENV, raising=False)
+
+    report = seat_cost.measure_session(
+        str(set_dir), 1, live=False, store_path=str(store)
+    )
+    assert report.get(ORCH).status == seat_cost.STATUS_UNKNOWN
+    assert report.get(ORCH).credits is None
+    assert report.total_credits is None
+
+
+def test_cost_block_drops_the_machine_path_and_labels_the_reading(tmp_path):
+    """The block is committed, so it carries no operator's absolute path --
+    and it carries the one label the arithmetic cannot: when it was read."""
+    store = _plant_store(tmp_path / "s.db", [("orch", 10_000_000_000)])
+    report = seat_cost.measure(
+        {ORCH: ["orch"]}, store_path=str(store), not_applicable=[API]
+    )
+    block = report.to_cost_block(seat_cost.MEASURED_AT_RETROSPECTIVE)
+
+    assert "store_path" not in block
+    assert str(tmp_path) not in repr(block)
+    assert block["store_schema_version"] == 6
+    assert block["measured_at"] == seat_cost.MEASURED_AT_RETROSPECTIVE
+    with pytest.raises(ValueError):
+        report.to_cost_block("sometime")
+
+
+def test_format_cost_block_never_renders_an_unknown_as_a_dollar_zero(tmp_path):
+    """The recorded artifact renders the same way wherever it is read."""
+    store = _plant_store(tmp_path / "s.db", [("orch", 10_000_000_000)])
+    report = seat_cost.measure(
+        {ORCH: ["orch"], ROUTED: []}, store_path=str(store), not_applicable=[API]
+    )
+    lines = seat_cost.format_cost_block(
+        report.to_cost_block(seat_cost.MEASURED_AT_CLOSE)
+    )
+    rendered = "\n".join(lines)
+    unknown_line = next(l for l in lines if "UNKNOWN" in l)
+    assert "routed calls (Copilot CLI transport)" in unknown_line
+    assert "$" not in unknown_line, (
+        "the component that was not measured must carry no dollar figure"
+    )
+    assert "TOTAL: not available" in rendered
+    assert "routed_seat" in rendered
+    rendered.encode("cp1252")
+
+
+# ==========================================================================
+# Set 130 S3, round 1+2 remediation -- the recorded block arrives from DISK
+#
+# The authoring validator guards what a producer writes. These guard what a
+# READER is handed: a hand edit, an older producer, a future one. Both
+# discovery lenses found the same hole independently, which is the shape of
+# a real one.
+# ==========================================================================
+
+
+def test_a_status_that_means_unmeasured_beats_a_number_sitting_beside_it():
+    """The renderer must not decide from `credits is not None`.
+
+    Planted straight from the finding: status 'unknown' with credits 0.0,
+    the exact fail-open shape, arriving the way it actually would -- off
+    disk, past the authoring validator.
+    """
+    block = {
+        "measured_at": "close",
+        "components": [{
+            "component": "routed_seat", "status": "unknown",
+            "credits": 0.0, "usd": 0.0,
+        }],
+        "total_status": "unknown",
+        "total_credits": 0.0,
+        "total_usd": 0.0,
+        "unmeasured": ["routed_seat"],
+    }
+    rendered = "\n".join(seat_cost.format_cost_block(block))
+    assert "$0.00" not in rendered, (
+        "an unmeasured component was rendered as a dollar figure"
+    )
+    assert "UNKNOWN" in rendered
+    assert "the status wins" in rendered
+    assert "TOTAL: not available" in rendered, (
+        "a total may not survive an unmeasured component, whatever the "
+        "block claims total_credits is"
+    )
+
+
+def test_a_numeric_status_with_no_number_reports_nothing_rather_than_guessing():
+    """The mirror: 'measured' with credits stripped must not print a figure."""
+    block = {
+        "measured_at": "retrospective",
+        "components": [{
+            "component": "orchestrator_seat", "status": "measured",
+            "credits": None, "usd": None,
+        }],
+        "total_status": "measured",
+        "total_credits": 100.0,
+        "total_usd": 1.0,
+        "unmeasured": [],
+    }
+    rendered = "\n".join(seat_cost.format_cost_block(block))
+    assert "MEASURED" in rendered
+    assert "refusing to report a figure" in rendered
+    assert "TOTAL: not available" in rendered
+    assert "$1.00" not in rendered
+
+
+def test_routed_api_applicability_is_derived_from_the_record_not_a_flag(
+    tmp_path, monkeypatch
+):
+    """The advertised flagless command must produce a total on a seat.
+
+    `--session-set-dir` used to pass `--no-api-calls` straight through, so
+    the documented producer path reported routed_api as UNKNOWN and
+    suppressed the total for the ordinary Copilot-seat case.
+    """
+    import json as _json
+
+    store = _plant_store(tmp_path / "s.db", [
+        ("orch-a", 40_000_000_000), ("child-1", 8_000_000_000),
+    ])
+    set_dir = _plant_state(tmp_path / "130-set", [(1, "complete", ["orch-a"])])
+    metrics_path = _plant_metrics(set_dir / "router-metrics.jsonl", [(1, "child-1")])
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
+    monkeypatch.delenv(seat_cost.SEAT_SESSION_ID_ENV, raising=False)
+
+    report = seat_cost.measure_session(
+        str(set_dir), 1, live=False, store_path=str(store)
+    )
+    assert report.get(API).status == seat_cost.STATUS_NOT_APPLICABLE
+    assert report.total_credits == pytest.approx(48.0)
+    assert report.total_status == seat_cost.STATUS_MEASURED
+
+    # A session that DID dispatch a priced Direct-API call is a different
+    # claim: real, authoritative elsewhere, in a different unit. Reporting
+    # it as not_applicable would report someone's spend as zero.
+    rows = _json.loads(
+        "[" + ",".join(metrics_path.read_text(encoding="utf-8").splitlines()) + "]"
+    )
+    rows.append({
+        "session_set": set_dir.name, "session_number": 1, "call_type": "route",
+        "transport": "api", "cost_usd": 1.25, "billed_usage_unavailable": None,
+        "transport_session_id": None,
+    })
+    metrics_path.write_text(
+        "\n".join(_json.dumps(r) for r in rows) + "\n", encoding="utf-8"
+    )
+    report = seat_cost.measure_session(
+        str(set_dir), 1, live=False, store_path=str(store)
+    )
+    api_component = report.get(API)
+    assert api_component.status == seat_cost.STATUS_UNAVAILABLE
+    assert api_component.credits is None
+    assert "router-metrics.jsonl" in (api_component.reason or "")
+    assert report.total_credits is None
+
+
+def test_the_advertised_cli_command_produces_a_block_with_a_total(
+    tmp_path, monkeypatch, capsys
+):
+    """End to end through the exact command the docs and close note print."""
+    import json as _json
+
+    store = _plant_store(tmp_path / "s.db", [("orch-a", 40_000_000_000)])
+    set_dir = _plant_state(tmp_path / "130-set", [(1, "complete", ["orch-a"])])
+    metrics_path = _plant_metrics(set_dir / "router-metrics.jsonl", [])
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
+    monkeypatch.delenv(seat_cost.SEAT_SESSION_ID_ENV, raising=False)
+
+    code = seat_cost.main([
+        "--session-set-dir", str(set_dir), "--session-number", "1",
+        "--retrospective", "--cost-block", "--store-path", str(store),
+    ])
+    assert code == 0
+    block = _json.loads(capsys.readouterr().out)
+    statuses = {c["component"]: c["status"] for c in block["components"]}
+    assert statuses[API] == seat_cost.STATUS_NOT_APPLICABLE
+    assert block["total_credits"] == pytest.approx(40.0)
+    assert block["measured_at"] == seat_cost.MEASURED_AT_RETROSPECTIVE
+
+
+def test_a_session_with_no_routed_call_at_all_is_a_zero_not_an_unknown(
+    tmp_path, monkeypatch
+):
+    """Derived both ways: absence of a CALL is zero, absence of an ID is not.
+
+    Without this, every session that simply made no routed call reported
+    routed_seat UNKNOWN and lost its total -- an unknown that means nothing
+    is as useless as a zero that means nothing.
+    """
+    store = _plant_store(tmp_path / "s.db", [("orch-a", 40_000_000_000)])
+    set_dir = _plant_state(tmp_path / "130-set", [(1, "complete", ["orch-a"])])
+    metrics_path = _plant_metrics(set_dir / "router-metrics.jsonl", [])
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(metrics_path))
+    monkeypatch.delenv(seat_cost.SEAT_SESSION_ID_ENV, raising=False)
+
+    report = seat_cost.measure_session(
+        str(set_dir), 1, live=False, store_path=str(store)
+    )
+    assert report.get(ROUTED).status == seat_cost.STATUS_NOT_APPLICABLE
+    assert report.total_credits == pytest.approx(40.0)
+
+    # Now the pre-Set-130-S2 shape: the calls happened, no id was captured.
+    _plant_metrics(set_dir / "router-metrics.jsonl", [(1, None), (1, None)])
+    report = seat_cost.measure_session(
+        str(set_dir), 1, live=False, store_path=str(store)
+    )
+    routed = report.get(ROUTED)
+    assert routed.status == seat_cost.STATUS_UNKNOWN
+    assert routed.credits is None, "real spend must not be reported as zero"
+    assert "2 routed call(s)" in (routed.reason or "")
+    assert report.total_credits is None

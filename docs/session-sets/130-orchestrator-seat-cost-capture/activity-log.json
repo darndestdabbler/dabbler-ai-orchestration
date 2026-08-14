@@ -262,6 +262,140 @@
       "dateTime": "2026-08-14T05:41:33.461691-04:00",
       "description": "Close-out",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T05:46:57.256570-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "ship-disposition-cost-as-a-real",
+      "dateTime": "2026-08-14T05:46:57.256570-04:00",
+      "description": "**Ship `disposition.cost` as a real field.** The `Disposition` dataclass, `validate_disposition`, and [`docs/disposition-schema.md`](../../disposition-schema.md) move in **one pass** \u2014 L-064-8 names this exact three-surface drift, and the close-out flow reads all three. The field carries the components separately with a per-component confidence, so `unknown` is representable and is structurally distinct from zero. An as-of-close figure is labelled a lower bound (T5).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "wire-the-step-10-report-and",
+      "dateTime": "2026-08-14T05:46:57.256570-04:00",
+      "description": "**Wire the Step 10 report and re-price Set 118 Session 1 with the tool.** The close-out path reports what it measured and **names what it could not**, `print_metrics_report` stops printing an authoritative `$0.0000` for rows that already declare `billed_usage_unavailable`, and Set 118 S1's corrected figure ($42.67 recorded \u2192 ~$56.10 measured) is published with the predicate behind it rather than left as a footnote in a cancelled set's disposition. Author `change-log.md` and the changelog fragment.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T05:46:57.256570-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T05:46:57.256570-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "close-out-including-the-step-9",
+      "dateTime": "2026-08-14T05:46:57.256570-04:00",
+      "description": "**Close-out**, including the Step 9 reorganization review of `project-guidance.md` / `lessons-learned.md`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T05:46:57.265271-04:00",
+      "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "costFieldLands",
+      "dateTime": "2026-08-14T05:53:58.606337-04:00",
+      "description": "Ship disposition.cost as a real field: dataclass, validator, JSON Schema and docs/disposition-schema.md in one pass.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "costFieldLands",
+      "dateTime": "2026-08-14T06:16:19.127172-04:00",
+      "description": "disposition.cost lands across all four surfaces in one pass: Disposition dataclass + to_dict/from_dict, validate_disposition (_validate_cost: unmeasured components carry no number, no total survives one, an as-of-close figure cannot claim exactness), ai_router/schemas/disposition.schema.json (same three rules encoded in JSON Schema) and docs/disposition-schema.md. Two pre-existing parity gaps of the same class fixed in the same pass (L-069-1): the schema omitted uat/checklist under additionalProperties:false, and the validator's dataclass-path dict view omitted verification_qualification/checklist.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "reportNamesUnknowns",
+      "dateTime": "2026-08-14T06:16:19.129113-04:00",
+      "description": "Wire the Step 10 report and re-price Set 118 S1 with the tool.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "reportNamesUnknowns",
+      "dateTime": "2026-08-14T06:26:04.612810-04:00",
+      "description": "Step 10 report wired and Set 118 S1 re-priced with the tool. seat_cost.measure_session()/session_conversation_ids() join S2's two records; close_session prints the cost block and names its absence (UNMEASURED, not zero); print_metrics_report stops summing billed_usage_unavailable rows into a dollar total (live log: 1 priced, 236 not priced). Set 118 S1 re-derived: 5,609.6 cr / $56.10 vs $42.67 recorded (+31%). change-log.md, changelog fragment 0120, seat-cost.md refreshed, disposition-schema.md cost section, constitution Step 10 (net-negative under the preload ceiling).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "crossProviderVerification",
+      "dateTime": "2026-08-14T06:26:04.614919-04:00",
+      "description": "Cross-provider verification.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "crossProviderVerification",
+      "dateTime": "2026-08-14T06:47:29.000631-04:00",
+      "description": "3 rounds: discovery (fan-out 2, gpt-5.5) -> 2 Major (the same defect from both lenses: the renderer decided from `credits is None` instead of `status`, so a hand-edited block could still print $0.00 at close); supplementary -> 1 Major (the advertised flagless --session-set-dir command reported routed_api UNKNOWN and suppressed the total); remediation-review -> VERIFIED, 2 fixes accepted, 0 findings.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "requiredTestPortion",
+      "dateTime": "2026-08-14T06:47:29.003079-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "requiredTestPortion",
+      "dateTime": "2026-08-14T07:14:23.099863-04:00",
+      "description": "All three suites owed (covers ai_router/) and recorded: pytest 4451 passed / 9 skipped (659s, +40 cases = exactly this session's new tests), mocha 1455 passing / 2 pending (45s, matching Session 2's baseline exactly), playwright 31/31 (composite: 29 in the declared 4-worker run + icon-render-mechanism.spec.ts standalone in 15.1s and vsix-first-run-walkthrough.spec.ts standalone in 62s; 548s). Both Playwright failures were checked for regression FIRST and ruled out by isolated passes at a fraction of their contended wall clock. Separately: `npm test` (NOT the declared suite) fails 44 on VS Code host API/cwd issues a Python-only change cannot cause; the declared `npm run test:unit` is green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "closeOut",
+      "dateTime": "2026-08-14T07:14:23.101991-04:00",
+      "description": "Close-out, including the Step 9 reorganization review.",
+      "status": "in-progress"
     }
   ]
 }

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "b641fdda84ac55abefd887c0e9ac981b1e6afaae",
+  "fixedTree": "bd24209e397b3b945bcc6b0638002a9ddd8395ef",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T10:44:56.886396+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The documented whole-session cost command misclassifies `routed_api` on Copilot-seat sessions. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/seat_cost.py:1038`, ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The advertised --session-set-dir --cost-block path for a Copilot-seat session either marks routed_api as not_applicable by default or the advertised command/close note includes the required flag, so a planted session with measured orchestrator and routed seat ids produces a total instead of a bogus routed_api UNKNOWN component.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

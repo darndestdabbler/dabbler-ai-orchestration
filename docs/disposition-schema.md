@@ -69,6 +69,85 @@ the events ledger, not through retained dispositions.
 | `verification_qualification` | string or omitted | conditional | Set 123 S2, omit-null. Present **only** when the verdict beside it is real but weaker than the cross-provider standard: `"same-provider"` means every verifier call resolved to the orchestrator's own effective provider, so the verdict is **not independently corroborated**. Written by `verify_session` for a project whose committed verify type is `DIRECT_API` and which holds no usable API key outside its orchestrator's provider — the operator's ruling (2026-08-11) that same-provider verification beats no verification, provided the result is flagged. It is **not a gate** (Set 116's standing rule): the close proceeds, the record just stops a later reader mistaking the weaker claim for the stronger one. The vocabulary is **closed** and fails closed — unlike `verification_verdict`, whose non-canonical tokens are warned-but-accepted, an unrecognized qualification is a validation error, because a token nobody can interpret does this field's only job worse than no token at all. An unqualified round actively **removes** the key, so a stale qualification cannot outlive the verdict it described. The authoritative copy is the paired metrics stamp row, where the close gate enforces a bijection against the verifier's registry-resolved provider. Deliberately **not** mirrored into `session-state.json`: that is the Work Explorer's surface, and operator decision P4 keeps orchestrator/verifier provenance out of it. |
 | `uat` | object or omitted | conditional | Set 111 S4 — how a `requiresUAT` session discharged its guided-look walk. `status` is `"walked"` or `"waived"`, `attestation` records what the operator actually said, and `walkArtifact` names the walk file when `status == "walked"`. The `uat_walk_recorded` close gate reads it; a session that owes a walk and carries no block does not close. Omit-null on sets that declare no UAT. |
 | `checklist` | object or omitted | conditional | Set 114 S1 — the **operator-attested waiver** for a step-checklist post that was missed. `{"status": "waived", "attestation": "..."}`; the attestation must be non-empty. A post window that has closed cannot be re-entered, so this is the only exit from the `checklist_posted` gate short of `--force` (which bypasses every *other* gate too). It never excuses a session that posted **nothing**, and it is omitted entirely by the overwhelming majority of sessions, which simply post on cadence. |
+| `cost` | object or omitted | omit-null | Set 130 S3 — what the session cost, by component, with a per-component status. See [§`cost` shape](#cost-shape) below. Produced by `python -m ai_router.seat_cost --session-set-dir <dir> --cost-block`; [`ai_router/docs/seat-cost.md`](../ai_router/docs/seat-cost.md) is canonical for the three measurements and for the rule this field encodes. Omitted when the session measured nothing — an absent field claims nothing, whereas a zero would claim a measurement. |
+
+### <a id="cost-shape"></a>`cost` shape
+
+There is no single "the cost of a session". There are three measurements
+(`orchestrator_seat`, `routed_seat`, `routed_api`), they are paid to
+different places, and **a report must say which one it is showing and name
+the components it could not measure**. This field makes that structural
+rather than advisory.
+
+```json
+"cost": {
+  "measured_at": "close",
+  "store_schema_version": 6,
+  "components": [
+    {
+      "component": "orchestrator_seat",
+      "status": "lower_bound",
+      "credits": 735.3,
+      "usd": 7.353,
+      "event_count": 64,
+      "session_ids": ["8c80156b-..."],
+      "measured_session_ids": ["8c80156b-..."],
+      "unmeasured_session_ids": [],
+      "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+    },
+    {
+      "component": "routed_seat",
+      "status": "unknown",
+      "credits": null,
+      "usd": null,
+      "event_count": 0,
+      "session_ids": [],
+      "measured_session_ids": [],
+      "unmeasured_session_ids": [],
+      "reason": "no conversation ids supplied; nothing to measure (this is not zero)"
+    }
+  ],
+  "total_status": "unknown",
+  "total_credits": null,
+  "total_usd": null,
+  "unmeasured": ["routed_seat"]
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `measured_at` | `"close"` (the session measuring itself — always a floor) or `"retrospective"` (after the fact — exact). |
+| `store_schema_version` | The local usage store's `schema_version` the number was read against, or `null`. The store **path** is deliberately not carried: it is an absolute path on one operator's machine, and this artifact is committed. |
+| `components[].status` | One of `measured`, `lower_bound`, `unknown`, `unavailable`, `schema_unrecognized`, `not_applicable`. Closed vocabulary, sourced from `seat_cost.STATUSES`. |
+| `components[].credits` / `usd` | The number, or `null`. |
+| `total_*` / `unmeasured` | The total, when one legitimately exists, and the components that cost it when one does not. |
+
+Three rules are enforced by **both** `validate_disposition` and the JSON
+Schema (the parity contract in `project-guidance.md` → Code Style), so a
+schema-validating consumer and the runtime path agree:
+
+1. **An unmeasured component carries no number.** `credits` and `usd` are
+   `null` for every non-numeric status. `0.0` beside `status: "unknown"`
+   reads as a measurement and no reader can tell it from a real zero
+   (L-112-1). The mirror also holds: a numeric status must carry a number.
+2. **A report containing an unmeasured component has no total.**
+   `total_credits` and `total_usd` are `null`. A total that quietly drops
+   one reports unmeasured spend as zero — the same defect, one addition
+   further along.
+3. **An as-of-close figure cannot claim to be exact.** `measured_at:
+   "close"` may not carry `total_status: "measured"`: the turns that author
+   the disposition and run the close are not in the store while the session
+   is closing. Set 118 Session 1 recorded 4,266.6 credits at close and
+   measures 4,743.2 retrospectively — nothing was wrong except that it was
+   early.
+
+One further rule is validator-only, because JSON Schema draft 2020-12
+cannot express it: **a component name may not appear twice.**
+
+`close_session` prints the block (and, when it is absent, says so out loud —
+"UNMEASURED, not zero"), and carries both in its `--json` output under
+`cost` / `cost_note`.
+
 
 ### `status` values
 
@@ -142,6 +221,11 @@ The close-out gate validates these three relationships:
 3. **`switch-due-to-blocker` ⇒ non-empty `blockers`.** If the
    reason for switching is a blocker, the ledger must record what
    the blocker was.
+
+`cost`, when present, additionally satisfies the three rules in
+[§`cost` shape](#cost-shape). It is **not** gated: nothing refuses a close
+for its absence (this set measures; it does not budget). The close output
+names the absence instead.
 
 ---
 
@@ -279,6 +363,7 @@ at [`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md)
 
 - [`docs/ai-led-session-workflow.md`](ai-led-session-workflow.md) §Step 8 — where in the workflow the disposition is authored.
 - [`ai_router/disposition.py`](../ai_router/disposition.py) — the `Disposition` dataclass and `validate_disposition` (authoritative).
+- [`ai_router/docs/seat-cost.md`](../ai_router/docs/seat-cost.md) — the three cost measurements, the rule `cost` encodes, and how to produce the block.
 - [`ai_router/session_state.py`](../ai_router/session_state.py) — `NextOrchestrator`, `NextOrchestratorReason`, `validate_next_orchestrator`, `NEXT_ORCHESTRATOR_REASON_CODES`.
 - [`ai_router/close_session.py`](../ai_router/close_session.py) — the gate that validates presence (`run_gate_checks` → `disposition_present`).
 - [`ai_router/docs/close-out.md`](../ai_router/docs/close-out.md) — the close-out CLI reference, `--force` contract, and operational recipes.

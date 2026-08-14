@@ -30,6 +30,7 @@ import pytest
 
 import close_session
 from close_session import (
+    CloseoutOutcome,
     GateResult,
     RESULT_TO_EXIT_CODE,
     _build_parser,
@@ -812,3 +813,122 @@ def test_result_to_exit_code_table_complete():
         "repair_drift": 5,
     }
     assert RESULT_TO_EXIT_CODE == expected
+
+
+# ---------------------------------------------------------------------------
+# Set 130 Session 3 - Step 10 reports cost, and names what it could not
+# measure. A close that printed nothing is how a session's real spend stayed
+# invisible: silence reads as "nothing", and this session cost money.
+# ---------------------------------------------------------------------------
+
+
+def _outcome_for(disposition_obj) -> CloseoutOutcome:
+    outcome = CloseoutOutcome(result="succeeded", session_set_dir="x")
+    close_session._apply_cost_report(outcome, disposition_obj)
+    return outcome
+
+
+def _completed(**overrides):
+    base = dict(
+        status="completed",
+        summary="Session 3 wired the Step 10 cost report.",
+        verification_method="api",
+        files_changed=["ai_router/metrics.py"],
+        verification_message_ids=[],
+        next_orchestrator=None,
+        blockers=[],
+    )
+    base.update(overrides)
+    return Disposition(**base)
+
+
+def test_close_output_names_an_absent_cost_block():
+    """The absence is a statement about the MEASUREMENT, not about spend."""
+    outcome = _outcome_for(_completed())
+    assert outcome.cost is None
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        close_session._emit_output(outcome, json_mode=False)
+    out = buf.getvalue()
+    assert "cost:" in out
+    assert "UNMEASURED, not zero" in out
+    assert "seat_cost" in out, "the operator is told how to measure it"
+    out.encode("cp1252")
+
+
+def test_close_output_renders_a_recorded_cost_block_with_its_unknowns():
+    block = {
+        "measured_at": "close",
+        "store_schema_version": 6,
+        "components": [
+            {
+                "component": "orchestrator_seat",
+                "status": "lower_bound",
+                "credits": 735.3,
+                "usd": 7.353,
+            },
+            {
+                "component": "routed_seat",
+                "status": "unknown",
+                "credits": None,
+                "usd": None,
+                "reason": "no conversation ids supplied; nothing to measure",
+            },
+        ],
+        "total_status": "unknown",
+        "total_credits": None,
+        "total_usd": None,
+        "unmeasured": ["routed_seat"],
+    }
+    outcome = _outcome_for(_completed(cost=block))
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        close_session._emit_output(outcome, json_mode=False)
+    out = buf.getvalue()
+
+    assert "measured at close -- a floor" in out
+    assert "735.3 credits = $7.35" in out
+    assert "UNKNOWN" in out
+    assert "TOTAL: not available" in out
+    assert "$0.00" not in out, "an unmeasured component is never a dollar zero"
+    out.encode("cp1252")
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        close_session._emit_output(outcome, json_mode=True)
+    payload = json.loads(buf.getvalue())
+    assert payload["cost"] == block
+    assert payload["cost_note"] is None
+
+
+def test_close_refuses_to_report_a_cost_block_that_breaks_its_own_contract():
+    """A recorded block arrives from disk, where nothing validated it.
+
+    read_disposition() reconstructs whatever is there; the close is where a
+    human reads it. A block claiming status 'unknown' beside credits 0.0 is
+    refused and NAMED -- reporting nothing silently would leave the operator
+    thinking cost was simply not measured, when in fact the record is wrong.
+    """
+    bad = {
+        "measured_at": "close",
+        "components": [{
+            "component": "routed_seat", "status": "unknown",
+            "credits": 0.0, "usd": 0.0,
+        }],
+        "total_status": "unknown",
+        "total_credits": 0.0,
+        "total_usd": 0.0,
+        "unmeasured": ["routed_seat"],
+    }
+    outcome = _outcome_for(_completed(cost=bad))
+    assert outcome.cost is None, "an invalid block must not be reported as one"
+    assert "REFUSED" in (outcome.cost_note or "")
+    assert "credits must be null when status is" in (outcome.cost_note or "")
+
+    buf = io.StringIO()
+    with redirect_stdout(buf):
+        close_session._emit_output(outcome, json_mode=False)
+    out = buf.getvalue()
+    assert "$0.00" not in out
+    assert "REFUSED" in out
+    out.encode("cp1252")

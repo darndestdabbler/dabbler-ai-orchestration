@@ -32,11 +32,10 @@ Run every router CLI through the workspace venv
 `No module named ai_router` means a bare `python`, not missing keys.
 
 - **0. Preload + keys.** Read the four preload files. On the **Direct
-  APIs** transport (`transport.profile: api`), confirm the provider keys
-  (`DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
-  `DABBLER_OPENAI_API_KEY`); a missing key → stop, tell the human. On the
-  **Copilot CLI** transport a seat carries no provider keys by design —
-  their absence is not an error and nothing warns about it.
+  APIs** transport (`transport.profile: api`), confirm the three
+  `DABBLER_*` provider keys your engine file names; a missing key → stop,
+  tell the human. On the **Copilot CLI** transport a seat carries no
+  provider keys by design — absence is not an error and nothing warns.
 - **1. Register first, work second.** Resolve the active set by reading
   each set's `session-state.json` `status` (never infer from file
   presence), then, as the first on-disk action, run
@@ -118,13 +117,13 @@ Run every router CLI through the workspace venv
   commit **and push**, run `python -m ai_router.close_session` for the
   set, and only after it succeeds fire the session-complete
   notification. Record instrumental lessons in
-  `disposition.lessons_cited` and run `cite_lessons` in the final
-  commit.
+  `disposition.lessons_cited` and run `cite_lessons` in the final commit.
 - **9. Last session only (post-notify).** Run the reorganization review
   of `project-guidance.md` / `lessons-learned.md` — "no changes
   recommended" is a valid outcome, skipping the review is not.
-- **10. Stop.** Report verdict, deferred issues, cost, sessions
-  remaining. One session per conversation; the human starts the next.
+- **10. Stop.** Report verdict, deferred issues, cost
+  (`disposition.cost`; unmeasured components named), sessions remaining.
+  One session per conversation; the human starts the next.
 
 ## Source of truth and conflict resolution
 

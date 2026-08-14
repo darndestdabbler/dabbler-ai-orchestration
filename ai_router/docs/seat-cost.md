@@ -46,14 +46,44 @@ that quietly drops an unmeasured component reports unmeasured spend as
 zero, which is the same fail-open defect as returning `$0.00`, one
 addition further along.
 
-Two surfaces in this repo currently break the rule, and both are wired
-correctly in Set 130 Session 3:
+Two surfaces in this repo broke the rule. Set 130 Session 3 wired both:
 
-- `session_log.get_cost_summary()` sums `routedApiCalls[].costUsd` and
-  returns it under the key **`total_cost`**. The arithmetic is right; the
-  label overclaims — it is measurement 1 only.
-- `metrics.print_metrics_report()` prints **`Total cost: $0.0000`** on a
-  seat while every row it summed carries `billed_usage_unavailable: true`.
+- `metrics.print_metrics_report()` printed **`Total cost: $0.0000`** on a
+  seat while every row it summed carried `billed_usage_unavailable: true`.
+  It now reports the priced calls under a label that says which
+  measurement they are (`routed_api`), names the unpriced ones instead of
+  adding them in as zeros, and renders `-` rather than `$0.0000` for any
+  group with nothing priced in it.
+- `close_session` reported no cost at all, so a session's spend was
+  invisible at exactly the moment Step 10 asks for it. It now prints
+  `disposition.cost` — component by component, with its unknowns named —
+  and, when no block was recorded, says that the spend is **unmeasured,
+  not zero**.
+
+`session_log.get_cost_summary()` still sums `routedApiCalls[].costUsd` and
+returns it under the key **`total_cost`**. The arithmetic is right and the
+label overclaims: it is measurement 1 only. It is not on the close path and
+was left alone rather than renamed under a session that could not
+re-verify every caller — a **named residual**, not an oversight.
+
+## 2b. The contract that carries it: `disposition.cost`
+
+Set 130 Session 3 made the rule structural. `disposition.cost` records the
+components separately with a per-component status, so `unknown` is
+representable and is *shaped* differently from zero:
+
+- an unmeasured component carries `credits: null`, never `0.0`;
+- a report containing one has **no total**;
+- a figure taken at close cannot claim to be exact (§5.2).
+
+Both `validate_disposition` and `ai_router/schemas/disposition.schema.json`
+enforce all three, in both directions. Full shape:
+[`docs/disposition-schema.md`](../../docs/disposition-schema.md) →
+*`cost` shape*. Produce one with:
+
+```bash
+python -m ai_router.seat_cost --session-set-dir docs/session-sets/<slug> --cost-block
+```
 
 ## 3. Where the numbers come from
 
@@ -152,35 +182,60 @@ hours — if a span is needed, it comes from
 ## 6. Using it
 
 ```bash
-# This session's seat cost, live (reports a LOWER BOUND, correctly).
-python -m ai_router.seat_cost --self --no-api-calls
+# A whole workflow session, from the ids the repo already recorded.
+# Live (default) reports a LOWER BOUND, correctly.
+python -m ai_router.seat_cost --session-set-dir docs/session-sets/<slug>
 
-# A past session, exactly, with its routed children named.
+# The same session after it closed: exact, and in disposition.cost form.
+python -m ai_router.seat_cost --session-set-dir docs/session-sets/<slug> \
+    --session-number 3 --retrospective --cost-block
+
+# Explicit ids, for a conversation the repo never recorded.
 python -m ai_router.seat_cost \
     --orchestrator 1f130689-... \
     --routed 4e3a296a-... --routed 9ea2cf1c-... \
     --no-api-calls
 ```
 
-Ids are supplied by the caller and never guessed. **Set 130 Session 2 is
-what makes that automatic**: `start_session` records
-`COPILOT_AGENT_SESSION_ID` at registration (appending, because a context
-reset starts a new conversation on the same workflow session), and
-`record_call` persists the routed child's `sessionId` that
-`cli_transport` already captures and currently drops.
+Ids are never guessed. **Set 130 Session 2 is what makes the mapping
+automatic**: `start_session` records `COPILOT_AGENT_SESSION_ID` into
+`session-state.json`'s per-session `orchestrator.seatSessionIds`
+(appending, because a context reset starts a new conversation on the same
+workflow session), and `record_call` persists the routed child's
+`sessionId` — which `cli_transport` already captured and used to drop —
+into `router-metrics.jsonl`'s `transport_session_id`. `--session-set-dir`
+reads exactly those two, and nothing else.
+
+A live reading also includes the calling process's own conversation, even
+when it is absent from `seatSessionIds` — a context reset that never
+re-ran `start_session` starts a conversation nothing recorded. That
+conversation is priced in the report and is **still missing from the
+record**, so a later retrospective measurement will not see it: a residual
+Set 130 named rather than closed, because closing it means making the
+close a second writer of the orchestrator block.
 
 ## 7. Worked example — Set 118 Session 1
 
-The set that first measured this, re-derived with the tool:
+The set that first measured this, re-derived with the tool. Set 118 is
+**cancelled**, which is precisely why its number needed a durable home:
+this section is that home, not the disposition of a set nobody will open
+again.
 
 | component | recorded at the time | measured |
 | :--- | ---: | ---: |
 | orchestrator seat | 4,266.6 cr / $42.67 | 4,743.2 cr / **$47.43** |
 | routed calls (seat) | $0.0000 | 866.4 cr / **$8.66** |
 | routed calls (API) | — | not applicable |
-| **total** | **$42.67** | **$56.10** |
+| **total** | **$42.67** | **5,609.6 cr / $56.10** |
 
-Reproduce it:
+**+31%**, and neither gap is an arithmetic slip: the first is §5.2 (the
+figure was early, not wrong), the second is the whole reason measurement 2
+has a name. Re-derived unchanged on 2026-08-14 by Set 130 Session 3 —
+which is itself the point of §5.2, a finished session measures the same
+every time.
+
+Reproduce it (the ids are supplied by hand because Set 118 pre-dates the
+recording that Session 2 shipped — there is no backfill, by design):
 
 ```bash
 python -m ai_router.seat_cost \
@@ -193,5 +248,6 @@ python -m ai_router.seat_cost \
     --no-api-calls
 ```
 
-Both gaps are defect classes, not arithmetic slips: the first is §5.2, the
-second is the whole reason measurement 2 has a name.
+The five routed ids were recovered from the store by hand for that one
+session. Every session from Set 130 Session 2 onward records them itself,
+which is the difference between a demonstration and a measurement.

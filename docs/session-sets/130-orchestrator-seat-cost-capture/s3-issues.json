@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** `close_session` renders `disposition.cost` without validating the cost contract first.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_session.py:1422`, `ai_router/close_session.py:1477`, `ai_router/seat_cost.py:941`, `ai_router/disposition.py:450`\n  - **Failure scenario:** A typical close-out records or hand-edits a malformed `disposition.cost` block with `status: \"unknown\"` but `credits: 0.0` / `usd: 0.0`—the exact fail-open shape this session is meant to prevent. Because `close_session` only checks `isinstance(block, dict)` and then renders it, the Step 10 close output can still print `$0.00` for an unmeasured component. This is probable enough to block because `disposition.cost` is a new manually carried JSON contract and the validator added for it is not wired into the report surface.\n  - **Acceptance criterion:** `python -c \"import io,sys; sys.path.insert(0,'ai_router'); import close_session; o=close_session.CloseoutOutcome(result='succeeded',session_set_dir='x',cost={'measured_at':'close','components':[{'component':'routed_seat','status':'unknown','credits':0.0,'usd':0.0}],'total_status':'unknown','total_credits':0.0,'total_usd':0.0,'unmeasured':['routed_seat']}); b=io.StringIO(); old=sys.stdout; sys.stdout=b; close_session._emit_output(o,json_mode=False); sys.stdout=old; raise SystemExit(1 if '$0.00' in b.getvalue() else 0)\"`\n  - **Acceptance expectation:** exit 0\n  - **Details:** **Violation:** the session contract says an unmeasured component carries `credits: null` and a report containing one “never presents an unmeasured component as `$0.00`.” **Impact:** the primary user-facing close report can still emit the plausible wrong number this set exists to eliminate, so a reviewer should not merge until the report validates or refuses/safely renders invalid cost blocks. **Evidence:** `_apply_cost_report` accepts any non-empty dict as `outcome.cost`, `_emit_output` passes it directly to `format_cost_block`, and `format_cost_block` formats any non-`None` credits/usd as a dollar amount regardless of status; `_validate_cost` has the right rule but is not called on this path.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical close-out records or hand-edits a malformed `disposition.cost` block with `status: \"unknown\"` but `credits: 0.0` / `usd: 0.0`—the exact fail-open shape this session is meant to prevent. Because `close_session` only checks `isinstance(block, dict)` and then renders it, the Step 10 close output can still print `$0.00` for an unmeasured component. This is probable enough to block because `disposition.cost` is a new manually carried JSON contract and the validator added for it is not wired into the report surface.",
+      "evidencePaths": [
+        "ai_router/close_session.py",
+        "ai_router/seat_cost.py",
+        "ai_router/disposition.py"
+      ],
+      "acceptance": {
+        "kind": "executable",
+        "command": "python -c \"import io,sys; sys.path.insert(0,'ai_router'); import close_session; o=close_session.CloseoutOutcome(result='succeeded',session_set_dir='x',cost={'measured_at':'close','components':[{'component':'routed_seat','status':'unknown','credits':0.0,'usd':0.0}],'total_status':'unknown','total_credits':0.0,'total_usd':0.0,'unmeasured':['routed_seat']}); b=io.StringIO(); old=sys.stdout; sys.stdout=b; close_session._emit_output(o,json_mode=False); sys.stdout=old; raise SystemExit(1 if '$0.00' in b.getvalue() else 0)\"",
+        "expectedExitCode": 0
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** `close_session` can still print an invalid recorded cost block as a real `$0.00` measurement.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_session.py:1477`, `ai_router/seat_cost.py:971`, `ai_router/disposition.py:418`, `ai_router/gate_checks.py:2435`\n  - **Failure scenario:** A typical session author pastes or hand-edits `disposition.cost` with `status: \"unknown\"` but `credits: 0.0` / `usd: 0.0`. `read_disposition()` does not validate, the close gate registry has no disposition-shape/cost validation gate, and `_emit_output()` renders the block through `format_cost_block()`, which chooses numeric rendering solely from `credits is None`. The close report can therefore show an unmeasured component as `$0.00`, the exact plausible-wrong-number failure this session is meant to prevent.\n  - **Acceptance criterion:** `JUDGMENT - A recorded cost block with any non-numeric status and numeric credits/usd is either rejected before close output or rendered only as unmeasured, never as a credit/USD amount.`\n  - **Details:** Violation: “an unmeasured component carries `credits: null`” and “never presents an unmeasured component as `$0.00`.” Impact: a close can succeed while printing and recording the misleading zero-cost shape the change is supposed to eliminate. Evidence: `close_session` prints `outcome.cost` directly; `format_cost_block` renders any non-`None` credits as `credits = $...` without consulting status; `read_disposition` reconstructs without validation; the close gate registry does not run `validate_disposition`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical session author pastes or hand-edits `disposition.cost` with `status: \"unknown\"` but `credits: 0.0` / `usd: 0.0`. `read_disposition()` does not validate, the close gate registry has no disposition-shape/cost validation gate, and `_emit_output()` renders the block through `format_cost_block()`, which chooses numeric rendering solely from `credits is None`. The close report can therefore show an unmeasured component as `$0.00`, the exact plausible-wrong-number failure this session is meant to prevent.",
+      "evidencePaths": [
+        "ai_router/close_session.py",
+        "ai_router/seat_cost.py",
+        "ai_router/disposition.py",
+        "ai_router/gate_checks.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A recorded cost block with any non-numeric status and numeric credits/usd is either rejected before close output or rendered only as unmeasured, never as a credit/USD amount."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "b96b02b7d132221bc9111f9686fc31f931ad4c4b"
+}

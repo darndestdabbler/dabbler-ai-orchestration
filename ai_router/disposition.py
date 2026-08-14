@@ -110,6 +110,46 @@ UAT_STATUSES = (UAT_STATUS_WALKED, UAT_STATUS_WAIVED)
 # to put a name against an omission.
 CHECKLIST_STATUS_WAIVED = "waived"
 
+# Set 130 S3: the cost vocabulary. Sourced from ``seat_cost`` rather than
+# re-spelled here — two copies of a vocabulary is the class L-069-1 names,
+# and this one has a fail-open failure mode (a status the validator does
+# not recognize is a status whose "this was not measured" meaning is lost).
+try:
+    from .seat_cost import (  # type: ignore[import-not-found]
+        COMPONENTS as COST_COMPONENTS,
+        MEASURED_AT_CLOSE,
+        MEASURED_AT_VALUES,
+        NUMERIC_STATUSES as COST_NUMERIC_STATUSES,
+        STATUS_MEASURED as COST_STATUS_MEASURED,
+        STATUSES as COST_STATUSES,
+    )
+except ImportError:  # pragma: no cover - test/bare context
+    from seat_cost import (  # type: ignore[no-redef]
+        COMPONENTS as COST_COMPONENTS,
+        MEASURED_AT_CLOSE,
+        MEASURED_AT_VALUES,
+        NUMERIC_STATUSES as COST_NUMERIC_STATUSES,
+        STATUS_MEASURED as COST_STATUS_MEASURED,
+        STATUSES as COST_STATUSES,
+    )
+
+#: The keys a ``cost.components[]`` entry may carry — exactly what
+#: ``seat_cost.ComponentCost.to_dict()`` emits. Pinned so the JSON Schema's
+#: ``additionalProperties: false`` and this validator cannot drift from the
+#: producer: if the producer grows a key, the parity test fails loudly here
+#: rather than a schema-validating consumer failing quietly later.
+COST_COMPONENT_KEYS = (
+    "component",
+    "status",
+    "credits",
+    "usd",
+    "event_count",
+    "session_ids",
+    "measured_session_ids",
+    "unmeasured_session_ids",
+    "reason",
+)
+
 
 @dataclass
 class Disposition:
@@ -173,6 +213,21 @@ class Disposition:
       ``--force``, which bypasses every *other* gate too. Omit-null:
       absent on the overwhelming majority of sessions, which simply
       post on cadence.
+    - ``cost``: Set 130 S3 — what the session cost, by component, with a
+      per-component status. Produced by
+      ``seat_cost.CostReport.to_cost_block()``; ``ai_router/docs/seat-cost.md``
+      is canonical for the three measurements (``orchestrator_seat``,
+      ``routed_seat``, ``routed_api``) and for the rule this field encodes:
+      **a report must say which measurement it is showing and name what it
+      could not measure.** The shape makes that structural rather than
+      advisory — a component that was not measured carries
+      ``credits: null`` (never ``0.0``, which looks like a measurement,
+      L-112-1), and a report containing one has no total at all. A block
+      whose ``measured_at`` is ``"close"`` cannot claim ``measured``,
+      because a session's own closing turns are not in the store while it
+      is closing (spec T5). Omit-null: absent on every session that did
+      not measure, which is honest — an absent field claims nothing,
+      whereas a zero would.
     """
 
     status: str
@@ -187,6 +242,7 @@ class Disposition:
     lessons_cited: List[str] = field(default_factory=list)
     uat: Optional[dict] = None
     checklist: Optional[dict] = None
+    cost: Optional[dict] = None
 
 
 def _disposition_path(session_set_dir: str) -> str:
@@ -281,6 +337,10 @@ def disposition_to_dict(disposition: Disposition) -> dict:
     # Omit-null (Set 114 S1): absent unless a missed post was waived.
     if disposition.checklist is not None:
         d["checklist"] = dict(disposition.checklist)
+    # Omit-null (Set 130 S3): absent when the session took no measurement.
+    # An absent field claims nothing; a zero would claim a measurement.
+    if disposition.cost is not None:
+        d["cost"] = dict(disposition.cost)
     return d
 
 
@@ -309,6 +369,7 @@ def disposition_from_dict(data: dict) -> Disposition:
             if isinstance(data.get("checklist"), dict)
             else None
         ),
+        cost=data.get("cost") if isinstance(data.get("cost"), dict) else None,
     )
 
 
@@ -379,6 +440,158 @@ def _is_str_list(value: object) -> bool:
     return isinstance(value, list) and all(isinstance(x, str) for x in value)
 
 
+def _is_number(value: object) -> bool:
+    """A JSON number. ``bool`` is excluded: ``True == 1`` in Python, and a
+    validator that lets ``credits: true`` through is not mirroring a schema
+    that says ``"type": "number"`` (project-guidance Code Style, rule 2)."""
+    return isinstance(value, (int, float)) and not isinstance(value, bool)
+
+
+def _validate_cost(cost: object) -> List[str]:
+    """Errors for a ``disposition.cost`` block. Empty list means valid.
+
+    Set 130 S3. Three of these rules are the contract; the rest are shape.
+
+    1. **A component that was not measured carries no number.** ``credits``
+       and ``usd`` must be ``null`` for every non-numeric status. This is
+       the whole reason the field is structured rather than a string:
+       ``0.0`` beside ``status: "unknown"`` reads as a measurement, and a
+       reader has no way to tell it from a real zero (L-112-1).
+    2. **A report containing an unmeasured component has no total.** A
+       total that quietly drops one reports unmeasured spend as zero --
+       the same defect as rule 1, one addition further along.
+    3. **An as-of-close figure cannot claim to be exact.** The turns that
+       author the disposition and run the close are not in the store when
+       the number is read, so ``measured_at: "close"`` with
+       ``total_status: "measured"`` is a claim no session can make about
+       itself (spec T5; ``ai_router/docs/seat-cost.md`` section 5.2).
+
+    The status and component vocabularies are **closed** and fail closed,
+    like ``verification_qualification`` and unlike ``verification_verdict``:
+    an unrecognized status is exactly the token whose "not measured"
+    meaning a later reader would lose.
+    """
+    errors: List[str] = []
+    if not isinstance(cost, dict):
+        return [f"cost must be a mapping or null (got {type(cost).__name__})"]
+
+    measured_at = cost.get("measured_at")
+    if measured_at not in MEASURED_AT_VALUES:
+        allowed = ", ".join(MEASURED_AT_VALUES)
+        errors.append(
+            f"cost.measured_at must be one of: {allowed} "
+            f"(got {measured_at!r}) -- a number whose reading time is "
+            "unknown cannot be told from a floor"
+        )
+
+    components = cost.get("components")
+    if not isinstance(components, list) or not components:
+        errors.append(
+            "cost.components must be a non-empty list -- a cost block that "
+            "names no component measures nothing and should be omitted "
+            "entirely"
+        )
+        components = []
+
+    seen: List[str] = []
+    any_unmeasured = False
+    for index, entry in enumerate(components):
+        where = f"cost.components[{index}]"
+        if not isinstance(entry, dict):
+            errors.append(f"{where} must be a mapping")
+            any_unmeasured = True
+            continue
+
+        unknown_keys = sorted(set(entry) - set(COST_COMPONENT_KEYS))
+        if unknown_keys:
+            errors.append(
+                f"{where} carries unknown key(s) {unknown_keys}; legal keys "
+                f"are {list(COST_COMPONENT_KEYS)}"
+            )
+
+        name = entry.get("component")
+        if name not in COST_COMPONENTS:
+            errors.append(
+                f"{where}.component must be one of: "
+                f"{', '.join(COST_COMPONENTS)} (got {name!r})"
+            )
+        elif name in seen:
+            errors.append(
+                f"{where}.component {name!r} appears more than once; one "
+                "component is one measurement"
+            )
+        else:
+            seen.append(name)
+
+        status = entry.get("status")
+        if status not in COST_STATUSES:
+            errors.append(
+                f"{where}.status must be one of: {', '.join(COST_STATUSES)} "
+                f"(got {status!r})"
+            )
+            any_unmeasured = True
+            continue
+
+        numeric = status in COST_NUMERIC_STATUSES
+        if not numeric:
+            any_unmeasured = True
+        credits = entry.get("credits")
+        usd = entry.get("usd")
+        if numeric:
+            if not _is_number(credits):
+                errors.append(
+                    f"{where}.credits must be a number when status is "
+                    f"{status!r} (got {credits!r})"
+                )
+            if usd is not None and not _is_number(usd):
+                errors.append(
+                    f"{where}.usd must be a number or null when status is "
+                    f"{status!r} (got {usd!r})"
+                )
+        else:
+            if credits is not None:
+                errors.append(
+                    f"{where}.credits must be null when status is "
+                    f"{status!r} (got {credits!r}) -- an unmeasured "
+                    "component reports UNKNOWN, never a number"
+                )
+            if usd is not None:
+                errors.append(
+                    f"{where}.usd must be null when status is {status!r} "
+                    f"(got {usd!r})"
+                )
+
+    total_status = cost.get("total_status")
+    if total_status is not None and total_status not in COST_STATUSES:
+        errors.append(
+            f"cost.total_status must be one of: {', '.join(COST_STATUSES)} "
+            f"(got {total_status!r})"
+        )
+
+    total_credits = cost.get("total_credits")
+    total_usd = cost.get("total_usd")
+    if any_unmeasured:
+        if total_credits is not None or total_usd is not None:
+            errors.append(
+                "cost.total_credits/total_usd must be null when any "
+                "component was not measured -- a total that drops an "
+                "unmeasured component reports unmeasured spend as zero"
+            )
+    else:
+        for key, value in (("total_credits", total_credits), ("total_usd", total_usd)):
+            if value is not None and not _is_number(value):
+                errors.append(f"cost.{key} must be a number or null (got {value!r})")
+
+    if measured_at == MEASURED_AT_CLOSE and total_status == COST_STATUS_MEASURED:
+        errors.append(
+            "cost.total_status cannot be 'measured' when measured_at is "
+            "'close' -- the turns that close a session are not in the store "
+            "while it is closing, so an as-of-close figure is a lower bound"
+        )
+
+    return errors
+
+
 def validate_disposition(
     disposition: object,
     is_final_session: bool = False,
@@ -400,6 +613,10 @@ def validate_disposition(
        ``status == "completed"`` and ``is_final_session`` is False.
     7. ``blockers`` must be a list of strings, and must be **non-empty**
        when ``next_orchestrator.reason.code == "switch-due-to-blocker"``.
+    8. ``cost``, when present, must satisfy :func:`_validate_cost` —
+       an unmeasured component carries ``credits: null`` rather than a
+       zero, a report containing one has no total, and an as-of-close
+       figure cannot claim to be exact.
 
     Errors are agent-readable strings — short enough to surface in a
     verifier prompt without further wrangling.
@@ -410,6 +627,14 @@ def validate_disposition(
         # Build the dict view manually rather than via
         # disposition_to_dict — the latter raises on a malformed
         # next_orchestrator, which would defeat validation.
+        #
+        # Set 130 S3 (L-069-1): every optional field this validator checks
+        # must appear here, or validating a Disposition OBJECT silently
+        # skips the check that validating the same content as a dict
+        # applies. ``verification_qualification`` (Set 123 S2) and
+        # ``checklist`` (Set 114 S1) were both missing, so an object
+        # carrying a bogus qualification or an incoherent checklist block
+        # passed. Adding a field below is part of adding a field above.
         data = {
             "status": disposition.status,
             "summary": disposition.summary,
@@ -419,8 +644,11 @@ def validate_disposition(
             "next_orchestrator": disposition.next_orchestrator,
             "blockers": disposition.blockers,
             "verification_verdict": disposition.verification_verdict,
+            "verification_qualification": disposition.verification_qualification,
             "lessons_cited": disposition.lessons_cited,
             "uat": disposition.uat,
+            "checklist": disposition.checklist,
+            "cost": disposition.cost,
         }
     elif isinstance(disposition, dict):
         data = disposition
@@ -616,5 +844,12 @@ def validate_disposition(
                     "a waived post is only auditable if it records what "
                     "the operator actually said"
                 )
+
+    # Set 130 S3: the cost block. Omit-null — a session that measured
+    # nothing carries no block, which claims nothing. A block that IS
+    # present must be internally honest; see :func:`_validate_cost`.
+    cost = data.get("cost")
+    if cost is not None:
+        errors.extend(_validate_cost(cost))
 
     return (len(errors) == 0), errors

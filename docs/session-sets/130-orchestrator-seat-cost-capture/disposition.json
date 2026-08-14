@@ -1,46 +1,107 @@
 {
   "status": "completed",
-  "summary": "Set 130 Session 2 of 3, 'The join key, recorded instead of dropped'. Session 1 shipped a reader that prices a session exactly -- and had to be handed its conversation ids BY HAND, because nothing in the repo recorded one. This session is entirely plumbing into two existing sanctioned writers and creates no new files. SHIPPED (1): register_session_start writes orchestrator.seatSessionIds, an omit-null array of the seat conversation ids that produced the session, read at the CLI boundary from COPILOT_AGENT_SESSION_ID via seat_cost.seat_session_id_from_env() so the env-var name stays spelled in exactly ONE place. It ACCUMULATES rather than replaces: start_session is idempotent by design and is re-run after a context reset, which starts a NEW conversation on the SAME workflow session, so a last-writer-wins scalar would have dropped the first conversation's cost from precisely the sessions that were hard enough to need a reset. A Direct-API run omits the key ENTIRELY -- never [] and never null, because 'not captured' and 'captured, and there were none' are different claims and only the first is true there; that is spec trap T2 applied to the schema instead of to a dollar figure. All three surfaces moved in ONE pass (L-064-8 by name): the writer, ai_router/schemas/session-state.schema.json (minItems: 1 + uniqueItems mirroring the writer's omit-when-empty and dedupe, the L-066-1 both-directions parity rule), and docs/session-state-schema.md, whose 'there is no per-field merge' writer contract was now false and was corrected with the one documented exception rather than left as a stale echo. SHIPPED (2): record_call() gains transport_session_id and both copilot-cli call sites pass the sessionId cli_transport has captured since Set 078 and nothing ever consumed. Additive-null exactly as Sets 078, 084, 109 and 123 established -- the column is present on every row and null on every historical and Direct-API one, which reads as 'not captured' rather than a false claim. The shape guard lives in ONE place, __init__._copilot_session_id, the exact sibling of _copilot_echoed_model (L-069-1), because both values come off the same open diagnostic dict on the same call. The metrics.py module docstring, that file's schema of record, moved with it. PROVED, not asserted: 13 falsifiers, and five defects PLANTED into the production code to show they fire -- writing [] instead of omitting (2 failed), replacing instead of appending (2 failed, 7 passed), removing the plan-less carry-forward (1 failed, 9 passed), hardcoding the env-var name (1 failed while all 4 behavioural tests still PASSED, which is the entire argument for the structural assertion, L-112-1), and dropping the metrics column / failing the shape guard open (2 and 1). Every plant reverted from a file copy. LIVE DOGFOOD: the feature captured the session that built it. This session registered at 04:48 before the code existed and its block had no ids; re-running start_session captured 04ab6f3d-..., and the verification round's two routed calls landed 73273cde-... and 5d9238fd-... automatically. Feeding those three ids -- every one recorded by the framework itself, none typed by hand -- to Session 1's reader prices this session at 1,822.0 + 431.0 credits. The routed component that router-metrics.jsonl recorded as $0.0000 is $4.31.",
-  "verification_method": "api",
-  "verification_verdict": "VERIFIED",
+  "summary": "Set 130 Session 3 of 3, 'The contract, the report, and the corrected number' -- the set's terminus. Sessions 1 and 2 built a reader that refuses to guess and the two records that feed it; this session ships the contract that carries the number, the join that produces it, and the two report surfaces that were presenting unmeasured spend as $0.00. SHIPPED (1) disposition.cost across all four surfaces in ONE pass (L-064-8 by name): the Disposition dataclass with omit-null serialization, validate_disposition._validate_cost, ai_router/schemas/disposition.schema.json, and docs/disposition-schema.md. Three rules are enforced on BOTH halves of the parity pair, so a schema-validating consumer and the runtime path cannot disagree: an unmeasured component carries credits: null (0.0 beside status 'unknown' reads as a measurement and no reader can tell it from a real zero, L-112-1); a report containing one has NO total (a total that drops it reports unmeasured spend as zero, the same defect one addition further along); and measured_at 'close' may not claim total_status 'measured', because the turns that author a disposition and run a close are not in the store while the session is closing. The status and component vocabularies are CLOSED and sourced from seat_cost, not re-spelled. SHIPPED (2) the join: seat_cost.session_conversation_ids() / measure_session() read the orchestrator ids from session-state.json's orchestrator.seatSessionIds and the routed ids from router-metrics.jsonl's transport_session_id -- the two records Session 2 shipped -- and price them, with metrics.transport_session_ids() as the selector keyed the way the log actually is. Nothing is guessed and nothing comes from a clock. SHIPPED (3) the report surfaces: print_metrics_report no longer sums billed_usage_unavailable rows into a dollar total (it reports the priced calls under a label naming which measurement they are, states how many calls are NOT priced here and how many carry the id that prices them, and renders '-' rather than $0.0000 for any group with nothing priced in it); close_session prints the recorded cost block with its unknowns named, and when a session recorded none says the spend is UNMEASURED, not zero. It is NOT a gate -- nothing refuses a close for an absent block, because this set measures and does not budget. FIXED, in the same pass and journaled: two PRE-EXISTING parity gaps of the same class, both found by adding a third omit-null field beside them. disposition.schema.json omitted uat (Set 111 S4) and checklist (Set 114 S1) while declaring additionalProperties: false, so the shipped schema deterministically REJECTED exactly the dispositions the uat_walk_recorded and checklist_posted close gates require -- the same defect Set 123 S2 graded Major on verification_qualification. And validate_disposition's dataclass-path dict view omitted verification_qualification and checklist, so a Disposition OBJECT carrying an invented qualification token validated CLEAN while identical content as a dict was refused. A three-way parity test now pins producer keys -> validator allowlist -> schema properties. PROVED, not asserted: 22 new test functions carrying ~40 cases, and 13 defects PLANTED into the production code to show they fire, each reverted from a file copy. Every plant was caught SELECTIVELY (3/91, 1/93, 2/92, 13/81, 1/22, 3/20, 2/50, 2/27, 1/28, 1/33 ...). The first plant initially ESCAPED, which is the useful part of the record: the assertion read 'must be null when status is', which the usd rule also produces, so deleting half the rule left the test green. It now names credits and usd separately. RE-PRICED: Set 118 Session 1, with the shipped tool -- 4,743.2 credits ($47.43) of orchestrator seat plus 866.4 credits ($8.66) of routed verification = 5,609.6 credits / $56.10, against the $42.67 recorded at the time. +31%. Re-derived unchanged today, which is itself the claim of seat-cost.md 5.2: a finished session measures the same every time. Published in change-log.md and seat-cost.md 7 with the command and the predicate, rather than left as a footnote in a cancelled set's disposition. LIVE DOGFOOD: this session's own cost block, in the cost field below, was produced by the shipped assembler from ids the framework recorded itself -- and its routed_seat component is MEASURED, not unknown, because every routed call this session made carried a transport_session_id. That is the whole chain, working, on the session that finished it.",
   "files_changed": [
-    "ai_router/__init__.py",
+    "ai_router/changelog.d/0120-set-130-orchestrator-seat-cost-capture.md",
+    "ai_router/close_session.py",
+    "ai_router/disposition.py",
+    "ai_router/docs/seat-cost.md",
     "ai_router/metrics.py",
-    "ai_router/schemas/session-state.schema.json",
-    "ai_router/session_state.py",
-    "ai_router/start_session.py",
+    "ai_router/schemas/disposition.schema.json",
+    "ai_router/seat_cost.py",
+    "ai_router/tests/test_close_session_skeleton.py",
+    "ai_router/tests/test_disposition.py",
     "ai_router/tests/test_metrics.py",
-    "ai_router/tests/test_start_session.py",
+    "ai_router/tests/test_seat_cost.py",
+    "docs/disposition-schema.md",
+    "docs/session-constitution.md",
     "docs/session-sets/130-orchestrator-seat-cost-capture/activity-log.json",
     "docs/session-sets/130-orchestrator-seat-cost-capture/ai-assignment.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/change-log.md",
     "docs/session-sets/130-orchestrator-seat-cost-capture/checklist-posts.jsonl",
     "docs/session-sets/130-orchestrator-seat-cost-capture/decisions.jsonl",
-    "docs/session-sets/130-orchestrator-seat-cost-capture/disposition.json",
-    "docs/session-sets/130-orchestrator-seat-cost-capture/s2-conventions.md",
-    "docs/session-sets/130-orchestrator-seat-cost-capture/s2-rounds.jsonl",
-    "docs/session-sets/130-orchestrator-seat-cost-capture/s2-verification-fanout-2.md",
-    "docs/session-sets/130-orchestrator-seat-cost-capture/s2-verification.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-acceptance-round-1.json",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-acceptance-round-2.json",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-conventions.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-issues-round-2.json",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-issues.json",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-remediation-round-1.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-remediation-round-2.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-rounds.jsonl",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-verification-fanout-2.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-verification-round-2.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-verification-round-3.md",
+    "docs/session-sets/130-orchestrator-seat-cost-capture/s3-verification.md",
     "docs/session-sets/130-orchestrator-seat-cost-capture/session-events.jsonl",
     "docs/session-sets/130-orchestrator-seat-cost-capture/session-state.json",
-    "docs/session-sets/130-orchestrator-seat-cost-capture/test-runs.jsonl",
-    "docs/session-state-schema.md"
+    "docs/session-sets/130-orchestrator-seat-cost-capture/test-runs.jsonl"
   ],
+  "verification_method": "api",
   "verification_message_ids": [],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 3 ships disposition.cost, its schema doc and the Step 10 report, and it consumes this session's output directly: the three public component names, the seatSessionIds shape and its accumulate-not-replace contract, and the transport_session_id column. It also carries the L-064-8 three-surface hazard (dataclass + validate_disposition + docs/disposition-schema.md) that this session just rehearsed on the state schema and solved by moving writer, JSON Schema and doc in one pass -- that is live context worth more than a fresh perspective, and the fresh perspective arrives anyway on a different provider at Step 6. Session 3 is also the set-terminal session, so it owns change-log.md, the changelog fragment and the Step 9 review. Two items to carry in: close_session still captures no seat id (residual named above, and close_session.py is in Session 3's Touches), and print_metrics_report still prints an authoritative Total cost: $0.0000 over rows that already declare billed_usage_unavailable: true. The verifier must remain a non-anthropic effective provider, as it was here."
-    }
-  },
+  "next_orchestrator": null,
   "blockers": [],
+  "verification_verdict": "VERIFIED",
   "lessons_cited": [
     "L-112-1",
+    "L-069-1",
     "L-064-8",
-    "L-069-1"
+    "L-064-9"
   ],
-  "notes": "COST OF THIS SESSION, and the first time it was assembled from ids the framework recorded ITSELF rather than ids read off a screen: orchestrator seat 1,822.0 credits ($18.22, 126 turns) + routed calls over the seat 431.0 credits ($4.31, 37 turns across the 2 discovery fan-out calls) = 2,253.0 credits ($22.53). Direct-API routed cost is not_applicable. THE TOTAL IS A LOWER BOUND and the tool labels it one without being asked: the turns that author this disposition, commit and close are not in the store yet (trap T5 -- the same effect that made Set 118's $42.67 read $47.43 later). Both routed rounds still REPORTED cost: $0.0000, because making that report honest is Session 3, not this one. || VERIFICATION: one round, non-blocking, no remediation. Discovery with fan-out 2 (lenses spec-conformance + failure-scenario), verifier gpt-5.5 on both calls, anthropic excluded as the orchestrator's effective provider: VERIFIED, 0 findings, 0 minor, 0 nits. A conventions block (s2-conventions.md) was supplied up front per project-guidance, stating the suite baseline, the release contract, the two claims most worth attacking, the plant-and-revert table, and the integration surfaces deliberately NOT changed and why -- so the round could spend itself on defects rather than on settled ground. || TWO INTEGRATION RISKS CHECKED RATHER THAN ASSUMED, both of which would have silently eaten the new field. (1) The v3->v4 migrator's orchestrator-block sweep is a DENYLIST (_RETIRED_ORCHESTRATOR_KEYS = chatSessionId / checkedOutAt / lastActivityAt), so seatSessionIds survives a sweep; an allowlist there would have deleted it on the next migrator run. (2) The VS Code extension's OrchestratorInfo interface and fileSystem.ts read are structural TypeScript assertions over parsed JSON with no runtime stripping, and the TS normalizeToV4Shape round-trips the block as an opaque object -- identityProvenance (Set 084) is likewise absent from that interface and has been fine. mark_session_complete already carries the block wholesale, so recorded ids survive close as historical attribution. No extension surface changed, which is a named non-goal and what keeps requiresUAT: false honest. || ONE DISCLOSURE A REVIEWER SHOULD CHECK HARDEST: PLAYWRIGHT'S RUN OF RECORD IS A COMPOSITE. The declared 4-worker command ran all 31 specs: 30 passed, 1 failed -- vsix-first-run-walkthrough.spec.ts, the same spec, same signature, as Set 118 S1 and Set 130 S1. Because THIS session changes a state-file writer, a first-run walkthrough failure could plausibly have been mine, so the regression question was settled FIRST: the spec passed standalone in 43.9s against Session 1's 43.6s, ruling the change out. Only then was the operator's standing ruling applied ('re-running what has already passed buys nothing', now a principle in project-guidance.md). The run of record is therefore the UNION -- 30 specs green in the declared run plus that one green standalone, 31/31 executed and passed -- recorded at 513s and disclosed here rather than presented as a single clean invocation. Journaled in decisions.jsonl. || A NOTE ON THE RUN-OF-RECORD TOOLING, which cost time and is not a defect: `run_of_record affected` reads files_changed from disposition.json, not from git. Run mid-session it reported SESSION 1's change set and looked stale; it is correct, and the answer is that this session's disposition had not been authored yet. Passing --files-changed explicitly gives the real answer. Worth a docstring line at some point; not worth a session. || ORCHESTRATOR ERROR WORTH RECORDING: mid-session I ran `git checkout -- ai_router/session_state.py` to revert a planted defect and destroyed ~120 lines of uncommitted session work, because the session's own changes were also uncommitted. All of it was reconstructed and re-verified green, and every later plant used a file copy instead. The durable lesson is that `git checkout --` is not an undo for a plant when the file also carries uncommitted work; a copy is. Recommended for Step 9 as a candidate lesson, since planting defects into production code to prove falsifiers fire is now standard practice here (L-112-1) and this is the failure mode that practice invites. || RESIDUAL, deliberately not fixed here: close_session does not capture a seat id. If an orchestrator suffers a context reset and never re-runs start_session, that final conversation's cost goes unrecorded. close_session.py is in SESSION 3's Touches list, not this session's, so fixing it here would be scope creep; it is named in s2-conventions.md as a known residual and is the cheapest remaining accuracy gain in the set. || IRONY BUDGET: the spec allowed 10 new test functions and 13 were written. The two extra are the structural env-var-spelling assertion (L-112-1 requires a structural assertion beside the textual ones, and it is the only one that catches the hardcoded-name plant) and the plan-less carry-forward falsifier, which covers a branch that would otherwise have shipped untested. Disclosed rather than trimmed."
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 3663.0891,
+        "usd": 36.630891,
+        "event_count": 199,
+        "session_ids": [
+          "8c80156b-9d38-4a7d-81a7-418b714c0e38"
+        ],
+        "measured_session_ids": [
+          "8c80156b-9d38-4a7d-81a7-418b714c0e38"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 704.8928,
+        "usd": 7.048928,
+        "event_count": 57,
+        "session_ids": [
+          "bb331b1f-2280-4a62-a637-da63965fd204",
+          "e32a85c0-780b-4417-ad81-d1765429b05a",
+          "85bba548-216c-460d-881f-8a1dd0469c74",
+          "8d788eef-d748-4e35-8837-59ee943cedb8"
+        ],
+        "measured_session_ids": [
+          "bb331b1f-2280-4a62-a637-da63965fd204",
+          "e32a85c0-780b-4417-ad81-d1765429b05a",
+          "85bba548-216c-460d-881f-8a1dd0469c74",
+          "8d788eef-d748-4e35-8837-59ee943cedb8"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 4367.9819,
+    "total_usd": 43.679818999999995,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
 }

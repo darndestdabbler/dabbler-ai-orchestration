@@ -1,7 +1,8 @@
 """Seat cost: what it costs to RUN a session, kept separate from what ``route()`` spends.
 
 **Who uses this:** the orchestrator at Step 10 (reporting cost), and
-``disposition.cost`` once Session 3 of Set 130 lands the contract.
+``disposition.cost``, whose block this module produces
+(:meth:`CostReport.to_cost_block`).
 **See also:** ``ai_router/docs/seat-cost.md`` (the three measurements and
 the separation rule -- read that first); ``metrics.py`` (routed-call cost,
 which this module does **not** redefine).
@@ -15,13 +16,15 @@ the components it could not measure.** There is no single "the cost of a
 session" number, and every surface that has pretended otherwise has been
 wrong in this repo:
 
+- ``metrics.print_metrics_report()`` printed ``Total cost: $0.0000`` on a
+  Copilot seat while every row it summed carried
+  ``billed_usage_unavailable: true``. The flag was right there and the
+  report ignored it. Set 130 S3 wired it.
 - ``session_log.get_cost_summary()`` sums ``routedApiCalls[].costUsd`` and
   returns it under the key ``total_cost``. It is routed-call cost only --
-  correct arithmetic, a label that overclaims.
-- ``metrics.print_metrics_report()`` prints ``Total cost: $0.0000`` on a
-  Copilot seat while every row it summed carries
-  ``billed_usage_unavailable: true``. The flag is right there and the
-  report ignores it.
+  correct arithmetic, a label that overclaims. Off the close path; left as
+  a named residual rather than renamed under a session that could not
+  re-verify every caller.
 
 So this module never returns a bare number. It returns a
 :class:`CostReport` of separately-labelled :class:`ComponentCost` values,
@@ -99,9 +102,10 @@ events span five hours, so spans must come from
 
 Set 130 Session 2 is what makes the mapping automatic (recording
 ``COPILOT_AGENT_SESSION_ID`` at registration and the routed child's
-``sessionId`` on each metrics row). Until then the caller supplies it, and
-``--self`` on this module's CLI reads the orchestrator's own id from the
-environment.
+``sessionId`` on each metrics row), and Session 3's
+:func:`session_conversation_ids` / :func:`measure_session` read exactly
+those two records back. ``--session-set-dir`` on this module's CLI is that
+path end to end; ``--self`` remains for a conversation nothing recorded.
 """
 
 from __future__ import annotations
@@ -142,6 +146,19 @@ COMPONENT_LABELS = {
     COMPONENT_ROUTED_API: "routed calls (Direct APIs, priced)",
 }
 
+# --- When the measurement was taken ---------------------------------------
+#: Taken by the session that is closing, about itself. Its own closing turns
+#: are not in the store yet, so such a figure is a FLOOR and never exact --
+#: see *A session cannot measure itself* above. ``disposition.cost`` carries
+#: this label so a later reader can tell a floor from a final number.
+MEASURED_AT_CLOSE = "close"
+
+#: Taken after the fact, about a session that has finished. Exact, provided
+#: every conversation is in the store.
+MEASURED_AT_RETROSPECTIVE = "retrospective"
+
+MEASURED_AT_VALUES = (MEASURED_AT_CLOSE, MEASURED_AT_RETROSPECTIVE)
+
 # --- Statuses -------------------------------------------------------------
 STATUS_MEASURED = "measured"
 STATUS_LOWER_BOUND = "lower_bound"
@@ -150,8 +167,26 @@ STATUS_UNAVAILABLE = "unavailable"
 STATUS_SCHEMA_UNRECOGNIZED = "schema_unrecognized"
 STATUS_NOT_APPLICABLE = "not_applicable"
 
+#: The whole closed vocabulary, in the order the doc's table lists it. This
+#: tuple is the ONE definition: ``disposition.cost`` validates against it and
+#: ``disposition.schema.json`` mirrors it, so a status can never mean one
+#: thing here and another in the artifact that carries it (L-069-1).
+STATUSES = (
+    STATUS_MEASURED,
+    STATUS_LOWER_BOUND,
+    STATUS_UNKNOWN,
+    STATUS_UNAVAILABLE,
+    STATUS_SCHEMA_UNRECOGNIZED,
+    STATUS_NOT_APPLICABLE,
+)
+
 #: Statuses that carry a number. Everything else has ``credits is None``.
 NUMERIC_STATUSES = frozenset({STATUS_MEASURED, STATUS_LOWER_BOUND, STATUS_NOT_APPLICABLE})
+
+#: The complement, named because it is what every anti-``$0.00`` rule keys
+#: off: a component with one of these statuses carries ``credits: null``, and
+#: a total containing one does not exist.
+NON_NUMERIC_STATUSES = frozenset(STATUSES) - NUMERIC_STATUSES
 
 # --- Store shape ----------------------------------------------------------
 #: Schema versions this module has been read against. A store reporting
@@ -333,6 +368,35 @@ class CostReport:
             "total_usd": self.total_usd,
             "unmeasured": [c.component for c in self.unmeasured],
         }
+
+    def to_cost_block(self, measured_at: str) -> dict:
+        """Render this report as the ``disposition.cost`` block.
+
+        Two deliberate differences from :meth:`to_dict`:
+
+        * ``store_path`` is **dropped**. It is an absolute path on one
+          operator's machine and the disposition is a committed artifact;
+          ``metrics.py`` learned the same lesson when mixed absolute
+          ``session_set`` values leaked machine paths into the log.
+          ``store_schema_version`` is what a later reader actually needs.
+        * ``measured_at`` is **added**, because the number's meaning depends
+          on it: a figure taken at close is a floor (T5), and nothing in the
+          arithmetic says so.
+
+        Raises ``ValueError`` on an unknown *measured_at* -- the vocabulary
+        is closed, and a label nobody can interpret does this field's only
+        job worse than no label.
+        """
+        if measured_at not in MEASURED_AT_VALUES:
+            raise ValueError(
+                f"measured_at must be one of {list(MEASURED_AT_VALUES)} "
+                f"(got {measured_at!r})"
+            )
+        block = self.to_dict()
+        block.pop("store_path", None)
+        block["store_schema_version"] = block.pop("schema_version", None)
+        block["measured_at"] = measured_at
+        return block
 
 
 # --------------------------------------------------------------------------
@@ -655,6 +719,296 @@ def seat_session_id_from_env(env: Optional[Mapping[str, str]] = None) -> Optiona
 
 
 # --------------------------------------------------------------------------
+# Assembling one workflow session's ids from what Set 130 Session 2 records
+# --------------------------------------------------------------------------
+
+
+def _session_entry(state: object, session_number: Optional[int]) -> Optional[dict]:
+    """The v4 ``sessions[]`` entry for *session_number*, or the in-flight one."""
+    if not isinstance(state, dict):
+        return None
+    entries = [e for e in (state.get("sessions") or []) if isinstance(e, dict)]
+    if session_number is not None:
+        for entry in entries:
+            if entry.get("number") == session_number:
+                return entry
+        return None
+    for entry in entries:
+        if entry.get("status") == "in-progress":
+            return entry
+    for entry in reversed(entries):
+        if entry.get("status") == "complete":
+            return entry
+    return None
+
+
+def session_conversation_ids(
+    session_set_dir: str,
+    session_number: Optional[int] = None,
+    *,
+    include_self: bool = False,
+    env: Optional[Mapping[str, str]] = None,
+    metrics_config: Optional[dict] = None,
+    metrics_records: Optional[Sequence[dict]] = None,
+) -> dict:
+    """Gather one workflow session's conversation ids from the repo's records.
+
+    This is the join Sets 130 S1 and S2 exist to make possible, and it reads
+    only what a **sanctioned writer** put on disk:
+
+    * ``orchestrator_seat`` <- ``session-state.json``'s per-session
+      ``orchestrator.seatSessionIds`` (written by ``start_session``,
+      accumulating across context resets).
+    * ``routed_seat`` <- ``router-metrics.jsonl``'s ``transport_session_id``
+      on the rows belonging to this set and session number.
+
+    Nothing here guesses, and nothing here uses a clock: a wall-clock window
+    around one session contains other sessions' conversations, so a
+    time-based reconstruction bills them to the wrong set (see the module
+    docstring). An id that was never recorded stays missing, which downstream
+    becomes ``unknown`` or ``lower_bound`` -- never a zero.
+
+    ``include_self`` adds the calling process's own conversation
+    (``COPILOT_AGENT_SESSION_ID``) to ``orchestrator_seat``. Set it when
+    measuring live at close: the conversation running the close is the one
+    conversation guaranteed to be mid-flight, and if a context reset started
+    it without a re-register it is not in ``seatSessionIds`` at all.
+
+    Returns ``{"orchestrator_seat": [...], "routed_seat": [...],
+    "live": [...]}`` -- ``live`` naming the ids whose closing turns are not
+    in the store yet.
+    """
+    state_path = Path(session_set_dir) / "session-state.json"
+    state: object = None
+    if state_path.is_file():
+        try:
+            import json as _json
+
+            state = _json.loads(state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            state = None
+
+    entry = _session_entry(state, session_number)
+    orchestrator = ()
+    if isinstance(entry, dict):
+        block = entry.get("orchestrator")
+        if isinstance(block, dict):
+            orchestrator = _normalize_ids(block.get("seatSessionIds"))
+
+    live: list = []
+    if include_self:
+        own = seat_session_id_from_env(env)
+        if own:
+            live.append(own)
+            if own not in orchestrator:
+                orchestrator = orchestrator + (own,)
+
+    number = session_number
+    if number is None and isinstance(entry, dict) and isinstance(entry.get("number"), int):
+        number = entry["number"]
+
+    try:
+        from .metrics import (  # type: ignore[import-not-found]
+            load_metrics,
+            priced_and_unpriced,
+            transport_session_ids,
+        )
+    except ImportError:  # pragma: no cover - bare/test context
+        from metrics import (  # type: ignore[no-redef]
+            load_metrics,
+            priced_and_unpriced,
+            transport_session_ids,
+        )
+
+    records = (
+        list(metrics_records)
+        if metrics_records is not None
+        else load_metrics(metrics_config or {})
+    )
+    routed = transport_session_ids(
+        session_set_dir,
+        number,
+        config=metrics_config,
+        records=records,
+    )
+
+    # Whether this session dispatched any Direct-API routed call, read off
+    # the same log rather than asked of the caller. A flag would be a claim
+    # about the transport; this is the record of what the transport did.
+    try:
+        from .metrics import _session_set_name  # type: ignore[import-not-found]
+    except ImportError:  # pragma: no cover - bare/test context
+        from metrics import _session_set_name  # type: ignore[no-redef]
+    wanted = _session_set_name(session_set_dir)
+    session_rows = [
+        r for r in records
+        if isinstance(r, dict)
+        and _session_set_name(r.get("session_set")) == wanted
+        and (number is None or r.get("session_number") == number)
+    ]
+    priced_rows, unpriced_rows = priced_and_unpriced(session_rows)
+    priced_api_calls = len(priced_rows)
+    seat_calls = len(unpriced_rows)
+
+    return {
+        COMPONENT_ORCHESTRATOR_SEAT: list(orchestrator),
+        COMPONENT_ROUTED_SEAT: list(routed),
+        "live": live,
+        "priced_api_calls": priced_api_calls,
+        "seat_calls": seat_calls,
+    }
+
+
+def measure_session(
+    session_set_dir: str,
+    session_number: Optional[int] = None,
+    *,
+    live: bool = True,
+    engine: Optional[str] = None,
+    store_path: Optional[str] = None,
+    home: Optional[str] = None,
+    env: Optional[Mapping[str, str]] = None,
+    metrics_config: Optional[dict] = None,
+    metrics_records: Optional[Sequence[dict]] = None,
+    routed_api_not_applicable: Optional[bool] = None,
+) -> CostReport:
+    """Price one workflow session from its own recorded ids.
+
+    The whole chain in one call: gather (:func:`session_conversation_ids`),
+    then price (:func:`measure`). ``live=True`` is the close-time reading
+    and marks the calling conversation in-flight, so the component comes
+    back ``lower_bound`` rather than claiming an exactness a session cannot
+    have about itself (T5). ``live=False`` is the retrospective reading.
+
+    ``routed_api_not_applicable`` defaults to ``None``, meaning **derive it
+    from the record**, and ``routed_seat`` is always derived the same way.
+    The log says whether a call happened; the ids say whether it can be
+    priced. So: no call dispatched → ``not_applicable``, an honest zero
+    that lets a total exist. Calls dispatched with no ids captured →
+    ``unknown``, because that spend is real. Fewer ids than calls →
+    ``lower_bound``. A session that made priced Direct-API calls gets
+    ``unavailable`` with a reason: that cost is real and authoritative, and
+    it is denominated in dollars in ``router-metrics.jsonl`` while
+    everything here is denominated in AI credits. Adding it would be a unit
+    error, and claiming ``not_applicable`` for it would report someone's
+    spend as zero.
+
+    Deriving rather than taking a flag is the module's own rule applied to
+    itself: attribution comes from records. ``True``/``False`` remain
+    available for a caller who knows better than the log.
+    """
+    ids = session_conversation_ids(
+        session_set_dir,
+        session_number,
+        include_self=live,
+        env=env,
+        metrics_config=metrics_config,
+        metrics_records=metrics_records,
+    )
+    seat_calls = ids["seat_calls"]
+    routed_ids = ids[COMPONENT_ROUTED_SEAT]
+
+    components = {COMPONENT_ORCHESTRATOR_SEAT: ids[COMPONENT_ORCHESTRATOR_SEAT]}
+    not_applicable = []
+
+    # Both routed components resolve the same way: the log says whether the
+    # call happened, the ids say whether it can be priced. "No call was
+    # dispatched" is an honest zero; "calls happened and their ids were
+    # never captured" is UNKNOWN. Deciding either from a flag would be a
+    # claim about the transport instead of a record of what it did.
+    if routed_ids or seat_calls:
+        components[COMPONENT_ROUTED_SEAT] = routed_ids
+    else:
+        not_applicable.append(COMPONENT_ROUTED_SEAT)
+
+    if routed_api_not_applicable is None:
+        routed_api_not_applicable = ids["priced_api_calls"] == 0
+    if routed_api_not_applicable:
+        not_applicable.append(COMPONENT_ROUTED_API)
+    else:
+        components[COMPONENT_ROUTED_API] = []
+
+    report = measure(
+        components,
+        store_path=store_path,
+        home=home,
+        engine=engine,
+        live_session_ids=ids["live"],
+        not_applicable=not_applicable,
+    )
+
+    rebuilt = []
+    for item in report.components:
+        if (
+            item.component == COMPONENT_ROUTED_API
+            and not routed_api_not_applicable
+            and not item.is_numeric
+        ):
+            # Real, authoritative elsewhere, and denominated in dollars
+            # while everything here is denominated in AI credits. Saying so
+            # beats the bare "no ids supplied", which reads as an omission.
+            rebuilt.append(ComponentCost(
+                component=item.component,
+                status=STATUS_UNAVAILABLE,
+                credits=None,
+                reason=(
+                    f"{ids['priced_api_calls']} Direct-API call(s) are "
+                    "recorded for this session; their cost is authoritative "
+                    "in router-metrics.jsonl (cost_usd, in dollars) and is "
+                    "not restated here in AI credits"
+                ),
+            ))
+        elif (
+            item.component == COMPONENT_ROUTED_SEAT
+            and item.status == STATUS_MEASURED
+            and seat_calls > len(item.measured_session_ids)
+        ):
+            # Priced every id we hold, and the log says there were more
+            # calls than ids. measure() cannot see that -- it only knows
+            # about ids it was handed -- so the floor has to be declared
+            # here or a partial capture would read as a complete count.
+            rebuilt.append(ComponentCost(
+                component=item.component,
+                status=STATUS_LOWER_BOUND,
+                credits=item.credits,
+                event_count=item.event_count,
+                session_ids=item.session_ids,
+                measured_session_ids=item.measured_session_ids,
+                unmeasured_session_ids=item.unmeasured_session_ids,
+                reason=(
+                    f"{seat_calls} routed call(s) are recorded for this "
+                    f"session and only {len(item.measured_session_ids)} "
+                    "carry a conversation id (rows written before Set 130 "
+                    "Session 2 carry none); the number below is a floor"
+                ),
+            ))
+        elif (
+            item.component == COMPONENT_ROUTED_SEAT
+            and item.status == STATUS_UNKNOWN
+            and seat_calls
+        ):
+            rebuilt.append(ComponentCost(
+                component=item.component,
+                status=STATUS_UNKNOWN,
+                credits=None,
+                session_ids=item.session_ids,
+                unmeasured_session_ids=item.unmeasured_session_ids,
+                reason=(
+                    f"{seat_calls} routed call(s) are recorded for this "
+                    "session and none carries a conversation id; the spend "
+                    "is real and cannot be attributed (this is not zero)"
+                ),
+            ))
+        else:
+            rebuilt.append(item)
+    return CostReport(
+        components=tuple(rebuilt),
+        store_path=report.store_path,
+        schema_version=report.schema_version,
+    )
+
+
+# --------------------------------------------------------------------------
 # Rendering (ASCII only -- project-guidance Code Style)
 # --------------------------------------------------------------------------
 
@@ -711,6 +1065,98 @@ def format_report(report: CostReport) -> str:
     return "\n".join(lines)
 
 
+def format_cost_block(block: object) -> list:
+    """Render a ``disposition.cost`` block as ASCII lines.
+
+    Takes the serialized block rather than a :class:`CostReport` so every
+    consumer of the recorded artifact -- the close-out output today, any
+    later reader -- renders the same record the same way, instead of each
+    growing its own opinion about how to display an unknown (L-069-1).
+
+    **Rendering is driven by ``status``, never by the presence of a
+    number.** A block that reaches this function has been on disk, where a
+    hand edit or an older producer can leave ``status: "unknown"`` beside
+    ``credits: 0.0``. Deciding from ``credits is not None`` would print
+    ``$0.00`` for that component -- the exact plausible wrong number this
+    module exists to refuse, arriving through the one door the authoring
+    validator does not guard. The status wins: a non-numeric component
+    renders as unmeasured whatever number is sitting next to it, and a
+    report containing one has no total regardless of what ``total_credits``
+    claims.
+    """
+    if not isinstance(block, dict):
+        return ["cost block is malformed; nothing can be reported from it"]
+    lines: list = []
+    measured_at = block.get("measured_at")
+    if measured_at == MEASURED_AT_CLOSE:
+        lines.append(
+            "measured at close -- a floor: this session's closing turns are "
+            "not in the store yet"
+        )
+    elif measured_at == MEASURED_AT_RETROSPECTIVE:
+        lines.append("measured retrospectively")
+    unmeasured: list = []
+    for item in block.get("components") or []:
+        if not isinstance(item, dict):
+            lines.append("a component entry is malformed: UNKNOWN")
+            unmeasured.append("(malformed entry)")
+            continue
+        name = item.get("component")
+        label = COMPONENT_LABELS.get(name, str(name))
+        status = str(item.get("status"))
+        credits = item.get("credits")
+        numeric = status in NUMERIC_STATUSES and isinstance(credits, (int, float))
+        if not numeric:
+            lines.append(f"{label}: {status.upper()}")
+            unmeasured.append(str(name))
+            if status in NUMERIC_STATUSES:
+                lines.append(
+                    "  status claims a number and none is recorded; refusing "
+                    "to report a figure this block does not carry"
+                )
+            elif credits is not None:
+                lines.append(
+                    f"  a number ({credits!r}) is recorded beside a status "
+                    "that means it was not measured; the status wins"
+                )
+        else:
+            usd = item.get("usd")
+            usd_text = (
+                f"${usd:,.2f}" if isinstance(usd, (int, float))
+                else f"${credits / CREDITS_PER_USD:,.2f}"
+            )
+            lines.append(
+                f"{label}: {credits:,.1f} credits = {usd_text} [{status}]"
+            )
+        reason = item.get("reason")
+        if reason:
+            lines.append(f"  {reason}")
+    total_credits = block.get("total_credits")
+    if unmeasured or not isinstance(total_credits, (int, float)):
+        declared = [str(c) for c in (block.get("unmeasured") or [])]
+        named = unmeasured or declared
+        lines.append(
+            "TOTAL: not available -- not measured: "
+            + (", ".join(named) if named else "see above")
+        )
+        lines.append(
+            "  a total dropping them would report unmeasured spend as zero"
+        )
+    else:
+        total_usd = block.get("total_usd")
+        usd_text = (
+            f"${total_usd:,.2f}" if isinstance(total_usd, (int, float))
+            else f"${total_credits / CREDITS_PER_USD:,.2f}"
+        )
+        prefix = (
+            "TOTAL"
+            if block.get("total_status") == STATUS_MEASURED
+            else "TOTAL (LOWER BOUND)"
+        )
+        lines.append(f"{prefix}: {total_credits:,.1f} credits = {usd_text}")
+    return lines
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="seat_cost",
@@ -748,7 +1194,38 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-api-calls", action="store_true",
         help=(
             "Declare that this session dispatched no Direct-API routed calls, "
-            "so that component contributes an honest zero instead of UNKNOWN."
+            "so that component contributes an honest zero instead of UNKNOWN. "
+            "Not needed with --session-set-dir, which derives the same answer "
+            "from the recorded metrics rows."
+        ),
+    )
+    parser.add_argument(
+        "--session-set-dir", default=None, metavar="DIR",
+        help=(
+            "Price a whole workflow session from the ids the repo already "
+            "recorded: orchestrator conversations from session-state.json's "
+            "orchestrator.seatSessionIds, routed children from "
+            "router-metrics.jsonl's transport_session_id. Mutually exclusive "
+            "with the explicit --orchestrator/--routed form."
+        ),
+    )
+    parser.add_argument(
+        "--session-number", type=int, default=None, metavar="N",
+        help="Which session of the set (default: the in-flight one).",
+    )
+    parser.add_argument(
+        "--retrospective", action="store_true",
+        help=(
+            "Measure a FINISHED session. Without this the reading is live "
+            "and reports a LOWER BOUND, because a session's closing turns "
+            "are not in the store while it is still closing."
+        ),
+    )
+    parser.add_argument(
+        "--cost-block", action="store_true",
+        help=(
+            "Emit the disposition.cost block (JSON) instead of a table -- "
+            "what a close-out pastes into disposition.json."
         ),
     )
     parser.add_argument("--store-path", default=None, help="Override the store location.")
@@ -760,37 +1237,61 @@ def _build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = _build_parser().parse_args(argv)
 
-    orchestrator = list(args.orchestrator)
-    live = list(args.live)
-    if args.use_self:
-        own = seat_session_id_from_env()
-        if own is None:
+    if args.session_set_dir:
+        if args.orchestrator or args.routed or args.use_self:
             print(
-                f"[dabbler] --self needs {SEAT_SESSION_ID_ENV} in the "
-                "environment; this does not look like a Copilot CLI seat.",
+                "[dabbler] --session-set-dir gathers the ids itself; do not "
+                "also pass --orchestrator/--routed/--self.",
                 file=sys.stderr,
             )
             return 2
-        orchestrator.append(own)
-        live.append(own)
+        report = measure_session(
+            args.session_set_dir,
+            args.session_number,
+            live=not args.retrospective,
+            engine=args.engine,
+            store_path=args.store_path,
+            routed_api_not_applicable=True if args.no_api_calls else None,
+        )
+    else:
+        orchestrator = list(args.orchestrator)
+        live = list(args.live)
+        if args.use_self:
+            own = seat_session_id_from_env()
+            if own is None:
+                print(
+                    f"[dabbler] --self needs {SEAT_SESSION_ID_ENV} in the "
+                    "environment; this does not look like a Copilot CLI seat.",
+                    file=sys.stderr,
+                )
+                return 2
+            orchestrator.append(own)
+            live.append(own)
 
-    components = {
-        COMPONENT_ORCHESTRATOR_SEAT: orchestrator,
-        COMPONENT_ROUTED_SEAT: list(args.routed),
-    }
-    not_applicable = [COMPONENT_ROUTED_API] if args.no_api_calls else []
-    if not args.no_api_calls:
-        components[COMPONENT_ROUTED_API] = []
+        components = {
+            COMPONENT_ORCHESTRATOR_SEAT: orchestrator,
+            COMPONENT_ROUTED_SEAT: list(args.routed),
+        }
+        not_applicable = [COMPONENT_ROUTED_API] if args.no_api_calls else []
+        if not args.no_api_calls:
+            components[COMPONENT_ROUTED_API] = []
 
-    report = measure(
-        components,
-        store_path=args.store_path,
-        engine=args.engine,
-        live_session_ids=live,
-        not_applicable=not_applicable,
-    )
-    if args.json:
-        import json as _json
+        report = measure(
+            components,
+            store_path=args.store_path,
+            engine=args.engine,
+            live_session_ids=live,
+            not_applicable=not_applicable,
+        )
+
+    import json as _json
+
+    if args.cost_block:
+        measured_at = (
+            MEASURED_AT_RETROSPECTIVE if args.retrospective else MEASURED_AT_CLOSE
+        )
+        print(_json.dumps(report.to_cost_block(measured_at), indent=2))
+    elif args.json:
         print(_json.dumps(report.to_dict(), indent=2))
     else:
         print(format_report(report))

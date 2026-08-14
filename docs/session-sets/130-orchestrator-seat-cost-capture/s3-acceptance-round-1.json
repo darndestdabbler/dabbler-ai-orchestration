@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "b96b02b7d132221bc9111f9686fc31f931ad4c4b",
+  "fixedTree": "3a736310c90560ff4abec6256e4dd12b24cdc135",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T10:44:02.882513+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** `close_session` renders `disposition.cost` without validating the cost contract first. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/close_session.py:1422`, `ai ...",
+      "severity": "Major",
+      "criterion": "python -c \"import io,sys; sys.path.insert(0,'ai_router'); import close_session; o=close_session.CloseoutOutcome(result='succeeded',session_set_dir='x',cost={'measured_at':'close','components':[{'component':'routed_seat','status':'unknown','credits':0.0,'usd':0.0}],'total_status':'unknown','total_credits':0.0,'total_usd':0.0,'unmeasured':['routed_seat']}); b=io.StringIO(); old=sys.stdout; sys.stdout=b; close_session._emit_output(o,json_mode=False); sys.stdout=old; raise SystemExit(1 if '$0.00' in b.getvalue() else 0)\"",
+      "criterionSha256": "78f3b958c488ce9c1124200e56562250c529c79e789e74eedeed57c1db1cd743",
+      "expectedExitCode": 0,
+      "outcome": "refused-unsafe",
+      "reason": "refused: shell operator ';' is not supported (the harness runs no shell)"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `close_session` can still print an invalid recorded cost block as a real `$0.00` measurement. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/close_session.py:147 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A recorded cost block with any non-numeric status and numeric credits/usd is either rejected before close output or rendered only as unmeasured, never as a credit/USD amount.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

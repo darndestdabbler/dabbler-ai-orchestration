@@ -17,6 +17,7 @@ that property end-to-end through a real ``load_config()`` call rather
 than a hand-built config dict.
 """
 
+import json
 import os
 import textwrap
 from pathlib import Path
@@ -449,3 +450,127 @@ def test_copilot_session_id_helper_refuses_a_wrong_typed_wire_value() -> None:
         router_pkg._copilot_session_id(_Result({"session_id": "conv-9"}))
         == "conv-9"
     )
+
+
+# ---------------------------------------------------------------------------
+# Set 130 Session 3 - the report stops presenting unpriced calls as $0.0000
+#
+# ``cost_usd`` is billing-authoritative only where ``billed_usage_unavailable``
+# is not true. Set 118 Session 1's five routed rounds recorded $0.0000 in this
+# log and consumed $8.66 of AI credits, and the report summed them anyway.
+# ---------------------------------------------------------------------------
+
+
+def _row(**overrides) -> dict:
+    base = {
+        "session_set": "130-orchestrator-seat-cost-capture",
+        "session_number": 2,
+        "call_type": "route",
+        "task_type": "session-verification",
+        "model": "gpt-5.5",
+        "provider": "openai",
+        "cost_usd": 0.0,
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "billed_usage_unavailable": True,
+        "transport": "copilot-cli",
+        "transport_session_id": None,
+    }
+    base.update(overrides)
+    return base
+
+
+def test_priced_total_excludes_rows_that_declare_they_are_not_priced(capsys):
+    """The header must not add an unpriced row into a dollar total."""
+    records = [
+        _row(cost_usd=0.0),
+        _row(cost_usd=0.0),
+        _row(
+            billed_usage_unavailable=None,
+            transport="api",
+            transport_session_id=None,
+            cost_usd=1.25,
+            model="claude-opus-5",
+            provider="anthropic",
+        ),
+    ]
+    priced, unpriced = metrics_mod.priced_and_unpriced(records)
+    assert len(priced) == 1 and len(unpriced) == 2
+    assert sum(r["cost_usd"] for r in priced) == 1.25
+
+
+def test_report_names_the_unpriced_calls_instead_of_summing_them_as_zero(
+    tmp_path: Path, monkeypatch, capsys
+):
+    """Drive the operator-facing surface end to end against a planted log."""
+    log = tmp_path / "router-metrics.jsonl"
+    rows = [
+        _row(transport_session_id="child-1"),
+        _row(transport_session_id="child-2"),
+        _row(session_set="129-other", session_number=1),
+    ]
+    log.write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(log))
+
+    metrics_mod.print_metrics_report({})
+    out = capsys.readouterr().out
+
+    assert "Total cost:" not in out, (
+        "an unqualified 'Total cost' line is the label that overclaims"
+    )
+    assert "NOT PRICED HERE" in out
+    assert "3 call(s) on a seat transport" in out
+    assert "2 carry the conversation id" in out
+    assert "$0.0000" not in out, (
+        "no cell may render an unpriced group as a dollar zero"
+    )
+    out.encode("cp1252")  # project-guidance Code Style: ASCII-only CLI output
+
+
+def test_a_group_with_nothing_priced_renders_a_dash_not_a_zero():
+    assert metrics_mod._cost_cell([_row(), _row()]).strip() == "-"
+    mixed = metrics_mod._cost_cell(
+        [_row(), _row(billed_usage_unavailable=None, cost_usd=2.0)]
+    )
+    assert mixed.strip() == "$  2.0000+", mixed
+    assert metrics_mod._cost_cell(
+        [_row(billed_usage_unavailable=None, cost_usd=2.0)]
+    ).strip() == "$  2.0000"
+
+
+def test_transport_session_ids_selects_by_set_and_session(tmp_path, monkeypatch):
+    """The join key, addressed the way the log is actually keyed.
+
+    The historical rows carry the set as a slug, a repo-relative path and an
+    absolute path; a caller filtering on the raw string would match none of
+    them. Nulls contribute nothing -- 'not captured' is not 'no conversation'.
+    """
+    log = tmp_path / "router-metrics.jsonl"
+    rows = [
+        _row(transport_session_id="child-1"),
+        _row(
+            session_set="docs/session-sets/130-orchestrator-seat-cost-capture",
+            transport_session_id="child-2",
+        ),
+        _row(
+            session_set="C:/repo/docs/session-sets/130-orchestrator-seat-cost-capture",
+            transport_session_id="child-2",
+        ),
+        _row(transport_session_id=None),
+        _row(session_number=1, transport_session_id="other-session"),
+        _row(session_set="129-other", transport_session_id="other-set"),
+    ]
+    log.write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
+    )
+    monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(log))
+
+    assert metrics_mod.transport_session_ids(
+        "130-orchestrator-seat-cost-capture", 2
+    ) == ["child-1", "child-2"]
+    assert metrics_mod.transport_session_ids(
+        "docs/session-sets/130-orchestrator-seat-cost-capture", None
+    ) == ["child-1", "child-2", "other-session"]
+    assert metrics_mod.transport_session_ids("129-other", None) == ["other-set"]

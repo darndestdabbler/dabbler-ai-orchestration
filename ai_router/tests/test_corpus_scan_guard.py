@@ -638,6 +638,93 @@ def test_two_plus_two():
     assert offenders == [], offenders
 
 
+def test_materializing_a_lazy_helper_at_the_call_site_is_accepted(tmp_path):
+    """Round 5 (close backstop): the wrapper wins over what it wraps.
+
+    ``files = list(_sources())`` is a real list even when ``_sources()``
+    returns a generator. Propagating helper laziness unconditionally
+    rejected this valid assertion -- a false positive is as damaging as a
+    false negative, because it teaches authors the guard is noise.
+    """
+    _plant(
+        tmp_path,
+        "test_planted_wrapped_lazy.py",
+        '''\
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+
+def _sources():
+    return ROOT.rglob("*.py")
+
+
+def test_scan():
+    files = list(_sources())
+    assert files
+    offenders = [p for p in files if "bad" in p.name]
+    assert not offenders
+''',
+    )
+    _, offenders = scan(tmp_path)
+    assert offenders == [], offenders
+
+
+def test_a_helper_that_materializes_a_lazy_helper_is_not_lazy(tmp_path):
+    """The same rule one level up, inside the helper chain."""
+    _plant(
+        tmp_path,
+        "test_planted_wrapped_chain.py",
+        '''\
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+
+def _walk():
+    return ROOT.rglob("*.py")
+
+
+def _sources():
+    return sorted(_walk())
+
+
+def test_scan():
+    files = _sources()
+    assert files
+    offenders = [p for p in files if "bad" in p.name]
+    assert not offenders
+''',
+    )
+    _, offenders = scan(tmp_path)
+    assert offenders == [], offenders
+
+
+def test_a_comprehension_over_a_lazy_helper_is_not_lazy(tmp_path):
+    _plant(
+        tmp_path,
+        "test_planted_comp_lazy.py",
+        '''\
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent
+
+
+def _sources():
+    return ROOT.rglob("*.py")
+
+
+def test_scan():
+    files = [p for p in _sources()]
+    assert files
+    offenders = [p for p in files if "bad" in p.name]
+    assert not offenders
+''',
+    )
+    _, offenders = scan(tmp_path)
+    assert offenders == [], offenders
+
+
 # --------------------------------------------------------------------
 # The guard reads the corpus it claims to read.
 # --------------------------------------------------------------------

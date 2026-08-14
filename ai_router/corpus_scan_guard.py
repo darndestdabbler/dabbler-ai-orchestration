@@ -229,6 +229,21 @@ def _target_names(target: ast.AST) -> set:
     }
 
 
+def _materializes(value: ast.AST) -> bool:
+    """True iff *value* forces a walk into a sized collection.
+
+    A materializing wrapper wins over whatever it wraps:
+    ``list(_sources())`` is a real list even when ``_sources()`` hands
+    back a generator, so treating it as lazy would reject a perfectly
+    good corpus assertion.
+    """
+    if isinstance(value, (ast.ListComp, ast.SetComp, ast.DictComp)):
+        return True
+    if isinstance(value, ast.Call) and isinstance(value.func, ast.Name):
+        return value.func.id in _MATERIALIZING_CALLS
+    return False
+
+
 def _is_lazy_walk(value: ast.AST) -> bool:
     """True iff *value* is a path walk that was never materialized.
 
@@ -321,8 +336,9 @@ def _corpus_variables(
             )
             if not derives:
                 continue
-            is_lazy = _is_lazy_walk(value) or bool(
-                _called_names(value) & lazy_helpers
+            is_lazy = not _materializes(value) and (
+                _is_lazy_walk(value)
+                or bool(_called_names(value) & lazy_helpers)
             )
             for target in targets:
                 for name in _target_names(target):
@@ -520,6 +536,8 @@ def _lazy_returning_helpers(
                 if not isinstance(node, ast.Return) or node.value is None:
                     continue
                 value = node.value
+                if _materializes(value):
+                    continue
                 if (
                     _is_lazy_walk(value)
                     or bool(_referenced_names(value) & local_lazy)

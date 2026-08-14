@@ -1,0 +1,150 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-14T01:48:55.906327-04:00",
+  "sessionSetDir": "118-test-retirement-and-coupling-budget",
+  "inputs": {
+    "activity-log.json": "77834e2fbce2ef814f5f3c9b9067e6ccd84828863ee39a99fa2d3de3f80173d2",
+    "session-state.json": "92e521201f0634cc4a683aeecd431b0a39b8cfce4e821bcd917c6ba0f94c5218",
+    "spec.md": "155441b41a0cb15579c3ae0001d616796d19ddb667439504552ef15878fe026c"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 1 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T20:34:08.032058-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-python-m-ai-router-test",
+          "description": "Built ai_router/test_inventory.py: one record per test file (test-function count by BOTH the historical line predicate and an AST cross-check, LOC, imported production modules, coupling tier, guard status, sole-cover flag, git first-seen/last-modified), emitting a human report plus a versioned JSON contract. THE DELIVERABLE IS THE PREDICATE, NOT THE NUMBER: PREDICATES{} carries the rule behind every figure and is rendered at the top of the report and carried in the JSON. --rev reads the corpus out of git via ONE `git cat-file --batch` pass (1.7s for the whole repo incl. a history pass), which is what makes a historical figure reproducible by command; without it Step 4 could not be performed at all, since the spec's figures are at ab47a3e7 and not at HEAD. The working-tree corpus is enumerated from the FILESYSTEM rather than git ls-files so an uncommitted test file cannot hide (L-064-9). 17 tests shipped against the spec's irony budget of 25.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T20:34:08.060084-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "classify-guards",
+          "description": "Guard classification reads a @pytest.mark.guard marker FIRST (the Session 2 convention -- the reader ships now so Session 2 only adds the marker) and falls back to an evidence-carrying heuristic, with the source recorded per file so the migration off the heuristic is visible. THE FIRST HEURISTIC WAS WRONG AND THE TOOL SAID SO: signal-any-hit called 53 of 124 files (1,838 test functions) guards, which would have handed Session 2's rule a meaningless population. Added a majority clause -- guard-shaped functions must be >=2 AND >=half the file -- plus filename 'guard', a set<NNN> filename pin, and docstring permanence phrases. Population is now 5 files / 138 functions at 8fda8d85 and 6 / 165 at HEAD, and it FINDS the two spec-named guards that are mechanically detectable (test_lightweight_resurrection_guard.py 43 tests, age 17 sets; test_set111_close_gates.py 19 tests, age 18 sets). Age in sets = latest set on disk minus the set the guard names. A NAMED LIMIT, published as guard.limits: the heuristic CANNOT see an invariant pin -- the spec's other two examples (test_step_row_parity.py, test_print_session_set_status_completed_count.py) are indistinguishable from ordinary behaviour tests by any mechanical signal, which is the argument for Session 2's marker rather than a defect in the heuristic. A1 sole-cover is computed per file and cross-cut with guard status: 3 files at HEAD are BOTH a guard and the sole cover for a production module and are never bulk-eligible.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T20:48:38.944943-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "reproduce-this-spec-s-numbers-from",
+          "description": "ALL EIGHT FIGURES IN THE SPEC'S RE-READ TABLE FALL OUT OF THE TOOL EXACTLY at ab47a3e7 -- 133 files / 3,513 functions / 67,182 test LOC / 67,634 production LOC / 0.99 ratio / 142 parametrize decorators, and both coupling readings 48/1,452 and 55/1,711. Counters were validated against the EARLIER commit first, the same way Set 128 S3 validated its own: 8fda8d85 reproduces 124 / 3,345 / 60,188 / 62,103 / 0.97 and 43/1,294 + 48/1,497. Nothing was adjusted to fit. THE PREDICATE THAT WAS DOING INVISIBLE WORK: 'test file' means basename test_*.py, not every *.py under ai_router/tests -- the latter gives 131 files at 8fda8d85, not 124, the seven conftest/fixture helpers being the difference. This also settles the spec's two-line-counters note: 52,868 vs 60,188 for one commit is blank/comment-excluding vs -including; the tool implements the second. THE COUPLING DISCREPANCY IS SETTLED AND THE SPEC'S 47/1,485 IS SUPERSEDED: it was never reproducible because its sentence has THREE defensible readings that disagree by ~250 functions -- 43/1,294 (repo_root as substring), 42/1,251 (repo_root word-anchored, which drops _repo_root() helpers and loses a whole 43-test file on one underscore) and 48/1,497 (bare __file__). The tool ships D1 and D2 as NAMED detectors for continuity and answers with a tier. Strong coupling -- derives a path from __file__ AND enumerates it -- is 7 files / 167 functions at the spec's own commit, not 1,485, and 5/66 at 8fda8d85, which reproduces the measurement-correction's independent count EXACTLY. Premise A is confirmed materially weakened; premises B (guard accrual) and the ratio bound both stand.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T20:48:38.946353-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Four rounds, all gpt-5.5 (openai) with anthropic excluded by model-registry lookup, all $0.00 on the Copilot CLI seat. R1 discovery 2-lens fan-out -> 2 Major (both lenses found the SAME defect independently); R2 supplementary -> 1 Major; R3 remediation-review -> BOTH fixes REJECTED plus 2 new Major; R4 remediation-review -> VERIFIED, 0 findings, 4/4 fixes accepted. Five Major total, all accepted, none disputed, all fixed. EVERY ONE WAS REAL AND EVERY ONE WAS IN THE TOOL'S OWN APPROXIMATIONS. (1) The A1 import map read importlib.import_module(<variable>) as 'imports nothing', so test_entry_points.py -- which imports every [project.scripts] target through a name read out of pyproject.toml -- recorded zero imports and report.py was published UNCOVERED when it is not. That is a false negative on the exact surface Session 3 retires against. Fixed by completing the map from the DECLARATION, and by recording every other unresolvable dynamic import as a visible hole (unresolvedDynamicImportFiles) rather than a confident zero. (2) D4/strong was a file-level CO-OCCURRENCE check, so test_session_state_backfill.py -- __file__ for a script path, .iterdir() on a tmp_path, different functions -- was 'strong'. Rewritten as an AST dataflow question. (3) The first rewrite counted any argument-passing and came out identical to D3 (39 files) -- meaningless. (4) Narrowing to iterated results made os.path.join(os.path.dirname(...)) read as an enumeration, which is how half the suite builds a fixture path. (5) The entry-point fix returned [] when tomllib was missing, silently restoring defect (1) on Python 3.10, which pyproject still supports -- now fails CLOSED via None-vs-[]. D4 was wrong THREE times in three different directions and not one was found by reading the predicate; all four readings are written down, the current one is pinned by a test against a real commit, and each narrowing ships the falsifier that broke it (L-112-1). NOTHING MOVED that this session claimed to reproduce: volume at both historical commits, D1, D2 and D3a are byte-identical across all four rounds. Irony budget 20 -> 25 functions, exactly at the spec's cap of 25.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T20:57:37.803275-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "A3: run_of_record affected named ALL THREE suites owed -- pytest, mocha and playwright -- because mocha's and playwright's covers both include ai_router/ (Set 129 S1 derived that empirically: Layer 3 pip-installs this tree rather than the published wheel). No suite was saved this time. pytest 4,374 passed / 9 skipped in 607.1s. mocha 1,455 passing / 2 pending in 44s. PLAYWRIGHT NEEDED AN OPERATOR DECISION: 30 passed / 1 failed under the declared command, the failure being vsix-first-run-walkthrough.spec.ts stuck on 'Default0 sets' for its full 300s wait. Attribution was established rather than assumed -- the spec passes STANDALONE in 45s and the whole suite passes at --workers=1 (31/31, 8.4m), while workers=4 fails it twice at 5.2m each. Cause is parallel contention: four VS Code instances each doing a real venv + network pip install starve the walkthrough past its budget. Independently confirmed the change cannot reach an extension surface by building the wheel (clean) and inspecting it: suite_inventory.py present, ZERO test modules -- which also re-proves the packaging invariant that forced the module rename. Operator attested to recording green from the serial run with the provenance disclosed; journaled under the verification-reduction carve-out with authority=human, because a green row under the declared command is exactly what the gate asks about and only the operator may relax it.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-13T21:43:47.701767-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 1,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 7
+      },
+      "current": [],
+      "remaining": [
+        "close-out"
+      ]
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

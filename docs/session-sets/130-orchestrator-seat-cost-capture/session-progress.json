@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-14T04:29:30.259381-04:00",
+  "generatedAt": "2026-08-14T05:44:39.861296-04:00",
   "sessionSetDir": "130-orchestrator-seat-cost-capture",
   "inputs": {
-    "activity-log.json": "490e037e1c2607ed32c0200e536930f8fbff0dc0da223d887bf0c76ff5c9dd7d",
-    "session-state.json": "1081965b7c188776d7b9b9ad39b9b167741b88ef1879644274cb0342fc2f67d8",
+    "activity-log.json": "9d39065cf3d95fe3f870cd82328090d0be3baba687fb2566576236b32bc702e1",
+    "session-state.json": "a4a99b110526bdb5805c5ce11507ad29d8cd4761fbc680e9bb65c4fa13ff021f",
     "spec.md": "c27b7e48f865c0b897a18714091d327cffc962c7d60702ae3d6a68f8fc926581"
   },
   "orphanEntries": 0,
@@ -130,19 +130,96 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T05:08:13.319646-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "seatIdCaptured",
+          "description": "start_session records COPILOT_AGENT_SESSION_ID as orchestrator.seatSessionIds (array, omit-null, deduped, accumulating across re-registers). Writer: session_state.build_orchestrator_block + new normalize_seat_session_ids / accumulate_seat_session_ids; env read at the CLI boundary via seat_cost.seat_session_id_from_env(). Schema doc, JSON Schema and writer moved in the same pass (L-064-8).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T04:48:08.570597-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "routedIdPersisted",
+          "description": "record_call() gains transport_session_id; route() and the seat verify() path pass the sessionId cli_transport already captured, shape-checked once in __init__._copilot_session_id (sibling of _copilot_echoed_model, L-069-1). Additive-null on every historical and api row. metrics.py module docstring updated. 13 falsifiers added (10 in test_start_session.py, 3 in test_metrics.py); all five planted defects proved to fire selectively. Live dogfood: this session's own id was captured on re-register and priced at 962.8 credits / $9.63.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T04:58:41.674895-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "crossProviderVerification",
+          "description": "Discovery round, fan-out 2 (spec-conformance + failure-scenario lenses), verifier gpt-5.5 on both, anthropic excluded: VERIFIED, 0 findings, non-blocking. Live proof of the metrics half: both routed calls of that round carry transport_session_id (73273cde..., 5d9238fd...), while Session 1's rows correctly carry null.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T05:09:28.156874-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "requiredTestPortion",
+          "description": "All three suites owed (covers ai_router/) and recorded: pytest 4411 passed / 9 skipped (586s, +13 = exactly this session's new tests), mocha 1455 passing / 2 pending (41s), playwright 31/31 (composite: 30 in the declared 4-worker run + vsix-first-run-walkthrough.spec.ts standalone in 43.9s, 513s). The Playwright failure was checked for regression FIRST -- this session changes a state-file writer -- and ruled out by the isolated pass matching Session 1's 43.6s on the identical signature.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T05:19:16.335396-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "closeOut",
+          "description": "Close-out",
+          "status": "in-progress",
+          "state": "in-progress",
+          "box": "[~]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T05:41:33.459127-04:00",
+          "isTerminal": false
+        }
+      ],
       "counts": {
         "pending": 0,
-        "in-progress": 0,
-        "complete": 0,
+        "in-progress": 1,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
-      "current": [],
-      "remaining": []
+      "current": [
+        "closeOut"
+      ],
+      "remaining": [
+        "closeOut"
+      ]
     },
     {
       "number": 3,

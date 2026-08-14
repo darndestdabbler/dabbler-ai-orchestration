@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "The join key, recorded instead of dropped",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T05:08:13.319646-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T05:44:39.858204-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -34,7 +34,7 @@
           "04ab6f3d-3dc9-4f6c-b88d-eb64c06ef0c1"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

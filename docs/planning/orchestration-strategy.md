@@ -73,6 +73,30 @@ A process can be cheap in one currency and ruinous in another. Always evaluate
 > expensive option despite the lowest per-call price. (Quantifying that rework
 > term is exactly what the Set 068 Experiment B cost model exists to do.)
 
+### The lever this section was missing: rotation
+
+The three currencies above are all managed by choosing *what process to run*.
+There is a fourth lever, and Set 131 measured it as the largest one: **the
+orchestrator's own retained transcript**, which is re-billed on every
+subsequent turn. Credits per inference on one model rise ~4.7x from the
+25–75K input band to the >300K band, and a single compaction of a 631K
+transcript cut the next inference's cost ~7–8x for a one-time 400 credits.
+
+Two consequences for allocating effort:
+
+- **Routing work away is partly a footprint decision, not only a skill
+  decision.** Work whose *output* is small but whose *inputs* are large is
+  worth delegating even when the orchestrator could do it, because the
+  delegate's context is discarded and the orchestrator's is not.
+- **Model substitution is a weaker lever than it looks.** At matched context
+  the frontier models here cost within ~2x of each other; the apparent 8.5x
+  gap is role/context confounding. Do not buy a cheaper orchestrator on a
+  per-model average.
+
+Canonical, with the measurements, the trigger threshold, and the survival
+contract a flush must honor: `docs/ai-led-session-workflow.md` →
+**Rotation, and the trade we declined**.
+
 ---
 
 ## 3. Falsifiability is the router — a tiered model
@@ -186,6 +210,10 @@ catching the genuinely ambiguous cases.
   **solution-variance** (Tier 2 panel only if oracle-free *and* divergent).
 - Evaluate **total** cost across dollars, latency, and human-attention; exploit
   parallelism so the heavy tier is wall-clock-cheap.
+- Manage the **fourth lever** — the orchestrator's retained transcript. It is
+  larger than model substitution and it is the one this document originally
+  omitted (`ai-led-session-workflow.md` → *Rotation, and the trade we
+  declined*).
 - For the panel: **generate-diverse → adversarial cross-critique → synthesize →
   operator-confirm**, targeting the architecture (or the decomposition when
   sequencing is the risk).

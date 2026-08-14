@@ -299,6 +299,132 @@
       "dateTime": "2026-08-14T11:14:15.591944-04:00",
       "description": "close_session succeeded; all 10 gates PASS. Cost at close (a floor): orchestrator seat 1401.0 credits / \\.01 lower_bound, routed CLI 280.7 credits / \\.81 measured, routed API not applicable; TOTAL LOWER BOUND 1681.7 credits / \\.82. Two verification rounds (discovery VERIFIED 0 blocking; A4 delta-scoped remediation-review VERIFIED 0 findings) and two full pytest runs of record, the second because the A4 round's artifacts staled the first.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T11:39:27.943491-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "document-transcript-rotation-as-the-dominant",
+      "dateTime": "2026-08-14T11:39:27.943491-04:00",
+      "description": "**Document transcript rotation as the dominant cost lever**, with the `a9f211a7` measurement as its evidence and a survival contract. What must survive a flush: the system prompt and engine bootstrap file, the session-set spec and the active step, `session-state.json`, the activity log, open findings from any verification round, and a dense carry-forward of what was tried and rejected and why. What must not be assumed to survive: anything discovered only in the transcript. **The failure mode is a session that repeats a path it already abandoned** \u2014 which is also the strongest argument against outsourcing stateful judgment (Session 1's rule 3), so the two sections cite each other. Trigger is a token threshold, not a vibe; step boundaries are where it is *cheapest*, so the guidance is \"at the first step boundary after the threshold\".",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "record-the-declined-trade",
+      "dateTime": "2026-08-14T11:39:27.943491-04:00",
+      "description": "**Record the declined trade.** A short subsection stating that the orchestrator model was deliberately **not** downgraded, the matched-context table that justifies it, and T3's confused-deputy reasoning \u2014 so the next reader who finds the naive 8.5x table does not re-derive the wrong conclusion. Author `change-log.md` and the changelog fragment.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T11:39:27.943491-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T11:39:27.943491-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "close-out-including-the-step-9",
+      "dateTime": "2026-08-14T11:39:27.943491-04:00",
+      "description": "**Close-out**, including the Step 9 reorganization review of `project-guidance.md` / `lessons-learned.md` \u2014 this set produces at least two candidate lessons (role/context confounding; unbounded child cost).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-14T11:39:27.959607-04:00",
+      "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "document-transcript-rotation-as-the-dominant",
+      "dateTime": "2026-08-14T11:42:50.232314-04:00",
+      "description": "Authoring the canonical rotation section in docs/ai-led-session-workflow.md (measurement, trigger threshold, survival contract, failure mode) plus the reciprocal citation from Delegation Discipline rule 3 and the currency-lever pointer in orchestration-strategy.md.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "document-transcript-rotation-as-the-dominant",
+      "dateTime": "2026-08-14T11:45:41.752090-04:00",
+      "description": "Wrote 'Rotation, and the trade we declined' in docs/ai-led-session-workflow.md (a9f211a7 measurement, the opus-5 context bands, a ~150K token trigger taken at the first step boundary, the survival contract, and the repeat-an-abandoned-path failure mode). Added the reciprocal citation to Delegation Discipline rule 3's statefulness carve-out and pointed the 'Child output is untrusted data' declined-trade paragraph at the new section. Added rotation as the fourth cost lever in docs/planning/orchestration-strategy.md (section 2 and the section 7 summary).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "record-the-declined-trade",
+      "dateTime": "2026-08-14T11:45:41.754775-04:00",
+      "description": "Recording the declined orchestrator downgrade with its matched-context evidence, making the three engine-file Delegation Discipline pointers byte-identical, and authoring change-log.md plus the ai_router/changelog.d fragment.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "record-the-declined-trade",
+      "dateTime": "2026-08-14T11:49:50.795026-04:00",
+      "description": "Wrote 'The trade we declined' with the naive table reproduced beside the matched-context table and the T3 confused-deputy reasoning. Replaced the Delegation Discipline pointer in AGENTS.md, CLAUDE.md and GEMINI.md with one byte-identical block (verified: 1129 bytes, identical sha256 in all three) - CLAUDE.md and GEMINI.md still named Sets 110-112 as a live window and all three pointed at thresholds Session 1 deleted. Authored change-log.md and ai_router/changelog.d/0130-set-131-outsourcing-policy-restoration.md via the sanctioned changelog writer. Journaled the ~150K rotation threshold.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-14T12:07:31.870249-04:00",
+      "description": "Round 1 (discovery, 2-way fan-out, both gpt-5.5, anthropic excluded as the orchestrator's effective provider): VERIFIED, 0 blocking, 2 Nits (one per lens) - an optimistic 150-300K payback figure and a matched-context table narrower than its source. Both fixed rather than merely recorded; sidecar in s3-remediation-round-1.md. post_round_delta classified the delta as shipped-code (A4.2) because docs/ai-led-session-workflow.md sits outside every declared test surface, so round 2 ran as a delta-scoped remediation-review (gpt-5.5, anthropic excluded): VERIFIED, 0 findings.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T12:07:31.872807-04:00",
+      "description": "Running the required portion of the full suite after the last code-changing stage (A2).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-14T12:31:31.990781-04:00",
+      "description": "All three expensive suites re-run after the last change and recorded. pytest 4490 passed / 9 skipped in one invocation (753s) - identical to Sessions 1 and 2, which is the spec's zero-new-tests budget showing up as a flat count. mocha 1455 passing / 2 pending (42s). playwright 30 passed in the declared invocation (7.4m) with vsix-first-run-walkthrough.spec.ts:218 timing out at 300s, then that one spec re-run in isolation and passing in 45.3s - the third consecutive session of this set to hit the identical spec for the identical load-induced reason; journaled. run_of_record check: all three fresh and green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "close-out-including-the-step-9",
+      "dateTime": "2026-08-14T12:31:31.992811-04:00",
+      "description": "Authoring disposition.json, committing and pushing, running close_session, then the Step 9 reorganization review of project-guidance.md / lessons-learned.md.",
+      "status": "in-progress"
     }
   ]
 }

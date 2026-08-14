@@ -2848,6 +2848,9 @@ Two carve-outs live here, both about **state** rather than capability:
   lived the session cannot know why an approach was abandoned forty turns
   ago, and no oracle catches a confidently-repeated dead end. This is not a
   claim that the delegate is weaker — a *stronger* model has the same gap.
+  The same premise governs transcript rotation (**Rotation, and the trade we
+  declined**, below): a post-rotation orchestrator is a delegate to its own
+  earlier self, and the carry-forward is what buys the statefulness back.
 - **Verifier-feedback synthesis may be routed, but it may only
   *recommend*.** A synthesis can propose dispositions; it can never erase a
   finding, change a verdict, or close a round. The gate stays exactly where
@@ -2920,9 +2923,10 @@ delegation must not turn the orchestrator into a relay:
 Because the orchestrator is the privileged actor, downgrading it to a
 cheaper model would buy a modest per-inference saving and pay for it with a
 `repository content → child output → privileged orchestrator` confused-deputy
-path that the read-only sandbox does not close. That trade is **declined**,
-and the measured reasoning is recorded so it is not re-derived from a naive
-per-model cost table.
+path that the read-only sandbox does not close. That trade is **declined**;
+the measurements behind the refusal, and the naive table that argues the
+other way, are in **Rotation, and the trade we declined** below, so the
+conclusion is not re-derived from a per-model average.
 
 ### Bound the child
 
@@ -2956,6 +2960,157 @@ calling `route()`. Everything else — model selection, effort, thinking
 depth, verification — the router handles. Passing the wrong
 `task_type` (e.g., tagging an architecture decision as `documentation`)
 undercuts the tuning, so this matters.
+
+---
+
+## Rotation, and the trade we declined
+
+> **Canonical.** This section is the authority on transcript rotation and on
+> why the orchestrator model is deliberately **not** downgraded. Delegation
+> Discipline above governs *what gets routed*; this governs *what the
+> orchestrator carries while it routes*, which is the larger number.
+
+**Transcript rotation is the largest measured cost effect in this repo's
+history. It is native to the Copilot CLI, and until Set 131 the workflow said
+nothing about it.**
+
+### The measurement
+
+Conversation `a9f211a7` — 1,148 inferences, $367.18, the most expensive in the
+seat store — ran a compaction at turn 75 on 2026-08-11. The store records it
+as a single event, `initiator='compaction'`, costing 400.01 credits.
+Immediately across it:
+
+| | input tokens | credits / inference |
+| :--- | ---: | ---: |
+| the inference before | 631,304 | ~33–35 |
+| the inference after | 54,119 | **~3.6–5.0** |
+
+A **~7–8x** reduction for a one-time cost of 400 credits — payback in roughly
+**14 inferences**.
+
+The effect is not one conversation's accident. Credits per inference for
+`claude-opus-5`, banded by retained input (2026-08-14, `assistant_usage_events`):
+
+| retained input | credits / inference | n |
+| :--- | ---: | ---: |
+| 25–75K | 7.65 | 733 |
+| 75–150K | 9.76 | 1,730 |
+| 150–300K | 17.18 | 5,482 |
+| >300K | **35.77** | 4,580 |
+
+Cost is flat from 25K to 150K and then roughly doubles per band. Retained
+input is re-billed on **every subsequent turn**, which is why this compounds
+and why precedence rule 4 measures footprint rather than emitted output.
+
+### The trigger
+
+**Rotate at ~150K retained input tokens, at the first step boundary after the
+threshold is crossed.** The trigger is a token count, not a feeling.
+
+- **150K** is where the curve leaves its plateau: 7.65–9.76 credits per
+  inference up to it, 17.18 immediately above, 35.77 above 300K.
+- **A step boundary** is where rotation is cheapest, because what a boundary
+  already produces — the step logged, the state file current, the next step's
+  inputs named — *is* most of what a flush has to preserve. Mid-step the same
+  summary has to be written from scratch, and it is written by the expensive
+  actor at its most expensive context size.
+- **Payback, stated honestly:** the 400-credit figure was measured flushing a
+  631K transcript, and a smaller transcript costs less to flush. Charged the
+  full 400 anyway, a rotation fired at the 150–300K band repays in roughly
+  **30–40 inferences** — ~31 if the post-flush context lands near the measured
+  54K, ~42 if it settles at the 25–75K band average — and one fired above 300K
+  repays in roughly **13–15**.
+
+Rotation is **manual and orchestrator-initiated**. Set 131 deliberately shipped
+no automatic trigger: wiring a writer that flushes an orchestrator's transcript
+on its behalf, in the same set that first measured the effect, is how a cost
+win becomes a data-loss incident.
+
+### The survival contract
+
+A flush is lossy by design, so name what has to come through it. Before
+rotating, confirm each of these is either **on disk** or written into the
+carry-forward:
+
+**Must survive:**
+
+- the system prompt and the engine bootstrap file (`AGENTS.md` / `CLAUDE.md` /
+  `GEMINI.md`) — re-read it after the flush rather than assuming it survived
+- the session-set `spec.md` and **which step is active**
+- `session-state.json`
+- `activity-log.json`
+- **open findings from any verification round**, with their severities
+- a dense carry-forward of **what was tried, what was rejected, and why**
+
+**Must not be assumed to survive:** anything discovered only in the
+transcript. A conclusion reached in conversation and never written to a file
+is gone, and nothing downstream will notice it is missing.
+
+### The failure mode
+
+**A rotated session repeats a path it already abandoned.** The abandoned
+attempt left no artifact, so nothing contradicts the second one and it is made
+confidently. No oracle catches it: there is nothing wrong with the code, only
+with having paid for it twice.
+
+That is the same premise as **rule 3's statefulness carve-out** in Delegation
+Discipline — a delegate that never lived the session cannot know why an
+approach was dropped forty turns ago — because *a post-rotation orchestrator
+is a delegate to its own earlier self*. The carry-forward is what buys the
+statefulness back. Both rules rest on one fact: state that was never written
+down does not survive a context change, whoever is on the other side of it.
+
+### The trade we declined
+
+The naive comparison — average credits per inference, grouped by model — argues
+for replacing the orchestrator with something cheaper:
+
+| model | credits / inference | avg input tokens |
+| :--- | ---: | ---: |
+| claude-opus-5 | 22.40 | 270,346 |
+| claude-sonnet-4.6 | 4.51 | 33,047 |
+| gemini-3.1-pro-preview | 2.65 | 43,622 |
+
+Read as a price list that is an 8.5x argument. **It is role/context
+confounding, not a price comparison:** `claude-opus-5` is measured at 270K
+input *because it is the orchestrator*, and the others at 33–45K *because they
+are children*. Control for input size and the gap collapses:
+
+| input band | claude-opus-5 | gpt-5.5 | gemini-3.1-pro | sonnet-4.6 |
+| :--- | ---: | ---: | ---: | ---: |
+| <25K | 9.70 (n=25) | 6.83 (n=338) | 1.72 (n=138) | 4.60 (n=51) |
+| 25–75K | 7.65 (n=733) | 9.71 (n=1,008) | 2.32 (n=211) | 4.40 (n=65) |
+| 75–150K | 9.76 (n=1,730) | 11.49 (n=1,921) | 3.85 (n=47) | 5.46 (n=3) |
+| 150–300K | 17.18 (n=5,482) | 17.37 (n=979) | 26.71 (n=6, ignore) | — |
+| >300K | **35.77** (n=4,580) | 38.80 (n=12) | — | — |
+
+**The blank cells are the confound, not a discount.** The two cheap-looking
+models have no usable data above 150K because nothing ever asked them to hold
+an orchestrator's context — so their headline averages are a measurement of
+the role they were given, not of what they would cost in the orchestrator's
+seat. Where the comparison *is* matched, `claude-opus-5` and `gpt-5.5` cost
+the **same per inference** across three consecutive bands, despite
+`request_multiplier` 15.0 and 7.5 — the credit axis and the premium-request
+axis are close to decoupled, which is also why the catalog lockfile's
+`probe_premium_requests` may never be used for selection. The substitution
+lever is ~1.7–2x. The rotation lever, on the *same* model, is 4.7x
+(7.65 → 35.77).
+
+So the trade actually on offer was: collect ~2x, and hand the **only actor
+holding write, shell and network rights** to a weaker model. Routed children
+hold a read-only allowlist (`view`, `grep`, `glob`) on `copilot-cli` and no
+tools at all on `api`, so the orchestrator is the privileged end of
+`repository content → child output → privileged orchestrator → destructive or
+governance action`. A weaker deputy at that end is a **confused deputy**, and
+the children's read-only sandbox does not close that path — the orchestrator's
+own judgment is what closes it.
+
+**Declined.** Keep the capable orchestrator and rotate its transcript instead:
+it returns more than substitution ever would and costs no security. A future
+set may reopen this, but it must start from the matched-context table, not the
+naive one — the naive table is reproduced here exactly so the next reader who
+finds it recognizes what it is.
 
 ---
 

@@ -1,0 +1,4 @@
+**VERIFIED** — I checked the Session 3 spec obligations against the authored workflow section, orchestration-strategy pointer, engine-file pointer blocks, changelog fragment, and session evidence. The required rotation guidance, survival contract, declined-trade record, cross-references, and changed surfaces are present; no Critical/Major issues found.
+
+**NITS**
+- **Nit:** The workflow doc’s matched-context table only shows `claude-opus-5` vs `gpt-5.5` while the spec’s source table also includes `gemini-3.1-pro` and `sonnet-4.6`; the canonical section still states the ~1.7–2x substitution-lever conclusion, but the supporting table is less self-contained than the spec.

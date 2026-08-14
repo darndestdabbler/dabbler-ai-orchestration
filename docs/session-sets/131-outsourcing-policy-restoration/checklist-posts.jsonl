@@ -15,3 +15,8 @@
 {"sessionNumber": 2, "postedAt": "2026-08-14T10:52:55.536255-04:00", "stepCount": 6, "surface": "text", "inProgressStepKeys": ["close-out"]}
 {"sessionNumber": 2, "postedAt": "2026-08-14T10:54:58.121220-04:00", "stepCount": 6, "surface": "markdown", "inProgressStepKeys": ["close-out"]}
 {"sessionNumber": 2, "postedAt": "2026-08-14T11:14:45.196628-04:00", "stepCount": 6, "surface": "markdown", "inProgressStepKeys": []}
+{"sessionNumber": 3, "postedAt": "2026-08-14T11:39:45.025613-04:00", "stepCount": 6, "surface": "markdown", "inProgressStepKeys": ["document-transcript-rotation-as-the-dominant"]}
+{"sessionNumber": 3, "postedAt": "2026-08-14T12:03:26.187528-04:00", "stepCount": 6, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-14T12:07:19.991888-04:00", "stepCount": 6, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-14T12:08:13.221576-04:00", "stepCount": 6, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 3, "postedAt": "2026-08-14T12:31:32.439850-04:00", "stepCount": 6, "surface": "markdown", "inProgressStepKeys": ["close-out-including-the-step-9"]}

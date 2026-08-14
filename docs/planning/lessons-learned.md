@@ -144,20 +144,20 @@ full text in `lessons-archive.md`:
   its regexes reads as confirmation. Only a **planted violation**
   separates them: per rule, one falsifier that plants the defect and
   asserts the gate fires, one that plants the legitimate look-alike and
-  asserts it does not. Set 112's anti-resurrection gate passed its own
-  repo cleanly and still missed six declaration shapes over four
-  verification rounds — every one found by planting it, none by reading
-  the code. Add a **structural** assertion beside the textual one; it
-  holds however a thing is spelled.
+  asserts it does not. Set 112's gate passed its own repo cleanly and
+  still missed six declaration shapes over four rounds — every one found
+  by planting, none by reading. Add a **structural** assertion beside the
+  textual one; it holds however a thing is spelled.
 - **Assert the INPUT SET is non-empty, and PLANT INTO THE CORPUS THE
   GATE READS.** A scan whose corpus comes back empty passes having
-  examined nothing. Set 128 S3 shipped that shape — a corpus check
-  looping a discovery helper with no `assert discovered`. Set 129 S2
-  added the drifting variant: a falsifier selecting its plant by
-  **recency** (`fragments[0:1]`) rather than from the frozen corpus fired
-  only until ordinary repo growth moved its target off that corpus.
-  Select by the gate's own corpus definition, never by position, and
-  assert the selection.
+  examined nothing (Set 128 S3: a corpus check with no
+  `assert discovered`). Select by the gate's own corpus definition, never
+  by position: Set 129 S2's plant, chosen by **recency**, fired only
+  until repo growth moved its target off it.
+- **Assert the RULE, not a substring a SIBLING rule also emits.** Set 130
+  S3 matched `"must be null when status is"`, which the neighbouring
+  `usd` check also emits, so deleting half the rule left it green. Plant
+  each half; name the field.
 
 ## Compare What A Transport CAN DO, Not What It Returns
 <!-- lesson: id="L-125-1" added-set="125" last-used-set="129" status="active" scope="portable" -->

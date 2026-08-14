@@ -190,3 +190,45 @@ The canonical reference is
 [`ai_router/docs/seat-cost.md`](../../../ai_router/docs/seat-cost.md);
 the `disposition.cost` shape is in
 [`docs/disposition-schema.md`](../../disposition-schema.md).
+
+---
+
+## Step 9 — reorganization review of the guidance corpus
+
+Run at the set-terminal session, post-notify. Outcome: **one refinement,
+landed at zero net preload cost.**
+
+**Added to L-112-1 (active tier).** *"Assert the RULE, not a substring a
+SIBLING rule also emits."* This session planted 13 defects into the
+production code to prove its falsifiers fire, and the **first one
+escaped**: the assertion matched `"must be null when status is"`, which
+the neighbouring `usd` check also emits, so deleting half the rule left
+the test green. That is the same family as L-112-1's existing two bullets
+— a check that looks like it discriminates and does not — and only
+planting separates them. Preload was at 12,599 of a 12,600-token ceiling,
+so it was paid for by compressing L-112-1's two existing examples;
+`guidance_report --check` returns to **12,599**. Ceilings ratchet down
+only, and this one did not move.
+
+**`cite_lessons` flagged L-069-1 as archived-but-instrumental.** No
+reactivation: its rule ("a bug is a bug CLASS — fix every sibling site")
+was *promoted* to `project-guidance.md` → Code Style at Set 069 and is
+already read at every session start. The pointer table in
+`lessons-learned.md` says exactly this. The flag is the citation tool
+being conservative, not a gap.
+
+**No change recommended to `project-guidance.md`.** The three principles
+this session leaned on hardest — validator/schema parity in both
+directions, fix-every-sibling-site, and practicality-over-rule-perfection
+— all applied unmodified and needed no amendment. The file is at 3,928 of
+3,930 tokens, so any addition would have to displace something, and
+nothing here earned that.
+
+**Recommended for a future set, not landed here:** `run_of_record
+affected` names which suites a session owes but not the **command** each
+one runs. This session ran `npm test` instead of the declared
+`npm run test:unit` and spent time diagnosing 44 failures in a harness no
+gate uses. Printing `SuiteSpec.command` beside each affected suite is a
+few lines and removes the trap entirely — an executable fix, which the
+guidance lifecycle prefers over a prose rule.
+

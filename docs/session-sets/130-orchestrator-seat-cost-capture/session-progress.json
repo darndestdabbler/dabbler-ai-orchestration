@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-14T05:44:39.861296-04:00",
+  "generatedAt": "2026-08-14T07:17:45.056438-04:00",
   "sessionSetDir": "130-orchestrator-seat-cost-capture",
   "inputs": {
-    "activity-log.json": "9d39065cf3d95fe3f870cd82328090d0be3baba687fb2566576236b32bc702e1",
-    "session-state.json": "a4a99b110526bdb5805c5ce11507ad29d8cd4761fbc680e9bb65c4fa13ff021f",
+    "activity-log.json": "9b78ad156b73c17b748914b42f273f9e5be2d37f6ffb8b8f3f48e8bac56ae6d4",
+    "session-state.json": "33de71c79bbb1a1d220d171c7e69f55bede98a7848f98dba2cd47c5f6ec366b1",
     "spec.md": "c27b7e48f865c0b897a18714091d327cffc962c7d60702ae3d6a68f8fc926581"
   },
   "orphanEntries": 0,
@@ -223,19 +223,96 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T05:46:57.246516-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "costFieldLands",
+          "description": "disposition.cost lands across all four surfaces in one pass: Disposition dataclass + to_dict/from_dict, validate_disposition (_validate_cost: unmeasured components carry no number, no total survives one, an as-of-close figure cannot claim exactness), ai_router/schemas/disposition.schema.json (same three rules encoded in JSON Schema) and docs/disposition-schema.md. Two pre-existing parity gaps of the same class fixed in the same pass (L-069-1): the schema omitted uat/checklist under additionalProperties:false, and the validator's dataclass-path dict view omitted verification_qualification/checklist.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T05:46:57.265271-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "reportNamesUnknowns",
+          "description": "Step 10 report wired and Set 118 S1 re-priced with the tool. seat_cost.measure_session()/session_conversation_ids() join S2's two records; close_session prints the cost block and names its absence (UNMEASURED, not zero); print_metrics_report stops summing billed_usage_unavailable rows into a dollar total (live log: 1 priced, 236 not priced). Set 118 S1 re-derived: 5,609.6 cr / $56.10 vs $42.67 recorded (+31%). change-log.md, changelog fragment 0120, seat-cost.md refreshed, disposition-schema.md cost section, constitution Step 10 (net-negative under the preload ceiling).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T06:16:19.127172-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "crossProviderVerification",
+          "description": "3 rounds: discovery (fan-out 2, gpt-5.5) -> 2 Major (the same defect from both lenses: the renderer decided from `credits is None` instead of `status`, so a hand-edited block could still print $0.00 at close); supplementary -> 1 Major (the advertised flagless --session-set-dir command reported routed_api UNKNOWN and suppressed the total); remediation-review -> VERIFIED, 2 fixes accepted, 0 findings.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T06:26:04.612810-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "requiredTestPortion",
+          "description": "All three suites owed (covers ai_router/) and recorded: pytest 4451 passed / 9 skipped (659s, +40 cases = exactly this session's new tests), mocha 1455 passing / 2 pending (45s, matching Session 2's baseline exactly), playwright 31/31 (composite: 29 in the declared 4-worker run + icon-render-mechanism.spec.ts standalone in 15.1s and vsix-first-run-walkthrough.spec.ts standalone in 62s; 548s). Both Playwright failures were checked for regression FIRST and ruled out by isolated passes at a fraction of their contended wall clock. Separately: `npm test` (NOT the declared suite) fails 44 on VS Code host API/cwd issues a Python-only change cannot cause; the declared `npm run test:unit` is green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T06:47:29.000631-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "closeOut",
+          "description": "Close-out, including the Step 9 reorganization review.",
+          "status": "in-progress",
+          "state": "in-progress",
+          "box": "[~]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-14T07:14:23.099863-04:00",
+          "isTerminal": false
+        }
+      ],
       "counts": {
         "pending": 0,
-        "in-progress": 0,
-        "complete": 0,
+        "in-progress": 1,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
-      "current": [],
-      "remaining": []
+      "current": [
+        "closeOut"
+      ],
+      "remaining": [
+        "closeOut"
+      ]
     }
   ]
 }

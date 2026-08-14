@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "130-orchestrator-seat-cost-capture",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -39,9 +39,9 @@
     {
       "number": 3,
       "title": "The contract, the report, and the corrected number",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T05:46:57.246516-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T07:17:45.052333-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -52,7 +52,7 @@
           "8c80156b-9d38-4a7d-81a7-418b714c0e38"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

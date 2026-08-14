@@ -1,0 +1,55 @@
+{
+  "status": "completed",
+  "summary": "Set 118 Session 1 of 3 makes the pytest suite legible to itself. It ships ai_router/suite_inventory.py -- one record per test file (test-function count by both the historical line predicate and an AST cross-check, LOC, imported production modules, coupling tier, guard status, sole-cover flag, git first-seen/last-modified), a human report and a versioned JSON contract -- plus 25 tests, inventory-findings.md and the first snapshot.\n\n(1) THE DELIVERABLE IS THE PREDICATE, NOT THE NUMBER. Every figure names the rule that produced it, in a PREDICATES map rendered at the top of the report and carried in the JSON. The spec's own history is the argument for this: its coupling figure could not be reproduced under its own prose, and Step 4 was written to chase a NAMED discrepancy rather than hope for a match.\n\n(2) ALL EIGHT FIGURES IN THE SPEC'S RE-READ TABLE FALL OUT OF THE TOOL EXACTLY at ab47a3e7 -- 133 files / 3,513 functions / 67,182 test LOC / 67,634 production LOC / 0.99 / 142 parametrize -- and the counters were validated against the EARLIER commit first, reproducing 124 / 3,345 / 60,188 / 62,103 / 0.97 at 8fda8d85. Nothing was adjusted to fit. The clause that was doing invisible work is now written down: 'test file' means BASENAME test_*.py, not every *.py under ai_router/tests, which reads 131 files at 8fda8d85 rather than 124. This also settles the spec's two-line-counters note (52,868 vs 60,188 for one commit is blank/comment-excluding vs -including). --rev reads the corpus out of git in one `git cat-file --batch` pass, which is what makes a historical figure a query instead of archaeology; without it Step 4 was not performable at all.\n\n(3) THE COUPLING DISCREPANCY IS SETTLED AND THE SPEC'S 47/1,485 IS SUPERSEDED. It was never reproducible because its sentence has THREE defensible readings that disagree by ~250 functions: 43/1,294 (repo_root as substring), 42/1,251 (word-anchored, which drops _repo_root() helpers and loses a whole 43-test file on one underscore) and 48/1,497 (bare __file__). D1 and D2 ship as NAMED detectors reproducing Set 128 S3 byte-for-byte. The tool answers with a tier, and strong coupling is 222 test functions at the spec's own commit, not 1,485. The measurement correction filed against this set is CONFIRMED.\n\n(4) FIVE MAJORS ACROSS FOUR ROUNDS, ALL REAL, ALL IN THE TOOL'S OWN APPROXIMATIONS, NONE DISPUTED. The A1 import map read importlib.import_module(<variable>) as 'imports nothing', so test_entry_points.py recorded zero imports and report.py was published UNCOVERED when it is not -- a false negative on the exact surface Session 3 retires against. D4/strong was a file-level CO-OCCURRENCE check that called a tmp_path .iterdir() 'the real tree'. The first rewrite counted any argument-passing and came out identical to D3 (39 files, meaningless). The second made os.path.join(os.path.dirname(...)) read as an enumeration. The entry-point fix returned [] when tomllib was missing, silently restoring the first defect on Python 3.10, which pyproject still supports -- now fails CLOSED on None-vs-[]. D4 was wrong three times in three different directions and NOT ONE was found by reading the predicate; all four readings are written down, the current one is pinned by a test against a real commit, and each narrowing ships the falsifier that broke it (L-112-1).\n\n(5) THE GUARD HEURISTIC IS TUNED FOR PRECISION AND SAYS SO. The first cut called 53 of 124 files (1,838 functions) guards. A majority clause plus a false-positive removal -- bare 'resurrection' is not a permanence signal here, the verification loop uses it for a settled finding that reappears -- brought it to 4 files / 122 functions, catching both spec-named guards that are mechanically detectable (43 tests aged 17 sets, 19 tests aged 18 sets). The published guard.limits predicate states what it CANNOT see: an invariant pin is indistinguishable from an ordinary behaviour test, which is the argument for Session 2's marker rather than a better regex. The marker reader already ships.\n\n(6) THE MODULE IS NAMED suite_inventory, NOT test_inventory. test_packaging_hygiene.py refuses a test_*.py outside ai_router/tests/ -- that invariant is what turns the wheel's ai_router.tests* exclude into a PROOF that no test module ships. It caught the spec's own filename on the first targeted run. Renamed rather than widening the guard (journaled, goal-over-letter); the wheel was later built and inspected, confirming suite_inventory.py present and zero test modules. SESSIONS 2 AND 3 SHOULD READ EVERY test_inventory IN THE SPEC AS suite_inventory.\n\n(7) A3 SAVED NOTHING: all three suites were owed, because mocha's and playwright's covers both include ai_router/. pytest 4,374 passed / 9 skipped in 607.1s; mocha 1,455 passing in 44s; playwright 31/31 in 509s AT --workers=1. The declared command (workers: 4) fails vsix-first-run-walkthrough.spec.ts on parallel contention -- four VS Code instances each doing a real venv + network pip install starve its 300s wait. Attribution was established, not assumed: the spec passes standalone in 45s, the suite passes serially, and the wheel check proves the change cannot reach an extension surface. Operator-attested under the verification-reduction carve-out.\n\n(8) SCOPE FINDING HANDED FORWARD, NOT ACTED ON. Re-derivation confirms the coupling premise is materially weaker than the spec assumed, which is what the measurement-correction note said would justify re-scoping the coupling half of the set. That is a scope decision, so it goes to the operator stop Session 2 already has scheduled (journaled, defer-to-existing-gate). inventory-findings.md section 6 states that Session 2 must not rule on a retirement policy until it is answered.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "files_changed": [
+    "ai_router/suite_inventory.py",
+    "ai_router/tests/test_suite_inventory.py",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/activity-log.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/ai-assignment.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/changelog-fragment-draft.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/checklist-posts.jsonl",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/decisions.jsonl",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/disposition.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/inventory-findings.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-acceptance-round-1.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-acceptance-round-2.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-acceptance-round-3.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-conventions.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-issues-round-2.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-issues-round-3.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-issues.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-remediation-round-1.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-remediation-round-2.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-remediation-round-3.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-rounds.jsonl",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-verification-fanout-2.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-verification-round-2.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-verification-round-3.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-verification-round-4.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/s1-verification.md",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/session-events.jsonl",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/session-state.json",
+    "docs/session-sets/118-test-retirement-and-coupling-budget/test-runs.jsonl"
+  ],
+  "verification_message_ids": [],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 rules the retirement policy and ships the guard marker, and both consume this session's inventory: the guard population and its published limits, the sole-cover map, and the open scope question about the coupling half of the set. Rebuilding that context is expensive and carrying it is free. The verifier must remain a non-anthropic provider, as it was here."
+    },
+    "effort": "high"
+  },
+  "blockers": [],
+  "lessons_cited": [
+    "L-112-1",
+    "L-064-9",
+    "L-064-8"
+  ],
+  "notes": "Playwright's recorded green is from --workers=1; the declared command's 4 local workers starve vsix-first-run-walkthrough.spec.ts past its 300s wait through parallel contention. All 31 specs executed and passed, worker count changes no test's set, and the spec also passes standalone in 45s. Operator-attested in decisions.jsonl under rubric_line verification-reduction. The underlying Layer 3 worker policy is bounded-test-parallelism territory (Set 117), not this set's. The ai_router changelog fragment is DRAFTED but deliberately not filed: changelog-fragment-draft.md sits in this session-set folder rather than in ai_router/changelog.d/, because that directory is under ai_router/ and therefore in all three suites' covers -- filing it would stale three green runs for a release artifact, and Session 2 changes ai_router/ again regardless. The repo files one fragment per set at the set-terminal session; Session 3 extends the draft and moves it."
+}

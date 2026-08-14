@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "9e95681ef81695e8daca8b4810f435de64d11cea",
+  "fixedTree": "bd31678d0f95c464c0c2d2f1bf07bedb28755785",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T01:29:25.993065+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** D4/strong coupling is a file-level co-occurrence check, so it reports temp-directory enumeration as “enumerates real tree.” - **Category:** Correctness - **Severity:** Major - **Evidence paths:** ` ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "D4/strong is only true when the enumerated path is derived from the real repo tree; a file that uses `Path(__file__)` only to locate a script but enumerates `tmp_path` is not reported as strong, and the regenerated snapshot no longer lists `test_session_state_backfill.py` with `D4-enumerates-real-tree: true`.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+ISSUES FOUND
+
+- **Issue 1:** The sole-cover/import map misses real dynamic imports from `test_entry_points.py`, so the generated inventory falsely reports at least `ai_router/report.py` as uncovered.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/suite_inventory.py:533`, `ai_router/tests/test_entry_points.py:55`, `pyproject.toml:68`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json:84`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-findings.md:205`
+  - **Failure scenario:** This is already present in the delivered snapshot: `test_entry_points.py` imports every `[project.scripts]` module via `importlib.import_module(module_path)`, but `suite_inventory` only records `import_module()` calls whose first argument is an AST string literal. A typical Session 2/3 reader using the A1 map sees `report.py` listed as having no importing test file, even though the suite imports it through the entry-point test; that makes the sole-cover/uncovered data unreliable for retirement decisions.
+  - **Acceptance criterion:** `python -c "exec('import importlib.util\nimport sys\nfrom pathlib import Path\nspec = importlib.util.spec_from_file_location(\"suite_inventory_under_test\", Path(\"ai_router/suite_inventory.py\"))\nmod = importlib.util.module_from_spec(spec)\nsys.modules[spec.name] = mod\nspec.loader.exec_module(mod)\ninventory = mod.build_inventory(Path(\".\"), dates=False)\nrecord = next(f for f in inventory.files if f.path == \"ai_router/tests/test_entry_points.py\")\nraise SystemExit(0 if \"ai_router/report.py\" in record.imports else 1)')"`
+  - **Acceptance expectation:** exit 0
+  - **Details:** **Violation:** the task requires “One record per test file: … the production modules it imports” and A1 sole-cover reporting. **Impact:** the inventory’s own findings claim `report.py` has no importing test, so downstream retirement or coverage decisions are made from false data. **Evidence:** `suite_inventory.py` only accepts literal `import_module()` arguments, while `test_entry_points.py` imports pyproject-declared modules through the variable `module_path`; `pyproject.toml` declares `report = "ai_router.report:main"`, yet the snapshot lists `ai_router/report.py` under `uncoveredModules`. The correct result is to attribute the currently used pyproject-driven dynamic imports to `test_entry_points.py` or otherwise avoid reporting those modules as uncovered.
+
+**NITS**
+
+- **Nit:** `PREDICATES["guard.heuristic"]` still says docstring “resurrection” is a guard signal, but the implemented docstring signal list excludes bare `resurrection` and `guard.limits` says that exclusion is intentional. That contradiction is confusing in the published predicate text, though the code/tests make the intended behavior clear.
+- **Nit:** The historical-count regression test skips when `ab47a3e7` is absent, and the GitHub Actions checkout shown here uses the default shallow fetch. That means the “predicate drift gets loud” claim is not reliably enforced in normal CI unless history is fetched.

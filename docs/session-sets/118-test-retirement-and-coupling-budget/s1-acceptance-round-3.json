@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "9e95681ef81695e8daca8b4810f435de64d11cea",
+  "fixedTree": "3ffcd3873232deddf9079531ccaaaab5968b9e0a",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T01:38:45.022293+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** D4 now treats `os.path.join(...)` path plumbing as iterable consumption, so it still reports non-enumerating files as “enumerates real tree.” - **Category:** Correctness - **Severity:** Major - **E ...",
+      "severity": "Major",
+      "outcome": "baseline-mismatch",
+      "criterion": "python -c \"exec('from pathlib import Path\\nimport importlib.util\\nspec = importlib.util.spec_from_file_location(\\\"suite_inventory_under_test\\\", Path(\\\"ai_router/suite_inventory.py\\\"))\\nmod = importlib.util.module_from_spec(spec)\\nspec.loader.exec_module(mod)\\ntext = \\\"import os\\\\nFIXTURE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), \\\\\\\\\\\"fixtures\\\\\\\\\\\", \\\\\\\\\\\"x.json\\\\\\\\\\\")\\\\n\\\"\\nraise SystemExit(0 if not mod.coupling_detectors(text)[\\\"D4-enumerates-real-tree\\\"] else 1)')\"",
+      "reason": "the only pre-fix tree available belongs to an earlier round than the one that raised this finding, so a fails-before result would not be attributable to this fix. The finding stays judgment-based."
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The dynamic entry-point fix silently fails on Python 3.10, which the package still declares as supported. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `pyproject.toml:11- ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Entry-point modules must be parsed or the inventory must fail closed on every declared supported Python version; Python 3.10 must not silently produce an empty entry-point map solely because tomllib is unavailable.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

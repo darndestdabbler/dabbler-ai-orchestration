@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The A1 import/sole-cover map misses real dynamic imports from `test_entry_points.py`.\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `docs/session-sets/118-test-retirement-and-coupling-budget/spec.md:284`, `docs/session-sets/118-test-retirement-and-coupling-budget/spec.md:296`, `ai_router/suite_inventory.py:533`, `ai_router/tests/test_entry_points.py:55`, `pyproject.toml:68`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json:84`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json:1587`\n- **Failure scenario:** Session 2/3 consumes the inventory’s A1 map and treats `ai_router/report.py` as uncovered, even though `test_entry_points.py` dynamically imports the `report = \"ai_router.report:main\"` console-script target. This is probable because the delivered snapshot already shows `test_entry_points.py` with `\"imports\": []` and lists `ai_router/report.py` under `uncoveredModules`.\n- **Acceptance criterion:** `JUDGMENT - The inventory accounts for pyproject-driven entry-point imports so the record for test_entry_points.py includes ai_router/report.py and ai_router/report.py is no longer reported as uncovered.`\n- **Details:** **Violation:** the spec requires “the production modules it imports” and a per-test-file “sole cover” flag. **Impact:** the highest-consequence A1 surface is false for a real suite import pattern, so later retirement/coverage decisions can be made from incorrect data. **Evidence:** `suite_inventory.py` only records `importlib.import_module(...)` when the argument is a literal; `test_entry_points.py` imports each `module_path` loaded from `[project.scripts]`, including `ai_router.report:main`; the snapshot nevertheless records no imports for that test and reports `ai_router/report.py` uncovered.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Session 2/3 consumes the inventory’s A1 map and treats `ai_router/report.py` as uncovered, even though `test_entry_points.py` dynamically imports the `report = \"ai_router.report:main\"` console-script target. This is probable because the delivered snapshot already shows `test_entry_points.py` with `\"imports\": []` and lists `ai_router/report.py` under `uncoveredModules`.",
+      "evidencePaths": [
+        "docs/session-sets/118-test-retirement-and-coupling-budget/spec.md",
+        "ai_router/suite_inventory.py",
+        "ai_router/tests/test_entry_points.py",
+        "pyproject.toml",
+        "docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The inventory accounts for pyproject-driven entry-point imports so the record for test_entry_points.py includes ai_router/report.py and ai_router/report.py is no longer reported as uncovered."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** The sole-cover/import map misses real dynamic imports from `test_entry_points.py`, so the generated inventory falsely reports at least `ai_router/report.py` as uncovered.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/suite_inventory.py:533`, `ai_router/tests/test_entry_points.py:55`, `pyproject.toml:68`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json:84`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-findings.md:205`\n  - **Failure scenario:** This is already present in the delivered snapshot: `test_entry_points.py` imports every `[project.scripts]` module via `importlib.import_module(module_path)`, but `suite_inventory` only records `import_module()` calls whose first argument is an AST string literal. A typical Session 2/3 reader using the A1 map sees `report.py` listed as having no importing test file, even though the suite imports it through the entry-point test; that makes the sole-cover/uncovered data unreliable for retirement decisions.\n  - **Acceptance criterion:** `python -c \"exec('import importlib.util\\nimport sys\\nfrom pathlib import Path\\nspec = importlib.util.spec_from_file_location(\\\"suite_inventory_under_test\\\", Path(\\\"ai_router/suite_inventory.py\\\"))\\nmod = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = mod\\nspec.loader.exec_module(mod)\\ninventory = mod.build_inventory(Path(\\\".\\\"), dates=False)\\nrecord = next(f for f in inventory.files if f.path == \\\"ai_router/tests/test_entry_points.py\\\")\\nraise SystemExit(0 if \\\"ai_router/report.py\\\" in record.imports else 1)')\"`\n  - **Acceptance expectation:** exit 0\n  - **Details:** **Violation:** the task requires “One record per test file: … the production modules it imports” and A1 sole-cover reporting. **Impact:** the inventory’s own findings claim `report.py` has no importing test, so downstream retirement or coverage decisions are made from false data. **Evidence:** `suite_inventory.py` only accepts literal `import_module()` arguments, while `test_entry_points.py` imports pyproject-declared modules through the variable `module_path`; `pyproject.toml` declares `report = \"ai_router.report:main\"`, yet the snapshot lists `ai_router/report.py` under `uncoveredModules`. The correct result is to attribute the currently used pyproject-driven dynamic imports to `test_entry_points.py` or otherwise avoid reporting those modules as uncovered.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "This is already present in the delivered snapshot: `test_entry_points.py` imports every `[project.scripts]` module via `importlib.import_module(module_path)`, but `suite_inventory` only records `import_module()` calls whose first argument is an AST string literal. A typical Session 2/3 reader using the A1 map sees `report.py` listed as having no importing test file, even though the suite imports it through the entry-point test; that makes the sole-cover/uncovered data unreliable for retirement decisions.",
+      "evidencePaths": [
+        "ai_router/suite_inventory.py",
+        "ai_router/tests/test_entry_points.py",
+        "pyproject.toml",
+        "docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json",
+        "docs/session-sets/118-test-retirement-and-coupling-budget/inventory-findings.md"
+      ],
+      "acceptance": {
+        "kind": "executable",
+        "command": "python -c \"exec('import importlib.util\\nimport sys\\nfrom pathlib import Path\\nspec = importlib.util.spec_from_file_location(\\\"suite_inventory_under_test\\\", Path(\\\"ai_router/suite_inventory.py\\\"))\\nmod = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = mod\\nspec.loader.exec_module(mod)\\ninventory = mod.build_inventory(Path(\\\".\\\"), dates=False)\\nrecord = next(f for f in inventory.files if f.path == \\\"ai_router/tests/test_entry_points.py\\\")\\nraise SystemExit(0 if \\\"ai_router/report.py\\\" in record.imports else 1)')\"",
+        "expectedExitCode": 0
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "e5b4781ec1a43698bedec7b5959db7d87740a1ae"
+}

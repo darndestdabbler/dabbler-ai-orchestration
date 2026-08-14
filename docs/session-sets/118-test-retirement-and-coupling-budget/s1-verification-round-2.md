@@ -1,0 +1,9 @@
+**ISSUES FOUND**
+
+- **Issue 1:** D4/strong coupling is a file-level co-occurrence check, so it reports temp-directory enumeration as “enumerates real tree.”
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/suite_inventory.py:159-184,256,579-591`, `ai_router/tests/test_session_state_backfill.py:524-539,547-563`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-snapshot.json:3660-3676`, `docs/session-sets/118-test-retirement-and-coupling-budget/inventory-findings.md:125-136`
+  - **Failure scenario:** Session 2/3 consumes the delivered snapshot/report and treats `test_session_state_backfill.py` as strong “enumerates real tree” coupling. This is probable because the generated snapshot already marks that file `D4-enumerates-real-tree: true` / `tier: strong`, and the report’s strong totals are the input for the set’s coupling scope decision.
+  - **Acceptance criterion:** JUDGMENT - D4/strong is only true when the enumerated path is derived from the real repo tree; a file that uses `Path(__file__)` only to locate a script but enumerates `tmp_path` is not reported as strong, and the regenerated snapshot no longer lists `test_session_state_backfill.py` with `D4-enumerates-real-tree: true`.
+  - **Details:** **Violation:** the published predicate says D4 means “the file enumerates what it found” and strong tests “break on a rename or a doc move,” while weak is just deriving a path from `__file__`. **Impact:** the core coupling measurement is over-counted today by at least this 26-test file, so the report’s “9 / 255” strong count is not the stated “enumerates real tree” population. **Evidence:** `coupling_detectors()` sets D4 to `d3 and enumerates` for the whole file; `test_session_state_backfill.py` has `Path(__file__)` only to build the CLI script path, while its `.iterdir()` is on `tmp_path`.

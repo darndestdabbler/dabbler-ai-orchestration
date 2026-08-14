@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "e5b4781ec1a43698bedec7b5959db7d87740a1ae",
+  "fixedTree": "f13396cdf716898baf6dfbaea0650c1098819a9f",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-14T01:29:13.810258+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The A1 import/sole-cover map misses real dynamic imports from `test_entry_points.py`. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/118-test-retirement- ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The inventory accounts for pyproject-driven entry-point imports so the record for test_entry_points.py includes ai_router/report.py and ai_router/report.py is no longer reported as uncovered.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The sole-cover/import map misses real dynamic imports from `test_entry_points.py`, so the generated inventory falsely reports at least `ai_router/report.py` as uncovered. - **Category:** Correctnes ...",
+      "severity": "Major",
+      "criterion": "python -c \"exec('import importlib.util\\nimport sys\\nfrom pathlib import Path\\nspec = importlib.util.spec_from_file_location(\\\"suite_inventory_under_test\\\", Path(\\\"ai_router/suite_inventory.py\\\"))\\nmod = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = mod\\nspec.loader.exec_module(mod)\\ninventory = mod.build_inventory(Path(\\\".\\\"), dates=False)\\nrecord = next(f for f in inventory.files if f.path == \\\"ai_router/tests/test_entry_points.py\\\")\\nraise SystemExit(0 if \\\"ai_router/report.py\\\" in record.imports else 1)')\"",
+      "criterionSha256": "e7c2878f3b1e07ff674bab933e0a1a0f0b572ad12c056feaaee53a838353f95c",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "exec('import importlib.util\\nimport sys\\nfrom pathlib import Path\\nspec = importlib.util.spec_from_file_location(\"suite_inventory_under_test\", Path(\"ai_router/suite_inventory.py\"))\\nmod = importlib.util.module_from_spec(spec)\\nsys.modules[spec.name] = mod\\nspec.loader.exec_module(mod)\\ninventory = mod.build_inventory(Path(\".\"), dates=False)\\nrecord = next(f for f in inventory.files if f.path == \"ai_router/tests/test_entry_points.py\")\\nraise SystemExit(0 if \"ai_router/report.py\" in record.imports else 1)')"
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "exec('import importlib.util/nimport sys/nfrom pathlib import Path/nspec = importlib.util.spec_from_file_location(\"suite_inventory_under_test\", Path(\"ai_router/suite_inventory.py\"))/nmod = importlib.util.module_from_spec(spec)/nsys.modules[spec.name] = mod/nspec.loader.exec_module(mod)/ninventory = mod.build_inventory(Path(\".\"), dates=False)/nrecord = next(f for f in inventory.files if f.path == \"ai_router/tests/test_entry_points.py\")/nraise SystemExit(0 if \"ai_router/report.py\" in record.imports else 1)')"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 0,
+        "output": ""
+      },
+      "fixed": {
+        "exitCode": 0,
+        "outputChars": 0,
+        "output": ""
+      },
+      "baselinePassed": false,
+      "fixedPassed": true,
+      "outcome": "auto-closed",
+      "reason": "baseline discrimination holds: the unchanged criterion FAILS on the pre-fix tree and PASSES on the fixed tree"
+    }
+  ]
+}

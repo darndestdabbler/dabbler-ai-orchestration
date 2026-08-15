@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-15T05:23:16.112023-04:00",
+  "generatedAt": "2026-08-15T06:51:30.261803-04:00",
   "sessionSetDir": "121-guidance-becomes-executable",
   "inputs": {
-    "activity-log.json": "10b304cd0604d76a40369691b3cdb752c76a2944a65a2820dc54b4bfd0fae733",
-    "session-state.json": "51b92153c41ffe14f9595c0437aa81bf655153198a6f8f1caa3a85756e663d25",
+    "activity-log.json": "eff61478200b01df36b8434fb5c4d95c37b008bea2e23411532ae1b65d1374a6",
+    "session-state.json": "69d7603d03fa853b64c0bd7a5f04e411dbdf9507146aadaf1017458dd9fc0851",
     "spec.md": "c47c7e70009eacbc75b8f671de08c68319cffeed360e822c90274d349998bce2"
   },
   "orphanEntries": 0,
@@ -332,16 +332,101 @@
     },
     {
       "number": 4,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 4 via start_session (github-copilot / anthropic / claude-opus-5 / high), the S3 next-orchestrator recommendation.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T05:27:40.050779-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "promote-from-the-queue-into-the",
+          "description": "Promoted C-003 then C-002 into project-guidance.md -> Conventions -> Workflow Expectations and registered both in the guidance ledger as instruction lines. C-001 stays queued: its enforcement lint and recall check do not exist, which is its own entry's stated bar. L-064-8 needed no admission -- Session 1 already condensed it to a live one-liner in lessons-learned.md. Both admissions fit the cap (corpus 21 / cap 22) and the measured headroom.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T05:42:08.898460-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "collapse-session-constitution-md-and-project",
+          "description": "Collapsed six project-guidance.md entries (G-009, G-011, G-014, G-016, G-017, G-021) that restated session-constitution.md -- both files are preload, so each duplicate was paid twice; full text archived to lessons-archive.md. Trimmed the shared body of AGENTS/CLAUDE/GEMINI in lockstep. Ratcheted every ceiling to measurement: constitution 4200->4059, project-guidance 3645->3394 NET of both promotions, total 12234->11644; the manifest's engine entry MOVED from AGENTS.md to GEMINI.md, which the trim left largest. Re-derived instruction_line_cap 25->22 (the measured peak is usable again now the corpus is 21). Deleted the retired standing-authorization section from guidance-lifecycle.md and the matching paragraph from router-config.yaml. guidance_report --check green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T05:42:08.900835-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "measure-the-doc-only-cap-on",
+          "description": "Measured the Set 119 doc-only cap on this set own verification traffic. Shipped ai_router/measure_doc_only_cap.py (calls the shipped predicates, not a reimplementation) plus 7 falsifiers including a planted doc-only Major so the capped counter is proven non-zero-able. Result across S1-S3: 20 findings, 20 cited evidencePaths (100 percent), 0 doc-only, 10 code-only, 10 mixed (50 percent), cap fired 0 times. Rounds 7/5/4 median 5.0 vs pre-cap 4.0, but netting the phased supplementary round gives 6/4/3 median 4.0 - the cap moved rounds neither way because it never applied. Counterfactual sized and NOT acted on: 4 of 9 blocking round artifacts carried only mixed-citation blockers; widening is a verification reduction reserved to the operator. Report: s4-doc-only-cap.md.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T05:42:08.903105-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Phased loop: discovery (fan-out 2, gpt-5.5) raised 2 blocking Majors; supplementary raised 1 more; all 3 accepted and fixed with the s4-remediation-round-1/2 sidecars and both acceptance-harness runs; remediation-review returned VERIFIED with 3 fix verdicts accepted, 0 rejected. Verifier provider openai (anthropic excluded as the orchestrator provider).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T05:48:48.310279-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three governed suites run in full after the last code change and recorded via run_of_record: pytest 4660 passed / 9 skipped (500s), mocha 1456 passing / 2 pending (31s), playwright 32 passed (4.1m).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T06:38:02.766198-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "Set-terminal close-out: change-log.md, s4-step9-guidance-review.md, the routed next-SET recommendation in ai-assignment.md, four journaled decisions, the full disposition with the cost block, and a delta-scoped remediation-review (round 4, VERIFIED) over the close-out artifacts so the close carries a fresh stamp instead of paying for a backstop.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T06:38:02.769526-04:00",
+          "isTerminal": true
+        }
+      ],
       "counts": {
         "pending": 0,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 7,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
       "remaining": []

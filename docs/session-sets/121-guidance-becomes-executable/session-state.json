@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "121-guidance-becomes-executable",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -59,9 +59,9 @@
     {
       "number": 4,
       "title": "Admit the queue, and measure whether the cap fired",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-15T05:27:40.050779-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-15T06:51:30.258363-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -72,7 +72,7 @@
           "dc5a7a85-2fdf-4998-b0f5-26f97306ca64"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

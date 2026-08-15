@@ -39,6 +39,15 @@ const launch = require("../../../scripts/vscode-launch.js") as {
     baseDir?: string;
     platform?: string;
   }) => { root: string; env: Record<string, string> };
+  LAUNCH_BLOCKERS: Array<{ id: string; pattern: RegExp; explain: string }>;
+  recognizeLaunchBlocker: (
+    output: unknown,
+  ) => { id: string; explain: string } | null;
+  describeLaunchFailure: (
+    originalMessage: string,
+    output: string,
+    maxOutputChars?: number,
+  ) => string;
 };
 
 const EXTENSION_ROOT: string = launch.EXTENSION_ROOT;
@@ -287,6 +296,142 @@ suite("Set 117 S1 — per-launch state isolation", () => {
       const sets = readSessionSets(root);
       assert.strictEqual(sets.length, 1);
       assert.strictEqual(sets[0].name, "001-demo");
+    });
+  });
+});
+
+// Set 133 follow-on — a failed launch must report what the CHILD said.
+//
+// On 2026-08-15 all 32 Layer 3 specs failed with the same six words, "Target
+// page, context or browser has been closed", each after ~34.3s, because a
+// stuck VS Code installer held the machine-wide `vscode-updating` mutex. VS
+// Code emitted the reason on the child's stderr and nothing read it, so a
+// one-line answer arrived as 32 identical timeouts.
+//
+// These are paired the way the isolation tests above are (L-112-1): every
+// recognizer assertion has a planted LOOK-ALIKE that must NOT match, because
+// a pattern that matches everything and a pattern that matches nothing both
+// read as "working" when you only test the positive case.
+suite("Set 133 follow-on — launch failure diagnostics", () => {
+  const MUTEX_LINE =
+    "[main 2026-08-15T13:58:05.575Z] checkInnoSetupMutex: vscode-updating " +
+    "is held, waiting up to 30s for setup to finish...";
+
+  suite("recognizeLaunchBlocker", () => {
+    test("recognizes the held vscode-updating mutex", () => {
+      const hit = launch.recognizeLaunchBlocker(MUTEX_LINE);
+      assert.ok(hit, "the mutex line must be recognized");
+      assert.strictEqual(hit.id, "vscode-updating-mutex");
+      // Assert the RULE, not a substring a sibling blocker also emits: the
+      // explanation has to tell the reader this is machine state and that
+      // the repo is not what needs changing.
+      assert.match(hit.explain, /INSTALLER/);
+      assert.match(hit.explain, /machine state, not a test failure/i);
+    });
+
+    test("recognizes an Electron binary that parsed args as a Node CLI", () => {
+      const hit = launch.recognizeLaunchBlocker(
+        "Code.exe: bad option: --extensionDevelopmentPath=D:/repo",
+      );
+      assert.ok(hit, "the bad-option line must be recognized");
+      assert.strictEqual(hit.id, "electron-run-as-node");
+      assert.match(hit.explain, /ELECTRON_RUN_AS_NODE/);
+    });
+
+    test("PLANTED LOOK-ALIKE: ordinary launch chatter is not a blocker", () => {
+      // The failure mode this guards is a pattern broad enough to match any
+      // stderr at all, which would label every failure with a cause it does
+      // not have -- worse than saying nothing.
+      const ordinary = [
+        "[main 2026-08-15T13:58:05.575Z] update#setState idle",
+        "[main] Starting VS Code",
+        "Warning: 'NO_COLOR' env is ignored due to 'FORCE_COLOR' being set.",
+        "an update is available and the window mentions vscode",
+      ].join("\n");
+      assert.strictEqual(launch.recognizeLaunchBlocker(ordinary), null);
+    });
+
+    test("PLANTED LOOK-ALIKE: a HEALTHY launch's real mutex chatter is not a blocker", () => {
+      // Captured verbatim from a successful launch on 2026-08-15 while
+      // building this fix. A healthy VS Code says "mutex" on its way up --
+      // installMutex is not checkInnoSetupMutex -- so a recognizer keyed on
+      // the word alone would label every green run as blocked. This is the
+      // look-alike that pattern would fail, using the real bytes rather than
+      // an invented approximation.
+      const healthy =
+        "[main 2026-08-15T14:41:24.586Z] StorageMainService: creating " +
+        "application shared storage\n" +
+        "[main 2026-08-15T14:41:24.666Z] Error: Error mutex already exists\n" +
+        "    at Ls.installMutex (file:///D:/.vscode-test/Code.exe)";
+      assert.strictEqual(launch.recognizeLaunchBlocker(healthy), null);
+    });
+
+    test("PLANTED LOOK-ALIKE: empty and non-string output are not blockers", () => {
+      assert.strictEqual(launch.recognizeLaunchBlocker(""), null);
+      assert.strictEqual(launch.recognizeLaunchBlocker(undefined), null);
+      assert.strictEqual(launch.recognizeLaunchBlocker(null), null);
+      assert.strictEqual(launch.recognizeLaunchBlocker(42), null);
+    });
+
+    test("the blocker corpus is non-empty and every entry is well formed", () => {
+      // A recognizer with an empty rule table matches nothing and passes the
+      // negative tests above for the wrong reason. Assert the input set.
+      assert.ok(launch.LAUNCH_BLOCKERS.length >= 2);
+      for (const b of launch.LAUNCH_BLOCKERS) {
+        assert.ok(b.id && typeof b.id === "string");
+        assert.ok(b.pattern instanceof RegExp);
+        assert.ok(
+          b.explain && b.explain.length > 40,
+          `${b.id}: an explanation that does not explain is not a fix`,
+        );
+      }
+    });
+  });
+
+  suite("describeLaunchFailure", () => {
+    test("keeps the original message and appends the recognized cause", () => {
+      const msg = launch.describeLaunchFailure(
+        "electronApplication.firstWindow: Target page, context or browser has been closed",
+        MUTEX_LINE,
+      );
+      // The original error is the half that says WHERE it died; losing it to
+      // make room for the diagnosis would trade one blind spot for another.
+      assert.match(msg, /firstWindow: Target page/);
+      assert.match(msg, /LIKELY CAUSE \(vscode-updating-mutex\)/);
+      assert.match(msg, /--- launched VS Code output ---/);
+      assert.match(msg, /checkInnoSetupMutex/);
+    });
+
+    test("PLANTED LOOK-ALIKE: unrecognized output still reaches the reader", () => {
+      // The point of capturing stderr is not the recognizer -- it is that an
+      // UNKNOWN cause stops being invisible. If this ever regresses to "only
+      // known causes are reported", the next novel blocker costs another
+      // half-day of bisecting.
+      const msg = launch.describeLaunchFailure(
+        "launch failed",
+        "SIGSEGV in some renderer nobody has seen before",
+      );
+      assert.doesNotMatch(msg, /LIKELY CAUSE/);
+      assert.match(msg, /SIGSEGV in some renderer/);
+    });
+
+    test("says so explicitly when the child wrote nothing", () => {
+      const msg = launch.describeLaunchFailure("launch failed", "");
+      assert.match(msg, /none captured/);
+    });
+
+    test("truncates from the END, keeping the last lines written", () => {
+      // A dying process's useful lines are its last ones. Truncating from the
+      // front would keep the startup banner and drop the cause.
+      const noise = "x".repeat(5000);
+      const msg = launch.describeLaunchFailure(
+        "launch failed",
+        `${noise}\nTHE LAST THING IT SAID`,
+        200,
+      );
+      assert.match(msg, /THE LAST THING IT SAID/);
+      assert.match(msg, /\(truncated\)/);
+      assert.ok(msg.length < 1500, "the clipped output must actually be clipped");
     });
   });
 });

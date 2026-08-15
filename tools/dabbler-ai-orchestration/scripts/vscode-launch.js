@@ -370,6 +370,108 @@ function launchArgs(opts) {
 /** The development-only companion that reveals the view during a walk. */
 const WALK_COMPANION_PATH = path.join(__dirname, "walk-companion");
 
+// ---------------------------------------------------------------------------
+// Why a launch failed (Set 133 follow-on).
+//
+// On 2026-08-15 all 32 Layer 3 specs failed with the same six words --
+// `Target page, context or browser has been closed` -- each after ~34.3s. The
+// cause was not the tests, the harness, the VS Code version, the worker count
+// or the shell: a stuck VS Code installer held the machine-wide
+// `vscode-updating` Inno Setup mutex, so every launched Code.exe waited its
+// 30s and exited without ever creating a window. VS Code says so itself, on
+// the child's stderr, in one line -- and nothing was reading it, so a
+// one-line answer arrived as 32 identical timeouts and a diagnosis that took
+// far longer than the suite it was blocking.
+//
+// The general rule this encodes: when a launch fails, report what the CHILD
+// said. The recognizer below is the specific half; `describeLaunchFailure`
+// keeps the raw output either way, so an unrecognized cause is still
+// diagnosable rather than swallowed.
+// ---------------------------------------------------------------------------
+
+/**
+ * A machine-wide condition that makes EVERY launch on this box fail, matched
+ * on the text VS Code itself emits. Keep patterns anchored on the log token
+ * rather than on prose: the wording around them is not a contract.
+ */
+const LAUNCH_BLOCKERS = [
+  {
+    id: "vscode-updating-mutex",
+    // VS Code's own `checkInnoSetupMutex`. It waits ~30s and gives up, so the
+    // symptom at the Playwright layer is a launch timeout with no window.
+    pattern: /checkInnoSetupMutex|vscode-updating is held/i,
+    explain:
+      "A VS Code INSTALLER is running and holds the machine-wide " +
+      "'vscode-updating' mutex, so every launched VS Code waits ~30s for it " +
+      "and then exits WITHOUT creating a window. This is a machine state, " +
+      "not a test failure -- the same run passes untouched once the mutex is " +
+      "free. Fix: finish or cancel the pending VS Code update (look for a " +
+      "CodeSetup-*.exe process, or an 'Update' button in your editor), then " +
+      "re-run. Nothing in this repo needs to change.",
+  },
+  {
+    id: "electron-run-as-node",
+    // A VS Code-hosted terminal exports these; they flip a launched Code.exe
+    // into Node/CLI mode, where it parses --extensionDevelopmentPath as a CLI
+    // flag and exits 9. `electronEnv` already excludes them by allowlist, so
+    // this fires only if something bypasses that seam.
+    pattern: /bad option: --extensionDevelopmentPath|bad option: --user-data-dir/i,
+    explain:
+      "The launched VS Code parsed its arguments as a Node CLI instead of " +
+      "starting a window, which is what ELECTRON_RUN_AS_NODE=1 does to an " +
+      "Electron binary. Something bypassed electronEnv's allowlist and passed " +
+      "the parent environment through. Fix the launch seam; do not scrub the " +
+      "parent shell and call it done.",
+  },
+];
+
+/**
+ * Recognize a machine-wide launch blocker in a child's output.
+ *
+ * Returns the matching blocker (`{id, explain}`) or `null`. Pure and
+ * synchronous so it can be falsified directly, which matters here: a
+ * recognizer that matches nothing looks exactly like one that finds nothing
+ * (L-112-1).
+ */
+function recognizeLaunchBlocker(output) {
+  if (typeof output !== "string" || output === "") return null;
+  for (const blocker of LAUNCH_BLOCKERS) {
+    if (blocker.pattern.test(output)) {
+      return { id: blocker.id, explain: blocker.explain };
+    }
+  }
+  return null;
+}
+
+/**
+ * The message a failed launch should actually carry: the original error, the
+ * recognized cause when there is one, and the child's own output either way.
+ *
+ * `output` is truncated from the END -- a launch failure's useful lines are
+ * the last ones written before the process died.
+ */
+function describeLaunchFailure(originalMessage, output, maxOutputChars) {
+  const limit = typeof maxOutputChars === "number" ? maxOutputChars : 2000;
+  const parts = [String(originalMessage || "VS Code launch failed")];
+  const blocker = recognizeLaunchBlocker(output);
+  if (blocker) {
+    parts.push("", `LIKELY CAUSE (${blocker.id}): ${blocker.explain}`);
+  }
+  const text = typeof output === "string" ? output.trim() : "";
+  if (text) {
+    const clipped =
+      text.length > limit ? `...(truncated)...\n${text.slice(-limit)}` : text;
+    parts.push("", "--- launched VS Code output ---", clipped);
+  } else {
+    parts.push(
+      "",
+      "--- launched VS Code output ---",
+      "(none captured -- the process wrote nothing before it died)"
+    );
+  }
+  return parts.join("\n");
+}
+
 module.exports = {
   EXTENSION_ROOT,
   ISOLATION_FLAGS,
@@ -382,4 +484,7 @@ module.exports = {
   realProbeIo,
   findCodeBinary,
   launchArgs,
+  LAUNCH_BLOCKERS,
+  recognizeLaunchBlocker,
+  describeLaunchFailure,
 };

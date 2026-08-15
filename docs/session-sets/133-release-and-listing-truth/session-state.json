@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "133-release-and-listing-truth",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -21,9 +21,9 @@
     {
       "number": 2,
       "title": "Confirm and correct the record",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-15T13:15:46.847133-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-15T14:56:24.303192-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -31,7 +31,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

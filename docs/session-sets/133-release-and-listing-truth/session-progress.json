@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-15T10:34:07.548738-04:00",
+  "generatedAt": "2026-08-15T14:56:24.304856-04:00",
   "sessionSetDir": "133-release-and-listing-truth",
   "inputs": {
-    "activity-log.json": "af284769c415516745836c30aa370a75008f2d9ad46722f6e13af917a6e2e0af",
-    "session-state.json": "13aa74af2be0852cf3930ed3ee00eba4e99dbbba9e502482433ae36617a4578f",
+    "activity-log.json": "5ae7146e325252a13e7d467a6d041057060fa88c70c6050aa31cc937d187b231",
+    "session-state.json": "5301489ef0823e635021604ee0518a13845599dd2d016089c4b3f9dcf95a4ef8",
     "spec.md": "14a11f14dfa1bd72a116a26a957f08d99fa6d4cc4dbd7e0dc8d1c8647cac4897"
   },
   "orphanEntries": 0,
@@ -116,19 +116,94 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (claude / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T13:15:46.847133-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "confirm-both-registries-are-live-and",
+          "description": "Confirmed both registries against the registries themselves, not the workflow exit codes. PyPI: dabbler-ai-router 1.0.0 live, wheel+sdist uploaded 2026-08-15T15:02:45Z. Marketplace: DarndestDabbler.dabbler-ai-orchestration 0.51.0, lastUpdated 15:09:32Z. Both tags at 6f195bd8, Test green on that commit (run 31891207265). Open VSX is NOT published and never has been: the job is green because OVSX_PAT is unset and the step skips non-fatally; open-vsx.org 404s on both the extension and the DarndestDabbler namespace. Rewrote both release-status rows to say what is live, added the coordinated-release walk entry, and corrected two false historical claims found in the same pass (the 0.45.0 row claimed an Open VSX publish that its own run log shows was skipped; the 0.32.0 walk bullet still said 'not yet on PyPI').",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T13:15:46.854962-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "journal-the-deletion-cost-ruling",
+          "description": "Journaled the operator's deletion-cost ruling: a test whose only subject is deleted code falls OUTSIDE the verification carve-out, paired with extending 'no gate is added without deleting one' from gates to modules, and gated on a subject-is-gone precondition. authority=human, rubric_line=value-trade-off, verification_effect=none, operator_attestation cites the spec. The three module line counts were re-derived (1319/1082/652) rather than inherited. No code changed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T13:21:54.275310-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "cross-provider-verification",
+          "description": "Six rounds. Rounds 1-4 ran on gemini-pro (tier 2) because every OpenAI model returned 429 all session; the escalation ladder's rung 2, journaled, with the tier degradation stated not buried. Five Majors from the two discovery passes plus two on the fix delta: three false positives settled by deterministic evidence, two accepted and fixed. The operator then restored OpenAI credit and authorized round 5 on gpt-5-6-sol -- a genuine third provider -- which accepted all six surviving fix verdicts, closing the disputed finding by independent acceptance rather than by adjudication of my argument, and caught one real new defect of mine (four hand-authored decision timestamps, one of them chronologically impossible). Corrected and disclosed. Round 6, on a second separate authorization, returned VERIFIED with zero findings and all nine ledger entries accepted.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T13:24:18.561106-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three declared suites green and fresh against the final tree. pytest 4656 passed / 5 skipped / 1 xfailed in 223s at -n 8 (re-run after the decisions.jsonl correction staled the first green run); the single xfail is the deliberate strict-xfail pinning Session 1's open changelog.check() gap. mocha 1468 passing / 0 failing in 23s. playwright 32 passed / 0 failed in 3.1m. mocha and playwright were not re-run for the journal correction and are not owed -- decisions.jsonl sits under docs/session-sets/, which run_of_record affected confirms is covered by pytest alone.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T14:55:56.498435-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "close-out",
+          "description": "Close-out.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 6
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     }
   ]
 }

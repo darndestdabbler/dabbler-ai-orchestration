@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "ea9838ecefa0342a22dd078d244e31d0ee2a4d62",
+  "fixedTree": "16fca128ff70616d11add49c3bd7bc3e1f55a6ff",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-15T17:46:12.239430+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "Unplanned work performed outside the session's declared scope - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/session-sets/133-release-and-listing-truth/spec.md`, `docs/ ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The session spec is amended to accurately reflect all work performed, or the unplanned work is reverted and moved to a separate session.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "Contradictory evidence regarding the existence of a key deliverable - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/133-release-and-listing-truth/checklist-p ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The evidence package must be made self-consistent. Either the change-log.md file, if premature, must be removed from the working tree and the git status must reflect its absence, or, if it is an intended deliverable at this stage, its contents must be provided for review and the process documentation updated to reflect its expected presence.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

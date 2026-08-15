@@ -121,6 +121,84 @@
       "dateTime": "2026-08-15T10:25:04.124083-04:00",
       "description": "All three declared suites run fresh and green against the final tree: pytest 4664 passed / 5 skipped / 1 xfailed (205.8s, -n 8 per the operator cap, route journaled), mocha 1458 passing (23s), playwright 32 passed (2.9m). run_of_record affected named all three because package.json sits in mocha's and playwright's covers and the changelogs sit in pytest's. pytest and mocha were re-taken after Layer 3, which rebuilds dist/ inside both suites' covers. Layer 3's earlier 32/32 failure was a stuck VS Code installer holding the vscode-updating mutex, resolved by the operator applying the pending update; nothing was changed to make it pass.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "confirm-both-registries-are-live-and",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "**Confirm both registries are live and correct the release-status row.** Verify `dabbler-ai-router 1.0.0` on PyPI and the extension `0.51.0` on the VS Code Marketplace and Open VSX, then update `docs/repository-reference.md` \u2192 *Current release status* to say what is live rather than what is staged. **This row has been wrong twice** \u2014 Set 112 S3 found it still naming `0.33.0` live nine releases on, and Set 107 S1 found it claiming `0.46.0` was staged after it had shipped. Both times the publish happened and the row was never updated, which is why correcting it is a named deliverable and not bookkeeping. Record the workflow run ids and the tagged commit, as the surrounding rows do.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "journal-the-deletion-cost-ruling",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "**Journal the deletion-cost ruling.** Operator decision, `authority=human`, via `python -m ai_router.decision_journal`: *deleting a test whose only subject is deleted code is not a verification reduction.* The reasoning to record: the framework currently makes addition cheap and deletion expensive, because deleting a module means deleting its tests, and reducing verification is a hard human-only carve-out that an orchestrator may never self-authorize. Measured symptoms \u2014 4,640 tests, ~+29 test functions/day, **zero guards ever retired**; Set 116 S3 demoted five gates and deliberately deleted nothing; of six modules scheduled for deletion three went and the three survivors *grew* (`contract_gate` 1,158 \u2192 1,319, `spec_admission` 403 \u2192 1,082, `replacement_gate` 546 \u2192 652). Pair it with the extension of the existing rule *\"no gate is added without deleting one\"* from gates to **modules**. This is a ruling, not an implementation: no code changes here.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T13:15:46.854962-04:00",
+      "description": "Registered session 2 (claude / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "confirm-both-registries-are-live-and",
+      "dateTime": "2026-08-15T13:21:54.275310-04:00",
+      "description": "Confirmed both registries against the registries themselves, not the workflow exit codes. PyPI: dabbler-ai-router 1.0.0 live, wheel+sdist uploaded 2026-08-15T15:02:45Z. Marketplace: DarndestDabbler.dabbler-ai-orchestration 0.51.0, lastUpdated 15:09:32Z. Both tags at 6f195bd8, Test green on that commit (run 31891207265). Open VSX is NOT published and never has been: the job is green because OVSX_PAT is unset and the step skips non-fatally; open-vsx.org 404s on both the extension and the DarndestDabbler namespace. Rewrote both release-status rows to say what is live, added the coordinated-release walk entry, and corrected two false historical claims found in the same pass (the 0.45.0 row claimed an Open VSX publish that its own run log shows was skipped; the 0.32.0 walk bullet still said 'not yet on PyPI').",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "journal-the-deletion-cost-ruling",
+      "dateTime": "2026-08-15T13:24:18.561106-04:00",
+      "description": "Journaled the operator's deletion-cost ruling: a test whose only subject is deleted code falls OUTSIDE the verification carve-out, paired with extending 'no gate is added without deleting one' from gates to modules, and gated on a subject-is-gone precondition. authority=human, rubric_line=value-trade-off, verification_effect=none, operator_attestation cites the spec. The three module line counts were re-derived (1319/1082/652) rather than inherited. No code changed.",
+      "status": "complete"
     }
   ]
 }

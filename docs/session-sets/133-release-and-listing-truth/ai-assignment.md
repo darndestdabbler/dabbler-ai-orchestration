@@ -68,3 +68,42 @@
   ```
 
 - **On close:** Proceed to the terminal session for Step 9 (reorganization review of `project-guidance.md` / `lessons-learned.md`).
+
+---
+
+## Set-terminal recommendation: what runs next (Step 3.5, Session 2)
+
+> Routed analysis, never self-opined. Authored by `gemini-2.5-pro` (google,
+> tier 2, $0.0059) on 2026-08-15 via `route(task_type="analysis")`.
+
+- **Recommended next set:** `134-ceremony-cost-and-what-to-cut`
+- **Goal in one line:** reduce ceremony cost per work step by simplifying
+  artifacts, checklists, and the rounds a human must drive.
+- **Why now:** ceremony cost per step has more than doubled, 7.1 -> 16.3
+  minutes, while work per step stayed flat at ~7.1. It is the most acute
+  drag on the operator and the standing guidance is to cut ceremony first.
+- **Why not the others:** the `changelog.check()` post-fold gap is a
+  localized correctness issue; `WORK_STEP_BUDGET` and the deletion-cost
+  ruling address longer-term system health; Open VSX is a capability
+  extension, not an active pain point. Ceremony cost is a workflow-wide tax
+  being paid every session.
+- **Sequencing risk, as stated by the analyst:** choosing ceremony first
+  leaves the `changelog.check()` gap open, so a contribution folded before
+  the next release set is not round-trip verified. Deferring
+  `WORK_STEP_BUDGET` and the deletion-cost implementation also means scope
+  and suite growth continue unconstrained in the meantime.
+- **Recommended next orchestrator:** provider **anthropic**, current flagship
+  family; effort medium. Rationale as routed: the work is interpreting
+  process data and standing guidance and proposing strategic cuts, which is
+  synthesis-shaped rather than mechanical.
+
+> **Known analyst defect, recorded not corrected — fourth set running.** The
+> prompt explicitly asked for a callable model id or, failing confidence, the
+> provider and family only. The analyst answered `claude-3-opus, latest
+> version`, which is neither: `claude-3-opus` is not a family this router
+> can call. It did at least caveat the id rather than assert one, which is
+> new. The **provider direction is actionable and is what the router
+> enforces anyway** — an anthropic orchestrator is verified by google or
+> openai, never by itself. The router-side fix for the step-3.5 analyst's
+> model-id emissions remains an owed follow-on; it is now the longest-lived
+> unaddressed defect this ledger carries.

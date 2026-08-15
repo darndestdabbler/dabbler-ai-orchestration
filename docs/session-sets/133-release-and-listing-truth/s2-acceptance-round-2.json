@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "b4a981fd5067124b9523a06e1f06c77dd2c9d907",
+  "fixedTree": "bcd883cfcbbc54be15430f19e6a0c36af32e9e76",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-15T17:46:18.416330+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "Unplanned decision records document significant operational failures - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/session-sets/133-release-and-listing-truth/decisions ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The session's spec.md is updated to reflect that three decisions would be journaled, including the work to diagnose and resolve the verifier outage, or the two unplanned decision records are removed from this session's journal.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "Session progress log is incomplete and factually incorrect - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/133-release-and-listing-truth/checklist-posts.json ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The file docs/session-sets/133-release-and-listing-truth/checklist-posts.jsonl contains at least one entry where the inProgressStepKeys array includes a key corresponding to Step 3 of the session plan (e.g., \"journal-the-deletion-cost-ruling\").",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "Unexplained modification to a tracked build artifact - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `git status --short` output (from prompt) - **Failure scenario:** A develop ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The modification to tools/dabbler-ai-orchestration/dist/extension.js.map is reverted, or the session records contain a justification for why this file was modified and evidence that the change is benign.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

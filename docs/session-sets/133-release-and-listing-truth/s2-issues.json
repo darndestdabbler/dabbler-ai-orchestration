@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "Unplanned work performed outside the session's declared scope\n\n- **Category:** Completeness\n- **Severity:** Major\n- **Evidence paths:** `docs/session-sets/133-release-and-listing-truth/spec.md`, `docs/session-sets/133-release-and-listing-truth/ai-assignment.md`, `docs/session-sets/133-release-and-listing-truth/decisions.jsonl`, `docs/session-sets/134-ceremony-cost-and-what-to-cut/spec.md`\n- **Failure scenario:** A future auditor or developer reviews this session's `spec.md` to understand what work was done. They will see the explicit `Creates` and `Touches` list and conclude that was the complete scope of the session. They will not be aware of the other significant changes made (the next-set recommendation, the procedural decisions about verification, and the creation of the spec for the next session set), because the session's primary contract was inaccurate. This leads to an incomplete understanding of the repository's history and undermines trust in the process documentation. This scenario is probable because the spec is presented as the authoritative plan for the session.\n- **Acceptance criterion:** `JUDGMENT - The session spec is amended to accurately reflect all work performed, or the unplanned work is reverted and moved to a separate session.`\n- **Details:**\n    - **Violation**: The session plan (`spec.md`) defines the scope of work in its `Creates` and `Touches` directives. The spec states:\n      > **Creates:** `change-log.md`; a `decisions.jsonl` entry for the deletion-cost ruling\n      > **Touches:** `docs/repository-reference.md`\n    - **Impact**: The work performed exceeded this scope, undermining the spec as a reliable contract for the session's work. A reviewer cannot trust the plan to be a complete description of the changes. This would change a merge decision, as the out-of-scope work needs to be explicitly reviewed and approved, which has not happened under the current plan.\n    - **Evidence**: The provided diff and file list show three categories of work performed that were not included in the session plan:\n        1.  A modification to `docs/session-sets/133-release-and-listing-truth/ai-assignment.md` to add a \"Set-terminal recommendation\" block. This file is not listed in `Touches`.\n        2.  *Three* new entries appended to `docs/session-sets/133-release-and-listing-truth/decisions.jsonl`, when the spec only called for one (\"the deletion-cost ruling\"). The other two entries record procedural decisions made during the session's own verification.\n        3.  The creation of a new directory `docs/session-sets/134-ceremony-cost-and-what-to-cut/` containing a new `spec.md`. This is a significant piece of work not mentioned in the `Creates` list.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A future auditor or developer reviews this session's `spec.md` to understand what work was done. They will see the explicit `Creates` and `Touches` list and conclude that was the complete scope of the session. They will not be aware of the other significant changes made (the next-set recommendation, the procedural decisions about verification, and the creation of the spec for the next session set), because the session's primary contract was inaccurate. This leads to an incomplete understanding of the repository's history and undermines trust in the process documentation. This scenario is probable because the spec is presented as the authoritative plan for the session.",
+      "evidencePaths": [
+        "docs/session-sets/133-release-and-listing-truth/spec.md",
+        "docs/session-sets/133-release-and-listing-truth/ai-assignment.md",
+        "docs/session-sets/133-release-and-listing-truth/decisions.jsonl",
+        "docs/session-sets/134-ceremony-cost-and-what-to-cut/spec.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The session spec is amended to accurately reflect all work performed, or the unplanned work is reverted and moved to a separate session."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "Contradictory evidence regarding the existence of a key deliverable\n\n-   **Category:** Correctness\n-   **Severity:** Major\n-   **Evidence paths:** `docs/session-sets/133-release-and-listing-truth/checklist-posts.jsonl`, plus the provided `git status` output and the \"Review scope\" instructions within the prompt.\n-   **Failure scenario:** A reviewer, presented with this evidence package, cannot determine the true state of the session's work. They are forced to either ignore a key deliverable (`change-log.md`) that appears to exist, or halt the process to ask for clarification. This ambiguity undermines the integrity of the verification step and would cause a reasonable person to block further progress until the state of the repository is made coherent.\n-   **Acceptance criterion:** `JUDGMENT - The evidence package must be made self-consistent. Either the change-log.md file, if premature, must be removed from the working tree and the git status must reflect its absence, or, if it is an intended deliverable at this stage, its contents must be provided for review and the process documentation updated to reflect its expected presence.`\n-   **Details:**\n    -   **Violation**: The provided evidence about the state of the session work is self-contradictory. The \"Review scope\" instructions state: *\"Close-out runs after this review, so the following do not exist yet and their absence is never a finding: a `close_session` success, `change-log.md`...\"*. Further, the `checklist-posts.jsonl` file indicates the session is at step 4 (\"cross-provider-verification\"), which precedes step 6 (\"close-out\"). These pieces of evidence state that `change-log.md` should not exist. However, the provided `git status` output explicitly lists `?? docs/session-sets/133-release-and-listing-truth/change-log.md`, indicating the file exists in the working tree.\n    -   **Impact**: This contradiction makes the work unsubstantiated. A reviewer cannot trust the evidence package to accurately represent the state of the work. It is impossible to know whether `change-log.md` is a deliverable that has been improperly withheld from review, or if its presence indicates a deviation from the specified process. This ambiguity prevents a complete and confident verification.\n    -   **Evidence**: The contradiction between the process artifacts (`checklist-posts.jsonl`, \"Review scope\" text) and the working tree state (`git status` output). The former claim `change-log.md` does not exist at this stage, while the latter shows that it does.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A reviewer, presented with this evidence package, cannot determine the true state of the session's work. They are forced to either ignore a key deliverable (`change-log.md`) that appears to exist, or halt the process to ask for clarification. This ambiguity undermines the integrity of the verification step and would cause a reasonable person to block further progress until the state of the repository is made coherent.",
+      "evidencePaths": [
+        "docs/session-sets/133-release-and-listing-truth/checklist-posts.jsonl",
+        "plus",
+        "the",
+        "provided",
+        "git",
+        "status",
+        "output",
+        "and",
+        "Review",
+        "scope",
+        "instructions",
+        "within",
+        "prompt"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The evidence package must be made self-consistent. Either the change-log.md file, if premature, must be removed from the working tree and the git status must reflect its absence, or, if it is an intended deliverable at this stage, its contents must be provided for review and the process documentation updated to reflect its expected presence."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "ea9838ecefa0342a22dd078d244e31d0ee2a4d62"
+}

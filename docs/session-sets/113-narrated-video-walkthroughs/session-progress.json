@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-15T16:20:13.012329-04:00",
+  "generatedAt": "2026-08-15T18:00:46.271969-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "6e8b0c38266f254ee95ef9b81569118e5fd3ddb99cdf024f2db9c51be0bdf3a7",
-    "session-state.json": "96bf5c13804b0335a6002634f763bad0221a93b290955e4d71c3c91f5b5c3396",
+    "activity-log.json": "df2fadb0618442c567c0b63815c3172c52d345831cc0df2dd60c2b199236f763",
+    "session-state.json": "0fcb0cdc4cfa9a0f90cd465455ba840f20df9aaf7f2a56627adcb35491f0473a",
     "spec.md": "c45ca1aa6984076ea84c88a24f8161690fa56a6f37609aac5820681953469fac"
   },
   "orphanEntries": 0,
@@ -118,19 +118,106 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (claude / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T17:08:25.269782-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "define-the-smallest-platform-neutral-scenario",
+          "description": "Defined the portable scenario model in ai_router/scenario.py: stable kebab-case scenario and step ids, prerequisites, baseline (description/setup/observable), reset, recovery, named checkpoints, and per step an action plus an expected observable result. Closed vocabularies at both levels -- an unknown key is refused, not ignored.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T17:08:25.276811-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "quarantine-driver-detail",
+          "description": "Quarantined driver detail structurally: drivers: is opaque to the model, no renderer receives it, and portable_digest() is taken over the portable half only, so a selector change leaves all four renderings byte-identical. ai_router/scenario_lint.py is the advisory second line for selector-shaped text that leaks into portable prose; five rules, each with a planted violation and a legitimate look-alike.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T17:27:53.535901-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "render-from-the-one-source-the",
+          "description": "Rendered four documents from the one source (walkthrough.md, training.md, captions.vtt, chapters.json) via ai_router/scenario_render.py, with --check as the divergence gate over the committed tree. Both prose documents state verbatim that no video is needed and carry the replay rule: reaching any step means replaying a prefix from the baseline or the nearest named checkpoint, never random access. One exemplar authored: docs/walkthroughs/work-explorer-first-look.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T17:27:53.535901-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Four rounds, all routed to gpt-5-6-sol with anthropic excluded. Discovery fan-out (2 lenses) + supplementary found 3 Majors and 8 nits; remediation-review cycle 1 REJECTED one fix (the CSS-id rule missed button#save) and cycle 2 returned VERIFIED with 3 fix verdicts accepted. One nit disputed with deterministic evidence: byte comparison would fail --check on every Windows clone. $1.90.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T17:27:53.535901-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three declared suites run after the last code-changing stage: pytest 4893 passed / 5 skipped / 1 xfailed (228s, run at -n 8 per the operator parallelism cap rather than the declared -n auto, recorded in the run's detail field); mocha 1468 passing (23s); playwright 32 passed (180s) on an idle machine. All three recorded via run_of_record.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T17:59:23.202258-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 3,

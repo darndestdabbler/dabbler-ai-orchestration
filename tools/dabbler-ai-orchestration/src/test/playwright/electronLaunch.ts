@@ -560,6 +560,11 @@ const _launch = require("../../../scripts/vscode-launch.js") as {
     baseDir?: string;
     platform?: NodeJS.Platform;
   }) => { root: string; env: { [key: string]: string } };
+  describeLaunchFailure: (
+    originalMessage: string,
+    output: string,
+    maxOutputChars?: number,
+  ) => string;
 };
 
 /** The filesystem surface {@link resolveCodeExecutable} needs. */
@@ -650,6 +655,15 @@ export async function launchVSCode(
   // cannot clean up what it was never handed, since the throw happens before
   // the LaunchedVSCode handle is returned.
   let app: ElectronApplication | undefined;
+  // Everything the launched VS Code writes, kept so a FAILED launch can say
+  // what the child said. Set 133 follow-on: a stuck installer holding the
+  // machine-wide `vscode-updating` mutex made all 32 specs fail with the same
+  // opaque "Target page, context or browser has been closed", while VS Code
+  // was explaining itself on stderr the whole time and nothing read it.
+  let childOutput = "";
+  const captureChildOutput = (chunk: unknown) => {
+    childOutput += String(chunk);
+  };
   try {
     app = await _electron.launch({
     executablePath: code,
@@ -679,6 +693,17 @@ export async function launchVSCode(
     }),
     timeout: 60_000,
     });
+    // Attach BEFORE awaiting the first window: that await is exactly where a
+    // blocked launch dies, so a listener attached after it would capture
+    // nothing in the only case this exists for.
+    try {
+      const proc = app.process();
+      proc.stdout?.on("data", captureChildOutput);
+      proc.stderr?.on("data", captureChildOutput);
+    } catch {
+      // Capture is diagnostic, never load-bearing: if the handle is already
+      // gone the launch is failing anyway and must fail on its own terms.
+    }
     const page = await app.firstWindow({ timeout: 60_000 });
     // Wait for the workbench to settle. The most reliable signal is
     // the activity bar element becoming visible.
@@ -700,7 +725,15 @@ export async function launchVSCode(
         // opportunistic; tmpdirs live under TMPDIR
       }
     }
-    throw err;
+    // Re-throw the SAME error object, with the child's own account appended.
+    // Replacing it would lose Playwright's stack and the original message,
+    // which is the half that says where in the launch it died.
+    const original = err instanceof Error ? err : new Error(String(err));
+    original.message = _launch.describeLaunchFailure(
+      original.message,
+      childOutput,
+    );
+    throw original;
   }
 }
 

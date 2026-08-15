@@ -96,13 +96,88 @@ RETIRED_VERIFICATION_METHODS = {
 
 SWITCH_DUE_TO_BLOCKER = "switch-due-to-blocker"
 
-# Set 111 S4: how a `requiresUAT` session discharges its walk. ``walked``
-# means the operator walked the guided-look walk; ``waived`` means they
-# explicitly declined it. There is deliberately no third value — "the walk
-# just did not happen" is the outcome this gate exists to make impossible.
-UAT_STATUS_WALKED = "walked"
-UAT_STATUS_WAIVED = "waived"
-UAT_STATUSES = (UAT_STATUS_WALKED, UAT_STATUS_WAIVED)
+# Set 113 S1: the UAT record. Set 111 S4 shipped a binary
+# ``walked | waived`` here; the operator retired it on 2026-08-10 with the
+# observation that a flag which can always be bypassed -- and always should
+# be, to prevent impasses -- is not a requirement, and that the honest
+# question is not *did UAT happen* but **how much additional confidence did
+# the UAT work buy, per component**. That quantity is continuous and it is
+# not uniform across one session's work: a single reviewer watching a
+# walkthrough of a low-risk component and driving a high-risk one manually
+# is a rational allocation of a scarce reviewer that a binary cannot
+# express.
+#
+# So the record carries **facts**, per component, and nothing else. What
+# was reviewed, how, by how many humans of what kind, what evidence exists,
+# and what they found. Risk is what those facts IMPLY; it is deliberately
+# not a number anybody types. There is no self-assessed confidence score
+# and no parallel debt ledger -- both were considered and refused (consult
+# round 3; operator's standing "do not make things too complicated").
+#
+# The methods, in rising order of what they buy. The order is meaningful to
+# a reader and meaningless to the code: nothing ranks these, because a rank
+# is a score wearing a different hat.
+UAT_METHOD_NONE = "none"
+UAT_METHOD_NOT_APPLICABLE = "not-applicable"
+UAT_METHOD_WATCHED = "watched"
+UAT_METHOD_WATCHED_PARTIALLY_REPEATED = "watched-and-partially-repeated"
+UAT_METHOD_MANUAL_WALKTHROUGH = "manual-walkthrough"
+UAT_METHOD_SYSTEMATIC_EXPLORATION = "systematic-exploration"
+
+#: Methods that record a review a human actually performed.
+UAT_METHODS_PERFORMED = (
+    UAT_METHOD_WATCHED,
+    UAT_METHOD_WATCHED_PARTIALLY_REPEATED,
+    UAT_METHOD_MANUAL_WALKTHROUGH,
+    UAT_METHOD_SYSTEMATIC_EXPLORATION,
+)
+#: Methods that record, explicitly and attributably, that no human review
+#: happened. **These pass.** "No UAT" is a valid answer -- it is only
+#: invalid as an *absence*. ``none`` means review was possible and was not
+#: done; ``not-applicable`` means review would have bought nothing here
+#: (no human-observable surface, or untouched in this accounting's scope).
+UAT_METHODS_ABSTAINED = (
+    UAT_METHOD_NONE,
+    UAT_METHOD_NOT_APPLICABLE,
+)
+UAT_METHODS = UAT_METHODS_PERFORMED + UAT_METHODS_ABSTAINED
+
+# The reviewer vocabulary is CLOSED, and closing it is the point. Consult
+# round 3 refused to reserve an ``ai-agent`` reviewer type -- "it bakes in
+# the category error the operator has already avoided" -- and the spec's
+# decision 9 says agent-driven exploration must never count as a human
+# reviewer. A closed vocabulary makes that structural instead of advisory:
+# there is no spelling of "an AI looked at it" this field will accept.
+UAT_REVIEWER_DEVELOPER = "developer"
+UAT_REVIEWER_BUSINESS_USER = "business-user"
+UAT_REVIEWER_TYPES = (UAT_REVIEWER_DEVELOPER, UAT_REVIEWER_BUSINESS_USER)
+
+# The component record's key set is closed too, for the same reason. An
+# open shape is how ``confidence: 0.8`` or ``debt: "high"`` gets in later
+# without anyone deciding to add it -- and a self-assessed score is the one
+# thing all three consult rounds and the operator agreed to keep out.
+# Extending this set is a deliberate edit, which is exactly the bar it
+# should have to clear.
+UAT_COMPONENT_KEYS = frozenset(
+    {
+        "component",
+        "method",
+        "reviewers",
+        "evidence",
+        "findings",
+        "attestation",
+    }
+)
+
+# The block's own key set, closed for the same reason and then some. Round 1
+# verification found the first version closing the COMPONENT record while
+# leaving the block around it open -- so a `confidence` score barred from
+# the per-component record could still be written one level up, and a
+# `walkArtifact` left behind by a Set 111 migration passed the Python
+# validator while `disposition.schema.json` rejected it under
+# `additionalProperties: false`. Two validators disagreeing about the same
+# file is worse than either rule alone.
+UAT_BLOCK_KEYS = frozenset({"attestation", "components"})
 
 # Set 114 S1: the only legal value of ``checklist.status``. There is no
 # "posted" counterpart — a session that posted on cadence needs no block
@@ -197,14 +272,27 @@ class Disposition:
       non-blocking mismatch). Omit-empty: absent when no lessons were
       cited, so older readers never see an unexpected key. An
       empty/absent list is fully inert — silence never auto-evicts.
-    - ``uat``: Set 111 S4 — how a ``requiresUAT`` session discharged its
-      guided-look walk. A mapping with ``status`` (one of
-      :data:`UAT_STATUSES`) and a non-empty ``attestation`` recording what
-      the operator said; ``walkArtifact`` names the walk file and is
-      required when ``status == "walked"``. Omit-null: absent on sets that
-      declare no UAT, so older readers never see an unexpected key. The
-      ``uat_walk_recorded`` close gate reads it — a ``requiresUAT``
-      session with no block does not close.
+    - ``uat``: Set 113 S1 — the UAT **accounting**, per component. A
+      mapping with a non-empty ``attestation`` (what the operator said
+      about the accounting as a whole) and ``components``, a list of
+      per-component records carrying facts only: ``component``,
+      ``method`` (one of :data:`UAT_METHODS`), ``reviewers``
+      (``[{"type": ..., "count": N}]``, distinct humans), and the optional
+      ``evidence`` / ``findings`` / ``attestation``. The component key set
+      is closed, which is what keeps a self-assessed confidence score out
+      of a record that is meant to carry facts.
+
+      **Replaces Set 111 S4's binary** ``status: walked | waived``, which
+      the operator retired on 2026-08-10: a session touching five
+      components may legitimately have five different answers, and a
+      single flag could express none of them. A block still carrying
+      ``status`` is refused with a message naming the replacement.
+
+      Omit-null: absent on sets that declare no UAT, so older readers
+      never see an unexpected key. The ``uat_walk_recorded`` close gate
+      reads it against the spec's ``uatComponents`` inventory — a
+      ``requiresUAT`` session that omits a declared component does not
+      close, which is what stops omission becoming the new evaporation.
     - ``checklist``: Set 114 S1 — the operator-attested waiver for a
       step-checklist post that was missed. A mapping with
       ``status: "waived"`` and a non-empty ``attestation``. A missed
@@ -592,6 +680,209 @@ def _validate_cost(cost: object) -> List[str]:
     return errors
 
 
+def _validate_uat_reviewers(value, where: str) -> List[str]:
+    """Validate one component record's ``reviewers`` list.
+
+    A reviewer entry is ``{"type": ..., "count": N}`` and ``count`` counts
+    **distinct humans**, never sittings. The operator drew that line
+    themselves -- "several independent reviewers is a different claim from
+    one reviewer looking several times" -- and the only reason the count is
+    recorded at all is that the two are not worth the same.
+    """
+    errors: List[str] = []
+    if not isinstance(value, list) or not value:
+        errors.append(
+            f"{where}.reviewers must be a non-empty list for a performed "
+            f"method -- a review nobody performed is method 'none'"
+        )
+        return errors
+    for index, entry in enumerate(value):
+        at = f"{where}.reviewers[{index}]"
+        if not isinstance(entry, dict):
+            errors.append(
+                f"{at} must be a mapping with 'type' and 'count' "
+                f"(got {type(entry).__name__})"
+            )
+            continue
+        unknown = sorted(set(entry) - {"type", "count"})
+        if unknown:
+            errors.append(
+                f"{at} has unknown key(s) {unknown}; a reviewer entry is "
+                f"'type' and 'count' only"
+            )
+        rtype = entry.get("type")
+        if rtype not in UAT_REVIEWER_TYPES:
+            allowed = ", ".join(UAT_REVIEWER_TYPES)
+            errors.append(
+                f"{at}.type must be one of: {allowed} (got {rtype!r}). "
+                f"The vocabulary is closed on purpose: an AI reviewer is "
+                f"not a human reviewer, and there is no spelling of one "
+                f"that this field accepts"
+            )
+        count = entry.get("count")
+        # bool is an int subclass, so `True` would otherwise sail through
+        # as a count of 1.
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            errors.append(
+                f"{at}.count must be an integer >= 1 -- the number of "
+                f"DISTINCT humans, not the number of sittings "
+                f"(got {count!r})"
+            )
+    return errors
+
+
+def _validate_uat_component(entry, index: int) -> List[str]:
+    """Validate one entry of ``uat.components``."""
+    where = f"uat.components[{index}]"
+    if not isinstance(entry, dict):
+        return [f"{where} must be a mapping (got {type(entry).__name__})"]
+
+    errors: List[str] = []
+
+    unknown = sorted(set(entry) - UAT_COMPONENT_KEYS)
+    if unknown:
+        errors.append(
+            f"{where} has unknown key(s) {unknown}; the record carries "
+            f"facts only ({', '.join(sorted(UAT_COMPONENT_KEYS))}). Scores, "
+            f"ratings and debt levels were deliberately excluded -- risk is "
+            f"what these facts imply, not a number someone types"
+        )
+
+    component = entry.get("component")
+    if not isinstance(component, str) or component.strip() == "":
+        errors.append(
+            f"{where}.component must be a non-empty string naming a "
+            f"component from the spec's uatComponents inventory"
+        )
+
+    method = entry.get("method")
+    if method not in UAT_METHODS:
+        allowed = ", ".join(UAT_METHODS)
+        errors.append(
+            f"{where}.method must be one of: {allowed} (got {method!r})"
+        )
+        return errors
+
+    attestation = entry.get("attestation")
+    has_attestation = (
+        isinstance(attestation, str) and attestation.strip() != ""
+    )
+    if method in UAT_METHODS_ABSTAINED:
+        # The passing-none path, and the only place this record demands
+        # prose. "No UAT" is a legitimate, passing answer -- the operator
+        # ruled exactly that -- but it has to be an answer somebody GAVE.
+        # Requiring the reason here is what stops it decaying back into an
+        # absence with a default value standing in front of it.
+        if not has_attestation:
+            errors.append(
+                f"{where}.attestation must say why method {method!r} was "
+                f"the right answer for this component. {method!r} is a "
+                f"valid, passing record -- but only as something a human "
+                f"said, never as a default nobody chose"
+            )
+        # Presence-and-type aware, deliberately NOT truthiness. The
+        # schema's `reviewers` is an array whose abstained form is
+        # `maxItems: 0`, so omitted and `[]` are the only shapes it
+        # accepts -- and `null`, which a nullable-field serializer emits
+        # and a truthiness test waves through, is not one of them.
+        if "reviewers" in entry:
+            reviewers = entry["reviewers"]
+            if not isinstance(reviewers, list):
+                errors.append(
+                    f"{where}.reviewers must be omitted or [] for method "
+                    f"{method!r} (got {reviewers!r}). disposition.schema.json "
+                    f"requires an array, so this shape would pass here and "
+                    f"fail there"
+                )
+            elif reviewers:
+                errors.append(
+                    f"{where} records method {method!r} but lists "
+                    f"reviewers; a component nobody reviewed has no "
+                    f"reviewers"
+                )
+    else:
+        errors.extend(_validate_uat_reviewers(entry.get("reviewers"), where))
+
+    for key in ("evidence", "findings"):
+        value = entry.get(key)
+        if value is not None and not _is_str_list(value):
+            errors.append(f"{where}.{key} must be a list of strings")
+
+    return errors
+
+
+def _validate_uat_block(uat) -> List[str]:
+    """Validate the shape of ``disposition.uat``.
+
+    Coverage against the spec's declared inventory is deliberately NOT
+    checked here -- this module never reads ``spec.md``. That check belongs
+    to the close gate, and it is the load-bearing half: a validator that
+    only inspects the records that are present would let an omitted
+    component become the new form of evaporation.
+    """
+    if not isinstance(uat, dict):
+        return [f"uat must be a mapping or null (got {type(uat).__name__})"]
+
+    errors: List[str] = []
+
+    unknown = sorted(set(uat) - UAT_BLOCK_KEYS - {"status"})
+    if unknown:
+        errors.append(
+            f"uat has unknown key(s) {unknown}; the block is "
+            f"{', '.join(sorted(UAT_BLOCK_KEYS))} only. "
+            f"disposition.schema.json closes this object too, so a key "
+            f"accepted here and rejected there would leave two validators "
+            f"disagreeing about one file. Set 111's walkArtifact belongs "
+            f"in a component's evidence list now"
+        )
+
+    if "status" in uat:
+        # Set 111 S4's binary, named explicitly so a stranded reader is not
+        # left guessing why a shape that worked last month does not now.
+        errors.append(
+            "uat.status was removed in Set 113 S1 -- the binary "
+            "'walked | waived' could not express what the operator asked "
+            "for (per-component records of what UAT was done, by which "
+            "kind of reviewer, and how many). Replace it with "
+            "uat.components[]; see docs/disposition-schema.md"
+        )
+
+    attestation = uat.get("attestation")
+    if not isinstance(attestation, str) or attestation.strip() == "":
+        errors.append(
+            "uat.attestation must be a non-empty string -- the accounting "
+            "is only auditable if it records what the operator actually "
+            "said about it"
+        )
+
+    components = uat.get("components")
+    if not isinstance(components, list):
+        errors.append(
+            "uat.components must be a list (use [] when the set declares "
+            "an empty uatComponents inventory)"
+        )
+        return errors
+
+    seen: dict = {}
+    for index, entry in enumerate(components):
+        errors.extend(_validate_uat_component(entry, index))
+        if isinstance(entry, dict):
+            name = entry.get("component")
+            if isinstance(name, str) and name.strip():
+                key = name.strip()
+                if key in seen:
+                    errors.append(
+                        f"uat.components[{index}] repeats component "
+                        f"{key!r}, already recorded at index {seen[key]}; "
+                        f"one component gets one record, so that two "
+                        f"different answers can never both be true"
+                    )
+                else:
+                    seen[key] = index
+
+    return errors
+
+
 def validate_disposition(
     disposition: object,
     is_final_session: bool = False,
@@ -782,40 +1073,15 @@ def validate_disposition(
     if lessons_cited is not None and not _is_str_list(lessons_cited):
         errors.append("lessons_cited must be a list of strings")
 
-    # Set 111 S4: the UAT discharge block. Shape-only here — WHETHER a
-    # block is required is the spec's `requiresUAT` question, answered by
-    # the `uat_walk_recorded` close gate, which owns the set-level policy.
-    # This validator only refuses a block that is present but incoherent,
-    # because a malformed block that silently parsed as "no UAT declared"
-    # would turn a typo into a bypass of the gate.
+    # Set 113 S1: the UAT record. Shape-only here — WHETHER a record is
+    # required, and whether it COVERS the declared inventory, is the spec's
+    # question, answered by the `uat_walk_recorded` close gate, which owns
+    # the set-level policy. This validator only refuses a block that is
+    # present but incoherent, because a malformed block that silently
+    # parsed as "no UAT declared" would turn a typo into a bypass.
     uat = data.get("uat")
     if uat is not None:
-        if not isinstance(uat, dict):
-            errors.append(
-                f"uat must be a mapping or null (got {type(uat).__name__})"
-            )
-        else:
-            uat_status = uat.get("status")
-            if uat_status not in UAT_STATUSES:
-                allowed = ", ".join(UAT_STATUSES)
-                errors.append(
-                    f"uat.status must be one of: {allowed} "
-                    f"(got {uat_status!r})"
-                )
-            attestation = uat.get("attestation")
-            if not isinstance(attestation, str) or attestation.strip() == "":
-                errors.append(
-                    "uat.attestation must be a non-empty string — a walk "
-                    "or a waiver is only auditable if it records what the "
-                    "operator actually said"
-                )
-            if uat_status == UAT_STATUS_WALKED:
-                artifact = uat.get("walkArtifact")
-                if not isinstance(artifact, str) or artifact.strip() == "":
-                    errors.append(
-                        "uat.walkArtifact must name the walk file when "
-                        "uat.status == 'walked'"
-                    )
+        errors.extend(_validate_uat_block(uat))
 
     # Set 114 S1: the checklist-post waiver. Shape-only, for the same
     # reason as the UAT block above — a malformed block that silently

@@ -570,7 +570,11 @@ returns the corresponding exit code without touching downstream state.
      The run belongs at **Step 8**, after remediation — see
      `docs/session-constitution.md`.
    - `check_uat_walk_recorded` (**gate**) — a `requiresUAT` session
-     closes with its recorded walk or an operator-attested waiver.
+     closes with a per-component UAT **accounting** covering every
+     component its spec declares in `uatComponents` (Set 113 S1,
+     replacing Set 111 S4's binary `walked | waived`). Method `none`
+     with an attestation passes; an omitted component does not, and an
+     armed set that declares no inventory at all is refused.
    - `check_checklist_posted` (**advisory**) — the step checklist was
      posted at each transition the session's own records show.
    - `check_verification_method_vocabulary` (**advisory**) /

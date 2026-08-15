@@ -1833,8 +1833,10 @@ def check_test_run_fresh(
     return False, "; ".join(f"{v.suite}: {v.reason}" for v in failures)
 
 
-def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
-    """Return ``(requires_uat, uat_scope)`` from the set's spec.
+def _uat_policy(
+    session_set_dir: str,
+) -> Tuple[bool, str, Optional[Tuple[str, ...]]]:
+    """Return ``(requires_uat, uat_scope, uat_components)`` from the spec.
 
     A spec that cannot be parsed reports ``(False, "none")`` — the gate
     is a universal-core addition and must stay inert for every set that
@@ -1850,6 +1852,12 @@ def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
     impossible, so anything other than a recognised scope now resolves to
     ``per-set``: the final session owes the walk. Disarming is done where
     it is visible, by ``requiresUAT: false`` or ``"suggested"``.
+
+    Set 113 S1 adds the third element: the declared ``uatComponents``
+    inventory, or ``None`` when the spec never declared one. The
+    omitted-versus-empty distinction is passed through untouched, because
+    the gate treats them oppositely -- an explicitly empty inventory is a
+    valid answer and an absent one is an unanswered question.
     """
     try:
         try:
@@ -1876,17 +1884,50 @@ def _uat_policy(session_set_dir: str) -> Tuple[bool, str]:
         # UAT policy. Re-raise so the caller's boundary refusal fires.
         raise
     except Exception:
-        return False, "none"
+        return False, "none", None
     # Only a literal `true` arms the gate. "suggested" is deliberately
     # NOT armed: Set 048 S2 defined it as advisory, and turning an
     # advisory flag into a hard close gate would be a policy change this
     # session was not asked to make.
     if cfg.requires_uat is not True:
-        return False, "none"
+        return False, "none", None
     scope = (cfg.uat_scope or "").strip().lower()
     if scope not in ("per-set", "per-session"):
         scope = "per-set"
-    return True, scope
+    return True, scope, cfg.uat_components
+
+
+# An evidence entry is treated as a repo file reference -- and therefore
+# checked for existence -- only when it looks unambiguously like a path:
+# no URL scheme, no whitespace, and either a directory separator or a
+# suffix. Everything else is free text and is left alone.
+#
+# The point of the check is the one Set 111 S4 bought with `walkArtifact`:
+# a record naming a walk file that does not exist is a FALSE record, and a
+# false record is worse than a missing one because it reads as evidence.
+# The point of the narrowness is that evidence is no longer only local
+# files -- the operator's standing convention is that sub-minute videos are
+# uploaded by hand to SharePoint or a Teams channel, so "Team X > Recordings
+# > walkthrough-0.51.0.mp4" and "https://..." are both perfectly good
+# evidence that this gate must not go looking for on disk.
+_EVIDENCE_URL_RE = re.compile(r"^[a-zA-Z][a-zA-Z0-9+.-]*://")
+
+
+def _evidence_is_local_path(entry: str) -> bool:
+    if _EVIDENCE_URL_RE.match(entry):
+        return False
+    if any(ch.isspace() for ch in entry):
+        return False
+    return "/" in entry or "\\" in entry or "." in os.path.basename(entry)
+
+
+def _missing_evidence(session_set_dir: str, entry: str) -> bool:
+    """True when a path-shaped evidence entry names nothing on disk."""
+    candidates = [os.path.join(session_set_dir, entry), entry]
+    repo_root = _repo_root_for(session_set_dir)
+    if repo_root:
+        candidates.append(os.path.join(repo_root, entry))
+    return not any(os.path.exists(c) for c in candidates)
 
 
 def check_uat_walk_recorded(
@@ -1895,34 +1936,56 @@ def check_uat_walk_recorded(
     *,
     allow_empty_commit: bool = False,
 ) -> GateOutcome:
-    """A ``requiresUAT`` session closes with its walk, or an attested waiver.
+    """A ``requiresUAT`` session closes with a per-component UAT accounting.
 
-    Set 110 S2 closed without its UAT walk — part of a long pattern the
+    Set 110 S2 closed without its UAT walk -- part of a long pattern the
     operator named directly: *"We often bypass UAT. I haven't complained
     because it totally sucks, but we shouldn't bypass it."* The failure
-    mode is not a decision to skip; it is **evaporation**, the walk simply
-    not happening and nothing noticing. This gate makes skipping a visible,
-    recorded operator decision instead.
+    mode was never a decision to skip; it was **evaporation**, the walk
+    simply not happening and nothing noticing. Set 111 S4 closed that with
+    a binary ``walked | waived``.
+
+    **Set 113 S1 replaces the binary with an accounting.** The operator
+    retired it on 2026-08-10: a flag that can always be bypassed -- and
+    always should be, to prevent impasses -- is not a requirement, and
+    "did UAT happen" is the wrong question. The right one is what each
+    component got and from whom, because a session touching five
+    components may legitimately have five different answers. So this gate
+    no longer demands a walk. It demands that every component the spec
+    declared in scope carries a record, and **"no UAT" is a valid,
+    attested, passing answer**. Nothing blocks on how much UAT was done.
+
+    The load-bearing detail is WHERE the inventory comes from. Consult
+    round 3 named it precisely: a gate that merely validates whatever
+    records exist makes *an omitted component the new form of
+    evaporation*, because the disposition would then declare both the
+    question and the answer and could never disagree with itself. So the
+    inventory is read from the **spec**, which is authored before the
+    session runs and is not the closing session's to edit quietly.
 
     Policy, read from the spec's configuration block:
 
-    * ``requiresUAT`` is not literally ``true`` → inert.
-    * ``uatScope: per-set`` → only the **final** session owes a walk.
-    * ``uatScope: per-session`` → every session owes one.
-    * anything else — omitted, ``none``, or a typo — → ``per-set``.
-      Scope chooses WHICH sessions owe a walk; it never cancels the
-      requirement. Disarming is done visibly, with ``requiresUAT: false``
-      or ``"suggested"``.
+    * ``requiresUAT`` is not literally ``true`` -> inert.
+    * ``uatScope: per-set`` -> only the **final** session owes the
+      accounting; ``per-session`` -> every session owes one.
+    * anything else -- omitted, ``none``, or a typo -- -> ``per-set``.
+      Scope chooses WHICH sessions owe an accounting; it never cancels the
+      requirement.
+    * ``uatComponents`` absent -> refused, with the fix in the message. An
+      armed set that never declared an inventory has not been asked the
+      question this gate exists to ask, and defaulting to "nothing is in
+      scope" would disarm the gate exactly where the author was least
+      deliberate. ``uatComponents: []`` is how an author says, on purpose,
+      that nothing here has a human-observable surface -- the operator's
+      own "no UI component at all -> zero marginal confidence" row.
 
-    A session that owes a walk passes only with a ``uat`` block whose
-    ``status`` is ``walked`` (and whose ``walkArtifact`` exists on disk)
-    or ``waived`` (with a non-empty attestation). Shape errors are the
-    disposition validator's job; this gate reports the policy failure and
-    the on-disk artifact check the validator cannot do.
+    Shape errors are the disposition validator's job. This gate reports
+    the policy failure, the inventory coverage, and the on-disk evidence
+    check the validator cannot do.
     """
     _ = allow_empty_commit
 
-    requires_uat, scope = _uat_policy(session_set_dir)
+    requires_uat, scope, inventory = _uat_policy(session_set_dir)
     if not requires_uat or scope == "none":
         return True, ""
 
@@ -1940,6 +2003,17 @@ def check_uat_walk_recorded(
     if scope == "per-set" and not is_final:
         return True, ""
 
+    if inventory is None:
+        return (
+            False,
+            "this set declares requiresUAT: true but its spec declares no "
+            "uatComponents inventory, so there is nothing to account "
+            "against and an omitted component could not be detected. Add "
+            "uatComponents to the Session Set Configuration block in "
+            "spec.md -- a list of the in-scope components, or an explicit "
+            "[] if this set has no human-observable surface at all.",
+        )
+
     if disposition is None:
         return True, ""
 
@@ -1948,56 +2022,89 @@ def check_uat_walk_recorded(
         return (
             False,
             f"this set declares requiresUAT: true (uatScope: {scope}) and "
-            f"session {current} owes its guided-look walk, but "
-            f"disposition.uat is absent. Record the walk "
-            f"(status 'walked' + walkArtifact + attestation) or an "
-            f"operator-attested waiver (status 'waived' + attestation). "
-            f"A walk must never evaporate silently.",
+            f"session {current} owes its UAT accounting, but "
+            f"disposition.uat is absent. Record one entry per declared "
+            f"component ({len(inventory)} declared) saying what was done "
+            f"and by whom; method 'none' with an attestation is a valid, "
+            f"passing answer. An accounting must never evaporate silently.",
         )
 
-    status = uat.get("status")
     attestation = uat.get("attestation")
     if not isinstance(attestation, str) or attestation.strip() == "":
         return (
             False,
             "disposition.uat.attestation must record what the operator "
-            "actually said; an unattested walk or waiver is not auditable",
+            "actually said about the accounting; an unattested record is "
+            "not auditable",
         )
 
-    if status == "waived":
-        return True, ""
-
-    if status != "walked":
+    components = uat.get("components")
+    if not isinstance(components, list):
         return (
             False,
-            f"disposition.uat.status must be 'walked' or 'waived' "
-            f"(got {status!r})",
+            "disposition.uat.components must be a list of per-component "
+            "records (use [] only when the spec declares uatComponents: []). "
+            "Set 111 S4's status: 'walked' | 'waived' was replaced in Set "
+            "113 S1; see docs/disposition-schema.md",
         )
 
-    artifact = uat.get("walkArtifact")
-    if not isinstance(artifact, str) or artifact.strip() == "":
+    recorded: List[str] = []
+    for entry in components:
+        if isinstance(entry, dict):
+            name = entry.get("component")
+            if isinstance(name, str) and name.strip():
+                recorded.append(name.strip())
+
+    declared = [c.strip() for c in inventory if c and c.strip()]
+    missing = [c for c in declared if c not in recorded]
+    if missing:
         return (
             False,
-            "disposition.uat.walkArtifact must name the walk file when "
-            "uat.status == 'walked'",
+            f"the spec declares {len(declared)} in-scope UAT component(s) "
+            f"and disposition.uat.components has no record for: "
+            f"{', '.join(repr(m) for m in missing)}. Every declared "
+            f"component needs an answer -- method 'none' or "
+            f"'not-applicable' with an attestation both PASS. An omitted "
+            f"component is the one thing this gate refuses, because "
+            f"silence is how UAT evaporated in the first place.",
         )
-    # Resolve relative to the session-set dir first (the normal case),
-    # then as a repo-relative or absolute path, so a walk stored outside
-    # the set folder still validates.
-    candidates = [
-        os.path.join(session_set_dir, artifact),
-        artifact,
-    ]
-    repo_root = _repo_root_for(session_set_dir)
-    if repo_root:
-        candidates.append(os.path.join(repo_root, artifact))
-    if not any(os.path.isfile(c) for c in candidates):
+
+    extra = [c for c in recorded if c not in declared]
+    if extra:
         return (
             False,
-            f"disposition.uat.walkArtifact {artifact!r} does not exist; "
-            f"a recorded walk must point at the walk that was actually "
-            f"presented",
+            f"disposition.uat.components records component(s) the spec "
+            f"never declared: {', '.join(repr(e) for e in extra)}. Either "
+            f"fix the spelling or add them to uatComponents in spec.md -- "
+            f"an unmatched record usually means a typo, and a typo here "
+            f"would leave a real component silently unaccounted for.",
         )
+
+    dangling: List[str] = []
+    for entry in components:
+        if not isinstance(entry, dict):
+            continue
+        evidence = entry.get("evidence")
+        if not isinstance(evidence, list):
+            continue
+        for item in evidence:
+            if not isinstance(item, str) or not item.strip():
+                continue
+            item = item.strip()
+            if not _evidence_is_local_path(item):
+                continue
+            if _missing_evidence(session_set_dir, item):
+                dangling.append(f"{entry.get('component')!r}: {item}")
+    if dangling:
+        return (
+            False,
+            f"UAT evidence names files that do not exist: "
+            f"{'; '.join(dangling)}. A record pointing at a missing "
+            f"artifact reads as evidence and is not -- which is worse than "
+            f"recording no evidence at all. (URLs and free-text locations "
+            f"such as a SharePoint or Teams path are not checked.)",
+        )
+
     return True, ""
 
 

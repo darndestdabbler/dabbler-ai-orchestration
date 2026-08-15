@@ -1,9 +1,12 @@
 """Tests for the Set 111 S4 close gates.
 
 * :func:`gate_checks.check_uat_walk_recorded` — inert without
-  ``requiresUAT``, scope-aware, refuses a missing block, accepts a walk
-  with an existing artifact, accepts an attested waiver, refuses a walk
-  whose artifact does not exist.
+  ``requiresUAT``, and scope-aware: which sessions owe an accounting, and
+  the arming behaviour of an omitted / bogus ``uatScope``. **Set 113 S1
+  replaced the binary record these tests used to assert**, so the
+  record-shape and inventory-coverage cases live in
+  ``test_set113_uat_accounting.py``; what stays here is the policy layer
+  Set 111 shipped, re-expressed against the new record.
 * :func:`gate_checks.check_test_run_fresh` — inert when no expensive
   surface was touched, refuses the Set 110 S3 stale-run pattern.
 """
@@ -44,14 +47,36 @@ SPEC_UAT = """# Spec
 tier: full
 requiresUAT: {uat}
 requiresE2E: false
-{scope_line}```
+{scope_line}{components_line}```
 """
 
 
-def _spec_text(uat: str, scope: Optional[str]) -> str:
-    """Render the config block; ``scope=None`` OMITS ``uatScope`` entirely."""
+def _spec_text(
+    uat: str,
+    scope: Optional[str],
+    components: Optional[list] = None,
+) -> str:
+    """Render the config block.
+
+    ``scope=None`` OMITS ``uatScope`` entirely; ``components=None`` omits
+    ``uatComponents`` entirely, which Set 113 S1 made a refusal in its own
+    right. The default here is a one-component inventory so the policy
+    tests below exercise the policy and not the inventory.
+    """
     scope_line = "" if scope is None else f"uatScope: {scope}\n"
-    return SPEC_UAT.format(uat=uat, scope_line=scope_line)
+    if components is None:
+        components_line = ""
+    elif not components:
+        components_line = "uatComponents: []\n"
+    else:
+        items = "".join(f"  - {c}\n" for c in components)
+        components_line = f"uatComponents:\n{items}"
+    return SPEC_UAT.format(
+        uat=uat, scope_line=scope_line, components_line=components_line
+    )
+
+
+_DEFAULT_COMPONENTS = ["Work Explorer"]
 
 
 def _make_set(
@@ -61,6 +86,7 @@ def _make_set(
     scope: Optional[str] = "per-set",
     current: int = 2,
     total: int = 2,
+    components: Optional[list] = _DEFAULT_COMPONENTS,
 ) -> Path:
     root.mkdir(parents=True, exist_ok=True)
     _git(root, "init", "-b", "main")
@@ -73,7 +99,7 @@ def _make_set(
     set_dir = root / "docs" / "session-sets" / "111-fixture"
     set_dir.mkdir(parents=True, exist_ok=True)
     (set_dir / "spec.md").write_text(
-        _spec_text(uat, scope), encoding="utf-8"
+        _spec_text(uat, scope, components), encoding="utf-8"
     )
     register_session_start(
         session_set=str(set_dir),
@@ -88,6 +114,29 @@ def _make_set(
         json.dumps({"entries": []}), encoding="utf-8"
     )
     return set_dir
+
+
+def _accounting(
+    component: str = "Work Explorer",
+    method: str = "none",
+    attestation: str = "no reviewer was available this session",
+) -> dict:
+    """A minimal PASSING accounting for the default one-item inventory.
+
+    Method ``none`` on purpose: the passing-none path is the one the
+    operator's ruling turns on, so the helper every other test leans on
+    should be the one most likely to regress unnoticed.
+    """
+    return {
+        "attestation": "operator reviewed the accounting 2026-08-15",
+        "components": [
+            {
+                "component": component,
+                "method": method,
+                "attestation": attestation,
+            }
+        ],
+    }
 
 
 def _disp(uat=None, files_changed=None) -> Disposition:
@@ -152,19 +201,13 @@ class TestUatWalkGate:
         passed, _ = gate_checks.check_uat_walk_recorded(str(set_dir), _disp())
         assert not passed
 
-    def test_an_omitted_scope_still_lets_a_recorded_walk_pass(self, tmp_path):
+    def test_an_omitted_scope_still_lets_a_recorded_accounting_pass(
+        self, tmp_path
+    ):
         """Arming by default must not make the gate unsatisfiable."""
         set_dir = _make_set(tmp_path / "r", scope=None)
-        (set_dir / "walk.md").write_text("# walk\n", encoding="utf-8")
         passed, remediation = gate_checks.check_uat_walk_recorded(
-            str(set_dir),
-            _disp(
-                uat={
-                    "status": "walked",
-                    "walkArtifact": "walk.md",
-                    "attestation": "operator walked it",
-                }
-            ),
+            str(set_dir), _disp(uat=_accounting())
         )
         assert passed, remediation
 
@@ -192,68 +235,43 @@ class TestUatWalkGate:
         )
         assert not passed
 
-    def test_a_walk_with_an_existing_artifact_passes(self, tmp_path):
+    def test_an_accounting_covering_the_inventory_passes(self, tmp_path):
         set_dir = _make_set(tmp_path / "r")
-        (set_dir / "s2-uat-walk.md").write_text("# walk\n", encoding="utf-8")
         passed, remediation = gate_checks.check_uat_walk_recorded(
-            str(set_dir),
-            _disp(
-                uat={
-                    "status": "walked",
-                    "walkArtifact": "s2-uat-walk.md",
-                    "attestation": "operator walked it 2026-08-07",
-                }
-            ),
+            str(set_dir), _disp(uat=_accounting())
         )
         assert passed, remediation
 
-    def test_a_walk_naming_a_missing_artifact_fails(self, tmp_path):
-        """A recorded walk must point at the walk actually presented."""
+    def test_an_accounting_without_an_attestation_fails(self, tmp_path):
+        """An unattested accounting is exactly the silent evaporation this
+        gate exists to prevent."""
         set_dir = _make_set(tmp_path / "r")
+        record = _accounting()
+        record["attestation"] = "  "
         passed, remediation = gate_checks.check_uat_walk_recorded(
-            str(set_dir),
-            _disp(
-                uat={
-                    "status": "walked",
-                    "walkArtifact": "s2-uat-walk.md",
-                    "attestation": "operator walked it",
-                }
-            ),
+            str(set_dir), _disp(uat=record)
         )
         assert not passed
-        assert "does not exist" in remediation
+        assert "attestation" in remediation
 
-    def test_an_attested_waiver_passes(self, tmp_path):
+    def test_the_retired_binary_no_longer_satisfies_the_gate(self, tmp_path):
+        """Set 111 S4's `status: waived` + attestation used to pass here.
+
+        It must not still pass, or the replacement would be optional and
+        every set could keep closing on the binary the operator retired.
+        """
         set_dir = _make_set(tmp_path / "r")
         passed, remediation = gate_checks.check_uat_walk_recorded(
             str(set_dir),
             _disp(
                 uat={
                     "status": "waived",
-                    "attestation": "operator declined: no UI surface shipped",
+                    "attestation": "operator declined: no UI surface",
                 }
             ),
         )
-        assert passed, remediation
-
-    def test_a_waiver_without_an_attestation_fails(self, tmp_path):
-        """An unattested waiver is exactly the silent evaporation this
-        gate exists to prevent."""
-        set_dir = _make_set(tmp_path / "r")
-        passed, remediation = gate_checks.check_uat_walk_recorded(
-            str(set_dir), _disp(uat={"status": "waived", "attestation": "  "})
-        )
         assert not passed
-        assert "attestation" in remediation
-
-    def test_an_unknown_status_fails(self, tmp_path):
-        set_dir = _make_set(tmp_path / "r")
-        passed, remediation = gate_checks.check_uat_walk_recorded(
-            str(set_dir),
-            _disp(uat={"status": "sort-of", "attestation": "hmm"}),
-        )
-        assert not passed
-        assert "'walked' or 'waived'" in remediation
+        assert "components" in remediation
 
     def test_an_empty_uat_block_is_treated_as_absent(self, tmp_path):
         set_dir = _make_set(tmp_path / "r")

@@ -582,7 +582,18 @@ def test_changelog_round_trip_flags_a_planted_reorder(tmp_path: Path):
     # exactly as the sibling battery in `test_changelog_partition.py`
     # does. (Both sites now carry this; folding the two copies into one
     # shared helper is a recorded follow-on.)
-    if not cl.load_fragments(target, str(root)):
+    # Set 113 S1 (L-069-1 / G-008): the guard asked "is the corpus EMPTY",
+    # but the plant below needs TWO recorded fragments to swap. Those
+    # differ in exactly one state -- a single fragment, which is what the
+    # corpus holds between the first contribution after a fold and the
+    # second -- so this failed on a correctly working repo the first time
+    # anyone contributed post-release. Set 133 S1 fixed the zero case and
+    # left the one case. Count the RECORDED fragments: an unrecorded
+    # contribution above the baseline cannot be planted into.
+    _recorded = {
+        e["file"] for e in (cl.load_baseline(target, str(root)) or {}).get("fragments") or []
+    }
+    if len([f for f in cl.load_fragments(target, str(root)) if f.filename in _recorded]) < 2:
         parts = cl.split_document(cl.read_text(str(dst)))
         _, sections = cl.split_blocks(parts.released, 2)
         assert len(sections) >= 2, "released history should carry version sections"

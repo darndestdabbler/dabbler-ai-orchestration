@@ -417,6 +417,9 @@ requiresUAT: false       # true | false | "suggested" — human UAT review requi
 requiresE2E: false       # true | false | "suggested" — E2E test coverage required before notifying
 uatStyle: ad-hoc         # dsl | ad-hoc (only meaningful when requiresUAT: true; default ad-hoc)
 uatScope: per-session    # per-session | per-set | none (only meaningful when requiresUAT: true)
+uatComponents:           # REQUIRED when requiresUAT: true (Set 113 S1). The
+  - Work Explorer tree   # in-scope components the close gate accounts against.
+  - Static index         # Use `uatComponents: []` when nothing is observable.
 pathAwareCritique: none  # optional (Set 066); none | advisory | required (default none). Seeds the once-at-set-start choice.
 kind: plan               # optional (Set 098); plan | decomposition — scaffolder-emitted module-lifecycle identity. Hand-authored work sets omit it.
 prerequisites:           # optional; sets that must complete before this one is workable
@@ -1501,39 +1504,126 @@ Playwright suite uses, and opens the Dabbler view by itself. It is a
 **walk, not a test**: no assertions, no exit-code verdict. The operator's
 judgment is the verdict.
 
-### No silent bypass
+### The UAT accounting (Set 113 S1)
 
-A `requiresUAT: true` session closes only with its walk recorded, or with
-an operator-attested waiver. The `uat_walk_recorded` close gate reads
-`disposition.uat`:
+**The gate no longer demands a walk. It demands an accounting.**
+
+Set 111 S4 shipped a binary `disposition.uat.status` of
+`walked | waived`. The operator retired it on 2026-08-10:
+
+> `requiresUAT` is not really a requirement if it can be bypassed — and
+> it always can be, and always should be, to prevent impasses.
+
+The honest question is not *did UAT happen* but **how much additional
+confidence did the UAT work buy** — a continuous quantity that varies by
+reviewer type, reviewer count, and, critically, **per component**. Their
+worked example: one developer watches walkthroughs of the low-risk
+components, where AI is less likely to have cheated its way to a
+solution, and performs manual walkthroughs of the higher-risk ones. That
+is a rational allocation of a scarce reviewer, and a single flag could
+express none of it.
+
+So the record carries **facts, per component** — and *"nobody looked at
+this"* is a valid, attested, **passing** answer.
+
+#### Declare the inventory in the spec
+
+A `requiresUAT: true` set declares what is in scope, in its
+configuration block:
+
+```yaml
+requiresUAT: true
+uatScope: per-set
+uatComponents:
+  - Work Explorer tree
+  - Static walkthrough index
+```
+
+**This is the load-bearing half.** A gate that only validated whatever
+records a disposition happened to contain would let the closing session
+declare both the question and the answer — and *an omitted component
+would become the new form of evaporation*. The inventory therefore lives
+in the **spec**, which is authored before the session runs.
+
+- **Omitting `uatComponents` on an armed set is refused.** Defaulting it
+  to "nothing in scope" would disarm the gate exactly where the author
+  was least deliberate.
+- **`uatComponents: []` is a real answer and it passes** — the operator's
+  own *"no UI component at all → zero marginal confidence"* row. Write it
+  when the set genuinely ships no human-observable surface.
+
+#### Record one entry per component
 
 ```json
 "uat": {
-  "status": "walked",
-  "walkArtifact": "s4-uat-walk.md",
-  "attestation": "operator walked it 2026-08-07; called the tree 'pleasurable'"
+  "attestation": "operator reviewed the accounting 2026-08-15",
+  "components": [
+    {
+      "component": "Work Explorer tree",
+      "method": "manual-walkthrough",
+      "reviewers": [{ "type": "developer", "count": 1 }],
+      "evidence": ["s4-uat-walk.md"],
+      "findings": ["chapter markers drift about a second on the last step"]
+    },
+    {
+      "component": "Static walkthrough index",
+      "method": "none",
+      "attestation": "no reviewer available before the release; low risk"
+    }
+  ]
 }
 ```
 
-```json
-"uat": {
-  "status": "waived",
-  "attestation": "operator declined: this set shipped no UI surface"
-}
-```
+`method` is one of — in rising order of what it buys, though nothing in
+the code ranks them, because a rank is a score wearing a different hat:
 
-`walked` requires a `walkArtifact` that **exists on disk** — a recorded
-walk must point at the walk actually presented. `waived` requires only
-the attestation. There is deliberately no third value: "the walk just did
-not happen" is the outcome this gate exists to make impossible. Skipping
-becomes a visible operator decision, not an evaporation.
+| method | what it records |
+| :--- | :--- |
+| `not-applicable` | review would buy nothing here — no human-observable surface, or untouched in this accounting's scope |
+| `none` | review was possible; nobody did it |
+| `watched` | a reviewer watched a walkthrough |
+| `watched-and-partially-repeated` | watched, and repeated some steps themselves |
+| `manual-walkthrough` | drove the whole thing themselves |
+| `systematic-exploration` | systematically explored workflows, typical and edge cases |
 
-Scope follows the config block: `uatScope: per-set` puts the obligation
-on the final session and `per-session` on every session. An omitted,
-`none`, or unrecognised scope resolves to `per-set` rather than
-disarming the gate — scope chooses the sessions, it never cancels the
-requirement. A `requiresUAT: "suggested"` set is advisory and never
-gated, and `requiresUAT: false` is the way to opt out.
+`reviewers` counts **distinct humans**, not sittings — several
+independent reviewers is a different claim from one reviewer looking
+several times, which is the entire reason a count is recorded. The type
+vocabulary is `developer` and `business-user`, and it is **closed**: an
+AI agent is not a human reviewer, and there is no spelling of one this
+field accepts.
+
+`none` and `not-applicable` require their own `attestation` and must list
+no reviewers. That one sentence is the whole obligation of the
+no-UAT path — it keeps "nobody looked" as something a human *said*
+rather than a default nobody chose.
+
+**There is no confidence score and no debt ledger.** The component key
+set is closed (`component`, `method`, `reviewers`, `evidence`,
+`findings`, `attestation`), so a `confidence: 0.8` cannot be slipped in
+beside the facts. Risk is what the facts *imply*.
+
+Path-shaped `evidence` entries are checked for existence on disk — a
+record naming a walk file that is not there reads as evidence and is not,
+which is worse than recording none. URLs and free-text locations (a
+SharePoint library, a Teams channel) are left alone.
+
+#### Scope still chooses the sessions
+
+`uatScope: per-set` puts the obligation on the final session and
+`per-session` on every session. An omitted, `none`, or unrecognised scope
+resolves to `per-set` rather than disarming the gate — scope chooses the
+sessions, it never cancels the requirement. A `requiresUAT: "suggested"`
+set is advisory and never gated, and `requiresUAT: false` is the way to
+opt out.
+
+> **Migrating from the Set 111 shape.** `status: "walked" | "waived"` is
+> refused with a message naming the replacement. A former `walked` becomes
+> a component record with the performed `method` and its reviewers, and
+> the old `walkArtifact` becomes an `evidence` entry; a former `waived`
+> becomes `method: "none"` with the waiver text as that component's
+> `attestation`. Nothing blocks on how much UAT was done — only on
+> whether every declared component got an answer.
 
 ---
 

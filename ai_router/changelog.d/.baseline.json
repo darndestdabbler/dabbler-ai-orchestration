@@ -1,14 +1,19 @@
 {
-  "note": "Folded into the rendered CHANGELOG.md at release time. The pending corpus is empty by design until the next contribution.",
+  "note": "Re-partitioned at the first contribution after a release fold. The folded CHANGELOG.md is the frozen document this corpus round-trips against.",
   "target": "router",
   "rendered": "ai_router/CHANGELOG.md",
-  "partitionedAt": "2026-08-13T12:31:39.015221-04:00",
+  "partitionedAt": "2026-08-15T16:05:28.165186-04:00",
   "fragmentHeadingLevel": 2,
   "partitionSha256": "2682fc4726c877fc0517e3186f9d15bc70c507d309aeb1f051f9796098b8f8af",
-  "partitionPendingSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "originalSha256": "13df896d6cbb04e9b5f9cae4741ef73bcc89c0cad408f0638980ed894dbd672c",
-  "originalBytes": 359983,
-  "fragments": [],
-  "restampedAt": "2026-08-15T09:11:19.988027-04:00",
-  "foldedAt": "2026-08-15T07:26:12.036043-04:00"
+  "partitionPendingSha256": "79191789180d45650738457895ddf10905498bcdb9d46f3b4d98d9d42afb9393",
+  "originalSha256": "0be44d4a9ee634c318e4890982449cfa26b97a4c41eb9bbcc0b7e11bf9e89fd8",
+  "originalBytes": 363867,
+  "fragments": [
+    {
+      "file": "0010-set-113-s1-uat-accounting.md",
+      "sha256": "79191789180d45650738457895ddf10905498bcdb9d46f3b4d98d9d42afb9393",
+      "bytes": 3884
+    }
+  ],
+  "restampedAt": "2026-08-15T09:11:19.988027-04:00"
 }

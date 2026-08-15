@@ -209,8 +209,9 @@ _ACTIONS: Dict[str, str] = {
         "python -m ai_router.session_checklist"
     ),
     "uat_walk_recorded": (
-        "record the UAT walk in disposition.uat, or an operator-attested "
-        "waiver -- a skipped UAT is a visible decision, not an evaporation"
+        "record one disposition.uat.components entry per component the "
+        "spec declares in uatComponents -- method 'none' with an "
+        "attestation passes; an omitted component does not"
     ),
     "verification_method_vocabulary": (
         "set disposition.verification_method to a legal token"

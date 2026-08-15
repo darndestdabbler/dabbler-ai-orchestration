@@ -662,7 +662,90 @@ def add_fragment(
     if os.path.exists(path):
         raise ChangelogError(f"{path} already exists; pick another slug.")
     write_text(path, fragment.text)
+    _rebaseline_after_fold(target, root)
     return fragment
+
+
+def _rebaseline_after_fold(target: ChangelogTarget, root: str) -> bool:
+    """Re-establish a partition point on the first fragment after a fold.
+
+    Set 113 S1. ``fold`` empties ``fragments``, stamps ``foldedAt``, and
+    re-pins ``partitionPendingSha256`` / ``originalSha256`` to the folded
+    document. That state is coherent while the corpus stays empty, and it
+    stops being coherent the moment anyone contributes: ``check`` returns
+    early on an empty recorded corpus, so the new fragment sits entirely
+    outside the round-trip guard, and the corpus matches neither state the
+    baseline can describe -- no recorded fragments, ``foldedAt`` set, and a
+    file on disk. Every planted-violation falsifier over the live corpus
+    then has nothing to examine (L-112-1), which is how the suite reports
+    it.
+
+    A fold is a re-partition: the document it wrote IS the new frozen
+    history, exactly as the pre-partition document was after ``migrate``.
+    So the first contribution after one re-stamps the same three fields
+    ``migrate`` stamps, against that document.
+
+    **Only that transition.** A mid-cycle add is left alone, which is the
+    behaviour every release before this one already had: ``check`` filters
+    the round trip to fragments the baseline RECORDS, so an unrecorded new
+    fragment is ignored by it and the recorded corpus keeps proving what
+    it always proved. Advancing the pins on every add would instead
+    re-stamp ``originalSha256`` from the current file each time, which
+    would silently absorb an edit to released history made just before a
+    contribution -- the guard's whole job. Widening the round trip to
+    cover pending fragments too is a real gap and a real question, but it
+    is a change to what the guard PROVES, so it belongs to the operator
+    and to the set that already has it queued, not to a helper called from
+    ``add``.
+
+    Returns ``True`` when it re-baselined.
+    """
+    baseline = load_baseline(target, root)
+    if baseline is None:
+        # A missing baseline is its own loud failure in `check`, which
+        # names the migrate command. Inventing one here would answer a
+        # question nobody asked and paper over a deleted file.
+        return False
+    if baseline.get("fragments") or not baseline.get("foldedAt"):
+        return False
+
+    fragments = load_fragments(target, root)
+    if not fragments:
+        return False
+
+    rendered = render(target, root, fragments=fragments)
+    baseline.update(
+        {
+            "partitionedAt": datetime.now().astimezone().isoformat(),
+            "partitionPendingSha256": sha256_text(
+                "".join(f.text for f in fragments)
+            ),
+            "originalSha256": sha256_text(rendered),
+            "originalBytes": len(rendered.encode("utf-8")),
+            "fragments": [
+                {
+                    "file": f.filename,
+                    "sha256": f.digest,
+                    "bytes": len(f.text.encode("utf-8")),
+                }
+                for f in fragments
+            ],
+            "note": (
+                "Re-partitioned at the first contribution after a release "
+                "fold. The folded CHANGELOG.md is the frozen document this "
+                "corpus round-trips against."
+            ),
+        }
+    )
+    # The corpus is no longer the post-fold empty one. Leaving the marker
+    # would let a later delete-everything look like a legitimately empty
+    # corpus, which is the state it exists to certify.
+    baseline.pop("foldedAt", None)
+    write_text(
+        target.baseline_path(root),
+        json.dumps(baseline, indent=2, ensure_ascii=False) + "\n",
+    )
+    return True
 
 
 def fold(target: ChangelogTarget, root: str) -> int:

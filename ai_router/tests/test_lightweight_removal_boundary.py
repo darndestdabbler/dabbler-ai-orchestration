@@ -160,9 +160,9 @@ def test_uat_policy_still_inert_for_an_unparseable_spec(tmp_path: Path):
     d = tmp_path / "002-broken"
     d.mkdir()
     (d / "spec.md").write_text("no config block here at all\n", encoding="utf-8")
-    assert gate_checks._uat_policy(str(d)) == (False, "none")
+    assert gate_checks._uat_policy(str(d)) == (False, "none", None)
 
 
 def test_uat_policy_still_arms_a_normal_set(tmp_path: Path):
     d = _make_set(tmp_path, "requiresUAT: true\nuatScope: per-set")
-    assert gate_checks._uat_policy(str(d)) == (True, "per-set")
+    assert gate_checks._uat_policy(str(d)) == (True, "per-set", None)

@@ -67,9 +67,74 @@ the events ledger, not through retained dispositions.
 | `verification_verdict` | string or omitted | recommended |**Should be set on the `api` verification path** to the verifier's pass/fail outcome: `"VERIFIED"`, `"ISSUES_FOUND"`, or `"WAIVED"`. Set to the value returned by `parse_verification_response()` in Step 6 of the workflow. `close_session` reads this via `resolve_close_verdict()` (explicit field wins; api-path fallback derives from `status` for backward compat with pre-Set-054 dispositions; otherwise `null`). Normally omit (not `null`) on manual / skipped / `--no-router` paths — `close_session` records `verificationVerdict: null` in those cases. **Set 086 (S1): the value is no longer persisted "verbatim, anything goes."** When `close_session` writes it into `session-state.json`'s `verificationVerdict`, the sanctioned writer enforces an **exact allowlist** — the three canonical tokens plus the shipped extension token `"ISSUES_FOUND_RESOLVED_IN_FLIGHT"` — and **hard-rejects** a free-form non-verdict (the `"manual-override-development"` confabulation) or a prefix look-alike (`"VERIFIED_NOT_REALLY"`). The disposition-file validator itself still only *warns* on a non-canonical token (it does not block authoring the disposition), but a close that carries a rejected token now fails loud at the state write rather than silently persisting it. See `docs/session-state-schema.md` → `verificationVerdict` for the full writer/reader asymmetry. |
 | `lessons_cited` | list of strings | omit-empty | Set 064 D3 — ids of the guidance lessons that were instrumental this session. Recorded in the `closeout_succeeded` event; run `cite_lessons` in the final commit so the usage signal drives archival. |
 | `verification_qualification` | string or omitted | conditional | Set 123 S2, omit-null. Present **only** when the verdict beside it is real but weaker than the cross-provider standard: `"same-provider"` means every verifier call resolved to the orchestrator's own effective provider, so the verdict is **not independently corroborated**. Written by `verify_session` for a project whose committed verify type is `DIRECT_API` and which holds no usable API key outside its orchestrator's provider — the operator's ruling (2026-08-11) that same-provider verification beats no verification, provided the result is flagged. It is **not a gate** (Set 116's standing rule): the close proceeds, the record just stops a later reader mistaking the weaker claim for the stronger one. The vocabulary is **closed** and fails closed — unlike `verification_verdict`, whose non-canonical tokens are warned-but-accepted, an unrecognized qualification is a validation error, because a token nobody can interpret does this field's only job worse than no token at all. An unqualified round actively **removes** the key, so a stale qualification cannot outlive the verdict it described. The authoritative copy is the paired metrics stamp row, where the close gate enforces a bijection against the verifier's registry-resolved provider. Deliberately **not** mirrored into `session-state.json`: that is the Work Explorer's surface, and operator decision P4 keeps orchestrator/verifier provenance out of it. |
-| `uat` | object or omitted | conditional | Set 111 S4 — how a `requiresUAT` session discharged its guided-look walk. `status` is `"walked"` or `"waived"`, `attestation` records what the operator actually said, and `walkArtifact` names the walk file when `status == "walked"`. The `uat_walk_recorded` close gate reads it; a session that owes a walk and carries no block does not close. Omit-null on sets that declare no UAT. |
+| `uat` | object or omitted | conditional | Set 113 S1 — the UAT **accounting**, per component. See [§`uat` shape](#uat-shape) below. Replaces Set 111 S4's binary `status: "walked" \| "waived"`, which the operator retired on 2026-08-10; a block still carrying `status` is refused with a message naming the replacement. The `uat_walk_recorded` close gate reads it against the spec's `uatComponents` inventory — a declared component with no record does not close, while method `"none"` with an attestation **passes**. Omit-null on sets that declare no UAT. |
 | `checklist` | object or omitted | conditional | Set 114 S1 — the **operator-attested waiver** for a step-checklist post that was missed. `{"status": "waived", "attestation": "..."}`; the attestation must be non-empty. A post window that has closed cannot be re-entered, so this is the only exit from the `checklist_posted` gate short of `--force` (which bypasses every *other* gate too). It never excuses a session that posted **nothing**, and it is omitted entirely by the overwhelming majority of sessions, which simply post on cadence. |
 | `cost` | object or omitted | omit-null | Set 130 S3 — what the session cost, by component, with a per-component status. See [§`cost` shape](#cost-shape) below. Produced by `python -m ai_router.seat_cost --session-set-dir <dir> --cost-block`; [`ai_router/docs/seat-cost.md`](../ai_router/docs/seat-cost.md) is canonical for the three measurements and for the rule this field encodes. Omitted when the session measured nothing — an absent field claims nothing, whereas a zero would claim a measurement. |
+
+### <a id="uat-shape"></a>`uat` shape
+
+**The gate demands an accounting, not a walk.** Set 111 S4 shipped a
+binary `walked | waived`; the operator retired it on 2026-08-10 because a
+flag that can always be bypassed — and always should be, to prevent
+impasses — is not a requirement. The honest question is what **each
+component** got and from whom, since a session touching five components
+may legitimately have five different answers.
+
+```json
+"uat": {
+  "attestation": "operator reviewed the accounting 2026-08-15",
+  "components": [
+    {
+      "component": "Work Explorer tree",
+      "method": "manual-walkthrough",
+      "reviewers": [{ "type": "developer", "count": 1 }],
+      "evidence": ["s4-uat-walk.md"],
+      "findings": ["chapter markers drift about a second on the last step"]
+    },
+    {
+      "component": "Static walkthrough index",
+      "method": "none",
+      "attestation": "no reviewer available before the release; low risk"
+    }
+  ]
+}
+```
+
+| Field | Required | Notes |
+|---|---|---|
+| `attestation` | always | Non-empty. What the operator said about the accounting as a whole. |
+| `components` | always | One record per component the spec declares in `uatComponents`. `[]` only when that inventory is explicitly `[]`. |
+| `components[].component` | always | Must name a component from the spec's inventory. Coverage is the close gate's check; shape is the validator's. |
+| `components[].method` | always | `watched`, `watched-and-partially-repeated`, `manual-walkthrough`, `systematic-exploration`, `none`, `not-applicable`. |
+| `components[].reviewers` | conditional | Required and non-empty for a performed method; forbidden for `none` / `not-applicable`. Each entry is `{"type", "count"}`, `count` being **distinct humans, not sittings**. |
+| `components[].attestation` | conditional | Required for `none` / `not-applicable`: why that was the right answer. |
+| `components[].evidence` | optional | List of strings. Path-shaped entries are checked for existence on disk; URLs and free-text locations (SharePoint, Teams) are not. |
+| `components[].findings` | optional | List of strings — what the review turned up. |
+
+**Two closed vocabularies, both closed on purpose.**
+
+- **Reviewer types** are `developer` and `business-user` only. Consult
+  round 3 refused to reserve an `ai-agent` type — *"it bakes in the
+  category error the operator has already avoided"* — and spec decision 9
+  says agent-driven exploration must never count as a human reviewer. A
+  closed enum is the only form of that rule a schema can enforce.
+- **Component keys** are exactly the six above. An open shape is how
+  `confidence: 0.8` or `debt: "high"` gets in later without anyone
+  deciding to add it, and a self-assessed score is the one thing all
+  three consult rounds and the operator agreed to keep out. Risk is what
+  the facts *imply*, not a number someone types. There is no parallel
+  debt ledger either.
+
+**`none` and `not-applicable` PASS.** Nothing blocks on how much UAT was
+done. The one thing the gate refuses is an in-scope component with **no
+answer at all**, because silence is how UAT evaporated in the first
+place. `none` means review was possible and nobody did it;
+`not-applicable` means review would have bought nothing here.
+
+**Migrating from the Set 111 shape.** A former `walked` becomes a
+component record with the performed method and its reviewers, with the
+old `walkArtifact` moved into `evidence`. A former `waived` becomes
+`method: "none"` with the waiver text as that component's `attestation`.
 
 ### <a id="cost-shape"></a>`cost` shape
 

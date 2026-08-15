@@ -884,6 +884,8 @@ class TestOptionalFieldParityAcrossValidationPaths:
         [
             ("verification_qualification", "invented-token"),
             ("checklist", {"status": "posted", "attestation": ""}),
+            # Set 113 S1: `status` is retired outright, so this is now
+            # bad twice over -- retired key AND missing components.
             ("uat", {"status": "sort-of", "attestation": ""}),
             ("cost", {"measured_at": "close", "components": []}),
         ],
@@ -915,14 +917,45 @@ class TestShippedBlocksValidateAgainstTheSchema:
         "field_name, value",
         [
             (
+                # A performed review, with its reviewers.
                 "uat",
                 {
-                    "status": "walked",
-                    "attestation": "Operator walked all six steps.",
-                    "walkArtifact": "s1-uat-walk.md",
+                    "attestation": "Operator reviewed the accounting.",
+                    "components": [
+                        {
+                            "component": "Work Explorer",
+                            "method": "manual-walkthrough",
+                            "reviewers": [
+                                {"type": "developer", "count": 1}
+                            ],
+                            "evidence": ["s1-uat-walk.md"],
+                            "findings": [],
+                        }
+                    ],
                 },
             ),
-            ("uat", {"status": "waived", "attestation": "Operator declined."}),
+            (
+                # The passing-none path -- "no UAT" as an attested answer.
+                "uat",
+                {
+                    "attestation": "Operator declined.",
+                    "components": [
+                        {
+                            "component": "Work Explorer",
+                            "method": "none",
+                            "attestation": "no reviewer before the release",
+                        }
+                    ],
+                },
+            ),
+            (
+                # An explicitly empty inventory, accounted for as empty.
+                "uat",
+                {
+                    "attestation": "no human-observable surface in this set",
+                    "components": [],
+                },
+            ),
             (
                 "checklist",
                 {"status": "waived", "attestation": "Post window had closed."},
@@ -937,11 +970,67 @@ class TestShippedBlocksValidateAgainstTheSchema:
         assert passed, errors
         validator.validate(disposition_to_dict(d))
 
-    def test_schema_still_rejects_an_incoherent_uat_block(self, validator):
+    @pytest.mark.parametrize(
+        "incoherent",
+        [
+            # Set 111 S4's retired binary. The schema must reject it too,
+            # or the replacement would be optional in one of the two
+            # places that check.
+            {"status": "walked", "attestation": "walked it"},
+            # A performed method with nobody who performed it.
+            {
+                "attestation": "a",
+                "components": [
+                    {"component": "x", "method": "manual-walkthrough"}
+                ],
+            },
+            # An abstention with no reason given.
+            {
+                "attestation": "a",
+                "components": [{"component": "x", "method": "none"}],
+            },
+            # An abstention that nonetheless lists reviewers.
+            {
+                "attestation": "a",
+                "components": [
+                    {
+                        "component": "x",
+                        "method": "none",
+                        "attestation": "nobody looked",
+                        "reviewers": [{"type": "developer", "count": 1}],
+                    }
+                ],
+            },
+            # A self-assessed score, smuggled in beside the facts.
+            {
+                "attestation": "a",
+                "components": [
+                    {
+                        "component": "x",
+                        "method": "none",
+                        "attestation": "nobody looked",
+                        "confidence": 0.8,
+                    }
+                ],
+            },
+            # An AI recorded as a human reviewer.
+            {
+                "attestation": "a",
+                "components": [
+                    {
+                        "component": "x",
+                        "method": "watched",
+                        "reviewers": [{"type": "ai-agent", "count": 1}],
+                    }
+                ],
+            },
+        ],
+    )
+    def test_schema_still_rejects_an_incoherent_uat_block(
+        self, validator, incoherent
+    ):
         payload = disposition_to_dict(
-            _valid_disposition_completed_api(
-                uat={"status": "walked", "attestation": "walked it"}
-            )
+            _valid_disposition_completed_api(uat=incoherent)
         )
         with pytest.raises(jsonschema.ValidationError):
             validator.validate(payload)

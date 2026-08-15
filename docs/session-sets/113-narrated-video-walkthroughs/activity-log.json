@@ -1,0 +1,112 @@
+{
+  "sessionSetName": "113-narrated-video-walkthroughs",
+  "createdDate": "2026-08-15T19:05:28.206925+00:00",
+  "totalSessions": 0,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "session-001/path-aware-critique",
+      "dateTime": "2026-08-15T19:05:28.206925+00:00",
+      "description": "Operator set pathAwareCritique: advisory.",
+      "status": "complete",
+      "kind": "path_aware_critique",
+      "choice": "advisory"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "Register. Read the operator notes and the three consult syntheses.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "design-the-uat-record-replacing-binary",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "**Design the UAT record**, replacing binary `walked | waived` in `disposition.uat` with per-component entries carrying **facts only**: in-scope component, method, human reviewer type and count, evidence links, findings or concerns, and an explicit attested `none`. No self-assessed confidence score; no separate debt ledger. Risk is what the record *implies*, not a number someone types.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "gate-on-the-component-inventory-not",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "**Gate on the component inventory, not on whatever records exist**, and wire it into `uat_walk_recorded` with tests for each recorded status \u2014 including the passing-`none` path and the missing-component refusal. This is the load-bearing detail: a gate that merely validates present records makes **an omitted component the new form of evaporation**. Every declared in-scope component must carry a record, or the session must carry an attested not-applicable disposition.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "journal-the-decision",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "**Journal the decision.** This is a verification reduction under the decision-rights carve-out. The operator's ruling of 2026-08-10 is direction; the attestation is written here, in `decisions.jsonl`, under operator authority. `decision_journal` refuses it under AI authority, and that refusal is correct.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T15:05:28.210648-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T15:05:28.217731-04:00",
+      "description": "Registered session 1 (claude / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "design-the-uat-record-replacing-binary",
+      "dateTime": "2026-08-15T15:29:17.644551-04:00",
+      "description": "Replaced the binary disposition.uat (status walked|waived) with a per-component accounting: attestation + components[], each record carrying component, method (6-value vocabulary), reviewers ({type,count}, distinct humans), evidence, findings and a per-component attestation. Reviewer types and component keys are CLOSED vocabularies - the first makes 'an AI reviewed it' unrecordable (spec decision 9), the second makes a self-assessed confidence score or debt ledger unrecordable. Landed in disposition.py (constants + _validate_uat_block) and mirrored in disposition.schema.json ($defs UatComponentRecord / UatReviewer), which an existing parity test caught me not having done.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "gate-on-the-component-inventory-not",
+      "dateTime": "2026-08-15T15:29:17.644551-04:00",
+      "description": "New spec key uatComponents parsed by spec_config (omitted vs explicitly-empty kept distinct, and the block-list scan cannot swallow the neighbouring prerequisites: list). check_uat_walk_recorded now reads it: an armed set with no inventory is REFUSED rather than defaulted inert, a declared component with no record is refused and named, an unmatched record is refused as a likely typo, and method 'none'/'not-applicable' with an attestation PASSES. Path-shaped evidence is checked for existence; URLs and free-text (SharePoint/Teams) are not. 61 new tests in test_set113_uat_accounting.py plus falsifiers in the schema parity suite; 280 targeted tests green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "journal-the-decision",
+      "dateTime": "2026-08-15T15:29:17.644551-04:00",
+      "description": "Journaled under OPERATOR authority with the operator's own words from operator-notes.md 2026-08-10 as the attestation. First attempted the same record under authority='ai', which decision_journal refused (exit 5, verification-reduction carve-out) - the refusal the spec calls correct, exercised rather than assumed. A second decision journals the mid-set addition of uatComponents to this set's own spec.",
+      "status": "complete"
+    }
+  ]
+}

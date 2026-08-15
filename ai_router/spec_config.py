@@ -27,7 +27,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 
 from typing import Literal
 
@@ -81,12 +81,28 @@ class SessionSetConfig:
     # signal a gate could use to tell "the author said no UAT scope" from
     # "the author never mentioned scope at all".
     uat_scope: Optional[str]
+    # Set 113 S1: the declared in-scope UAT component inventory. The same
+    # omitted-vs-empty distinction as ``uat_scope``, and here it is
+    # load-bearing rather than merely useful: ``None`` (key absent) means
+    # the author never declared an inventory and the close gate refuses,
+    # while ``()`` is the author saying **explicitly** that nothing in this
+    # set has a human-observable surface -- the operator's own "no UI
+    # component at all -> zero marginal confidence" row, which is a valid
+    # passing answer. Collapsing the two would make forgetting the key
+    # indistinguishable from declaring nothing, which is precisely the
+    # evaporation this inventory exists to close.
+    #
+    # A tuple (not a list) because ``SessionSetConfig`` is frozen and a
+    # mutable default would let a caller edit one set's inventory through
+    # another's config object.
+    uat_components: Optional[Tuple[str, ...]] = None
 
 
 _DEFAULT = SessionSetConfig(
     requires_uat=False,
     requires_e2e=False,
     uat_scope=None,
+    uat_components=None,
 )
 
 
@@ -109,6 +125,109 @@ def _string_re(key: str) -> re.Pattern[str]:
         rf'^\s*{re.escape(key)}\s*:\s*["\']?([\w-]+)["\']?\s*(?:#.*)?$',
         re.IGNORECASE | re.MULTILINE,
     )
+
+
+# Set 113 S1: the ``uatComponents`` inventory. Written by hand in a spec's
+# YAML block, so every spelling a person or a YAML formatter actually
+# produces has to work -- the inline ``uatComponents: []`` an author
+# reaches for when nothing is in scope, and the block list they reach for
+# when something is, at either of YAML's two legal indentations, with
+# comments wherever comments go.
+#
+# This stays hand-rolled regex/scan for the reason at the top of the
+# module: the parser is dependency-free on purpose.
+#
+# **Every ambiguity here resolves toward declaring MORE, never less.**
+# Round 1 verification found two Criticals in the first version of this
+# function, and both were the same mistake: it terminated the scan on
+# indentation, so a valid indentationless sequence (``- item`` flush with
+# the key, which is what most YAML emitters write) and a comment line
+# between entries each silently produced a SHORTER inventory -- and a
+# short inventory is a close gate that passes while a declared component
+# goes unaccounted for. Under-counting here fails OPEN, which is the one
+# failure this whole mechanism exists to prevent.
+#
+# So termination is by SHAPE, not indentation: blank and comment-only
+# lines are skipped, any ``- `` line is an item at any indentation, and
+# the first line that is none of those ends the list. That still cannot
+# swallow a neighbouring key's items -- ``prerequisites:`` in this repo's
+# own specs is a ``- `` list too, but the ``prerequisites:`` line itself
+# is not an item, so the scan stops on it.
+_INVENTORY_KEY_RE = re.compile(
+    r"^(?P<indent>[ \t]*)uatComponents\s*:[ \t]*(?P<inline>.*?)\s*(?:#.*)?$",
+    re.IGNORECASE | re.MULTILINE,
+)
+_LIST_ITEM_RE = re.compile(r"^[ \t]*-(?:[ \t]+(?P<value>.*?))?[ \t]*$")
+# A YAML comment needs whitespace before the ``#``; ``A#B`` is a literal.
+_TRAILING_COMMENT_RE = re.compile(r"\s+#.*$")
+
+
+def _clean_item(raw: str) -> str:
+    """Strip a list item down to the component name it declares.
+
+    Quoted first, so a name may legitimately contain a ``#``; unquoted
+    values lose a trailing YAML comment. Round 1 verification (Major)
+    found this missing: the authoring guide's own example annotates each
+    entry, so the documented shape produced component names with the
+    comment still attached, and the gate then refused the clean name the
+    same guide told the author to record.
+    """
+    value = raw.strip()
+    if len(value) >= 2 and value[0] in "\"'":
+        quote = value[0]
+        closing = value.find(quote, 1)
+        if closing > 0:
+            return value[1:closing].strip()
+        return value[1:].strip()
+    return _TRAILING_COMMENT_RE.sub("", value).strip()
+
+
+def _parse_uat_components(block: str) -> Optional[Tuple[str, ...]]:
+    """Return the declared inventory, or ``None`` when none was declared.
+
+    ``()`` means the author wrote an explicitly empty inventory, which is
+    a real answer and passes the close gate. ``None`` means the question
+    was never answered, which the gate refuses. The caller must keep the
+    two apart -- see the field's docstring.
+
+    A **bare** ``uatComponents:`` with nothing under it returns ``None``,
+    not ``()``. It reads far more like an unfinished edit than like a
+    deliberate declaration that nothing is observable, and the deliberate
+    form is one keystroke away: ``uatComponents: []``.
+    """
+    match = _INVENTORY_KEY_RE.search(block)
+    if match is None:
+        return None
+
+    inline = (match.group("inline") or "").strip()
+    if inline:
+        # Inline flow sequence: `[]`, or `[a, "b c"]`.
+        if inline.startswith("[") and inline.endswith("]"):
+            body = inline[1:-1].strip()
+            if not body:
+                return ()
+            items = [_clean_item(part) for part in body.split(",")]
+            return tuple(item for item in items if item)
+        # A scalar on the key line is not a list. Treat it as a
+        # single-component inventory rather than dropping it -- the
+        # author plainly meant to declare something, and dropping it
+        # would under-count, which is the direction that fails open.
+        return (_clean_item(inline),)
+
+    items: list[str] = []
+    for line in block[match.end():].splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        item = _LIST_ITEM_RE.match(line)
+        if item is None:
+            break
+        value = _clean_item(item.group("value") or "")
+        if value:
+            items.append(value)
+    if not items:
+        return None
+    return tuple(items)
 
 
 def _parse_tri(m: re.Match[str] | None) -> TriStateFlag | None:
@@ -171,10 +290,20 @@ def parse_session_set_config(spec_md_path: Path) -> SessionSetConfig:
     if scope_match:
         uat_scope = scope_match.group(1)
 
+    # Set 113 S1: read the inventory from the CANONICAL block only when
+    # there is one. The legacy plain-text fallback above hands `block` the
+    # whole file for specs that predate the heading; scanning that for a
+    # `- ` list would pick up prose bullets, and an inventory invented out
+    # of a doc's bullet points is worse than no inventory at all.
+    uat_components = _parse_uat_components(
+        block_match.group(1) if block_match else ""
+    )
+
     return SessionSetConfig(
         requires_uat=uat if uat is not None else _DEFAULT.requires_uat,
         requires_e2e=e2e if e2e is not None else _DEFAULT.requires_e2e,
         uat_scope=uat_scope,
+        uat_components=uat_components,
     )
 
 

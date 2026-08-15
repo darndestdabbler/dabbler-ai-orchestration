@@ -13,6 +13,15 @@
 > Capture via obs-websocket) is Session 4's primary capture candidate;
 > ffmpeg `gdigrab` is the fallback. Pass criteria unchanged. See the
 > operator note of 2026-08-15.
+> **Amended 2026-08-15** (Session 1): `uatComponents` added to the
+> configuration block. Session 1 shipped the inventory-aware gate, and an
+> armed set that declares no inventory is refused at close — so this set
+> would otherwise have made its own Session 4 unclosable. This adds the
+> data the new gate reads; it does **not** change an arming flag, and it
+> could not affect Sessions 1-3, which owe no accounting under
+> `uatScope: per-set`. The four entries are the human-observable surfaces
+> Sessions 2-4 create, read off this spec's own Creates lines. Journaled
+> in `decisions.jsonl`.
 > **Prerequisites:** Set 112 complete (operator sequencing decision, 2026-08-08).
 > **Session Set:** `docs/session-sets/113-narrated-video-walkthroughs/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
@@ -46,6 +55,11 @@ requiresUAT: true         # A set whose deliverable IS the UAT experience must b
 requiresE2E: true         # Sessions 3 and 4 drive real rendering surfaces (a browser fixture and the Extension Development Host).
 uatStyle: ad-hoc
 uatScope: per-set
+uatComponents:            # Set 113 S1's own gate, applied to this set. Session 4 owes one record per line.
+  - Rendered walkthrough and training document
+  - Static generated index
+  - Recorded web scenario
+  - Windows OS-capture pilot
 pathAwareCritique: advisory
 prerequisites:
   - slug: 112-remove-lightweight-tier

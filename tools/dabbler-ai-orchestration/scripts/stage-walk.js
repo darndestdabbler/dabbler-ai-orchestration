@@ -205,8 +205,9 @@ function main() {
   log(`  workspace: ${workspacePath}`);
   log("  the Dabbler view opens by itself; nothing to set up.");
   log("");
-  log("Close the VS Code window when you are done, then record the walk in");
-  log("disposition.uat (status 'walked' + walkArtifact + attestation).");
+  log("Close the VS Code window when you are done, then record what you did");
+  log("in disposition.uat.components -- one entry per component the spec");
+  log("declares in uatComponents, with the method and who reviewed it.");
 
   const child = cp.spawn(code, argv, {
     // An ALLOWLIST, not `...process.env`. A walk is normally started from

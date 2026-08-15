@@ -98,8 +98,18 @@ def sandbox(tmp_path, live_root):
         if os.path.isdir(fragments_src):
             shutil.copytree(fragments_src, root / target.fragments_rel.replace("/", os.sep))
 
+        # Set 113 S1 (L-069-1 / G-008 again, third time on this line): the
+        # re-seed guard asked "is the corpus EMPTY", but what the
+        # falsifiers below need is "does the corpus hold TWO fragments to
+        # swap". Those differ in exactly one state -- a single fragment,
+        # which is what the corpus holds from the first contribution after
+        # a release fold until the second. Set 133 S1 fixed the zero case
+        # and left the one case, so this fired the first time anybody
+        # added a fragment to a freshly folded corpus. Count the RECORDED
+        # fragments, since those are the only ones the falsifiers can
+        # plant into.
     for target in cl.TARGETS.values():
-        if cl.load_fragments(target, str(root)):
+        if _recorded_count(target, str(root)) >= 2:
             continue
         path = target.rendered_path(str(root))
         parts = cl.split_document(cl.read_text(path))
@@ -107,6 +117,23 @@ def sandbox(tmp_path, live_root):
         cl.write_text(path, parts.preamble + seeded + parts.released)
         cl.migrate(target, str(root))
     return str(root)
+
+
+def _recorded_count(target, root: str) -> int:
+    """How many fragments the baseline actually froze.
+
+    Not ``len(load_fragments(...))``: an unrecorded contribution sitting
+    above the baseline is not something a falsifier can plant into, so
+    counting it would let the re-seed be skipped and the plant silently
+    target nothing.
+    """
+    baseline = cl.load_baseline(target, root)
+    if not baseline:
+        return 0
+    recorded = {e["file"] for e in baseline.get("fragments") or []}
+    return sum(
+        1 for f in cl.load_fragments(target, root) if f.filename in recorded
+    )
 
 
 def _write_doc(path, body: str) -> None:

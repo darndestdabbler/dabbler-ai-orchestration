@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-14T20:47:34.330885-04:00",
+  "generatedAt": "2026-08-15T04:08:15.466261-04:00",
   "sessionSetDir": "121-guidance-becomes-executable",
   "inputs": {
-    "activity-log.json": "df842f1f055ad643876fc64225c71db8420ac2fe9559532c9db65e584a52e93a",
-    "session-state.json": "ef1828013bc61e2470bfc1f5521f10a52ad78d7f6f15d5b826ca52f8e37cffe0",
+    "activity-log.json": "b061d5327df94a29688885627917939299a1d62ace53cacb4d7f279ac7dfe2b6",
+    "session-state.json": "7810430ffb99605f4d01916a8df43d553249421a64fcc8095430397cd64240fe",
     "spec.md": "c47c7e70009eacbc75b8f671de08c68319cffeed360e822c90274d349998bce2"
   },
   "orphanEntries": 0,
@@ -114,19 +114,118 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T02:27:43.420799-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "move-usage-metadata-out-of-the",
+          "description": "Moved usage accounting out of the preload corpus into ai_router/guidance_ledger.py -> docs/planning/guidance-usage.json: schemaVersion 1, keyed by id, {kind, cost, uses[]} with a bounded 10-entry ring of dash-separated zero-padded <set>-<session> STRINGS, one sanctioned writer, atomic replace, and the repo's single lock implementation via a new generic close_lock.file_mutex (the session-set lifecycle lock is directory-scoped and carries a Set-036 dual-hold, so exposing the proven stale-reclaim/TTL primitive beat growing a second copy of it). MEASUREMENT RE-DERIVED, and the spec's number is stale in the direction Session 1 left it: the spec says 'six trailers, 594 bytes, ~148 tokens', but after Session 1 archived two lessons and condensed three there are THREE trailers, 300 bytes, ~75 tokens (plus 5 lesson-pointer comments, 225 bytes, ~57 tokens). A finding about the SPEC. Every site redirected per L-069-1, not the first found: guidance_meta (last-used-set removed from LessonMeta/SINGLE_FIELDS/CANONICAL_ORDER; update_last_used is now a loud NotImplementedError stub rather than a silent no-op that would drop a pinned consumer's usage signal; normalize_close_mandated_metadata DELETED); cite_lessons (records to the ledger, resolves against the docs read-only, CLOSE_MANDATED_WRITES repointed to the ledger as whole-file); guidance_triage (the routed classifier now sees the real recency ring instead of the scalar); lessons-learned.md, lessons-archive.md, both consumer-bootstrap templates, the cold-start fixture and the extension dist bundle (npm run compile). status=\"active\" is now omitted too, since the active tier is what active means. BACKFILLED from history rather than started empty: close_session has recorded disposition.lessons_cited into session-events.jsonl since Set 064, so 167 per-SESSION citation events across 65 sets seeded 25 ids with true recency rings -- strictly more than the scalar could hold. STRICTLY SAFER CLOSE EXEMPTION: the two preload documents lost their surgical exemption entirely and now bind byte for byte; only the bookkeeping JSON is exempt. Tokens: lessons-learned.md 2,229 -> 2,202.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T02:27:43.488970-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "instruction-line-retention-measured-in-sessions",
+          "description": "Instruction-line retention in ACTIVE SESSIONS, never elapsed time. guidance_ledger.active_session_timeline() builds the denominator from closeout_succeeded events across every set, ordered by TIMESTAMP rather than by set number -- Session 1 measured sets 115 and 118 executing after 119, so a set-number sort would put a session in the window that had not run yet. 345 active sessions on record. A session that closed more than once (a repaired close) counts once, at its first success. retention_report() classifies retain / prune-candidate / never-used and there is deliberately NO evict path in the module: pruning is a batched pass the operator initiates, never automatic and never mid-session (standing decision 3), so the tool cannot perform the eviction that broke the old scheme. Scoping fix caught while wiring it: governed_ids scopes the INSTRUCTION rule to the live corpus only -- encoding a lesson is precisely what archives its prose, so scoping a check by corpus membership would exempt every check the moment it did its job.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T02:53:45.109709-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "check-retention-split-by-cost-and",
+          "description": "Check retention split by cost, recording FIRES and not runs. Cheap (<1s, deterministic, no routed call) -> permanent, no usage record required, free insurance that never expires. Expensive (a routed call, or >10s) -> must have fired within the last N sets; never firing is reported as never-used rather than silently passing, because a gate that never fires is indistinguishable from a useless one, which IS L-112-1. 'Record fires, not runs' is ENCODED as a type error, not a convention: record_citation() refuses an executable and record_fire() refuses an instruction, so a CI run cannot be filed as a fire and a check cannot earn credit for being mentioned. Session 1's three encoded checks registered cheap: L-064-9, L-125-1, and K-121-1 (corpus_scan_guard -- a new check-namespace id, since L-112-1 survives as an instruction line and the check is a separate artifact).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T02:53:45.111556-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "argue-n-and-the-cap-from",
+          "description": "N and the cap DERIVED from 345 sessions of citation history, not inherited from 5.3. (a) instruction_window_sessions = 30: measured over 694 intra-lesson gaps -- median 1, p90 5, p95 10, p99 30.2, max 51 -- so 30 retains 99% of genuinely recurring guidance through its quiet stretches. At this repo's measured 2.88 sessions/set that is ~10.4 sets, so 5.3's proposed 'N = 10 sets' SURVIVES measurement once the unit is corrected to the one the operator mandated. (b) check_window_sets = 20: the data supports NOTHING here -- there is no fire history at all, since the ledger records its first fire after this session -- so per the spec's instruction this is an honest default with a stated reason rather than a fabricated derivation: it reuses the operator-set disuse_window_sets of 20 that Set 064 already blessed, so the repo carries one disuse horizon rather than two that drift. (c) instruction_line_cap = 22: peak distinct ids cited in ANY trailing window across the whole history (20 at W=30, 21 at W=40-51, 22 at W=60-80), so 5.3's proposed 20 is close to the measured ceiling. KNOWN BLIND SPOT stated rather than smoothed over: project-guidance.md has no ids yet, so its ~24 entries contributed nothing to this measurement, which is exactly why Session 3 exists; Session 3 must RE-DERIVE the cap against the enlarged corpus rather than inherit 22 -- the same refusal this session made of 5.3.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T02:53:45.113247-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "cross-provider-verification",
+          "description": "Four rounds, VERIFIED at round 4 with 8 fix verdicts (7 accepted, 1 accepted-with-modification) and 0 findings. Verifier gpt-5.5; anthropic excluded as the orchestrator's registry-resolved effective provider on every round. Round 1 discovery (2-lens fan-out): 7 Majors. Round 2 supplementary: 1 Major. SEVEN ACCEPTED AND FIXED, ONE REJECTED AS A FALSE POSITIVE with evidence. Accepted: (1+3, one root cause) retention_report and instruction_count iterated the LEDGER, so a live instruction line with no ledger entry -- a brand-new lesson, or Session 3's project-guidance ids -- was neither reported nor counted against the cap; the anti-rebloat gate could pass on a corpus it could not see, and the case it missed is the case it exists to govern. (2) docs/ai-led-session-workflow.md Step 9 still taught the retired last-used-set/disuse_window_sets rule -- L-065-1, I fixed six echoes and missed the canonical procedure doc. (4) project-guidance readiness was only half real: corpus_ids used the HEADING-BOUND parser against a file whose entries are bullets under level-3 sections, so it would have returned zero ids SILENTLY, which is L-112-1's exact shape. (5) cite_lessons recorded unknown ids before reporting them, and since the module has no eviction path a typo became a permanent ghost. (6) --session defaulted to 1 silently -- a call I made deliberately and got wrong. (8, round 2, the sharpest) backfill+register let an executable INHERIT its prose-era citations, which retention_report reads as FIRES: an expensive check that had never caught anything would be retained for having once been prose somebody mentioned -- the exact failure the fire/run split exists to prevent, committed in the session that wrote the split. REJECTED (7): the claim that the shipped ledger's L-064-12 use '122-02' contradicts the close events. It does not -- set 122 session 2 cites L-064-12 and session 3 does not; the sessions are transposed. The ring's ordering was independently re-verified against close timestamps and is strictly descending by EXECUTION time (122-02 ahead of 127-02 and 123-03), which is the allocation-vs-execution property Session 1 measured. Evidence tables in s2-remediation-round-2.md. Round 3 rejected the project-guidance fix, CORRECTLY and for the same root cause one sibling site on: validate_documents still walked the heading-bound model and validate_guidance_meta still defaulted to the two lessons files, so the gate that must catch a malformed or duplicate project-guidance id would have reported success having inspected none of them -- L-069-1 twice in one session. Fixed with scan_entries() plus project-guidance in the default file set (the real corpus now validates 29 ids across 3 files, up from 26 across 2). Round 4: VERIFIED. HARNESS NOTE: round 1 finding #2 reported still-failing on a criterion whose expectedOutputContains carries stray literal double-quote characters, which no output can contain -- the Set 121 S1 defect class. The artifact was NOT edited; the criterion's intent was reproduced as a runnable equivalent and run against both trees (pre-fix produced '0 / cap', post-fix '1 / cap'), and running the verifier's own command exposed a real over-correction of mine: exiting non-zero on unregistered ids would have failed every fresh consumer repo, since a repo that has not cited anything has no ledger at all. Softened to surface-and-count, with a look-alike falsifier proving the cap still fires. Falsifiers proven non-vacuous by mutation: five rules mutated (string check, ring cap, kind guard, retention window, timestamp sort), all five fired.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T02:53:45.114887-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three governed suites run in full after the last code change and recorded via run_of_record. run_of_record affected named all three: every suite declares ai_router/ in its covers. pytest: 4631 passed, 9 skipped, 786s. mocha (npm run test:unit): 1456 passing, 2 pending, 33s. playwright (npm run test:playwright): 32 passed, 294s. TWO REAL FAILURES WERE FOUND AND FIXED BEFORE THESE RUNS, both from surfaces the targeted runs did not cover. (1) The extension's dist template bundle drifted once the consumer-bootstrap templates were edited; drift_guard named the remedy itself (npm run compile) and it was applied. (2) The mocha cold-start snapshot compares the RENDERED consumer-bootstrap template byte-for-byte against test-fixtures/cold-start/full/, and my hand-edit of the fixture wrapped two paragraphs differently from the template, so the golden was regenerated from the template with the fixed context substituted rather than hand-patched -- which is the deliberate, reviewed regeneration that test exists to force. HARNESS FINDING, not a product regression: the first playwright run was launched concurrently with the full pytest suite and reported 8 failures across unrelated tree-rendering specs (blocked-by-prereqs, cancellation, scaffold, icon-render, manifest-diagnostic, migration-drift, vsix-first-run). Re-run alone with no code change in between, the same suite returned 32 passed in 4.9m. Layer 3 drives a real VS Code UI on wall-clock timeouts, so it must not share a machine with a 4,600-test Layer 1 run; the recorded run is the uncontended one.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T03:33:12.817360-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 8,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 7,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 8
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 3,

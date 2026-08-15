@@ -64,9 +64,70 @@
     "model": "claude-sonnet-4.6",
     "effort": "medium",
     "reason": {
-      "code": "reduce-effort",
-      "specifics": "Routed recommendation, reproduced verbatim in ai-assignment.md: Session 3 is predominantly mechanical -- assigning ids to ~24 bullet entries, encoding two already-specified lessons with known token deltas, and re-deriving the cap by an established method. Reserve opus-5/high for Session 4, where the deferred judgment-heavy triage lands. NOTE for the next orchestrator: the cap re-derivation is an OBLIGATION recorded in router-config.yaml, docs/guidance-lifecycle.md and decisions.jsonl -- inheriting 22 would repeat exactly what this session refused to do with proposal 5.3's 20."
+      "code": "switch-due-to-cost",
+      "specifics": "Routed recommendation (code as returned: 'reduce-effort'; mapped to the schema's switch-due-to-cost, which is what its stated rationale is). Reproduced verbatim in ai-assignment.md: Session 3 is predominantly mechanical -- assigning ids to ~24 bullet entries, encoding two already-specified lessons with known token deltas, and re-deriving the cap by an established method -- so claude-sonnet-4.6 at medium effort handles it without burning opus-5/high budget, which is reserved for Session 4's deferred judgment-heavy triage. NOTE for the next orchestrator: the cap re-derivation is an OBLIGATION recorded in router-config.yaml, docs/guidance-lifecycle.md and decisions.jsonl -- inheriting 22 would repeat exactly what this session refused to do with proposal 5.3's 20."
     }
   },
-  "blockers": []
+  "blockers": [],
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 4476.030525,
+        "usd": 44.76030525,
+        "event_count": 237,
+        "session_ids": [
+          "584b0901-33fa-4763-b74f-3e151c8c663f"
+        ],
+        "measured_session_ids": [
+          "584b0901-33fa-4763-b74f-3e151c8c663f"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 1247.0238,
+        "usd": 12.470238,
+        "event_count": 77,
+        "session_ids": [
+          "7f94031a-dfd6-4c0c-ae82-a2a39b569581",
+          "41210f34-6a50-4a1c-b916-d071501a3088",
+          "d8b9be23-87fe-4582-a3f2-bcf0eb16eea0",
+          "287f1664-015f-4c7f-bbb3-27a8ecb86f7c",
+          "09b7c2f4-e23d-4261-a3e1-9ba3b4341573",
+          "0143c2f7-eb79-409f-a48c-8bc7e587192a"
+        ],
+        "measured_session_ids": [
+          "7f94031a-dfd6-4c0c-ae82-a2a39b569581",
+          "41210f34-6a50-4a1c-b916-d071501a3088",
+          "d8b9be23-87fe-4582-a3f2-bcf0eb16eea0",
+          "287f1664-015f-4c7f-bbb3-27a8ecb86f7c",
+          "09b7c2f4-e23d-4261-a3e1-9ba3b4341573",
+          "0143c2f7-eb79-409f-a48c-8bc7e587192a"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 5723.054325,
+    "total_usd": 57.230543250000004,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
 }

@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Truthful UAT accounting",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-15T15:05:28.206925-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-15T16:20:13.008984-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -16,7 +16,7 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

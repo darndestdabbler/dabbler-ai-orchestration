@@ -1,0 +1,168 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-15T16:20:13.012329-04:00",
+  "sessionSetDir": "113-narrated-video-walkthroughs",
+  "inputs": {
+    "activity-log.json": "6e8b0c38266f254ee95ef9b81569118e5fd3ddb99cdf024f2db9c51be0bdf3a7",
+    "session-state.json": "96bf5c13804b0335a6002634f763bad0221a93b290955e4d71c3c91f5b5c3396",
+    "spec.md": "c45ca1aa6984076ea84c88a24f8161690fa56a6f37609aac5820681953469fac"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 1 (claude / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T15:05:28.206925-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "design-the-uat-record-replacing-binary",
+          "description": "Replaced the binary disposition.uat (status walked|waived) with a per-component accounting: attestation + components[], each record carrying component, method (6-value vocabulary), reviewers ({type,count}, distinct humans), evidence, findings and a per-component attestation. Reviewer types and component keys are CLOSED vocabularies - the first makes 'an AI reviewed it' unrecordable (spec decision 9), the second makes a self-assessed confidence score or debt ledger unrecordable. Landed in disposition.py (constants + _validate_uat_block) and mirrored in disposition.schema.json ($defs UatComponentRecord / UatReviewer), which an existing parity test caught me not having done.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T15:05:28.217731-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "gate-on-the-component-inventory-not",
+          "description": "New spec key uatComponents parsed by spec_config (omitted vs explicitly-empty kept distinct, and the block-list scan cannot swallow the neighbouring prerequisites: list). check_uat_walk_recorded now reads it: an armed set with no inventory is REFUSED rather than defaulted inert, a declared component with no record is refused and named, an unmatched record is refused as a likely typo, and method 'none'/'not-applicable' with an attestation PASSES. Path-shaped evidence is checked for existence; URLs and free-text (SharePoint/Teams) are not. 61 new tests in test_set113_uat_accounting.py plus falsifiers in the schema parity suite; 280 targeted tests green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T15:29:17.644551-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "journal-the-decision",
+          "description": "Journaled under OPERATOR authority with the operator's own words from operator-notes.md 2026-08-10 as the attestation. First attempted the same record under authority='ai', which decision_journal refused (exit 5, verification-reduction carve-out) - the refusal the spec calls correct, exercised rather than assumed. A second decision journals the mid-set addition of uatComponents to this set's own spec.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T15:29:17.644551-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "**Cross-provider verification.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "**Required portion of the full test suite.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 3,
+        "in-progress": 0,
+        "complete": 4,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 7
+      },
+      "current": [],
+      "remaining": [
+        "cross-provider-verification",
+        "required-portion-of-the-full-test",
+        "close-out"
+      ]
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 3,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 4,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

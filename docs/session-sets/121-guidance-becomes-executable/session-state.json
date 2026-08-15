@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Encode what earns its keep; drop what does not",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-14T17:39:42.929153-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-14T20:47:34.327814-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -19,7 +19,7 @@
           "db17efc0-e9a1-44a7-84cf-126da2c2e705"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

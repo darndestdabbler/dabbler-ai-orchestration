@@ -199,6 +199,22 @@
       "dateTime": "2026-08-15T13:24:18.561106-04:00",
       "description": "Journaled the operator's deletion-cost ruling: a test whose only subject is deleted code falls OUTSIDE the verification carve-out, paired with extending 'no gate is added without deleting one' from gates to modules, and gated on a subject-is-gone precondition. authority=human, rubric_line=value-trade-off, verification_effect=none, operator_attestation cites the spec. The three module line counts were re-derived (1319/1082/652) rather than inherited. No code changed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T14:55:56.498435-04:00",
+      "description": "Six rounds. Rounds 1-4 ran on gemini-pro (tier 2) because every OpenAI model returned 429 all session; the escalation ladder's rung 2, journaled, with the tier degradation stated not buried. Five Majors from the two discovery passes plus two on the fix delta: three false positives settled by deterministic evidence, two accepted and fixed. The operator then restored OpenAI credit and authorized round 5 on gpt-5-6-sol -- a genuine third provider -- which accepted all six surviving fix verdicts, closing the disputed finding by independent acceptance rather than by adjudication of my argument, and caught one real new defect of mine (four hand-authored decision timestamps, one of them chronologically impossible). Corrected and disclosed. Round 6, on a second separate authorization, returned VERIFIED with zero findings and all nine ledger entries accepted.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T14:55:56.500108-04:00",
+      "description": "All three declared suites green and fresh against the final tree. pytest 4656 passed / 5 skipped / 1 xfailed in 223s at -n 8 (re-run after the decisions.jsonl correction staled the first green run); the single xfail is the deliberate strict-xfail pinning Session 1's open changelog.check() gap. mocha 1468 passing / 0 failing in 23s. playwright 32 passed / 0 failed in 3.1m. mocha and playwright were not re-run for the journal correction and are not owed -- decisions.jsonl sits under docs/session-sets/, which run_of_record affected confirms is covered by pytest alone.",
+      "status": "complete"
     }
   ]
 }

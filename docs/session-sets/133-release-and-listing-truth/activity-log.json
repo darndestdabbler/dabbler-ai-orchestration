@@ -1,0 +1,118 @@
+{
+  "sessionSetName": "133-release-and-listing-truth",
+  "createdDate": "2026-08-15T07:21:41.715827-04:00",
+  "totalSessions": 2,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "write-the-missing-set-125-changelog",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "**Write the missing Set 125 changelog fragment, then fold both targets.** Author `ai_router/changelog.d/` fragment for the read-only tool grant: what a routed call could do before (arbitrary shell, file create/edit, sub-agent spawning against the live working tree), what it can do now (`view`, `grep`, `glob`), and why it matters (a verifier able to edit the code it judges can report VERIFIED on its own edit). State it as the consumer-visible security-relevant change it is, not as a refactor. Then run `python -m ai_router.changelog fold --target router` and `--target extension` so the tagged commit carries real version sections rather than 16 loose fragments. **Do not invent entries for sets that already have fragments** \u2014 fold what is there; the gap being closed is Set 125 specifically. **Then make the breaking change self-remedying in the same pass.** The `1.0.0` section must state, at the top and in one screen: the symptom a user actually sees (config load refuses the spec), the one-line fix, and a working link to `docs/cross-repo-lightweight-removal-notice.md`. This replaces detection with remediation on purpose \u2014 it reaches every consumer of an open-source package, which no sweep of known checkouts can do.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "rework-the-extension-readme-into-the",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "**Rework the extension README into the Marketplace listing.** This is the pitch, and it is the artifact six staff and every future adopter read. Lead with what the framework *is* \u2014 the work is organized and standardized, and the verification is one you can check \u2014 not with what the AI writes. Use the new `media/ai-work-explorer.png` (committed in `d370e8f0`), referenced by **absolute raw.githubusercontent URL** like the existing image; a relative path does not render on the Marketplace. Also refresh `package.json`'s `description` and `keywords`, which are what Marketplace *search results* show and which are equally baked at publish. **Claim auditability, never efficacy.** Supported: the verifier is chosen by excluding the orchestrator's own provider (resolved from the model id, not a self-reported label); a session blocks rather than passing when no different-provider verifier exists; a close with no cross-provider evidence runs the verification itself; a finding closes only when its criterion fails before the fix and passes after; rounds are bounded and only the operator may authorize another; full suites run before commit, push and close. **Not supported and not to be claimed:** any defect-catch rate or \"catches bugs before they ship\" \u2014 the framework has never measured what fraction of real defects it finds. Keep the register of the existing docs (*\"it is containment, not a sandbox, and the docs must not claim otherwise\"*); that candour is the most credible asset here and a marketing pass must not sand it off.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "correct-the-root-readme-s-two",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "**Correct the root README's two false statements.** It calls the tree \"Session Set Explorer\" (Set 132 S1 renamed it to **AI Work Explorer**, and `package.json` agrees; the stale phrase is line-wrapped, so grep for both halves). And its Prerequisites section states API-key accounts for all three providers are required \u2014 wrong for the Copilot-seat population that Sets 078/112 exist to serve, and wrong for the six staff now using it. Reconcile it with the seat path described earlier in the same file.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T07:21:41.715827-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T07:21:41.722729-04:00",
+      "description": "Registered session 1 (claude / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T07:22:28.369289-04:00",
+      "description": "Register.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "write-the-missing-set-125-changelog",
+      "dateTime": "2026-08-15T07:28:55.772537-04:00",
+      "description": "Wrote the Set 125 read-only tool grant fragment (Security), folded 17 router + 13 extension fragments, restructured both pending regions into the [1.0.0] / [0.51.0] version sections being tagged, and made the breaking change self-remedying at the top of 1.0.0 (symptom, one-line diff, working notice link). Restamped both baselines; round trip OK.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "rework-the-extension-readme-into-the",
+      "dateTime": "2026-08-15T07:31:54.863823-04:00",
+      "description": "Reworked the extension README as the Marketplace listing: leads with what the framework is and that the verification is checkable, hero image swapped to media/ai-work-explorer.png by absolute raw.githubusercontent URL with descriptive alt text, added a 'Verification you can check' section carrying only the six supported auditability claims plus an explicit 'what this does not claim' block (no defect-catch rate) and the containment-not-a-sandbox register. Removed two false statements: the $0-budget 'or you skip verification' bullet (no skip exists post-1.0.0) and 'all three API keys are required'. Re-framed the 73/32% savings as the hypothetical Opus-baseline counterfactual the report actually computes. Refreshed package.json description + keywords.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "correct-the-root-readme-s-two",
+      "dateTime": "2026-08-15T07:33:25.136255-04:00",
+      "description": "Corrected both false statements in the root README: the activity-bar view is AI Work Explorer (Set 132 S1 rename, package.json agrees), and Prerequisites no longer requires API-key accounts for all three providers -- it now states the two answers (DIRECT_API with two of three keys as the working minimum, or a keyless COPILOT_CLI seat) and points at verify_type, reconciling with the seat path described earlier in the same file. RESIDUAL, out of scope by the spec's Non-goals: 'Session Set Explorer' survives in 25 other markdown files (most are dated proposals; the live ones are close-out.md, copilot-seat-setup-checklist.md, repository-reference.md, session-state-schema.md, spec-md-schema.md).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T09:11:32.856932-04:00",
+      "description": "4 rounds, gpt-5-6-sol throughout, anthropic excluded as the orchestrator's effective provider via model-registry lookup. R1 discovery (2-way fan-out, spec-conformance + failure-scenario lenses): 1 Major -- the listing promised an unconditional cross-provider block while the same release documents an accepted same-provider fallback. R2 supplementary (harvest before remediating, per loop discipline): VERIFIED, 0 new. R3 remediation-review: REJECTED the fix -- package.json had been re-worded ('independent verification built into every close') rather than fixed, and the changelog argued the point instead of reporting it. R4 remediation-review: VERIFIED, fix accepted, 0 findings. Both rejections were correct and are recorded in the round-1 and round-3 remediation sidecars. Routed cost $2.5455.",
+      "status": "complete"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "5e0a03108ce70e7dd6c708bded733cbd4f78409f",
+  "fixedTree": "c594bea69a84a758ac760a3e184ee7c30b7feaa7",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-15T13:10:23.460801+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "The remediation discloses the fallback in the READMEs but leaves the Marketplace search description and changelog asserting unconditional independence** - **Category:** Correctness - **Severity:** Maj ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The package description, Marketplace README, and router changelog consistently state that verification is normally cross-provider but that qualified same-provider session verification can occur for the disclosed `DIRECT_API` configuration, without calling every close independently or cross-provider verified.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

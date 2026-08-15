@@ -62,7 +62,8 @@ deeper feature descriptions live at
 - **Cross-provider verification** — Every session ends with
   `verify_session`, which sends the work to an independent
   model from a different provider (mandatory — the close gate refuses an
-  unverified close). The verifier returns structured JSON
+  unverified close; see the one disclosed same-provider exception under
+  [Highlights](#highlights)). The verifier returns structured JSON
   (`{"verdict": "VERIFIED" | "ISSUES_FOUND", "issues": [...]}`); the
   orchestrator surfaces disagreements for human adjudication rather
   than self-resolving.
@@ -96,7 +97,17 @@ deeper feature descriptions live at
   provider, so work is never reviewed by the model that did it. If no
   different-provider verifier is reachable, the outcome is a blocked
   `verification_unavailable`, resolvable only by the operator-attested
-  manual path — never a silent same-provider pass.
+  manual path — never a *silent* same-provider pass.
+
+  **One disclosed exception (Set 123 S2, operator ruling 2026-08-11).** A
+  `DIRECT_API` project on a machine whose only usable key is the
+  orchestrator's own provider runs session verification same-provider
+  instead of stopping. It warns on stderr, and every record the verdict
+  lands on carries `verification_qualification: same-provider`, so an
+  uncorroborated verdict is labelled as one rather than passing for an
+  independent review. The exception covers session verification only —
+  code review and security review still fail closed — and does not apply
+  to a Copilot seat, which keeps the unqualified fail-closed contract.
 
 ---
 
@@ -113,18 +124,22 @@ deeper feature descriptions live at
      [GitHub Releases page](https://github.com/darndestdabbler/dabbler-ai-orchestration/releases);
      pick the latest, then **Extensions → ... → Install from VSIX...**.
 2. **Open your workspace.** Any folder with — or destined for — a
-   `docs/session-sets/` directory. The activity-bar **Session Set
+   `docs/session-sets/` directory. The activity-bar **AI Work
    Explorer** icon appears automatically once that path is present.
 3. **Run `Dabbler: Install ai-router`** from the command palette
    (`Ctrl+Shift+P`). The command auto-detects (or offers to create)
    a workspace `.venv/`, runs `pip install dabbler-ai-router` inside
    it, and materializes `ai_router/router-config.yaml` for tuning.
 
-Then **set API keys** as environment variables (one-time):
+Then **give the router a provider to call** (one-time). Either set
+provider API keys as environment variables —
 `DABBLER_ANTHROPIC_API_KEY`, `DABBLER_GEMINI_API_KEY`,
-`DABBLER_OPENAI_API_KEY` — the
-[Prerequisites](#prerequisites-tools-and-accounts) section below has
-the sign-up links and notes which providers are required.
+`DABBLER_OPENAI_API_KEY` — **or** use an authenticated GitHub Copilot
+CLI seat and no keys at all. Which one this project uses is recorded by
+`python -m ai_router.verify_type` (see
+[For new projects](#for-new-projects-set-up-in-two-commands) below); the
+[Prerequisites](#prerequisites-tools-and-accounts) section has the
+sign-up links.
 
 Subsequent updates: **`Dabbler: Update ai-router`** from the command
 palette.
@@ -222,9 +237,22 @@ redirect stub for older clients.)
 ## Prerequisites: tools and accounts
 
 You need **VS Code**, at least one **orchestrator agent** installed as
-a VS Code extension, and **API-key accounts** for all three model
-providers (the router calls all three so cross-provider verification
-has somewhere to route to).
+a VS Code extension, and **a provider for the router to call**. That
+last one has two answers, and you only need one of them:
+
+- **Provider API keys** (`DIRECT_API`) — accounts with Anthropic,
+  Google and/or OpenAI. Two of the three is the working minimum;
+  cross-provider verification only needs somewhere *different* to route
+  to than the model that did the work.
+- **A GitHub Copilot CLI seat** (`COPILOT_CLI`) — no provider API keys
+  at all, and none expected. A seat measured on 2026-08-05 exposed
+  three provider families, which is why this path exists: it is the one
+  for shops whose staff hold a Copilot seat and cannot get provider
+  keys.
+
+Which answer a machine gives is recorded once by
+`python -m ai_router.verify_type` — see
+[For new projects](#for-new-projects-set-up-in-two-commands).
 
 ### VS Code
 
@@ -252,11 +280,14 @@ provider-agnostic and you can switch mid-set.
   [codeassist.google](https://codeassist.google/) (free tier
   available); docs at [cloud.google.com/gemini/docs/codeassist/overview](https://cloud.google.com/gemini/docs/codeassist/overview).
 
-### API keys (all three required)
+### API keys (the `DIRECT_API` path — skip this on a Copilot seat)
 
-The router calls all three providers and cross-provider verification
-needs at least two providers live to be meaningful. Expect to set up
-all three.
+Cross-provider verification needs **at least two** provider families
+live to be meaningful, so two of these three is the working minimum;
+setting all three gives the router more to choose from and is what this
+repo itself runs on. On the `COPILOT_CLI` path you set **none** of them
+— the seat carries no provider keys by design, and nothing warns about
+their absence.
 
 - `DABBLER_ANTHROPIC_API_KEY` — [console.anthropic.com](https://console.anthropic.com/)
   (Settings → API Keys, requires billing).

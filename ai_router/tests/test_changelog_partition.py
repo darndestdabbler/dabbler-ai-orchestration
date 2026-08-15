@@ -40,12 +40,53 @@ def live_root() -> str:
     return cl.repo_root()
 
 
+def _seed_pending_region(target, released: str) -> str:
+    """A pending region of REAL prose, rebuilt from released history.
+
+    Set 133 S1: the falsifier battery below plants defects into the live
+    corpus, and `fold` empties that corpus at every release — so from the
+    moment a version is cut until the next contribution, every planted
+    violation had nothing left to plant into and the whole battery went
+    red on a repo that was working correctly. A gate that only functions
+    between releases is not a gate.
+
+    Seeding keeps the property the module docstring actually relies on:
+    the subjects are hand-written changelog prose with em dashes, fenced
+    code and nested blockquotes, not a synthetic three-liner that would
+    round-trip under almost any implementation. They are taken from this
+    repo's own released history, re-headed into the pending region at the
+    target's fragment heading level so `migrate` cuts them the way a real
+    contribution would be cut.
+    """
+    _, sections = cl.split_blocks(released, 2)
+    assert len(sections) >= 2, "released history should carry version sections"
+    if target.fragment_heading_level <= 2:
+        # Whole-section fragments (the router): re-head two released
+        # sections as Unreleased contributions.
+        blocks = []
+        for index, section in enumerate(sections[:2]):
+            lines = section.splitlines(keepends=True)
+            body = "".join(lines[1:])
+            blocks.append(f"## [Unreleased] — seeded prose {index}\n{body}")
+        return "".join(blocks)
+    # Level-3 fragments (the extension): the body of one released section
+    # already contains several `### Added` / `### Changed` blocks, which
+    # is exactly the shape migrate cuts for this target.
+    lines = sections[0].splitlines(keepends=True)
+    body = "".join(lines[1:])
+    _, inner = cl.split_blocks(body, 3)
+    assert len(inner) >= 2, "released section should carry several subsections"
+    return "## [Unreleased] — seeded\n\n" + "".join(inner)
+
+
 @pytest.fixture
 def sandbox(tmp_path, live_root):
-    """A throwaway copy of the live corpus.
+    """A throwaway copy of the live corpus, guaranteed non-empty.
 
     Mutation tests plant defects, so they must never touch the tree the
-    developer is working in.
+    developer is working in. When the live corpus has just been folded
+    into a release, the copy is re-seeded from real released prose (see
+    :func:`_seed_pending_region`) so the falsifiers keep their subjects.
     """
     root = tmp_path / "repo"
     for target in cl.TARGETS.values():
@@ -56,6 +97,15 @@ def sandbox(tmp_path, live_root):
         fragments_src = target.fragments_dir(live_root)
         if os.path.isdir(fragments_src):
             shutil.copytree(fragments_src, root / target.fragments_rel.replace("/", os.sep))
+
+    for target in cl.TARGETS.values():
+        if cl.load_fragments(target, str(root)):
+            continue
+        path = target.rendered_path(str(root))
+        parts = cl.split_document(cl.read_text(path))
+        seeded = _seed_pending_region(target, parts.released)
+        cl.write_text(path, parts.preamble + seeded + parts.released)
+        cl.migrate(target, str(root))
     return str(root)
 
 
@@ -134,11 +184,29 @@ def test_baseline_corpus_is_non_empty(live_root, key):
     L-112-1's second half: a check whose corpus comes back empty passes
     having examined nothing, and no planted-violation falsifier covers
     that. Assert the input set, not just the verdict.
+
+    Set 133 S1: an empty corpus is legitimate in exactly one state, and
+    `check` already ships that rule — a baseline that lists no fragments
+    passes only when `foldedAt` records the release that emptied it. So
+    the assertion is not "there are fragments" (which is false for every
+    repo sitting on a freshly cut release) but "the corpus and the
+    baseline agree about which state this repo is in".
     """
-    baseline = cl.load_baseline(cl.TARGETS[key], live_root)
+    target = cl.TARGETS[key]
+    baseline = cl.load_baseline(target, live_root)
     assert baseline is not None
-    assert baseline["fragments"], f"{key}: baseline lists no fragments"
-    assert cl.load_fragments(cl.TARGETS[key], live_root), f"{key}: no fragments on disk"
+    on_disk = cl.load_fragments(target, live_root)
+    if baseline["fragments"]:
+        assert on_disk, f"{key}: baseline lists fragments but none are on disk"
+        return
+    assert baseline.get("foldedAt"), (
+        f"{key}: baseline lists no fragments and records no fold — an empty "
+        f"corpus would pass the round-trip check without examining anything"
+    )
+    assert not on_disk, (
+        f"{key}: baseline records a fold but fragments are on disk; the fold "
+        f"deletes what it folds, so this corpus is neither state"
+    )
 
 
 @pytest.mark.parametrize("key", sorted(cl.TARGETS))
@@ -147,11 +215,24 @@ def test_concatenation_equals_the_recorded_pending_region(live_root, key):
 
     Not "a digest matches" but: the bytes of the fragments, joined in
     render order, are the bytes the unpartitioned file held.
+
+    Set 133 S1: once a release is folded there is no pending region left
+    to make that claim about, and the frozen record becomes the whole
+    rendered document. The test asserts THAT instead of skipping —
+    deliberately, because it is the comparison `check` itself omits in
+    its post-fold branch (see the xfail falsifier below).
     """
     target = cl.TARGETS[key]
     baseline = cl.load_baseline(target, live_root)
     fragments = baseline_fragments(target, live_root)
-    assert fragments, "vacuous: no baseline fragments on disk"
+    if not fragments:
+        assert baseline.get("foldedAt"), "vacuous: no fragments and no fold"
+        rendered = cl.read_text(target.rendered_path(live_root))
+        assert cl.sha256_text(rendered) == baseline["originalSha256"], (
+            f"{key}: the folded document no longer matches the digest the "
+            f"fold recorded for it"
+        )
+        return
     joined = "".join(f.text for f in fragments)
     assert cl.sha256_text(joined) == baseline["partitionPendingSha256"]
 
@@ -260,6 +341,37 @@ def test_an_empty_baseline_does_not_pass_vacuously(sandbox):
     problems = cl.check(target, sandbox)
     assert problems
     assert any("examining anything" in p for p in problems)
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "OPEN DEFECT, found by Set 133 S1 running `fold` on the live repo for "
+        "the first time. check()'s empty-corpus branch returns [] as soon as "
+        "foldedAt is stamped, without ever comparing the originalSha256 that "
+        "fold recorded for the whole document. So between a release and the "
+        "next contribution the round-trip guard verifies nothing and an edit "
+        "to released history passes silently. The fix is ~6 lines and "
+        "symmetric with the comparison the non-empty path already makes; it "
+        "was deliberately NOT applied here because this set's spec forbids "
+        "product code changes in a release commit (operator ruling, "
+        "2026-08-15, journaled). Owner: the follow-on set that picks up this "
+        "residual. This test turns green the day the gap is closed."
+    ),
+)
+def test_post_fold_check_still_guards_released_history(sandbox):
+    """The window a release is cut in must not be the window with no guard."""
+    target = cl.TARGETS["router"]
+    assert cl.fold(target, sandbox) > 0, "precondition: something to fold"
+    assert cl.check(target, sandbox) == [], "precondition: a fresh fold is clean"
+
+    path = target.rendered_path(sandbox)
+    text = cl.read_text(path)
+    index = text.rindex("## [")
+    cl.write_text(path, text[:index] + "Planted line.\n\n" + text[index:])
+
+    problems = cl.check(target, sandbox)
+    assert problems, "a folded changelog accepted an edit to released history"
 
 
 def test_a_missing_baseline_does_not_pass_vacuously(sandbox):

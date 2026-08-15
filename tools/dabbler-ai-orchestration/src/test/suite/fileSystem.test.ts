@@ -1398,11 +1398,25 @@ suite("fileSystem — readSessionSets stepLedger (Set 114 S3)", () => {
   function landProjection(setDir: string, over: Record<string, unknown> = {}) {
     const crypto = require("crypto") as typeof import("crypto");
     const inputs: Record<string, string> = {};
-    for (const entry of fs.readdirSync(setDir, { withFileTypes: true })) {
-      if (!entry.isFile()) continue;
-      inputs[entry.name] = crypto
+    // `statSync`, not `Dirent.isFile()` — this helper stands in for the
+    // PYTHON writer, and `os.path.isfile` follows a symlink to a regular
+    // file. Using the dirent check here reproduced, inside the stand-in
+    // writer, the very defect `digestSetDirectory` documents itself for
+    // avoiding: the symlinked artifact was left out of the projection
+    // while the reader digested it, the key sets could not match, and the
+    // symlink-parity test below failed with `stale` on any machine
+    // privileged enough to create a symlink (it self-skips everywhere
+    // else, which is why this went unnoticed). Set 133 S1.
+    for (const name of fs.readdirSync(setDir)) {
+      const full = path.join(setDir, name);
+      try {
+        if (!fs.statSync(full).isFile()) continue;
+      } catch {
+        continue;
+      }
+      inputs[name] = crypto
         .createHash("sha256")
-        .update(fs.readFileSync(path.join(setDir, entry.name)))
+        .update(fs.readFileSync(full))
         .digest("hex");
     }
     const dir = path.join(setDir, ".dabbler");

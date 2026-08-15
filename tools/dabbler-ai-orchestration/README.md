@@ -1,27 +1,103 @@
 # Dabbler AI Orchestration
 
-An AI-led coding-session workflow for VS Code. Manage structured AI
-sessions, mandatory cross-provider verification, cost tracking, and
-git-worktree-aware session-set state — all from the activity bar.
+**Your AI work, organized like work.** Instead of a chat log you scroll
+back through, this extension gives AI-led development the same shape the
+rest of your project has: named units of work, an ordered plan for each
+one, a step list that shows where the work actually is, and a record at
+the end that survives the conversation. The tree below is not a summary
+someone wrote — it is read back from files on disk that the workflow
+writes as it goes.
 
-![The native Work Explorer tree, four levels deep: the Auth Service module is expanded into In Progress, Not Started and Complete status buckets; the in-progress set 042-token-refresh-rotation is expanded again into its four sessions, with Session 1 complete and Session 2 in flight; the Billing, Notifications and Platform Core modules are collapsed below](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/work-explorer-modules.png)
+**And the verification is one you can check.** Every session is reviewed
+before it closes, as a rule by a model from a *different provider* than
+the one that did the work — with one exception that is disclosed below
+rather than buried. You do not have to remember to ask for it, the AI
+cannot decide its own diff is too small to bother, and the evidence it
+ran on is written to disk where you can read it.
+
+![The AI Work Explorer panel in the VS Code sidebar. A Default module holding 131 sets is expanded into status buckets — In Progress (1 set), Not Started (2), Complete (115), Cancelled (13). The one in-progress set, 132-session-length-and-explorer-captions, is expanded into its sessions; the session in flight, "Fix the instrument before trusting it", is expanded again into its seven steps, each finished step carrying a tick and a start time from 14:00 to 14:46, the step being worked carrying the in-progress glyph, and the final Close out step not started](https://raw.githubusercontent.com/darndestdabbler/dabbler-ai-orchestration/master/tools/dabbler-ai-orchestration/media/ai-work-explorer.png)
 
 ---
 
-## Verification you do not have to remember
+## What the tree is showing you
 
-Every session is reviewed before it closes, and the review is run for
-you. `verify_session` picks a model from a **different provider** than
-the one that did the work, routes it the session's evidence, and writes
-the verdict where the close-out gate can corroborate it. There is no
-per-session skip: an engine cannot decide its own diff is too small to
-check, and a close with no corroborated verification is refused.
+Four levels, all derived from files rather than remembered:
 
-If no different-provider verifier can be reached, the result is an
-honest blocked state (`verification_unavailable`) resolvable only by an
-operator-attested manual path — never a silent same-provider pass.
+- **Modules** — a unit of work owned by one developer at a time. Projects
+  that do not need them stay under one default group.
+- **Status buckets** — In Progress, Not Started, Complete, Cancelled.
+- **Session sets** — an ordered sequence of AI-led sessions you and the AI
+  co-design *before* code is written, each with a spec on disk.
+- **Sessions and their steps** — expand the session in flight and you see
+  the step it is on and when each finished step started. Nothing writes
+  those times specially; they are derived from records the panel already
+  reads, so they light up on sets that closed months ago too.
 
-Two ways to give the router a provider to call:
+You direct the work and the workflow carries it. The feeling is less
+"hands on the wheel" and more telling a driver where to go next — and
+then being able to check the route they took.
+
+---
+
+## Verification you can check
+
+These are properties of the machinery, and each one is something you can
+go and confirm rather than take on trust:
+
+- **The verifier is chosen by excluding the orchestrator's own provider**,
+  resolved from the model id in the registry — never from a label a model
+  reports about itself.
+- **Verification is normally cross-provider, and a session never quietly
+  passes without it.** Where no different-provider verifier can be
+  reached, the usual result is an honest `verification_unavailable`
+  state, resolvable only by an operator-attested manual path — never a
+  *silent* same-provider pass.
+
+  **The one exception, stated plainly.** A project whose committed verify
+  type is `DIRECT_API`, running on a machine where the only usable
+  provider key is the orchestrator's own, does **not** stop: session
+  verification proceeds same-provider. It is loud rather than silent, and
+  you can find it afterwards — the run prints a warning telling you to add
+  a second provider's key, and **every record the verdict lands on carries
+  `verification_qualification: same-provider`**, so a verdict that was not
+  independently corroborated says so in its own machine-readable record.
+  The verdict is real; it is weaker, and it is labelled. This exception is
+  narrow by operator ruling: it covers **only** session verification (code
+  review and security review still fail closed), and **only** the
+  `DIRECT_API` path — a Copilot seat keeps the unqualified fail-closed
+  contract. Set a second `DABBLER_*_API_KEY` and it does not arise.
+- **A close with no cross-provider evidence runs the verification itself.**
+  There is no per-session skip to find.
+- **A finding closes only when its criterion fails before the fix and
+  passes after.** A fix that does not move its own criterion does not
+  count as a fix.
+- **Rounds are bounded**, and only the operator may authorize another —
+  not the AI, and not by rewording a finding it already lost.
+- **Full test suites run before commit, before push and before close**,
+  and each run is recorded; a close whose recorded runs are stale is
+  refused.
+- **A routed call cannot write to your workspace.** On the Copilot CLI
+  transport routed calls are dispatched with a read-only tool allowlist
+  (`view`, `grep`, `glob`); on the direct-API transport they are plain
+  completions that never had filesystem reach. A verifier that could edit
+  the code it judges could report a pass on its own edit — so it cannot.
+
+**What this extension does not claim.** It does not claim a defect-catch
+rate, and it will not tell you it catches bugs before they ship: nobody
+here has measured what fraction of real defects this finds, and a number
+we have not measured is not one we will print. What is claimed above is
+that the checks happen, that they are independent, and that you can audit
+them afterwards. Where a criterion is executed for you, it runs in a
+disposable checkout with a credential-stripped environment — **that is
+containment, not a sandbox**, and the docs say so plainly rather than
+implying more.
+
+---
+
+## Giving the router a provider to call
+
+Cross-provider verification needs reach to **at least two provider
+families**, or there is nothing to cross to. Two ways to get there:
 
 | | **Direct provider API keys** | **GitHub Copilot CLI seat** |
 |---|---|---|
@@ -29,75 +105,55 @@ Two ways to give the router a provider to call:
 | Spend | Metered, capped by your not-to-exceed budget (a 3-session set typically totals $0.15–$2.50) | Covered by your existing Copilot subscription |
 | Best for | Anyone with provider accounts | Shops whose staff hold only a Copilot seat and cannot get provider keys |
 
-Either way you need reach to **at least two provider families**, or
-cross-provider verification has nothing to cross to. Which one a project
-uses is answered once per machine by
+You do **not** need both, and you do not need all three API keys — one
+seat that exposes two provider families is enough, which is the case the
+Copilot path exists to serve.
+
+Which one a project uses is answered once per machine by
 `python -m ai_router.verify_type --set DIRECT_API` (or `COPILOT_CLI`) and
 recorded in `project-verify-type.txt` at the repo root — **gitignored on
-purpose**, because what verifies a project is machine/project state: one
-checkout answers `COPILOT_CLI` on a Copilot seat and `DIRECT_API` on a
-machine that holds provider keys. The router derives `transport.profile`
+purpose**, because what verifies a project is machine/project state: the
+same checkout answers `COPILOT_CLI` on a Copilot seat and `DIRECT_API` on
+a machine that holds provider keys. The router derives `transport.profile`
 from that file, so there is no second place for the fact to be recorded
 differently.
 
 > **Upgrading from a version before 2026-08?** A second "Lightweight"
 > tier used to let a session set opt out of routed verification
 > (`tier: lightweight` in the spec). It is **removed**, and a spec that
-> still declares it now fails to load with a migration message. The
-> Copilot seat option above covers the same keyless case without giving
-> verification up. What to change:
+> still declares it now fails to load with a one-line migration message.
+> The Copilot seat option above covers the same keyless case without
+> giving verification up. What to change:
 > [the removal notice](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/cross-repo-lightweight-removal-notice.md).
 
 ---
 
-## What you get
+## Also in the box
 
-- **A standardized, largely automated workflow — not just better
-  chat hygiene.** Most developers already split AI work into
-  sessions; the hard part is everything around them. This extension
-  operationalizes a high-level plan into **session sets** — ordered
-  sequences of AI-led work sessions that you and the AI co-design
-  before any code is written — and then runs every session through
-  the same structured lifecycle: register, work, verify, document,
-  commit, close. You direct the work; the workflow carries it. The
-  feeling is less "hands on the wheel" and more "telling your
-  chauffeur where to go next."
-
-- **Ongoing visibility into AI work.** Every session leaves an
-  AI-generated paper trail in predictable places — the spec, an
-  activity log of every step, per-session state with verification
-  verdicts, a change log at close. The Work Explorer reads it
-  all back at a glance: what's in flight, what's queued, what's
-  blocked on prerequisites, what's done and verified. You can step
-  away and know exactly what happened while you weren't watching.
+- **Ongoing visibility into AI work.** Every session leaves a paper trail
+  in predictable places — the spec, an activity log of every step,
+  per-session state with verification verdicts, a change log at close. The
+  Work Explorer reads it all back at a glance: what's in flight, what's
+  queued, what's blocked on prerequisites, what's done and verified. You
+  can step away and know exactly what happened while you weren't watching.
 
 - **Cost-minded routing.** Reasoning tasks (code review, analysis,
-  documentation, end-of-session
-  verification) go through the AI router, which picks the cheapest
-  capable model per task and escalates only when needed. Real
-  projects we tested measured **73% savings vs Opus-only** on a
-  CLI/library project (990 routed calls) and **32% savings** on a UI
-  app with UAT/E2E gates (370 calls). Two sample reports ship in the
-  [GitHub repo](https://github.com/darndestdabbler/dabbler-ai-orchestration/tree/master/docs/sample-reports).
-
-- **Cross-provider verification at session close.** Every session is
-  reviewed before it closes — no skip: a model
-  from a *different provider* than the one that did the work reviews the session and returns a
-  structured verdict, and the close gate refuses an unverified close;
-  disagreements surface for human adjudication
-  rather than being silently merged or dismissed.
+  documentation, end-of-session verification) go through the AI router,
+  which picks the cheapest capable model per task and escalates only when
+  needed. Every call is written to `ai_router/router-metrics.jsonl`, one
+  JSON line each, so the bill is auditable rather than asserted.
 
 - **Confirm-gated git automation — remove keystrokes, not oversight.**
-  The mechanical trunk-based loop (push a session branch and open its
-  PR, sync-and-clean-up after the merge, cut a release tag, start a
-  hotfix, roll back) is one command each — on **GitHub (incl.
-  Enterprise) and Azure DevOps** alike, with the host auto-detected
-  from your remote. Every command previews the exact git/CLI lines it
-  will run and waits for your confirm; PR review/approval, release
-  decisions, and rollback authorization stay yours (an AI agent can
-  *invoke* the commands, but the confirm modal always goes to the
-  human). No host CLI installed? The PR command still pushes and
-  opens the host's create-a-PR page in your browser.
+  The mechanical trunk-based loop (push a session branch and open its PR,
+  sync-and-clean-up after the merge, cut a release tag, start a hotfix,
+  roll back) is one command each — on **GitHub (incl. Enterprise) and
+  Azure DevOps** alike, with the host auto-detected from your remote.
+  Every command previews the exact git/CLI lines it will run and waits for
+  your confirm; PR review/approval, release decisions and rollback
+  authorization stay yours (an AI agent can *invoke* the commands, but the
+  confirm modal always goes to the human). No host CLI installed? The PR
+  command still pushes and opens the host's create-a-PR page in your
+  browser.
 
 ---
 
@@ -190,26 +246,33 @@ back are covered in
 
 ## What it'll cost
 
-API spend is real and varies by project size and verification
-appetite. Honest framing:
+API spend is real and varies by project size and verification appetite.
+Honest framing:
 
-- **$0 budget** — verification routes through a *different* AI
-  assistant you open manually (e.g. open a second AI chat as the
-  verifier), or you skip verification with the decision logged. No
-  API spend.
-- **Non-zero budget** — the router makes synchronous API calls for
-  cross-provider verification, capped at your not-to-exceed (NTE)
-  threshold. Verification calls typically run **$0.05–$0.80 each**;
-  a 3-session set usually totals **$0.15–$2.50**; a 6-session set
-  **$0.30–$5.00**. These are empirical medians — outliers exist.
+- **Verification is not optional, so it is not free.** The router makes
+  synchronous API calls for cross-provider verification, capped at your
+  not-to-exceed (NTE) threshold. Verification calls typically run
+  **$0.05–$0.80 each**; a 3-session set usually totals **$0.15–$2.50**; a
+  6-session set **$0.30–$5.00**. These are empirical medians — outliers
+  exist.
+- **On a Copilot seat that spend is your existing subscription**, not a
+  second bill. That is the whole reason the seat path exists.
+- **Tiered routing is cheaper than sending everything to a frontier
+  model** — how much cheaper is a number you can compute rather than one
+  you have to believe. `python -m ai_router.report` reads the metrics log
+  and prints the ratio of what you actually spent to a **hypothetical
+  Opus-only baseline** (every call repriced at Opus rates). On two sample
+  projects that ratio came out at 73% and 32% below baseline; both reports
+  ship in the [GitHub
+  repo](https://github.com/darndestdabbler/dabbler-ai-orchestration/tree/master/docs/sample-reports)
+  so you can check the arithmetic. Read it for what it is — a
+  counterfactual against list prices, not a measurement of two projects
+  run twice — and note that at *matched context size* the per-call gap
+  between model tiers is far narrower than headline rates suggest.
 
-The router writes one JSON line per call to
-`ai_router/router-metrics.jsonl` so you can audit spend at any
-time. `python -m ai_router.report` produces a full markdown
-manager-report with the Opus-baseline savings headline,
-per-task-type unreliability rates, and auto-generated action
-items. The framework is open-source (MIT) — your costs are entirely
-your provider's API spend; nothing in this extension is paywalled.
+The framework is open-source (MIT) — your costs are entirely your
+provider's API spend or your Copilot seat; nothing in this extension is
+paywalled.
 
 ---
 
@@ -219,14 +282,18 @@ your provider's API spend; nothing in this extension is paywalled.
 - **Python 3.10+** with a workspace `.venv/` (the
   **`Dabbler: Install ai-router`** command auto-detects or creates
   it for you)
-- **API keys** as environment variables:
-  - `DABBLER_ANTHROPIC_API_KEY` (Claude Sonnet, Opus)
-  - `DABBLER_GEMINI_API_KEY` (Gemini Flash, Pro)
-  - `DABBLER_OPENAI_API_KEY` (GPT-5.4, GPT-5.4 Mini)
-  - All three are required so cross-provider verification has
-    somewhere to route to.
+- **A provider for the router to call** — *either* an authenticated
+  GitHub Copilot CLI seat exposing two provider families, *or* provider
+  API keys as environment variables:
+  - `DABBLER_ANTHROPIC_API_KEY` (Claude)
+  - `DABBLER_GEMINI_API_KEY` (Gemini)
+  - `DABBLER_OPENAI_API_KEY` (GPT)
+  - Two of the three is the working minimum — cross-provider
+    verification needs somewhere different to route to. Set all three
+    and the router has more to choose from.
   - These variables hold the normal provider-issued keys from Anthropic,
-    Google, and OpenAI; Dabbler only prefixes the environment variable names.
+    Google and OpenAI; Dabbler only prefixes the environment variable
+    names.
 - **One orchestrator AI agent** installed as a VS Code extension
   (Claude Code, Codex/GitHub Copilot, or Gemini Code Assist — the
   framework is agent-agnostic and supports switching mid-set).

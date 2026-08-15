@@ -573,6 +573,28 @@ def test_changelog_round_trip_flags_a_planted_reorder(tmp_path: Path):
     shutil.copytree(
         target.fragments_dir(str(repo)), root / target.fragments_rel.replace("/", os.sep)
     )
+
+    # Set 133 S1 (L-069-1, the same class as the comment below): `fold`
+    # empties the live corpus at every release, so from the moment a
+    # version is cut until the next contribution this falsifier had
+    # nothing to plant into and failed on a repo that was working
+    # correctly. Re-seed from real released prose when that is the state,
+    # exactly as the sibling battery in `test_changelog_partition.py`
+    # does. (Both sites now carry this; folding the two copies into one
+    # shared helper is a recorded follow-on.)
+    if not cl.load_fragments(target, str(root)):
+        parts = cl.split_document(cl.read_text(str(dst)))
+        _, sections = cl.split_blocks(parts.released, 2)
+        assert len(sections) >= 2, "released history should carry version sections"
+        seeded = "".join(
+            "## [Unreleased] — seeded prose {}\n{}".format(
+                index, "".join(section.splitlines(keepends=True)[1:])
+            )
+            for index, section in enumerate(sections[:2])
+        )
+        cl.write_text(str(dst), parts.preamble + seeded + parts.released)
+        cl.migrate(target, str(root))
+
     assert drift_guard.check_changelog_partition_round_trips(root) == []
 
     # L-112-1: plant into the corpus the gate actually reads. `check`

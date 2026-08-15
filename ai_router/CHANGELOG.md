@@ -24,7 +24,1953 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > (`python -m ai_router.changelog fold --target router`). Full contract:
 > [`docs/partitioned-append-files.md`](../docs/partitioned-append-files.md).
 
-## [1.0.0] — 2026-08-09 (Set 112 — the Lightweight tier is removed; staged, publish operator-gated)
+## [1.0.0] — 2026-08-15
+
+> **BREAKING — read this before you upgrade.** A session set can no longer
+> declare `tier: lightweight`. There is one tier now.
+>
+> **The symptom you will see.** Nothing silently changes behaviour; the
+> spec simply stops loading, with this message:
+>
+> ```
+> tier: lightweight was removed in Set 112 -- there is one tier now.
+> Fix: set 'tier: full' in the Session Set Configuration block (or drop
+> the tier: line entirely), then give the router a provider to call ...
+> ```
+>
+> **The one-line fix.** In your `spec.md`, inside the Session Set
+> Configuration block:
+>
+> ```diff
+> - tier: lightweight
+> + tier: full
+> ```
+>
+> Deleting the `tier:` line entirely does the same thing. You then need a
+> provider for the router to call — either the `DABBLER_ANTHROPIC_API_KEY`
+> / `DABBLER_GEMINI_API_KEY` / `DABBLER_OPENAI_API_KEY` variables for the
+> Direct APIs transport, or an authenticated GitHub Copilot CLI seat
+> selected with `python -m ai_router.verify_type --set COPILOT_CLI`
+> followed by `python -m ai_router.verify_type --set-env`.
+>
+> **Full migration notes:**
+> [`docs/cross-repo-lightweight-removal-notice.md`](https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/cross-repo-lightweight-removal-notice.md).
+>
+> The failure is loud, immediate and one line to fix by design. That is
+> the whole remedy: a spec that declares the removed tier is never
+> converted silently, because a silent conversion would run a set under
+> discipline its author did not choose and did not configure a provider
+> for.
+
+> **What is in this release.** `1.0.0` says the package now has exactly
+> one tier and one verification story. Stated without varnish, that story
+> is: **verification is normally cross-provider** — the verifier is
+> chosen by excluding the orchestrator's own effective provider, resolved
+> from the model id — and the tier that let a set substitute a
+> hand-recorded verdict for a routed one is gone.
+>
+> **It is not cross-provider in every case, and this release does not
+> claim it is.** One configuration still produces a same-provider
+> verdict: a `DIRECT_API` project on a machine holding no usable API key
+> outside the orchestrator's own provider. There, **session** verification
+> proceeds same-provider rather than stopping (Set 123 S2, operator
+> ruling 2026-08-11). It is same-provider verification, not an
+> independent review of it — what Set 123 S2 changed is that the case is
+> now loud and labelled instead of silent: the run warns on stderr, and
+> `verification_qualification: same-provider` is stamped on every record
+> the verdict touches, so a later reader can tell a corroborated verdict
+> from an uncorroborated one. The exception is narrow: **session
+> verification only** (code review and security review still fail
+> closed), and **`DIRECT_API` only** — a Copilot seat keeps the
+> unqualified fail-closed contract. Adding a second provider's
+> `DABBLER_*_API_KEY` removes the case entirely.
+>
+> The per-set entries immediately below are every set from 119
+> to 132 that accrued a router-side change — each one headed by the set
+> that made it — and **the release continues in the *Set 112 tranche*
+> section beneath them**, which additionally carries the previously
+> unpublished router work of Sets 105, 107, 109, 110, 111 and 114. That
+> tranche was staged on 2026-08-09 under this same version number and
+> ships as part of this release, not as a separate one.
+>
+> One entry deserves to be read even if you read nothing else:
+> ***a routed call cannot mutate the repo*** (Set 125), immediately below.
+> If you run the Copilot CLI transport, this is the first published router
+> in which a routed call — including a verifier — cannot write to your
+> working tree.
+
+### a routed call cannot mutate the repo (Set 125)
+
+#### Security
+
+- **(Set 125) A routed call on the Copilot CLI transport can no longer
+  write to your working tree.** This is a consumer-visible security fix,
+  not a refactor, and it is the first release to carry it: the fix landed
+  in `d13e7b9d` on 2026-08-12, **after** the last published router
+  (`0.34.0`), so every seat running the published package until now has
+  been dispatching routed calls under the old grant. Verify for yourself
+  with `git merge-base --is-ancestor d13e7b9d v0.34.0`.
+
+  **What a routed call could do before.** `route()` is one contract, but
+  its two transports did not honour it equally. On the `api` profile a
+  routed call is a plain HTTPS completion — `providers.py` sends no tools
+  key at all — so the model returns text and cannot touch the filesystem
+  by construction. On the `copilot-cli` profile the same call dispatches
+  an **agentic CLI**, and `--allow-all-tools` alone handed the model the
+  whole tool universe against the **live** working tree: arbitrary shell
+  (`powershell`), file `create`/`edit`, web fetch, and sub-agent spawning
+  (`task`, `write_agent`).
+
+  **What it can do now.** Both dispatch paths — inline, and the Set 104
+  large-prompt file handoff — pass `--available-tools` with a read-only
+  allowlist: `view`, `grep`, `glob`. Nothing else is in the model's view.
+  The argv comes from one shared `_tool_grant_argv()` helper precisely so
+  a fix applied to only one dispatch path is impossible (L-069-1).
+
+  **Why it matters, beyond the obvious.** A verifier that can edit the
+  code it judges can fix a finding and then report VERIFIED on its own
+  edit — the verification is then a statement about the verifier's own
+  work, and nothing in the artifact says so. That is the failure this
+  closes, and it is why the fix belongs in the release notes rather than
+  in a commit message.
+
+  **Observed, not theorised.** On 2026-08-12 routed calls fired from this
+  repo's own test suite modified 23 files with no human in the loop — two
+  production modules, extension source, the built `dist` bundle, a JSON
+  schema, six docs, plus one 150-line doc the model invented — and wrote
+  two spurious rounds into a live verification ledger.
+
+  **Shape of the fix: an allowlist.** `--available-tools` removes a tool
+  from the model's view, while `--deny-tool` only withholds permission,
+  and a denylist fails open on whatever tool a future CLI release adds.
+  `view` is in the allowlist because it is **required** — the Set 104
+  handoff instructs the model to pull its payload from a temp file — and
+  `grep`/`glob` keep path-aware review able to locate what it is asked to
+  review.
+
+  **Evidence is a matched pair**, identical prompt, only the grant
+  differing: `--allow-all-tools` alone returned
+  `filesModified: ["sample.txt"]`; with the allowlist, `filesModified:
+  []`. Worth recording that the blunt *"create breach.txt"* phrasing was
+  **declined** by the model while the benign *"bring this file into line
+  with the convention"* framing wrote immediately — refusal is not a
+  control, the grant is. Pinned by
+  `ai_router/tests/test_routed_calls_cannot_mutate.py`, including a
+  structural disjointness falsifier against the named mutating tools.
+
+  **Nothing is owed to users of the `api` profile**, who were never
+  exposed. If you run the seat profile, this release is the one that
+  closes it, and no configuration change is required to get the fix.
+### usage accounting leaves the preload corpus (Set 121 S2)
+
+#### Added
+
+- **(Set 121 S2) `ai_router/guidance_ledger.py` — the guidance usage
+  ledger.** One compact record per guidance item in
+  `docs/planning/guidance-usage.json`, keyed by id and **agnostic about
+  which document an entry lives in** (`kind` says what an entry *is*,
+  never where it sits — `project-guidance.md` is the sink lessons are
+  promoted into, so a lesson-specific ledger would have guaranteed a
+  rewrite). Each entry carries a **bounded ring of its last 10 uses**,
+  every use a dash-separated, zero-padded `<set>-<session>` **string** —
+  `"120-10"`, never `120.10`, which round-trips through a float to
+  `120.1` and reads back as session **1**. One sanctioned writer, an
+  atomic replace, and the package's single lock implementation.
+
+  Ordering is **append order, never label order**: set numbers are
+  allocation order, not execution order (Set 121 S1 measured sets 115 and
+  118 executing after 119), so both the ring and the active-session
+  timeline are built from close-event timestamps.
+
+  New CLI: `report` (retention candidates), `cite`, `fire`, `register`,
+  `validate`, `backfill`.
+
+- **(Set 121 S2) Retention rules, split by artifact type.** A single
+  *"unused in N sets → drop"* rule fails for preventive gates: a gate
+  that never fires is indistinguishable from a useless one, which **is**
+  `L-112-1`. Instruction lines are retained when cited within the last
+  `instruction_window_sessions` **active sessions** (never elapsed time —
+  a dormant repository must not lose its guidance to the calendar).
+  Cheap checks (<1s, deterministic, no routed call) are permanent and
+  need no usage record at all. Expensive checks (a routed call, or >10s)
+  must have **fired** within the last `check_window_sets` sets.
+
+  *A use is a citation for an instruction and a FIRE for a check*, and
+  that is a type error rather than a convention: `record_citation()`
+  refuses an executable and `record_fire()` refuses an instruction, so a
+  CI run cannot be filed as a fire.
+
+  **Nothing here evicts anything.** The module has no evict path;
+  pruning is a batched pass the operator initiates, never automatic and
+  never mid-session.
+
+- **(Set 121 S2) `close_lock.file_mutex` / `acquire_file_mutex`** — the
+  single-file form of the existing stale-reclaim + TTL primitive, for
+  repo-level append-only state that no session set owns. One lock
+  implementation, two entry points, rather than a second copy of
+  dead-PID and TTL probing.
+
+- **(Set 121 S2) `guidance.retention` in `router-config.yaml`**, with the
+  numbers **derived** from 345 recorded active sessions and 167
+  per-session citation events rather than inherited from the proposal:
+  `instruction_window_sessions: 30` (p99 of 694 intra-lesson citation
+  gaps; ~10.4 sets at this repo's measured 2.88 sessions/set),
+  `check_window_sets: 20` (**no fire history exists** — an honest default
+  reusing the operator-set `disuse_window_sets`, stated as unmeasured),
+  and `instruction_line_cap: 22` (peak distinct ids cited in any trailing
+  window), whose known blind spot — `project-guidance.md` has no ids yet —
+  is recorded along with Session 3's obligation to re-derive it.
+
+#### Changed
+
+- **(Set 121 S2) `cite_lessons` records to the ledger, not the preload
+  markdown.** It gains `--session <M>`, resolves ids against the guidance
+  files **read-only**, and still prints `[reconsider]` for an archived
+  id. Its `CLOSE_MANDATED_WRITES` declaration is repointed at
+  `docs/planning/guidance-usage.json` with `bound: "whole-file"`.
+
+  This is **strictly safer** than the exemption it replaces:
+  `lessons-learned.md` and `lessons-archive.md` previously carried a
+  surgical exemption so the close could bump one trailer field in them.
+  Nothing writes them at close any more, so they now bind the freshness
+  digest **byte for byte** with no exemption at all.
+
+- **(Set 121 S2) `guidance_triage` shows the classifier real recency.**
+  The routed prompt carries the ledger's use ring instead of the
+  `last-used-set` scalar, which could not distinguish *used once, ten
+  sets ago* from *used in every one of the last ten* — the two cases that
+  warrant opposite triage verdicts.
+
+- **(Set 121 S2) The ledger is backfilled from history, not started
+  empty.** `close_session` has recorded `disposition.lessons_cited` into
+  `session-events.jsonl` since Set 064, so `guidance_ledger backfill`
+  replays 167 per-session citation events across 65 sets into true
+  recency rings. A repo that has been citing lessons gets a populated
+  ledger on day one.
+
+#### Removed
+
+- **(Set 121 S2) `last-used-set` is retired from the lesson trailer
+  scheme**, along with `guidance_meta.normalize_close_mandated_metadata`
+  (the freshness normalizer that existed only because the close rewrote
+  a preload document). `guidance_meta.update_last_used` remains as a
+  **loud `NotImplementedError`** naming its replacement rather than a
+  silent no-op, because a consumer repo pinned to an older release would
+  otherwise drop its usage signal while appearing to work. A stale
+  `last-used-set` in a trailer is reported by `validate_guidance_meta` as
+  *retired*, not as an unknown key.
+
+  `status="active"` is now omitted from a formatted trailer too — the
+  active tier is what active means, and restating it cost preload tokens
+  to say nothing.
+
+**Migration for consumer repos:** run `python -m
+ai_router.guidance_ledger backfill` once, then use `cite_lessons --set
+<N> --session <M>`. Existing `last-used-set` values are left in place and
+are inert; strip them at your convenience.
+### why long sessions are long (Set 132)
+
+#### Changed
+
+- **(Set 132 S3) Transcript rotation fires only at a threshold-crossing step
+  boundary, and N and the threshold are now documented as one setting.** Set
+  131 established the trigger (~150K retained input tokens, taken at the first
+  step boundary after the crossing) but not the half that stops it firing at
+  *every* boundary. The arithmetic is self-defeating rather than merely
+  unprofitable: a flush resets the transcript to ~54K, inside the cheap
+  25–75K plateau, so a second flush at the next boundary pays the full
+  400 credits to save approximately nothing. A session declaring `N = 3` has
+  seven steps and six internal boundaries; firing at all six would cost 2,400
+  credits, of which at most the first could repay. The boundary rule says
+  *when* a flush is safe, the threshold says *whether* it is worth making, and
+  both conditions are required. `docs/ai-led-session-workflow.md` →
+  *Rotation, and the trade we declined* carries the rule and a new subsection
+  stating the coupling in one place: **N determines how many boundaries exist,
+  the threshold determines which of them fire** — with the obligation named in
+  both directions, so a future set that lowers N must check the remaining
+  boundaries still land near the 150K crossing, and one that lowers the
+  threshold must check it has not recreated the every-boundary policy.
+
+- **(Set 132 S3) The session-size cap section now states what the cap is
+  competing against.** Per-session fixed overhead `F` was estimated two ways —
+  as a regression intercept over 199–225 sessions (39 min) and as a direct
+  partition of ceremony-step time over 97 sessions (41 min) — against a median
+  work step of 6–9 minutes. The two are **not** independent confirmations:
+  they regress and partition the same `startedAt`/`completedAt` interval, so
+  what agrees is a fitted intercept and a measured split, which checks the
+  decomposition rather than the interval. **Fixed overhead is 5–7× the cost of
+  a work step**, so a step-budget change is a small lever by construction.
+  Directly measured `w̄` does not rise with N (`corr(N, w̄)` = −0.03 to −0.40
+  across every cut), which is the test the `F/N + w̄` ratio was algebraically
+  unable to perform. And the residual tail's strongest observed correlate is
+  not step count: among sets 111+, verification-artifact count correlates with
+  duration at **+0.767** against N's **+0.228** — a ranking of unmodelled
+  correlations, not an effect size, and its causal direction is unresolved.
+  `WORK_STEP_BUDGET` is unchanged at 3 — the number moves only on the
+  operator's word, and this set ships the brief, not the change.
+
+#### Added
+
+- **(Set 132 S3) The consequence rubric is documented as governing plan
+  authoring, not only severity triage.** Answering an operator question —
+  *"what is the risk (probability × impact) of not doing this work?"* —
+  **nothing was added to enforce it**: no gate, no config key, no CLI, no
+  close-out predicate. L-095-1's existing rubric already *is* that question,
+  evaluated about a proposed step rather than a reported finding, and it is
+  already preload. The authoring guide's *Other sizing signals* now names the
+  application point: before a step enters a spec, name the failure scenario
+  that follows from not doing it; no nameable scenario means it is a nit and
+  does not belong in the plan. The test can only ever delete a step, which
+  makes it an instance of *Prefer removal over addition* rather than an
+  exception to it.
+
+#### Known issues
+
+- **`route(prefer_model=...)` is silently ignored on the `copilot-cli`
+  transport.** `_route_via_copilot_cli` does not accept the parameter at all —
+  that profile resolves exactly one generator *role* from the seat catalog
+  instead of walking a tier ladder — so a preference the public `route()`
+  signature accepts and documents is dropped without warning, while being
+  honoured on `api`. A caller cannot detect it: the call succeeds, and the
+  metrics row records `served_model_mismatch: false` because the model that
+  answered is faithfully the one the transport asked for. Found by using it
+  (a two-provider panel that came back single-provider). The working lever on
+  that transport is `exclude_providers`, which it does apply against the
+  catalog's confirmed entries. Not fixed here — this was a documentation
+  session — and a fix owes falsifiers on **both** transports (L-112-1),
+  covering the honour path and the loud-refusal path.
+
+- **The automated path-aware-critique producer is wired to the `api`
+  transport only.** `python -m ai_router.pull_critique` fails on a Copilot
+  seat with `missing API key (env 'DABBLER_OPENAI_API_KEY')`, which reads as
+  "path-aware review needs provider keys". It does not. Routed children on
+  `copilot-cli` are dispatched as agentic CLI processes carrying
+  `--available-tools view,grep,glob`, so they hold genuine read-only repo
+  access by construction. The failure is in the producer: `pull_verifier.py`
+  contains no reference to transports at all and implements its own tool loop
+  against provider SDKs. The asymmetry is about who supplies the agentic
+  loop — on `api` the router must build it, on `copilot-cli` the CLI already
+  **is** the agent — so the seat that needs a hand-rolled loop least is the
+  one the producer refuses. The **manual flow, which the template documents
+  as the default, is unaffected** and is what Set 132 used. Same family as
+  the `prefer_model` issue above: transport-conditional behaviour invisible
+  from the call site.
+### the instrument that counted wrong (Set 132)
+
+#### Fixed
+
+- **(Set 132 S2) `spec_admission` no longer hoists a nested ordered list
+  into the step count.** `_STEP_RE` capped a step marker's indent at three
+  characters, on the reasoning that "4+ spaces is a nested list in
+  Markdown". That holds under a *bullet*; under the ordinary `2. ` parent
+  the content column is **3**, which is exactly where CommonMark nests a
+  child list — so every nested ordered list this repo's specs actually
+  write was counted as top-level steps. Set 131's Session 1 declared six
+  steps, nested five precedence rules under step 2, and was reported
+  `OVER CAP` at eleven, then seeded into `activity-log.json` as five plan
+  rows that could never be logged as steps in their own right. Depth is
+  now resolved the way Markdown resolves it, by `_top_level_step_starts`
+  comparing each marker's indent against the content column of the items
+  still open above it; sub-steps stay inside their parent step's text
+  rather than becoming steps beside it. Across the 374 sessions in this
+  repo the parse loses 25 phantom steps in five sessions, one of which
+  (Set 107 S1) was being counted at 16 against a declared 9.
+
+- **(Set 132 S2) Ceremony is classified by role, not by mention.**
+  `intents_named` charged any step containing "verification", "register"
+  or "close" as ceremony, so a work step reading *"Independence
+  requirement. Work whose value is an independent perspective is always
+  routed: session-verification, code review, security review"* was tallied
+  as a verification step, and `N` — the authored work-step count
+  `WORK_STEP_BUDGET` budgets — was deflated wherever a session's work
+  discussed a stage. New `classify_steps()` / `work_step_count()` decide
+  the question the way the skeleton already poses it: the first slot and
+  the last three are the ceremony positions, a step there is ceremony only
+  when it also **names** the stage it stands for, and everything else is
+  work. Requiring the naming as well as the position is what keeps the
+  pre-skeleton corpus honest — a session that compressed its whole tail
+  into one step is charged for one ceremony step, not four.
+  `intents_named` is unchanged and stays the mention primitive
+  `check_step_shape` needs at a fixed position. `SessionPlan` gained a
+  derived `work_step_count`, and the report now prints `N` beside the
+  declared step count.
+
+#### Changed
+
+- **(Set 132 S2) `spec_admission --spec` exits non-zero when the named
+  spec fails admission.** It used to print `OVER CAP` and return success
+  unless `--check` was passed, which is a gate announcing a violation and
+  permitting it. `--spec` names one spec, which the caller is authoring
+  and wants a verdict on. `--all` deliberately stays a census and still
+  needs `--check` to gate: 47 sessions across 31 of this repo's 131 specs
+  are over cap with no declared exception, so an enforcing default there
+  would be a gate that always fires. `--check` still means "enforce" in
+  either mode. Journaled in the set's `decisions.jsonl`
+  (`goal-over-letter`).
+
+  Not the cause of the Set 131 incident, and the code now says so:
+  `start_session` does not consult the admission test at all, so those
+  eleven mis-parsed rows would have been seeded whatever `--spec`
+  returned. The parse was the defect.
+
+- **(Set 132 S2) The "longest sessions on record" claim is corrected in
+  both places it was printed** (`spec_admission`'s docstring and
+  `session-set-authoring-guide.md`). Re-running the probe on the fixed
+  parser over 225 sessions found longer sessions than the quoted 591 /
+  562 / 544 / 509 minutes — and found why. Duration is
+  `completedAt - startedAt`, elapsed **calendar** time: 15 sessions were
+  registered on one day and closed the next, **all 15 sit in the 23
+  longest sessions on record**, and excluding them takes the population
+  p90 from 301 to 147 minutes. Trimming idle gaps from `activity-log.json`
+  step timestamps instead takes it from 311 to 140. The cap did not move —
+  the median still steps up between `N = 3` and `N = 4-5` — but the tail
+  it disclaims responsibility for was mostly sleep. Method, tables and
+  caveats:
+  `docs/session-sets/132-session-length-and-explorer-captions/s2-measurement.md`.
+### the pin comes out, and the lever that was never written down (Set 131)
+
+#### Changed
+
+- **(Set 131 S1) `routing.outsourcing_mode` restored to `whenever-helpful`.**
+  It was pinned to `verification-only` on 2026-08-05 as a **temporary**
+  operator policy whose own comment named Set 111 as the owner of its
+  removal. Set 111 shipped the decision-rights rubric and never lifted it, so
+  a three-set window became twenty sets of de-facto permanent policy. A
+  temporary narrowing should name the set that owns its removal; this was the
+  set that owned that line.
+
+- **(Set 131 S1) `delegation.always_route_task_types` regained `code-review`
+  and `security-review`, and became a floor.** The list is now exactly the
+  work whose *value is* an independent perspective — the tasks where the
+  orchestrator doing them does not save money but destroys the thing being
+  bought. `load_config()` unions `config.INDEPENDENCE_REQUIRED_TASK_TYPES` in
+  regardless of what the file says, so an economic edit cannot delete a
+  requirement precedence rule 2 imposes. It is not a list of expensive tasks,
+  and it is deliberately no longer than three entries.
+
+- **(Set 131 S1) Delegation Discipline is a precedence order, not a pair of
+  lists.** `docs/ai-led-session-workflow.md` now evaluates: **authority veto**
+  (the decision-rights rubric and the verification-reduction carve-out, with
+  cost not an input) → **independence requirement** → **risk gate** →
+  **context footprint** → **model choice, last**. A later rule may never
+  override an earlier one, so no economic rule can move a decision from human
+  authority to AI authority.
+
+  The risk gate is the operator's gate made precise: work is outsourceable
+  when its failure mode is caught by an oracle **already independent of the
+  producer**. Tests authored by the same delegate are not one. Stateful
+  judgment — work whose correctness depends on what this session already
+  tried and rejected — is the standing exception.
+
+- **(Set 131 S2) `ModelEntry.premium_request_weight` renamed to
+  `probe_premium_requests`; catalog lockfile schema v1 → v2.** The name
+  asserted a rate; the value is the premium-request count the CLI reported
+  for the **one short probe call** that confirmed the model. Existing
+  lockfiles keep loading — the reader accepts the legacy key
+  (`_LEGACY_PROBE_PREMIUM_KEY`) so no seat loses a real measurement — and the
+  next `--refresh` writes v2. `None` means **unknown**, never free, and no
+  module outside `copilot_catalog.py` may name the field in either spelling.
+
+#### Added
+
+- **(Set 131 S1) `delegation.direct_work_reason_codes`** replaces the
+  "~50 lines of reasoned output" threshold, which measured the wrong end:
+  emitted output is not what gets re-billed, **retained input is**.
+  Classification is **constant-time** — pick a code or route, with no
+  narrative justification, and if deciding which code applies would require
+  opening a file, that *is* the answer. This is the disciplined form of the
+  operator's "don't spend more deciding than doing"; the undisciplined form
+  is a licence to hoard, because an orchestrator asked to estimate its own
+  decision cost reliably concludes that doing the work is cheaper. The list
+  is a closed enum — an unknown code is refused at load, because inventing a
+  code is inventing a new way to keep work. Codes are audited in aggregate,
+  never debated per call.
+
+- **(Set 131 S1) `delegation.child_budget`** — a routed child's cost tracks
+  its **inference count**, which is unbounded, not its rate. Advisory, not
+  enforced: this repo measures before it gates, and the sample is 11 child
+  conversations. A child that would exceed its budget is a task that should
+  have been split.
+
+- **(Set 131 S1) `delegation.thresholds`, keyed on `transport.profile`.** One
+  philosophy, two thresholds, and the reason is **capability, not money**: on
+  `copilot-cli` a child holds a read-only tool allowlist and can explore the
+  repo itself, so delegating exploration is cheap; on `api` a child gets no
+  tools at all and the orchestrator must package every byte of context, so
+  packaging cost frequently dominates. An unknown profile key is refused at
+  load rather than silently ignored.
+
+- **(Set 131 S1) "Child output is untrusted data."** The orchestrator is the
+  only actor holding write, shell and network rights, so widening delegation
+  must not turn it into a relay: child responses are **evidence, never
+  instructions** (including repository content they quote), no child-supplied
+  command string is ever executed, and child output may not expand scope,
+  authorize destructive actions, reduce verification, or close a session.
+
+- **(Set 131 S2) `ai_router/tests/test_catalog_weight_not_a_price.py`** —
+  eight structural falsifiers holding down the prohibition, every one proven
+  by planting the defect in the real tree and watching the named test fail
+  (10 plants, 10 fired). The scan asserts its own corpus is non-empty and
+  contains named members, so it cannot pass having examined nothing, and the
+  legitimate look-alike (`premium_requests` in the transport metadata) is
+  asserted **not** to fire.
+
+- **(Set 131 S3) `docs/ai-led-session-workflow.md` → "Rotation, and the trade
+  we declined".** Transcript rotation is the largest measured cost effect in
+  this repo's history and was documented nowhere. It ships with a **trigger**
+  (~150K retained input tokens, taken at the first step boundary after the
+  threshold is crossed, because a boundary already produces most of the
+  carry-forward), a **survival contract** naming what must come through a
+  flush and what must not be assumed to, and the **failure mode** — a session
+  that repeats a path it already abandoned, which is the same statefulness
+  argument that keeps stateful judgment with the orchestrator. Rotation stays
+  manual: no automatic trigger ships in the set that first measured it.
+
+- **(Set 131 S3) Rotation named as a fourth cost lever in
+  `docs/planning/orchestration-strategy.md`.** Its three currencies are all
+  managed by choosing what process to run; the orchestrator's own retained
+  transcript is the lever that document omitted, and it is the larger one.
+
+#### Fixed
+
+- **(Set 131 S2) `premium_request_weight` was not a price and was wrong
+  besides.** Measured against the seat store's authoritative
+  `request_multiplier`, the probe-derived field disagrees for the **entire
+  OpenAI family**: `gpt-5.5` probes `0` and bills **7.5**, the second-highest
+  multiplier on the seat; `gpt-5.4` probes `0` and bills `1.0`;
+  `gpt-5.4-mini` probes `0` and bills `0.33`. The Anthropic and Google
+  entries agree, which is precisely what made the field look trustworthy.
+
+  The defect was **latent** — nothing read it for selection — and Session 1,
+  by widening delegation, is what would have created such a reader. The
+  subtler half is now stated beside the declaration: the field is unusable
+  **even where it agrees**, because the credit axis is decoupled from the
+  premium-request axis, so a reader who learns only "the OpenAI numbers are
+  wrong" would conclude that correcting them makes the field usable.
+
+- **(Set 131 S1) Two documented config keys that never existed.** The
+  workflow doc told readers that `delegation.direct_work_max_lines` and
+  `delegation.direct_work_max_files` lived in `router-config.yaml` and were
+  human-tunable per project. They appear only in a design proposal and Set
+  031's spec and were never shipped. Removed rather than added: the
+  replacement rule measures retained input, not emitted lines.
+
+- **(Set 131 S3) `AGENTS.md`, `CLAUDE.md` and `GEMINI.md` disagreed with each
+  other and with the config.** `CLAUDE.md` and `GEMINI.md` still named "Set
+  110 Session 4 and Sets 111-112" as a live window, `AGENTS.md` had drifted
+  to a compressed variant of the same stale claim, and all three pointed at
+  "human-tunable thresholds" that Session 1 had just deleted as phantom. The
+  three engine files are supposed to differ **only** in their engine-specific
+  bootstrap; the section is now byte-identical across all three.
+
+#### Measurement
+
+All figures from the live Copilot seat store on 2026-08-14
+(`assistant_usage_events`, 17,531 events), opened `mode=ro` — never
+`immutable=1`, which skips the WAL and undercounts.
+
+- **Rotation is a ~7–8x per-inference reduction.** Conversation `a9f211a7`
+  (1,148 inferences, **$367.18**) compacted at turn 75: input fell
+  631,304 → 54,119 tokens and cost fell ~33–35 → **~3.6–5.0** credits per
+  inference. One-time cost 400 credits, payback ≈ 14 inferences. Banded on
+  the same model, cost is flat from 25K to 150K input (7.65 → 9.76) and then
+  roughly doubles per band (17.18 at 150–300K, **35.77** above 300K) — which
+  is where the ~150K trigger comes from.
+
+- **The orchestrator-downgrade case does not survive controlling for
+  context.** The naive per-model table (opus-5 22.40 credits/inference vs
+  gemini-3.1-pro 2.65) is **role/context confounding** — opus-5 is measured
+  at ~270K input because it is the orchestrator, children at 33–45K because
+  they are children. At matched context the gap collapses to ~1.7–2x, and
+  `claude-opus-5` (multiplier **15.0**) and `gpt-5.5` (**7.5**) cost the
+  **same** per inference. The premium-request and credit axes are effectively
+  decoupled. The trade was declined on the record — a weaker orchestrator is
+  a confused deputy at the only end holding write and shell rights — so the
+  next reader does not re-derive the opposite from the naive table.
+
+- **An unbounded agentic child can cost more than doing the work.** Over true
+  sub-agent children (`initiator='sub-agent'`): gemini-3.1-pro **70.2**
+  credits/child over 17 inferences, sonnet-4.6 **39.7** over 18, haiku-4.5
+  **47.1** over 34 — but gpt-5.5 **721.8** over 89, which exceeds twenty
+  orchestrator inferences at a >300K context. Cost tracks inference count,
+  not rate.
+### what a session costs, and the unknown that is not zero (Set 130)
+
+#### Added
+
+- **(Set 130 S1) `ai_router/seat_cost.py` — the reader that refuses to
+  guess.** Prices an **explicit** component → conversation-id mapping
+  against the Copilot CLI's local usage store and returns a typed
+  `CostReport` of separately-labelled `ComponentCost` values. Every
+  failure path is a **named status** carrying a reason, and `credits` is
+  `None` — never `0.0` — whenever the number is not known: `measured`,
+  `lower_bound`, `unknown`, `unavailable`, `schema_unrecognized`,
+  `not_applicable`. A total exists **only** when every component in it was
+  measured, because a total that quietly drops one reports unmeasured
+  spend as zero.
+
+  `unavailable` vs `not_applicable` is the whole fail-open question in two
+  words. Claude Code and Gemini keep no local usage store, so cost
+  incurred there is `unavailable` (real, unseen), never `not_applicable`
+  (cannot exist) — and only the *caller* may declare the latter.
+
+  The store's `schema_version` is pinned and the columns actually read are
+  checked **before** any number is trusted: it is a private store read by
+  inference, and refusing is better than multiplying by a stale constant.
+
+- **(Set 130 S1) `ai_router/docs/seat-cost.md`** — canonical for the three
+  measurements (`routed_api`, `routed_seat`, `orchestrator_seat`), for the
+  rule that **any report showing one must say which it is showing and name
+  what it could not measure**, and for the three traps that produce a
+  plausible wrong number.
+
+- **(Set 130 S2) `orchestrator.seatSessionIds` on the per-session state
+  block.** `start_session` records `COPILOT_AGENT_SESSION_ID` through the
+  sanctioned writer, **appending** rather than replacing: `start_session`
+  is idempotent by design and is re-run after a context reset, and a reset
+  starts a *new* conversation on the *same* workflow session. Deduped,
+  order-preserving, omit-null — a Direct-API run records **no key**, never
+  `[]`, because "captured, and there were none" is a claim the empty list
+  makes and the seat cannot support.
+
+- **(Set 130 S2) `transport_session_id` on every `router-metrics.jsonl`
+  row.** `record_call()` gained the column and `route()` passes the
+  `sessionId` the Copilot CLI transport already captured and had nowhere
+  to put. It is the primary key of the usage store, so a row carrying it
+  can be priced exactly; a row without it can only be attributed by wall
+  clock, which cannot attribute at all. Additive-null on every historical
+  row and permanently null on the `api` profile, where `cost_usd` is
+  already authoritative and no child conversation exists.
+
+- **(Set 130 S3) `disposition.cost` — the contract.** Components carried
+  separately with a per-component status, so `unknown` is representable
+  and *shaped* differently from zero. Three rules, enforced by both
+  `validate_disposition` and `ai_router/schemas/disposition.schema.json`
+  (the parity contract, both directions): an unmeasured component carries
+  `credits: null`; a report containing one has **no total**; and a figure
+  taken at close cannot claim to be exact, because the turns that author
+  the disposition and run the close are not in the store while the session
+  is closing. Omit-null — a session that measured nothing carries no
+  block, which claims nothing.
+
+- **(Set 130 S3) `seat_cost.measure_session()` /
+  `session_conversation_ids()` — the join.** Reads the orchestrator ids
+  from `session-state.json` and the routed ids from
+  `router-metrics.jsonl`, prices them, and emits the `disposition.cost`
+  block. Nothing is guessed and nothing comes from a clock. Exposed as
+  `python -m ai_router.seat_cost --session-set-dir <dir>
+  [--session-number N] [--retrospective] [--cost-block]`. A live reading
+  includes the calling conversation and reports a **lower bound**; the
+  `--retrospective` reading of a finished session is exact.
+
+- **(Set 130 S3) `metrics.transport_session_ids()` and
+  `metrics.priced_and_unpriced()`** — the selector for the join key,
+  keyed the way the log actually is (normalized slug, so the historical
+  mixed path shapes match), and the split that decides what `cost_usd` is
+  a measurement *of*.
+
+#### Changed
+
+- **(Set 130 S3) `print_metrics_report` stops presenting unpriced calls as
+  `$0.0000`.** `cost_usd` is billing-authoritative only where
+  `billed_usage_unavailable` is not true; on a seat row it is a
+  placeholder beside a flag that says so. The header now reports the
+  priced calls under a label naming which measurement they are, states how
+  many calls are **not priced here** and how many of those carry the
+  conversation id that prices them, and every table cell renders `-`
+  rather than `$0.0000` for a group with nothing priced in it (`+` marks a
+  mixed group). Set 118 Session 1's five verification rounds are the
+  worked example: `$0.0000` printed, $8.66 spent.
+
+- **(Set 130 S3) `close_session` reports cost.** The recorded
+  `disposition.cost` block is printed component by component with its
+  unknowns named, and carried in `--json` output under `cost`. A session
+  that recorded no block gets `cost_note` instead, saying the spend is
+  **UNMEASURED, not zero** and naming the command that measures it. It is
+  **not** a gate: nothing refuses a close for an absent block.
+
+- **(Set 130 S3) `docs/session-constitution.md` Step 10 names
+  `disposition.cost`.** Paid for under the preload ceiling by removing the
+  provider-key enumeration duplicated from the engine bootstrap files; the
+  file is a net 8 bytes smaller.
+
+#### Fixed
+
+- **(Set 130 S3) The disposition JSON Schema rejected `uat` and
+  `checklist`.** Both shipped (Sets 111 S4 and 114 S1) without being added
+  to `disposition.schema.json`, which declares
+  `additionalProperties: false` — so the shipped schema deterministically
+  refused exactly the dispositions the `uat_walk_recorded` and
+  `checklist_posted` close gates require. Same defect class Set 123 S2
+  caught as a Major on `verification_qualification`; found this time by
+  adding a third omit-null field beside them.
+
+- **(Set 130 S3) `validate_disposition` skipped two fields when handed a
+  `Disposition` object.** The dict view it builds for the object path
+  omitted `verification_qualification` and `checklist` entirely, so an
+  object carrying an invented qualification token or an incoherent
+  checklist block validated **clean** while the identical content as a
+  dict was refused. A parametrized falsifier now asserts the two paths
+  return the same errors for every optional field.
+
+#### Measurement
+
+- **Set 118 Session 1, re-priced with the tool:** 4,743.2 credits
+  ($47.43) of orchestrator seat plus 866.4 credits ($8.66) of routed
+  verification, **5,609.6 credits / $56.10** against the **$42.67**
+  recorded at the time — **+31%**. The seat figure was early, not wrong (a
+  session cannot measure itself); the routed figure was the `$0.0000`
+  fail-open. Re-derived unchanged on 2026-08-14, which is itself the point:
+  a finished session measures the same every time. Command and predicate:
+  `ai_router/docs/seat-cost.md` §7.
+### the suite declares its inputs (Set 129)
+
+#### Added
+
+- **(Set 129 S1) `affected_suites(files_changed, suites)` — which suites a
+  change set affects, and *which inputs* made each one affected.** Returns
+  `SuiteMatch` records carrying `changed_inputs` and `matched_prefixes`,
+  because "which suites does this session owe" must be **auditable**
+  rather than a bare boolean: a session told only *that* it owes a
+  14-minute suite cannot check the claim, and a wrong declaration is
+  invisible from a yes/no answer. `evaluate_freshness()` consumes it
+  instead of re-deriving the intersection per suite, so the report and
+  the close gate cannot disagree (L-069-1). Exposed as
+  `python -m ai_router.run_of_record affected --session-set-dir <dir>`,
+  which defaults to the disposition's `files_changed`.
+
+  There is deliberately **no module axis** — the answer A5 resolves to
+  (`docs/proposals/2026-08-12-multi-module-retesting/verdict.md` §3–§4)
+  is that the suite declares its inputs, the intersection decides the
+  obligation, and modules are grouping and ownership metadata. A module
+  label could only ever *subtract* from this intersection, and nothing
+  checks that a module's declared `codeRoots` match its real imports, so
+  routing test selection through one would fail open (L-125-1).
+
+- **(Set 129 S1) `load_suites_checked()` → `SuiteLoadResult`, and
+  `SUITE_FIELDS` as an allowlist.** `load_suites()` is now its
+  error-discarding projection. Every unusable entry, every unusable
+  value and every unrecognised **key** is carried rather than dropped;
+  the key check is an allowlist because a denylist could never contain
+  the next typo.
+
+#### Changed
+
+- **(Set 129 S1) `covers` is a suite's INPUT SET, not the paths it is
+  about.** The complete allowlist of repo-relative prefixes that can
+  affect the suite's **result**: product source, test source, fixtures,
+  contracts, mocks, shared libraries, **lockfiles, build and test
+  configuration, and checked-in toolchain configuration**. Under the old
+  reading a lockfile or a CI config outside `covers` was merely out of
+  scope; under this one it is a **declaration bug**, because a dependency
+  bump or an unpinned GitHub action can turn a suite red without touching
+  a line the declaration names.
+
+  All three of this repo's suites were re-derived against the stronger
+  definition **empirically** rather than editorially — a full pytest run
+  under a `sys.addaudithook` tracer recorded 1,655 distinct repo paths
+  the suite actually opens or enumerates, and every addition is one that
+  evidence named. pytest gained `pytest.ini`, `pyproject.toml`,
+  `.github/`, `test-fixtures/`, `scripts/`, `tests/`, `docs/templates/`,
+  `tools/dabbler-ai-orchestration/dist/templates/`,
+  `tools/dabbler-ai-orchestration/changelog.d/` and
+  `docs/session-sets/`; mocha and playwright gained their lockfile,
+  `tsconfig.json`, `esbuild.js`, `playwright.config.ts` — and both gained
+  `ai_router/`, because Layer 2 shells out to the real router CLIs and
+  Layer 3 `pip install -e`s this tree rather than exercising the
+  published package. `MANIFEST.in` looked like an input and the trace
+  never touched it, so it stays out; `docs/planning/` is deliberately
+  undeclared and the module docstring says why.
+
+  What this does **not** license is the inverse claim. Unchanged declared
+  inputs are *evidence that a rerun is likely redundant within a
+  qualified execution environment; they do not prove identical outcomes
+  for non-hermetic or flaky suites.* Skipping a suite remains a
+  verification reduction and keeps needing the operator attestation every
+  verification reduction needs.
+
+- **(Set 129 S1) `surface_digest()` excludes the ACTIVE set's own
+  close-out bookkeeping** (`is_active_set_bookkeeping`, reusing
+  `verification_stamp.WORK_DIFF_SET_BOOKKEEPING` rather than re-listing
+  it). This is what makes `docs/session-sets/` declarable at all: without
+  it, `record_run` digests the covered surfaces and *then* appends
+  `test-runs.jsonl` into the set directory, so the suite stales its own
+  run at the instant it records it. Another set's artifacts are ordinary
+  changed files and bind normally.
+
+- **(Set 129 S2) A5 is written into the authoring guide beside A1–A4,
+  with the refusals and the trigger-gated deferrals.** The test-run
+  policy section is now *A1–A5*. Eight rejections with their reasons and
+  six deferrals with their **trigger conditions** land where a future
+  author will meet them rather than only in a proposal folder — a
+  rejection nobody wrote down gets re-proposed by the next reader of a
+  persuasive document.
+  `docs/planning/session-step-skeleton-and-verification-cost.md` is now
+  fully closed: A5 was its last open item.
+
+#### Fixed
+
+- **(Set 129 S1) A typo in `testing.suites` disarmed the close gate for
+  every expensive suite in the repo.** `load_suites()` dropped malformed
+  entries in silence, so a `suites:` key yielding zero usable entries
+  returned an empty tuple and `check_test_run_fresh()` read it as *"no
+  expensive suites declared"* and **passed**. Nothing said so. The gate
+  now blocks on any suite-configuration error. Tolerance is right for a
+  *reader* and wrong for the input to a *gate*: if the information a skip
+  needs is missing or unverifiable, do not skip. An explicit
+  `suites: []` is untouched — that is the deliberate operator disarm, a
+  declaration rather than a typo.
+
+- **(Set 129 S1) Four coupled fail-open path-matching bugs**, surfaced by
+  unifying four copies of prefix matching into `matching_prefixes()`.
+  `session_touched` normalised with `lstrip('./')` — a **character-set**
+  strip — which ate the leading dot of every dotfile, so a `.github/` or
+  `.gitignore` declaration matched nothing while reading as correct.
+  Prefixes were normalised on only one side of the comparison, so the
+  ordinary `covers: ["./src/"]` spelling matched nothing. A repo-root
+  `covers: ["./"]` normalised to empty and matched nothing, disarming a
+  whole-repo suite for every change. And an unrecognised key such as
+  `expensvie: true` silently kept `expensive`'s default, loading the
+  suite as cheap. Each one reads as correct code and fails open.
+### the append-only files stop colliding (Set 122 S4)
+
+#### Added
+
+- **(Set 122 S4) `python -m ai_router.changelog` — one fragment file per
+  contribution, one computed view.** The verdict-adopted fix for the one
+  genuine merge conflict Option A has (§7 of
+  `docs/proposals/2026-08-11-multi-module-architecture/verdict.md`).
+  `CHANGELOG.md` was a file every session edited, at the same offset — the
+  top — so two developers running concurrent session sets in separate
+  worktrees were **guaranteed** a conflict on it, of the worst kind: both
+  sides correct, so resolving it is manual reading rather than a rule. Not
+  hypothetical: over the sixty days before this change `ai_router/
+  CHANGELOG.md` was touched by 79 commits.
+
+  Sessions now write `changelog.d/<order>-<slug>.md` and never touch the
+  shared file. A new file per contribution is a shape git merges without a
+  conflict. `render` concatenates preamble + fragments + released history on
+  demand; `fold` writes the view back and clears the fragments at release
+  time, which is a serialized one-person act and so cannot race. Ordering is
+  descending and `add` allocates `max + 10`, so a new entry lands on top —
+  where a changelog entry belongs — without renumbering anything.
+
+  This is less a new convention than an existing one made executable. This
+  changelog already carried **nine stacked `## [Unreleased] — … (Set NNN)`
+  sections**, one per set, and the extension's carried ten `### Section`
+  blocks inside one Unreleased. Sessions were already partitioning by hand.
+  They were doing it inside a single file, which is exactly what conflicts.
+
+  **The partition does not rewrite history, and that is enforced rather than
+  asserted.** A fragment stores the *verbatim slice* of the pending region,
+  so concatenation equals the original by construction rather than by care.
+  `changelog.d/.baseline.json` freezes the pre-partition digest, each
+  fragment's digest, and the fragment ORDER; `check` re-renders from the
+  baseline set alone — a fragment added later cannot make the assertion
+  vacuous — and fails on a reorder, a drop, an edit, or an edit to frozen
+  prose. `restamp` exists for a deliberate correction to released text and
+  **refuses to run if any fragment moved or changed**, so the escape hatch
+  for "I fixed a typo" cannot become the escape hatch for "I reordered
+  history". Byte-identity is claimed after LF normalization, because
+  `core.autocrlf=true` would otherwise make the digest an assertion about
+  which CI runner ran it.
+
+  The round trip earned its keep during the session itself: the first
+  implementation spliced fragments after the *preamble* rather than after the
+  pending lead, which silently dropped the extension changelog's 1,086-byte
+  Unreleased header. Every entry still rendered. Only the byte comparison
+  found it.
+
+  Two named exclusions, both deliberate. `lessons-learned.md` and its archive
+  are exempt per verdict §7 even though they churn hardest of all.
+  `router-metrics.jsonl` was named by the verdict but is gitignored and
+  untracked, so it cannot conflict — partitioning it would defend against a
+  defect that cannot occur. Canonical:
+  `docs/partitioned-append-files.md`.
+
+- **(Set 122 S4) `resolve_set --check`, and a duplicate set number refused
+  before the work starts.** Verdict §6.4 asks developers to reserve set
+  numbers in chat before scaffolding; nothing enforced it, and the collision
+  is invisible inside a single worktree — two branches each mint `123-…`,
+  and the clash only exists after they merge. `resolve_set` already treated
+  the collision as a bug, but only at *address* time, which reports it once
+  the work is done.
+
+  The refusal now fires where it can act. `start_session` refuses to register
+  a set whose number another directory already carries — scoped to that set's
+  number, so an unrelated collision elsewhere does not block unrelated work.
+  `resolve_set --check` sweeps the whole tree and exits `3`, naming both
+  sides and the corpus size. `ai_router/scripts/drift_guard.py` runs that
+  sweep *and* the changelog round trip in CI's fast gate, which is the right
+  home because both defects are introduced by a merge.
+
+  `ai_router.modules create` deliberately gained **no** check. It mints
+  `max(existing) + 1` from a live directory listing, so within one worktree
+  it cannot take a number that is already there; a refusal there could only
+  ever pass, and L-112-1 is explicit that such a gate proves nothing. The
+  property is asserted by a test instead. Every refusal ships with the
+  legitimate look-alike it must not fire on: a bare descriptive slug, an
+  `_archived` holding pen, and an idempotent re-scaffold of a set's own
+  number.
+### the shape a session declares (Set 128)
+
+#### Added
+
+- **(Set 122 S2) `python -m ai_router.session_lifecycle cancel | restore` —
+  an entry point for the cancel/restore writers.** The functions were
+  complete and had been since Set 047; they simply could not be reached
+  from outside Python, so the extension carried its own TypeScript port of
+  them in `src/utils/cancelLifecycle.ts` — and that port wrote
+  `session-state.json` directly, which only the router's sanctioned writers
+  may do. Set 122 exists to remove exactly that violation. Session 2 added
+  the entry point and the extension deleted its writer, so there is now one
+  implementation of cancel/restore rather than two mirrors held in sync by
+  a parity test. Exit codes match `ai_router.modules` deliberately, so both
+  surfaces read the same way: `0` ok, `3` refused with nothing written
+  (restoring a set that was never cancelled reaches this), `4` write
+  failure. `--json` for machine callers. Operator decision of 2026-08-13,
+  journalled: severing only the module-delete path was considered and
+  rejected, because it leaves a second writer shipping and the two
+  implementations drifting.
+
+- **(Set 122 S1) `python -m ai_router.modules create | rename | delete |
+  assign-sets` — the module lifecycle, in Python, transactional.** The
+  verdict-adopted port (`docs/proposals/2026-08-11-multi-module-architecture/
+  verdict.md` §4) of the lifecycle logic that lived in the extension's
+  `moduleAuthoring.ts`. The **on-disk contract is unchanged**: the same
+  `docs/modules.yaml` shape, the same header template, the same
+  format-preserving text splices (never a re-serialization, which would
+  destroy the operator's comments and entry order) and the same
+  parse-after-write guards, because a format change would strand every repo
+  that already has a manifest.
+
+  Two things are genuinely new. **Refusals**: `rename` and `delete` refuse
+  while any affected set has a running session — including a legacy set with
+  no `session-state.json`, whose status is inferred from file presence rather
+  than read as "not started". **Rollback**: every writer runs through one
+  transaction that records each effect and undoes all of them on failure, so
+  a create that scaffolds a directory and then fails to append the manifest
+  entry leaves neither behind (the TypeScript scaffold wrote the stub first
+  and stranded it). `delete` is the exception by design — its cancels and
+  scaffold removals are idempotent and the manifest entry is written last, so
+  an interrupted run leaves the module still declared and is simply re-run.
+
+  `create` also carries the **numbering** half of the adopted surface: it
+  scaffolds the module's `kind: plan` and `kind: decomposition` set pair at
+  the next two free set numbers, cross-linked by `prerequisites:`, and
+  skip-existing by identity so a re-run never mints a duplicate. Unlike the
+  TypeScript flow — which scaffolded them after the manifest write and
+  downgraded a failure to a warning, because it could not undo the entry it
+  had just written — the scaffold runs inside the same transaction, so a
+  create either fully happened or did not happen at all. The two spec
+  templates now ship as package data under `ai_router/templates/`, since a
+  pip-installed router has no repo checkout to read
+  `docs/templates/consumer-bootstrap/` from; a parity test pins the two
+  copies byte-identical.
+
+  Every `session-state.json` mutation goes through
+  `session_lifecycle.cancel_session_set`, the sanctioned writer. That is the
+  point of the port: `src/utils/cancelLifecycle.ts:296` writes the state file
+  from TypeScript today, reached through `deleteModule`, and the framework
+  believed it had already stopped doing that. The test suite asserts the
+  invariant behaviorally — neutralize the sanctioned writer and every state
+  file is byte-identical — with a planted direct write proving the assertion
+  can fail.
+
+  Exit codes are stable for the extension's launchers: `3` = refused
+  (nothing written), `4` = write failure (rolled back, or still-declared and
+  re-runnable). `--json` for a machine read.
+
+- **(Set 128 S2) `python -m ai_router.post_round_delta` — what a fix made
+  after the full suite owes, decided mechanically.** Classifies everything
+  that changed since the session's recorded verification round as
+  `no-change`, `test-only` (A4.1 — owes nothing), `shipped-code` (A4.2 —
+  owes one delta-scoped remediation-review) or `unknown` (fails closed,
+  owes one). Exit 1 when a review is owed, `--json` for a machine read.
+  Neither half of "what changed" is invented: the path list is
+  `verification_stamp.work_diff_binding_paths` (the same set whose digest
+  decides stamp freshness, already excluding round bookkeeping) and the
+  test classification is `run_of_record`'s declared suite surfaces — a
+  second notion of either would drift silently, because both directions
+  still produce an answer (L-069-1). `record_round_completed` now snapshots
+  `worktreeTreeAtCompletion` on **every** completed round, including
+  remediation-review and backstop rounds; `discoveryBaselineTree` is taken
+  *before* a round assembles evidence, so it over-reports and is used only
+  as a named fallback that says so.
+
+- **(Set 128 S1) A spec can no longer declare its steps in the shape that
+  produced two verification-ordering incidents.** The canonical order —
+  targeted tests → verify → remediate → full suites → close — already lived
+  in `session-constitution.md`, and was violated anyway, because nothing
+  checked the shape a spec declared its steps in. Set 127 Session 2 compressed
+  three canonical stages into one numbered instruction in the wrong internal
+  order (`5. Full pytest and the Layer 3 run recorded as runs of record;
+  verify; close.`), and the orchestrator followed the spec's letter over the
+  policy that outranks it: a 752-second pytest run and a 350-second Playwright
+  run, both taken before a verification round that returned a blocking
+  finding, so both were staled by the remediation that followed. Set 112 S3
+  had done the same into 15 runs and 186 minutes.
+
+  `spec_admission.check_step_shape()` now checks the **shape** beside the
+  **count**, reading the step texts it already parses. Every session declares
+  `Register` + its authored work + a fixed three-step tail (cross-provider
+  verification → required portion of the full test suite → close-out), and a
+  tail step that names more than one of those stages — in **either** internal
+  order — is refused as a compression. The four are recognised by **intent**,
+  not exact prose: "Close out" and "Close-out" both pass, and rewording cannot
+  slip the retired ordering through. Scope stops at the tail: a work step that
+  *describes* verification is prose, and a work step that *orders* an early
+  full suite is an ordering question owned by the constitution.
+
+  **Requires restructuring, or an informational note** (operator ratification,
+  2026-08-12): blocking for a set that has not started — no `session-state.json`,
+  or status `not-started`, where restructuring is still a text edit — and an
+  informational note for a set already started, complete, or cancelled. Those
+  specs were authored at a different time under a different approach; nothing
+  about them is wrong and none will be rewritten. Four unstarted specs fail on
+  day one, which is the point: a gate nothing can fail proves nothing
+  (`L-112-1`). Shipped with 12 falsifiers that plant the malformation —
+  including the Set 127 S2 step verbatim — rather than read the regexes; a
+  mutation probe gutting the checker fails 12 of its 19 cases.
+
+#### Fixed
+
+- **(Set 122 S2) `start_session` now ticks the `register` step it just
+  performed.** `start_session` *is* the registration, so seeding that row
+  `pending` published a step checklist that was wrong the instant it was
+  written, and it stayed wrong until an orchestrator remembered to log a
+  step the framework had performed. That tax was real, not theoretical:
+  Set 122 Session 1 logged four of its seven steps "retroactively at
+  close-out", `register` among them. `session_checklist.
+  complete_register_step` closes the one case that needs no judgement, and
+  deliberately touches **no other step** — every other one describes work
+  only the orchestrator can know it finished, and a writer that guessed
+  would replace an honestly-empty checklist with a confidently-wrong one.
+  Idempotent (a re-registration after a context reset writes nothing),
+  best-effort, and NAMED on stderr when it skips (L-079-1).
+  Operator-directed 2026-08-13 as a release blocker for the Set 122
+  publish. Shipped with falsifiers that plant each failure — tick any
+  step, tick twice, invent a row where the spec has no `register` step —
+  and a mutation probe confirms removing each guard fails its own case
+  (L-112-1).
+
+- **(Set 122 S2) `_existing_lifecycle_slug` matched a module's lifecycle
+  sets by basename suffix.** Creating module `api` reused `payment-api`'s
+  `-api-plan` / `-api-decomposition` sets instead of minting its own. The
+  identity test is now the set name minus its numeric prefix equalling
+  `<slug>-<kind>` **exactly**. Inherited from the TypeScript
+  `findExistingLifecycleSetSlug` rather than introduced by the port, and
+  carried as residual `S122-S1-R1` from Session 1's disposition.
+
+- **(Set 128 S2) A one-line test fix after the full suite no longer buys a
+  fresh metered verification round.** Operator ruling of 2026-08-12,
+  journalled as an **operator-attested verification-reduction** (the
+  constitution's hard carve-out): **A4.1** — a post-suite fix to tests only
+  triggers no re-verification; **A4.2** — a post-suite fix to shipped code
+  triggers a targeted `--phase remediation-review`, not an open
+  re-verification. This is the other half of A2, not a saving bolted onto it:
+  once every full suite runs *after* every cross-verification stage, a late
+  suite failure strands a stale verdict **by construction**.
+
+  The rule was contradicted by the machinery, not merely unwritten. Any
+  post-verification change — including a one-line test fix — moved
+  `work_diff_sha256`, so the stamped row went stale and `close_session`'s
+  backstop bought a full round. `validate_stamped_row`'s freshness check now
+  consults the new `post_round_delta` classifier and exempts a delta whose
+  every path is a **declared test surface** (`SuiteSpec.tests`, an allowlist
+  beside `covers`; `test-fixtures/` and `scripts/` are deliberately absent
+  because they stage what Layer 3 asserts). Reached only on a digest
+  mismatch, it relaxes freshness and nothing else: source, template,
+  verifier identity, the cross-provider exclusion, the artifact hash and the
+  verdict re-derivation all still refuse, and the round bounds and
+  no-resurrection arithmetic are untouched. Every exemption is reported and
+  ledgered (`a4-test-only-exemption`), so a close that settled under A4.1 is
+  distinguishable in the record from one that re-verified.
+
+  **The rule is keyed on what changed, never on how much.** An earlier
+  "less than two lines" formulation is superseded and must not return: Set
+  127 S2 planted eight defects against its finished suite and **six were two
+  lines or fewer** — `if (false)`, `const status = row.status`, one inverted
+  ternary — every one a real correctness bug. Size does not track blast
+  radius.
+
+  Shipped with 11 falsifiers that plant real edits in a real repo. Two
+  mutation probes: widening the classifier fails 6 of 13 cases, and a probe
+  pinning the exemption predicate to "granted" initially survived all of
+  them — the gap was real and closed with a both-directions assertion before
+  the change shipped.
+
+- **(Set 128 S1) `session_checklist.build_rows` no longer renders a
+  gate-policy record as a step.** A `path_aware_critique` /
+  `contract_gate` / `dual_surface_mode` / `suggestion_disposition` entry
+  is written at **registration**, before any work exists, and rendered as
+  a `complete` row in the step list — so both the CLI checklist and the
+  Work Explorer said the path-aware critique, a stage that runs once at
+  the **end of a set**, had already finished minutes after the session
+  began. The operator reported it from a live session. The step list now
+  renders only steps, using `is_logged_step` — the same predicate that
+  already refused such an entry a planned row, so the two answers cannot
+  diverge — and the record stays untouched in `activity-log.json`, where
+  the close gates read it. The start-time chain already treated the
+  record as transparent, which is what makes the removal safe rather than
+  merely tidy: the step below it is still dated from the previous
+  **step's** completion, not from when a policy was recorded. Mirrored in
+  `sessionStepModel.ts` with the parity corpus updated in both
+  directions, and falsified for all four kinds (L-069-1: the reported
+  kind is the one 50 sets happen to carry; the others are the same bug).
+
+#### Changed
+
+- **(Set 128 S1) `authoring.max_steps_per_session` re-baselined 5 → 7, and the  number now counts something else.** Under the skeleton a session declares
+  four baked-in ceremony steps plus `N` authored work steps, and the operator
+  ratified **N = 3** — rejecting their own opening suggestion of N = 4 as a
+  deliberate loosening rather than an artifact of re-counting. The Set 111 S4
+  measurement (172 schema-v4 sessions: 1–5 declared steps ran a 42-min median,
+  6–8 ran 84 with a 386-min p90) was taken on specs whose declared steps
+  *already absorbed* the ceremony — Set 127 S1 spent three of six on it — so a
+  historical "5 declared" was roughly 3–4 real work steps and the old bands do
+  not transfer. 7 is not a loosening of 5; compare a spec's **N** to 3, not its
+  total to 5. `DEFAULT_MAX_STEPS` is now derived as `CEREMONY_STEPS +
+  WORK_STEP_BUDGET` so the two cannot drift, and the authoring guide carries
+  the table with the re-reading beside it.
+
+### the active step, and the round that posts itself (Set 127)
+
+#### Added
+
+- **(Set 127 S1) The record can say a step is in flight, and since when —
+  without a new writer.** Nothing on disk ever said which step a session was
+  *on*: `log_step` writes after a step finishes and `start_session` seeds the
+  plan as `pending`, so the two writers between them only ever produced
+  `pending` and `complete`, and `in-progress` was ~1.4% of every step status
+  ever written. Rather than add a third write (and a convention to remember),
+  `session_checklist.build_rows()` **derives** it: the active step is the
+  lowest-numbered seeded `plan-step` row with nothing logged against it, in a
+  session `session-state.json` says is in flight. Each started row also
+  carries a derived **start time** — the previous step's completion, or the
+  session's `startedAt` for the first step — an honest wall-clock proxy for
+  *how long has this been running*. Because it is computed from rows both
+  surfaces already read, it cannot drift out of sync and it fixes every
+  historical set retroactively. `session_projection` serializes the derived
+  fields rather than recomputing them.
+
+- **(Set 127 S3) A verification round posts its own checklist.** The
+  `checklist_posted` gate wants a post inside each transition's own window,
+  and one transition type could not realistically be met: a blocking
+  discovery round drives `discovery → supplementary → remediate →
+  remediation-review` minutes apart, machine-driven, with nobody at the
+  terminal. Set 126 S2 missed rounds 2 and 3 exactly that way, and a missed
+  window cannot be re-entered — so a structurally predictable omission kept
+  arriving on the operator's desk as waiver paperwork.
+
+  `verify_session.post_round_checklist()` renders the checklist at the end of
+  every round that **completed**, through the existing `record_post` path, so
+  the record still means *a render happened* and the round's output tells the
+  operator where the session is. It is called from one place — the line after
+  `record_round_completed()` — which is what pairs a post with a ledgered
+  round and nothing else: a round refused past its bound, a failed routed
+  call, and `--dry-run` all return before it, and a **close-backstop** round
+  never reaches it (the backstop calls the ledger writer directly, and its
+  rounds are not checklist transitions). Both failure modes are non-fatal and
+  **named** on stderr (`L-079-1`): bookkeeping must never cost the operator a
+  round they have already paid for.
+
+  Nothing else moved. `check_checklist_posted` is unchanged — same positional
+  windows, same one-post-per-window rule, same waiver path — and the other
+  transition types (session start, test-run recorded, operator stop, last
+  logged step) bind exactly as they did. Falsified in both directions
+  (`L-112-1`), including the window rule asserted against a hand-built ledger
+  rather than by reading the new call site.
+
+  **The cost, on the record:** that transition can no longer be missed, so it
+  can no longer report a missing post. This reduces what a close-time gate
+  can catch, which is the decision-rights carve-out the orchestrator may
+  never self-authorize; the operator ratified it on 2026-08-12 with the two
+  rejected alternatives recorded (`decisions.jsonl`, `authority: "human"`,
+  `verification_effect: "reduces"`).
+
+#### Changed
+
+- **(Set 127 S3) The cadence documentation now matches the mechanism.** The
+  constitution's Step 4 transition list, the authoring guide's *step-checklist
+  cadence* table, and `check_checklist_posted`'s own docstring all taught an
+  obligation the tool now discharges for one transition type — an instruction
+  surviving the change it describes is the defect family Set 126 spent a
+  session on. The guide's stale `<- here` marker prose (removed by the Set
+  120 S3 operator ruling) went with it.
+
+### setup finishes itself (Set 126)
+
+#### Added
+
+- **(Set 126 S2) `python -m ai_router.verify_type --set-env` finishes
+  setup's second half, and the instructions stop lying about it.** The
+  design's own bar has always been that setup is finished when BOTH
+  `$AI_ORCHESTRATION_VERIFY_TYPE` is set and `project-verify-type.txt`
+  carries the same value. One half was a command; the other was a sentence
+  — and the sentence said `set AI_ORCHESTRATION_VERIFY_TYPE=<VALUE>`, which
+  is **process-scoped** on Windows: copy-pasted, exactly as a setup
+  instruction invites, it works in that terminal and is gone tomorrow.
+
+  `set_env_verify_type()` derives the value from `project-verify-type.txt`
+  — never asking again, so the two halves cannot drift — and branches by
+  OS, because what a helper can honestly do differs by platform:
+
+  - **Windows:** persists at **USER** scope through the registry API at
+    `HKEY_CURRENT_USER\Environment`, preferred over `setx` (which truncates
+    past 1024 characters and cannot tell the calling process). The value is
+    also published into the running process, so the caller's own next
+    resolution does not read a stale environment block and report the half
+    just finished as missing. A best-effort `WM_SETTINGCHANGE` broadcast
+    notifies other running programs; a failure there is a **named** warning,
+    never a failed setup (L-079-1).
+  - **POSIX:** writes **nothing at all** and prints the exact `export` line
+    for `~/.bashrc` / `~/.zshenv`. There is no OS-level user environment on
+    Unix — `.NET`'s `User` target is a no-op there — so a helper that exited
+    0 having persisted nothing would be the defect it was written to fix,
+    wearing a success message. Editing a developer's shell profile without
+    consent is not this tool's business.
+
+  **Machine scope is refused, not merely unused.** A Copilot seat is
+  licensed per GitHub identity, not per box, so a machine-wide answer would
+  tell every other account — service accounts included — that this project
+  is verified the way one seat verifies it, which is the "one seat's answer
+  imposed on everyone" failure Set 124 S1 removed from git. The writer
+  raises on any scope but `user`, **before** `winreg` is imported, which is
+  what makes the guarantee assertable on the ubuntu and macOS runners the
+  `python-tests` matrix already pays for.
+
+  The write is opt-in rather than folded into `--set`: writing the project
+  file touches only the project, while writing the environment is a
+  machine-scoped mutation outside the repo. The two compose —
+  `--set <VALUE> --set-env` finishes both halves in one command. `--json`
+  carries an `env_write` block; exit codes are unmoved (a project with no
+  value to derive exits 3, "guided setup required", not 2).
+
+#### Fixed
+
+- **(Set 126 S2) Every setup instruction that told the operator to persist
+  the variable by hand, and two that told them to commit a gitignored
+  file.** `guided_setup_instructions()` now names `--set-env` and says
+  plainly that a bare `set` / `export` does not persist. The echo pass was
+  re-derived rather than trusted from the authoring list (`L-069-1`), which
+  turned up two sites nobody had listed: `docs/quick-start.md` and
+  `docs/adoption-bootstrap.md` both said to **commit** what verifies the
+  project — the precise inverse of Set 124's ruling, matching the extension
+  README's own known claim that the file is *"project configuration, not
+  machine state"*. Corrected in the same pass: the extension `README.md`,
+  the repo `README.md`, `docs/quick-start.md`, `docs/adoption-bootstrap.md`,
+  `docs/tutorials/adopt-dabbler.md`, the consumer-bootstrap
+  `getting-started.md.template`, and the regenerated cold-start golden.
+  `docs/planning/verify-type-env-var-setup-gap.md` moves from *diagnosed,
+  not fixed* to fixed.
+
+- **(Set 126 S2) Two docstring claims that were never quite true.**
+  `describe()` called itself ASCII-only while echoing a project path that
+  can carry non-ASCII, and `resolve_verify_type()` said broadly that an
+  invalid environment value raises — which was never true on branch 1,
+  where the file has already answered and the environment is only captured
+  for `env_agreement`. Both were the adjudicated-minor residual Session 1
+  left with Session 2 named as owner.
+
+#### Added
+
+- **(Set 126 S1) A half-finished setup says so.**
+  `VerifyTypeResolution.env_agreement` is the comparison branch 1 never
+  made between the `env_value` it always captured and the file that decides:
+  `agrees` / `missing` / `disagrees`, plus `not-applicable` on branches 2
+  and 3 where the project file has not answered and a disagreement would
+  have to be invented from a single value. Published on `to_dict()` for
+  `--json` consumers, and reported by `describe()` — a disagreement naming
+  **both** values and stating that dispatch uses the file, because an
+  operator who cannot see which side won cannot tell whether to fix the file
+  or the environment. An invalid environment value is reported as a
+  disagreement rather than raised: `describe()` is a narration path, and
+  branch 1's contract is that the environment decides nothing. Narration
+  only — the file still wins silently, `resolved` still means "the project
+  file answered", and **no exit code moved**.
+
+### one computed projection, and the marker goes (Set 120 S3)
+
+#### Security
+
+- **(Set 125) A routed call can no longer mutate the workspace on the
+  `copilot-cli` transport.** `route()` is one contract, but its two
+  transports did not honour it equally. On `api` a routed call is a plain
+  HTTPS completion — `providers.py` sends model/max_tokens/system/messages
+  and **no `tools` key** — so the provider returns text and the call cannot
+  touch the filesystem by construction. On `copilot-cli` the same call
+  dispatches an **agentic** CLI, and `--allow-all-tools` alone handed the
+  model the entire tool universe against the live working tree: arbitrary
+  shell (`powershell`), file creation and editing (`create`, `edit`), and
+  sub-agent spawning (`task`, `write_agent`).
+
+  This was not theoretical. On 2026-08-12, routed calls fired from the test
+  suite modified **23 files** in this repo with no human in the loop —
+  including two production modules, extension source, the built `dist`
+  bundle, a JSON schema, six docs, and one 150-line document the model
+  invented outright — and wrote two spurious rounds into a live
+  verification ledger. The deeper hazard is independent of that trigger: a
+  verifier that can edit the code it is judging can fix a finding and then
+  report VERIFIED on its own edit, which dissolves the cross-provider
+  guarantee the workflow rests on.
+
+  `cli_transport.py` now passes `--available-tools` with a read-only
+  allowlist (`view`, `grep`, `glob`) on **both** dispatch paths — the inline
+  path and the Set 104 large-prompt handoff — from one shared
+  `_tool_grant_argv()` helper so the two cannot drift.
+
+  Notes on the shape of the fix: an **allowlist**, because
+  `--available-tools` removes a tool from the model's view while
+  `--deny-tool` only withholds permission, and a denylist fails open on any
+  tool a future CLI release adds. `--allow-all-tools` is **retained** — it
+  governs auto-approval without prompting, which headless dispatch
+  requires; once the universe is read-only, "allow all" allows only
+  read-only tools. `view` is **required**, not incidental: the Set 104
+  handoff instructs the model to pull its payload from a temp file with a
+  file-read tool. Temp-dir access is likewise retained.
+
+  Verified by a matched pair on an identical prompt (`--allow-all-tools`
+  alone rewrote the target file, `filesModified: ["sample.txt"]`; with the
+  allowlist, `filesModified: []`) and by a live end-to-end `route()` call in
+  which the model tried to comply, reported *"I can't write files directly
+  with my tools"*, fell back to shell, was blocked there too, and left the
+  target unchanged. Note that an earlier blunt "create breach.txt" prompt
+  was *declined by the model* while a benign "bring this file into line
+  with the convention" framing wrote immediately — **refusal is not a
+  control; the grant is.**
+
+#### Added
+
+- **(Set 123 S2) The `DIRECT_API` precondition, and the qualified
+  verdict.** `verification.check_direct_api_precondition()` answers whether
+  a project can verify cross-provider *right now*: it compares the
+  providers whose `api_key_env` actually resolves against the
+  orchestrator's **effective** provider (registry-resolved via
+  `orchestrator_identity`, never a configured seat label — a
+  `github-copilot` seat labelled `anthropic` may be running an OpenAI
+  model, and the cross-provider claim rests on the effective one).
+
+  When a project whose committed verify type is `DIRECT_API` holds no
+  usable key outside its own orchestrator's provider, `route()` **warns on
+  stderr and proceeds** with a same-provider verifier rather than
+  hard-blocking into the operator-attested manual path. This is the
+  operator's ruling — *"verification with the same provider is better than
+  no verification at all, but the results should be flagged with this
+  limitation"* — re-confirmed in session on 2026-08-11 against the sharper
+  question (the change relaxes a close gate), and journaled with
+  `verification_effect: reduces` plus an operator attestation, because
+  reducing verification is never self-authorized.
+
+  **The permission is derived inside `route()`, never passed to it.** A
+  parameter would re-open `I-084-S1-3` (a caller-supplied exclusion list
+  that omits the orchestrator's provider). No caller can ask for a
+  same-provider verification, and an **uncommitted**
+  `AI_ORCHESTRATION_VERIFY_TYPE` cannot trigger one: a machine-level
+  suggestion that could weaken every verdict on that machine is exactly the
+  action-at-a-distance Session 1's branch 2 exists to prevent. The
+  Copilot-seat path keeps its fail-closed `ProvenanceUnavailable` contract
+  (Sets 083/084) untouched.
+
+  **The qualification travels with the verdict, omit-null**, on the three
+  router-owned records: the metrics stamp row
+  (`verification_qualification`), the findings envelope
+  (`verificationQualification`), and `disposition.json`
+  (`verification_qualification`, *removed* when a later unqualified round
+  supersedes a qualified one). `classify_verification_qualification()` is
+  the single mechanism that decides, so the three cannot disagree.
+
+  **The close gate enforces it as a bijection** (`validate_stamped_row`
+  check 5): a same-provider row passes only when it declares the
+  qualification, *and* a cross-provider row declaring it is refused. A
+  one-way check would let the flag be attached unconditionally, at which
+  point it would distinguish nothing — and distinguishing is its only job
+  (`L-112-1`). The vocabulary is closed and fails closed, unlike
+  `verification_verdict`'s warned-but-accepted extension tokens: a token
+  nobody can interpret does this field's job worse than no token at all.
+
+  Not written to `session-state.json` — that is the Work Explorer's
+  surface, and operator decision **P4** keeps orchestrator/verifier
+  provenance out of it.
+
+- **(Set 115 S4) `close_preflight --write` / `--check` — the close-out
+  obligations, serialized where a renderer can read them.** The preflight
+  costs 2-7 seconds (git-backed predicates plus interpreter startup), so
+  nothing that redraws may call it. `--write` runs the report as usual —
+  same output, same exit code — and additionally serializes it to
+  `<set>/.dabbler/close-obligations.json`, which the Work Explorer renders
+  as a **Close-out** row under the in-flight session. `--check` compares
+  the file against its inputs without evaluating anything: exit `0` fresh,
+  `3` stale, absent or unreadable.
+
+  **The report is embedded verbatim.** The file carries
+  `PreflightReport.to_dict()` unchanged rather than a shape a renderer
+  might prefer, because this module has already shipped two surfaces of
+  one report that disagreed (`would_close` said `true` while the human
+  report said "NOT yet decided"), and one spelling is the fix that holds.
+
+  **The digest map is the whole session-set directory**, not a curated
+  filename list. Obligations derive from `disposition.json`,
+  `session-state.json`, `activity-log.json`, `spec.md`, `change-log.md`,
+  the run-of-record and checklist-post ledgers, and every
+  `s<N>-verification*.md` / `s<N>-issues*.json` artifact the backstop and
+  the integrity gate look for. A set that grows an artifact grows an
+  input, with nothing to remember to add (L-069-1).
+
+  **Two obligations cannot be digested at all**, and the file says so
+  rather than averaging over it. Five checks read state that lives
+  outside the session-set directory — `working_tree_clean` and
+  `pushed_to_remote` call git directly; `verification_integrity`
+  validates an evidence stamp that binds the repo-wide work diff;
+  `test_run_fresh` compares a `run_of_record` freshness digest over the
+  source files a suite covers; and the backstop reads both. Committing,
+  or editing a module anywhere in the repo, changes those answers while
+  every file in the session-set directory stays byte-identical. Those
+  rows carry `volatile: true` and the file records a git fingerprint
+  under `volatileInputs`, so `projection_state(..., include_volatile=False)`
+  is the honest answer for a reader that will not spawn git. The Work
+  Explorer uses exactly that, and labels those rows "as of" the
+  projection's timestamp.
+
+  **The classification fails safe.** `SET_LOCAL_CHECKS` names the checks
+  that are a pure function of files inside the set directory and
+  *everything else is volatile*, so a check added later is over-labelled
+  "as of" (noise) rather than silently rendered as current truth (a lie).
+  Both end-of-set path-aware critics independently found the first cut
+  the other way round: it listed the two checks that call git directly
+  and rendered the two stamp/digest-backed ones as re-checkable. Two
+  tests hold the line — an AST walk (through function-local imports,
+  which is how these predicates actually reach outside) that refuses a
+  set-local check reaching a repo-wide helper, and its falsifier proving
+  the walk can see one.
+
+  **It is never committed.** `.dabbler/` is git-ignored and the writer
+  drops a self-protecting `.gitignore` inside the directory it creates, so
+  a consumer repo is covered without editing its root ignore file. That is
+  what keeps a mid-session write out of the verification stamp's work diff
+  — structurally, rather than by adding one more filename to an exemption
+  list — and off `working_tree_clean`. The cost is that the projection is
+  per-machine: a fresh clone reads `absent`, which is a designed state.
+
+  `Obligation.volatile` also appears in `--json`. Consumers that pin the
+  exact key set of an obligation row will see one new key.
+
+#### Fixed
+
+- **(Set 115 S1) A generic `Session N` title no longer sticks.** Title
+  resolution puts the stored `sessions[]` ledger first so titles survive
+  boundary writes — which also meant one `Session N` on disk was copied
+  forward by every later write, and nothing self-healed. 130 rows across
+  this repo were in that state. `progress.heal_title` adds the missing
+  carve-out: a `spec.md` heading beats a **generic-shaped** stored title
+  (exactly `Session <that entry's own number>`, or empty), while a
+  genuinely operator-authored title is still never overwritten —
+  `Session 5` stored on session 3 is authored, not the fallback.
+
+  The rule runs in two places for one reason. `_build_sessions_array`
+  applies it at every boundary write, so the fix persists; and
+  `normalize_to_v4_shape` applies it in the read view, because a
+  **closed set gets no further boundary write** — the read view is the
+  only place its labels can heal, and healing there rewrites no closed
+  history (the spec asked for healing *without* a migration script). The
+  reader's `spec.md` read is conditional on `needs_title_heal`, so a
+  healthy set costs no additional disk read on the tree scan.
+
+  New public helpers in `ai_router.progress`: `is_generic_title`,
+  `heal_title`, `heal_generic_titles`, `needs_title_heal`. The extension
+  mirrors them in `utils/progress.ts`, and
+  `ai_router/tests/fixtures/session-title-parity.json` pins the two
+  implementations to one corpus that neither language owns.
+
+#### Added
+
+- **(Set 120 S3) `ai_router.session_projection` — the session progress
+  projection, computed once and serialized.** One Python answer for a
+  session set's steps, their states, what is in flight and what remains,
+  written to `session-progress.json` beside the artifacts it derives
+  from. Canonical shape: `docs/session-progress-schema.md`.
+
+  It does **not** re-implement the row derivation.
+  `session_checklist.build_rows` stays the one Python computation and
+  this module serializes what it returns, so "computed once" is
+  structural rather than asserted — there is no second Python derivation
+  that could drift. The read-side leniency is likewise *derived* from
+  `session_checklist.STATUS_BOXES` by box glyph rather than re-spelled as
+  a second alias table, so the projection cannot recognise a token the
+  renderer does not (L-069-1).
+
+  **Derived and regenerable — a cache, never a source.** Every file
+  carries `derived: true`, the exact regenerate command, and the SHA-256
+  of each input (`activity-log.json`, `session-state.json`, `spec.md`),
+  so `projection_state()` can always answer `fresh` / `stale` / `absent`
+  / `unreadable` and `--check` exits `3` on anything but fresh. A
+  `schemaVersion` newer than the reading code reads as `unreadable`
+  rather than being guessed at.
+
+  `close_session` regenerates it after flipping the state snapshot. That
+  write is declared through the Set 119 S3 `CLOSE_MANDATED_WRITES`
+  mechanism rather than by adding a filename to a list in
+  `verification_stamp`, so a close-time write cannot stale the
+  verification stamp it is written after — the failure Sets 111 S2, 112
+  S3 and 114 S1 each paid a metered round for.
+
+- **(Set 120 S3) The states absence used to hide.** `unknown` for a
+  status token no reader can name — which is where 11 of the 15 entries
+  Set 120 S2 deliberately preserved now surface, with their raw token
+  intact rather than laundered. `unreadable` beside `absent` and `read`
+  for the ledger itself, so "no work" and "cannot read the evidence" stop
+  being the same empty session row (a defect both Set 115 reviewers named
+  independently). `stale` for the projection against its own inputs. And
+  `orphanEntries`, a top-level count of ledger entries with no integer
+  `sessionNumber` — every reader in both languages silently drops them,
+  which is where the other 4 preserved entries (Set 028's absent-status
+  population) had gone. Reported as a count rather than as rows, because
+  inventing rows for entries that name no session would break the parity
+  the projection has to hold.
+
+#### Removed
+
+- **(Set 120 S3, operator ruling 2026-08-11) The `<- here` marker.**
+  `session_checklist.HERE_MARKER`, both of its rendering sites,
+  `_mark_here`, and **`ChecklistRow.is_here`** are gone. The marker
+  inferred a single current row (first non-terminal logged step, falling
+  back to the first pending planned row, falling back to the last row) —
+  and that inference is what pointed confidently at step 1 of Set 119 S2
+  while the real work was four steps further on. Since Set 120 S1 the
+  `in-progress` token carries the fact directly, so nothing needs to be
+  derived; and because the fact is per-row, two steps may now be in
+  flight at once, which a single-valued marker could not represent.
+
+  **(Set 115 S4) The TypeScript half went with it**, finishing a removal
+  that stood half-done for one set: `workExplorerTreeModel.HERE_MARKER`
+  and its render site, `sessionStepModel.markHere`, its `TERMINAL_STATUSES`
+  table and the `StepRow.isHere` field. `grep`ping both languages before
+  declaring the class closed is the rule that was skipped the first time
+  (L-069-1).
+
+  **Breaking for callers that construct `ChecklistRow` positionally with
+  five arguments, or read `row.is_here`.** `is_planned` is now the fifth
+  field. Read what is in flight from the row's `box`
+  (`session_checklist.IN_PROGRESS_BOX`) or from the projection's
+  `current`.
+
+- **(Set 120 S3) The post ledger's `hereStepKey` / `hereStepNumber` /
+  `hereStatus` triple**, replaced by `inProgressStepKeys` — a list,
+  always present, possibly empty. The old fields recorded a rule's
+  output; this records a fact the ledger already carries. Empty is a real
+  answer (nothing started yet), which the marker had to fake.
+
+#### Changed
+
+- **(Set 120 S3, closed by Set 115 S4) The cross-language step-row parity
+  corpus's declared divergence is over.**
+  `ai_router/tests/fixtures/session-step-parity.json` kept its `cases`
+  byte-identical through Set 120 S3 — the extension still computed
+  `isHere`, that set could not touch it (standing decision 3), and the
+  corpus was the only coverage the behaviour had — so the Python half
+  compared the five shared fields and projected `isHere` out of the
+  expectation. **Set 115 S4 deleted the extension's derivation**, so the
+  field is gone from the corpus, both halves compare the same whole row
+  again, and the `_readme`'s divergence note is replaced by the history
+  of its removal. `SHARED_ROW_FIELDS` is still asserted against
+  `ChecklistRow`'s own dataclass fields; the guard that *required*
+  `isHere` in the corpus is replaced by its inverse — a test that refuses
+  any expectation field the two halves do not both compare — plus one
+  that pins a real in-progress row, which is what the icon that replaced
+  the marker is drawn from.
+
+### the drift inventory and the scoped history migration (Set 120 S2)
+
+#### Added
+
+- **(Set 120 S2) `ai_router.step_status_drift` — the drift inventory
+  command, and the migration that executes the operator's ruling about
+  the history already on disk.** Set 120 S1 stopped *new* drift; this
+  measures and repairs what was already written. The command has three
+  read-only modes and one writing one:
+
+  - default — the inventory: every `activity-log.json` under
+    `docs/session-sets`, per file, per token, with the session and step
+    each occurrence belongs to, sorted into the two populations the
+    ruling treats oppositely. `--json` for machine output, `--verbose`
+    for per-entry detail, `--only <slug>` to narrow.
+  - `--check-premise` — the falsifier for the ruling's premise, that
+    `completed` and `done` are *pure* synonyms wherever they appear.
+    Three independent signals: the owning session never completed, the
+    same step was re-logged later as non-terminal, and the step's own
+    description asserts it did not finish. Exits `2` on any
+    **unadjudicated** flag.
+  - `--migrate` — the migration plan (dry run, no writes).
+  - `--migrate --in-place` — apply. Idempotent and re-runnable.
+
+  **The premise check is an enforced precondition of the write path, not
+  a companion command you are trusted to remember.** One unadjudicated
+  premise flag anywhere in the scan refuses the whole run and writes
+  nothing, and `migrate_file()` checks for its own set when called
+  directly, so a library caller is equally fail-closed. There is no
+  `--force`: the way past a flag is to read it and record the reading,
+  because the operator authorised a lossless rename and not a judgement
+  call about outcomes.
+
+  **Scope is enforced structurally, not left to the default scan root.**
+  Any activity log under a `test-fixtures/` tree
+  (`EXCLUDED_PATH_SEGMENTS`) is test data rather than a record of a real
+  session: it is reported, kept out of the drift totals, and never
+  migrated whatever `--scan` says. This repo's pinned UAT fixture is the
+  case that forced it — `--scan .` would otherwise have rewritten an
+  extension test fixture from inside a Python-only history migration.
+
+- **(Set 120 S2) The 271 lossless synonyms in this repo's history are
+  now canonical.** Measured from the command rather than a one-off
+  query: 286 drifted entries of 2,805 (10.2%) across 24 files, split
+  271 lossless (`completed` 229, `done` 42) and 15 semantically loaded.
+  The lossless population was rewritten to `complete` across 21 files;
+  the 15 loaded entries — 4 with no status field, 8 prose blobs, 1 JSON
+  array, 1 `skipped`, 1 `complete-with-known-failures` — are byte-for-byte
+  untouched, because normalising them would launder meaning that
+  Set 120 S3's projection will instead render as an explicit `unknown`.
+
+  **The rewrite is byte-surgical, not a re-serialize**, and that is not
+  a stylistic choice. These logs were written by several tools over a
+  year: 108 of 109 use CRLF, 39 carry a trailing newline and 69 do not,
+  and Set 028's was written `ensure_ascii=False` so it holds a literal
+  `→` that a default `json.dump` would escape. A parse-mutate-dump
+  migration would have rewritten bytes in files it was asked not to
+  touch, and would have made the ruling's own acceptance condition — the
+  loaded entries come out byte-identical — impossible to check. The
+  migrator locates each `"status"` member as a span of raw text,
+  cross-checks those spans against what the JSON parser sees (a file the
+  scan cannot explain is **refused**, never rewritten blind), replaces
+  only the ruled ones, and then asserts both that no byte outside those
+  spans moved and that the re-parsed document differs by exactly those
+  statuses.
+
+#### Changed
+
+- **(Set 120 S2) Nothing in the public API changed.** The migration is a
+  one-time repair of this repo's own records plus a standing inventory
+  command; no reader, writer, or gate behaviour is altered. Consumer
+  repos carrying their own drifted history can run
+  `python -m ai_router.step_status_drift --check-premise` and then
+  `--migrate --in-place` against their own `docs/session-sets` — the
+  write path enforces that ordering itself and refuses while any flag is
+  unadjudicated — but nothing obliges them to; readers stay lenient by
+  standing decision 1.
+
+### the step-status vocabulary, enforced at the writer (Set 120 S1)
+
+#### Added
+
+- **(Set 120 S1) A closed step-status vocabulary, and a writer that fails
+  closed on anything outside it.** `ai_router.session_log` now defines
+  the four tokens that are both measured in use across every
+  `activity-log.json` in the repo **and** nameable by every reader —
+  `complete`, `in-progress`, `pending`, `blocked` — and exports
+  `CANONICAL_STEP_STATUSES`, `ALLOWED_STEP_STATUSES`,
+  `is_valid_step_status`, `validate_step_status`, `require_step_status`,
+  `suggest_step_status` and `InvalidStepStatusError`. Nothing was
+  invented; the vocabulary is a confirmation of practice.
+
+  **`skipped` is deliberately excluded** (operator ruling, 2026-08-11)
+  even though it appears once on disk. It has no entry in
+  `session_checklist.STATUS_BOXES`, so it renders as `[?]` — the
+  corrupt-data glyph — and neither `_mark_here` nor the Work Explorer's
+  mirrored `markHere` counts it as terminal, so a skipped step steals the
+  current-step marker from real work. Admitting a token the readers
+  cannot name is the exact defect this change exists to prevent, so the
+  vocabulary is the *intersection* of what was measured and what the
+  readers understand. Teaching both readers is a two-language change that
+  belongs with the extension carve.
+
+  This follows the Set 086 S1 pattern for verification verdicts:
+  **readers stay lenient, the writer is strict.** Every reader keeps
+  rendering whatever it finds on disk — history is a record, not a bug to
+  crash on — while nothing a reader cannot name may be written from here
+  on.
+
+#### Changed
+
+- **(Set 120 S1) `SessionLog.log_step()` raises `InvalidStepStatusError`
+  on a status outside the vocabulary.** Previously it accepted arbitrary
+  strings, and roughly 10% of the step entries on disk carry a token no
+  reader recognises: "done" is spelled four ways, and prose up to ~1,500
+  characters had been written into the status field. The consequence was
+  visible — Set 119 S2 wrote `completed`, and the whole session rendered
+  as not-started with the `<- here` marker stranded on step 1, because
+  `session_checklist` selects the first *non-terminal* row and an
+  unparseable row is never terminal.
+
+  **Breaking for library consumers** that log a non-canonical status.
+  `InvalidStepStatusError` subclasses `ValueError`, so existing
+  `except ValueError` handlers still catch it. Near-misses the readers
+  happen to tolerate (`completed`, `done`, `Complete`, `" complete"`) are
+  refused too, and the refusal names both the legal set and the token the
+  caller most likely meant.
+
+- **(Set 120 S1) `SessionLog.append_entry()` validates a `status` when
+  one is present.** Absence is still accepted: "no status recorded" is a
+  different defect from "a status no reader can name", and Set 120 S3
+  owns it explicitly.
+
+- **(Set 120 S1) The four writers that bypass `SessionLog` now route
+  through the same chokepoint.** `contract_gate`,
+  `path_aware_critique`, `dual_surface_verify` and
+  `suggestion_disposition` each do their own read-modify-write of
+  `activity-log.json`. All four already hard-coded `"complete"`, so none
+  could drift at runtime — but an allowlist at one entry point is
+  worthless if another path writes the file directly (`L-069-1`). Each
+  now spells the token from the shared `STEP_STATUS_COMPLETE` constant
+  and passes it through `require_step_status`, and a structural `ast`
+  scan over every production module enforces the rule for writers that do
+  not exist yet.
+
+### close-mandated writes, the backstop's recovery path, and what nothing reached (Set 119 S3)
+
+#### Removed
+
+- **(Set 119 S3) Four modules nothing reached: `floor_ratchet.py` (914),
+  `routed_gate.py` (437), `pricing_proposal.py` (1,581) and
+  `cost_report.py` (551) — 3,483 LOC plus 3,012 lines of tests (235
+  tests).** Unreachability was PROVEN before anything was deleted, with a
+  static import graph over all 78 `ai_router/*.py` modules (`ast`, no
+  execution), against the spec's three criteria: no import from a close
+  path, no console-script entry point, no reference in
+  `router-config.yaml`. `routed_gate` was retired as a skip authority by
+  Set 083 and answered `REQUIRED` unconditionally thereafter; the cost
+  surface could not be populated at all on a Copilot seat, where all 83
+  routed calls record `billed_usage_unavailable: true` and
+  `cost_usd: 0.0`.
+
+  **Breaking for library consumers:** `ai_router.get_costs` and
+  `ai_router.print_cost_report` are gone, as are the `routed_gate`
+  re-exports (`evaluate_routed_gate`, `RoutedGateDecision`,
+  `ROUTED_GATE_TRIGGERS`, `BREADTH_THRESHOLD`, `TRIGGER_*`).
+  `python -m ai_router.report` still summarises `router-metrics.jsonl`
+  and the extension's cost dashboard is unchanged. The dead
+  `output.cost_report_on_exit` and `verification.routed_gate`
+  `router-config.yaml` keys went with them — neither had a reader.
+
+  **`pricing.py` STAYS**, as does `contract_gate.py`, `spec_admission.py`
+  and `replacement_gate.py`: the last three turned out to be REACHABLE
+  and are reported rather than forced. `close_session.run` calls
+  `validate_contract_gate` as a live close gate, `session_checklist`
+  calls `spec_admission.parse_session_plans` to seed the plan the
+  `checklist_posted` gate reads, and `dual_surface_verify` imports
+  `replacement_gate.validate_benchmark_registration` at module scope. The
+  line: a module is reachable when a surviving module CALLS it; an
+  `__init__` re-export is publication, not use.
+
+#### Added
+
+- **(Set 119 S3) Close-mandated writes are a declared CATEGORY, so a
+  close-out artifact no longer stales the verification it just passed.**
+  A writer declares a module-level `CLOSE_MANDATED_WRITES` literal;
+  `verification_stamp.discover_close_mandated_writes` finds it by parsing
+  the source with `ast` — no import, no side effects, safe on the close
+  path — so a fifth close-mandated writer is exempt the moment it says
+  so, **in either scope**, with no list here to edit.
+
+  Two `bound` values, because the honesty matters. A per-set ledger is
+  close output end to end (`whole-file`, a pathspec exclusion). A
+  guidance file is only PARTLY close output: `cite_lessons` owns one
+  `last-used-set` trailer field and the lesson prose around it is session
+  WORK. So `cite_lessons` declares a normalizer
+  (`guidance_meta.normalize_close_mandated_metadata`) and the freshness
+  digest compares normalized-current against normalized-at-base, dropping
+  the file entirely when only the mandated field moved. Exempting the
+  file wholesale would have let a post-verification rewrite of a
+  **preload** document ride a passed round — a verification reduction, so
+  not an option.
+
+  Why it mattered: the constitution MANDATES `cite_lessons` in the final
+  commit, so every citing session staled its own stamp between verifying
+  and closing, and the backstop quietly bought a metered round to
+  re-verify a byte-identical tree. It surfaced in Set 119 S2 only because
+  the round budget was already spent, so the backstop refused instead of
+  paying.
+
+- **(Set 119 S3) Every round now records the baseline it reviewed, so the
+  backstop's own recovery path is reachable.**
+  `verify_session.record_round_completed` takes an omit-null
+  `discovery_baseline_tree` and `find_discovery_baseline_tree` reads the
+  `sN-rounds.jsonl` ledger as well as the `sN-issues*.json` envelopes.
+  The envelope is written only on a findings-bearing round, so the two
+  states that most need a baseline left none — a **clean** discovery
+  round, and **every close-backstop round** (which is unphased) — and
+  `--phase remediation-review` refused with `EXIT_USAGE`, forcing a full
+  ~$0.88 discovery round to reach a ~$0.07 fix-delta review.
+  `verify_session` now snapshots for every round except a
+  remediation-review itself, which must never become a baseline or a
+  second cycle would diff from the first fix instead of from the original
+  discovery baseline.
+
+#### Changed
+
+- **(Set 119 S3) `EvidenceTooLargeError` now inherits from
+  `VerifySessionError`.** They were siblings, and `close_backstop`
+  catches the parent at four sites while catching this one at exactly
+  one — so an oversized evidence bundle took the close down with an
+  unhandled traceback on four paths: the gate gone, no remediation line,
+  on the most expensive path there is. Fixing the TYPE fixes all four
+  (L-069-1: the class, not the instance). The exit-code distinction never
+  lived in the class relationship, only in handler ORDER, so the
+  `verify_session` CLI's clauses were reordered — it caught the parent
+  first, and a subclass caught after its parent is unreachable code.
+
+- **(Set 119 S3) The backstop's blocking refusal names the phase, and the
+  command it names now works.** It said "re-verify with `verify_session`
+  (the sanctioned remediation loop)" while `--phase remediation-review`
+  failed closed from exactly that state.
+  `gate_checks._verify_session_command` takes an optional `phase`, and a
+  test PARSES the refusal text and executes the command it names from the
+  state it was printed in.
+
+
+
+### finding provenance and the doc-only severity cap (Set 119 S1)
+
+#### Added
+
+- **Every finding now carries `evidencePaths` — the repo-relative paths
+  the verifier actually read.** It is contract on **both** verification
+  surfaces: the markdown parse (`verification._parse_issue_blocks` reads a
+  tolerant `Evidence paths:` line) and the structured `submit_verdict`
+  tool (`pull_verifier` gains an ungated `evidencePaths` array offered on
+  every configuration, parsed into `Finding.evidence_paths` and serialized
+  as `evidencePaths`). Both reviewer templates make it **mandatory on a
+  Critical/Major finding**; `verification.normalize_evidence_path` strips
+  the decoration reviewers add (backticks, emphasis, `./`, `\`,
+  `:<line>`, `#anchor`) so the same file compares equal across rounds.
+  Declared optional in `docs/session-issues.schema.json` and
+  `docs/path-aware-critique.schema.json` — optional **by design**, because
+  its absence must not launder a blocking finding.
+
+  `TEMPLATE_ID` is bumped to `session-verification-v8` with its pinned
+  hash, per the verification-integrity protocol.
+
+#### Changed
+
+- **A finding whose cited evidence is entirely documentation prose is
+  capped at Minor and opens no verification round.** Applied in
+  `verification.is_blocking_issue` — the one predicate both surfaces
+  already consult — so the push and pull surfaces inherit it identically.
+  `classify_blocking` reports the demoted findings in a new
+  `doc_capped_issues` list and names the count in its `reason`, so the cap
+  is auditable rather than silent.
+
+  This is an **operator-attested verification reduction** (Set 119 S1
+  `decisions.jsonl`: `authority=human`,
+  `rubric_line=verification-reduction`, `verification_effect=reduces`),
+  authorized on measurement: 520 of 572 findings in this repo's history
+  are Major (91% — a scale on which almost everything blocks is not a
+  scale), and Set 116 S3 spent 13 routed calls and $4.75 on a session
+  whose code was clean at round 1, where every Critical/Major after round 1
+  concerned the wording of one markdown document and two of the three were
+  *created by fixing the previous one*.
+
+  Three properties keep it from being the anti-laundering rule in reverse:
+
+  - **Doc-ness is derived from paths, never self-declared.** The only
+    input is `evidencePaths`. A verifier asserting "this is only a doc
+    issue" in its description or free-text `category` changes nothing.
+  - **Absence is not doc-ness.** A finding citing no paths is unchanged:
+    Critical, Major and unknown severity all still block, so an uncited
+    blocking finding is never the cheaper option.
+  - **Behaviour-bearing markdown is not documentation.**
+    `ai_router/prompt-templates/**` are the verifier's own instructions —
+    a defect there changes what every routed call does, so it keeps its
+    declared severity. Doc-ness is extension-based (`.md`, `.markdown`,
+    `.rst`, `.txt`) and never directory-based, so a machine contract that
+    lives under `docs/` (a JSON schema) is not prose either.
+
+  Shipped with the falsifier pairs `L-112-1` requires (30 test functions
+  in `ai_router/tests/test_doc_only_cap.py`): each rule is planted both
+  ways — the defect the cap must fire on, and the legitimate look-alike it
+  must not touch.
+
+### the close preflight (Set 119 S2)
+
+#### Added
+
+- **`python -m ai_router.close_preflight` — every close-out obligation,
+  knowable before the close runs.** Runnable at any time against a
+  session set, with **no side effects and no routed call**: no lock, no
+  ledger event, no file written. It prints every obligation in one pass
+  — met and unmet, blocking and advisory — each with the predicate's own
+  remediation and the action that satisfies it. Exit `0` when nothing
+  blocking is unmet, `1` when something is, `2` on an invalid
+  invocation; `--json` emits the same report for a script.
+
+  Authorized by measurement: close-out is not slow (median 0.1 min) — it
+  **fails**. 122 of 295 sessions failed at least once, mean 1.6 attempts,
+  max 9, and every failure is an obligation nobody knew they had until a
+  gate refused.
+
+  It **reports; it never refuses** (this set's spec forbids a new gate).
+  Its blocking/advisory split is read from `gate_checks.is_blocking_check`
+  rather than re-derived, so it cannot refuse something the close allows,
+  and a check demoted to advisory is advisory here automatically. Every
+  verdict comes from **calling** the predicate `close_session` calls —
+  a preflight that disagrees with the gate is worse than no preflight.
+
+- **The expensive question, answered for free.**
+  `close_backstop.decide_backstop` (+ `BackstopDecision`) is **extracted**
+  from `run_close_backstop`, which now consumes it, so there is one
+  spelling of "will the backstop spend a routed call" with two readers.
+  Every branch of that sequence is a pure read — the method token,
+  `budget.yaml`, the orchestrator identity, the stamped rows and their
+  hash-bound artifacts, the round ledger, and the git diff base — so the
+  preflight predicts it without buying it. `verification_backstop` is 79
+  of 214 recorded check-failures and each firing spends a routed call at
+  close time.
+
+  Three answers, and the middle one is the point: the backstop **will not
+  run** (settling evidence, zero-budget tier, or an illegal method token);
+  it **will refuse before routing** (unresolvable identity, spent round
+  budget, unresolvable diff base) — reported unmet and blocking with the
+  backstop's own remediation; or it **will route**, reported as a **cost
+  warning, not a refusal**, because a backstop round returning VERIFIED
+  closes fine. Only `EvidenceTooLargeError` stays unpredicted: it is
+  raised by the evidence assembly *after* the decision.
+
+- **`--replay-history` — the tool's reach, measured rather than
+  asserted.** Replays coverage over every `closeout_failed` event in the
+  corpus and reports how many still-blocking failures the preflight would
+  have named first. Measured at Set 119 S2: 186 events, 214 recorded
+  check-failures, 64 belonging to checks Set 116 S3 demoted (worth
+  nothing to pre-empt now), **150 still blocking, of which the preflight
+  covers 150**. Filtering to before `2026-08-10T20:28Z` reproduces the
+  spec's prediction to the digit (184 events, 212 failures, 148
+  still-blocking, 78 backstop, 122 sessions); the delta is exactly Set
+  117 Session 1's two close-out failures, recorded after the spec was
+  written. The prediction was right and history grew.
+
+  It counts **coverage, not outcomes**, and says so: the working trees
+  that produced those failures are gone, so it answers "would the
+  preflight have named this obligation first?" — which for a
+  deterministic read-only predicate is the same question.
+
+#### Fixed
+
+- **A legacy `"session_number": 0` event no longer counts as a session.**
+  Set 047's first close attempt recorded one; session numbers are 1-based
+  everywhere here, so counting it inflated the replay's per-session tally
+  by one (123 vs the spec's 122). Its check-failures still count — a close
+  really did fail and really did name them — and the discarded events are
+  reported separately as `unnumbered_events` rather than vanishing.
+
+- **`docs/path-aware-critique.schema.json` no longer accepts a
+  whitespace-only `evidencePaths` entry** (the owed residual from Set 119
+  S1's own verification). The item constraint was `minLength: 1`, which a
+  single space satisfies, while `path_aware_critique` rejects it via
+  `p.strip()` — the sibling `description` property in the same file
+  already carried the non-whitespace `pattern` and the array item did not.
+  Fail-closed is not the same as in-parity (L-066-1): nothing invalid was
+  ever accepted at runtime, but a schema-only consumer would have accepted
+  an artifact the runtime rejects. Both directions are now pinned by
+  falsifier pairs in `test_path_aware_critique_schema.py`.
+
+## [1.0.0] — the Set 112 tranche (staged 2026-08-09; ships in the 1.0.0 release above, not separately)
 
 > **BREAKING. A session set can no longer declare `tier: lightweight`.**
 > This is the release the version number is for: `1.0.0` says the package
@@ -43,13 +1989,11 @@ here. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 > checklist and its recorded posting cadence, the spec-admission cap, and
 > dispatch-time provider-key validation.
 >
-> **Publish is deferred until Set 114 completes** (operator decision,
-> 2026-08-09, at the Set 112 UAT walk). The artifact is staged and green;
-> it is held, not blocked. The version number `1.0.0` was confirmed by the
-> operator at the same walk.
->
-> **Not yet published.** No tag, no PyPI run: the version is staged and
-> the gates are green; the publish is the operator's.
+> **Held, then released.** Publish was deferred on 2026-08-09 (operator
+> decision, at the Set 112 UAT walk) until Set 114 completed; the version
+> number `1.0.0` was confirmed by the operator at the same walk. Twenty
+> sets later this tranche ships unchanged, as part of the `1.0.0` release
+> section above.
 
 ### Removed
 

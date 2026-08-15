@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 1,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "b46b88a2e1f06a8bf6114b57e0c3b9041490d508",
+  "fixedTree": "7acf44cfe6eb28eefd986a2a5419aeb905374bea",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-15T13:07:51.988623+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "The Marketplace surfaces promise an unconditional cross-provider block, while the same release documents an accepted same-provider fallback** - **Category:** Correctness - **Severity:** Major - **Evid ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The Marketplace README and package description accurately disclose the qualified DIRECT_API same-provider fallback, or the release behavior is shown to block whenever no different-provider verifier exists; the three release surfaces must state one consistent contract.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

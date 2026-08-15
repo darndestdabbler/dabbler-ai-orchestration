@@ -1,7 +1,7 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Work Explorer for the Dabbler AI-led workflow: session sets, modules and session plans in a native tree, plus the git and scaffolding commands the workflow runs on.",
+  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
   "version": "0.51.0",
   "publisher": "DarndestDabbler",
   "private": true,
@@ -15,14 +15,19 @@
   ],
   "keywords": [
     "ai",
-    "workflow",
-    "session",
-    "claude",
+    "ai agent",
+    "agent workflow",
     "orchestration",
-    "dabbler",
-    "adoption",
-    "bootstrap",
-    "onboarding"
+    "verification",
+    "code review",
+    "copilot",
+    "claude",
+    "gemini",
+    "codex",
+    "session sets",
+    "planning",
+    "git workflow",
+    "dabbler"
   ],
   "icon": "media/darndest-dabbler-icon.png",
   "galleryBanner": {

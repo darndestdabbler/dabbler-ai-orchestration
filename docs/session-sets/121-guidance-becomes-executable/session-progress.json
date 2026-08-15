@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-15T04:08:15.466261-04:00",
+  "generatedAt": "2026-08-15T05:23:16.112023-04:00",
   "sessionSetDir": "121-guidance-becomes-executable",
   "inputs": {
-    "activity-log.json": "b061d5327df94a29688885627917939299a1d62ace53cacb4d7f279ac7dfe2b6",
-    "session-state.json": "7810430ffb99605f4d01916a8df43d553249421a64fcc8095430397cd64240fe",
+    "activity-log.json": "10b304cd0604d76a40369691b3cdb752c76a2944a65a2820dc54b4bfd0fae733",
+    "session-state.json": "51b92153c41ffe14f9595c0437aa81bf655153198a6f8f1caa3a85756e663d25",
     "spec.md": "c47c7e70009eacbc75b8f671de08c68319cffeed360e822c90274d349998bce2"
   },
   "orphanEntries": 0,
@@ -229,19 +229,106 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 (github-copilot / claude-sonnet-4.6).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T04:20:39.501905-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "encode",
+          "description": "Encoded L-064-4 (cli_glyph_guard.py+test); archived L-066-1 (test_contract_gate_schema.py already a true falsifier); fixed 6 em-dash violations in print() calls",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T04:20:39.525037-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "assign_ids",
+          "description": "Assigned G-001..G-024 to all 24 project-guidance.md entries; registered all 24 in guidance-usage.json",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T04:43:42.036455-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "prove_arithmetic",
+          "description": "guidance_report --check: project-guidance.md 3645/3645; re-derived cap 22->25; ratcheted ceilings; retired standing authorization",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T04:43:42.038721-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross_provider_verification",
+          "description": "Discovery rounds 1+2 found 4 Major findings; remediated all (AGENTS ceiling 2031->2208, glyph guard scope+sep/end, retention test cap, close_session G-* resolution); remediation-review VERIFIED.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T04:43:42.040859-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "test_suite",
+          "description": "pytest: 4643 passed, 9 skipped (528s). run_of_record recorded.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T05:02:41.029628-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 4,

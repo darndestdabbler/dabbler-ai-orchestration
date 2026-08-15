@@ -42,9 +42,9 @@
     {
       "number": 3,
       "title": "Make project-guidance.md addressable, and pay for it",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-15T04:20:39.501905-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-15T05:23:16.107445-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -54,7 +54,7 @@
           "4aa0b92b-9517-4b2b-a3ca-3357c4618156"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 4,

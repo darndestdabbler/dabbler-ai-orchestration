@@ -1,43 +1,101 @@
 {
   "status": "completed",
-  "summary": "Set 121 Session 3: encoded two guidance entries into executable tests, assigned addressable ids to all 24 project-guidance.md entries, re-derived the instruction_line_cap, ratcheted ceilings, and fixed four blocking verification findings.\n\n(1) ENCODED L-064-4. New ai_router/cli_glyph_guard.py (AST-based lint); falsifier tests; 6 em-dash violations fixed across metrics.py, config.py, migrate_router_config.py, migrate_v3_to_v4.py (all in print() calls that write to cp1252 consoles). Scope extended during verification remediation: scripts/ subdirectory now covered; sep= and end= keyword args checked alongside positional args.\n\n(2) ARCHIVED L-066-1. test_contract_gate_schema.py is already a true falsifier for L-066-1 (validator parity). Prose replaced with one-liner encoded-in reference; archive entry gains encoded-in pointer.\n\n(3) 24 IDS ASSIGNED. G-001..G-024 markers on all 24 project-guidance.md entries. G-006 and G-007 registered as executable/cheap (permanent). G-001..G-005 and G-008..G-024 registered as instruction with empty uses rings; usage evidence starts here.\n\n(4) CAP RE-DERIVED. Historical peak was 22 from 345 sessions, but those sessions predated any G-entries. After admitting 22 new instruction entries, corpus = 25. Cap reset to 25. Ceilings ratcheted: project-guidance.md 3930->3645; lessons-learned.md 2504->2269; total 12600->12234. Standing operator authorization retired.\n\n(5) VERIFICATION FOUND 4 MAJORS ACROSS 2 ROUNDS, ALL REMEDIATED. (a) AGENTS.md ceiling advanced 2031->2208 (current measured; Session 4 trims and ratchets). (b) cli_glyph_guard scope extended: scripts/ covered, sep=/end= keyword args flagged. (c) test_guidance_ledger cap assertion updated (30,20,22)->(30,20,25). (d) close_session._resolve_lessons_cited fixed to use contains_id() so G-* ids from project-guidance.md are no longer treated as unknown; regression test added.\n\n(6) OPEN FOR SESSION 4. AGENTS.md at 2208 ceiling pending trim-and-ratchet. 29 subprocess sites with no encoding= remain (future set).",
+  "summary": "Set 121 Session 4 of 4, the set-terminal session: the guidance queue is empty of everything that could leave it, every preload ceiling is back at its measurement, and the doc-only severity cap has an evidence-backed verdict for the first time.\n\n(1) PROMOTED C-003 then C-002 out of guidance-candidates.md into project-guidance.md, and registered both in the guidance ledger. C-001 stays queued on its own stated prerequisites (an enforcement lint and a recall check), which is now a merit blocker rather than a space one. L-064-8 needed no admission: Session 1 had already condensed it to a live one-liner.\n\n(2) FUNDED THE PROMOTIONS BY COLLAPSE, not by an exception. Six entries (G-009, G-011, G-014, G-016, G-017, G-021) restated session-constitution.md; both files are preload, so each duplicate was read every session and bought nothing. Full text archived to lessons-archive.md with a table naming where each rule is live. project-guidance.md measures 3,394 tokens, down from 3,645 NET of both admissions. G-018 (path-aware critique) is also a duplicate and was deliberately kept: the spec names its deletion under ceiling pressure as the defect that broke the previous scheme.\n\n(3) RATCHETED EVERY CEILING TO MEASUREMENT and deleted the last accommodation. Total 12,234 -> 11,644; constitution 4,200 -> 4,059; project-guidance 3,645 -> 3,394. The standing operator authorization of 2026-08-12 is deleted from both guidance-lifecycle.md and router-config.yaml, not merely marked retired. The manifest's engine entry MOVED from AGENTS.md to GEMINI.md: the lockstep trim of the three bootstrap files left GEMINI largest, and the manifest must count the largest or it understates what a session reads. That rule existed and had never fired; guidance-lifecycle.md now carries it as a worked example.\n\n(4) RE-DERIVED instruction_line_cap 25 -> 22. S3 was forced to set cap == corpus == 25, which can only fire on the next entry and therefore measures nothing. The collapse left the corpus at 21, back under the measured historical peak, so the evidence-backed number is usable again with one slot of real headroom.\n\n(5) MEASURED THE DOC-ONLY CAP across all four sessions and shipped the measurement as ai_router/measure_doc_only_cap.py so it can be re-run rather than re-derived. THE CAP DID NOT FIRE - not once, in any round, in any session. 23 of 23 findings cited evidencePaths (100%), zero were doc-only, and 13 of 23 (57%) were MIXED doc-and-code, up from the 38% measured while the spec was written. Netting out the phased supplementary round, sessions 1-3 ran 5/4/3 - a median of exactly the pre-cap 4.0, so the cap moved rounds neither way because it never applied. A finding that it did not fire was a declared successful outcome of this step.\n\n(6) DID NOT WIDEN THE CAP, deliberately. 6 of 11 blocking round artifacts carried only mixed-citation blockers, so the counterfactual is sized and recorded - but widening is a verification reduction reserved to the operator by spec decision 5 and the constitution's hard carve-out. The argument against is recorded beside the number: those rounds found real defects, not wording. Session 4's own round 1 found a false number in this session's headline deliverable (the round counter was counting operator-authorization ledger rows as verification rounds) and cited module, ledger and report together. A widened cap would have suppressed the finding that corrected this document.\n\n(7) VERIFICATION: 3 blocking Majors across 2 discovery passes, all accepted and fixed, none disputed; VERIFIED on round 3 with 3 fix verdicts accepted. (a) The measurement did not cover all four sessions and its saved JSON was the prototype's shape - now regenerated from the shipped module, with --markdown added so the report's table is generated rather than hand-copied. (b) The round counter counted authorization rows as rounds, reporting 7 rounds for a session that ran 6 - fixed to count only round-completed events, with falsifiers in both directions. (c) The new cap test asserted corpus < cap as a permanent invariant, contradicting the shipped gate's corpus <= cap and so guaranteed to redden CI the moment the free slot was legitimately used - replaced with a guard on the DERIVATION (cap == the measured peak) plus the shipped semantics.\n\n(8) NAMED RESIDUALS. The set shipped 151 net new test functions against a declared cap of 40 (S1's corpus_scan_guard suite 53, S2's guidance_ledger suite 76, S3 30, S4 12). Sessions 1-3 are closed and VERIFIED and their test files were outside Session 4's Touches, so this was surfaced to the operator rather than unwound or passed silently; operator ruled on 2026-08-15 to record it as a named residual and close. Also open: C-001 queued on its prerequisites, 29 subprocess call sites with no encoding=, and the 91%-Major severity scale, all out of scope by declaration.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/cli_glyph_guard.py",
-    "ai_router/tests/test_cli_glyph_guard.py",
-    "ai_router/metrics.py",
-    "ai_router/config.py",
-    "ai_router/migrate_router_config.py",
-    "ai_router/migrate_v3_to_v4.py",
-    "ai_router/close_session.py",
+    "AGENTS.md",
+    "CLAUDE.md",
+    "GEMINI.md",
+    "ai_router/guidance_ledger.py",
+    "ai_router/measure_doc_only_cap.py",
     "ai_router/router-config.yaml",
-    "ai_router/tests/test_cite_lessons.py",
     "ai_router/tests/test_guidance_ledger.py",
+    "ai_router/tests/test_measure_doc_only_cap.py",
     "docs/guidance-lifecycle.md",
+    "docs/planning/guidance-candidates.md",
     "docs/planning/guidance-usage.json",
     "docs/planning/lessons-archive.md",
-    "docs/planning/lessons-learned.md",
     "docs/planning/project-guidance.md",
-    "docs/session-sets/121-guidance-becomes-executable/activity-log.json",
-    "docs/session-sets/121-guidance-becomes-executable/session-state.json"
+    "docs/session-constitution.md",
+    "docs/session-sets/121-guidance-becomes-executable/ai-assignment.md",
+    "docs/session-sets/121-guidance-becomes-executable/change-log.md",
+    "docs/session-sets/121-guidance-becomes-executable/decisions.jsonl",
+    "docs/session-sets/121-guidance-becomes-executable/s4-conventions.md",
+    "docs/session-sets/121-guidance-becomes-executable/s4-doc-only-cap.md",
+    "docs/session-sets/121-guidance-becomes-executable/s4-doc-only-cap-measurement.json",
+    "docs/session-sets/121-guidance-becomes-executable/s4-remediation-round-1.md",
+    "docs/session-sets/121-guidance-becomes-executable/s4-remediation-round-2.md",
+    "docs/session-sets/121-guidance-becomes-executable/s4-step9-guidance-review.md"
   ],
   "lessons_cited": [
-    "L-064-4",
-    "L-066-1",
-    "L-069-1",
+    "G-005",
+    "G-008",
+    "G-012",
+    "G-013",
+    "L-064-8",
     "L-112-1"
   ],
-  "next_orchestrator": {
-    "engine": "github-copilot",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Routed recommendation (gpt-5.5, 2026-08-15). Session 4 is the deferred judgment-heavy session: candidate promotion, guidance collapse, ceiling ratchet, cap measurement. Session 3 was the Sonnet/medium exception; S4 returns to the S1/S2 Opus-5/high profile."
-    }
-  },
-  "blockers": []
+  "next_orchestrator": null,
+  "blockers": [],
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 2302.6884,
+        "usd": 23.026884,
+        "event_count": 176,
+        "session_ids": [
+          "dc5a7a85-2fdf-4998-b0f5-26f97306ca64"
+        ],
+        "measured_session_ids": [
+          "dc5a7a85-2fdf-4998-b0f5-26f97306ca64"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 668.59475,
+        "usd": 6.6859475,
+        "event_count": 51,
+        "session_ids": [
+          "e2ffcbfe-fa3c-485e-afa6-def8c3d835ef",
+          "ebb505bb-bd70-440f-b688-ff2299569e3b",
+          "d58f7670-e76f-4f7d-a3ac-76074c327fd1",
+          "348f7621-972c-4bc0-96ff-97e6022c9ac4",
+          "36328c90-ccff-4992-a2fb-a2325c2e5702"
+        ],
+        "measured_session_ids": [
+          "e2ffcbfe-fa3c-485e-afa6-def8c3d835ef",
+          "ebb505bb-bd70-440f-b688-ff2299569e3b",
+          "d58f7670-e76f-4f7d-a3ac-76074c327fd1",
+          "348f7621-972c-4bc0-96ff-97e6022c9ac4",
+          "36328c90-ccff-4992-a2fb-a2325c2e5702"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 2971.28315,
+    "total_usd": 29.712831500000004,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
 }

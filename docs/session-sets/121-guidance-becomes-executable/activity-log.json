@@ -360,6 +360,133 @@
       "dateTime": "2026-08-15T05:13:27.993844-04:00",
       "description": "pytest: 4643 passed, 9 skipped (528s). run_of_record recorded.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "promote-from-the-queue-into-the",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "**Promote from the queue into the freed headroom**, in the order C-003, C-002, then C-001 \u2014 C-003 first because it needs no new machinery and documents a boundary the code already enforces. Admit the `L-064-8` one-liner if Session 1 gave it that disposition. **C-001 stays queued unless its enforcement lint and recall check exist.** Every admission is subject to Session 2's cap and must fit the measured headroom.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "collapse-session-constitution-md-and-project",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "**Collapse `session-constitution.md` and `project-guidance.md`** to the extent the promotions require, per proposal step 3. Content demoted to on-demand reference is a ceiling *reduction*, which is routine. `guidance_report --check` must pass at the end, and any ceiling that can now ratchet down should. **Retire the standing operator authorization of 2026-08-12** in the same pass: ratchet every `ceiling_tokens` (and `total_ceiling_tokens`) back down to the slimmed corpus's measurement, and delete both the *\"Standing operator authorization\"* section of `docs/guidance-lifecycle.md` and the matching paragraph in `router-config.yaml`. That authorization exists because this set had not run yet; an accommodation nobody retires is how a temporary one becomes the norm.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "measure-the-doc-only-cap-on",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "**Measure the doc-only cap on this set's own verification traffic** \u2014 the first prose-heavy work since it shipped, now across all **four** sessions. Report, per round: findings raised, how many cited `evidencePaths`, how many were doc-only, how many were **mixed**, and how many the cap actually capped. Compare rounds/session against the pre-cap median of **4.0**. State plainly whether the cap fired, and whether mixed citations defeated it. **A finding that it did not fire is a successful outcome of this step** \u2014 it is the answer the sequencing note asked for, and it sizes the deferred `project-guidance` triage.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T05:27:40.063939-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T05:27:40.092063-04:00",
+      "description": "Registered session 4 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T05:42:08.898460-04:00",
+      "description": "Registered session 4 via start_session (github-copilot / anthropic / claude-opus-5 / high), the S3 next-orchestrator recommendation.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "promote-from-the-queue-into-the",
+      "dateTime": "2026-08-15T05:42:08.900835-04:00",
+      "description": "Promoted C-003 then C-002 into project-guidance.md -> Conventions -> Workflow Expectations and registered both in the guidance ledger as instruction lines. C-001 stays queued: its enforcement lint and recall check do not exist, which is its own entry's stated bar. L-064-8 needed no admission -- Session 1 already condensed it to a live one-liner in lessons-learned.md. Both admissions fit the cap (corpus 21 / cap 22) and the measured headroom.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "collapse-session-constitution-md-and-project",
+      "dateTime": "2026-08-15T05:42:08.903105-04:00",
+      "description": "Collapsed six project-guidance.md entries (G-009, G-011, G-014, G-016, G-017, G-021) that restated session-constitution.md -- both files are preload, so each duplicate was paid twice; full text archived to lessons-archive.md. Trimmed the shared body of AGENTS/CLAUDE/GEMINI in lockstep. Ratcheted every ceiling to measurement: constitution 4200->4059, project-guidance 3645->3394 NET of both promotions, total 12234->11644; the manifest's engine entry MOVED from AGENTS.md to GEMINI.md, which the trim left largest. Re-derived instruction_line_cap 25->22 (the measured peak is usable again now the corpus is 21). Deleted the retired standing-authorization section from guidance-lifecycle.md and the matching paragraph from router-config.yaml. guidance_report --check green.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "measure-the-doc-only-cap-on",
+      "dateTime": "2026-08-15T05:48:48.310279-04:00",
+      "description": "Measured the Set 119 doc-only cap on this set own verification traffic. Shipped ai_router/measure_doc_only_cap.py (calls the shipped predicates, not a reimplementation) plus 7 falsifiers including a planted doc-only Major so the capped counter is proven non-zero-able. Result across S1-S3: 20 findings, 20 cited evidencePaths (100 percent), 0 doc-only, 10 code-only, 10 mixed (50 percent), cap fired 0 times. Rounds 7/5/4 median 5.0 vs pre-cap 4.0, but netting the phased supplementary round gives 6/4/3 median 4.0 - the cap moved rounds neither way because it never applied. Counterfactual sized and NOT acted on: 4 of 9 blocking round artifacts carried only mixed-citation blockers; widening is a verification reduction reserved to the operator. Report: s4-doc-only-cap.md.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T06:38:02.766198-04:00",
+      "description": "Phased loop: discovery (fan-out 2, gpt-5.5) raised 2 blocking Majors; supplementary raised 1 more; all 3 accepted and fixed with the s4-remediation-round-1/2 sidecars and both acceptance-harness runs; remediation-review returned VERIFIED with 3 fix verdicts accepted, 0 rejected. Verifier provider openai (anthropic excluded as the orchestrator provider).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T06:38:02.769526-04:00",
+      "description": "All three governed suites run in full after the last code change and recorded via run_of_record: pytest 4660 passed / 9 skipped (500s), mocha 1456 passing / 2 pending (31s), playwright 32 passed (4.1m).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T06:40:00.865530-04:00",
+      "description": "Set-terminal close-out: change-log.md, s4-step9-guidance-review.md, the routed next-SET recommendation in ai-assignment.md, four journaled decisions, the full disposition with the cost block, and a delta-scoped remediation-review (round 4, VERIFIED) over the close-out artifacts so the close carries a fresh stamp instead of paying for a backstop.",
+      "status": "complete"
     }
   ]
 }

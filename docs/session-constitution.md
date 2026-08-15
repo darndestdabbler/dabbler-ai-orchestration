@@ -5,9 +5,8 @@
 > into the on-demand references. This file replaces the full workflow
 > doc in the session-start preload (Set 085); the demoted docs stay
 > canonical for their domains and are opened at their trigger moments.
-> **Preload budget:** this file is capped at 4,000 tokens by the
-> `guidance.preload` manifest — at ceiling, adding prose requires
-> removing prose.
+> **Preload budget:** this file is capped by the `guidance.preload`
+> manifest — at ceiling, adding prose requires removing prose.
 
 ## Required reading — the whole preload
 
@@ -136,9 +135,8 @@ Run every router CLI through the workspace venv
 - **The spec's configuration block, as captured at set start, is
   immutable at runtime.** Gate policy records (`pathAwareCritique`,
   `contractGate`) are written once at the first `start_session`.
-- **Shared operational facts live in engine-agnostic docs** (`docs/`,
-  package changelogs), never only in `CLAUDE.md` / `AGENTS.md` /
-  `GEMINI.md` — the bootstrap files are entrypoints, not the record.
+- **Shared operational facts live in engine-agnostic docs**, never only in
+  `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` (G-001).
 - **Verification artifacts are raw records.** `sN-verification*.md`,
   `sN-issues*.json`, and `path-aware-critique.json` are never edited
   after they are written; retries append sibling round files.
@@ -266,5 +264,4 @@ Open the named reference at the step's trigger moment — not before.
 | 9 | `docs/guidance-lifecycle.md` | Citation, archival, ceilings, the preload admission test |
 | 9 | `docs/ai-led-session-workflow.md` | Path-aware critique stage mechanics; Step 9 procedure detail |
 | any | `docs/session-state-schema.md` | Any `session-state.json` question (shape, invariants, hand-edit recipe) |
-| any | `python -m ai_router.guidance_search --archive` | A lesson that might exist but is not in the active tier |
 | any | `docs/guidance-slimming-playbook.md` (Set 085 S3) | Slimming an over-budget guidance corpus in another repo |

@@ -1,0 +1,237 @@
+{
+  "setDir": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\docs\\session-sets\\121-guidance-becomes-executable",
+  "rows": [
+    {
+      "artifact": "s1-issues.json",
+      "session": 1,
+      "round": 1,
+      "phase": "discovery",
+      "verdict": "ISSUES_FOUND",
+      "findings": 4,
+      "cited": 4,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 4,
+      "mixed": 0,
+      "capped": 0,
+      "blocking_after_cap": 4,
+      "blocking_if_mixed_capped": 4,
+      "severities": {
+        "Major": 4
+      }
+    },
+    {
+      "artifact": "s1-issues-round-2.json",
+      "session": 1,
+      "round": 2,
+      "phase": "supplementary",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 1,
+      "mixed": 0,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 1,
+      "severities": {
+        "Major": 1
+      }
+    },
+    {
+      "artifact": "s1-issues-round-3.json",
+      "session": 1,
+      "round": 3,
+      "phase": "remediation-review",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 1,
+      "mixed": 0,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 1,
+      "severities": {
+        "Major": 1
+      }
+    },
+    {
+      "artifact": "s1-issues-round-5.json",
+      "session": 1,
+      "round": 5,
+      "phase": "remediation-review",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 0,
+      "mixed": 1,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 0,
+      "severities": {
+        "Major": 1
+      }
+    },
+    {
+      "artifact": "s2-issues.json",
+      "session": 2,
+      "round": 1,
+      "phase": "discovery",
+      "verdict": "ISSUES_FOUND",
+      "findings": 7,
+      "cited": 7,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 3,
+      "mixed": 4,
+      "capped": 0,
+      "blocking_after_cap": 7,
+      "blocking_if_mixed_capped": 3,
+      "severities": {
+        "Major": 7
+      }
+    },
+    {
+      "artifact": "s2-issues-round-2.json",
+      "session": 2,
+      "round": 2,
+      "phase": "supplementary",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 0,
+      "mixed": 1,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 0,
+      "severities": {
+        "Major": 1
+      }
+    },
+    {
+      "artifact": "s2-issues-round-3.json",
+      "session": 2,
+      "round": 3,
+      "phase": "remediation-review",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 0,
+      "mixed": 1,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 0,
+      "severities": {
+        "Major": 1
+      }
+    },
+    {
+      "artifact": "s3-issues.json",
+      "session": 3,
+      "round": 1,
+      "phase": "discovery",
+      "verdict": "ISSUES_FOUND",
+      "findings": 3,
+      "cited": 3,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 1,
+      "mixed": 2,
+      "capped": 0,
+      "blocking_after_cap": 3,
+      "blocking_if_mixed_capped": 1,
+      "severities": {
+        "Major": 3
+      }
+    },
+    {
+      "artifact": "s3-issues-round-2.json",
+      "session": 3,
+      "round": 2,
+      "phase": "supplementary",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 0,
+      "mixed": 1,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 0,
+      "severities": {
+        "Major": 1
+      }
+    },
+    {
+      "artifact": "s4-issues.json",
+      "session": 4,
+      "round": 1,
+      "phase": "discovery",
+      "verdict": "ISSUES_FOUND",
+      "findings": 2,
+      "cited": 2,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 0,
+      "mixed": 2,
+      "capped": 0,
+      "blocking_after_cap": 2,
+      "blocking_if_mixed_capped": 0,
+      "severities": {
+        "Major": 2
+      }
+    },
+    {
+      "artifact": "s4-issues-round-2.json",
+      "session": 4,
+      "round": 2,
+      "phase": "supplementary",
+      "verdict": "ISSUES_FOUND",
+      "findings": 1,
+      "cited": 1,
+      "uncited": 0,
+      "doc-only": 0,
+      "code-only": 0,
+      "mixed": 1,
+      "capped": 0,
+      "blocking_after_cap": 1,
+      "blocking_if_mixed_capped": 0,
+      "severities": {
+        "Major": 1
+      }
+    }
+  ],
+  "roundsPerSession": {
+    "1": 6,
+    "2": 5,
+    "3": 4,
+    "4": 4
+  },
+  "medianRounds": 4.5,
+  "preCapMedianRounds": 4.0,
+  "totals": {
+    "findings": 23,
+    "cited": 23,
+    "uncited": 0,
+    "doc-only": 0,
+    "code-only": 10,
+    "mixed": 13,
+    "capped": 0,
+    "blocking_after_cap": 23,
+    "blocking_if_mixed_capped": 10
+  },
+  "counterfactual": {
+    "roundsWithBlockingFindings": 11,
+    "roundsCarryingOnlyMixedBlockers": 6
+  }
+}

@@ -1428,29 +1428,22 @@ guidance:
     # never expires. Every check ships with a falsifier regardless.
     check_window_sets: 20
 
-    # RE-DERIVED (Set 121 S3), obligation from Session 2 discharged.
+    # RE-DERIVED AGAIN (Set 121 S4). S3 set 25 because the corpus was 25:
+    # a cap equal to its own corpus is tautological -- it can only ever
+    # fire on the very next entry, so it measures nothing.
     #
-    # The Session 2 cap (22) was measured against a corpus of ~46
-    # instruction entries; project-guidance.md carried no ids yet, so
-    # its ~24 entries contributed nothing -- the known blind spot that
-    # Session 2 explicitly recorded and Session 3 was obligated to fix.
+    # S4 collapsed six project-guidance.md entries that restated
+    # session-constitution.md and admitted two (C-002, C-003), leaving a
+    # live corpus of 21 instruction lines. That is now BELOW the measured
+    # historical peak of 22 (peak distinct ids cited in any trailing
+    # 30-session window, over the same 345 sessions and the same method),
+    # so the honest derivation is available again: the cap is the measured
+    # peak, not a restatement of the corpus size.
     #
-    # The historical peak is still 22 (same 345 sessions, same method:
-    # peak distinct ids cited in any trailing 30-session window). That
-    # number has not changed because G-entries had no ids before this
-    # session and could not appear in any citation record.
-    #
-    # However, inheriting 22 would fire immediately: the corpus now has
-    # 25 live instruction lines (3 pre-existing + 22 new G-entries).
-    # A cap that fires the moment it is set against its own corpus is
-    # not evidence -- it is noise. The re-derivation method is:
-    #   set cap = total live instruction corpus size after admission
-    # which produces 25. This cap means: the corpus is at capacity;
-    # adding any new instruction entry requires removing one or
-    # re-deriving again. The gate still fires for real bloat; it just
-    # fires when the NEXT entry is added, not on the 22 entries this
-    # session was chartered to admit.
-    instruction_line_cap: 25
+    # 22 against a corpus of 21 is a gate with one slot of real headroom --
+    # it admits the next genuinely-earned line and fires on the one after,
+    # which is what a backstop is supposed to do.
+    instruction_line_cap: 22
 
   # --- Preload manifest + ratcheting ceiling gate (Set 085 F1) ---
   # Every file the session-start workflow requires in context, each with
@@ -1462,12 +1455,6 @@ guidance:
   # Ceilings RATCHET DOWN ONLY. Raising any ceiling (or the total) is an
   # operator-authorized config edit with a stated reason, never an
   # in-session accommodation (docs/guidance-lifecycle.md).
-  #
-  # The STANDING OPERATOR AUTHORIZATION of 2026-08-12 (Set 128 S2) that
-  # permitted raises without slimming first has been RETIRED by Set 121 S3.
-  # That session re-slimmed project-guidance.md and ratcheted all ceilings
-  # down to measured sizes. Future ceiling raises require fresh operator
-  # authorization per the standard rule above.
   #
   # These ceilings are the "preload residency" budget and are DISTINCT
   # from the two Set-064 lifecycle ceilings above (which remain the
@@ -1498,29 +1485,34 @@ guidance:
   # (docs/guidance-lifecycle.md -> "Membership follows the
   # required-reading contract").
   preload:
-    # Set 121 S3, 2026-08-15: ratcheted 12600 -> 12234 (measured after
-    # encoding two entries in project-guidance.md and assigning 24 ids).
-    total_ceiling_tokens: 12234
+    # Set 121 S4, 2026-08-15: ratcheted 12234 -> 11644 (measured after
+    # promoting C-002/C-003, collapsing six project-guidance.md entries
+    # that duplicated the constitution, trimming the engine files, and
+    # repointing the engine entry to GEMINI.md, now the largest).
+    total_ceiling_tokens: 11644
     files:
       - path: docs/session-constitution.md
-        # Set 128 S2: raised 4000 -> 4200 under the same authorization.
-        # The A1-A4 ordering rules belong in the per-session operating
-        # doc; no other preload file can carry them.
-        ceiling_tokens: 4200
+        # Set 121 S4, 2026-08-15: ratcheted 4200 -> 4059 (measured). The
+        # Set 128 S2 raise was made under the standing authorization now
+        # retired; the A1-A4 test-ordering rules it bought are still in
+        # the file and still load-bearing, so the measurement sits 59
+        # tokens above the pre-authorization 4000 in live content.
+        ceiling_tokens: 4059
       - path: docs/planning/project-guidance.md
-        # Set 121 S3, 2026-08-15: ratcheted 3930 -> 3645 (measured after
-        # encoding L-064-4 and L-066-1, assigning 24 minimal id markers,
-        # and fixing 6 em-dash violations in print() calls found by the
-        # new cli_glyph_guard).
-        ceiling_tokens: 3645
+        # Set 121 S4, 2026-08-15: ratcheted 3645 -> 3394 (measured NET of
+        # admitting C-002 and C-003 -- the promotions were funded by
+        # collapsing six entries that restated session-constitution.md,
+        # which is preload too, so the duplicate was paid twice).
+        ceiling_tokens: 3394
       - path: docs/planning/lessons-learned.md
         # Set 121 S3, 2026-08-15: ratcheted 2504 -> 2269 (measured after
         # the Set 121 S1/S2/S3 edits; the standing authorization that
         # permitted the earlier raise is retired by this session).
         ceiling_tokens: 2269
-      - path: AGENTS.md   # largest engine bootstrap file (representative)
-        # Set 121 S3, 2026-08-15: raised 2031 -> 2208 (measured; the standing
-        # authorization that permitted the prior overage is retired by this
-        # session, so the ceiling is advanced to match current reality).
-        # Session 4 Step 3 will trim the file and ratchet this back down.
-        ceiling_tokens: 2208
+      - path: GEMINI.md   # largest engine bootstrap file (representative)
+        # Set 121 S4, 2026-08-15: the manifest entry MOVED from AGENTS.md.
+        # S4's lockstep trim of the shared body left GEMINI.md the largest
+        # of the three (7,730 vs 7,646 vs 7,164 bytes), and the manifest
+        # must always count the largest so the total bounds every engine's
+        # session. Ratcheted 2208 -> 1922 (measured).
+        ceiling_tokens: 1922

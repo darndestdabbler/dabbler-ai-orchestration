@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "8428ac09ee14f196c533f15b938139e6f8f99a96",
+  "fixedTree": "fbf24f1023023e11954a204fb3d2c81b7e2e4208",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-15T10:04:25.920038+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The new cap self-application test makes the advertised instruction-cap headroom unusable. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/tests/test_guidance_ledg ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The cap self-application coverage aligns with the shipped cap semantics: a corpus equal to instruction_line_cap is allowed, only a corpus greater than the cap fails, and any current-headroom assertion is not encoded as a permanent live < cap invariant.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

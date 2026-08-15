@@ -155,11 +155,14 @@ citation events** (Set 121 S2). They live in `router-config.yaml` under
 | `check_window_sets` | **20** | **The data supports nothing here** — there is no fire history yet. An honest default rather than a fabricated derivation: it reuses the operator-set `disuse_window_sets`, so the repo carries one disuse horizon rather than two that drift. |
 | `instruction_line_cap` | **22** | Peak distinct ids cited in any trailing window across the whole history (20 at W=30, 21 at W=40–51, 22 at W=60–80). |
 
-> **Known blind spot in the cap.** `project-guidance.md` had no ids when
-> this was measured, so its ~24 entries contributed **nothing**. Session 3
-> of Set 121 admits them; when it does it must **re-derive** the cap
-> against the enlarged corpus rather than inherit 22 — the same refusal
-> Session 2 made of proposal §5.3's 20.
+> **The Session-2 blind spot, and how it was closed.**
+> `project-guidance.md` had no ids when the cap was first measured, so its
+> ~24 entries contributed nothing. Set 121 S3 admitted them, which pushed
+> the corpus to 25 and forced a tautological cap of 25 — a cap equal to
+> its own corpus can only fire on the very next entry, so it measures
+> nothing. Set 121 S4 collapsed six duplicated entries and promoted two,
+> leaving a live corpus of **21**, back under the measured peak. The cap
+> is therefore the measured 22 again, with one slot of real headroom.
 
 ## Citation at close (the keystone)
 
@@ -243,12 +246,12 @@ It lives in the router-config `guidance:` block:
 ```yaml
 guidance:
   preload:
-    total_ceiling_tokens: 12000
+    total_ceiling_tokens: 11644
     files:
       - path: docs/session-constitution.md
-        ceiling_tokens: 4000
+        ceiling_tokens: 4059
       - path: docs/planning/project-guidance.md
-        ceiling_tokens: 3499
+        ceiling_tokens: 3394
       # ... one entry per required-reading file
 ```
 
@@ -269,18 +272,16 @@ it does not edit the number. The `stamp: true` per-entry opt-in controls
 `--write-headers` auto-editing (default false — canonical docs and the
 engine bootstrap files are never machine-stamped).
 
-### Standing operator authorization, 2026-08-12 → Set 121 (RETIRED by Set 121 S3)
+### Standing operator authorization, 2026-08-12 → Set 121 (RETIRED)
 
-> **Operator, 2026-08-12 (Set 128 Session 2):** *"I hereby authorize all
-> sessions to go over the ceiling on guidance until we fix guidance in
-> set 121."*
->
-> **Set 121 Session 3 (2026-08-15):** Authorization has been discharged.
-> `project-guidance.md` was re-slimmed (3,928 → 3,645 tokens), all
-> ceilings have been ratcheted down to measured sizes, and the paragraph
-> in `router-config.yaml` was deleted. **This authorization is no longer
-> in effect.** Future ceiling raises require fresh operator authorization
-> per the standard ratchet rule.
+The operator authorized sessions to exceed the guidance ceilings until
+Set 121 landed, because the no-headroom condition was taxing every
+unrelated set that touched a preload file. **That authorization is
+discharged and no longer in effect.** Set 121 S3 re-slimmed
+`project-guidance.md` and S4 collapsed six entries that duplicated the
+constitution, promoted the queue, and ratcheted every ceiling back down
+to measurement. Future ceiling raises require fresh operator
+authorization per the standard ratchet rule above.
 
 Back-compat: a repo with no `preload:` block keeps exactly the two-file
 Set-064 behavior (universal core, gated extension). Only a
@@ -295,7 +296,7 @@ stays on the legacy behavior instead of inheriting this repo's manifest
 manifest bounds the per-session preload — in this repo:
 `docs/session-constitution.md`, `docs/planning/project-guidance.md`,
 `docs/planning/lessons-learned.md`, and **one** engine bootstrap file —
-under a 12,000-token total. Because a session reads exactly one of
+under the manifest's total. Because a session reads exactly one of
 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` and the gate sums every listed
 entry, the manifest counts the **largest** engine file as the
 representative entry, so the total bounds every engine's session
@@ -304,7 +305,10 @@ one body by policy and are kept in lockstep; the gate does not watch
 the two uncounted siblings, so an edit that makes a sibling the largest
 must repoint the manifest entry **in the same change** — that is a
 review-time discipline, and the per-file ceiling on the representative
-still blocks growth of the counted path. Demoted
+still blocks growth of the counted path. **Set 121 S4 is the worked
+example:** a lockstep trim of the shared body left `GEMINI.md` largest
+(7,730 bytes vs `AGENTS.md` 7,646 and `CLAUDE.md` 7,164), so the entry
+moved from `AGENTS.md` to `GEMINI.md` in the same commit. Demoted
 on-demand references (the workflow doc, the schema doc, the close-out
 doc, the authoring guide, `quick-start.md`) are deliberately **uncapped**,
 like the archive: their size is no longer a recurring per-session tax,

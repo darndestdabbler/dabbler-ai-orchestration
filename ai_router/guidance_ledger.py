@@ -1059,11 +1059,12 @@ DEFAULT_CHECK_WINDOW_SETS = 20
 #: Peak distinct ids cited in ANY trailing window across 345 sessions:
 #: 20 at W=30, 21 at W=40-51, **22** at W=60-80. The working set has
 #: never exceeded 22, so that is the measured ceiling and 5.3's proposed
-#: 20 is very close to it. KNOWN BLIND SPOT: `project-guidance.md` has
-#: no ids yet, so its ~24 entries contributed nothing to this measurement.
-#: Session 3 admits them; when it does it must RE-DERIVE this number
-#: against the enlarged corpus rather than inherit 22 -- the same refusal
-#: this session made of 5.3.
+#: 20 is very close to it. The Session-2 blind spot (`project-guidance.md`
+#: carried no ids, so its ~24 entries contributed nothing) was closed by
+#: Set 121 S3, which admitted them, and by S4, which collapsed six that
+#: duplicated the constitution -- leaving a live corpus of 21, back under
+#: the measured peak, so 22 is an evidence-backed cap again rather than a
+#: restatement of the corpus size.
 DEFAULT_INSTRUCTION_LINE_CAP = 22
 
 

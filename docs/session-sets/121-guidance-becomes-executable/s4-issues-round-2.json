@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The new cap self-application test makes the advertised instruction-cap headroom unusable.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/tests/test_guidance_ledger.py:855-876`, `ai_router/guidance_ledger.py:1255-1280`, `ai_router/router-config.yaml:1431-1446`, `docs/planning/guidance-candidates.md:26-30`\n  - **Failure scenario:** A future session promotes C-001, or another earned instruction, into the one free slot this session explicitly creates. That is probable because C-001 is already queued and now blocked only on its prerequisites, not on headroom. The shipped cap gate treats `22 / cap 22` as valid (`over_cap = lines > cap`), and the config says the next line is admitted, but the new test fails as soon as live instructions equal the cap, blocking the suite and forcing unnecessary deletion or re-derivation while still within the cap.\n  - **Acceptance criterion:** `JUDGMENT - The cap self-application coverage aligns with the shipped cap semantics: a corpus equal to instruction_line_cap is allowed, only a corpus greater than the cap fails, and any current-headroom assertion is not encoded as a permanent live < cap invariant.`\n  - **Details:** **Violation:** `router-config.yaml` says `22 against a corpus of 21` “admits the next genuinely-earned line and fires on the one after,” and `guidance_ledger.py` implements that with `over_cap = lines > cap`; the test instead asserts `len(live) < cap` and says the cap “must sit above the live corpus.” **Impact:** this changes the practical merge/close decision for the next legitimate guidance admission: CI fails even though the product cap has not been exceeded. **Evidence:** the queue doc says C-001 now has “a free slot under the instruction cap,” while the new test would fail immediately after that slot is used.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A future session promotes C-001, or another earned instruction, into the one free slot this session explicitly creates. That is probable because C-001 is already queued and now blocked only on its prerequisites, not on headroom. The shipped cap gate treats `22 / cap 22` as valid (`over_cap = lines > cap`), and the config says the next line is admitted, but the new test fails as soon as live instructions equal the cap, blocking the suite and forcing unnecessary deletion or re-derivation while still within the cap.",
+      "evidencePaths": [
+        "ai_router/tests/test_guidance_ledger.py",
+        "ai_router/guidance_ledger.py",
+        "ai_router/router-config.yaml",
+        "docs/planning/guidance-candidates.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The cap self-application coverage aligns with the shipped cap semantics: a corpus equal to instruction_line_cap is allowed, only a corpus greater than the cap fails, and any current-headroom assertion is not encoded as a permanent live < cap invariant."
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "8428ac09ee14f196c533f15b938139e6f8f99a96"
+}

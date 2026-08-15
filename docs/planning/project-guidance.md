@@ -163,21 +163,21 @@ Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already
 
 ### Workflow Expectations
 
-<!-- lesson: id="G-009" -->
-- Before every session, read the preload (Set 085):
-  [`docs/session-constitution.md`](../session-constitution.md) — the
-  per-session operating doc — plus this file,
-  `docs/planning/lessons-learned.md`, and your engine bootstrap file
-  (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`). Do **not** read
-  `docs/planning/lessons-archive.md` — it is the never-auto-loaded archive
-  tier (Set 064), searched on demand with
-  `python -m ai_router.guidance_search --archive`. Everything else is
-  consulted on demand at the trigger moments in the constitution's
-  per-step pointer table (the authoring guide owns *spec* authoring; the
-  workflow doc owns *execution* mechanics). The guidance lifecycle
-  (metadata, citation-at-close, archival, ceilings, the preload manifest
-  and admission test) is canonical in
-  [`docs/guidance-lifecycle.md`](../guidance-lifecycle.md).
+<!-- lesson-pointer: archived-set="121" -->
+- Six entries here restated [`docs/session-constitution.md`](../session-constitution.md)
+  — the preload reading list, raw verification artifacts, step logging,
+  session-state SSOT and registration, routing `ai-assignment.md`, and obeying
+  the spec's configuration block. The constitution is preload too, so each
+  duplicate was paid twice and bought nothing; Set 121 S4 collapsed them into it.
+  Full text in `lessons-archive.md`.
+<!-- lesson: id="C-003" -->
+- **A rejected blocking finding requires independent verifier acceptance,
+  deterministic falsifying evidence, or operator adjudication — never the
+  orchestrator's own reasoning.**
+<!-- lesson: id="C-002" -->
+- **Tests give deterministic evidence for exercised behaviour; verification owns
+  requirements, *test adequacy*, residual risk and plausible counterexamples.
+  Correctness is never out of scope.**
 <!-- lesson: id="G-010" -->
 - **Open every session-verification prompt with an up-front conventions
   block.** Before the work to be reviewed, state the suite baseline (exact
@@ -186,11 +186,6 @@ Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already
   by-design exclusions (e.g. a research/proposal set ships no production
   code). This keeps Round 1 focused on real defects instead of burning
   findings — and re-verify rounds — on the agreed baseline. (L-064-10)
-<!-- lesson: id="G-011" -->
-- Save verifier output raw and never edit saved verification artifacts after
-  they are written. On the current path this means root-level
-  `sN-verification*.md`; legacy `session-reviews/` files remain read-only if
-  encountered.
 <!-- lesson: id="G-012" -->
 - **Propagate a consistency fix to every echo before re-verifying.** The same
   claim echoes in summary tables, prose, per-row cells and quoting artifacts;
@@ -200,19 +195,10 @@ Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already
   scenario hits a real user × impact. Low probability **or** low impact is
   Minor; no nameable failure scenario is a nit. Carry the rubric in each round's
   conventions block until it ships in the verification template. (L-095-1)
-<!-- lesson: id="G-014" -->
-- Log every AI-led session step in the active session set.
 <!-- lesson: id="G-015" -->
 - AI instruction documents (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) reference
   this file and `docs/ai-led-session-workflow.md` so future runs inherit the
   same durable expectations.
-<!-- lesson: id="G-016" -->
-- **Session-state.json is the single source of truth for in-progress
-  detection.** Call `register_session_start()` at Step 1 before the first
-  `log_step()`, and `mark_session_complete()` at Step 8.
-<!-- lesson: id="G-017" -->
-- **Author `ai-assignment.md` and next-orchestrator / next-session-set
-  recommendations via routed analysis — never self-opine.**
 <!-- lesson: id="G-018" -->
 - **When a set's `pathAwareCritique` is `advisory` or `required`, run the
   end-of-set Path-Aware Critique stage before the set-terminal close.** A
@@ -240,11 +226,6 @@ Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already
   with no pre-seeded config, assert the provisioned artifacts exist (or are
   correctly absent), and be named in the spec's "Ends with" line. (L-079-3; full
   text and the Sets 079–082 evidence in `lessons-archive.md`)
-<!-- lesson: id="G-021" -->
-- **Obey the spec's Session Set Configuration block at runtime.** Rules are
-  conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
-  re-litigate those flags during a session — if a flag is wrong, surface it
-  at the Step 9 reorganization review.
 <!-- lesson: id="G-022" -->
 - When the human gives a session instruction or decision that appears durable
   enough to guide future sessions, ask whether it should be incorporated here.

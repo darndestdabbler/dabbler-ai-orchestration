@@ -850,7 +850,43 @@ class TestRetentionSettings:
         import config as router_config
 
         settings = gl.retention_settings(router_config.load_config())
-        assert settings == (30, 20, 25)
+        assert settings == (30, 20, 22)
+
+    def test_the_cap_is_evidence_derived_not_a_restatement_of_the_corpus(self):
+        """The cap must be the MEASURED peak, never the corpus size.
+
+        Set 121 S3 was forced to set cap == corpus == 25 because the corpus had
+        outgrown the measured peak. A cap equal to its own corpus can only fire
+        on the very next entry, so it measures nothing. S4's collapse brought
+        the corpus back under the measured peak, which makes the honest
+        derivation available again.
+
+        Guard the derivation, not today's headroom. The shipped gate treats
+        ``lines == cap`` as legal (``over_cap = lines > cap``), so asserting a
+        permanent ``live < cap`` would redden CI the moment a future session
+        fills the free slot this one deliberately created -- while the product
+        cap is still green. Assert instead that (a) the corpus obeys the
+        shipped semantics and (b) the cap still equals the measured historical
+        peak, so a future session that re-derives the cap from its own corpus
+        size has to change the constant and say why.
+        """
+        import config as router_config
+
+        repo_root = Path(__file__).resolve().parents[2]
+        _, _, cap = gl.retention_settings(router_config.load_config())
+        ledger, _ = gl.load_ledger(str(repo_root))
+        live = gl.governed_instruction_ids(ledger, gl.corpus_ids(str(repo_root)))
+        assert live, "corpus check: no live instruction ids were discovered"
+        assert len(live) <= cap, (
+            f"the live instruction corpus ({len(live)}) exceeds the shipped "
+            f"cap ({cap}); the gate itself reports this too"
+        )
+        assert cap == gl.DEFAULT_INSTRUCTION_LINE_CAP, (
+            f"the shipped cap ({cap}) has drifted from the measured "
+            f"historical peak ({gl.DEFAULT_INSTRUCTION_LINE_CAP}); a cap "
+            f"re-derived from the corpus size is tautological, so a change "
+            f"here must move the documented constant and state its basis"
+        )
 
     def test_a_missing_block_falls_back_to_the_defaults(self):
         assert gl.retention_settings(None) == (

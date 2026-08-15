@@ -3,18 +3,32 @@
 > **Purpose:** a holding pen for guidance that has been *decided* but
 > cannot be *admitted*, because the preload corpus is at its ceiling.
 >
-> **Why this file exists.** Every preload document currently sits at
-> 98–100% of a ceiling that was set to its own measured size and
-> *"ratchets DOWN only"* — `session-constitution.md` 3,978/4,000,
-> `project-guidance.md` 3,499/**3,499**, `lessons-learned.md` 2,379/2,385,
-> total 11,851/12,000. There is no headroom, and the standing rule is
-> that an orchestrator at ceiling **removes prose rather than editing the
+> **Why this file exists.** Every preload document sat at 98–100% of a
+> ceiling that was set to its own measured size and *"ratchets DOWN
+> only"*. There was no headroom, and the standing rule is that an
+> orchestrator at ceiling **removes prose rather than editing the
 > number**.
 >
 > The consequence is invisible: guidance that should exist simply never
 > gets written, and nothing records what was lost. **This file makes that
 > cost visible.** A growing queue is evidence that the ceiling is binding
 > on real content, not on padding.
+
+## Status, 2026-08-15 (Set 121 S4)
+
+**Two of the three entries have left the queue.** C-003 and C-002 were
+promoted into `docs/planning/project-guidance.md` → Conventions →
+Workflow Expectations, funded by collapsing six entries there that
+restated `session-constitution.md` — which is preload too, so each
+duplicate was paid twice and bought nothing. `project-guidance.md`
+measured 3,645 tokens before and **3,394 after, net of both admissions**.
+
+**C-001 remains queued, and its blocker is unchanged and stated below:**
+it needs an enforcement lint and a recall check. That is not a headroom
+problem any more — there are 251 tokens of freed room and a free slot
+under the instruction cap — so C-001 now sits here on its *own* merits,
+which is what the queue is for. Promoting it without the machinery would
+ship advice with no teeth, by its own entry's terms.
 
 ## Admission rule
 
@@ -34,7 +48,8 @@ archive; `lessons-archive.md` is the archive.
 
 ## C-001 — Implement so tests can be partitioned
 
-**Status:** queued 2026-08-10. Blocked on preload headroom.
+**Status:** **still queued** as of 2026-08-15 (Set 121 S4). No longer
+blocked on headroom — blocked on its own prerequisites, below.
 **Class:** one-line instruction (for the agent writing the implementation).
 **Depends on:** the preload collapse in
 [`docs/proposals/2026-08-10-smaller-framework-target-state.md`](../proposals/2026-08-10-smaller-framework-target-state.md) §5.1.
@@ -85,7 +100,9 @@ that machinery, or the instruction is advice with no teeth.
 
 ## C-002 — What verification is for
 
-**Status:** queued 2026-08-11. Blocked on preload headroom.
+**Status:** **PROMOTED 2026-08-15 (Set 121 S4)** into
+`project-guidance.md` → Conventions → Workflow Expectations. Queued
+2026-08-11; blocked purely on headroom, which S4 freed.
 **Class:** one-line instruction.
 **Source:** GPT-5.6 Sol, in the consultation recorded at
 [`docs/proposals/2026-08-10-concurrent-monitoring-as-a-gate/verdict.md`](../proposals/2026-08-10-concurrent-monitoring-as-a-gate/verdict.md) §5.
@@ -120,7 +137,9 @@ stops re-deriving the charter every round.
 
 ## C-003 — Who may dismiss a blocking finding
 
-**Status:** queued 2026-08-11. Blocked on preload headroom.
+**Status:** **PROMOTED 2026-08-15 (Set 121 S4)** into
+`project-guidance.md` → Conventions → Workflow Expectations, first of the
+queue because it needs no new machinery. Queued 2026-08-11.
 **Class:** one-line instruction — **the code half already exists.**
 
 ### The candidate instruction

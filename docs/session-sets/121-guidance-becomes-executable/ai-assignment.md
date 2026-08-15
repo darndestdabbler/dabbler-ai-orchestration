@@ -231,3 +231,68 @@ where the deferred judgment-heavy triage lands.
 - **Still open from Session 1:** `AGENTS.md` is 177 tokens over its
   2,031 ceiling (retired by Session 4 Step 3), and 29 production
   `subprocess` call sites pass `text=True` with no `encoding=`.
+
+---
+
+## Session 4 — Admit the queue, and measure whether the cap fired
+
+**Assigned:** github-copilot / anthropic / claude-opus-5 / high, per Session 3's
+routed next-orchestrator recommendation (gpt-5.5, tier-0, 2026-08-15), which
+called Session 4 the deferred judgment-heavy session and returned it to the
+S1/S2 profile after Session 3's mechanical Sonnet/medium exception. Accepted
+unchanged.
+
+**Verdict:** VERIFIED on round 3 (`remediation-review`), 3 fix verdicts accepted,
+0 rejected. Three blocking Majors across two discovery passes, all accepted and
+fixed, none disputed.
+
+### Next-SET recommendation (routed, verbatim)
+
+```
+RECOMMENDED_SET: set-115-sessions-1-3
+CONFIDENCE: high
+WHY: The sequencing note's standing order explicitly places Set 115 S1-3 next,
+and nothing in Set 121's output changes that. The operator has confirmed context
+menus and click-to-open-spec are in daily use - that is a value signal, not a
+guess. Set 115 is fully independent of everything else, requires no new
+instrument, and its Session 4 re-author decision is now unblocked because Set 120
+is complete. The new guidance ledger and guard-accrual evidence produced by Set
+121 make Set 118 *cheaper than before*, but Set 118 S1 still needs to run before
+S2-S3 can be confirmed - it does not leapfrog Set 115.
+RUNNER_UP: set-118-s1-only - The guidance ledger's fired/cited tracking is
+exactly the instrument Set 118's guard-accrual half was missing; running S1 now
+would let the operator decide S2-S3 while the ledger evidence is fresh. It
+becomes first if the operator weights infrastructure health over UX wins.
+DO_NOT_RUN_YET: extension-carve - Still depends on Set 120's projection work
+being fully digested and the ~1,200-1,500 TypeScript lines being confirmed ready
+for deletion; running it before Set 115 also violates the sequencing note's
+explicit ordering rationale.
+```
+
+### What the next set inherits
+
+- **The preload corpus is inside every ceiling, with none to spare and none
+  wasted.** 11,644 tokens against 11,644, each file at its own measurement. The
+  standing authorization to exceed the ceilings is deleted, not merely marked
+  retired, so the next session that needs room removes prose or asks the
+  operator.
+- **The manifest's engine entry is `GEMINI.md`, not `AGENTS.md`.** The three
+  bootstrap files were trimmed in lockstep and GEMINI is now the largest. Anyone
+  editing them must keep all three in step and repoint the manifest in the same
+  change if the ordering flips again.
+- **The instruction cap is 22 with a live corpus of 21** — one free slot, held
+  open deliberately. A test asserts the cap equals the measured historical peak,
+  so a future session that re-derives it from its own corpus size has to move the
+  documented constant and say why.
+- **The doc-only cap has an evidence-backed verdict: it has never fired**, and
+  `python -m ai_router.measure_doc_only_cap <set-dir>` re-runs the measurement on
+  any set. Prose-heavy work does not produce doc-only findings, so no future set
+  should budget for the cap to shorten its loop.
+- **An open operator question, sized and unacted:** 13 of 23 findings were mixed
+  doc-and-code citations, and 6 of 11 blocking round artifacts carried only mixed
+  blockers. Widening the cap to cover them is a verification reduction and needs
+  a fresh ruling. The argument against is recorded beside the number.
+- **A cautionary residual: the set shipped 151 net new test functions against a
+  declared cap of 40.** Operator ruled it recorded rather than remediated. A
+  future set that declares a budget should check it at each session close, not at
+  the terminal one, where every option but recording it has expired.

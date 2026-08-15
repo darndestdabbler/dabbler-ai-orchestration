@@ -971,3 +971,65 @@ grep, deliberately **without metadata trailers** — the live ids remain in
   `test_close_session_skeleton.py::test_parser_accepts_every_documented_flag`,
   is a hand-maintained argparse cross-check for one module; generalising
   it would cover flag names only, never the class of claim at issue.
+
+## Collapsed into `session-constitution.md` by Set 121 S4
+
+Six `project-guidance.md` entries restated rules that
+`docs/session-constitution.md` already carries. Both files are **preload**,
+so the duplicate was paid on every session and bought nothing; the collapse
+is a token reduction, not a policy change. Each rule below is live in the
+constitution at the named place — full text preserved here for grep, and
+`cite_lessons` reactivates any of them.
+
+| id | the rule is live in `session-constitution.md` at |
+| :--- | :--- |
+| G-009 | *Required reading — the whole preload* (items 1-4, the never-auto-load archive line, the per-step pointer table) |
+| G-011 | *Source of truth and conflict resolution* -> "Verification artifacts are raw records" |
+| G-014 | Step 4 -> "log every step to `activity-log.json` (`log_step`) using the spec's own step numbers" |
+| G-016 | *Source of truth* -> "`session-state.json` is the single source of truth" + Step 1 "Register first, work second" |
+| G-017 | Step 3.5 -> "via routed analysis — never self-opine" |
+| G-021 | Step 2 -> "The flags govern the rest of the session — obey them at runtime, never re-litigate them mid-session" |
+
+### Read the preload before every session (full text of G-009)
+
+- Before every session, read the preload (Set 085):
+  `docs/session-constitution.md` — the per-session operating doc — plus
+  `docs/planning/project-guidance.md`, `docs/planning/lessons-learned.md`,
+  and your engine bootstrap file (`CLAUDE.md` / `AGENTS.md` / `GEMINI.md`).
+  Do **not** read `docs/planning/lessons-archive.md` — it is the
+  never-auto-loaded archive tier (Set 064), searched on demand with
+  `python -m ai_router.guidance_search --archive`. Everything else is
+  consulted on demand at the trigger moments in the constitution's per-step
+  pointer table (the authoring guide owns *spec* authoring; the workflow doc
+  owns *execution* mechanics). The guidance lifecycle (metadata,
+  citation-at-close, archival, ceilings, the preload manifest and admission
+  test) is canonical in `docs/guidance-lifecycle.md`.
+
+### Verification artifacts are written once (full text of G-011)
+
+- Save verifier output raw and never edit saved verification artifacts after
+  they are written. On the current path this means root-level
+  `sN-verification*.md`; legacy `session-reviews/` files remain read-only if
+  encountered.
+
+### Log every step (full text of G-014)
+
+- Log every AI-led session step in the active session set.
+
+### Session state is the single source of truth (full text of G-016)
+
+- **Session-state.json is the single source of truth for in-progress
+  detection.** Call `register_session_start()` at Step 1 before the first
+  `log_step()`, and `mark_session_complete()` at Step 8.
+
+### Route the assignment; never self-opine (full text of G-017)
+
+- **Author `ai-assignment.md` and next-orchestrator / next-session-set
+  recommendations via routed analysis — never self-opine.**
+
+### Obey the spec's configuration block at runtime (full text of G-021)
+
+- **Obey the spec's Session Set Configuration block at runtime.** Rules are
+  conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
+  re-litigate those flags during a session — if a flag is wrong, surface it
+  at the Step 9 reorganization review.

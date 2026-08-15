@@ -1,6 +1,16 @@
 {
   "schemaVersion": 1,
   "entries": {
+    "C-002": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "Promoted from guidance-candidates.md by Set 121 S4; names verification's charter so a verifier stops re-deriving it each round."
+    },
+    "C-003": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "Promoted from guidance-candidates.md by Set 121 S4; documents a boundary verify_session already enforces."
+    },
     "G-001": {
       "kind": "instruction",
       "uses": [],
@@ -23,7 +33,9 @@
     },
     "G-005": {
       "kind": "instruction",
-      "uses": [],
+      "uses": [
+        "121-04"
+      ],
       "note": "project-guidance.md G-005 Prefer removal over addition when fixing. Usage evidence starts here (Set 121 S3); no prior history."
     },
     "G-006": {
@@ -40,7 +52,9 @@
     },
     "G-008": {
       "kind": "instruction",
-      "uses": [],
+      "uses": [
+        "121-04"
+      ],
       "note": "project-guidance.md G-008 A bug is a bug CLASS (L-069-1). Usage evidence starts here (Set 121 S3); no prior history."
     },
     "G-009": {
@@ -60,12 +74,16 @@
     },
     "G-012": {
       "kind": "instruction",
-      "uses": [],
+      "uses": [
+        "121-04"
+      ],
       "note": "project-guidance.md G-012 Propagate a consistency fix to every echo (L-065-1). Usage evidence starts here (Set 121 S3); no prior history."
     },
     "G-013": {
       "kind": "instruction",
-      "uses": [],
+      "uses": [
+        "121-04"
+      ],
       "note": "project-guidance.md G-013 Grade verification severity by CONSEQUENCE (L-095-1). Usage evidence starts here (Set 121 S3); no prior history."
     },
     "G-014": {
@@ -226,6 +244,7 @@
     "L-064-8": {
       "kind": "instruction",
       "uses": [
+        "121-04",
         "121-02",
         "132-03",
         "132-02",
@@ -234,8 +253,7 @@
         "131-02",
         "131-01",
         "130-03",
-        "130-02",
-        "130-01"
+        "130-02"
       ]
     },
     "L-064-9": {
@@ -431,6 +449,7 @@
     "L-112-1": {
       "kind": "instruction",
       "uses": [
+        "121-04",
         "121-03",
         "121-02",
         "121-01",
@@ -439,8 +458,7 @@
         "132-01",
         "131-02",
         "131-01",
-        "130-03",
-        "130-02"
+        "130-03"
       ]
     },
     "L-125-1": {

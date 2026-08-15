@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-15T18:00:46.271969-04:00",
+  "generatedAt": "2026-08-15T19:37:18.747475-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "df2fadb0618442c567c0b63815c3172c52d345831cc0df2dd60c2b199236f763",
-    "session-state.json": "0fcb0cdc4cfa9a0f90cd465455ba840f20df9aaf7f2a56627adcb35491f0473a",
+    "activity-log.json": "ef57954f92fa28825b9a8430d18e184236958b3ba92bbc0d5d139d311e9ceceb",
+    "session-state.json": "3a1e27e18802e7a828abdd709ed1b43e59e62fc0680e9d60eb21ed8f51239504",
     "spec.md": "c45ca1aa6984076ea84c88a24f8161690fa56a6f37609aac5820681953469fac"
   },
   "orphanEntries": 0,
@@ -221,19 +221,106 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 (claude / claude-opus-5).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T18:03:17.292124-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "build-against-a-dummy-web-app",
+          "description": "Built the fixture web app (src/test/fixtures/task-board: vanilla HTML/CSS/JS, no framework, served over HTTP on an ephemeral port by scripts/web-fixture-server.js) as the stand-in for the .NET/Java/vanilla-JS/Python web targets, which are one platform, not four. Reproduced browser recordVideo WITH A CONTROL by the same method Set 111 S4 used to measure the workbench failure: the same fixed probe run twice, differing only in whether recordVideo was passed. Arm A (passed) drove the UI and wrote a 30374-byte video; arm B (omitted) drove the UI and wrote nothing - the exact inversion of the workbench table. Recorded raw in s3-browser-record-measurement.json and reproducible via scripts/measure-browser-record.js, which exits non-zero if the premise ever stops holding. The video is .webm, not MP4, which is the first evidence for the manifest requirement in step 3.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T18:03:01.923364-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "emit-a-timestamped-step-event-stream",
+          "description": "Shipped ai_router/walkthrough_run.py: a JSONL step-event stream (run-started / started / completed / failed / run-finished) keyed by S2's stable step ids, and an artifact-agnostic run manifest. The parser is lenient about truncation (a killed driver's half-written last line is dropped with a note) and strict about contradiction (unknown kind, out-of-order timestamp, terminal event for a step that never started, a stepId the scenario does not declare). Artifact kinds are a closed vocabulary that names terminal-cast and transcript alongside video, every artifact carries an explicit mediaType, an EMPTY artifact list is valid, and a listed-but-missing file is refused. Timing is anchored honestly: the driver brackets newContext() and reports the width of the bracket as anchor.uncertaintyMillis (6-7ms measured) rather than implying frame accuracy. Caption retiming reuses the existing VTT writer via a windows_ms parameter instead of a second copy - measured drift on the real run was ~0.6s cumulative against the authored estimates. Chapter mapping is the manifest's per-step startMillis/endMillis, so there is no second chapters schema to drift. Per the operator's 2026-08-15 tier-2 hedge, each step's target bounding box is recorded and read by nothing.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T18:08:12.618108-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "generate-into-ignored-output-with-deterministic",
+          "description": "One command (npm run walkthrough:web -> scripts/record-web-walkthrough.js) drives the fixture, records it, and produces a watchable captioned result in gitignored .walkthrough-runs/. The driver does NOT parse scenario.yaml - walkthrough_run plan hands it the portable steps plus its own quarantined block as JSON, so the repo keeps one scenario parser. Real run: 5/5 steps, 44.1s, 944KB webm, retimed captions, self-contained index.html. Both degraded paths proven, not asserted: --no-video produces a manifest with no video, an index that says so where the player would be, and no captions sidecar; a planted failing expectation in step 3 yields outcome=failed with steps 4-5 recorded as not-reached rather than absent. Cleanup is deterministic and ordered (events stream, context, browser, server, scratch video dir, each guarded); the output dir is emptied per run but REFUSES a non-empty --out that is not a prior run. Tier-1 emphasis outlines the target and dims the rest, injected by the driver so it works against an app that cannot be edited - and it is released after the action, which a first recording proved necessary: the fixture re-renders its list, destroying the emphasised node and leaving the page grey for the rest of the step.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T18:27:58.783025-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Four rounds, all routed to gpt-5-6-sol with anthropic excluded. ROUND 1 VERIFIED NOTHING: the work had been committed first and verify_session diffs the working tree against HEAD, so the bundle was empty; both findings correctly said so, but with only spec.md to cite the doc-only cap recorded them at Minor and the round printed 'MINOR-ONLY ... effectively VERIFIED' with instructions to close. Round 2 (--diff-base at the pre-session ref) reviewed the real 4681-line delta and found 1 Critical + 4 Majors = 3 distinct defects, all accepted, none disputed, all sharing one shape: each worked on the bundled fixture and failed on a real consumer app. Round 3 (remediation-review) returned VERIFIED, 3 fix verdicts accepted / 0 rejected, and explicitly resolved the round-1 findings. Round 4 is the A4 delta-scoped review owed because docs/walkthroughs/README.md - classified as shipped, correctly - changed after round 3; also VERIFIED, 0 findings. The round-1 hole was fixed at source rather than by weakening the operator-attested severity cap. $2.2754 across 8 routed calls, stated without netting out the $0.44 that bought no verification.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T18:27:59.033932-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three declared suites run to completion after the last code-changing edit and recorded via run_of_record: pytest 4978 passed / 5 skipped / 1 xfailed (235s, at -n 8 per the operator parallelism cap rather than the declared -n auto); mocha 1492 passing (17s, +24 for the new webWalkthroughRecorder suite); playwright 37 passed (180s, +5 for expectation-wait.spec.ts). Layer 3 is owed by this session's own spec step 6 and by L-064-12, since package.json counts as product. The FIRST full pytest run found 5 failures - every one a fixture artifact of the new empty-evidence guard, in files not previously run - so they were fixed and the WHOLE suite re-run rather than re-running the five, which is the point of the policy.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T19:35:01.208753-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 4,

@@ -106,21 +106,22 @@
       },
       {
         "component": "routed_api",
-        "status": "measured",
+        "status": "unavailable",
         "credits": null,
-        "usd": 2.2754,
+        "usd": null,
         "event_count": 8,
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "8 Direct-API calls in router-metrics.jsonl for session 3, summed in dollars: 1 planning call for the Step 3.5 assignment analysis (google/gemini-pro, $0.0055) and 7 session-verification calls (openai/gpt-5-6-sol). The total INCLUDES three calls that bought no verification and are stated rather than netted out, because money spent on a round that verified nothing is still money spent: round 1's two calls ($0.2815), which reviewed an EMPTY evidence bundle; and one aborted probe ($0.1599, 22:58:42Z) with no corresponding round in s3-rounds.jsonl. Round 4 ($0.2821) is the A4 delta-scoped review owed because documentation classified as shipped changed after round 3."
+        "reason": "8 Direct-API calls are recorded for this session; their cost is authoritative in router-metrics.jsonl (cost_usd, in dollars) and is not restated here in AI credits. In dollars they sum to $2.2754: one planning call for the Step 3.5 assignment analysis (google/gemini-pro, $0.0055) and seven session-verification calls (openai/gpt-5-6-sol, $2.2699). THREE of those bought no verification and are named rather than netted out, because money spent on a round that verified nothing is still money spent: round 1's two calls ($0.2815) reviewed an EMPTY evidence bundle, and one aborted probe ($0.1599, 22:58:42Z) has no corresponding round in s3-rounds.jsonl. Round 4 ($0.2821) is the A4 delta-scoped review owed because documentation classified as shipped changed after round 3."
       }
     ],
-    "total_status": "partial",
+    "total_status": "unknown",
     "total_credits": null,
-    "total_usd": 2.2754,
+    "total_usd": null,
     "unmeasured": [
-      "orchestrator_seat"
+      "orchestrator_seat",
+      "routed_api"
     ],
     "store_schema_version": 6,
     "measured_at": "close"

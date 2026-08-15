@@ -5,3 +5,5 @@
 {"sessionNumber": 1, "postedAt": "2026-08-15T09:08:59.299238-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
 {"sessionNumber": 1, "postedAt": "2026-08-15T09:11:01.683082-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
 {"sessionNumber": 1, "postedAt": "2026-08-15T09:24:30.367128-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 1, "postedAt": "2026-08-15T10:24:55.916673-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 1, "postedAt": "2026-08-15T10:27:36.028121-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["close-out"]}

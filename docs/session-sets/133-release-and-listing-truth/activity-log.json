@@ -113,6 +113,14 @@
       "dateTime": "2026-08-15T09:11:32.856932-04:00",
       "description": "4 rounds, gpt-5-6-sol throughout, anthropic excluded as the orchestrator's effective provider via model-registry lookup. R1 discovery (2-way fan-out, spec-conformance + failure-scenario lenses): 1 Major -- the listing promised an unconditional cross-provider block while the same release documents an accepted same-provider fallback. R2 supplementary (harvest before remediating, per loop discipline): VERIFIED, 0 new. R3 remediation-review: REJECTED the fix -- package.json had been re-worded ('independent verification built into every close') rather than fixed, and the changelog argued the point instead of reporting it. R4 remediation-review: VERIFIED, fix accepted, 0 findings. Both rejections were correct and are recorded in the round-1 and round-3 remediation sidecars. Routed cost $2.5455.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T10:25:04.124083-04:00",
+      "description": "All three declared suites run fresh and green against the final tree: pytest 4664 passed / 5 skipped / 1 xfailed (205.8s, -n 8 per the operator cap, route journaled), mocha 1458 passing (23s), playwright 32 passed (2.9m). run_of_record affected named all three because package.json sits in mocha's and playwright's covers and the changelogs sit in pytest's. pytest and mocha were re-taken after Layer 3, which rebuilds dist/ inside both suites' covers. Layer 3's earlier 32/32 failure was a stuck VS Code installer holding the vscode-updating mutex, resolved by the operator applying the pending update; nothing was changed to make it pass.",
+      "status": "complete"
     }
   ]
 }

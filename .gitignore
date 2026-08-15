@@ -80,3 +80,10 @@ ai_router/pricing-proposal.json
 # silently swallow a fixture some future test means to commit. That is the
 # look-alike the Set 124 falsifier plants.
 /project-verify-type.txt
+# Set 113 S3: recorded walkthrough runs. Video, a step-event stream and a
+# generated index, produced on demand by `npm run walkthrough:web` and
+# regenerated rather than patched when they go stale. The spec's non-goals
+# refuse committed video binaries outright; regeneration is on demand and
+# never in CI, because a headless runner records a different thing than the
+# operator's machine shows.
+tools/dabbler-ai-orchestration/.walkthrough-runs/

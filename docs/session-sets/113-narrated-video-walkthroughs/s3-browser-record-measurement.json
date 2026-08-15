@@ -1,0 +1,38 @@
+{
+  "measurement": "browser recordVideo, with a control",
+  "method": "The same fixed probe against the same fixture web app, run twice, differing only in whether Playwright's recordVideo option was passed. Mirrors the Set 111 S4 experiment that measured the VS Code workbench failure (proposal 2026-08-08).",
+  "fixture": "src/test/fixtures/task-board (vanilla HTML/CSS/JS over HTTP)",
+  "platform": "win32 x64",
+  "node": "v25.8.1",
+  "playwright": "1.60.0",
+  "chromium": "C:\\Users\\denmi\\AppData\\Local\\ms-playwright\\chromium-1223\\chrome-win64\\chrome.exe",
+  "videoSize": {
+    "width": 1280,
+    "height": 800
+  },
+  "arms": [
+    {
+      "arm": "A",
+      "recordVideo": true,
+      "pageUrl": "http://127.0.0.1:53968/",
+      "uiDriven": true,
+      "observedText": "1 open",
+      "videoWritten": true,
+      "videoBytes": 30374,
+      "error": null,
+      "durationMs": 3396
+    },
+    {
+      "arm": "B",
+      "recordVideo": false,
+      "pageUrl": "http://127.0.0.1:53968/",
+      "uiDriven": true,
+      "observedText": "1 open",
+      "videoWritten": false,
+      "videoBytes": 0,
+      "error": null,
+      "durationMs": 244
+    }
+  ],
+  "premiseHeld": true
+}

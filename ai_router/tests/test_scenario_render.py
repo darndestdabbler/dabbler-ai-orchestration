@@ -45,6 +45,7 @@ from scenario_render import (
     check_scenario_dir,
     main,
     render_all,
+    render_captions,
     write_all,
 )
 
@@ -497,3 +498,67 @@ class TestCli:
         stage(tmp_path, SOURCE.replace("seconds: 7", "seconds: 70"))
         main(["--check", str(tmp_path)])
         assert "design check" in capsys.readouterr().out
+
+
+class TestOneCaptionWriterTwoTimingSources:
+    """Set 113 S3 retimes the cues from a recorded run through THIS writer.
+
+    A second copy of the cue-timing arithmetic is exactly how a caption
+    file drifts away from the video it is a sidecar for, so the run path
+    reuses ``render_captions`` with real windows instead of owning its own.
+    The claim that needs guarding both ways: real windows must actually
+    change the output, and passing none must leave the committed,
+    ``--check``-gated rendering byte-for-byte as it was.
+    """
+
+    def test_the_authored_path_is_unchanged_when_no_windows_are_passed(self):
+        scenario = parse_scenario(SOURCE)
+        assert render_captions(scenario) == RENDERERS[CAPTIONS_FILENAME](scenario)
+
+    def test_real_windows_replace_the_authored_ones(self):
+        scenario = parse_scenario(SOURCE)
+        windows = [(i * 1234, i * 1234 + 1000) for i in range(len(scenario.steps))]
+        text = render_captions(scenario, windows_ms=windows)
+        assert "00:00:00.000 --> 00:00:01.000" in text
+        assert "00:00:01.234 --> 00:00:02.234" in text
+
+    def test_milliseconds_survive_rather_than_being_rounded_away(self):
+        scenario = parse_scenario(SOURCE)
+        windows = [(7, 8)] + [(1000, 2000)] * (len(scenario.steps) - 1)
+        assert "00:00:00.007 --> 00:00:00.008" in render_captions(
+            scenario, windows_ms=windows
+        )
+
+    def test_an_unreached_step_gets_no_cue(self):
+        scenario = parse_scenario(SOURCE)
+        windows = [(0, 1000)] + [None] * (len(scenario.steps) - 1)
+        text = render_captions(scenario, windows_ms=windows)
+        assert text.count("-->") == 1
+        assert scenario.steps[0].id in text
+        for step in scenario.steps[1:]:
+            assert f"\n{step.id}\n" not in text
+
+    def test_the_wrong_number_of_windows_is_refused_rather_than_zipped_short(self):
+        # zip() would silently drop the tail, producing a caption file that
+        # looks complete and is not.
+        scenario = parse_scenario(SOURCE)
+        with pytest.raises(ValueError, match="one window per step"):
+            render_captions(scenario, windows_ms=[(0, 1000)])
+
+    def test_a_run_caption_does_not_claim_to_be_the_committed_rendering(self):
+        scenario = parse_scenario(SOURCE)
+        windows = [(0, 1000)] * len(scenario.steps)
+        text = render_captions(
+            scenario, windows_ms=windows, timing_note="Timed from a run."
+        )
+        assert "Timed from a run." in text
+        # The committed file's note tells a reader to re-render; nothing
+        # re-renders a run artifact, and --check does not gate it.
+        assert "--check" not in text
+
+    def test_a_negative_cue_time_is_refused(self):
+        scenario = parse_scenario(SOURCE)
+        with pytest.raises(ValueError, match="negative"):
+            render_captions(
+                scenario, windows_ms=[(-1, 10)] * len(scenario.steps)
+            )

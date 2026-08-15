@@ -1,7 +1,7 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
+  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree \u2014 plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
   "version": "0.51.0",
   "publisher": "DarndestDabbler",
   "private": true,
@@ -493,7 +493,7 @@
         "dabblerSessionSets.copilotCliPath": {
           "type": "string",
           "default": "",
-          "markdownDescription": "GitHub Copilot CLI executable used by the Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` — on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
+          "markdownDescription": "GitHub Copilot CLI executable used by the Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` \u2014 on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
         },
         "dabblerSessionSets.gitHost": {
           "type": "string",
@@ -503,7 +503,7 @@
             "azure-devops"
           ],
           "default": "auto",
-          "markdownDescription": "Which git host the git-workflow commands (`Dabbler: Open PR for this set`) talk to.\n\n- `auto` (default): detect from the `origin` remote URL — `github.com` → GitHub, `dev.azure.com` / `*.visualstudio.com` → Azure DevOps.\n- `github`: force GitHub — required for a GitHub Enterprise host on a custom domain, which auto-detect cannot recognize.\n- `azure-devops`: force Azure DevOps.\n\nEverything except PR creation is pure git and identical on every host."
+          "markdownDescription": "Which git host the git-workflow commands (`Dabbler: Open PR for this set`) talk to.\n\n- `auto` (default): detect from the `origin` remote URL \u2014 `github.com` \u2192 GitHub, `dev.azure.com` / `*.visualstudio.com` \u2192 Azure DevOps.\n- `github`: force GitHub \u2014 required for a GitHub Enterprise host on a custom domain, which auto-detect cannot recognize.\n- `azure-devops`: force Azure DevOps.\n\nEverything except PR creation is pure git and identical on every host."
         },
         "dabblerSessionSets.ghCliPath": {
           "type": "string",
@@ -518,7 +518,7 @@
         "dabblerSessionSets.aiRouterRepoUrl": {
           "type": "string",
           "default": "",
-          "markdownDescription": "Git repo URL the `Dabbler: Install ai-router` command's GitHub-fallback path clones from. Leave blank to use the upstream Dabbler repository. Override to point at a fork — handy for fork-trackers who want the GitHub fallback to pull *their* tags / branches rather than upstream's."
+          "markdownDescription": "Git repo URL the `Dabbler: Install ai-router` command's GitHub-fallback path clones from. Leave blank to use the upstream Dabbler repository. Override to point at a fork \u2014 handy for fork-trackers who want the GitHub fallback to pull *their* tags / branches rather than upstream's."
         }
       }
     },
@@ -544,6 +544,7 @@
     "make-uat-workspace": "node scripts/make-uat-workspace.js",
     "walk": "npm run compile && node scripts/stage-walk.js",
     "walk:smoke": "npm run compile && node scripts/walk-smoke.js",
+    "walkthrough:web": "node scripts/record-web-walkthrough.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

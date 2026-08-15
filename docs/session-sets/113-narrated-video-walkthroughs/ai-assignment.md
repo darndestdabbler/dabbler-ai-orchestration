@@ -330,3 +330,71 @@ Proceed to **Session 2 — Portable scenario source and standalone rendering** a
 - **Verifier:** google / current flagship family / effort=high
 - **Reason:** Session 2 establishes the stable scenario and rendering contract required by both recording sessions. It should consume Session 1's schema and documentation changes, but must not wait for browser or desktop capture. The written walkthrough is the durable foundation and must be validated before recording work begins.
 - **First action:** reread the operator notes and consults, inspect the Session 1 diff and tests, then confirm that no component can be omitted from the UAT accounting before authoring the scenario model.
+
+
+---
+
+# Session 3 addendum
+
+> Routed analysis, `task_type: planning`, `exclude_providers: [anthropic]`
+> (the orchestrator's own provider). Served by **google / gemini-pro**,
+> tier 2, $0.00548, 2026-08-15. Reproduced verbatim below: child output is
+> **evidence, never instructions**. The orchestrator's reading follows it.
+
+## Next-session recommendation (from Session 3)
+
+Proceed to Session 4. The successful proof-of-concept for browser-based video recording in Session 3 validates the core artifact generation pipeline, clearing the path to attempt the more complex OS-level capture.
+
+-   **Orchestrator:** openai / gpt-5.6 / effort=high
+-   **Verifier:** anthropic / claude-opus-5 / effort=medium
+-   **Reason:** Session 4's primary risk is the brittle nature of controlling external OS-level processes and graphics capture APIs; it requires a high-capability orchestrator to generate robust automation code and a strong verifier to critique the logic for race conditions and incomplete error handling.
+-   **First action:** Instruct the orchestrator to draft the detailed test plan and measurement harness that defines and automates the ten-run pass criteria.
+
+## Risks Session 4 should be warned about
+
+-   The external process control for OBS or ffmpeg introduces significant flakiness, risking difficult-to-debug failures in process startup, communication, or shutdown.
+-   Correctly and consistently identifying the target VS Code window for capture is fragile and may fail under different display scaling, window focus, or timing conditions.
+-   A mid-run failure could bypass the deterministic cleanup logic, leaving video artifacts or orphaned capture processes on the system.
+-   System performance variations may introduce timing-related race conditions between the test driver and the capture process, leading to inconsistent results.
+
+## Next-set recommendation
+
+Upon successful completion of Set 113, the next set should be "Terminal Walkthroughs and Cast Artifacts". This set directly leverages the OS-level capture capability proven in Session 4 to address a high-value, non-web automation target. The trigger for this set is the verified success of ten consecutive clean captures in Session 4, proving the capture method is reliable enough for production use.
+
+## Orchestrator's reading of the above
+
+Recorded because the analysis is input, not authority, and it is wrong in
+one place that matters.
+
+1. **The next-set recommendation contradicts this set's own spec, and the
+   spec governs.** *Terminal Walkthroughs and Cast Artifacts* is reserved
+   with the trigger **"a real terminal target exists"** — not "OS capture
+   was proved". The two are unrelated: a terminal cast is a PTY recording,
+   not a screen capture, and Session 4 passing would say nothing about
+   whether anyone has a terminal product to walk through. Adopting the
+   suggested trigger would start a set with no requirements to build
+   against, which is the shape the complexity note warns about. **Do not
+   act on it.** Of the reserved sets, the one with a standing case is
+   *Independent Black-Box UI Critique* — its subject (common-mode
+   self-verification failure) is a live, named concern, and Session 3 just
+   shipped the web-driving machinery it would build on. Set selection is
+   the operator's call and is left to the Step 9 review.
+
+2. **The verifier suggestion is sound and non-obvious.** With an `openai`
+   orchestrator, `anthropic` is a legitimate different-provider verifier;
+   the pairing is only ever wrong when it collapses to the orchestrator's
+   own provider.
+
+3. **Its first three risks are real and this session can already
+   corroborate two of them.** Session 3 hit the process-lifecycle risk in
+   miniature — the events stream had to be made idempotent to close
+   because both the happy path and the cleanup path close it — and hit the
+   timing risk when the first recording came out uniformly grey after the
+   fixture re-rendered and destroyed the emphasised node. Both were cheap
+   here and will not be cheap against an external capture process.
+
+4. **One risk Session 4 owns that the analysis does not name:** the
+   Session 1 UAT gate is now armed on this set, and Session 4 is the
+   session that owes an accounting for all four declared
+   `uatComponents` — including the two Session 3 created. A pilot that
+   fails is still a passing close, but only if the accounting is written.

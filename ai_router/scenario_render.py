@@ -111,11 +111,27 @@ def _generated_note(kind: str) -> str:
     )
 
 
+def _timestamp_ms(millis: int) -> str:
+    """WebVTT ``HH:MM:SS.mmm`` from whole milliseconds.
+
+    Milliseconds rather than seconds because the same writer serves two
+    timing sources: the AUTHORED durations, which are whole seconds and
+    an estimate, and a RECORDED run's real step boundaries, which are
+    not (Set 113 S3). One writer, two sources -- a second copy of the
+    cue-timing arithmetic is exactly how a caption file drifts away from
+    the video it is a sidecar for.
+    """
+    if millis < 0:
+        raise ValueError(f"cue timestamp cannot be negative: {millis}ms")
+    seconds, remainder = divmod(int(millis), 1000)
+    hours, rest = divmod(seconds, 3600)
+    minutes, secs = divmod(rest, 60)
+    return f"{hours:02d}:{minutes:02d}:{secs:02d}.{remainder:03d}"
+
+
 def _timestamp(seconds: int) -> str:
-    """WebVTT ``HH:MM:SS.mmm``."""
-    hours, remainder = divmod(seconds, 3600)
-    minutes, secs = divmod(remainder, 60)
-    return f"{hours:02d}:{minutes:02d}:{secs:02d}.000"
+    """WebVTT ``HH:MM:SS.mmm`` from whole seconds."""
+    return _timestamp_ms(seconds * 1000)
 
 
 def _one_line(text: str) -> str:
@@ -346,22 +362,54 @@ def render_training(scenario: Scenario) -> str:
     return "\n".join(out).rstrip("\n") + "\n"
 
 
-def render_captions(scenario: Scenario) -> str:
+def render_captions(
+    scenario: Scenario,
+    windows_ms: Optional[Sequence[Tuple[int, int]]] = None,
+    timing_note: Optional[str] = None,
+) -> str:
     """WebVTT cues, one per step, keyed by the stable step id.
 
     The step list is the caption source (spec decision 3). Auto-captions
     on a copy someone uploaded to Stream are a bonus and never the
     artifact, or the video and the walkthrough can drift.
+
+    *windows_ms* replaces the AUTHORED cue windows with real ones -- one
+    ``(start, end)`` pair in milliseconds per step, in order. Set 113 S3
+    passes the boundaries a recorded run actually measured, so a video's
+    sidecar says when things happened rather than when the author
+    guessed they would. Omitted, the authored durations are used and the
+    output is the committed, ``--check``-gated rendering.
+
+    An entry may be ``None``, meaning that step has no window: a run that
+    failed at step 2 never reached steps 3 to 5, and inventing cues for
+    them would caption a video over footage that does not exist.
+
+    *timing_note* replaces the "edit the scenario and re-render" note,
+    which is true of the committed file and false of a run artifact that
+    nothing re-renders.
     """
+    if windows_ms is not None and len(windows_ms) != len(scenario.steps):
+        raise ValueError(
+            f"windows_ms has {len(windows_ms)} entries for "
+            f"{len(scenario.steps)} steps; pass one window per step, in order"
+        )
+    windows = (
+        [None if window is None else tuple(window) for window in windows_ms]
+        if windows_ms is not None
+        else [(start * 1000, end * 1000) for start, end in _cue_windows(scenario)]
+    )
     digest = scenario.portable_digest()
     out: List[str] = ["WEBVTT", ""]
-    out.append(f"NOTE {_generated_note('file')}")
+    out.append(f"NOTE {timing_note or _generated_note('file')}")
     out.append("")
     out.append(f"NOTE portable-digest: {digest}")
     out.append("")
-    for step, (start, end) in zip(scenario.steps, _cue_windows(scenario)):
+    for step, window in zip(scenario.steps, windows):
+        if window is None:
+            continue
+        start, end = window
         out.append(step.id)
-        out.append(f"{_timestamp(start)} --> {_timestamp(end)}")
+        out.append(f"{_timestamp_ms(start)} --> {_timestamp_ms(end)}")
         # Flattened: a blank line inside a payload ends the cue, so an
         # authored block scalar that wraps must not become two cues.
         out.append(_one_line(step.caption))

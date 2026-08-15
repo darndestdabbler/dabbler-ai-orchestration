@@ -218,6 +218,101 @@
       "dateTime": "2026-08-15T17:59:23.203258-04:00",
       "description": "All three declared suites run after the last code-changing stage: pytest 4893 passed / 5 skipped / 1 xfailed (228s, run at -n 8 per the operator parallelism cap rather than the declared -n auto, recorded in the run's detail field); mocha 1468 passing (23s); playwright 32 passed (180s) on an idle machine. All three recorded via run_of_record.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "build-against-a-dummy-web-app",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "**Build against a dummy web app**, standing in for the .NET / Java / vanilla JS / Python web targets that are the real audience. First act: reproduce a browser `recordVideo` success **with a control**, the same way Set 111 S4 measured the workbench failure \u2014 this repo has so far measured only the failing case.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "emit-a-timestamped-step-event-stream",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "**Emit a timestamped step-event stream** (`started` / `completed` / `failed`) keyed by the stable step IDs from Session 2 \u2014 driving caption timing and chapter mapping \u2014 and **a run manifest that can reference zero or more artifacts** (browser video, OS video, terminal cast, captions, screenshots, transcript) *without assuming every artifact is an MP4*. The manifest is the cheap hedge against platform uncertainty, and it is the only one this set pays for.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "generate-into-ignored-output-with-deterministic",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "**Generate into ignored output**, with deterministic cleanup on failure, and a static generated index linking video to steps. Failure to record must never fail the walkthrough.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "**Required portion of the full test suite** \u2014 this session drives a rendering surface, so Layer 3 is owed (`L-064-12`).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T18:03:01.921409-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T18:03:01.923364-04:00",
+      "description": "Registered session 3 (claude / claude-opus-5).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "build-against-a-dummy-web-app",
+      "dateTime": "2026-08-15T18:08:12.618108-04:00",
+      "description": "Built the fixture web app (src/test/fixtures/task-board: vanilla HTML/CSS/JS, no framework, served over HTTP on an ephemeral port by scripts/web-fixture-server.js) as the stand-in for the .NET/Java/vanilla-JS/Python web targets, which are one platform, not four. Reproduced browser recordVideo WITH A CONTROL by the same method Set 111 S4 used to measure the workbench failure: the same fixed probe run twice, differing only in whether recordVideo was passed. Arm A (passed) drove the UI and wrote a 30374-byte video; arm B (omitted) drove the UI and wrote nothing - the exact inversion of the workbench table. Recorded raw in s3-browser-record-measurement.json and reproducible via scripts/measure-browser-record.js, which exits non-zero if the premise ever stops holding. The video is .webm, not MP4, which is the first evidence for the manifest requirement in step 3.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "emit-a-timestamped-step-event-stream",
+      "dateTime": "2026-08-15T18:27:58.783025-04:00",
+      "description": "Shipped ai_router/walkthrough_run.py: a JSONL step-event stream (run-started / started / completed / failed / run-finished) keyed by S2's stable step ids, and an artifact-agnostic run manifest. The parser is lenient about truncation (a killed driver's half-written last line is dropped with a note) and strict about contradiction (unknown kind, out-of-order timestamp, terminal event for a step that never started, a stepId the scenario does not declare). Artifact kinds are a closed vocabulary that names terminal-cast and transcript alongside video, every artifact carries an explicit mediaType, an EMPTY artifact list is valid, and a listed-but-missing file is refused. Timing is anchored honestly: the driver brackets newContext() and reports the width of the bracket as anchor.uncertaintyMillis (6-7ms measured) rather than implying frame accuracy. Caption retiming reuses the existing VTT writer via a windows_ms parameter instead of a second copy - measured drift on the real run was ~0.6s cumulative against the authored estimates. Chapter mapping is the manifest's per-step startMillis/endMillis, so there is no second chapters schema to drift. Per the operator's 2026-08-15 tier-2 hedge, each step's target bounding box is recorded and read by nothing.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "generate-into-ignored-output-with-deterministic",
+      "dateTime": "2026-08-15T18:27:59.033932-04:00",
+      "description": "One command (npm run walkthrough:web -> scripts/record-web-walkthrough.js) drives the fixture, records it, and produces a watchable captioned result in gitignored .walkthrough-runs/. The driver does NOT parse scenario.yaml - walkthrough_run plan hands it the portable steps plus its own quarantined block as JSON, so the repo keeps one scenario parser. Real run: 5/5 steps, 44.1s, 944KB webm, retimed captions, self-contained index.html. Both degraded paths proven, not asserted: --no-video produces a manifest with no video, an index that says so where the player would be, and no captions sidecar; a planted failing expectation in step 3 yields outcome=failed with steps 4-5 recorded as not-reached rather than absent. Cleanup is deterministic and ordered (events stream, context, browser, server, scratch video dir, each guarded); the output dir is emptied per run but REFUSES a non-empty --out that is not a prior run. Tier-1 emphasis outlines the target and dims the rest, injected by the driver so it works against an app that cannot be edited - and it is released after the action, which a first recording proved necessary: the fixture re-renders its list, destroying the emphasised node and leaving the page grey for the rest of the step.",
+      "status": "complete"
     }
   ]
 }

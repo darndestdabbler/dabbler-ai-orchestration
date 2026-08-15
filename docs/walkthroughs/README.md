@@ -88,11 +88,24 @@ steps:                       # required, at least one
     focus: what the reader's eye should be on   # optional, prose only
 
 drivers:                     # optional — see "The quarantine" below
-  playwright-web:
+  playwright-web:            # this driver's own vocabulary, not the model's
+    fixture: task-board      # or `url:` for an app you already serve
+    viewport: { width: 1280, height: 800 }
     steps:
       stable-step-id:
-        selector: '#some-id'
+        emphasize: '#some-id'          # outlined before the action
+        do:
+          - fill: '#some-input'
+            value: what to type
+          - click: '#some-button'
+        expect: { selector: '#result', text: 'what it should say' }
 ```
+
+Every key under `drivers:` is validated by **its own driver**, not by the
+scenario model — that is the price of the quarantine, and the recorder
+pays it: an unknown key, an unknown action verb, an authored step with no
+driver detail, and a driver step the scenario does not declare are each
+refused by name (`src/test/suite/webWalkthroughRecorder.test.ts`).
 
 Unknown keys are **refused**, not ignored — at the top level and inside
 a step. A field nobody validates is how a self-assessed confidence score
@@ -195,11 +208,12 @@ the replay from it short.
 
 ## What this is not
 
-- **Not a video pipeline.** Nothing here records, encodes, uploads or
-  stores anything. Set 113 Session 3 adds a browser recorder that writes
-  into ignored output; Session 4 measures whether Windows OS-level
-  capture is viable at all. Both are optional, and their absence costs a
-  reader of these documents nothing.
+- **Not a video pipeline.** Nothing in the *scenario format* records,
+  encodes, uploads or stores anything. Set 113 Session 3 added an
+  optional browser recorder (below) that writes into ignored output;
+  Session 4 measures whether Windows OS-level capture is viable at all.
+  Both are optional, and their absence costs a reader of these documents
+  nothing.
 - **Not a driver.** Nothing here makes an application do anything. That
   is the expensive half, and it is deliberately not solved in general —
   Playwright drives browsers, and nothing drives an arbitrary desktop
@@ -207,12 +221,96 @@ the replay from it short.
 - **Not a library of scenarios.** Set 113 authors exactly one exemplar.
   New scenarios arrive when a real product workflow needs one.
 
-## The exemplar
+## Recording one
 
-[`work-explorer-first-look/`](work-explorer-first-look/) — reading where
-every session set stands, off the AI Work Explorer tree, on the
-disposable fixture project that `npm run walk` stages. Five steps, under
-a minute.
+**Optional, on demand, and never in CI.** A recording is an enhancement;
+the documents above are the deliverable. From
+`tools/dabbler-ai-orchestration`:
+
+```bash
+npm run walkthrough:web                              # the bundled fixture
+npm run walkthrough:web -- --url http://localhost:5173   # your own app
+npm run walkthrough:web -- --no-video                # the degraded path
+```
+
+One command drives the real UI, records it, and writes a run directory
+into gitignored `.walkthrough-runs/<scenario-id>/`:
+
+| File | What it is |
+| :--- | :--- |
+| `events.jsonl` | The step-event stream — `run-started`, then `started` / `completed` / `failed` per stable step id, then `run-finished`. Written by the driver. |
+| `driver-output.json` | What the driver saw: target, timing anchor, and any artifacts it produced. Written by the driver. |
+| `manifest.json` | The validated record of the run: one entry per **authored** step, and zero or more typed artifacts. Written by `walkthrough_run finalize`. |
+| `captions.vtt` | The caption sidecar, retimed from the stream. Written only when there is a video for it to sit under. |
+| `index.html` | A self-contained page: the recording, the steps, and what happened. Written by `walkthrough_run finalize`. |
+| `recording.webm` | The video, when there is one. |
+
+**A consumer repo changes the URL and nothing else.** The recorder drives
+a browser, so the .NET, Java, Python and vanilla-JS web applications this
+framework is used to build are one target, not four. Point `--url` at a
+dev server already running, or author `url:` in the scenario's
+`playwright-web` driver block instead of `fixture:`.
+
+### What the manifest is for
+
+It can reference **zero or more artifacts, of any kind** — browser video,
+OS video, terminal cast, captions, screenshots, a transcript, the index —
+each with an explicit media type. Nothing anywhere assumes an MP4, and
+Session 3's own recordings are WebM. **An empty artifact list is valid:**
+failure to record must never fail the walkthrough, so a run that captured
+nothing still produces a manifest, an index that says so where the player
+would be, and a truthful account of every step.
+
+The manifest also carries one record per **authored** step, so a run that
+stopped at step 3 reports steps 4 and 5 as `not-reached` rather than
+omitting them. That is Session 1's finding one layer down: a report
+assembled from whatever records exist makes an omitted item look
+identical to a passing one.
+
+### Timing, honestly
+
+Recording starts inside `newContext()` and nothing reports the exact
+instant. The driver brackets that call and records the width of the
+bracket as `anchor.uncertaintyMillis` (single-digit milliseconds in
+practice), rather than implying a frame accuracy it does not have. Cue
+times come from the run, not from the authored `seconds` — those are a
+floor the driver holds each step on screen for, and real driver latency
+drifts past them cumulatively.
+
+A recording is tied to the `portableDigest` of the scenario it was made
+from, and `finalize` refuses to assemble a run whose scenario has moved.
+A stale recording is regenerated, never patched.
+
+### Emphasis, not zoom
+
+Before each step's action the driver outlines the target element and dims
+the rest, then **releases the emphasis as soon as the action has run** so
+the result is on screen at full brightness. The stylesheet is injected by
+the driver, not carried by the page — a consumer cannot add CSS to their
+own running application. There is no capture-time zoom and there is not
+meant to be (operator ruling, 2026-08-15): post-processing zoom is
+deferred until a real reviewer says the videos are hard to follow, which
+is why each step's target bounding box is recorded in the stream even
+though nothing reads it yet.
+
+### Measured, not assumed
+
+`node scripts/measure-browser-record.js` reruns the control experiment
+this path is built on: the same probe against the same fixture, twice,
+differing only in whether Playwright's `recordVideo` was passed. It exits
+non-zero if recording ever starts costing the automation again. The
+result inverts the VS Code workbench finding (proposal 2026-08-08), which
+is why that finding is platform-specific and must not be generalised.
+
+## The exemplars
+
+- [`work-explorer-first-look/`](work-explorer-first-look/) — reading where
+  every session set stands, off the AI Work Explorer tree, on the
+  disposable fixture project that `npm run walk` stages. Its driver block
+  is `proposed`: nothing in this repo drives it yet.
+- [`task-board-first-task/`](task-board-first-task/) — adding, completing
+  and filtering a task on a deliberately tiny sample web page. Its driver
+  block is `shipped`, and it is what Session 3 actually recorded.
 
 > The exact running time is not repeated here on purpose. It is derived
 > from the source and rendered into all four documents; restating it in

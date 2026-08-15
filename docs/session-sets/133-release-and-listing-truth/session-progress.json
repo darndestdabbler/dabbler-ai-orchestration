@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "derived": true,
+  "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
+  "generatedAt": "2026-08-15T10:34:07.548738-04:00",
+  "sessionSetDir": "133-release-and-listing-truth",
+  "inputs": {
+    "activity-log.json": "af284769c415516745836c30aa370a75008f2d9ad46722f6e13af917a6e2e0af",
+    "session-state.json": "13aa74af2be0852cf3930ed3ee00eba4e99dbbba9e502482433ae36617a4578f",
+    "spec.md": "14a11f14dfa1bd72a116a26a957f08d99fa6d4cc4dbd7e0dc8d1c8647cac4897"
+  },
+  "orphanEntries": 0,
+  "sessions": [
+    {
+      "number": 1,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Register.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T07:21:41.702146-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "write-the-missing-set-125-changelog",
+          "description": "Wrote the Set 125 read-only tool grant fragment (Security), folded 17 router + 13 extension fragments, restructured both pending regions into the [1.0.0] / [0.51.0] version sections being tagged, and made the breaking change self-remedying at the top of 1.0.0 (symptom, one-line diff, working notice link). Restamped both baselines; round trip OK.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T07:22:28.369289-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "rework-the-extension-readme-into-the",
+          "description": "Reworked the extension README as the Marketplace listing: leads with what the framework is and that the verification is checkable, hero image swapped to media/ai-work-explorer.png by absolute raw.githubusercontent URL with descriptive alt text, added a 'Verification you can check' section carrying only the six supported auditability claims plus an explicit 'what this does not claim' block (no defect-catch rate) and the containment-not-a-sandbox register. Removed two false statements: the $0-budget 'or you skip verification' bullet (no skip exists post-1.0.0) and 'all three API keys are required'. Re-framed the 73/32% savings as the hypothetical Opus-baseline counterfactual the report actually computes. Refreshed package.json description + keywords.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T07:28:55.772537-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "correct-the-root-readme-s-two",
+          "description": "Corrected both false statements in the root README: the activity-bar view is AI Work Explorer (Set 132 S1 rename, package.json agrees), and Prerequisites no longer requires API-key accounts for all three providers -- it now states the two answers (DIRECT_API with two of three keys as the working minimum, or a keyless COPILOT_CLI seat) and points at verify_type, reconciling with the seat path described earlier in the same file. RESIDUAL, out of scope by the spec's Non-goals: 'Session Set Explorer' survives in 25 other markdown files (most are dated proposals; the live ones are close-out.md, copilot-seat-setup-checklist.md, repository-reference.md, session-state-schema.md, spec-md-schema.md).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T07:31:54.863823-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "4 rounds, gpt-5-6-sol throughout, anthropic excluded as the orchestrator's effective provider via model-registry lookup. R1 discovery (2-way fan-out, spec-conformance + failure-scenario lenses): 1 Major -- the listing promised an unconditional cross-provider block while the same release documents an accepted same-provider fallback. R2 supplementary (harvest before remediating, per loop discipline): VERIFIED, 0 new. R3 remediation-review: REJECTED the fix -- package.json had been re-worded ('independent verification built into every close') rather than fixed, and the changelog argued the point instead of reporting it. R4 remediation-review: VERIFIED, fix accepted, 0 findings. Both rejections were correct and are recorded in the round-1 and round-3 remediation sidecars. Routed cost $2.5455.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T07:33:25.136255-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three declared suites run fresh and green against the final tree: pytest 4664 passed / 5 skipped / 1 xfailed (205.8s, -n 8 per the operator cap, route journaled), mocha 1458 passing (23s), playwright 32 passed (2.9m). run_of_record affected named all three because package.json sits in mocha's and playwright's covers and the changelogs sit in pytest's. pytest and mocha were re-taken after Layer 3, which rebuilds dist/ inside both suites' covers. Layer 3's earlier 32/32 failure was a stuck VS Code installer holding the vscode-updating mutex, resolved by the operator applying the pending update; nothing was changed to make it pass.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-15T09:11:32.856932-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "Close-out.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 1,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 7
+      },
+      "current": [],
+      "remaining": [
+        "close-out"
+      ]
+    },
+    {
+      "number": 2,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    }
+  ]
+}

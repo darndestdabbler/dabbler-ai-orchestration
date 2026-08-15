@@ -35,7 +35,7 @@
     "model": "claude-opus-5",
     "effort": "high",
     "reason": {
-      "code": "escalate-effort",
+      "code": "switch-due-to-cost",
       "specifics": "Routed recommendation (gpt-5.5, 2026-08-15). Session 4 is the deferred judgment-heavy session: candidate promotion, guidance collapse, ceiling ratchet, cap measurement. Session 3 was the Sonnet/medium exception; S4 returns to the S1/S2 Opus-5/high profile."
     }
   },

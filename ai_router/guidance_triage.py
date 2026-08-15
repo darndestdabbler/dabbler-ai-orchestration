@@ -1,7 +1,7 @@
 """Routed bulk-triage for over-budget guidance files (Set 064, D6).
 
 The steady-state lifecycle (D1-D5, Set 064 S2) is forward-looking: it
-records ``last-used-set`` from the moment it ships and archives on
+records usage from the moment it ships and archives on
 evidence as history accumulates. It is useless on **day one** for a repo
 that is *already* over budget -- every existing lesson has no usage
 history, so the disuse trigger would either evict everything or nothing.
@@ -326,16 +326,29 @@ def _excerpt(block: Block, excerpt_chars: int) -> str:
 
 
 def build_triage_prompt(
-    blocks: List[Block], excerpt_chars: int = DEFAULT_EXCERPT_CHARS
+    blocks: List[Block],
+    excerpt_chars: int = DEFAULT_EXCERPT_CHARS,
+    usage: Optional[Dict[str, List[str]]] = None,
 ) -> str:
-    """Build the routed classification prompt for *blocks*."""
+    """Build the routed classification prompt for *blocks*.
+
+    *usage* is ``{id: [<set>-<session> labels, newest first]}`` from the
+    guidance usage ledger (Set 121 S2). It replaces the old
+    ``last-used-set`` scalar, which could not distinguish *used once, ten
+    sets ago* from *used in every one of the last ten* — the two cases
+    that warrant opposite triage verdicts, and therefore the two cases a
+    classifier most needs told apart.
+    """
     parts = [_PROMPT_HEADER, "\n--- BLOCKS ---\n"]
+    uses_by_id = usage or {}
     for b in blocks:
         meta_note = ""
         if b.meta and b.meta.id:
+            recent = uses_by_id.get(b.meta.id, [])
+            uses_note = ",".join(recent) if recent else "(never recorded)"
             meta_note = (
                 f" [existing meta: id={b.meta.id} status={b.meta.status}"
-                f" last-used-set={b.meta.last_used_set or '(none)'}]"
+                f" recent-uses={len(recent)}: {uses_note}]"
             )
         parts.append(
             f"\n### BLOCK {b.index} (heading level {b.level}, "
@@ -725,6 +738,7 @@ def _route_batch(
     models: List[str],
     complexity_hint: Optional[int] = None,
     depth: int = 0,
+    usage: Optional[Dict[str, List[str]]] = None,
 ) -> List[Classification]:
     """Classify *blocks* in one routed call, splitting on truncation.
 
@@ -732,7 +746,7 @@ def _route_batch(
     syntactic-completeness heuristic) is retried by halving the batch,
     down to a single block, per the truncation lesson (L-064-1).
     """
-    prompt = build_triage_prompt(blocks, excerpt_chars=excerpt_chars)
+    prompt = build_triage_prompt(blocks, excerpt_chars=excerpt_chars, usage=usage)
     rr = route_fn(
         content=prompt,
         task_type="analysis",
@@ -755,10 +769,12 @@ def _route_batch(
         left = _route_batch(
             blocks[:mid], route_fn, max_tier, excerpt_chars, session_set,
             raw_sink, errors, cost_acc, models, complexity_hint, depth + 1,
+            usage,
         )
         right = _route_batch(
             blocks[mid:], route_fn, max_tier, excerpt_chars, session_set,
             raw_sink, errors, cost_acc, models, complexity_hint, depth + 1,
+            usage,
         )
         return left + right
 
@@ -779,6 +795,7 @@ def run_triage(
     excerpt_chars: int = DEFAULT_EXCERPT_CHARS,
     session_set: Optional[str] = None,
     complexity_hint: Optional[int] = None,
+    usage: Optional[Dict[str, List[str]]] = None,
 ) -> TriageRun:
     """Run the full routed triage over *extraction*'s blocks.
 
@@ -787,6 +804,8 @@ def run_triage(
     *batch_size*; results are concatenated. *complexity_hint* is passed
     through to :func:`route` so an operator can bias model selection (e.g.
     force a tier-3 model for a high-stakes one-time backlog pass).
+    *usage* is the guidance ledger's ``{id: [labels]}`` recency data,
+    surfaced to the classifier in place of the retired scalar.
     """
     if route_fn is None:  # pragma: no cover - exercised via main(), not unit tests
         try:
@@ -808,7 +827,7 @@ def run_triage(
         all_cls.extend(
             _route_batch(
                 batch, route_fn, max_tier, excerpt_chars, session_set,
-                raw_sink, errors, cost_acc, models, complexity_hint,
+                raw_sink, errors, cost_acc, models, complexity_hint, 0, usage,
             )
         )
     # Note any blocks the model never classified.
@@ -826,6 +845,25 @@ def run_triage(
 
 
 # --- CLI ---------------------------------------------------------------------
+
+
+def _ledger_usage() -> Dict[str, List[str]]:
+    """``{id: [<set>-<session> labels]}`` from the guidance usage ledger.
+
+    Best-effort: a missing or unreadable ledger yields an empty mapping,
+    and the prompt then says "(never recorded)" rather than failing the
+    triage. Set 121 S2 replaced the ``last-used-set`` scalar this used to
+    read.
+    """
+    try:
+        try:
+            from guidance_ledger import load_ledger  # type: ignore[import-not-found]
+        except ImportError:
+            from .guidance_ledger import load_ledger  # type: ignore[no-redef]
+        ledger, _problems = load_ledger()
+    except Exception:  # pragma: no cover - a ledger fault must not break triage
+        return {}
+    return {key: list(entry.uses) for key, entry in ledger.entries.items()}
 
 
 def _load_router_config() -> Optional[dict]:
@@ -950,6 +988,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         excerpt_chars=args.excerpt_chars,
         session_set=args.session_set,
         complexity_hint=args.complexity_hint,
+        usage=_ledger_usage(),
     )
 
     # Persist raw routed output to UTF-8 FIRST (L-064-3), before any parse

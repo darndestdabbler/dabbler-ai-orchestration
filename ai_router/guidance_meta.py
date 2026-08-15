@@ -11,7 +11,7 @@ each `##` lesson heading, so it is invisible in rendered markdown,
 grep-able from the shell, and human-editable:
 
     ## Persist Routed Output To Disk Before Display Or Logging
-    <!-- lesson: id="L-064-3" added-set="030" last-used-set="064" status="active" scope="portable" -->
+    <!-- lesson: id="L-064-3" added-set="030" scope="portable" -->
 
     - **Context:** ...
 
@@ -22,21 +22,30 @@ Design locks (Set 064 S1 audit, D2)
   then ``key="value"`` pairs, double-quoted values, a fixed canonical
   field order, **omit-empty** (a field with no value is left out, not
   written as ``key=""``).
-- **Fields:** ``id``, ``added-set``, ``last-used-set``, ``status``
+- **Fields:** ``id``, ``added-set``, ``status``
   (``active|archived|promoted``), ``superseded-by``, ``encoded-in``,
   ``scope`` (``portable|repo-specific``). ``superseded-by`` and
   ``encoded-in`` are multi-value (comma-separated inside the quotes).
+  Usage (``last-used-set``) was **retired in Set 121 S2** — it lives in
+  the guidance usage ledger now, not in a preload document.
 - **ID governance:** ``id = L-<set>-<seq>`` (e.g. ``L-064-1``), minted
   once and **permanent across heading renames**. On a merge the survivor
   keeps its id; absorbed entries get ``status="archived"`` +
   ``superseded-by="<survivor>"``. IDs are never regenerated casually.
 
-This module is pure parsing/formatting + validation. It performs the
-**surgical** ``last-used-set`` rewrite the D3 citation path
-(:mod:`ai_router.cite_lessons`) depends on: it rewrites only the one
-trailer line for a cited id and leaves every other byte of the file
-untouched, so a citation lands as a one-line diff that ``git blame``
-attributes to the commit that used the lesson.
+This module is pure parsing/formatting + validation.
+
+**Set 121 S2 — usage metadata left this scheme.** The trailer used to
+carry ``last-used-set``, and :mod:`ai_router.cite_lessons` performed a
+surgical in-place rewrite of it at every close. That bookkeeping lived
+*inside* a preload document, so every session paid to read the
+accounting that decides what to prune, and the close-mandated rewrite of
+a just-verified file needed its own freshness normalizer to stop the
+close backstop buying a metered round for a metadata trailer. Usage now
+lives in :mod:`ai_router.guidance_ledger` — a sidecar JSON read only at
+prune time — and the trailer is back to being pure identity and
+classification. The active tier keeps only what a human or orchestrator
+must be able to cite: the ``id``.
 """
 
 from __future__ import annotations
@@ -48,14 +57,13 @@ from typing import List, Optional, Tuple
 # --- field model -------------------------------------------------------------
 
 # Canonical serialization order. Single-value fields plus the two
-# multi-value fields (superseded-by, encoded-in). ``id`` and ``status``
-# are always emitted; the rest are omit-empty.
-SINGLE_FIELDS = ("id", "added-set", "last-used-set", "status", "scope")
+# multi-value fields (superseded-by, encoded-in). ``id`` is always
+# emitted; the rest are omit-empty.
+SINGLE_FIELDS = ("id", "added-set", "status", "scope")
 MULTI_FIELDS = ("superseded-by", "encoded-in")
 CANONICAL_ORDER = (
     "id",
     "added-set",
-    "last-used-set",
     "status",
     "superseded-by",
     "encoded-in",
@@ -65,9 +73,19 @@ CANONICAL_ORDER = (
 STATUS_VALUES = ("active", "archived", "promoted")
 SCOPE_VALUES = ("portable", "repo-specific")
 
-# id = L-<set>-<seq>; <set> is alphanumeric (set number, zero-padded, or a
-# short legacy token); <seq> is a positive integer. e.g. L-064-1, L-007-12.
-ID_RE = re.compile(r"^L-[A-Za-z0-9]+-\d+$")
+# Retired by Set 121 S2. Kept as a named constant so a stale trailer is
+# reported as retired rather than as a generic "unknown key", and so the
+# one place that knows the field is gone is this module.
+RETIRED_FIELDS = ("last-used-set",)
+
+# id = a guidance-entry handle. ``L-<set>-<seq>`` is the lesson form
+# (e.g. L-064-1, L-007-12); Set 121 S2 widened it because the ledger and
+# the corpus scan are deliberately **agnostic about which document an
+# entry lives in**, and ``project-guidance.md`` is the sink lessons are
+# promoted into. Its entries take a two-segment form (``C-003``,
+# ``G-001``) and a shipped check takes ``K-<set>-<seq>``. Still tight
+# enough that a bare word or a sentence is malformed.
+ID_RE = re.compile(r"^[A-Za-z]{1,4}-[A-Za-z0-9]+(?:-\d+)?$")
 
 # A trailer line: optional leading whitespace, then <!-- lesson: ... -->.
 _TRAILER_RE = re.compile(r"^\s*<!--\s*lesson:\s*(?P<body>.*?)\s*-->\s*$")
@@ -89,7 +107,6 @@ class LessonMeta:
 
     id: str = ""
     added_set: str = ""
-    last_used_set: str = ""
     status: str = "active"
     superseded_by: Tuple[str, ...] = ()
     encoded_in: Tuple[str, ...] = ()
@@ -106,7 +123,10 @@ def parse_trailer(line: str) -> Optional[LessonMeta]:
     Returns ``None`` when *line* is not a ``<!-- lesson: ... -->`` trailer
     at all. A trailer with unknown keys still parses (unknown keys are
     ignored here and flagged by :func:`validate_meta`), so the parser is
-    lenient and the validator is the gatekeeper.
+    lenient and the validator is the gatekeeper. A bare
+    ``<!-- lesson: id="L-079-1" -->`` — the Set 121 S2 minimal marker —
+    parses to an active lesson with no bookkeeping, which is the whole
+    point: identity in the document, accounting in the ledger.
     """
     m = _TRAILER_RE.match(line)
     if m is None:
@@ -115,7 +135,6 @@ def parse_trailer(line: str) -> Optional[LessonMeta]:
     return LessonMeta(
         id=pairs.get("id", "").strip(),
         added_set=pairs.get("added-set", "").strip(),
-        last_used_set=pairs.get("last-used-set", "").strip(),
         status=pairs.get("status", "active").strip() or "active",
         superseded_by=_split_multi(pairs.get("superseded-by", "")),
         encoded_in=_split_multi(pairs.get("encoded-in", "")),
@@ -126,21 +145,24 @@ def parse_trailer(line: str) -> Optional[LessonMeta]:
 def format_trailer(meta: LessonMeta) -> str:
     """Serialize *meta* into the canonical one-line trailer.
 
-    Field order is fixed; ``id`` and ``status`` are always present; every
-    other field is omitted when empty. The result round-trips through
-    :func:`parse_trailer` to an equal :class:`LessonMeta`.
+    Field order is fixed; ``id`` is always present; every other field is
+    omitted when empty. ``status`` is omitted when it is the default
+    ``active``, because the active tier is where active lessons live and
+    restating it costs preload tokens to say nothing. The result
+    round-trips through :func:`parse_trailer` to an equal
+    :class:`LessonMeta`.
     """
     parts: List[str] = []
+    status = meta.status or "active"
     values = {
         "id": meta.id,
         "added-set": meta.added_set,
-        "last-used-set": meta.last_used_set,
-        "status": meta.status or "active",
+        "status": "" if status == "active" else status,
         "superseded-by": ",".join(meta.superseded_by),
         "encoded-in": ",".join(meta.encoded_in),
         "scope": meta.scope,
     }
-    always = {"id", "status"}
+    always = {"id"}
     for key in CANONICAL_ORDER:
         val = values[key]
         if val == "" and key not in always:
@@ -218,87 +240,70 @@ def find_entry(text: str, lesson_id: str) -> Optional[LessonEntry]:
     return None
 
 
-def update_last_used(
-    text: str, lesson_id: str, set_label: str
-) -> Tuple[Optional[str], Optional[LessonMeta]]:
-    """Rewrite *lesson_id*'s ``last-used-set`` to *set_label* in *text*.
+def scan_entries(text: str) -> List[Tuple[int, LessonMeta]]:
+    """Every marker in *text* as ``(0-based line index, meta)``.
 
-    Returns ``(new_text, updated_meta)``. When the id is not present, or
-    is present but already records *set_label* as its ``last-used-set``,
-    ``new_text`` reflects the (possibly unchanged) document and
-    ``updated_meta`` is the entry's meta — except when the id is absent
-    entirely, where both elements are ``None``.
-
-    The rewrite is surgical: only the single trailer line changes; line
-    endings and every other byte are preserved. A lesson that has a
-    heading but **no** trailer yet cannot be cited (there is nowhere to
-    record usage); that case returns ``(None, None)`` so the caller can
-    warn distinctly from "unknown id".
+    The validation counterpart to :func:`scan_ids`, and the reason
+    :func:`validate_documents` no longer walks :func:`parse_document`: a
+    heading-bound walk validates **zero** markers in a document whose
+    entries are bullets under level-3 sections, and reports success for
+    having checked nothing.
     """
-    # Preserve the document's newline style by splitting on "\n" and
-    # rejoining the same way; "\r\n" survives because the "\r" stays on
-    # each element.
-    lines = text.split("\n")
-    for entry in parse_document(text):
-        if entry.meta is None or entry.meta.id != lesson_id:
-            continue
-        if entry.trailer_line is None:
-            return None, None
-        meta = entry.meta
-        new_meta = LessonMeta(
-            id=meta.id,
-            added_set=meta.added_set,
-            last_used_set=set_label,
-            status=meta.status,
-            superseded_by=meta.superseded_by,
-            encoded_in=meta.encoded_in,
-            scope=meta.scope,
-        )
-        # Preserve any trailing "\r" the split left on the line.
-        suffix = "\r" if lines[entry.trailer_line].endswith("\r") else ""
-        # Preserve leading indentation of the original trailer line.
-        original = lines[entry.trailer_line]
-        indent = original[: len(original) - len(original.lstrip())]
-        lines[entry.trailer_line] = indent + format_trailer(new_meta) + suffix
-        return "\n".join(lines), new_meta
-    return None, None
+    out: List[Tuple[int, LessonMeta]] = []
+    for index, line in enumerate(text.split("\n")):
+        meta = parse_trailer(line[:-1] if line.endswith("\r") else line)
+        if meta is not None:
+            out.append((index, meta))
+    return out
+
+
+def scan_ids(text: str) -> List[str]:
+    """Every marker id in *text*, in order, regardless of heading structure.
+
+    :func:`parse_document` associates a trailer with the ``##`` heading
+    above it, which is right for ``lessons-learned.md`` — one lesson, one
+    level-2 heading. It is wrong for ``project-guidance.md``, whose
+    entries are bullets under level-3 sections: a heading-bound scan
+    there returns **zero** ids while looking like it worked, and a corpus
+    gate that silently examines nothing is indistinguishable from one
+    that found nothing (L-112-1).
+
+    So the corpus scan is structural about the marker, not about the
+    document around it, which is what lets one mechanism serve both files
+    and whatever a consumer repo shapes its guidance like.
+    """
+    out: List[str] = []
+    for line in text.split("\n"):
+        meta = parse_trailer(line[:-1] if line.endswith("\r") else line)
+        if meta is not None and meta.id:
+            out.append(meta.id)
+    return out
+
+
+def contains_id(text: str, entry_id: str) -> bool:
+    """True when *entry_id* has a marker anywhere in *text*."""
+    return entry_id in scan_ids(text)
+
+
+def update_last_used(*_args: object, **_kwargs: object) -> None:
+    """Retired in Set 121 S2. Usage is recorded in the guidance ledger.
+
+    Kept as a loud stub rather than deleted outright: a consumer repo
+    pinned to an older ``dabbler-ai-router`` may still call this, and a
+    silent no-op would drop its usage signal on the floor while looking
+    like it worked. Raising names the replacement.
+    """
+    raise NotImplementedError(
+        "guidance_meta.update_last_used was retired in Set 121 S2. Usage "
+        "metadata no longer lives in the preload documents; record it with "
+        "ai_router.guidance_ledger.record_citation() (or the cite_lessons "
+        "CLI, which now writes docs/planning/guidance-usage.json)."
+    )
 
 
 # --- validation --------------------------------------------------------------
 
 _KNOWN_KEYS = set(SINGLE_FIELDS) | set(MULTI_FIELDS)
-
-
-# The one field ``cite_lessons`` is mandated to move at close.
-_LAST_USED_RE = re.compile(r'last-used-set="[^"]*"')
-_CLOSE_MANDATED_PLACEHOLDER = 'last-used-set="<close-mandated>"'
-
-
-def normalize_close_mandated_metadata(data: bytes) -> bytes:
-    """Blank the ``last-used-set`` value in every lesson trailer.
-
-    The freshness normalizer for the guidance files (Set 119 S3; the
-    contract is in :mod:`ai_router.verification_stamp`). The constitution
-    mandates ``cite_lessons`` in the final commit, so a citing session
-    rewrites this field AFTER the round that will settle its close —
-    staling its own stamp and sending the backstop off to buy a metered
-    round for a metadata trailer.
-
-    Only the trailer's own value is replaced, and only on lines that
-    parse as a lesson trailer, so **the lesson prose keeps binding
-    normally**: exempting the whole file would let a post-verification
-    rewrite of a preload document ride a passed round. Byte-preserving
-    otherwise — line endings, indentation and every other field survive,
-    because this output is hashed, never written back.
-    """
-    text = data.decode("utf-8", errors="surrogateescape")
-    out: List[str] = []
-    for line in text.split("\n"):
-        stripped = line[:-1] if line.endswith("\r") else line
-        if _TRAILER_RE.match(stripped):
-            line = _LAST_USED_RE.sub(_CLOSE_MANDATED_PLACEHOLDER, line)
-        out.append(line)
-    return "\n".join(out).encode("utf-8", errors="surrogateescape")
 
 
 def validate_meta(meta: LessonMeta) -> List[str]:
@@ -308,16 +313,17 @@ def validate_meta(meta: LessonMeta) -> List[str]:
     :data:`STATUS_VALUES`; ``scope`` set but not in :data:`SCOPE_VALUES`;
     an ``archived`` lesson with no ``superseded-by``/``encoded-in`` and no
     other archive justification is *not* an error here (archival rationale
-    is operator-reviewed, D5). Recommended-but-missing fields
-    (``added-set`` / ``last-used-set``) are **warnings**, returned by
-    :func:`meta_warnings`, not errors — legacy lessons predate the scheme.
+    is operator-reviewed, D5). A recommended-but-missing ``added-set`` is
+    a **warning**, returned by :func:`meta_warnings`, not an error —
+    legacy lessons predate the scheme.
     """
     errors: List[str] = []
     if not meta.id:
         errors.append("missing required field: id")
     elif not ID_RE.match(meta.id):
         errors.append(
-            f'id {meta.id!r} is malformed (expected L-<set>-<seq>, e.g. "L-064-1")'
+            f'id {meta.id!r} is malformed (expected L-<set>-<seq> for a '
+            'lesson, e.g. "L-064-1", or a short handle such as "C-003")'
         )
     if meta.status not in STATUS_VALUES:
         allowed = ", ".join(STATUS_VALUES)
@@ -351,31 +357,39 @@ class DocValidation:
 
 
 def validate_documents(docs: List[Tuple[str, str]]) -> DocValidation:
-    """Validate trailers across *docs* and enforce cross-file id uniqueness.
+    """Validate every marker across *docs* and enforce id uniqueness.
 
     *docs* is a list of ``(label, text)`` pairs (label is a filename used
     in messages). Rules:
 
-    - every present trailer must pass :func:`validate_meta`;
-    - a malformed trailer line under a ``##`` heading (parses as a comment
-      but yields no id) is reported;
-    - each ``id`` must be unique across **all** documents (active +
-      archive share one id namespace, D2 lock).
+    - every marker must pass :func:`validate_meta`;
+    - a malformed marker line (parses as a lesson comment but yields no
+      id) is reported;
+    - each ``id`` must be unique across **all** documents (the active
+      tier, the archive and ``project-guidance.md`` share one id
+      namespace, D2 lock).
+
+    Set 121 S2: this walks :func:`scan_entries`, not
+    :func:`parse_document`. The heading-bound walk validated only markers
+    sitting under a ``##`` heading, which is every lesson but **no**
+    entry in ``project-guidance.md`` — whose entries are bullets under
+    level-3 sections. The gate would have reported success for the very
+    file the next session is admitting ids into, having checked none of
+    them.
     """
     result = DocValidation()
     seen: dict = {}
     all_ids: List[str] = []
     for label, text in docs:
-        for entry in parse_document(text):
-            if entry.meta is None:
-                continue
-            line_ref = f"{label}:{(entry.trailer_line or entry.heading_line) + 1}"
-            for err in validate_meta(entry.meta):
+        lines = text.split("\n")
+        for line_index, meta in scan_entries(text):
+            line_ref = f"{label}:{line_index + 1}"
+            for err in validate_meta(meta):
                 result.errors.append(f"{line_ref}: {err}")
             result.warnings.extend(
-                f"{line_ref}: {w}" for w in meta_warnings(entry.meta)
+                f"{line_ref}: {w}" for w in meta_warnings(meta)
             )
-            lid = entry.meta.id
+            lid = meta.id
             if lid:
                 if lid in seen:
                     result.errors.append(
@@ -385,11 +399,19 @@ def validate_documents(docs: List[Tuple[str, str]]) -> DocValidation:
                     seen[lid] = line_ref
                     all_ids.append(lid)
             # Surface unknown keys as a warning (lenient parser, strict report).
-            raw = text.split("\n")[entry.trailer_line] if entry.trailer_line is not None else ""
+            raw = lines[line_index]
             for pm in _PAIR_RE.finditer(raw):
-                if pm.group("key") not in _KNOWN_KEYS:
+                key = pm.group("key")
+                if key in RETIRED_FIELDS:
                     result.warnings.append(
-                        f"{line_ref}: unknown trailer key {pm.group('key')!r}"
+                        f"{line_ref}: trailer key {key!r} was retired in Set "
+                        "121 S2; usage lives in the guidance ledger "
+                        "(docs/planning/guidance-usage.json). The value here "
+                        "is stale and nothing writes it"
+                    )
+                elif key not in _KNOWN_KEYS:
+                    result.warnings.append(
+                        f"{line_ref}: unknown trailer key {key!r}"
                     )
     result.ids = tuple(all_ids)
     return result
@@ -401,6 +423,7 @@ __all__ = [
     "CANONICAL_ORDER",
     "STATUS_VALUES",
     "SCOPE_VALUES",
+    "RETIRED_FIELDS",
     "ID_RE",
     "LessonMeta",
     "LessonEntry",
@@ -409,8 +432,10 @@ __all__ = [
     "format_trailer",
     "parse_document",
     "find_entry",
+    "scan_entries",
+    "scan_ids",
+    "contains_id",
     "update_last_used",
-    "normalize_close_mandated_metadata",
     "validate_meta",
     "meta_warnings",
     "validate_documents",

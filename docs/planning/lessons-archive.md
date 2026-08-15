@@ -17,8 +17,9 @@
 > is consulted only when searching for prior knowledge.
 >
 > **Reactivation.** If `python -m ai_router.cite_lessons` is run for an id
-> that lives here, the tool updates the entry's `last-used-set` in place
-> and prints a `[reconsider]` line so an operator can move the lesson back
+> that lives here, the use is recorded in the guidance usage ledger
+> (`docs/planning/guidance-usage.json`) and the tool prints a
+> `[reconsider]` line so an operator can move the lesson back
 > into the active tier. Archival is reversible; nothing here is lost.
 
 ---
@@ -33,7 +34,7 @@ self-diagnosing rather than silent. Full text preserved; reactivate with
 `cite_lessons`.
 
 ## A Dependency-Pin Bump Is Not Enablement
-<!-- lesson: id="L-075-1" added-set="075" last-used-set="084" status="archived" scope="portable" -->
+<!-- lesson: id="L-075-1" added-set="075" status="archived" scope="portable" -->
 
 - A raised floor in `requirements.txt` (or any manifest) does not touch
   the already-provisioned environment; the downstream step still fails
@@ -52,7 +53,7 @@ Archived by Set 073 (promoted-lesson sweep): each lesson below was promoted to
 copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
 
 ## ASCII-Only Glyphs In Cross-Platform Terminal Output
-<!-- lesson: id="L-064-4" last-used-set="064" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-4" status="archived" scope="portable" -->
 
 - **Context:** Any helper that prints status to the terminal.
 - **Failure or friction:** Emoji glyphs crash Windows `cp1252` consoles.
@@ -80,7 +81,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   2026-05-01 to avoid duplicate guidance drifting in two places.
 
 ## State The Suite Baseline And Release Contract Up Front In Verification Round 1
-<!-- lesson: id="L-064-10" added-set="062" last-used-set="127" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-10" added-set="062" status="archived" scope="portable" -->
 
 - **Promoted.** This lesson now lives at `project-guidance.md` →
   Conventions → Workflow Expectations: *"Open every session-verification
@@ -104,7 +105,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   the same rule.
 
 ## A Pure-Python Validator Mirroring A JSON Schema Drifts Looser — Type-Check Optional Fields And Guard Numeric Equivalence
-<!-- lesson: id="L-066-1" added-set="066" last-used-set="123" status="archived" scope="portable" -->
+<!-- lesson: id="L-066-1" added-set="066" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-16**
   after instrumental application across Sets 066, 069, and 070. The detailed
@@ -141,7 +142,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   per-session routed verification had missed.
 
 ## A Bug Is A Bug CLASS — Fix Every Sibling Site, Not Just The Reported One
-<!-- lesson: id="L-069-1" added-set="069" last-used-set="121" status="archived" scope="portable" -->
+<!-- lesson: id="L-069-1" added-set="069" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-19**
   after application across Sets 068 (origin: the `contract_gate` `UnicodeError` fix),
@@ -155,7 +156,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   ceiling.
 
 ## An Iterative Dogfood Keeps Its Own Gate Artifact "Pre-Fix" — Frame It As Evidence, Not A Clean Snapshot
-<!-- lesson: id="L-070-1" added-set="070" last-used-set="104" status="archived" scope="portable" -->
+<!-- lesson: id="L-070-1" added-set="070" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
   2026-06-19** after application across Sets 070 (origin: the path-aware critique
@@ -170,7 +171,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
 
 
 ## Dogfood The True Cold Start — A Pre-Seeded Fixture Masks First-Run Defects
-<!-- lesson: id="L-079-3" added-set="079" last-used-set="123" status="archived" scope="portable" -->
+<!-- lesson: id="L-079-3" added-set="079" status="archived" scope="portable" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Workflow Expectations on
   2026-07-06** after instrumental application across Sets 079 (origin: the
@@ -199,7 +200,7 @@ this section (no metadata trailers there — the live ids stay in the active
 tier; cross-file id uniqueness is the D2 lock).
 
 ## Truncation Detection: `stop_reason` Alone Is Not Sufficient
-<!-- lesson: id="L-064-1" last-used-set="077" status="archived" scope="portable" encoded-in="ai_router/utils.py::detect_truncation" -->
+<!-- lesson: id="L-064-1" status="archived" scope="portable" encoded-in="ai_router/utils.py::detect_truncation" -->
 
 - **Context:** Any routed call whose response is consumed programmatically —
   code generation, test generation, structured data emission.
@@ -235,7 +236,7 @@ tier; cross-file id uniqueness is the D2 lock).
   orchestrator action exists to remind about.
 
 ## Always Route `ai-assignment.md` And Next-Orchestrator / Next-Set Recommendations
-<!-- lesson: id="L-064-6" last-used-set="081" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-6" status="archived" scope="portable" -->
 
 - **Context:** Authoring `ai-assignment.md` (Step 3.5) or next-orchestrator /
   next-session-set recommendations (Step 8).
@@ -250,7 +251,7 @@ tier; cross-file id uniqueness is the D2 lock).
   Step 3.5.
 
 ## Measure A Verification Surface At Its Strongest Framing Before Demoting Or Retiring It
-<!-- lesson: id="L-069-2" added-set="069" last-used-set="083" status="archived" scope="portable" encoded-in="ai_router/prompt-templates/verification.md" -->
+<!-- lesson: id="L-069-2" added-set="069" status="archived" scope="portable" encoded-in="ai_router/prompt-templates/verification.md" -->
 
 - **Context:** Comparing two verification surfaces (e.g. snippet-fed *push* /
   routed vs. repository-reading *pull* / path-aware) to decide whether one earns
@@ -283,7 +284,7 @@ tier; cross-file id uniqueness is the D2 lock).
   archive material consulted when designing a comparison.
 
 ## Strong Adversarial Framing Without A Materiality Bar Manufactures Minor-Finding Churn
-<!-- lesson: id="L-071-1" added-set="071" last-used-set="085" status="archived" scope="portable" encoded-in="ai_router/verification.py::is_blocking_verdict" -->
+<!-- lesson: id="L-071-1" added-set="071" status="archived" scope="portable" encoded-in="ai_router/verification.py::is_blocking_verdict" -->
 
 - **Context:** A verification surface running at its **strongest adversarial
   framing** (devil's advocate, "assume the work is flawed, a rubber-stamp is a
@@ -349,7 +350,7 @@ tier; cross-file id uniqueness is the D2 lock).
   doc's Step 6 and the constitution states the principle.
 
 ## An Equal-Arms A/B Isolates Its One Variable — And Is Structurally Blind To That Variable's Interactions
-<!-- lesson: id="L-072-1" added-set="072" last-used-set="075" status="archived" scope="portable" -->
+<!-- lesson: id="L-072-1" added-set="072" status="archived" scope="portable" -->
 
 - **Context:** A controlled comparison built to isolate **one** variable by holding
   everything else equal — the Set 070 dual-surface verifier held *provider, model, and
@@ -387,7 +388,7 @@ tier; cross-file id uniqueness is the D2 lock).
   moment is designing a comparison, not session start.
 
 ## A Replication Confirms One Property, Not A Headline — Name Which Held And Which Did Not
-<!-- lesson: id="L-073-1" added-set="073" last-used-set="075" status="archived" scope="portable" -->
+<!-- lesson: id="L-073-1" added-set="073" status="archived" scope="portable" -->
 
 - **Context:** Replicating a prior single-datapoint observation on a second target /
   run, then recording the verdict in a settled-strategy doc (Set 073 S1 reran the Set 072
@@ -418,7 +419,7 @@ tier; cross-file id uniqueness is the D2 lock).
   replication result, not session start.
 
 ## A Spec's Prose Cannot Arm A Gate — Declare Every Gate Flag In The Configuration Block
-<!-- lesson: id="L-079-2" added-set="079" last-used-set="079" status="archived" scope="portable" -->
+<!-- lesson: id="L-079-2" added-set="079" status="archived" scope="portable" -->
 
 - **Context:** Spec authoring for any set whose end-of-set machinery is
   seeded from the Session Set Configuration block (`pathAwareCritique`,
@@ -442,7 +443,7 @@ tier; cross-file id uniqueness is the D2 lock).
   and the authoring guide (on-demand) now carries the pointer.
 
 ## GPT-5.4 In The Pull-Verifier Loop Over-Probes And Times Out On Token Budget Before A Verdict
-<!-- lesson: id="L-067-1" added-set="067" last-used-set="073" status="archived" scope="repo-specific" encoded-in="ai_router/pull_verifier.py::PullCaps" -->
+<!-- lesson: id="L-067-1" added-set="067" status="archived" scope="repo-specific" encoded-in="ai_router/pull_verifier.py::PullCaps" -->
 
 - **Context:** Driving `ai_router.pull_verifier.pull_route` (or the
   `pull_critique` producer) with the OpenAI binding (GPT-5.4) over a sandbox
@@ -722,7 +723,7 @@ each id is in the active tier (D2: one id, one trailer).
 ## Archived by Set 095 (preload-ceiling triage — L-095-1 admission)
 
 ## Pin `max_tier` On Wording-Only Re-Verifies; Never Pin A Substantive One Below Round 1
-<!-- lesson: id="L-064-7" added-set="064" last-used-set="083" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-7" added-set="064" status="archived" scope="portable" -->
 
 - A wording-only re-verify (substance correct, verdict format off —
   gpt-5-4 has returned format-shortfall on clean reviews twice, Sets
@@ -739,7 +740,7 @@ each id is in the active tier (D2: one id, one trailer).
   "no executable-gate equivalent" criterion no longer holds.
 
 ## A Rollback Recipe Must Name A Registry-Live Version
-<!-- lesson: id="L-078-1" added-set="078" last-used-set="085" status="archived" scope="portable" -->
+<!-- lesson: id="L-078-1" added-set="078" status="archived" scope="portable" -->
 
 - "Decided in the repo" and "installable by an operator" are different
   facts: a rollback step naming a not-yet-published version fails at the
@@ -755,7 +756,7 @@ each id is in the active tier (D2: one id, one trailer).
 ## Archived by Set 105 (born archived — executable-gate-encoded on admission)
 
 ## A Verification Finding That Re-Appears On A File You Delete Is Being Re-Synthesized Out Of Band — Fix The Evidence Layer, Not The File
-<!-- lesson: id="L-105-1" added-set="105" last-used-set="105" status="archived" scope="portable" encoded-in="ai_router/verify_session.py::_collect_untracked_contents (FRAMEWORK_BOOKKEEPING_FILES)" -->
+<!-- lesson: id="L-105-1" added-set="105" status="archived" scope="portable" encoded-in="ai_router/verify_session.py::_collect_untracked_contents (FRAMEWORK_BOOKKEEPING_FILES)" -->
 
 - When a cross-provider verification finding **re-appears every round on a
   file you deleted between rounds**, the file is being **re-created out of
@@ -781,7 +782,7 @@ each id is in the active tier (D2: one id, one trailer).
   at that trigger moment.
 
 ## Propagate A Consistency Fix To Every Echo Before Re-Verifying
-<!-- lesson: id="L-065-1" added-set="065" last-used-set="115" status="archived" scope="portable" -->
+<!-- lesson: id="L-065-1" added-set="065" status="archived" scope="portable" -->
 
 - A consistency finding is rarely local: the same claim echoes in the
   summary table, body prose, per-row cells, and the bottom line, and each
@@ -799,7 +800,7 @@ found the same file still quoting an 8.0m Layer 3 run after the run of record ha
 become 11.3m. The canonical rule now lives in `project-guidance.md`.
 
 ## An Ungraded "Find Issues" Verification Loop On An Unbounded Artifact Surface Does Not Converge
-<!-- lesson: id="L-095-1" added-set="095" last-used-set="127" status="archived" scope="portable" -->
+<!-- lesson: id="L-095-1" added-set="095" status="archived" scope="portable" -->
 
 - Reviewers are salience-limited, not context-limited: each pass returns
   the most salient handful of technically-real findings, and fixing them
@@ -819,7 +820,7 @@ instruction is still live: the rubric has not shipped in
 `project-guidance.md`.
 
 ## Explorer / State-Writer / Fixture Changes Run Layer 3 Locally Before Close
-<!-- lesson: id="L-064-12" added-set="047" last-used-set="122" status="archived" scope="repo-specific" -->
+<!-- lesson: id="L-064-12" added-set="047" status="archived" scope="repo-specific" -->
 
 - The Layer-3 Playwright suite is the only gate that exercises the real
   webview, and a test layer nobody runs rots silently — five rot families
@@ -855,7 +856,7 @@ and the reasoning are journaled in
 `docs/session-sets/121-guidance-becomes-executable/decisions.jsonl`.
 
 ## `git diff`-Based Verification Evidence Omits Untracked Files
-<!-- lesson: id="L-064-9" added-set="063" last-used-set="121" status="archived" encoded-in="ai_router/verify_session.py::EvidenceBundle.as_response_under_review" scope="portable" -->
+<!-- lesson: id="L-064-9" added-set="063" status="archived" encoded-in="ai_router/verify_session.py::EvidenceBundle.as_response_under_review" scope="portable" -->
 
 - `git diff` shows only tracked changes, so an evidence bundle that
   presents a diffstat as "the change set" silently omits new files and
@@ -872,7 +873,7 @@ and the reasoning are journaled in
   population or the rendering turns the suite red.
 
 ## Compare What A Transport CAN DO, Not What It Returns
-<!-- lesson: id="L-125-1" added-set="125" last-used-set="132" status="archived" scope="portable" encoded-in="ai_router/cli_transport.py::READ_ONLY_TOOLS" -->
+<!-- lesson: id="L-125-1" added-set="125" status="archived" scope="portable" encoded-in="ai_router/cli_transport.py::READ_ONLY_TOOLS" -->
 
 - Backends behind one interface differ in **capability**, not output. Under
   one `route()` contract, direct-API sends no `tools` key and cannot touch

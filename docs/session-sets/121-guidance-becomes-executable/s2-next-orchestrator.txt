@@ -1,0 +1,6 @@
+CODE: reduce-effort
+ENGINE: github-copilot
+PROVIDER: anthropic
+MODEL: claude-sonnet-4.6
+EFFORT: medium
+SPECIFICS: Session 3 is predominantly mechanical work: assigning IDs to ~24 bullet entries, encoding two already-specified lessons with known token deltas, and re-deriving a cap against an enlarged corpus using an established derivation method. None of these tasks require deep reasoning or synthesis — they follow explicit rules laid out by Session 2. Claude Sonnet 4.6 at medium effort handles structured, well-scoped mechanical tasks reliably without burning Opus-5/high-effort budget. The one non-trivial step (cap re-derivation) is a quantitative calculation with a clear method, not a judgment call. Reserve Opus-5/high for Session 4 where the deferred judgment-heavy triage lands.

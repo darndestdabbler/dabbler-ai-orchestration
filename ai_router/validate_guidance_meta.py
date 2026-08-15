@@ -19,6 +19,7 @@ try:  # test convention: bare import; production: relative fallback
     from guidance_config import (  # type: ignore[import-not-found]
         LESSONS_ACTIVE,
         LESSONS_ARCHIVE,
+        PROJECT_GUIDANCE,
         discover_guidance_files,
     )
     from guidance_meta import validate_documents  # type: ignore[import-not-found]
@@ -26,15 +27,27 @@ except ImportError:
     from .guidance_config import (  # type: ignore[no-redef]
         LESSONS_ACTIVE,
         LESSONS_ARCHIVE,
+        PROJECT_GUIDANCE,
         discover_guidance_files,
     )
     from .guidance_meta import validate_documents  # type: ignore[no-redef]
 
 
 def _default_files(repo_root: Optional[str] = None) -> List[str]:
-    """The active + archive lessons files that carry trailers, if present."""
+    """Every guidance document that can carry an id marker, if present.
+
+    Set 121 S2 added ``project-guidance.md``. It is the **sink** lessons
+    are promoted into, so it shares the id namespace and must be in the
+    uniqueness check; leaving it out would let a promoted entry collide
+    with the lesson it came from, and would mean the gate that admits
+    Session 3's ids never inspects the file it is admitting them to.
+    """
     found = discover_guidance_files(repo_root)
-    return [found[name] for name in (LESSONS_ACTIVE, LESSONS_ARCHIVE) if name in found]
+    return [
+        found[name]
+        for name in (LESSONS_ACTIVE, PROJECT_GUIDANCE, LESSONS_ARCHIVE)
+        if name in found
+    ]
 
 
 def _read_docs(paths: List[str]) -> Tuple[List[Tuple[str, str]], List[str]]:
@@ -64,7 +77,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         nargs="*",
         help=(
             "Markdown files to validate. Default: lessons-learned.md + "
-            "lessons-archive.md under ./docs/planning."
+            "project-guidance.md + lessons-archive.md under ./docs/planning."
         ),
     )
     parser.add_argument(
@@ -82,7 +95,8 @@ def main(argv: Optional[List[str]] = None) -> int:
     paths = list(args.files) if args.files else _default_files()
     if not paths:
         print("No guidance files found to validate (looked for "
-              "docs/planning/lessons-learned.md, lessons-archive.md).")
+              "docs/planning/lessons-learned.md, project-guidance.md, "
+              "lessons-archive.md).")
         return 0
 
     docs, read_errors = _read_docs(paths)

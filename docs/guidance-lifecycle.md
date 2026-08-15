@@ -31,11 +31,11 @@ The `lessons-learned.md` file is split into two tiers to manage its size.
 
 ## Per-lesson metadata
 
-Each lesson heading (`## ...`) in `lessons-learned.md` must be followed by a one-line HTML comment trailer containing its metadata. This trailer is the ground truth for tracking and automation.
+Each lesson heading (`## ...`) in `lessons-learned.md` must be followed by a one-line HTML comment trailer containing its **identity**. This trailer is the ground truth for addressing a lesson; its **usage** is tracked separately, in the ledger below.
 
 **Format:**
 ```html
-<!-- lesson: id="L-SET-SEQ" added-set="NNN" last-used-set="NNN" status="active" scope="portable" -->
+<!-- lesson: id="L-SET-SEQ" added-set="NNN" scope="portable" -->
 ```
 
 **Fields:**
@@ -44,11 +44,16 @@ Each lesson heading (`## ...`) in `lessons-learned.md` must be followed by a one
 | :--- | :--- | :--- | :--- |
 | `id` | A short, stable handle, minted once. Permanent across heading renames. | Yes | `L-064-1` |
 | `added-set` | The set number when the lesson was added. | Yes | `064` |
-| `last-used-set` | The set number of the last session that cited this lesson. | Yes | `072` |
-| `status`| The lesson's current state. | Yes | `active`, `archived`, `promoted` |
+| `status`| The lesson's current state. Omitted when `active` (the active tier is what active means). | No | `archived`, `promoted` |
 | `superseded-by` | ID of the lesson that replaces this one. | No | `L-075-3` |
 | `encoded-in` | Path to a test, linter, or template that automates this lesson. | No | `tests/test_foo.py` |
 | `scope` | Portability of the lesson. | No | `portable`, `repo-specific` |
+
+> **`last-used-set` was retired in Set 121 S2.** Usage lives in the
+> guidance usage ledger (below), not in a preload document. A stale
+> `last-used-set` in a consumer repo's trailer is reported by
+> `validate_guidance_meta` as *retired*, not as an unknown key — nothing
+> writes it, and its value is not read.
 
 **Validation**:
 To ensure all lessons have valid, parseable metadata, run:
@@ -57,23 +62,124 @@ python -m ai_router.validate_guidance_meta
 ```
 The parser and formatter in `ai_router/guidance_meta.py` are designed to round-trip files, preserving human readability.
 
+## The guidance usage ledger (Set 121 S2)
+
+Usage accounting used to live *inside* `lessons-learned.md`, which is
+preload — so every session paid to read the bookkeeping that decides what
+to prune, and the accounting cost more than the headroom that was left.
+It now lives in `docs/planning/guidance-usage.json`, **read only at prune
+time**:
+
+```json
+{
+  "schemaVersion": 1,
+  "entries": {
+    "L-064-9": { "kind": "executable", "cost": "cheap", "uses": [] },
+    "C-003":   { "kind": "instruction", "uses": ["120-01", "119-03"] }
+  }
+}
+```
+
+(The executable's `uses` is empty on purpose: a check's ring is filled
+only by `record_fire`, never by a citation. See *Retention, split by
+artifact type* below.)
+
+**The ledger is keyed by id and agnostic about which document an entry
+lives in.** `kind` says what the entry *is*, never where it sits — which
+matters because `project-guidance.md` is the **sink** that lessons are
+promoted into, so it needs the identical mechanism.
+
+Four load-bearing properties:
+
+- **Sessions, not timestamps.** A repository may lie dormant for months;
+  wall-clock decay would evict the whole corpus for the *project's*
+  inactivity rather than the guidance's uselessness. The only question
+  ever asked is *"used within the last N active sessions?"*
+- **A bounded array, not a scalar.** `last-used-set="120"` could not
+  distinguish *used once, ten sets ago* from *used in every one of the
+  last ten*, which warrant opposite pruning decisions. The ring holds the
+  last **10** uses; the cap keeps the file from growing without bound.
+- **Entries are dash-separated STRINGS, never JSON numbers** — `"120-02"`,
+  not `120.02`. A decimal is not merely risky to parse, it is *ambiguous
+  to read*: `120.10` round-trips through a float to `120.1`, which reads
+  back as session **1**. The reader refuses a numeric use outright.
+- **Pruning is batched and operator-initiated.** `guidance_ledger` has no
+  evict path and never will. Eviction was never automatic and never
+  mid-session: an orchestrator at 100% of a ceiling evicting prose under
+  time pressure is the specific defect that broke the old scheme.
+
+**Ordering is APPEND order, never label order.** Set numbers are
+*allocation* order, not execution order — Set 121 S1 measured sets 115
+and 118 executing after 119 — so the ring and the active-session
+timeline are both built from close-event timestamps.
+
+One sanctioned writer (this module), the same lock discipline as other
+append-only state (`close_lock.file_mutex`), and an atomic replace.
+
+### Retention, split by artifact type
+
+A single *"unused in N sets → drop"* rule fails for preventive gates: a
+gate that never fires is indistinguishable from a useless one, which
+**is** `L-112-1`. So the rule splits:
+
+| kind | rule |
+| :--- | :--- |
+| **instruction** | Retained when cited within the last `instruction_window_sessions` **active sessions**. |
+| **executable, cheap** (<1s, deterministic, no routed call) | Kept indefinitely. Free insurance that never expires; **no usage record required**. |
+| **executable, expensive** (a routed call, or >10s) | Must have **fired** at least once within the last `check_window_sets` sets. |
+
+**A use is a citation for an instruction and a FIRE for a check**, and
+that is enforced by the writer rather than by convention:
+`record_citation()` refuses an executable and `record_fire()` refuses an
+instruction. Recording mere *execution* would be worthless — a check that
+runs in CI every session would look permanently in use — so the only
+event an executable records is that it **caught** something. Every check
+ships with a falsifier regardless.
+
+```sh
+python -m ai_router.guidance_ledger report     # retention candidates (read-only)
+python -m ai_router.guidance_ledger validate   # gate the ledger's shape
+python -m ai_router.guidance_ledger fire --set 133 --session 2 K-121-1
+python -m ai_router.guidance_ledger backfill   # seed from close-event history
+```
+
+### The numbers, and how they were derived
+
+Measured over **345 recorded active sessions** and **167 per-session
+citation events** (Set 121 S2). They live in `router-config.yaml` under
+`guidance.retention:`.
+
+| key | value | basis |
+| :--- | ---: | :--- |
+| `instruction_window_sessions` | **30** | p99 of 694 intra-lesson citation gaps (median 1, p90 5, p95 10, p99 30.2, max 51). Retains 99% of genuinely recurring guidance through its quiet stretches. At this repo's measured 2.88 sessions/set that is ~10.4 sets. |
+| `check_window_sets` | **20** | **The data supports nothing here** — there is no fire history yet. An honest default rather than a fabricated derivation: it reuses the operator-set `disuse_window_sets`, so the repo carries one disuse horizon rather than two that drift. |
+| `instruction_line_cap` | **22** | Peak distinct ids cited in any trailing window across the whole history (20 at W=30, 21 at W=40–51, 22 at W=60–80). |
+
+> **Known blind spot in the cap.** `project-guidance.md` had no ids when
+> this was measured, so its ~24 entries contributed **nothing**. Session 3
+> of Set 121 admits them; when it does it must **re-derive** the cap
+> against the enlarged corpus rather than inherit 22 — the same refusal
+> Session 2 made of proposal §5.3's 20.
+
 ## Citation at close (the keystone)
 
 Usage is the primary signal for a lesson's relevance. This signal is captured via explicit citation.
 
 1.  When a lesson is instrumental in a session's success, the orchestrator records its `id` in the `disposition.lessons_cited` array within `disposition.json`.
-2.  As part of the final commit for that session, the operator runs the `cite_lessons` command. This updates the `last-used-set` metadata field for each cited lesson.
+2.  As part of the final commit for that session, the orchestrator runs the `cite_lessons` command. This appends a `<set>-<session>` use to the ledger.
 
 **Command:**
 ```sh
-python -m ai_router.cite_lessons --set <CURRENT_SET_NUMBER> <id_1> <id_2> ...
+python -m ai_router.cite_lessons --set <CURRENT_SET_NUMBER> --session <N> <id_1> <id_2> ...
 ```
 
-In addition to the `cite_lessons` update of `last-used-set`, `close_session`
+In addition to the `cite_lessons` ledger write, `close_session`
 records the `disposition.lessons_cited` array into the close-out event, so the
-session's cited ids are preserved in the session-events ledger.
+session's cited ids are preserved in the session-events ledger. That event is
+also what `guidance_ledger backfill` replays, so a repo that has been citing
+lessons already gets a populated ledger on day one.
 
-This mechanism is inert by default. A lesson that is never cited will never have its `last-used-set` field updated. Silence does not trigger archival.
+This mechanism is inert by default. A lesson that is never cited simply accrues no uses. Silence does not trigger archival.
 
 ## When to archive a lesson
 
@@ -82,7 +188,7 @@ Archival is an operator-reviewed process based on concrete evidence. A lesson is
 -   **Superseded**: Its `superseded-by` metadata field points to a newer lesson.
 -   **Automated**: Its `encoded-in` metadata field points to live automation (e.g., a test, linter rule, or template) that makes the manual guidance obsolete.
 -   **Retired**: The subsystem or technology it pertains to has been removed.
--   **Disused**: It has no `last-used-set` activity for a configured window (default 20 sets) **AND** it is not referenced by any other active guidance. Disuse only makes a lesson a *candidate* — it is never the sole reason to evict. A rare-but-critical lesson (see the next section) is explicitly spared at operator review even when it crosses the disuse window.
+-   **Disused**: It has recorded no use for the retention window (see the table above) **AND** it is not referenced by any other active guidance. Disuse only makes a lesson a *candidate* — it is never the sole reason to evict. A rare-but-critical lesson (see the next section) is explicitly spared at operator review even when it crosses the disuse window.
 
 **Archival is never automatic.** It is a deliberate, reviewed action by the human operator. Archiving is not deleting; it is moving the content to `lessons-archive.md`.
 
@@ -277,7 +383,11 @@ It is supported by the `ai_router/guidance_triage.py` helper, which classifies e
 | Command | Purpose |
 | :--- | :--- |
 | `python -m ai_router.guidance_report` | Report current guidance file sizes against ceilings (read-only; add `--write-headers` to stamp, `--check` to gate). |
-| `python -m ai_router.validate_guidance_meta` | Validate all `<!-- lesson: ... -->` metadata trailers. |
-| `python -m ai_router.cite_lessons --set <N> <id>` | Update a lesson's `last-used-set` after it was cited. |
+| `python -m ai_router.validate_guidance_meta` | Validate all `<!-- lesson: ... -->` id markers. |
+| `python -m ai_router.cite_lessons --set <N> --session <M> <id>` | Record a use of a lesson in the guidance usage ledger. |
+| `python -m ai_router.guidance_ledger report` | Retention candidates for the operator's batched prune review (never evicts). |
+| `python -m ai_router.guidance_ledger fire --set <N> --session <M> <id>` | Record that an expensive check **caught** something. |
+| `python -m ai_router.guidance_ledger validate` | Validate the usage ledger's shape. |
+| `python -m ai_router.guidance_ledger backfill` | Seed the ledger from recorded close-event citation history. |
 | `python -m ai_router.guidance_search --archive` | Search for content within the `lessons-archive.md` file. |
 | `python -m ai_router.guidance_triage` | Assist with the one-time backlog remediation process. |

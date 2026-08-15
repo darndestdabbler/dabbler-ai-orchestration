@@ -14,15 +14,19 @@ ceilings) is the lifecycle doc in the orchestration repo:
 - Add entries when a failure, surprise, or avoidable friction reveals a
   better repeatable strategy. Give each new lesson a **metadata trailer**
   (see below) so its usage and lifecycle can be tracked.
-- **Per-lesson metadata trailer.** Directly under each `##` lesson
+- **Per-lesson id marker.** Directly under each `##` lesson
   heading, add a one-line HTML comment:
-  `<!-- lesson: id="L-<set>-<seq>" added-set="NNN" last-used-set="NNN" status="active" scope="repo-specific" -->`.
+  `<!-- lesson: id="L-<set>-<seq>" added-set="NNN" scope="repo-specific" -->`.
   The `id` is minted once and is permanent across heading renames.
   Validate trailers with `python -m ai_router.validate_guidance_meta`.
+  **Usage is not recorded here.** It lives in a sidecar ledger,
+  `docs/planning/guidance-usage.json`, read only at prune time, so the
+  accounting costs nothing at session start.
 - **Citation records real usage.** When a lesson is instrumental in a
   session, list its id in `disposition.lessons_cited` and run
-  `python -m ai_router.cite_lessons --set <N> <id> …` as part of the final
-  commit — that updates the lesson's `last-used-set` inside the pushed
+  `python -m ai_router.cite_lessons --set <N> --session <M> <id> …` as part
+  of the final commit — that appends a `<set>-<session>` use to the
+  ledger's bounded ring of the entry's last ten uses, inside the pushed
   work. This usage signal is what every archival decision relies on.
 - **Promotion is orthogonal to archival.** When a lesson has proven itself
   in two or more different contexts, propose promoting it to
@@ -33,8 +37,9 @@ ceilings) is the lifecycle doc in the orchestration repo:
 - **Never delete a lesson; move active → archive.** Archive a lesson when
   **any** of: it is superseded (`superseded-by` set); it is encoded into live
   automation (`encoded-in` names a test/lint/guard/template); its subsystem
-  was retired; or it has had no `last-used-set` activity for the disuse window
-  (default 20 sets, `guidance.disuse_window_sets`) **and** is not referenced
+  was retired; or it has recorded no use for the disuse window
+  (default 30 active sessions, `guidance.retention.instruction_window_sessions`)
+  **and** is not referenced
   by active guidance. Archival moves the full text to `lessons-archive.md` (it
   is never lost) and is **operator-reviewed**, never automatic.
 - **Token ceiling is a backstop, not the trigger.** This file is capped at
@@ -64,7 +69,7 @@ ceilings) is the lifecycle doc in the orchestration repo:
 > trailer on every entry.
 
 ## Example Lesson Heading (delete me)
-<!-- lesson: id="L-001-1" added-set="001" last-used-set="001" status="active" scope="repo-specific" -->
+<!-- lesson: id="L-001-1" added-set="001" scope="repo-specific" -->
 
 - **Context:** When this lesson applies.
 - **Failure or friction:** What went wrong or was avoidably hard.

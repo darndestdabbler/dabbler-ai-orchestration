@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** Executable checks can inherit citation history as if it were fire history.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/guidance_ledger.py:825`, `ai_router/guidance_ledger.py:923`, `ai_router/guidance_ledger.py:755`, `ai_router/guidance_ledger.py:520`, `docs/planning/guidance-usage.json:118`, `docs/planning/guidance-usage.json:334`, `docs/guidance-lifecycle.md:123`\n  - **Failure scenario:** A repo runs the documented backfill/register migration for a guidance item that is now an executable check. This is probable because this repo already has executable entries (`L-064-9`, `L-125-1`) with populated `uses`, and encoded lessons are the normal path from prose to checks. If such a check is expensive, `retention_report()` treats the inherited citation labels as recent fires, so a check that has never caught anything is retained as if it had fired within the check window.\n  - **Acceptance criterion:** `JUDGMENT - Backfill/register must not carry citation labels into executable entries as fire history; executable uses must be created only by an explicit fire event/path, and existing executable ledger entries must not contain citation-derived uses.`\n  - **Details:** **Violation:** the lifecycle rule says “**A use is a citation for an instruction and a FIRE for a check**” and expensive checks “must have **fired**” within the window. **Impact:** the main objective of check retention is defeated for expensive checks, because citation history can satisfy the fire requirement without the check ever catching a defect. **Evidence:** `harvest_citation_history()` harvests `lessons_cited` events, `backfill()` merges those labels into existing entries without excluding executables, `upsert_entry()` changes `kind`/`cost` without clearing citation-derived uses, and `retention_report()` interprets every executable `uses` label as a fire. The shipped ledger already contains executable entries with non-empty `uses`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A repo runs the documented backfill/register migration for a guidance item that is now an executable check. This is probable because this repo already has executable entries (`L-064-9`, `L-125-1`) with populated `uses`, and encoded lessons are the normal path from prose to checks. If such a check is expensive, `retention_report()` treats the inherited citation labels as recent fires, so a check that has never caught anything is retained as if it had fired within the check window.",
+      "evidencePaths": [
+        "ai_router/guidance_ledger.py",
+        "docs/planning/guidance-usage.json",
+        "docs/guidance-lifecycle.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Backfill/register must not carry citation labels into executable entries as fire history; executable uses must be created only by an explicit fire event/path, and existing executable ledger entries must not contain citation-derived uses."
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "2c53b3cc3baf31be67add3288f5ffeeec155326e"
+}

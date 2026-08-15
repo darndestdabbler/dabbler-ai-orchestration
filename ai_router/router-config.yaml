@@ -1384,6 +1384,64 @@ guidance:
   project_guidance_ceiling_tokens: 6000  # docs/planning/project-guidance.md (~24 KB)
   disuse_window_sets: 20                  # D5: archive after N sets unused AND unreferenced
 
+  # --- Retention, split by artifact type (Set 121 S2) ---
+  # The operator's concern is that code and one-liners accrete exactly as
+  # prose did. A single "unused in N sets -> drop" rule cannot govern both:
+  # a preventive gate that never fires is indistinguishable from a useless
+  # one, which IS L-112-1. So the rule splits, and the usage record lives
+  # in docs/planning/guidance-usage.json -- a sidecar read only at prune
+  # time, never at session start.
+  #
+  # NOTHING HERE EVICTS ANYTHING. `python -m ai_router.guidance_ledger
+  # report` classifies; eviction is a batched pass the operator initiates,
+  # never automatic and never mid-session (operator, 2026-08-11). The
+  # specific defect that broke the old scheme was an orchestrator at 100%
+  # of a ceiling evicting prose under time pressure -- which is how the
+  # instruction to run the path-aware critique was deleted and became the
+  # next round's Major.
+  #
+  # These numbers were DERIVED, not inherited. Proposal 5.3 proposed
+  # N = 10 sets and a cap of 20 lines, and section 4b of the sequencing
+  # note flagged both as proposed-not-measured.
+  retention:
+    # Measured over 694 intra-lesson gaps across 345 recorded active
+    # sessions: median 1, p90 5, p95 10, p99 30.2, max 51. A window of 30
+    # keeps 99% of genuinely recurring guidance through its quiet
+    # stretches. At this repo's measured 2.88 sessions per set that is
+    # ~10.4 sets -- so 5.3's number survives measurement, but only once
+    # the UNIT is corrected to active sessions. Retention is counted in
+    # sessions and NEVER in elapsed time: a repository dormant for a month
+    # must not lose its guidance to the calendar (operator, 2026-08-11).
+    instruction_window_sessions: 30
+
+    # Expensive checks (a routed call, or >10s) must FIRE -- catch
+    # something -- at least once per N sets. Recording mere execution
+    # would be worthless: a check that runs in CI every session would look
+    # permanently in use. There is no fire history to derive N from (the
+    # ledger records its first fire after this session), so this is an
+    # honest default rather than a fabricated derivation: it reuses the
+    # operator-set disuse_window_sets above, so the repo carries ONE
+    # disuse horizon rather than two that drift apart.
+    #
+    # Cheap checks (<1s, deterministic, no routed call) are kept
+    # indefinitely and need no usage record at all -- free insurance that
+    # never expires. Every check ships with a falsifier regardless.
+    check_window_sets: 20
+
+    # Peak distinct ids cited in ANY trailing window across 345 sessions:
+    # 20 at W=30, 21 at W=40-51, 22 at W=60-80. The working set has never
+    # exceeded 22.
+    #
+    # KNOWN BLIND SPOT, stated rather than smoothed over: project-guidance.md
+    # has no ids yet, so its ~24 entries contributed NOTHING to this
+    # measurement -- which is exactly why Session 3 of Set 121 exists
+    # ("usage evidence only accrues from the moment ids exist"). When
+    # Session 3 admits them, it must RE-DERIVE this number against the
+    # enlarged corpus rather than inherit 22, the same refusal this session
+    # made of 5.3's 20. A cap set today against a corpus that grows by 24
+    # entries tomorrow would fire on its own author.
+    instruction_line_cap: 22
+
   # --- Preload manifest + ratcheting ceiling gate (Set 085 F1) ---
   # Every file the session-start workflow requires in context, each with
   # a per-file token ceiling, plus a combined total_ceiling_tokens. The

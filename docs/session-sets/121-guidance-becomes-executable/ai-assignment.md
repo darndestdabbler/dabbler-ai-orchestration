@@ -111,3 +111,123 @@ justify.
 - **Three lessons are now one-liners** (`L-079-1`, `L-064-8`,
   `L-112-1`), which is the shape Session 2's instruction-line retention
   rule has to govern.
+
+---
+
+## Session 2 — The retention mechanism, so it cannot re-bloat
+
+**Orchestrator:** `github-copilot` / `anthropic` / `claude-opus-5`,
+effort `high` (Copilot CLI transport — this seat carries no provider API
+keys by design, and their absence is not an error).
+
+**Verification:** routed to `gpt-5.5`; `anthropic` was excluded by the
+router as the orchestrator's registry-resolved effective provider, so the
+cross-provider requirement held on all four rounds.
+
+**The spec's premise measurement had expired the same way Session 1's
+did.** The spec sizes the inline bookkeeping at *"six trailers, 594
+bytes, ~148 tokens"*. After Session 1 archived two lessons and condensed
+three, the actual figure is **three trailers, 300 bytes, ~75 tokens**
+(plus five `lesson-pointer` comments at 225 bytes). A finding about the
+spec, and the second time in this set that re-measuring beat inheriting.
+
+**Usage accounting left the preload corpus.**
+`docs/planning/guidance-usage.json` holds one record per guidance item,
+keyed by id and agnostic about which document it lives in, each with a
+bounded ring of its last ten `<set>-<session>` **string** labels. The
+scalar it replaces could not tell *used once, ten sets ago* from *used in
+every one of the last ten* — the two cases that warrant opposite pruning
+decisions.
+
+**It was backfilled from history rather than started empty.**
+`close_session` has recorded `disposition.lessons_cited` into
+`session-events.jsonl` since Set 064, so 167 per-session citation events
+across 65 sets replayed straight into real recency rings. That backfill
+is also the dataset the numbers were derived from.
+
+**The close-mandated exemption got strictly stricter.** The two preload
+documents used to carry a surgical exemption so the close could bump one
+trailer field inside them. Nothing writes them at close any more, so they
+lost the exemption entirely and now bind the freshness digest byte for
+byte; only the bookkeeping JSON is exempt, whole-file.
+
+**N and the cap were derived, and one of them honestly could not be.**
+30 active sessions is the p99 of 694 measured intra-lesson citation gaps
+— which is ~10.4 sets at this repo's 2.88 sessions/set, so §5.3's *"N =
+10 sets"* survives measurement once the unit is corrected to the one the
+operator mandated. The cap of 22 is the peak concurrent working set over
+345 sessions. The check window had **no fire history to derive it from at
+all**, so it is declared an honest default reusing the operator-set
+`disuse_window_sets` rather than a fabricated derivation. The cap's
+blind spot — `project-guidance.md` has no ids yet — is recorded along
+with Session 3's obligation to re-derive rather than inherit it.
+
+**Verification found eight Majors. Seven were real; the eighth was
+not, and the difference was evidenced rather than asserted.** The real
+ones: live ids absent from the ledger were invisible to both the report
+and the cap (twice, one root cause); the canonical workflow doc still
+taught the retired rule; the corpus scan used a heading-bound parser
+against a file whose entries are bullets, so it would have returned zero
+ids *silently*; a mistyped id became a permanent ghost in a ledger with
+no eviction path; `--session` defaulted to 1 silently; and — the sharpest
+— an encoded check **inherited its prose-era citations as fires**, which
+is the exact failure the citation/fire split exists to prevent, committed
+in the session that wrote the split. The rejected one claimed a shipped
+label contradicted the close events; set 122 session 2 does cite
+`L-064-12` and session 3 does not, and the ring's ordering was
+independently re-verified as strictly descending by execution time.
+
+**L-069-1 fired twice in one session.** Round 3 correctly rejected the
+project-guidance fix: I had made the corpus scan and the citation path
+document-agnostic and left the *validator* heading-bound and blind to the
+file, so the gate that must catch a malformed or duplicate id would have
+reported success having inspected none of them.
+
+**The generated acceptance criterion was unrunnable again**, in a new
+way: `expectedOutputContains` carried stray literal quote characters that
+no output can contain. The artifact was not edited; the criterion's
+intent was reproduced and run against both trees — and running the
+verifier's own command exposed a real over-correction of mine, where
+exiting non-zero on unregistered ids would have failed every fresh
+consumer repo on day one.
+
+### Next-session recommendation (routed, verbatim)
+
+```
+CODE: reduce-effort
+ENGINE: github-copilot
+PROVIDER: anthropic
+MODEL: claude-sonnet-4.6
+EFFORT: medium
+SPECIFICS: Session 3 is predominantly mechanical work: assigning IDs to
+~24 bullet entries, encoding two already-specified lessons with known
+token deltas, and re-deriving a cap against an enlarged corpus using an
+established derivation method. None of these tasks require deep reasoning
+or synthesis - they follow explicit rules laid out by Session 2. Claude
+Sonnet 4.6 at medium effort handles structured, well-scoped mechanical
+tasks reliably without burning Opus-5/high-effort budget. The one
+non-trivial step (cap re-derivation) is a quantitative calculation with a
+clear method, not a judgment call. Reserve Opus-5/high for Session 4
+where the deferred judgment-heavy triage lands.
+```
+
+### What Session 3 inherits
+
+- **The mechanism is ready for its ids, and now genuinely so.** Markers
+  are found anywhere in a document (not only under an `##` heading),
+  `cite_lessons` searches `project-guidance.md`, `ID_RE` accepts the
+  two-segment handle (`C-003`, `G-001`), and
+  `validate_guidance_meta` validates that file by default — including in
+  the cross-file id-uniqueness check, which matters because
+  project-guidance is the **sink** lessons are promoted into.
+- **An obligation, not a suggestion: re-derive `instruction_line_cap`.**
+  22 was measured against a corpus that contained none of the ~24 entries
+  Session 3 admits. Inheriting it would repeat exactly what this session
+  refused to do with §5.3's 20.
+- **Unregistered live ids are surfaced but do not fail the report.** A
+  freshly-idded entry shows as `unregistered` and counts against the cap;
+  it is not an error, because a repo that has not cited anything yet has
+  no ledger at all.
+- **Still open from Session 1:** `AGENTS.md` is 177 tokens over its
+  2,031 ceiling (retired by Session 4 Step 3), and 29 production
+  `subprocess` call sites pass `text=True` with no `encoding=`.

@@ -495,6 +495,86 @@ def acquire_lock_with_timeout(
             time.sleep(min(poll_interval_seconds, remaining))
 
 
+def acquire_file_mutex(
+    lock_path: str,
+    *,
+    timeout_seconds: float = DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
+    worker_id: Optional[str] = None,
+    poll_interval_seconds: float = _ACQUIRE_POLL_INTERVAL_SECONDS,
+) -> LockHandle:
+    """Acquire a SINGLE-file mutex at *lock_path*, polling up to the timeout.
+
+    Set 121 S2. The lifecycle lock above is scoped to a session-set
+    directory and carries the Set-036 dual-hold. Repo-level append-only
+    state that is not owned by any one session set — the guidance usage
+    ledger is the first — needs the same **stale-reclaim and TTL**
+    discipline without the dual-hold, so this entry point exposes the
+    proven primitive rather than letting a second module grow its own
+    copy of it. There is exactly one lock-acquisition implementation in
+    this package, and this is the seam onto it.
+
+    Raises :class:`LockContention` when a live peer still holds the file
+    after *timeout_seconds*. ``timeout_seconds <= 0`` makes a single
+    immediate attempt.
+    """
+    pid = os.getpid()
+    worker = worker_id or f"mutex/{pid}"
+    label = os.path.basename(lock_path)
+    deadline = time.monotonic() + max(timeout_seconds, 0.0)
+    while True:
+        warnings: List[str] = []
+        payload = {
+            "pid": pid,
+            "worker_id": worker,
+            "acquired_at": _now_iso(),
+        }
+        parent = os.path.dirname(lock_path)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        if _try_create_with_stale_reclaim(lock_path, payload, warnings, label=label):
+            return LockHandle(
+                path=lock_path,
+                pid=pid,
+                worker_id=worker,
+                acquired_at=payload["acquired_at"],
+                warnings=warnings,
+            )
+        existing = _read_lock_record(lock_path) or {}
+        now = time.monotonic()
+        if timeout_seconds <= 0 or now >= deadline:
+            raise LockContention(
+                f"lock at {lock_path} is held by another process"
+                + ("" if timeout_seconds <= 0 else f" (waited {timeout_seconds:.1f}s)"),
+                record=existing,
+            )
+        time.sleep(min(poll_interval_seconds, deadline - now))
+
+
+def release_file_mutex(handle: LockHandle) -> None:
+    """Release a mutex taken with :func:`acquire_file_mutex` (single file)."""
+    _release_one(handle.path, handle.pid)
+
+
+@contextmanager
+def file_mutex(
+    lock_path: str,
+    *,
+    timeout_seconds: float = DEFAULT_ACQUIRE_TIMEOUT_SECONDS,
+    worker_id: Optional[str] = None,
+) -> Iterator[LockHandle]:
+    """Context manager form of :func:`acquire_file_mutex`."""
+    handle = acquire_file_mutex(
+        lock_path, timeout_seconds=timeout_seconds, worker_id=worker_id
+    )
+    try:
+        yield handle
+    finally:
+        try:
+            release_file_mutex(handle)
+        except OSError:
+            pass
+
+
 def _release_one(path: str, owner_pid: int) -> None:
     """Best-effort unlink of *path* if we still own it.
 

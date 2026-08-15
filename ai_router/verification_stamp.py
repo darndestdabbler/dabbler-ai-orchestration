@@ -415,7 +415,7 @@ PHASED_EVIDENCE_SET_EXCLUDES = tuple(
 # That scope was never stated, only assumed, and the assumption broke the
 # moment a close-mandated write landed outside it. ``cite_lessons`` is
 # exactly that write: the constitution MANDATES it in the final commit,
-# and it bumps ``last-used-set`` trailers in ``docs/planning/``. So every
+# and it lands a usage record under ``docs/planning/``. So every
 # citing session staled its own verification stamp between verifying and
 # closing, and the backstop quietly bought a fresh metered round to
 # re-stamp a tree whose source, tests and docs were byte-identical.
@@ -435,22 +435,27 @@ PHASED_EVIDENCE_SET_EXCLUDES = tuple(
 #
 #     CLOSE_MANDATED_WRITES = (
 #         {
-#             "path": "docs/planning/lessons-learned.md",
+#             "path": "docs/planning/guidance-usage.json",
 #             "scope": "repo",
-#             "bound": "guidance_meta:normalize_close_mandated_metadata",
+#             "bound": "whole-file",
 #             "reason": "...",
 #         },
 #     )
 #
-# ``bound`` is the honest half. A per-set ledger is close output END TO
-# END, so the whole file is exempt (``bound: "whole-file"``). A guidance
-# file is NOT: the close mandates one metadata field in it, while the
-# lesson prose around that field is session WORK and must keep binding —
-# exempting the file wholesale would let a post-verification rewrite of a
-# PRELOAD document ride a passed round, which is a verification reduction
-# no orchestrator may self-authorize. So a partially-mandated artifact
-# names a normalizer, and only the bytes the close is entitled to move
-# are removed from the digest.
+# ``bound`` is the honest half. An artifact that is close output END TO
+# END is exempt wholesale (``bound: "whole-file"``) — a per-set ledger,
+# or the guidance usage ledger, which carries no reviewable prose at all.
+# A PARTIALLY mandated artifact is NOT: where the close is entitled to
+# move one field of a file whose surrounding content is session WORK,
+# exempting it wholesale would let a post-verification rewrite ride a
+# passed round, which is a verification reduction no orchestrator may
+# self-authorize. Such an artifact names a ``module:function``
+# normalizer, and only the bytes the close is entitled to move are
+# removed from the digest. (Set 121 S2 retired this repo's only
+# normalizer by moving the mandated write out of the preload markdown
+# entirely — the strictly safer resolution, since those two documents now
+# bind byte for byte. The mechanism stays, because the next partially
+# mandated artifact should not have to reinvent it.)
 CLOSE_MANDATED_DECLARATION = "CLOSE_MANDATED_WRITES"
 
 # ``bound`` sentinel: the artifact is close output in its entirety.

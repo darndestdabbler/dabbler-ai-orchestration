@@ -14,7 +14,7 @@ python -m ai_router.guidance_search --archive
 
 A lesson is moved here (operator-reviewed, never automatic) when **any** of:
 it is superseded, it is encoded into live automation (`encoded-in`), its
-subsystem was retired, or it has had no `last-used-set` activity for the disuse
+subsystem was retired, or it has recorded no use for the disuse
 window **and** is not referenced by active guidance. The canonical lifecycle
 reference is
 <https://github.com/darndestdabbler/dabbler-ai-orchestration/blob/master/docs/guidance-lifecycle.md>.

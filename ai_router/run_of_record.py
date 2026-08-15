@@ -81,13 +81,16 @@ narrow exclusion that makes the declaration honest AND satisfiable.
 One input is still deliberately undeclared, and it is named here so that
 it is a decision rather than a silence: ``docs/planning/``. The suite
 does read it -- the guidance ceilings are checked against the real files
--- but ``cite_lessons`` rewrites lesson metadata trailers there **in the
+-- but ``cite_lessons`` writes the guidance usage ledger there **in the
 final commit**, after the run of record, by design. The bookkeeping
 exclusion does not reach it: ``lessons-learned.md`` is a real
 guidance file with a real ceiling, not a per-set ledger with a
 sanctioned-writer basename. Declaring it would make every session that
 cites a lesson unclosable, which is a gate that refuses every close
-rather than one that guards any.
+rather than one that guards any. (Set 121 S2 narrowed the write itself:
+the close-mandated edit now lands in ``guidance-usage.json`` rather than
+inside the always-loaded markdown, so the two preload documents are no
+longer rewritten after the run at all.)
 
 ``MANIFEST.in`` is the other kind of finding: it looked like an input and
 the trace never touched it, so it is correctly absent. Evidence keeps a

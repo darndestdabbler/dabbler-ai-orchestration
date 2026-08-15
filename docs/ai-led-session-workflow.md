@@ -2445,16 +2445,23 @@ Candidate moves include:
 - **Principle → Convention.** A principle that turns out to be a specific
   rule rather than durable strategy.
 - **Relocation within a file.** Moving an item to a more fitting section.
-- **Active → Archive (Set 064).** A lesson is an **archival** candidate —
-  orthogonal to promotion — when **any** of: it is superseded
-  (`superseded-by` set), encoded into live automation (`encoded-in` names a
-  test/lint/guard/template), its subsystem was retired, or it has had no
-  `last-used-set` activity for the disuse window (default 20 sets,
-  `guidance.disuse_window_sets`) **and** is not referenced by active
-  guidance. Move accepted candidates (full text) to
-  `docs/planning/lessons-archive.md`; never delete. Promotion is **not** a
-  precondition for staying active, and disuse alone (without the
-  "unreferenced" half) is **not** sufficient.
+- **Active → Archive (Set 064; retention reworked in Set 121 S2).** A
+  lesson is an **archival** candidate — orthogonal to promotion — when
+  **any** of: it is superseded (`superseded-by` set), encoded into live
+  automation (`encoded-in` names a test/lint/guard/template), its
+  subsystem was retired, or it has recorded no use within the retention
+  window **and** is not referenced by active guidance. Usage lives in the
+  guidance usage ledger (`docs/planning/guidance-usage.json`), **not** in
+  the lesson trailer — `last-used-set` was retired and nothing writes it.
+  Read the evidence with `python -m ai_router.guidance_ledger report`,
+  which measures retention in **active sessions**, never elapsed time, so
+  a dormant repository does not lose its guidance to the calendar. The
+  report classifies; it never evicts. Pruning is a **batched pass the
+  operator initiates**, never automatic and never mid-session. Move
+  accepted candidates (full text) to `docs/planning/lessons-archive.md`;
+  never delete. Promotion is **not** a precondition for staying active,
+  and disuse alone (without the "unreferenced" half) is **not**
+  sufficient. Canonical: `docs/guidance-lifecycle.md`.
 - **Staleness flag.** An item whose driving context is gone may be flagged
   for the human as an Active → Archive candidate — but do not delete. Only
   move, with a note about why.

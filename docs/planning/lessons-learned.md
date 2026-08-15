@@ -13,17 +13,21 @@
 **Lifecycle in brief** (canonical reference:
 [`docs/guidance-lifecycle.md`](../guidance-lifecycle.md)):
 
-- Every lesson carries a one-line metadata trailer under its heading:
-  `<!-- lesson: id="L-<set>-<seq>" added-set="NNN" last-used-set="NNN" status="active" scope="portable" -->`.
-  Validate with `python -m ai_router.validate_guidance_meta`.
+- Every lesson carries a one-line id marker under its heading:
+  `<!-- lesson: id="L-<set>-<seq>" added-set="NNN" scope="portable" -->`.
+  Validate with `python -m ai_router.validate_guidance_meta`. **Usage is
+  not recorded here** — it lives in `docs/planning/guidance-usage.json`,
+  read only at prune time (Set 121 S2).
 - **Cite at close:** when a lesson is instrumental, list its id in
   `disposition.lessons_cited` and run
-  `python -m ai_router.cite_lessons --set <N> <id> ...` in the final
-  commit — that usage signal drives every archival decision.
+  `python -m ai_router.cite_lessons --set <N> --session <M> <id> ...` in
+  the final commit — that usage signal drives every archival decision.
 - **Never delete — archive** (operator-reviewed, full text preserved).
-  Preload residency follows the Set 085 admission test; this file is
-  capped by the preload manifest
-  (`python -m ai_router.guidance_report --check`).
+  Retention is measured in **active sessions**, never elapsed time, and
+  pruning is a batched pass the operator initiates
+  (`python -m ai_router.guidance_ledger report`). Preload residency
+  follows the Set 085 admission test; this file is capped by the preload
+  manifest (`python -m ai_router.guidance_report --check`).
 
 ---
 
@@ -91,7 +95,7 @@ whose trigger moment is situational, moved full-text to
 | L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
 
 ## Windows cp1252 Is A Standing Bug Class — Bytes At Subprocess Boundaries, Persist Before Printing
-<!-- lesson: id="L-079-1" added-set="079" last-used-set="132" status="active" scope="portable" -->
+<!-- lesson: id="L-079-1" added-set="079" scope="portable" -->
 
 - Pass **bytes** end-to-end across a subprocess pipe and decode once at
   the consumer with an explicit codec, and write routed output to disk
@@ -113,7 +117,7 @@ full text in `lessons-archive.md`:
 | L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
 
 ## A Replacement Doc Inherits The Retired Doc's Claims At Its Peril
-<!-- lesson: id="L-064-8" added-set="063" last-used-set="132" status="active" scope="portable" -->
+<!-- lesson: id="L-064-8" added-set="063" scope="portable" -->
 
 - When authoring a replacement or successor doc, grep the new text for
   claims of *current* behavior (reads, writes, enforcement, defaults) and
@@ -123,7 +127,7 @@ full text in `lessons-archive.md`:
 
 
 ## Ship Every Pattern Gate With A Falsifier That Plants The Violation
-<!-- lesson: id="L-112-1" added-set="112" last-used-set="121" status="active" scope="portable" -->
+<!-- lesson: id="L-112-1" added-set="112" scope="portable" -->
 
 - Per rule: one falsifier that plants the defect and asserts the gate
   fires, one that plants the legitimate look-alike and asserts it does

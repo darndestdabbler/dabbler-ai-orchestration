@@ -2,7 +2,8 @@
 
 - :func:`parse_trailer` / :func:`format_trailer` round-trip
 - :func:`parse_document` heading/trailer association
-- :func:`update_last_used` surgical, byte-preserving rewrite
+- the retirement of ``last-used-set`` (Set 121 S2): usage lives in
+  the guidance ledger, and the retired writer refuses loudly
 - :func:`validate_meta` / :func:`validate_documents` rules + id uniqueness
 - :mod:`guidance_config` token estimate, config block, file discovery
 
@@ -29,6 +30,7 @@ from guidance_meta import (
     format_trailer,
     parse_document,
     parse_trailer,
+    RETIRED_FIELDS,
     update_last_used,
     validate_documents,
     validate_meta,
@@ -39,12 +41,11 @@ from guidance_meta import (
 
 
 def test_parse_basic_trailer():
-    line = '<!-- lesson: id="L-064-1" added-set="064" last-used-set="064" status="active" scope="portable" -->'
+    line = '<!-- lesson: id="L-064-1" added-set="064" scope="portable" -->'
     meta = parse_trailer(line)
     assert meta is not None
     assert meta.id == "L-064-1"
     assert meta.added_set == "064"
-    assert meta.last_used_set == "064"
     assert meta.status == "active"
     assert meta.scope == "portable"
     assert meta.superseded_by == ()
@@ -57,10 +58,15 @@ def test_parse_non_trailer_returns_none():
     assert parse_trailer("<!-- not a lesson comment -->") is None
 
 
-def test_format_omits_empty_keeps_id_and_status():
+def test_format_omits_empty_and_the_default_status():
+    """The Set 121 S2 minimal marker: identity only.
+
+    ``status="active"`` is what the active tier means, so restating it
+    costs preload tokens to say nothing.
+    """
     meta = LessonMeta(id="L-064-2", status="active")
     out = format_trailer(meta)
-    assert out == '<!-- lesson: id="L-064-2" status="active" -->'
+    assert out == '<!-- lesson: id="L-064-2" -->'
 
 
 def test_multi_value_fields_round_trip():
@@ -81,17 +87,16 @@ def test_canonical_field_order():
     meta = LessonMeta(
         id="L-064-4",
         added_set="050",
-        last_used_set="064",
-        status="active",
+        status="archived",
         scope="portable",
     )
     line = format_trailer(meta)
-    # id < added-set < last-used-set < status < scope
-    assert line.index("id=") < line.index("added-set=") < line.index("last-used-set=") < line.index("status=") < line.index("scope=")
+    # id < added-set < status < scope
+    assert line.index("id=") < line.index("added-set=") < line.index("status=") < line.index("scope=")
 
 
 def test_indempotent_reformat():
-    meta = LessonMeta(id="L-1-1", added_set="1", last_used_set="2", status="promoted")
+    meta = LessonMeta(id="L-1-1", added_set="1", status="promoted")
     assert format_trailer(parse_trailer(format_trailer(meta))) == format_trailer(meta)
 
 
@@ -100,7 +105,7 @@ def test_indempotent_reformat():
 DOC = """# Lessons Learned
 
 ## First Lesson
-<!-- lesson: id="L-064-1" added-set="010" last-used-set="050" status="active" scope="portable" -->
+<!-- lesson: id="L-064-1" added-set="010" scope="portable" -->
 
 - **Context:** ...
 
@@ -134,40 +139,40 @@ def test_deeper_headings_not_lesson_boundaries():
     assert len(entries) == 1
 
 
-# --- surgical update ---------------------------------------------------------
+# --- the retired writer ------------------------------------------------------
 
 
-def test_update_last_used_is_surgical():
-    new_text, meta = update_last_used(DOC, "L-064-1", "064")
-    assert meta is not None and meta.last_used_set == "064"
-    # Exactly one line changed.
-    old_lines = DOC.split("\n")
-    new_lines = new_text.split("\n")
-    assert len(old_lines) == len(new_lines)
-    diff = [i for i in range(len(old_lines)) if old_lines[i] != new_lines[i]]
-    assert len(diff) == 1
-    assert 'last-used-set="064"' in new_lines[diff[0]]
+def test_last_used_set_is_a_retired_field():
+    """PLANTED: the field name must be known-retired, not merely unknown.
+
+    A stale trailer in a consumer repo has to read as "this was retired
+    and nothing writes it", or an operator re-adds it by hand.
+    """
+    assert "last-used-set" in RETIRED_FIELDS
+    stale = '## A\n<!-- lesson: id="L-1-1" added-set="1" last-used-set="120" -->\n'
+    result = validate_documents([("lessons-learned.md", stale)])
+    assert result.ok  # a stale field is a warning, never a hard failure
+    assert any("was retired in Set" in w for w in result.warnings)
+    assert not any("unknown trailer key" in w for w in result.warnings)
 
 
-def test_update_last_used_unknown_id_returns_none():
-    new_text, meta = update_last_used(DOC, "L-999-9", "064")
-    assert new_text is None and meta is None
+def test_a_parsed_stale_trailer_carries_no_usage_attribute():
+    """LOOK-ALIKE: the value parses harmlessly and is simply dropped.
+
+    Nothing may read it back, because the ledger is the only truth.
+    """
+    meta = parse_trailer('<!-- lesson: id="L-1-1" last-used-set="120" -->')
+    assert meta is not None and meta.id == "L-1-1"
+    assert not hasattr(meta, "last_used_set")
+    assert "last-used-set" not in format_trailer(meta)
 
 
-def test_update_last_used_no_trailer_returns_none():
-    # "Second Lesson" has a heading but no trailer; it has no id, so an
-    # update keyed by a real id can't target it. Confirm a heading-only
-    # lesson can't be cited even if we somehow knew its (absent) id.
-    text = "## Heading only\n\n- body\n"
-    new_text, meta = update_last_used(text, "L-1-1", "064")
-    assert new_text is None and meta is None
+def test_update_last_used_refuses_loudly():
+    """A silent no-op would drop a consumer repo's usage signal."""
+    import pytest
 
-
-def test_update_preserves_crlf():
-    text = '## L\r\n<!-- lesson: id="L-1-1" last-used-set="001" status="active" -->\r\nbody\r\n'
-    new_text, _ = update_last_used(text, "L-1-1", "064")
-    assert "\r\n" in new_text
-    assert '<!-- lesson: id="L-1-1" last-used-set="064" status="active" -->\r' in new_text.split("\n")[1]
+    with pytest.raises(NotImplementedError, match="guidance_ledger"):
+        update_last_used(DOC, "L-064-1", "064")
 
 
 # --- validation --------------------------------------------------------------

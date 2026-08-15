@@ -27,8 +27,7 @@ from pathlib import Path
 import pytest
 
 import cite_lessons
-import guidance_config
-import guidance_meta
+import guidance_ledger
 import verification_stamp as vstamp
 from tests.stamp_fixtures import write_stamped_evidence
 from verification_stamp import (
@@ -44,8 +43,7 @@ from verification_stamp import (
 
 LESSON = (
     "## A Lesson\n"
-    '<!-- lesson: id="L-119-1" added-set="119" last-used-set="119" '
-    'status="active" scope="portable" -->\n'
+    '<!-- lesson: id="L-119-1" added-set="119" scope="portable" -->\n'
     "\n"
     "- The lesson's prose, which is session WORK and must keep binding.\n"
 )
@@ -177,49 +175,32 @@ class TestAMalformedDeclarationFailsClosed:
 
 
 class TestCiteLessonsDeclaresItsOwnWrites:
-    def test_both_guidance_files_are_declared_repo_scoped(self):
+    def test_the_ledger_is_declared_repo_scoped_whole_file(self):
         declared = {
             d.path: d
             for d in discover_close_mandated_writes()
             if d.declared_by == "cite_lessons"
         }
-        assert set(declared) == {
-            "docs/planning/lessons-learned.md",
-            "docs/planning/lessons-archive.md",
-        }
+        assert set(declared) == {"docs/planning/guidance-usage.json"}
         for d in declared.values():
             assert d.scope == "repo"
-            assert d.bound == (
-                "guidance_meta:normalize_close_mandated_metadata"
-            )
+            assert d.bound == BOUND_WHOLE_FILE
 
-    def test_the_literal_paths_match_guidance_config(self):
+    def test_the_literal_path_matches_guidance_ledger(self):
         """The declaration is a literal (it is read without importing), so
         the one thing a literal can do wrong is drift from its source."""
-        reldir = guidance_config.GUIDANCE_RELDIR.replace("\\", "/")
-        expected = {
-            f"{reldir}/{guidance_config.LESSONS_ACTIVE}",
-            f"{reldir}/{guidance_config.LESSONS_ARCHIVE}",
+        assert {d["path"] for d in cite_lessons.CLOSE_MANDATED_WRITES} == {
+            guidance_ledger.GUIDANCE_LEDGER_RELPATH
         }
-        assert {d["path"] for d in cite_lessons.CLOSE_MANDATED_WRITES} == expected
 
-    def test_the_guidance_files_are_never_wholly_exempt(self):
-        """Prose in a PRELOAD document is work, and work binds.
+    def test_the_preload_documents_are_no_longer_exempt_at_all(self):
+        """PLANTED LOOK-ALIKE, and the whole point of the Set 121 S2 move.
 
-        A whole-file exemption here would let a post-verification rewrite
-        of the always-loaded lessons file ride a passed round — a
-        verification reduction, and not one this set is authorized to
-        make.
-
-        Asserted against the GUIDANCE paths specifically rather than
-        against an empty list. The original form ("nothing is wholly
-        exempt anywhere") was a proxy that happened to hold while
-        cite_lessons was the only declaring module, and it failed the
-        moment Set 120 S3 declared a legitimately whole-file artifact
-        (``session-progress.json``, which is derived from inputs that
-        each bind on their own). A proxy that fails on a correct change
-        is testing the wrong thing; the claim in the docstring is about
-        these two files.
+        Prose in a PRELOAD document is work, and work binds. Before the
+        move these two files carried a surgical exemption because the
+        close was entitled to bump one trailer field in them; nothing
+        writes them at close any more, so they must have NO exemption --
+        a strictly stronger position than the normalizer they replaced.
         """
         exempt = close_mandated_excludes("docs/session-sets/x")
         for path in (
@@ -228,58 +209,20 @@ class TestCiteLessonsDeclaresItsOwnWrites:
         ):
             assert path not in exempt
             assert f"docs/session-sets/x/{path}" not in exempt
+            assert close_mandated_normalizer(path) is None
 
-    def test_a_guidance_path_resolves_to_the_normalizer(self):
-        fn = close_mandated_normalizer("docs/planning/lessons-learned.md")
-        assert fn is guidance_meta.normalize_close_mandated_metadata
+    def test_the_ledger_needs_no_normalizer(self):
+        """A whole-file bound resolves to no normalizer by construction."""
+        assert close_mandated_normalizer(
+            guidance_ledger.GUIDANCE_LEDGER_RELPATH
+        ) is None
+        assert guidance_ledger.GUIDANCE_LEDGER_RELPATH in close_mandated_excludes(
+            "docs/session-sets/x"
+        )
 
     def test_an_unrelated_path_resolves_to_no_normalizer(self):
         assert close_mandated_normalizer("ai_router/close_session.py") is None
         assert close_mandated_normalizer("docs/planning/project-guidance.md") is None
-
-
-class TestTheNormalizerMovesOnlyTheMandatedField:
-    def test_a_trailer_bump_normalizes_equal(self):
-        before = LESSON.encode("utf-8")
-        after = LESSON.replace('last-used-set="119"', 'last-used-set="120"').encode(
-            "utf-8"
-        )
-        assert before != after
-        fn = guidance_meta.normalize_close_mandated_metadata
-        assert fn(before) == fn(after)
-
-    def test_a_prose_edit_does_not_normalize_equal(self):
-        before = LESSON.encode("utf-8")
-        after = LESSON.replace("session WORK", "session work, actually").encode(
-            "utf-8"
-        )
-        fn = guidance_meta.normalize_close_mandated_metadata
-        assert fn(before) != fn(after)
-
-    def test_another_trailer_field_still_binds(self):
-        """Only ``last-used-set`` is close-mandated; ``status`` is not."""
-        before = LESSON.encode("utf-8")
-        after = LESSON.replace('status="active"', 'status="archived"').encode(
-            "utf-8"
-        )
-        fn = guidance_meta.normalize_close_mandated_metadata
-        assert fn(before) != fn(after)
-
-    def test_a_last_used_set_outside_a_trailer_is_untouched(self):
-        """The look-alike: prose that quotes the field name is prose."""
-        text = 'The trailer carries last-used-set="064" as a metadata field.\n'
-        fn = guidance_meta.normalize_close_mandated_metadata
-        assert fn(text.encode("utf-8")) == text.encode("utf-8")
-
-    def test_crlf_survives(self):
-        crlf = LESSON.replace("\n", "\r\n").encode("utf-8")
-        fn = guidance_meta.normalize_close_mandated_metadata
-        assert b"\r\n" in fn(crlf)
-
-    def test_undecodable_bytes_do_not_raise(self):
-        fn = guidance_meta.normalize_close_mandated_metadata
-        blob = b"\xff\xfe not utf-8 at all"
-        assert fn(blob) == blob
 
 
 # --- end to end, against a real git repo ---------------------------------
@@ -333,19 +276,20 @@ class TestTheStampSurvivesTheCloseMandatedWrite:
         """
         before = _digest(repo)
         assert cite_lessons.main(
-            ["--set", "120", "L-119-1", "--repo-root", str(repo)]
+            ["--set", "120", "--session", "2", "L-119-1", "--repo-root", str(repo)]
         ) == 0
-        text = (repo / "docs" / "planning" / "lessons-learned.md").read_text(
+        ledger = (repo / "docs" / "planning" / "guidance-usage.json").read_text(
             encoding="utf-8"
         )
-        assert 'last-used-set="120"' in text  # the write really happened
+        assert '"120-02"' in ledger  # the write really happened
         assert _digest(repo) == before
 
     def test_a_prose_edit_to_the_same_file_still_stales_it(self, repo):
         """PLANTED LOOK-ALIKE: the exemption must not become a hole.
 
         Rewriting a PRELOAD document after the round that reviewed it is
-        exactly what must keep staling the stamp.
+        exactly what must keep staling the stamp — and since Set 121 S2
+        that document has no exemption at all, so this holds a fortiori.
         """
         before = _digest(repo)
         path = repo / "docs" / "planning" / "lessons-learned.md"
@@ -361,7 +305,7 @@ class TestTheStampSurvivesTheCloseMandatedWrite:
         _write(path, LESSON + "\n- A sentence nobody reviewed.\n")
         after_work = _digest(repo)
         assert cite_lessons.main(
-            ["--set", "120", "L-119-1", "--repo-root", str(repo)]
+            ["--set", "120", "--session", "2", "L-119-1", "--repo-root", str(repo)]
         ) == 0
         assert _digest(repo) == after_work
 
@@ -438,7 +382,7 @@ class TestTheGateItselfStillSettlesTheClose:
         assert self._validate(repo, row)[0]
 
         assert cite_lessons.main(
-            ["--set", "120", "L-119-1", "--repo-root", str(repo)]
+            ["--set", "120", "--session", "2", "L-119-1", "--repo-root", str(repo)]
         ) == 0
 
         ok, reason = self._validate(repo, row)

@@ -190,8 +190,8 @@ class Disposition:
     - ``lessons_cited``: Set 064 (D3, citation-at-close keystone) — the
       ids of the guidance lessons (``L-<set>-<seq>``) that were
       instrumental in this session. The work agent populates it and runs
-      ``python -m ai_router.cite_lessons`` so the markdown ``last-used-set``
-      edit lands inside the committed work; ``close_session`` reads this
+      ``python -m ai_router.cite_lessons`` so the guidance-usage-ledger
+      write lands inside the committed work; ``close_session`` reads this
       field only to record a ``lessons_cited`` entry in the
       ``closeout_succeeded`` event (and to flag unknown ids as a
       non-blocking mismatch). Omit-empty: absent when no lessons were

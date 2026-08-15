@@ -2,7 +2,8 @@
 
 - :func:`cite_lessons.normalize_set_label`
 - :func:`cite_lessons.cite_one` (active hit, archive hit/reconsider, miss)
-- in-place, surgical file rewrite
+- Set 121 S2: the usage record lands in the guidance LEDGER, and the
+  preload markdown is left byte-identical
 - the close_session resolver helper :func:`_resolve_lessons_cited`
   (cited + unknown id split, fail-open)
 - disposition ``lessons_cited`` round-trip + validation
@@ -24,13 +25,14 @@ from cite_lessons import (
     cite_one,
     normalize_set_label,
 )
+from guidance_ledger import load_ledger, upsert_entry
 from disposition import Disposition, disposition_from_dict, disposition_to_dict, validate_disposition
 
 
 ACTIVE = """# Lessons Learned
 
 ## A Live Lesson
-<!-- lesson: id="L-064-1" added-set="030" last-used-set="030" status="active" scope="portable" -->
+<!-- lesson: id="L-064-1" added-set="030" scope="portable" -->
 
 - **Context:** body
 """
@@ -38,7 +40,7 @@ ACTIVE = """# Lessons Learned
 ARCHIVE = """# Lessons Archive
 
 ## A Retired Lesson
-<!-- lesson: id="L-050-2" added-set="050" last-used-set="050" status="archived" scope="portable" -->
+<!-- lesson: id="L-050-2" added-set="050" status="archived" scope="portable" -->
 
 - **Context:** body
 """
@@ -77,44 +79,86 @@ def test_normalize_set_label_passthrough_non_numeric():
 # --- cite_one ----------------------------------------------------------------
 
 
-def test_cite_active_lesson_updates_in_place(guidance):
+def test_cite_active_lesson_resolves_without_touching_the_file(guidance):
+    """PLANTED: the preload document must come back byte-identical.
+
+    Before Set 121 S2 this call rewrote a trailer inside an always-loaded
+    file, which is both a per-session token tax and the reason the close
+    backstop kept buying a metered round to re-verify an unchanged tree.
+    """
     _, gdir = guidance
-    outcome, path = cite_one(_files(gdir), "L-064-1", "064")
+    before = (gdir / "lessons-learned.md").read_text(encoding="utf-8")
+    outcome, path = cite_one(_files(gdir), "L-064-1")
     assert outcome == CITED_ACTIVE
-    text = (gdir / "lessons-learned.md").read_text(encoding="utf-8")
-    assert 'last-used-set="064"' in text
-    # surgical: only the trailer changed
-    assert "## A Live Lesson" in text
-    assert "- **Context:** body" in text
+    assert path.endswith("lessons-learned.md")
+    assert (gdir / "lessons-learned.md").read_text(encoding="utf-8") == before
 
 
 def test_cite_archived_lesson_flags_reconsider(guidance):
     _, gdir = guidance
-    outcome, path = cite_one(_files(gdir), "L-050-2", "064")
+    before = (gdir / "lessons-archive.md").read_text(encoding="utf-8")
+    outcome, path = cite_one(_files(gdir), "L-050-2")
     assert outcome == CITED_ARCHIVED
-    text = (gdir / "lessons-archive.md").read_text(encoding="utf-8")
-    assert 'last-used-set="064"' in text
+    assert (gdir / "lessons-archive.md").read_text(encoding="utf-8") == before
 
 
 def test_cite_unknown_id(guidance):
     _, gdir = guidance
-    outcome, path = cite_one(_files(gdir), "L-999-9", "064")
+    outcome, path = cite_one(_files(gdir), "L-999-9")
     assert outcome == NOT_FOUND
     assert path is None
 
 
-def test_cite_one_no_change_when_already_current(guidance):
-    _, gdir = guidance
-    cite_one(_files(gdir), "L-064-1", "064")
-    before = (gdir / "lessons-learned.md").read_text(encoding="utf-8")
-    cite_one(_files(gdir), "L-064-1", "064")  # idempotent re-cite
-    after = (gdir / "lessons-learned.md").read_text(encoding="utf-8")
-    assert before == after
+def test_main_records_the_use_in_the_ledger(guidance):
+    """The record moved; it did not disappear."""
+    repo_root, gdir = guidance
+    assert cite_lessons.main(
+        ["--set", "64", "--session", "2", "L-064-1", "--repo-root", str(repo_root)]
+    ) == 0
+    ledger, problems = load_ledger(str(repo_root))
+    assert problems == []
+    assert ledger.entries["L-064-1"].uses == ["064-02"]
+    assert ledger.entries["L-064-1"].kind == "instruction"
+
+
+def test_main_is_idempotent_within_one_session(guidance):
+    """Citing twice in one session is one use, not two ring slots."""
+    repo_root, _ = guidance
+    args = ["--set", "64", "--session", "2", "L-064-1", "--repo-root", str(repo_root)]
+    cite_lessons.main(args)
+    cite_lessons.main(args)
+    ledger, _ = load_ledger(str(repo_root))
+    assert ledger.entries["L-064-1"].uses == ["064-02"]
+
+
+def test_main_refuses_to_credit_an_executable_for_being_mentioned(
+    guidance, capsys
+):
+    """PLANTED LOOK-ALIKE: a check earns a use by FIRING, never by mention.
+
+    Recording mere execution (or mention) would be worthless -- a check
+    that runs in CI every session would look permanently in use.
+    """
+    repo_root, _ = guidance
+    upsert_entry(
+        "L-064-1", kind="executable", cost="cheap", repo_root=str(repo_root)
+    )
+    rc = cite_lessons.main(
+        ["--set", "64", "--session", "2", "L-064-1", "--repo-root", str(repo_root)]
+    )
+    out = capsys.readouterr().out
+    assert rc == 1
+    assert "kind-mismatch" in out
+    ledger, _ = load_ledger(str(repo_root))
+    assert ledger.entries["L-064-1"].uses == []
 
 
 def test_main_exit_code_and_repo_root(guidance, capsys):
     repo_root, _ = guidance
-    rc = cite_lessons.main(["--set", "64", "L-064-1", "L-999-9", "--repo-root", str(repo_root)])
+    rc = cite_lessons.main(
+        ["--set", "64", "--session", "2", "L-064-1", "L-999-9",
+         "--repo-root", str(repo_root)]
+    )
     out = capsys.readouterr().out
     assert "[cited]" in out
     assert "[not-found]" in out
@@ -182,3 +226,64 @@ def test_disposition_validate_rejects_non_list_lessons_cited():
     ok, errors = validate_disposition(d, is_final_session=True)
     assert not ok
     assert any("lessons_cited" in e for e in errors)
+
+
+# --- round 1 remediation falsifiers ------------------------------------------
+
+
+def test_an_unknown_id_records_nothing(guidance):
+    """PLANTED: a typo must not become a permanent ghost ledger entry.
+
+    The ledger deliberately has no eviction path, so a record written for
+    a mistyped id could never be removed -- and a later, correct citation
+    would leave the false one behind.
+    """
+    repo_root, _ = guidance
+    ledger_path = repo_root / "docs" / "planning" / "guidance-usage.json"
+    rc = cite_lessons.main(
+        ["--set", "64", "--session", "2", "L-999-9", "--repo-root", str(repo_root)]
+    )
+    assert rc == 1
+    assert not ledger_path.exists(), "a not-found id created a ghost ledger"
+
+
+def test_a_known_id_beside_an_unknown_one_is_still_recorded(guidance):
+    """LOOK-ALIKE: refusing the typo must not refuse the real citation."""
+    repo_root, _ = guidance
+    rc = cite_lessons.main(
+        ["--set", "64", "--session", "2", "L-064-1", "L-999-9",
+         "--repo-root", str(repo_root)]
+    )
+    assert rc == 1  # the unknown id still fails the command
+    ledger, _ = load_ledger(str(repo_root))
+    assert ledger.entries["L-064-1"].uses == ["064-02"]
+    assert "L-999-9" not in ledger.entries
+
+
+def test_session_is_required(guidance):
+    """PLANTED: the old invocation form must FAIL, not silently file the
+    citation under session 1 and corrupt per-session history."""
+    repo_root, _ = guidance
+    with pytest.raises(SystemExit) as excinfo:
+        cite_lessons.main(["--set", "64", "L-064-1", "--repo-root", str(repo_root)])
+    assert excinfo.value.code == 2
+
+
+def test_a_project_guidance_id_resolves_and_records(tmp_path):
+    """The ledger had to be ready for project-guidance ids without a
+    format change; so does the path that writes to it."""
+    gdir = tmp_path / "docs" / "planning"
+    gdir.mkdir(parents=True)
+    (gdir / "lessons-learned.md").write_text(ACTIVE, encoding="utf-8")
+    (gdir / "project-guidance.md").write_text(
+        "### Conventions\n\n- **A rule.** Body.\n"
+        '  <!-- lesson: id="C-003" added-set="121" -->\n',
+        encoding="utf-8",
+    )
+    rc = cite_lessons.main(
+        ["--set", "121", "--session", "3", "C-003", "--repo-root", str(tmp_path)]
+    )
+    assert rc == 0
+    ledger, problems = load_ledger(str(tmp_path))
+    assert problems == []
+    assert ledger.entries["C-003"].uses == ["121-03"]

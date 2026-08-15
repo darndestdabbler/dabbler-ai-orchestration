@@ -743,6 +743,24 @@ def load_driver_output(run_dir: Path) -> Dict[str, Any]:
     return dict(raw)
 
 
+def resolve_scenario(
+    raw: Mapping[str, Any],
+    scenario: Optional[Scenario],
+    source: Optional[Path] = None,
+) -> Scenario:
+    """The caller's scenario, or the one the driver recorded the path of."""
+    if scenario is not None:
+        return scenario
+    scenario_path = raw.get("scenarioPath")
+    if not scenario_path:
+        raise RunError(
+            "driver output carries no 'scenarioPath', so the scenario "
+            "cannot be re-read; pass one explicitly",
+            source,
+        )
+    return load_scenario(Path(scenario_path))
+
+
 def finalize_run(
     run_dir: Path,
     scenario: Optional[Scenario] = None,
@@ -758,16 +776,7 @@ def finalize_run(
     run_dir = Path(run_dir).resolve()
     raw = load_driver_output(run_dir)
     source = run_dir / DRIVER_OUTPUT_FILENAME
-
-    if scenario is None:
-        scenario_path = raw.get("scenarioPath")
-        if not scenario_path:
-            raise RunError(
-                "driver output carries no 'scenarioPath', so the scenario "
-                "cannot be re-read; pass one explicitly",
-                source,
-            )
-        scenario = load_scenario(Path(scenario_path))
+    scenario = resolve_scenario(raw, scenario, source)
 
     if scenario.id != raw["scenarioId"]:
         raise RunError(
@@ -844,10 +853,8 @@ def finalize_and_write(
     from ai_router.walkthrough_index import render_index
 
     run_dir = Path(run_dir).resolve()
-    manifest = finalize_run(run_dir, scenario)
-    resolved = scenario
-    if resolved is None:
-        resolved = load_scenario(Path(load_driver_output(run_dir)["scenarioPath"]))
+    resolved = resolve_scenario(load_driver_output(run_dir), scenario)
+    manifest = finalize_run(run_dir, resolved)
 
     artifacts: List[Artifact] = list(manifest.artifacts)
 

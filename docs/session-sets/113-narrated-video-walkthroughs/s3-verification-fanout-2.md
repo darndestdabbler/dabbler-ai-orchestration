@@ -1,0 +1,9 @@
+ISSUES FOUND
+
+- **Issue 1:** The response does not perform the requested independent verification.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/session-sets/113-narrated-video-walkthroughs/spec.md`
+  - **Failure scenario:** Every consumer of this response receives only an empty working-tree diff, with no verdict, inspection of the session implementation, test assessment, or findings. Consequently, Step 6 cannot establish whether the browser-recording deliverables satisfy the plan or require remediation. This is certain for the submitted response, not merely possible.
+  - **Acceptance criterion:** JUDGMENT - The response begins with `VERIFIED` or `ISSUES FOUND` and provides a substantive verification of the actual Session 3 implementation and required test evidence, obtaining the relevant session commit delta when the working-tree diff is empty.
+  - **Details:** **Violation:** The instructions require, “Start with one of these verdicts” and an exhaustive review of changed code against the plan and failure scenarios. **Impact:** The response supplies no pass/fail disposition and detects no implementation defects, so a reasonable reviewer cannot authorize close-out or determine remediation from it. **Evidence:** The entire response consists of `git status --short` reporting clean and an empty working-tree-versus-`HEAD` diff. A clean worktree neither verifies the Session 3 deliverables nor proves they are absent from `HEAD`; the response needed to locate the relevant committed delta or report that no reviewable implementation could be found, then issue a supported verdict.

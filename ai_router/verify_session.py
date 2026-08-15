@@ -459,6 +459,48 @@ class VerifySessionError(Exception):
     """Raised for deterministic pre-route failures (usage / state)."""
 
 
+class EvidenceEmptyError(VerifySessionError):
+    """Raised by ``assemble_evidence`` when the bundle contains NO work.
+
+    The mirror of :class:`EvidenceTooLargeError`, at the other end of the
+    same scale: that one refuses evidence a verifier would silently
+    truncate, this one refuses evidence a verifier cannot review at all.
+
+    **Measured, Set 113 S3.** The session committed its work before
+    running ``verify_session``, so the default working-tree-vs-``HEAD``
+    diff was empty. The round routed anyway, the verifier correctly
+    reported that it had been handed nothing, and because the only path
+    it could cite was the spec, the Set 119 doc-only cap recorded both
+    findings at Minor -- so the round printed "MINOR-ONLY ... effectively
+    VERIFIED" and instructed the caller to proceed to close. A session
+    that verified nothing was one step from closing as verified.
+
+    The class was already known and already fixed ONCE: ``close_backstop``
+    derives its base from the session's ``startedAt`` precisely because
+    "a plain ``HEAD`` diff at close time is empty -- it would hand the
+    verifier nothing", and fails closed rather than route a thin bundle.
+    The interactive path never got the same treatment (L-069-1 / G-008: a
+    point-fix reads complete while the class stays alive at the sibling).
+
+    Deliberately NOT fixed by making the severity cap cleverer. The cap is
+    operator-attested and behaved correctly on the input it was given; the
+    defect is that the input should never have been routed.
+    """
+
+    def __init__(self, diff_base: str) -> None:
+        self.diff_base = diff_base
+        super().__init__(
+            f"the evidence bundle is empty: nothing differs from '{diff_base}' "
+            "and there are no untracked files to review, so a verifier would "
+            "be asked to review nothing and would have no way to say so that "
+            "this tool could distinguish from a clean pass. Fails closed.\n"
+            "  If this session's work is already COMMITTED, pass the "
+            "pre-session ref:  --diff-base <ref-before-the-session>\n"
+            "  If the session genuinely has no work yet, there is nothing to "
+            "verify."
+        )
+
+
 class EvidenceTooLargeError(VerifySessionError):
     """Raised by ``assemble_evidence`` when the assembled evidence exceeds the
     oversized-input cap (Set 089). The CLI maps it to
@@ -1143,6 +1185,12 @@ def assemble_evidence(
         untracked_bookkeeping=untracked_bookkeeping,
         tracked_excluded=tracked_excluded,
     )
+
+    # Nothing to review is refused BEFORE nothing-too-large, and for the
+    # same reason: enforced here rather than in the CLI so every caller
+    # fails closed instead of routing a bundle the verifier cannot act on.
+    if not diff.strip() and not untracked_included:
+        raise EvidenceEmptyError(diff_base)
 
     cap = max_evidence_chars if max_evidence_chars is not None else evidence_char_cap()
     assembled = bundle.assembled_char_count()
@@ -3015,7 +3063,8 @@ def _build_arg_parser() -> argparse.ArgumentParser:
         help=(
             "Git ref the working-tree diff is taken against "
             "(default: HEAD). Use the pre-session ref when session work "
-            "has already been committed."
+            "has already been committed -- otherwise the diff is empty, "
+            "and an empty bundle is REFUSED rather than routed (Set 113 S3)."
         ),
     )
     p.add_argument(
@@ -3421,6 +3470,12 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             evidence = assemble_evidence(
                 session_set_dir, session_number, args.diff_base, excludes
             )
+    except EvidenceEmptyError as exc:
+        # EXIT_USAGE, not EXIT_VERIFICATION_UNAVAILABLE: the caller fixes
+        # this themselves with --diff-base. It is not a provider outage and
+        # must not route anyone to the operator-attested manual path.
+        print(f"verify_session: {exc}", file=sys.stderr)
+        return EXIT_USAGE
     except EvidenceTooLargeError as exc:
         # -- Set 089: oversized-INPUT guard (enforced in assemble_evidence so
         #    every caller fails closed). A larger input would be truncated at

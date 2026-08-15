@@ -224,8 +224,26 @@ the replay from it short.
 ## Recording one
 
 **Optional, on demand, and never in CI.** A recording is an enhancement;
-the documents above are the deliverable. From
-`tools/dabbler-ai-orchestration`:
+the documents above are the deliverable.
+
+**What recording needs, beyond what the walkthrough itself needs.** The
+written walkthrough needs only what its own `prerequisites` say. The
+*recorder* additionally needs two things, and neither is implied by the
+other:
+
+1. **Node dependencies** — `npm install` in
+   `tools/dabbler-ai-orchestration`, which is what supplies Playwright and
+   its browser.
+2. **A Python interpreter that can import `ai_router`** — the recorder
+   asks it for the scenario rather than parsing YAML itself, so that this
+   repository keeps exactly one scenario parser. A checkout with
+   `pip install -e .` gives you one; a consumer repository that installed
+   `dabbler-ai-router` from PyPI already has one on `PATH`. Set
+   `DABBLER_PYTHON` to override which is used. The recorder probes each
+   candidate by actually importing the package and names all of them if
+   none works.
+
+From `tools/dabbler-ai-orchestration`:
 
 ```bash
 npm run walkthrough:web                              # the bundled fixture
@@ -266,6 +284,22 @@ stopped at step 3 reports steps 4 and 5 as `not-reached` rather than
 omitting them. That is Session 1's finding one layer down: a report
 assembled from whatever records exist makes an omitted item look
 identical to a passing one.
+
+### Captions you can actually see
+
+The generated `index.html` is meant to be opened straight off disk, and
+Chromium refuses to load a caption sidecar **element** over `file://` —
+it treats it as cross-origin. A page that linked `captions.vtt` that way
+would look correct in the markup and show no captions on its own
+documented viewing path. So the cues are embedded in the page and added
+through the standard `addTextTrack` / `VTTCue` API on load: the browser
+renders them with its **own native caption UI**, the player's caption
+button works, and nothing is fetched.
+
+`captions.vtt` is still written and still listed as an artifact — it is
+the sidecar you upload beside a copy of the video, which is what the
+SharePoint/Teams convention wants. The page simply does not depend on
+being able to read it.
 
 ### Timing, honestly
 

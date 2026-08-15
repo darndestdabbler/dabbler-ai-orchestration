@@ -1,7 +1,7 @@
 # Put a task on the board, finish it, and filter it away
 
 <!-- Generated from scenario.yaml by `python -m ai_router.scenario_render`. Do not edit this document: edit the scenario and re-render. `python -m ai_router.scenario_render --check` fails if they disagree. -->
-<!-- portable-digest: sha256:1a571c2065e463f77437cdd1a5f2a10a516f10d88d3f3784d2c42f5b13eaf2f1 -->
+<!-- portable-digest: sha256:714218e4b40539ab5698d28dff032e72dedfc5d9493fd7bd7df400158fc8d01e -->
 
 > **Do it yourself.** A short look at what a recorded walkthrough is. You drive a deliberately tiny web page -- add two tasks, tick one off, then narrow the list -- and every step says what to do and what you should see when you have done it. The same five steps are what the browser recorder drives when it makes the video, so the video and this document can never describe different things.
 >
@@ -12,7 +12,7 @@ About **44 seconds** of product time, 5 steps.
 ## Before you start
 
 - A local clone of the `dabbler-ai-orchestration` repository, and Node.js 20 or newer. Every command below is written to be run from `tools/dabbler-ai-orchestration` inside that clone -- the folder that contains `package.json`. Open a terminal there before you start.
-- The extension package's dependencies. From `tools/dabbler-ai-orchestration`, run `npm install` once.
+- Nothing else. There is no `npm install` step and nothing to build: the command below uses only what Node.js itself ships with, and the page it serves has no dependencies. (Recording this walkthrough as a video does need more, but that is a separate job and this document does not need it.)
 
 ## Get to the baseline
 

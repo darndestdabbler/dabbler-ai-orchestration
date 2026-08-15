@@ -58,6 +58,42 @@
   box is recorded so post-processing zoom stays possible without
   re-recording.
 
+  The recorder needs **an** interpreter that can import `ai_router`, not a
+  repository-local `.venv`: it tries `DABBLER_PYTHON`, the repo venv, then
+  `python3`/`python`, probing each by actually importing. A consumer
+  repository that installed `dabbler-ai-router` from PyPI has no repo venv
+  and must still be able to record.
+
+  Step expectations **wait** for their result, bounded and with a message
+  naming what was on screen when the budget ran out. A single immediate
+  read works against the synchronous bundled fixture and fails on every
+  server-backed application the recorder is for.
+
+### Fixed
+
+- **(Set 113 S3) `verify_session` refused to notice when it had been handed
+  nothing to review.** The working-tree-vs-`HEAD` default means a session
+  that commits before verifying assembles an EMPTY evidence bundle, which
+  was routed like any other. The verifier then correctly reports that it
+  was given nothing — but with only `spec.md` to cite, the Set 119
+  doc-only severity cap records those findings at Minor, so the round
+  prints *"MINOR-ONLY ... effectively VERIFIED"* and instructs the caller
+  to close. A session that verified nothing was one step from closing as
+  verified. Measured on this session's own round 1.
+
+  `assemble_evidence` now raises `EvidenceEmptyError` when the bundle
+  carries no diff and no untracked contents, refusing **before** anything
+  routes and naming `--diff-base` as the fix; `close_backstop` handles it
+  explicitly rather than reporting it as a provider failure.
+
+  The class was already known and fixed at one site — `close_backstop`
+  derives its base from the session's `startedAt` precisely because *"a
+  plain `HEAD` diff at close time is empty — it would hand the verifier
+  nothing"* — and the interactive path never got the same treatment
+  (G-008). Changing `verify_session`'s **default** base to that same
+  session-derived ref is the better long-term fix and is deferred with
+  evidence: it changes behaviour for every set on the close path.
+
 ### Changed
 
 - **(Set 113 S3) `render_captions` accepts real cue windows.** A recorded

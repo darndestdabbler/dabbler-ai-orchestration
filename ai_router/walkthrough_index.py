@@ -13,22 +13,37 @@ be worth opening in that case rather than showing a broken player. With
 no video it says so plainly, in the same place the player would have
 been, and points at the walkthrough document that never needed one.
 
-**The steps are on the page, not only in the caption track.** Chromium
-refuses to load a ``<track>`` sidecar over ``file://`` (it is treated as
-cross-origin), so a page opened straight off disk would show a video with
-no captions. Rather than requiring a web server to read a local file, the
-narration is rendered into the page itself and the caption track is
-attached as a bonus for the case where it does load. Nothing is lost when
-it does not.
+**Captions are built in the page, not loaded from beside it.** Chromium
+refuses to load a ``<track>`` sidecar over ``file://`` -- it treats it as
+cross-origin -- and the documented way to view a run is to open the
+generated file directly from disk. A ``<track src=...>`` would therefore
+have produced a video with no captions on the normal path, while looking
+correct in the markup. So the cues are embedded in the page and added
+through the standard ``addTextTrack`` / ``VTTCue`` API on load: the
+browser renders them with its own native caption UI, the caption button
+works, and nothing is fetched. ``captions.vtt`` is still written and still
+listed as an artifact -- it is the sidecar you upload beside a copy of the
+video -- but this page no longer depends on being able to read it.
+
+The steps are ALSO rendered into the page as text, which is what makes it
+useful with no recording at all.
 """
 
 from __future__ import annotations
 
 import html
+import json
 import re
 from typing import TYPE_CHECKING, List, Optional
 
 from ai_router.scenario import Scenario
+from ai_router.scenario_render import _one_line as flatten_prose
+from ai_router.walkthrough_run import cue_windows
+
+# ``flatten_prose`` is imported rather than re-implemented on purpose:
+# the cue text on this page must be the SAME string ``captions.vtt``
+# carries, and two whitespace-collapsing helpers is how those two stop
+# agreeing. A blank line inside a payload would also end a WebVTT cue.
 
 if TYPE_CHECKING:  # pragma: no cover - typing only, and avoids an import cycle
     from ai_router.walkthrough_run import RunManifest, StepRecord
@@ -148,12 +163,9 @@ def render_index(manifest: "RunManifest", scenario: Scenario) -> str:
             f'    <source src="{_esc(video.path)}" '
             f'type="{_esc(video.media_type)}">'
         )
-        if captions is not None:
-            # A child of <video>, which is the only place a track is read.
-            out.append(
-                f'    <track default kind="captions" srclang="en" label="Steps" '
-                f'src="{_esc(captions.path)}">'
-            )
+        # No caption sidecar ELEMENT: over file:// Chromium refuses to
+        # load one, and that is the documented way to open this page. The
+        # cues are embedded below and added through addTextTrack instead.
         out.append("  </video>")
         out.append("</div>")
     else:
@@ -235,6 +247,28 @@ def render_index(manifest: "RunManifest", scenario: Scenario) -> str:
                "editing it changes nothing: re-run the driver instead.</p></footer>")
     out.append("</main>")
     if seekable:
+        cues = [
+            {
+                "start": window[0] / 1000,
+                "end": window[1] / 1000,
+                "text": flatten_prose(step.caption),
+            }
+            for step, window in zip(
+                scenario.steps, cue_windows(manifest.steps, manifest.duration_millis)
+            )
+            if window is not None
+        ]
+        out.append(
+            '<script type="application/json" id="cues">'
+            # ``</`` is the only sequence that can end a <script> block
+            # early, and JSON inside one is NOT html-escaped -- so authored
+            # prose containing it would become markup. The replacement is a
+            # real backslash, written raw: spelled as a normal literal it
+            # is an INVALID escape that survives today with a
+            # DeprecationWarning and becomes a SyntaxError later.
+            + json.dumps(cues, ensure_ascii=False).replace("</", r"<\/")
+            + "</script>"
+        )
         out.append("<script>")
         out.append(_SCRIPT)
         out.append("</script>")
@@ -293,6 +327,31 @@ footer { margin-top: 48px; border-top: 1px solid var(--line); padding-top: 16px;
 
 
 _SCRIPT = """
+// Captions, built rather than fetched. A caption sidecar ELEMENT is
+// refused by Chromium over file://, which is exactly how this page is
+// meant to be opened, so the cues are embedded above and added through
+// the standard API. The browser then renders them itself -- native
+// caption styling, and the player's own caption button works.
+(function () {
+  var video = document.getElementById('recording');
+  var payload = document.getElementById('cues');
+  if (!video || !payload) return;
+  var cues;
+  try {
+    cues = JSON.parse(payload.textContent);
+  } catch (err) {
+    return;
+  }
+  if (!cues.length || typeof video.addTextTrack !== 'function') return;
+  var track = video.addTextTrack('captions', 'Steps', 'en');
+  var Cue = window.VTTCue || window.TextTrackCue;
+  if (!Cue) return;
+  for (var i = 0; i < cues.length; i += 1) {
+    track.addCue(new Cue(cues[i].start, cues[i].end, cues[i].text));
+  }
+  track.mode = 'showing';
+})();
+
 // Seek the recording to a step. The times come from the run's own
 // step-event stream, so they point at what actually happened rather than
 // at what the author estimated.

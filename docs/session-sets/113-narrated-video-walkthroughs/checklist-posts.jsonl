@@ -16,3 +16,9 @@
 {"sessionNumber": 2, "postedAt": "2026-08-15T17:59:23.082123-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
 {"sessionNumber": 2, "postedAt": "2026-08-15T18:00:29.165712-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["close-out"]}
 {"sessionNumber": 3, "postedAt": "2026-08-15T18:03:21.305964-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["build-against-a-dummy-web-app"]}
+{"sessionNumber": 3, "postedAt": "2026-08-15T18:40:36.272707-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-15T18:47:55.652936-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-15T19:15:33.709163-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-15T19:15:50.691628-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-15T19:31:12.513224-04:00", "stepCount": 7, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 3, "postedAt": "2026-08-15T19:32:50.976941-04:00", "stepCount": 7, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}

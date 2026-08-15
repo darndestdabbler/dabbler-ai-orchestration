@@ -40,8 +40,11 @@ prerequisites:
     `tools/dabbler-ai-orchestration` inside that clone -- the folder that
     contains `package.json`. Open a terminal there before you start.
   - >-
-    The extension package's dependencies. From
-    `tools/dabbler-ai-orchestration`, run `npm install` once.
+    Nothing else. There is no `npm install` step and nothing to build: the
+    command below uses only what Node.js itself ships with, and the page
+    it serves has no dependencies. (Recording this walkthrough as a video
+    does need more, but that is a separate job and this document does not
+    need it.)
 
 baseline:
   description: >-

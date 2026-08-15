@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The documented one-command path fails in a fresh checkout because the recorder requires an undocumented, gitignored Python virtual environment.\n  - **Category:** Completeness\n  - **Severity:** Critical\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js, docs/walkthroughs/README.md, docs/walkthroughs/task-board-first-task/scenario.yaml`\n  - **Failure scenario:** A typical user follows the documented prerequisites—Node.js plus `npm install`—and runs `npm run walkthrough:web`. In a fresh checkout, `.venv/` does not exist because it is not committed, so `venvPython()` throws before planning or browser launch. The promised recording, manifest, captions, and index are never produced. This is probable on the documented fresh-clone path and defeats the session’s primary objective.\n  - **Acceptance criterion:** JUDGMENT - In a clean checkout containing only the documented prerequisites, `npm run walkthrough:web` must reach the recorder and produce a finalized run without depending on an undocumented repository-local `.venv`.\n  - **Details:** **Violation:** The plan says, “**Ends with:** one command produces a watchable, captioned recording,” while the walkthrough documentation lists only Node.js and `npm install` as prerequisites. **Impact:** The main documented entrypoint fails before doing any work, which should block merge. **Evidence:** `venvPython()` accepts only `.venv/Scripts/python.exe` or `.venv/bin/python` and throws if absent; neither user-facing setup document requires creating that environment or installing the Python dependencies. **Fix:** Either provide a declared, automatically available Python entrypoint or document and automate the required Python environment as part of the supported setup.",
+      "category": "Completeness",
+      "severity": "Critical",
+      "failureScenario": "A typical user follows the documented prerequisites—Node.js plus `npm install`—and runs `npm run walkthrough:web`. In a fresh checkout, `.venv/` does not exist because it is not committed, so `venvPython()` throws before planning or browser launch. The promised recording, manifest, captions, and index are never produced. This is probable on the documented fresh-clone path and defeats the session’s primary objective.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js",
+        "docs/walkthroughs/README.md",
+        "docs/walkthroughs/task-board-first-task/scenario.yaml"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "In a clean checkout containing only the documented prerequisites, `npm run walkthrough:web` must reach the recorder and produce a finalized run without depending on an undocumented repository-local `.venv`."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** The generated recording is not captioned on the documented local-file viewing path.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/walkthrough_index.py, ai_router/walkthrough_run.py, docs/walkthroughs/README.md`\n  - **Failure scenario:** A typical Chromium user runs the command and opens the generated `.walkthrough-runs/.../index.html` as instructed. The page loads over `file://`; the implementation itself states that Chromium refuses to load the sibling WebVTT `<track>` in that mode. The user therefore sees a playable video without timed captions. Static narration below the player is not synchronized captioning. This affects the normal generated-index path, not an unusual configuration.\n  - **Acceptance criterion:** JUDGMENT - Opening a generated `index.html` directly from disk in Chromium must display the run’s timed captions during video playback without requiring an undocumented web server.\n  - **Details:** **Violation:** The plan requires “one command produces a watchable, **captioned recording**.” **Impact:** The primary viewing artifact omits a required accessibility and narration surface for normal users, materially reducing the promised deliverable. **Evidence:** `render_index()` emits `<track src=\"captions.vtt\">`, while its module documentation explicitly acknowledges that Chromium rejects that sidecar over `file://`; the README directs users to the local generated index and provides no serving command. **Fix:** Embed captions in a form Chromium can load locally, inline synchronized captions in the page, or make a documented serving path part of the one-command workflow.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical Chromium user runs the command and opens the generated `.walkthrough-runs/.../index.html` as instructed. The page loads over `file://`; the implementation itself states that Chromium refuses to load the sibling WebVTT `<track>` in that mode. The user therefore sees a playable video without timed captions. Static narration below the player is not synchronized captioning. This affects the normal generated-index path, not an unusual configuration.",
+      "evidencePaths": [
+        "ai_router/walkthrough_index.py",
+        "ai_router/walkthrough_run.py",
+        "docs/walkthroughs/README.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Opening a generated `index.html` directly from disk in Chromium must display the run’s timed captions during video playback without requiring an undocumented web server."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** Result assertions do not wait for asynchronous web application updates, undermining the claimed portable consumer-app path.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js, docs/walkthroughs/README.md`\n  - **Failure scenario:** A user points `--url` at an ordinary .NET, Java, Python, or SPA application where clicking a control starts an API request and updates the DOM shortly afterward. `page.click()` returns before that asynchronous update completes, and `assertExpectation()` immediately reads `textContent()` once. It observes the previous value, marks the step failed, stops the scenario, and exits nonzero even though the expected UI appears moments later. Server-backed asynchronous updates are common among the exact application classes advertised by the recorder, making this probable rather than hypothetical.\n  - **Acceptance criterion:** JUDGMENT - A scenario expectation must wait, up to a bounded timeout with a useful error, for its selector to contain the expected text rather than taking a single immediate snapshot.\n  - **Details:** **Violation:** The README claims, “A consumer repo changes the URL and nothing else,” for .NET, Java, Python, and vanilla-JS web applications. **Impact:** The recorder reliably handles only the synchronous fixture and falsely fails common real applications, materially weakening the portability objective. **Evidence:** `assertExpectation()` performs one `page.textContent(expectation.selector)` call followed by an immediate `includes()` check; it has no polling or expected-text wait. **Fix:** Use a bounded Playwright locator/text assertion or polling wait that observes the expected state while retaining deterministic timeout behavior.\n\n**Prior ledger status:** Both Round 1 findings are fixed in the current evidence: the session-relative implementation delta is now present, and this round performs substantive independent verification.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A user points `--url` at an ordinary .NET, Java, Python, or SPA application where clicking a control starts an API request and updates the DOM shortly afterward. `page.click()` returns before that asynchronous update completes, and `assertExpectation()` immediately reads `textContent()` once. It observes the previous value, marks the step failed, stops the scenario, and exits nonzero even though the expected UI appears moments later. Server-backed asynchronous updates are common among the exact application classes advertised by the recorder, making this probable rather than hypothetical.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js",
+        "docs/walkthroughs/README.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A scenario expectation must wait, up to a bounded timeout with a useful error, for its selector to contain the expected text rather than taking a single immediate snapshot."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "The documented one-command path fails in a fresh clone because it requires an undocumented, hard-coded repository virtualenv**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js`, `docs/walkthroughs/task-board-first-task/scenario.yaml`, `docs/walkthroughs/README.md`\n  - **Failure scenario:** A typical user follows the stated prerequisites—Node.js 20+ and `npm install`—then runs `npm run walkthrough:web`. In a fresh clone, the gitignored `.venv` does not exist, so `venvPython()` throws before the browser or fixture starts and no recording, manifest, or fallback index is produced. This is probable because neither documented prerequisite creates the exact `.venv/Scripts/python.exe` or `.venv/bin/python` path the script requires.\n  - **Acceptance criterion:** JUDGMENT - In a fresh clone satisfying every documented prerequisite but containing no pre-existing repository `.venv`, the documented `npm run walkthrough:web -- --no-video` path must generate a manifest and index without relying on an undisclosed interpreter location.\n  - **Details:**\n    - **Violation:** The session promises that “one command produces a watchable, captioned recording,” while the walkthrough documents list only Node.js and `npm install` as prerequisites.\n    - **Impact:** The primary entrypoint fails before producing any deliverable for users who follow the instructions, which materially changes the merge decision for a one-command workflow.\n    - **Evidence:** `venvPython()` accepts only the repository-local `.venv` interpreter and otherwise throws. Its recovery text says to run `pip install -e .`, but that command neither creates the required `.venv` nor ensures installation through its interpreter.\n    - **Correct answer:** Either make the npm entrypoint locate/use a documented available Python interpreter and verify its dependencies, or document and automate creation of the exact required environment before presenting the recorder command as ready to run.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical user follows the stated prerequisites—Node.js 20+ and `npm install`—then runs `npm run walkthrough:web`. In a fresh clone, the gitignored `.venv` does not exist, so `venvPython()` throws before the browser or fixture starts and no recording, manifest, or fallback index is produced. This is probable because neither documented prerequisite creates the exact `.venv/Scripts/python.exe` or `.venv/bin/python` path the script requires.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js",
+        "docs/walkthroughs/task-board-first-task/scenario.yaml",
+        "docs/walkthroughs/README.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "In a fresh clone satisfying every documented prerequisite but containing no pre-existing repository `.venv`, the documented `npm run walkthrough:web -- --no-video` path must generate a manifest and index without relying on an undisclosed interpreter location."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    },
+    {
+      "description": "The generated recording is not actually captioned on the normal local-file viewing path**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/walkthrough_index.py`, `ai_router/walkthrough_run.py`, `tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js`\n  - **Failure scenario:** A typical user runs the command and opens the logged `.walkthrough-runs/.../index.html` directly from disk. The implementation itself states that Chromium refuses to load the external `<track>` sidecar over `file://`; therefore the video plays without synchronized captions. The prose step list below the player is not a caption track and may be off-screen while the recording plays. This is the normal viewing path because the command generates a static directory and starts no server for the result.\n  - **Acceptance criterion:** JUDGMENT - Opening the generated index through the recorder’s documented default viewing path must display synchronized captions during video playback in Chromium, without requiring an undocumented web server.\n  - **Details:**\n    - **Violation:** The required end state is “a watchable, captioned recording,” and the code claims the index works when opened directly from disk.\n    - **Impact:** The main generated recording lacks its required synchronized narration for the expected viewer, materially impairing accessibility and the core deliverable.\n    - **Evidence:** `render_index()` emits an external `<track src=\"captions.vtt\">`, while the module documentation explicitly acknowledges Chromium will not load that track over `file://`. The only fallback is a static step list, with no JavaScript-driven synchronized caption display.\n    - **Correct answer:** Embed the VTT data or cues into the generated page and render synchronized captions locally, or make the command provide and document a viewing path that reliably serves the track over HTTP.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A typical user runs the command and opens the logged `.walkthrough-runs/.../index.html` directly from disk. The implementation itself states that Chromium refuses to load the external `<track>` sidecar over `file://`; therefore the video plays without synchronized captions. The prose step list below the player is not a caption track and may be off-screen while the recording plays. This is the normal viewing path because the command generates a static directory and starts no server for the result.",
+      "evidencePaths": [
+        "ai_router/walkthrough_index.py",
+        "ai_router/walkthrough_run.py",
+        "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Opening the generated index through the recorder’s documented default viewing path must display synchronized captions during video playback in Chromium, without requiring an undocumented web server."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "7d6d56bdda98b6ec45871a3b91345c80f56ce9fb"
+}

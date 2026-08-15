@@ -37,6 +37,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -164,9 +165,38 @@ def closeable(tmp_path: Path, monkeypatch):
 
 
 def _land(root: Path, set_dir: Path, disposition: Disposition) -> None:
+    """Commit the session's work, the way the close contract requires.
+
+    Dated an HOUR ahead, for the reason
+    ``test_diff_base_is_the_last_pre_session_commit`` already documents:
+    git commit timestamps have one-second resolution and this whole
+    fixture runs inside a single second, so a commit made "now" shares a
+    second with the ``startedAt`` written moments earlier. The backstop's
+    ``--before=<startedAt>`` lookup then selects the commit that CONTAINS
+    the session's work as the base it should be diffed against, and the
+    evidence bundle comes out empty.
+
+    That is a fixture artifact rather than a product defect -- real
+    sessions commit minutes or hours after they register -- but it used
+    to be INVISIBLE, because an empty bundle was routed like any other
+    and the fake verifier answered regardless of what it was shown. Set
+    113 S3 made an empty bundle a refusal, which turned the artifact into
+    a failure, which is how it came to be documented here.
+    """
     write_disposition(str(set_dir), disposition)
     _git(root, "add", "-A")
-    _git(root, "commit", "-m", "land session work")
+    future = (
+        datetime.now(timezone.utc) + timedelta(hours=1)
+    ).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    env = dict(os.environ)
+    env["GIT_COMMITTER_DATE"] = future
+    env["GIT_AUTHOR_DATE"] = future
+    proc = subprocess.run(
+        ["git", "commit", "-m", "land session work"],
+        cwd=str(root), env=env, capture_output=True, text=True, check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"git commit failed: {proc.stderr}")
     _git(root, "push", "origin", "main")
 
 
@@ -1538,6 +1568,45 @@ class TestTheBackstopLeavesARecoveryPath:
         # And it really reviewed the fix delta, from the baseline the
         # backstop round left behind.
         assert (set_dir / "s1-verification-round-2.md").exists()
+
+    def test_an_empty_bundle_at_close_is_named_not_reported_as_a_route_failure(
+        self, closeable, monkeypatch,
+    ):
+        """Set 113 S3. The backstop must not route a bundle with nothing
+        in it, and must not describe the refusal as a provider problem.
+
+        The measured consequence of routing one: the verifier correctly
+        reports it was handed nothing, its findings can only cite the
+        spec, and the doc-only severity cap then records the round as
+        effectively VERIFIED. A session that verified nothing gets told
+        it passed.
+        """
+        import verify_session as _vs
+
+        root, set_dir = closeable
+        _land(root, set_dir, _api_disposition(verdict="VERIFIED"))
+
+        def _empty(*args, **kwargs):
+            raise _vs.EvidenceEmptyError("abc1234")
+
+        monkeypatch.setattr(_vs, "assemble_evidence", _empty)
+        called = []
+        monkeypatch.setattr(
+            close_backstop, "_default_route",
+            lambda *a, **k: called.append(1),
+        )
+
+        outcome = run_close_backstop(
+            str(set_dir), 1, _api_disposition(verdict="VERIFIED"),
+        )
+
+        # Nothing was routed: no money spent reviewing nothing.
+        assert called == []
+        # And it is NOT reported as a provider failure, which would send
+        # the operator looking in entirely the wrong place.
+        assert outcome.status != close_backstop.STATUS_ROUTE_FAILED
+        assert outcome.status == close_backstop.STATUS_UNAVAILABLE
+        assert "--diff-base" in outcome.remediation
 
     def test_a_clean_round_also_leaves_a_baseline(self, closeable, fake_route):
         """The case the old behaviour ignored: a CLEAN round writes no

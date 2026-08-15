@@ -744,6 +744,11 @@ def _live_set(tmp_path: Path, orchestrator: dict) -> Path:
         ["git", "-C", str(tmp_path), "commit", "-q", "-m", "seed"],
         check=True,
     )
+    # Set 113 S3: leave one uncommitted change, so the fixture represents a
+    # session that has done work. An evidence bundle with nothing in it is
+    # now refused before anything routes -- see TestEmptyEvidenceFailsClosed
+    # in test_verify_session.py for the measured reason.
+    (tmp_path / "f.py").write_text("x = 1  # in progress\n", encoding="utf-8")
     return set_dir
 
 

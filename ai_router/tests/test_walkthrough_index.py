@@ -9,6 +9,7 @@ in words rather than to merely omit a player.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -107,18 +108,61 @@ def _run(tmp_path: Path, scenario, events: str, with_video: bool) -> Path:
 
 
 class TestTheHappyPage:
-    def test_it_plays_the_recording_and_attaches_the_captions(
-        self, tmp_path, scenario
-    ):
+    def test_it_plays_the_recording(self, tmp_path, scenario):
         run = _run(tmp_path, scenario, FULL_RUN, with_video=True)
         finalize_and_write(run, scenario)
         page = (run / "index.html").read_text(encoding="utf-8")
 
         assert '<video id="recording"' in page
         assert '<source src="recording.webm" type="video/webm">' in page
-        # A track is only read as a CHILD of the video element.
-        assert page.index('<track') > page.index('<video')
-        assert page.index('<track') < page.index("</video>")
+
+    def test_captions_are_embedded_not_fetched(self, tmp_path, scenario):
+        """The documented way to view a run is to open the file from disk,
+        and Chromium refuses to load a ``<track>`` sidecar over
+        ``file://``. A track ELEMENT would therefore look right in the
+        markup and show no captions on the normal path, so the cues ship
+        in the page and are added through ``addTextTrack``."""
+        run = _run(tmp_path, scenario, FULL_RUN, with_video=True)
+        finalize_and_write(run, scenario)
+        page = (run / "index.html").read_text(encoding="utf-8")
+
+        assert "<track" not in page
+        assert 'id="cues"' in page
+        assert "addTextTrack" in page
+
+        payload = page.split('id="cues">')[1].split("</script>")[0]
+        cues = json.loads(payload)
+        # One cue per REACHED step, in seconds, carrying the caption line.
+        assert [cue["start"] for cue in cues] == [0.1, 1.0, 1.9]
+        assert cues[0]["text"] == scenario.steps[0].caption
+
+    def test_the_caption_sidecar_is_still_written_for_uploading(
+        self, tmp_path, scenario
+    ):
+        """Embedding the cues does not retire the file: it is what you
+        upload beside a copy of the video."""
+        run = _run(tmp_path, scenario, FULL_RUN, with_video=True)
+        manifest = finalize_and_write(run, scenario)
+        assert (run / "captions.vtt").exists()
+        assert manifest.artifact("captions") is not None
+
+    def test_a_cue_payload_cannot_break_out_of_its_script_tag(self, tmp_path):
+        """The look-alike for the escaping test below: JSON in a <script>
+        block is not HTML-escaped, so the one sequence that ends the block
+        early has to be neutralised or authored prose becomes markup."""
+        nasty = parse_scenario(
+            SCENARIO_YAML.replace(
+                "narration: The count is the thing to watch.",
+                'narration: Watch the </script><img src=x> line.',
+            )
+        )
+        (tmp_path / "recording.webm").write_bytes(b"pretend this is a video")
+        run = _run(tmp_path, nasty, FULL_RUN, with_video=True)
+        finalize_and_write(run, nasty)
+        page = (run / "index.html").read_text(encoding="utf-8")
+        payload = page.split('id="cues">')[1].split("</script>")[0]
+        # The block did not end early: the payload still parses as JSON.
+        assert json.loads(payload)
 
     def test_every_step_carries_its_do_and_its_see(self, tmp_path, scenario):
         run = _run(tmp_path, scenario, FULL_RUN, with_video=True)

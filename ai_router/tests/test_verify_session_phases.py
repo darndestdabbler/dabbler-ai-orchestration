@@ -111,6 +111,12 @@ def repo(tmp_path: Path) -> Path:
     (tmp_path / "tracked.py").write_text("x = 1\n", encoding="utf-8")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "seed")
+    # Set 113 S3: leave one uncommitted change, so the fixture represents a
+    # session that has done work. An empty evidence bundle is now refused
+    # before anything routes -- see TestEmptyEvidenceFailsClosed in
+    # test_verify_session.py for why a pristine tree was never a realistic
+    # thing to verify.
+    (tmp_path / "tracked.py").write_text("x = 1  # in progress\n", encoding="utf-8")
     return tmp_path
 
 

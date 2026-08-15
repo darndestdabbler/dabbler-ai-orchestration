@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The reviewed session delta contains none of the implementation or verification required by Session 3.\n  - **Category:** Completeness\n  - **Severity:** Critical\n  - **Evidence paths:** `docs/session-sets/113-narrated-video-walkthroughs/spec.md`\n  - **Failure scenario:** A typical user attempts the promised one-command browser walkthrough and receives no recorder, scenario, manifest, index, captions, or fallback because the supplied session diff is empty. This is certain on the reviewed delta, not merely possible, and completely defeats the session’s primary objective.\n  - **Acceptance criterion:** JUDGMENT - A reviewer must see a session-relative implementation delta and execution evidence satisfying every Step 2–6 obligation, every Creates/Touches entry, and the complete Ends-with behavior.\n  - **Details:** **Violation:** The plan requires creating “the browser recorder, the step-event stream, the run manifest, the static index, [and] one recorded web scenario,” touching extension `scripts/`, `ai_router/`, and a fixture web app, and ending with “one command” that produces a watchable captioned recording or honestly degrades to the Session 2 document. **Impact:** None of the session’s user-facing objective or required validation can be approved; a reasonable reviewer must block the work because there is no reviewable product change. **Evidence:** The supplied “Complete diff” is explicitly empty and the response supplies no execution results. Consequently, it discharges none of the following obligations: the dummy-web-app control recording; portable browser recording outside the repository extension; timestamped stable-ID `started`/`completed`/`failed` events; a zero-or-more heterogeneous-artifact manifest; ignored output and deterministic failure cleanup; a static video-to-step index; nonfatal recording failure; captions and Session 2 fallback; cross-provider verification; Layer 3 `L-064-12`; or the recorded web scenario. The correct result is to provide the actual session/commit delta containing those artifacts and the required verification evidence.",
+      "category": "Completeness",
+      "severity": "Critical",
+      "failureScenario": "A typical user attempts the promised one-command browser walkthrough and receives no recorder, scenario, manifest, index, captions, or fallback because the supplied session diff is empty. This is certain on the reviewed delta, not merely possible, and completely defeats the session’s primary objective.",
+      "evidencePaths": [
+        "docs/session-sets/113-narrated-video-walkthroughs/spec.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A reviewer must see a session-relative implementation delta and execution evidence satisfying every Step 2–6 obligation, every Creates/Touches entry, and the complete Ends-with behavior."
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** The response does not perform the requested independent verification.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `docs/session-sets/113-narrated-video-walkthroughs/spec.md`\n  - **Failure scenario:** Every consumer of this response receives only an empty working-tree diff, with no verdict, inspection of the session implementation, test assessment, or findings. Consequently, Step 6 cannot establish whether the browser-recording deliverables satisfy the plan or require remediation. This is certain for the submitted response, not merely possible.\n  - **Acceptance criterion:** JUDGMENT - The response begins with `VERIFIED` or `ISSUES FOUND` and provides a substantive verification of the actual Session 3 implementation and required test evidence, obtaining the relevant session commit delta when the working-tree diff is empty.\n  - **Details:** **Violation:** The instructions require, “Start with one of these verdicts” and an exhaustive review of changed code against the plan and failure scenarios. **Impact:** The response supplies no pass/fail disposition and detects no implementation defects, so a reasonable reviewer cannot authorize close-out or determine remediation from it. **Evidence:** The entire response consists of `git status --short` reporting clean and an empty working-tree-versus-`HEAD` diff. A clean worktree neither verifies the Session 3 deliverables nor proves they are absent from `HEAD`; the response needed to locate the relevant committed delta or report that no reviewable implementation could be found, then issue a supported verdict.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "Every consumer of this response receives only an empty working-tree diff, with no verdict, inspection of the session implementation, test assessment, or findings. Consequently, Step 6 cannot establish whether the browser-recording deliverables satisfy the plan or require remediation. This is certain for the submitted response, not merely possible.",
+      "evidencePaths": [
+        "docs/session-sets/113-narrated-video-walkthroughs/spec.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The response begins with `VERIFIED` or `ISSUES FOUND` and provides a substantive verification of the actual Session 3 implementation and required test evidence, obtaining the relevant session commit delta when the working-tree diff is empty."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "dade65147d75a4ae29d2d2fcaead458cb69756f7"
+}

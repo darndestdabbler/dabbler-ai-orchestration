@@ -1,0 +1,35 @@
+ISSUES FOUND
+
+- **Issue 1:** The documented one-command path fails in a fresh checkout because the recorder requires an undocumented, gitignored Python virtual environment.
+  - **Category:** Completeness
+  - **Severity:** Critical
+  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js, docs/walkthroughs/README.md, docs/walkthroughs/task-board-first-task/scenario.yaml`
+  - **Failure scenario:** A typical user follows the documented prerequisites—Node.js plus `npm install`—and runs `npm run walkthrough:web`. In a fresh checkout, `.venv/` does not exist because it is not committed, so `venvPython()` throws before planning or browser launch. The promised recording, manifest, captions, and index are never produced. This is probable on the documented fresh-clone path and defeats the session’s primary objective.
+  - **Acceptance criterion:** JUDGMENT - In a clean checkout containing only the documented prerequisites, `npm run walkthrough:web` must reach the recorder and produce a finalized run without depending on an undocumented repository-local `.venv`.
+  - **Details:** **Violation:** The plan says, “**Ends with:** one command produces a watchable, captioned recording,” while the walkthrough documentation lists only Node.js and `npm install` as prerequisites. **Impact:** The main documented entrypoint fails before doing any work, which should block merge. **Evidence:** `venvPython()` accepts only `.venv/Scripts/python.exe` or `.venv/bin/python` and throws if absent; neither user-facing setup document requires creating that environment or installing the Python dependencies. **Fix:** Either provide a declared, automatically available Python entrypoint or document and automate the required Python environment as part of the supported setup.
+
+- **Issue 2:** The generated recording is not captioned on the documented local-file viewing path.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/walkthrough_index.py, ai_router/walkthrough_run.py, docs/walkthroughs/README.md`
+  - **Failure scenario:** A typical Chromium user runs the command and opens the generated `.walkthrough-runs/.../index.html` as instructed. The page loads over `file://`; the implementation itself states that Chromium refuses to load the sibling WebVTT `<track>` in that mode. The user therefore sees a playable video without timed captions. Static narration below the player is not synchronized captioning. This affects the normal generated-index path, not an unusual configuration.
+  - **Acceptance criterion:** JUDGMENT - Opening a generated `index.html` directly from disk in Chromium must display the run’s timed captions during video playback without requiring an undocumented web server.
+  - **Details:** **Violation:** The plan requires “one command produces a watchable, **captioned recording**.” **Impact:** The primary viewing artifact omits a required accessibility and narration surface for normal users, materially reducing the promised deliverable. **Evidence:** `render_index()` emits `<track src="captions.vtt">`, while its module documentation explicitly acknowledges that Chromium rejects that sidecar over `file://`; the README directs users to the local generated index and provides no serving command. **Fix:** Embed captions in a form Chromium can load locally, inline synchronized captions in the page, or make a documented serving path part of the one-command workflow.
+
+- **Issue 3:** Result assertions do not wait for asynchronous web application updates, undermining the claimed portable consumer-app path.
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js, docs/walkthroughs/README.md`
+  - **Failure scenario:** A user points `--url` at an ordinary .NET, Java, Python, or SPA application where clicking a control starts an API request and updates the DOM shortly afterward. `page.click()` returns before that asynchronous update completes, and `assertExpectation()` immediately reads `textContent()` once. It observes the previous value, marks the step failed, stops the scenario, and exits nonzero even though the expected UI appears moments later. Server-backed asynchronous updates are common among the exact application classes advertised by the recorder, making this probable rather than hypothetical.
+  - **Acceptance criterion:** JUDGMENT - A scenario expectation must wait, up to a bounded timeout with a useful error, for its selector to contain the expected text rather than taking a single immediate snapshot.
+  - **Details:** **Violation:** The README claims, “A consumer repo changes the URL and nothing else,” for .NET, Java, Python, and vanilla-JS web applications. **Impact:** The recorder reliably handles only the synchronous fixture and falsely fails common real applications, materially weakening the portability objective. **Evidence:** `assertExpectation()` performs one `page.textContent(expectation.selector)` call followed by an immediate `includes()` check; it has no polling or expected-text wait. **Fix:** Use a bounded Playwright locator/text assertion or polling wait that observes the expected state while retaining deterministic timeout behavior.
+
+**Prior ledger status:** Both Round 1 findings are fixed in the current evidence: the session-relative implementation delta is now present, and this round performs substantive independent verification.
+
+## NITS
+
+- **Nit:** `record-web-walkthrough.js` does not fully enforce “failure to record must never fail the walkthrough.” Only `video.saveAs()` failure is downgraded; failure while creating or closing a video-enabled context falls into the outer fatal path instead of retrying without video. A zero-byte `saveAs()` result is also registered as video without validation.
+- **Nit:** Deterministic failure cleanup is incomplete. `usable` becomes `true` before context closure, browser closure, `driver-output.json` writing, and Python finalization. Failures in those later operations preserve a partial run directory because the final cleanup removes output only when `usable` is false.
+- **Nit:** The no-video index says the Session 2 walkthrough document is the deliverable but neither links to nor copies that document. It reproduces the steps but omits the document’s prerequisites, baseline, reset, and recovery guidance.
+- **Nit:** Driver-block validation is weaker than the README claims. Unknown top-level keys are not refused, malformed `viewport`, `steps`, and expectation values are not shape-checked, multiple action verbs can be accepted and partially executed, and a missing `emphasize` target is silently ignored.
+- **Nit:** The timing-anchor explanation is reversed. Using `afterContext` as zero makes event timestamps earlier relative to a video that began somewhere during `newContext()`; it does not ensure cues “never fire before” their subjects. The recorded uncertainty limits the likely drift, so the practical impact is small.

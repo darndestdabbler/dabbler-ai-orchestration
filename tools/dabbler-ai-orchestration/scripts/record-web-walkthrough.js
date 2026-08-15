@@ -37,7 +37,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 
-const { chromium } = require("@playwright/test");
+const { chromium, expect } = require("@playwright/test");
 const { startFixtureServer, FIXTURE_ROOT } = require("./web-fixture-server.js");
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..");
@@ -97,20 +97,65 @@ const EMPHASIS_SETTLE_MS = 450;
 //     action is the portable behaviour, not a fixture-shaped workaround.
 const EMPHASIS_HOLD_MS = 1_200;
 
+// How long a step's expected result may take to appear. Generous: it is
+// a ceiling on a real application's round trip, not a pacing knob, and a
+// step that genuinely fails still fails -- just later and with a message
+// that says what was on screen instead.
+const EXPECT_TIMEOUT_MS = 15_000;
+
+// The failure-path read of what was actually on screen. Short on
+// purpose: by the time it runs, the wait has already run out.
+const DIAGNOSTIC_READ_MS = 1_000;
+
 function log(msg) {
   console.log(`[walkthrough:web] ${msg}`);
 }
 
+/**
+ * An interpreter that can import `ai_router`.
+ *
+ * NOT "the repository's .venv". This recorder is meant to be inherited by
+ * consumer repositories, which install `dabbler-ai-router` from PyPI and
+ * may have no repo-local virtualenv at all -- so requiring one would make
+ * the recorder work in exactly one checkout: this one. The development
+ * venv is preferred when present, and an interpreter on PATH is accepted
+ * when it can actually import the package, which is the thing that
+ * matters. Verified rather than assumed: a `python` that exists and
+ * cannot import `ai_router` fails later, further away, with a worse
+ * message.
+ */
+let cachedInterpreter;
 function venvPython() {
-  const interp =
+  if (cachedInterpreter) return cachedInterpreter;
+
+  const candidates = [];
+  if (process.env.DABBLER_PYTHON) candidates.push(process.env.DABBLER_PYTHON);
+  candidates.push(
     process.platform === "win32"
       ? path.join(REPO_ROOT, ".venv", "Scripts", "python.exe")
-      : path.join(REPO_ROOT, ".venv", "bin", "python");
-  if (fs.existsSync(interp)) return interp;
+      : path.join(REPO_ROOT, ".venv", "bin", "python")
+  );
+  candidates.push("python3", "python");
+
+  for (const candidate of candidates) {
+    const probe = cp.spawnSync(candidate, ["-c", "import ai_router"], {
+      encoding: "utf8",
+    });
+    if (!probe.error && probe.status === 0) {
+      cachedInterpreter = candidate;
+      return candidate;
+    }
+  }
+
   throw new Error(
-    `no virtualenv interpreter at ${interp}. This recorder reads the ` +
-      "scenario through `python -m ai_router.walkthrough_run` rather than " +
-      "parsing YAML itself; run `pip install -e .` from the repository root."
+    "no Python interpreter that can import `ai_router` was found. This " +
+      "recorder reads the scenario through `python -m " +
+      "ai_router.walkthrough_run` rather than parsing YAML itself, so it " +
+      "needs one. Tried: " +
+      candidates.join(", ") +
+      ". Fix it with `pip install dabbler-ai-router` (or `pip install -e .` " +
+      "in a checkout of dabbler-ai-orchestration), or point DABBLER_PYTHON " +
+      "at the interpreter you want used."
   );
 }
 
@@ -137,11 +182,21 @@ function parseArgs(argv) {
     video: true,
     keep: false,
   };
+  const valueFor = (flag, index) => {
+    const value = argv[index];
+    // A flag whose value was forgotten used to become `undefined` and
+    // travel all the way to a spawn() call, which fails much later with a
+    // message about argument types rather than about the typo.
+    if (value === undefined || value.startsWith("--")) {
+      throw new Error(`'${flag}' needs a value`);
+    }
+    return value;
+  };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--scenario") options.scenario = argv[++index];
-    else if (arg === "--out") options.out = argv[++index];
-    else if (arg === "--url") options.url = argv[++index];
+    if (arg === "--scenario") options.scenario = valueFor(arg, ++index);
+    else if (arg === "--out") options.out = valueFor(arg, ++index);
+    else if (arg === "--url") options.url = valueFor(arg, ++index);
     else if (arg === "--no-video") options.video = false;
     else if (arg === "--keep") options.keep = true;
     else throw new Error(`unknown argument '${arg}'`);
@@ -230,8 +285,19 @@ function validateDriverBlock(plan) {
   }
 }
 
-async function applyEmphasis(page, selector) {
-  await page.evaluate((target) => {
+async function applyEmphasis(page, selector, style) {
+  await page.evaluate(({ target, css }) => {
+    // Re-inject if missing. `addStyleTag` is per-document, so ANY
+    // navigation drops it -- and a consumer application has more than one
+    // page. Without this the emphasis silently stops working after the
+    // first link, which looks like a recorder that never emphasises
+    // anything rather than like a defect.
+    if (!document.getElementById("dabbler-emphasis-style")) {
+      const tag = document.createElement("style");
+      tag.id = "dabbler-emphasis-style";
+      tag.textContent = css;
+      document.head.appendChild(tag);
+    }
     const previous = document.querySelectorAll(
       ".dabbler-emphasis, .dabbler-emphasis-branch"
     );
@@ -248,7 +314,7 @@ async function applyEmphasis(page, selector) {
     }
     document.body.classList.add("dabbler-emphasis-on");
     return true;
-  }, selector);
+  }, { target: selector, css: style });
 }
 
 async function clearEmphasis(page) {
@@ -270,11 +336,50 @@ async function performAction(page, action) {
   else throw new Error(`action names no verb: ${JSON.stringify(action)}`);
 }
 
-async function assertExpectation(page, expectation) {
-  const text = (await page.textContent(expectation.selector)) || "";
-  if (expectation.text && !text.includes(expectation.text)) {
+/**
+ * Wait, up to a bounded timeout, for the step's expected result.
+ *
+ * This POLLS rather than taking one snapshot, and the difference is the
+ * whole cross-platform claim. The fixture updates synchronously, so a
+ * single read happens to work against it -- but the applications this
+ * recorder advertises (.NET, Java, Python, SPA front ends) update after a
+ * round trip, and `page.click()` returns before that lands. A snapshot
+ * would read the PREVIOUS value, mark the step failed and stop the
+ * scenario, on exactly the targets the recorder exists for.
+ */
+async function assertExpectation(page, expectation, timeoutMs) {
+  const budget = timeoutMs === undefined ? EXPECT_TIMEOUT_MS : timeoutMs;
+  const locator = page.locator(expectation.selector).first();
+  try {
+    if (expectation.text) {
+      await expect(locator).toContainText(expectation.text, {
+        timeout: budget,
+      });
+    } else {
+      await locator.waitFor({ state: "visible", timeout: budget });
+    }
+  } catch (err) {
+    // Playwright's own message is accurate but long. Report what the step
+    // wanted and what was actually on screen when the wait ran out --
+    // which is what a person reading the manifest needs.
+    //
+    // The diagnostic read gets its OWN short timeout, and only runs when
+    // it has something to say. Without one it inherits the default and
+    // spends another fifteen seconds looking for an element that has
+    // already been established as absent, doubling the cost of every
+    // failed step.
+    if (expectation.text) {
+      const actual = await locator
+        .textContent({ timeout: DIAGNOSTIC_READ_MS })
+        .catch(() => null);
+      throw new Error(
+        `expected to read "${expectation.text}" within ` +
+          `${budget}ms but the page said ` +
+          `"${actual === null ? "<no such element>" : actual.trim()}"`
+      );
+    }
     throw new Error(
-      `expected to read "${expectation.text}" but the page said "${text.trim()}"`
+      `"${expectation.selector}" never became visible within ${budget}ms`
     );
   }
 }
@@ -386,7 +491,9 @@ async function main() {
     const startedAt = new Date().toISOString();
     const page = await context.newPage();
     await page.goto(url);
-    await page.addStyleTag({ content: EMPHASIS_STYLE });
+    // No up-front style injection: `applyEmphasis` adds the stylesheet if
+    // the document does not already have it, which is what makes it
+    // survive a navigation. One injection path, not two that can disagree.
 
     emit({ event: "run-started", atMillis: 0 });
 
@@ -397,7 +504,7 @@ async function main() {
       let bounds = null;
 
       if (detail.emphasize) {
-        await applyEmphasis(page, detail.emphasize);
+        await applyEmphasis(page, detail.emphasize, EMPHASIS_STYLE);
         const box = await page
           .locator(detail.emphasize)
           .first()
@@ -567,4 +674,6 @@ module.exports = {
   EMPHASIS_STYLE,
   parseArgs,
   validateDriverBlock,
+  assertExpectation,
+  EXPECT_TIMEOUT_MS,
 };

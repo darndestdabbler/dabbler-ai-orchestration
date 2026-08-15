@@ -1005,6 +1005,38 @@ def run_close_backstop(
                 f"{_verify_session_command(str(set_dir))}"
             ),
         )
+    except _vs.EvidenceEmptyError as exc:
+        # Set 113 S3, and the same shape as the oversized handler above:
+        # a NEW assembly exception that the generic handler below would
+        # have reported as "route_failed", which reads as a provider
+        # problem and sends the operator looking in the wrong place.
+        #
+        # The backstop already derives its base from the session's
+        # ``startedAt`` precisely so this does not happen. Reaching here
+        # means that derivation produced a base that is not actually
+        # before the work -- most often a session whose commits share a
+        # second with its own registration, since git commit timestamps
+        # have one-second resolution. Fail CLOSED and name the way out
+        # rather than routing a bundle with nothing in it: the measured
+        # consequence of routing one (Set 113 S3, round 1) is a verifier
+        # that correctly reports having been handed nothing, findings
+        # that can only cite the spec, and a doc-only severity cap that
+        # then records the round as effectively VERIFIED.
+        try:
+            from .gate_checks import _verify_session_command
+        except ImportError:
+            from gate_checks import _verify_session_command  # type: ignore[no-redef]
+        return BackstopOutcome(
+            status=STATUS_UNAVAILABLE,
+            remediation=(
+                f"the backstop cannot verify this close: {exc} It derived the "
+                f"base {diff_base!r} from this session's recorded start time, "
+                "and nothing differs from it. Run the sanctioned Step 6 "
+                "command yourself with an explicit --diff-base naming the "
+                "commit this session started from, then close again: "
+                f"{_verify_session_command(str(set_dir))}"
+            ),
+        )
     except _vs.VerifySessionError as exc:
         return BackstopOutcome(
             status=STATUS_ROUTE_FAILED,

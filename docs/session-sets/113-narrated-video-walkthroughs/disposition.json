@@ -1,73 +1,78 @@
 {
   "status": "completed",
-  "summary": "Session 2 of 4: one authored scenario now renders four documents that cannot drift apart. ai_router/scenario.py is the platform-neutral model -- stable kebab-case scenario and step ids, prerequisites, a baseline carrying its own observable, reset, recovery, named checkpoints, and per step an action plus the expected observable result -- with closed vocabularies at both levels, so an unknown key, a duplicate key and a '-->' that would break a WebVTT cue are all refused rather than silently absorbed. ai_router/scenario_render.py renders walkthrough.md, training.md, captions.vtt and chapters.json, and its --check re-renders in memory and refuses any committed file whose text differs; the pytest suite runs that over the whole committed tree, which is the divergence gate the session owed. THE DRIVER QUARANTINE IS STRUCTURAL, not conventional: render_all hands each renderer a copy with drivers emptied, and portable_digest never sees driver blocks, so replacing the entire driver block leaves all four documents identical -- asserted, including a stub renderer that proves it is handed {}. ai_router/scenario_lint.py is the advisory second line for selector-shaped text that leaks into portable prose; six rules, each with a planted violation and a legitimate look-alike, and the committed corpus asserted clean. The operator's 2026-08-10 condition on cutting the synced window is honoured in what the documents SAY: both state, verbatim, that reaching any step means replaying a prefix from the baseline or the nearest named checkpoint, and walkthrough.md renders a Where to start table instead of implying a seek bar. Both prose documents also state verbatim that no video is needed and link no media file. One exemplar ships: docs/walkthroughs/work-explorer-first-look, five steps reading the AI Work Explorer on the disposable fixture project npm run walk stages, with every expected result checked against shipped extension code and the pinned uat-matrix fixtures. Verification ran four rounds and found three Majors -- two of them the same defect seen independently by two lenses -- plus eight nits. The Major that mattered: the exemplar declared its audience as anyone who had installed the extension while its baseline needed a repository checkout and an unstated starting directory, so the first command failed before step 1 in a document whose entire claim is that a stranger can follow it. The second Major, found by the supplementary pass, was that the quarantine lint had no CSS id rule at all; the first fix for it was then REJECTED on the fix delta for missing button#save, which is the form browser tooling emits and which survives an unquoted YAML scalar. Both are fixed and the verifier's own executable acceptance criterion was run verbatim. One nit was disputed with deterministic evidence rather than accepted: comparing raw bytes instead of text would fail --check on every Windows clone of this repo (core.autocrlf=true; .gitattributes exempts only the stamped verification artifacts), so the wrong thing was the byte-for-byte CLAIM, which is corrected everywhere, with two tests pinning that the tolerance is line endings and nothing more. Two Minor residuals ship unfixed and named (S2-R1, S2-R2), both found by the final VERIFIED round: neither could be fixed without a delta-scoped remediation-review past the 2-cycle cap, which the orchestrator may not self-authorize, and shipping a named residual beats shipping unverified code.",
+  "summary": "Session 3 of 4: one command now produces a watchable, captioned recording of a real web UI being driven, and degrades honestly to the Session 2 document when it cannot. STEP 2 MEASURED THE PREMISE RATHER THAN ASSUMING IT. This repo had measured only the failing case -- Set 111 S4 ran the same VS Code launch twice, differing only in whether Playwright's recordVideo was passed, and recorded that passing it broke the automation it was meant to record. The spec calls that platform-specific and forbids generalising it, so the browser claim was measured the same way: the same fixed probe, the same fixture web app, run twice, one option different. Arm A drove the UI AND wrote a 30KB video; arm B drove it and wrote nothing -- the exact inversion of the workbench table. scripts/measure-browser-record.js reproduces it and exits non-zero if it ever stops holding; the raw record is s3-browser-record-measurement.json. The fixture (src/test/fixtures/task-board) is dependency-free vanilla HTML/CSS/JS served over HTTP on an ephemeral port, standing in for the .NET / Java / Python / vanilla-JS targets the operator named -- which are one platform, not four, once they reach a browser. THE MANIFEST IS THE HEDGE THE SET AGREED TO PAY FOR, and it is written so nothing anywhere assumes an MP4: zero or more typed artifacts, each with an explicit media type, a closed vocabulary naming terminal-cast and transcript alongside video, and an EMPTY artifact list is valid -- failure to record must never fail the walkthrough. A manifest that lists a file nobody wrote is refused. One layer down from Session 1: the inventory is the AUTHORED SCENARIO, not the event stream, so a run that stopped at step 3 reports steps 4 and 5 as not-reached rather than omitting them. Both degraded paths were proven by running them, not asserted: --no-video yields a manifest with no video and an index that says so where the player would be, and a planted failing expectation yields outcome=failed with the unreached steps present and marked. TIMING SAYS WHAT IT KNOWS: nothing reports the instant recording begins, so the driver brackets newContext() and carries the width of the bracket as anchor.uncertaintyMillis (5-7ms measured) instead of implying frame accuracy. Captions retime through the EXISTING WebVTT writer via a windows_ms parameter rather than a second copy of the cue arithmetic; called without windows the output is byte-for-byte the committed --check-gated rendering. The driver does not parse scenario.yaml -- walkthrough_run plan hands it the portable steps and its own quarantined block as JSON -- so the repo keeps exactly one scenario parser, and the quarantine survives the trip: the driver block is passed through verbatim and validated by its own consumer. VERIFICATION FOUND THREE REAL DEFECTS, ALL THE SAME SHAPE: each worked on the bundled fixture and failed on a real consumer application. (1) Critical -- the recorder hard-required a repository-local .venv; the finding would have been satisfied by DOCUMENTING it, which was refused as satisfying the letter while leaving the goal false, since a consumer repo installing dabbler-ai-router from PyPI has no repo venv at all and the recorder would have worked in exactly one checkout. It now resolves the first interpreter that can genuinely import ai_router, probing by importing. (2) Major -- the index showed no captions over file://, which is its own documented viewing path; the limitation had been DOCUMENTED rather than fixed, and prose under a player is not synchronised captioning. The sidecar element is gone and the cues are embedded and added through addTextTrack, verified empirically over file:// (one track, five cues, correct cue active at 20s, no console errors, visible in a screenshot). (3) Major -- step expectations took one immediate snapshot, which works only against a synchronous fixture and fails on every server-backed target the recorder advertises; they now wait with a bounded timeout, proved by a Playwright spec that plants the delay the fixture does not have and asserts the control (a single snapshot WOULD have failed on that same page). Writing that spec surfaced a second defect: the failure path re-read the element with no timeout, doubling the cost of every failed step. ROUND 1 VERIFIED NOTHING, AND THAT IS THIS SESSION'S MOST CONSEQUENTIAL FINDING. The work had been committed before verify_session ran, and verify_session diffs the working tree against HEAD, so the bundle was empty. Both findings correctly said the verifier had been handed nothing -- but with only spec.md to cite, the Set 119 doc-only severity cap recorded them at Minor, and the round printed 'MINOR-ONLY ... effectively VERIFIED' with instructions to close. A session that verified nothing was one instruction from closing as verified. Fixed at the source rather than by making the cap cleverer (the cap is operator-attested and behaved correctly on its input; the input should never have been routed): assemble_evidence now raises EvidenceEmptyError when the bundle carries no diff and no untracked contents, naming --diff-base, and close_backstop handles it explicitly instead of reporting a provider failure. The class was already known and already fixed at ONE site -- resolve_backstop_diff_base exists precisely because 'a plain HEAD diff at close time is empty -- it would hand the verifier nothing' -- and the interactive path never got the same treatment, which is G-008 exactly. Blast radius was measured: two shared test fixtures were pristine trees, meaning every run() test had been exercising routing and verdict logic over an empty bundle. Round 2, against the real delta, found the three defects above; round 3 (remediation-review) returned VERIFIED with 3 fix verdicts accepted, 0 rejected, and explicitly resolved the round-1 findings.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/changelog.d/0011-set-113-s2-scenario-model.md",
-    "ai_router/scenario.py",
-    "ai_router/scenario_lint.py",
+    "ai_router/walkthrough_run.py",
+    "ai_router/walkthrough_index.py",
     "ai_router/scenario_render.py",
-    "ai_router/tests/test_scenario_lint.py",
-    "ai_router/tests/test_scenario_model.py",
+    "ai_router/verify_session.py",
+    "ai_router/close_backstop.py",
+    "ai_router/tests/test_walkthrough_run.py",
+    "ai_router/tests/test_walkthrough_index.py",
     "ai_router/tests/test_scenario_render.py",
-    "docs/planning/session-set-authoring-guide.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/activity-log.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/checklist-posts.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/decisions.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-acceptance-round-1.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-acceptance-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-conventions.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-issues-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-issues-round-3.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-issues.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-remediation-round-1.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-remediation-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-rounds.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-fanout-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-round-3.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-round-4.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/session-events.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/session-state.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/test-runs.jsonl",
+    "ai_router/tests/test_verify_session.py",
+    "ai_router/tests/test_verify_session_phases.py",
+    "ai_router/tests/test_close_backstop.py",
+    "ai_router/changelog.d/0012-set-113-s3-browser-recording.md",
     "docs/walkthroughs/README.md",
-    "docs/walkthroughs/work-explorer-first-look/captions.vtt",
-    "docs/walkthroughs/work-explorer-first-look/chapters.json",
-    "docs/walkthroughs/work-explorer-first-look/scenario.yaml",
-    "docs/walkthroughs/work-explorer-first-look/training.md",
-    "docs/walkthroughs/work-explorer-first-look/walkthrough.md",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map"
+    "docs/walkthroughs/task-board-first-task/scenario.yaml",
+    "docs/walkthroughs/task-board-first-task/walkthrough.md",
+    "docs/walkthroughs/task-board-first-task/training.md",
+    "docs/walkthroughs/task-board-first-task/captions.vtt",
+    "docs/walkthroughs/task-board-first-task/chapters.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s3-browser-record-measurement.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s3-remediation-round-2.md",
+    "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js",
+    "tools/dabbler-ai-orchestration/scripts/web-fixture-server.js",
+    "tools/dabbler-ai-orchestration/scripts/measure-browser-record.js",
+    "tools/dabbler-ai-orchestration/src/test/fixtures/task-board/index.html",
+    "tools/dabbler-ai-orchestration/src/test/fixtures/task-board/app.js",
+    "tools/dabbler-ai-orchestration/src/test/fixtures/task-board/app.css",
+    "tools/dabbler-ai-orchestration/src/test/suite/webWalkthroughRecorder.test.ts",
+    "tools/dabbler-ai-orchestration/src/test/playwright/expectation-wait.spec.ts",
+    "tools/dabbler-ai-orchestration/package.json",
+    ".gitignore"
   ],
   "blockers": [],
   "residuals": [
     {
-      "id": "S2-R1",
-      "severity": "minor",
-      "summary": "_StrictLoader's docstring claims SafeLoader behaviour is otherwise unchanged. Replacing the mapping constructor bypasses merge-key ('<<') handling, and an unhashable YAML key raises a bare TypeError instead of ScenarioError. Neither shape appears in an authored scenario, and an unhandled '<<' key is refused by the unknown-key check anyway, so the practical exposure is a misleading docstring rather than a wrong result.",
-      "owner": "Session 3 of Set 113",
-      "why_not_fixed_here": "Found by the round-4 remediation-review, which returned VERIFIED. Both remediation-review cycles were spent, and a shipped-code change after a clean round owes one delta-scoped remediation-review that the orchestrator may not self-authorize. Shipping a named residual beats shipping unverified code."
+      "id": "S3-R1",
+      "severity": "major",
+      "summary": "verify_session's DEFAULT diff base is still HEAD. The empty-evidence guard now refuses the resulting bundle loudly, so the failure is no longer silent -- but the better fix is to default the base to the session-derived pre-session ref, exactly as close_backstop.resolve_backstop_diff_base already does, so a session that commits before verifying gets the right bundle instead of a refusal it must fix by hand. DELIBERATELY DEFERRED, not overlooked: it changes behaviour for every set on the close path, and belongs in a session that can verify it as its own subject rather than in a remediation pass of a session about video walkthroughs. Journaled in decisions.jsonl with the alternatives.",
+      "owner": "a named follow-on set (operator to schedule)"
     },
     {
-      "id": "S2-R2",
+      "id": "S3-R2",
       "severity": "minor",
-      "summary": "The advisory lint still misses two selector forms: 'my-button#save' (hyphenated custom-element prefix) and '.primary#save' (the class half carries no hyphen, so the class rule -- which requires one -- misses it, and the id rule declines any prefix following a '.'). '#save' and 'button#save' are both caught. The STRUCTURAL half of the quarantine has no gap; this is the text scan only.",
-      "owner": "Session 3 of Set 113",
-      "why_not_fixed_here": "Same budget reason as S2-R1.",
-      "owed_documentation": "A 'Known gaps in the lint' section for docs/walkthroughs/README.md was written during this session and then REVERTED before close, because it landed after the round-4 VERIFIED stamp and post_round_delta correctly classified it as shipped code -- docs/walkthroughs/ is under no declared test surface. Keeping it would have required an operator-authorized routed round past the remediation cap, which is poor value for one paragraph. Session 3 should write it when it closes these gaps; the full text of both false negatives is in this residual and in s2-remediation-round-2.md, so nothing is lost."
+      "summary": "The backstop's diff base is derived with git's one-second commit-timestamp resolution, so a session whose commits share a second with its own registration can resolve a base that already contains the work. Previously invisible (the empty bundle was routed like any other); now it surfaces as an explicit refusal naming --diff-base. Surfaced by the close_backstop test fixture, which this session fixed the same way its own neighbouring test already documented. Real sessions commit minutes to hours after registering, so exposure is low.",
+      "owner": "the same follow-on as S3-R1"
+    },
+    {
+      "id": "S3-R3",
+      "severity": "minor",
+      "summary": "Round 1 of this session's verification is a NULL ROUND: its evidence bundle was empty and it reviewed nothing. Its artifacts (s3-verification.md, s3-verification-fanout-2.md, s3-issues.json) are kept unaltered as the record of the defect they exposed, and it consumed one of the two bounded discovery passes. A later probe run, aborted by a command timeout while the tree was temporarily stashed, overwrote s3-verification.md; the original was recovered from the stash and restored, and that probe's routed call ($0.1599, 22:58:42Z) is in router-metrics.jsonl with no corresponding round in s3-rounds.jsonl. The rounds ledger itself is correct: exactly three rounds.",
+      "owner": "Session 3 (recorded, no action owed)"
+    },
+    {
+      "id": "S3-R4",
+      "severity": "minor",
+      "summary": "Sequencing, stated rather than implied, and CORRECTED after the close preflight contradicted the first version of this note. Things that landed AFTER the remediation-review round returned VERIFIED: the changelog fragment; fixture-only fixes to test_close_preflight.py and test_orchestrator_identity.py, whose pristine trees hit the new empty-evidence guard when the FULL pytest suite ran; and a new 'Captions you can actually see' section in docs/walkthroughs/README.md. This note first claimed no shipped code changed after the round. That was WRONG: post_round_delta classifies the README as shipped, because it is the canonical documentation for the scenario format and a claim a reader relies on, not a test file. The A4 obligation was therefore paid rather than argued away -- one delta-scoped `verify_session --phase remediation-review` over the post-round delta -- and the README section was NOT reverted to dodge the gate, since it documents behaviour this session changed and a reader needs.",
+      "owner": "Session 3 (recorded, no action owed)"
     }
   ],
   "next_orchestrator": {
-    "engine": "gemini",
-    "provider": "google",
-    "model": "current flagship family",
+    "engine": "codex",
+    "provider": "openai",
+    "model": "current frontier family",
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 3 proves the browser recording path against a web fixture and emits the step-event stream keyed by this session's stable step ids. The routed Step 3.5 ledger assigns it to google at high effort with an anthropic verifier. Rotating off openai also matters here specifically: openai verified every round of this session, so the lineage that signed off the scenario model should not be the one building the first consumer of it. NOTE: this session itself ran on anthropic (claude-opus-5) rather than the openai orchestrator the ledger and Session 1's disposition both recommended -- an operator launch decision, recorded here rather than left implicit. Verifier independence was preserved throughout (anthropic excluded; every round routed to gpt-5-6-sol)."
-    }
+      "specifics": "Session 4 is the bounded Windows OS-capture pilot and the set-terminal session. The routed Step 3.5 analysis (google/gemini-pro, anthropic excluded) recommends openai at high effort with an anthropic verifier, and its stated grounds hold: the session's risk is controlling an external GUI process (OBS via obs-websocket, ffmpeg gdigrab as fallback) and the failure modes are startup/shutdown races, wrong-window capture and non-deterministic cleanup. Session 3 corroborates two of those in miniature -- the events stream had to be made idempotent to close because both the happy path and the cleanup path close it, and the first recording came out uniformly grey because the fixture re-rendered and destroyed the emphasised node. Both were cheap here and will not be cheap against an external capture process. NOTE: the same routed analysis also recommended 'Terminal Walkthroughs and Cast Artifacts' as the next SET with a trigger of 'ten consecutive clean captures'; that contradicts this set's own spec, which reserves it under 'a real terminal target exists'. The spec governs -- do not act on the routed suggestion. See the Session 3 addendum in ai-assignment.md."
+    },
+    "first_action": "Set the pass criteria BEFORE the first capture and write them down -- criteria decided after the first capture are not criteria. Then confirm OBS is installed with its websocket reachable, and prove the dependency-absent path fails clearly before proving the happy one."
   },
   "cost": {
     "components": [
@@ -95,29 +100,28 @@
       },
       {
         "component": "routed_api",
-        "status": "unavailable",
+        "status": "measured",
         "credits": null,
-        "usd": null,
-        "event_count": 0,
+        "usd": 2.2754,
+        "event_count": 8,
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "5 Direct-API call(s) are recorded for this session; their cost is authoritative in router-metrics.jsonl (cost_usd, in dollars) and is not restated here in AI credits"
+        "reason": "8 Direct-API calls in router-metrics.jsonl for session 3, summed in dollars: 1 planning call for the Step 3.5 assignment analysis (google/gemini-pro, $0.0055) and 7 session-verification calls (openai/gpt-5-6-sol). The total INCLUDES three calls that bought no verification and are stated rather than netted out, because money spent on a round that verified nothing is still money spent: round 1's two calls ($0.2815), which reviewed an EMPTY evidence bundle; and one aborted probe ($0.1599, 22:58:42Z) with no corresponding round in s3-rounds.jsonl. Round 4 ($0.2821) is the A4 delta-scoped review owed because documentation classified as shipped changed after round 3."
       }
     ],
-    "total_status": "unknown",
+    "total_status": "partial",
     "total_credits": null,
-    "total_usd": null,
+    "total_usd": 2.2754,
     "unmeasured": [
-      "orchestrator_seat",
-      "routed_api"
+      "orchestrator_seat"
     ],
     "store_schema_version": 6,
     "measured_at": "close"
   },
   "lessons_cited": [
     "L-112-1",
-    "L-064-8",
-    "L-079-1"
+    "L-079-1",
+    "L-064-8"
   ]
 }

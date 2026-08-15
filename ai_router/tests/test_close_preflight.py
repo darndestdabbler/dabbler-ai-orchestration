@@ -26,6 +26,7 @@ from __future__ import annotations
 import ast
 import json
 import os
+from datetime import datetime, timedelta, timezone
 import re
 import subprocess
 from pathlib import Path
@@ -153,9 +154,30 @@ def workable(tmp_path: Path, monkeypatch):
 
 
 def _land(root: Path, set_dir: Path, disposition: Disposition) -> None:
+    """Commit the session's work, dated an hour ahead.
+
+    Set 113 S3, same reason as ``test_close_backstop._land``: git commit
+    timestamps have one-second resolution and this fixture runs inside a
+    single second, so a commit made "now" shares a second with the
+    ``startedAt`` written moments earlier. The backstop's
+    ``--before=<startedAt>`` lookup then picks the commit CONTAINING the
+    work as the base to diff against, and the bundle comes out empty --
+    which is now a refusal rather than a silently-routed empty round.
+    """
     write_disposition(str(set_dir), disposition)
     _git(root, "add", "-A")
-    _git(root, "commit", "-m", "land session work")
+    future = (
+        datetime.now(timezone.utc) + timedelta(hours=1)
+    ).strftime("%Y-%m-%dT%H:%M:%S+00:00")
+    env = dict(os.environ)
+    env["GIT_COMMITTER_DATE"] = future
+    env["GIT_AUTHOR_DATE"] = future
+    proc = subprocess.run(
+        ["git", "commit", "-m", "land session work"],
+        cwd=str(root), env=env, capture_output=True, text=True, check=False,
+    )
+    if proc.returncode != 0:
+        raise RuntimeError(f"git commit failed: {proc.stderr}")
     _git(root, "push", "origin", "main")
 
 

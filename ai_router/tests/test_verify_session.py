@@ -105,6 +105,18 @@ def repo(tmp_path: Path) -> Path:
     (tmp_path / "tracked.py").write_text("x = 1\n", encoding="utf-8")
     _git(tmp_path, "add", "-A")
     _git(tmp_path, "commit", "-q", "-m", "seed")
+    # Set 113 S3: the fixture leaves ONE uncommitted change behind, so the
+    # repo represents a session that has done some work. It used to be
+    # pristine, which meant every `run()` test exercised the routing and
+    # verdict logic over an EMPTY evidence bundle -- the exact state that
+    # is now refused, and the exact state that let a real session verify
+    # nothing and be told it had passed. Tests that need a genuinely
+    # clean tree make one themselves (TestEmptyEvidenceFailsClosed).
+    #
+    # A TRACKED modification rather than a new file, deliberately: it
+    # leaves `untracked_included` empty, so the assembly tests below can
+    # keep asserting exactly which untracked files were inlined.
+    (tmp_path / "tracked.py").write_text("x = 1  # in progress\n", encoding="utf-8")
     return tmp_path
 
 
@@ -1284,3 +1296,87 @@ class TestCrossRoundLedger:
         rc = vs.run(_args(set_dir), route_fn=fake)
         assert rc == vs.EXIT_OK
         assert "Cross-round issue ledger" not in fake.calls[0]["prompt"]
+
+
+class TestEmptyEvidenceFailsClosed:
+    """Set 113 S3: a bundle with nothing in it is REFUSED, never routed.
+
+    Measured, not hypothesised. Set 113 S3 committed its work before
+    running ``verify_session``, so the default working-tree-vs-``HEAD``
+    diff was empty. The round routed anyway; the verifier correctly said
+    it had been handed nothing; and because the only path it could cite
+    was the spec, the Set 119 doc-only cap recorded both findings at
+    Minor -- so the round printed "MINOR-ONLY ... effectively VERIFIED"
+    and told the caller to close. A session that verified nothing was one
+    step from closing as verified.
+
+    ``close_backstop`` had already fixed this class at ITS site by
+    deriving the base from the session's ``startedAt``; the interactive
+    path had not (L-069-1 / G-008 -- the point-fix reads complete while
+    the sibling stays alive).
+    """
+
+    @staticmethod
+    def _commit_everything(repo: Path) -> None:
+        """The state a session is in at close: all work committed."""
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "the session's work")
+
+    def test_a_clean_tree_against_head_is_refused(self, repo: Path):
+        # Exactly the Set 113 S3 situation: everything committed.
+        self._commit_everything(repo)
+        with pytest.raises(vs.EvidenceEmptyError):
+            vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+
+    def test_the_refusal_names_the_flag_that_fixes_it(self, repo: Path):
+        self._commit_everything(repo)
+        with pytest.raises(vs.EvidenceEmptyError) as caught:
+            vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        message = str(caught.value)
+        assert "--diff-base" in message
+        assert "COMMITTED" in message
+
+    def test_it_is_a_verify_session_error_so_the_backstop_handles_it(self):
+        # Set 119 S3's lesson, applied at birth rather than after a crash:
+        # close_backstop catches the PARENT at four sites, so a sibling
+        # exception type would take the close down with a traceback.
+        assert issubclass(vs.EvidenceEmptyError, vs.VerifySessionError)
+
+    def test_the_same_tree_against_the_pre_session_ref_is_fine(self, repo: Path):
+        # The legitimate look-alike, and the documented fix: the session's
+        # work IS committed, so it diffs from the commit before it. Same
+        # clean worktree, same command, one flag different -- refused
+        # above, accepted here.
+        (repo / "tracked.py").write_text("x = 2\n", encoding="utf-8")
+        self._commit_everything(repo)
+
+        with pytest.raises(vs.EvidenceEmptyError):
+            vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD~1", ())
+        assert "x = 2" in evidence.diff
+
+    def test_a_tracked_change_is_not_empty(self, repo: Path):
+        (repo / "tracked.py").write_text("x = 2\n", encoding="utf-8")
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert "x = 2" in evidence.diff
+
+    def test_an_untracked_file_alone_is_not_empty(self, repo: Path):
+        # A session whose whole delta is new files has an empty `git diff`
+        # and is NOT an empty bundle -- the untracked contents are the
+        # evidence (L-064-9). Refusing this would be the guard overreaching.
+        self._commit_everything(repo)
+        (repo / "brand_new.py").write_text("y = 1\n", encoding="utf-8")
+        evidence = vs.assemble_evidence(_set_dir(repo), 1, "HEAD", ())
+        assert not evidence.diff.strip()
+        assert any("brand_new.py" in path for path, _ in evidence.untracked_included)
+
+    def test_bookkeeping_churn_alone_does_not_count_as_evidence(self, repo: Path):
+        # Set 105's third bucket: framework bookkeeping is reclassified out
+        # of the review surface, so a "session" that only touched its own
+        # state files has nothing to verify and must not route.
+        self._commit_everything(repo)
+        set_dir = _set_dir(repo)
+        (set_dir / "session-events.jsonl").write_text("{}\n", encoding="utf-8")
+        with pytest.raises(vs.EvidenceEmptyError):
+            vs.assemble_evidence(set_dir, 1, "HEAD", ())

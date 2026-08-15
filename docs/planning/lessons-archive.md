@@ -53,7 +53,7 @@ Archived by Set 073 (promoted-lesson sweep): each lesson below was promoted to
 copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
 
 ## ASCII-Only Glyphs In Cross-Platform Terminal Output
-<!-- lesson: id="L-064-4" status="archived" scope="portable" -->
+<!-- lesson: id="L-064-4" status="archived" scope="portable" encoded-in="ai_router/cli_glyph_guard.py" -->
 
 - **Context:** Any helper that prints status to the terminal.
 - **Failure or friction:** Emoji glyphs crash Windows `cp1252` consoles.
@@ -105,7 +105,7 @@ copy was redundant. Full text preserved here; reactivate with `cite_lessons`.
   the same rule.
 
 ## A Pure-Python Validator Mirroring A JSON Schema Drifts Looser — Type-Check Optional Fields And Guard Numeric Equivalence
-<!-- lesson: id="L-066-1" added-set="066" status="archived" scope="portable" -->
+<!-- lesson: id="L-066-1" added-set="066" status="archived" scope="portable" encoded-in="ai_router/tests/test_contract_gate_schema.py" -->
 
 - **Promoted to `project-guidance.md` → Conventions → Code Style on 2026-06-16**
   after instrumental application across Sets 066, 069, and 070. The detailed

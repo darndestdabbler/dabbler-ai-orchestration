@@ -35,6 +35,7 @@ The file has two top-level sections:
 > **TODO:** Add security and auth principles if applicable.
 
 ### Documentation authority
+<!-- lesson: id="G-001" -->
 
 Shared operational facts that future orchestrators, reviewers, or release
 operators may need must live in engine-agnostic docs or canonical package
@@ -45,6 +46,7 @@ This prevents one engine-specific file from drifting stale while another
 continues to be updated.
 
 ### Orchestration and verification effort
+<!-- lesson: id="G-002" -->
 
 Spend independent-perspective effort (extra reviewers, multiple orchestrators)
 where **solution-variance** and **irreversibility** are highest — which is
@@ -64,6 +66,7 @@ framework; the multi-orchestrator-planning part is not yet experimentally
 validated — consider it, apply judgment).
 
 ### UAT is written for a stranger and pre-verified by automation
+<!-- lesson: id="G-003" -->
 
 Human UAT time is the most expensive verification resource in the workflow,
 and a confusing walk destroys its evidentiary value: when a step is ambiguous,
@@ -85,6 +88,7 @@ suspending the Set 077 UAT over instruction quality):
   above manually to every checklist.
 
 ### Practicality outranks rule-perfectionism
+<!-- lesson: id="G-004" -->
 
 A workflow rule exists to protect an outcome. When following its letter costs
 real time or money and protects nothing, the rule has stopped doing its job —
@@ -114,6 +118,7 @@ verification reduction and still needs the operator. Record the route taken in
 in the disposition rather than presenting a composite as a single clean run.
 
 ### Prefer removal over addition when fixing
+<!-- lesson: id="G-005" -->
 
 When considering any fix, first look for something to **remove** — a state, a
 branch, a surface — rather than something to add. If addition is unavoidable,
@@ -129,36 +134,13 @@ alternative was not possible.
 
 ### Code Style
 
-- **CLI / terminal output uses ASCII-only glyphs.** Every helper that
-  writes to a console (`print_session_set_status`,
-  `print_metrics_report`, `queue_status`, `heartbeat_status`,
-  `close_session` output, and any future CLI) must avoid Unicode
-  characters that Windows `cp1252` cannot encode. Use `[~]` for
-  in-progress, `[ ]` for not-started, `[x]` for done; reserve emoji
-  and box-drawing characters for files written with
-  `encoding="utf-8"`. Promoted from `lessons-learned.md` on
-  2026-05-01 after consistent application across five+ CLI surfaces.
+<!-- lesson: id="G-006" -->
+Encoded: `ai_router/cli_glyph_guard.py` + `tests/test_cli_glyph_guard.py` (Set 121 S3).
 
-- **A pure-Python validator that mirrors a JSON Schema must hold parity in
-  both directions.** When a runtime validator enforces the same contract as a
-  JSON Schema (so the runtime path avoids a `jsonschema` dependency), the two
-  drift apart silently unless every schema-constrained field is checked on
-  **both** sides. Rules: (1) check the **optional** fields the schema constrains,
-  not just the required ones; (2) add an explicit `isinstance` guard wherever
-  JSON Schema's `"type"` is stricter than Python's `in`/`==` — especially
-  `isinstance(x, int) and not isinstance(x, bool)` for integer fields
-  (`1.0 == 1 == True` in Python); (3) when a cross-field or cross-array invariant
-  is **expressible** in JSON Schema (`if`/`then`, `not`/`contains`, `uniqueItems`),
-  encode it in the schema too — do not assume "the schema can't express it" without
-  checking, or a schema-only consumer accepts artifacts the runtime rejects; (4)
-  "all tests green" does not prove parity — **dogfood the gate by arming the
-  shipping set under its own policy**, since a multi-provider path-aware critique of
-  the set's own changes repeatedly catches parity gaps the per-session routed
-  verification misses. Promoted from `lessons-learned.md` (L-066-1) on 2026-06-16
-  after instrumental application across Sets 066, 069, and 070 (Set 070's dogfood
-  alone caught a duplicate-`surfaces` gap and two `provenanceComplete` schema↔validator
-  parity gaps).
+<!-- lesson: id="G-007" -->
+Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already ship as true falsifiers (Set 121 S3).
 
+<!-- lesson: id="G-008" -->
 - **A bug is a bug CLASS — fix every sibling site, not just the reported one.** When a
   fix closes a *class* of defect (a robustness gap shared by several parallel
   readers / validators / handlers that all do the same thing), **grep the whole
@@ -181,6 +163,7 @@ alternative was not possible.
 
 ### Workflow Expectations
 
+<!-- lesson: id="G-009" -->
 - Before every session, read the preload (Set 085):
   [`docs/session-constitution.md`](../session-constitution.md) — the
   per-session operating doc — plus this file,
@@ -195,6 +178,7 @@ alternative was not possible.
   (metadata, citation-at-close, archival, ceilings, the preload manifest
   and admission test) is canonical in
   [`docs/guidance-lifecycle.md`](../guidance-lifecycle.md).
+<!-- lesson: id="G-010" -->
 - **Open every session-verification prompt with an up-front conventions
   block.** Before the work to be reviewed, state the suite baseline (exact
   pass/fail/skip counts and which failures are tracked), the release
@@ -202,26 +186,34 @@ alternative was not possible.
   by-design exclusions (e.g. a research/proposal set ships no production
   code). This keeps Round 1 focused on real defects instead of burning
   findings — and re-verify rounds — on the agreed baseline. (L-064-10)
+<!-- lesson: id="G-011" -->
 - Save verifier output raw and never edit saved verification artifacts after
   they are written. On the current path this means root-level
   `sN-verification*.md`; legacy `session-reviews/` files remain read-only if
   encountered.
+<!-- lesson: id="G-012" -->
 - **Propagate a consistency fix to every echo before re-verifying.** The same
   claim echoes in summary tables, prose, per-row cells and quoting artifacts;
   grep the *old* phrasing and fix every echo in one pass. (L-065-1)
+<!-- lesson: id="G-013" -->
 - **Grade verification severity by CONSEQUENCE.** Probability the stated failure
   scenario hits a real user × impact. Low probability **or** low impact is
   Minor; no nameable failure scenario is a nit. Carry the rubric in each round's
   conventions block until it ships in the verification template. (L-095-1)
+<!-- lesson: id="G-014" -->
 - Log every AI-led session step in the active session set.
+<!-- lesson: id="G-015" -->
 - AI instruction documents (`CLAUDE.md`, `AGENTS.md`, `GEMINI.md`) reference
   this file and `docs/ai-led-session-workflow.md` so future runs inherit the
   same durable expectations.
+<!-- lesson: id="G-016" -->
 - **Session-state.json is the single source of truth for in-progress
   detection.** Call `register_session_start()` at Step 1 before the first
   `log_step()`, and `mark_session_complete()` at Step 8.
+<!-- lesson: id="G-017" -->
 - **Author `ai-assignment.md` and next-orchestrator / next-session-set
   recommendations via routed analysis — never self-opine.**
+<!-- lesson: id="G-018" -->
 - **When a set's `pathAwareCritique` is `advisory` or `required`, run the
   end-of-set Path-Aware Critique stage before the set-terminal close.** A
   multi-provider (`>= 2` distinct providers), path-aware review — each critic
@@ -230,6 +222,7 @@ alternative was not possible.
   `path-aware-critique.json`. On `required` the close-out gate enforces a valid
   artifact (Set 066). Orthogonal to per-session routed verification. Mechanics:
   `docs/ai-led-session-workflow.md` → *The end-of-set Path-Aware Critique stage*.
+<!-- lesson: id="G-019" -->
 - **An iterative end-of-set dogfood keeps its own gate artifact "pre-fix" —
   frame it as evidence, not a clean snapshot.** Do not chase a pristine post-fix
   re-run; the next round re-stales it. Commit the **final round** as the gate
@@ -238,6 +231,7 @@ alternative was not possible.
   verification own the authoritative verdict. Converge when a round drives **no
   new code change**, not when it returns a clean one. (L-070-1; full text and
   the Sets 070–072 evidence in `lessons-archive.md`)
+<!-- lesson: id="G-020" -->
 - **Any set shipping provisioning must dogfood the true cold start.** A walk
   starting from a partially-provisioned fixture validates the steady state, not
   the first run, and provisioning is exactly where silent fail-open paths hide.
@@ -246,17 +240,21 @@ alternative was not possible.
   with no pre-seeded config, assert the provisioned artifacts exist (or are
   correctly absent), and be named in the spec's "Ends with" line. (L-079-3; full
   text and the Sets 079–082 evidence in `lessons-archive.md`)
+<!-- lesson: id="G-021" -->
 - **Obey the spec's Session Set Configuration block at runtime.** Rules are
   conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
   re-litigate those flags during a session — if a flag is wrong, surface it
   at the Step 9 reorganization review.
+<!-- lesson: id="G-022" -->
 - When the human gives a session instruction or decision that appears durable
   enough to guide future sessions, ask whether it should be incorporated here.
+<!-- lesson: id="G-023" -->
 - When a failure reveals a reusable strategy, recommend a corresponding update
   to `docs/planning/lessons-learned.md`.
 
 ### Build and Test
 
+<!-- lesson: id="G-024" -->
 - **Any session touching Explorer-rendering surfaces, state-file writers, the
   extension MANIFEST, or the fixture harness runs the full
   `npm run test:playwright` locally before close — after its last code change.**

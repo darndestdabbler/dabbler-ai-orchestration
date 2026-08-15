@@ -249,6 +249,117 @@
       "dateTime": "2026-08-15T04:03:24.523197-04:00",
       "description": "All three governed suites run in full after the last code change and recorded via run_of_record. run_of_record affected named all three: every suite declares ai_router/ in its covers. pytest: 4631 passed, 9 skipped, 786s. mocha (npm run test:unit): 1456 passing, 2 pending, 33s. playwright (npm run test:playwright): 32 passed, 294s. TWO REAL FAILURES WERE FOUND AND FIXED BEFORE THESE RUNS, both from surfaces the targeted runs did not cover. (1) The extension's dist template bundle drifted once the consumer-bootstrap templates were edited; drift_guard named the remedy itself (npm run compile) and it was applied. (2) The mocha cold-start snapshot compares the RENDERED consumer-bootstrap template byte-for-byte against test-fixtures/cold-start/full/, and my hand-edit of the fixture wrapped two paragraphs differently from the template, so the golden was regenerated from the template with the fixed context substituted rather than hand-patched -- which is the deliberate, reviewed regeneration that test exists to force. HARNESS FINDING, not a product regression: the first playwright run was launched concurrently with the full pytest suite and reported 8 failures across unrelated tree-rendering specs (blocked-by-prereqs, cancellation, scaffold, icon-render, manifest-diagnostic, migration-drift, vsix-first-run). Re-run alone with no code change in between, the same suite returned 32 passed in 4.9m. Layer 3 drives a real VS Code UI on wall-clock timeouts, so it must not share a machine with a 4,600-test Layer 1 run; the recorded run is the uncontended one.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "encode-the-plainly-encodable-entries-with",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "**Encode the plainly-encodable entries, with falsifiers**, and delete their prose. At minimum the two named above; include any other entry whose disposition is unambiguously *code* under the operator's rule. **Do not triage the judgment-heavy remainder** \u2014 that is deferred deliberately, to be driven later by the usage data this session starts collecting. Report tokens freed.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "assign-a-minimal-id-to-every",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "**Assign a minimal id to every remaining entry** and register them in the ledger so accrual starts immediately. Use the short marker form \u2014 the full lessons-style trailer costs 468 tokens against 84 and buys nothing, since the ledger holds the metadata now. Record explicitly in the change log that usage evidence starts here and has no history.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "prove-the-arithmetic",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "**Prove the arithmetic**: `guidance_report --check` must pass with `project-guidance.md` measurably **under** its ceiling, and the ceiling should be ratcheted down to the new measured size \u2014 standing decision 2, and the mechanism only works if reductions are taken.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T04:20:39.512232-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T04:20:39.525037-04:00",
+      "description": "Registered session 3 (github-copilot / claude-sonnet-4.6).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "encode",
+      "dateTime": "2026-08-15T04:43:42.036455-04:00",
+      "description": "Encoded L-064-4 (cli_glyph_guard.py+test); archived L-066-1 (test_contract_gate_schema.py already a true falsifier); fixed 6 em-dash violations in print() calls",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "assign_ids",
+      "dateTime": "2026-08-15T04:43:42.038721-04:00",
+      "description": "Assigned G-001..G-024 to all 24 project-guidance.md entries; registered all 24 in guidance-usage.json",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "prove_arithmetic",
+      "dateTime": "2026-08-15T04:43:42.040859-04:00",
+      "description": "guidance_report --check: project-guidance.md 3645/3645; re-derived cap 22->25; ratcheted ceilings; retired standing authorization",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross_provider_verification",
+      "dateTime": "2026-08-15T05:02:41.029628-04:00",
+      "description": "Discovery rounds 1+2 found 4 Major findings; remediated all (AGENTS ceiling 2031->2208, glyph guard scope+sep/end, retention test cap, close_session G-* resolution); remediation-review VERIFIED.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "test_suite",
+      "dateTime": "2026-08-15T05:13:27.993844-04:00",
+      "description": "pytest: 4643 passed, 9 skipped (528s). run_of_record recorded.",
+      "status": "complete"
     }
   ]
 }

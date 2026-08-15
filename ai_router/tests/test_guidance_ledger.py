@@ -850,7 +850,7 @@ class TestRetentionSettings:
         import config as router_config
 
         settings = gl.retention_settings(router_config.load_config())
-        assert settings == (30, 20, 22)
+        assert settings == (30, 20, 25)
 
     def test_a_missing_block_falls_back_to_the_defaults(self):
         assert gl.retention_settings(None) == (

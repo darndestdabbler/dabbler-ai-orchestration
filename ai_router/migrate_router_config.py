@@ -150,7 +150,7 @@ def _migrate_budget(doc: CommentedMap) -> bool:
         raw = str(doc["threshold_scope"])
         if raw not in _SCOPE_MAP:
             print(
-                f"WARNING: unrecognised threshold_scope value {raw!r} — "
+                f"WARNING: unrecognised threshold_scope value {raw!r} -- "
                 "leaving as-is; set 'scope' manually.",
                 file=sys.stderr,
             )

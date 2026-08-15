@@ -44,14 +44,14 @@ their **full text** to `lessons-archive.md` (never deleted; grep-able via
 
 | id | rule now lives in |
 | :--- | :--- |
-| L-064-4 | `project-guidance.md` -> Conventions -> Code Style (ASCII-only glyphs) |
+| L-064-4 | `ai_router/cli_glyph_guard.py` (encoded Set 121 S3) |
 | L-064-5 | `project-guidance.md` -> Conventions -> Workflow Expectations (session-state SSOT) |
-| L-064-10 | `project-guidance.md` -> Conventions -> Workflow Expectations (up-front conventions block) |
+| L-064-10 | `project-guidance.md` -> Conventions -> Workflow Expectations (up-front conventions block) — G-010 |
 | L-064-11 | `session-set-authoring-guide.md` + `project-guidance.md` (spec-declared E2E/UAT) |
-| L-066-1 | `project-guidance.md` -> Conventions -> Code Style (pure-Python validator parity) |
-| L-069-1 | `project-guidance.md` -> Conventions -> Code Style (fix every sibling site) |
-| L-070-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (iterative dogfood is evidence) |
-| L-079-3 | `project-guidance.md` -> Conventions -> Workflow Expectations (dogfood the true cold start) |
+| L-066-1 | `ai_router/tests/test_contract_gate_schema.py` (encoded Set 121 S3) |
+| L-069-1 | `project-guidance.md` -> Conventions -> Code Style (fix every sibling site) — G-008 |
+| L-070-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (iterative dogfood is evidence) — G-019 |
+| L-079-3 | `project-guidance.md` -> Conventions -> Workflow Expectations (dogfood the true cold start) — G-020 |
 
 ## Promoted lessons (Set 110 Step 9)
 <!-- lesson-pointer: archived-set="110" -->

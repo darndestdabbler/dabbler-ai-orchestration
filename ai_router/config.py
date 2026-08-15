@@ -1011,7 +1011,7 @@ def _apply_local_overrides(config: dict, path: Path) -> None:
             # (Model-field overrides not currently in the allowed set; skip silently
             # with a warning rather than raising, to be forward-compatible.)
             print(
-                "WARNING: local-overrides.yaml 'models' section — model-field "
+                "WARNING: local-overrides.yaml 'models' section -- model-field "
                 "overrides are not in the Appendix B allowed set; ignored.",
                 file=sys.stderr,
             )
@@ -1061,7 +1061,7 @@ def _apply_local_overrides(config: dict, path: Path) -> None:
         # --- unknown keys ---
         else:
             print(
-                f"WARNING: local-overrides.yaml: unknown key '{key}' — ignored.",
+                f"WARNING: local-overrides.yaml: unknown key '{key}' -- ignored.",
                 file=sys.stderr,
             )
 

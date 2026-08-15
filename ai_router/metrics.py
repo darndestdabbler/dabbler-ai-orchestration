@@ -639,13 +639,13 @@ def print_metrics_report(config: dict) -> None:
     """Print a human-readable summary of the metrics log to stdout."""
     records = load_metrics(config)
     if not records:
-        print("(no metrics recorded yet — router-metrics.jsonl is empty "
+        print("(no metrics recorded yet -- router-metrics.jsonl is empty "
               "or missing)")
         return
 
     # Header
     print("\n" + "=" * 68)
-    print(f"AI ROUTER — METRICS REPORT  ({len(records)} calls logged)")
+    print(f"AI ROUTER -- METRICS REPORT  ({len(records)} calls logged)")
     print("=" * 68)
 
     # Overall totals. Set 130 S3: cost_usd is a measurement only on rows

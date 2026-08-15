@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 2,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** `close_session` still treats valid `project-guidance.md` `G-*` citations as unknown.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/close_session.py:700-737,2367-2379`, `ai_router/guidance_meta.py:197-240,260-285`, `docs/planning/project-guidance.md:37-143,166-258`\n  - **Failure scenario:** A future session cites `G-008` or any other new `project-guidance.md` id in `disposition.lessons_cited`. This is probable because Session 3’s purpose is to make those entries citable. `close_session` then records the valid id under `lessons_cited_unknown` and prints a warning that it was “not found in any guidance file,” because it resolves citations with `find_entry()`, which only sees `##`-heading-bound lesson trailers and misses all `project-guidance.md` markers.\n  - **Acceptance criterion:** `JUDGMENT - close_session._resolve_lessons_cited must use the document-agnostic marker scan for guidance ids, and a regression test must prove a G-* id from project-guidance.md is not returned in unknown_cited.`\n  - **Details:** **Violation:** the session’s contract says “Assign a minimal id to every remaining entry and register them in the ledger so accrual starts immediately” and “Ends with: every guidance entry is addressable, usage is accruing.” **Impact:** the close-out audit trail falsely labels the new valid ids as typos, so operators cannot trust close records to distinguish real unknown citations from the very `G-*` citations this session introduced. **Evidence:** `project-guidance.md` places `<!-- lesson: id=\"G-...\" -->` markers under `###` headings/bullets; `guidance_meta.find_entry()` only walks `parse_document()`, which recognizes `##` headings; `close_session._resolve_lessons_cited()` uses that H2-bound `find_entry()` to populate `lessons_cited_unknown`.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A future session cites `G-008` or any other new `project-guidance.md` id in `disposition.lessons_cited`. This is probable because Session 3’s purpose is to make those entries citable. `close_session` then records the valid id under `lessons_cited_unknown` and prints a warning that it was “not found in any guidance file,” because it resolves citations with `find_entry()`, which only sees `##`-heading-bound lesson trailers and misses all `project-guidance.md` markers.",
+      "evidencePaths": [
+        "ai_router/close_session.py",
+        "2367-2379",
+        "ai_router/guidance_meta.py",
+        "260-285",
+        "docs/planning/project-guidance.md",
+        "166-258"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "close_session._resolve_lessons_cited must use the document-agnostic marker scan for guidance ids, and a regression test must prove a G-* id from project-guidance.md is not returned in unknown_cited."
+      }
+    }
+  ],
+  "phase": "supplementary",
+  "discoveryBaselineTree": "b5531611783068f120c183ed4b594c9d286cf0cc"
+}

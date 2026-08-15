@@ -192,7 +192,45 @@ def test_resolve_lessons_cited_empty_is_inert(guidance):
     assert close_session._resolve_lessons_cited(None) == ([], [])
 
 
-# --- disposition field round-trip -------------------------------------------
+def test_resolve_lessons_cited_recognises_project_guidance_g_ids(tmp_path: Path):
+    """G-* ids from project-guidance.md are not returned in unknown_cited.
+
+    Set 121 S3 regression: ``_resolve_lessons_cited`` previously used
+    ``find_entry()`` which only walks ``##``-heading-bound trailers.
+    ``project-guidance.md`` places markers under ``###`` bullets, so
+    ``find_entry()`` returned zero ids for that file and every G-* id was
+    reported as unknown.  The fix uses ``contains_id()`` which is structural
+    about the marker, not the document shape.
+    """
+    gdir = tmp_path / "docs" / "planning"
+    gdir.mkdir(parents=True)
+    (gdir / "lessons-learned.md").write_text(ACTIVE, encoding="utf-8")
+    (gdir / "lessons-archive.md").write_text(ARCHIVE, encoding="utf-8")
+    # project-guidance.md with a G-* marker under an H3 section (not H2).
+    (gdir / "project-guidance.md").write_text(
+        "# Project Guidance\n\n"
+        "## Guidelines\n\n"
+        "### G-008 Some guidance\n\n"
+        "<!-- lesson: id=\"G-008\" -->\n\n"
+        "- Guidance body.\n",
+        encoding="utf-8",
+    )
+    import close_session
+
+    disp = Disposition(
+        status="completed",
+        summary="s",
+        verification_method="api",
+        lessons_cited=["L-064-1", "G-008", "L-999-9"],
+    )
+    cited, unknown = close_session._resolve_lessons_cited(disp, repo_root=str(tmp_path))
+    assert cited == ["L-064-1", "G-008", "L-999-9"]
+    assert "G-008" not in unknown, (
+        "G-008 is a valid project-guidance.md id; it must not appear in unknown_cited"
+    )
+    assert unknown == ["L-999-9"]
+
+
 
 
 def test_disposition_lessons_cited_round_trip():

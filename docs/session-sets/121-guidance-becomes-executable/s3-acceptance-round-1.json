@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 3,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "af6a1882754d6c2f7433da6d494fde80feabe926",
+  "fixedTree": "03fb8d5f35150a2a5c1654457cecb22ce012962c",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-15T09:00:36.853563+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The required `guidance_report --check` gate is still not passable after retiring the ceiling override. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/session-sets/12 ...",
+      "severity": "Major",
+      "criterion": "python ai_router/guidance_report.py --check --repo-root .",
+      "criterionSha256": "27da6d30a961dc67cb89424793054d0a3a942ecc7884046dea40b5bd2a83bad5",
+      "expectedExitCode": 0,
+      "argv": [
+        "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "ai_router/guidance_report.py",
+        "--check",
+        "--repo-root",
+        "."
+      ],
+      "interpreterSubstituted": "C:\\Users\\adm.dennis.mitchell\\source\\repos\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "ai_router/guidance_report.py"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 1022,
+        "output": "Preload manifest (tokens-read-per-session, Set 085):\n  docs/session-constitution.md                    16,575 bytes    270 lines  ~  4,112 tokens  [ceiling 4,200: OK (98% of ceiling)]\n  docs/planning/project-guidance.md               14,646 bytes    268 lines  ~  3,645 tokens  [ceiling 3,645: OK (100% of ceiling)]\n  docs/planning/lessons-learned.md                 9,115 bytes    167 lines  ~  2,269 tokens  [ceiling 2,269: OK (100% of ceiling)]\n  AGENTS.md                                        8,883 bytes    191 lines  ~  2,208 tokens  [ceiling 2,031: OVER by 177 tokens]\n  TOTAL                                           49,219 bytes    896 lines  ~ 12,234 tokens  [ceiling 12,234: OK (100% of ceiling)]\nCHECK FAILED: 1 preload-ceiling breach(es):\n  - AGENTS.md: +177 tok over its 2,031-token ceiling.\nPreload ceilings ratchet DOWN only: at ceiling, remove prose (demote to on-demand reference or a gate) rather than raising the number. Raising a ceiling is an operator-authorized config edit with a stated reason.\n"
+      },
+      "fixed": {
+        "exitCode": 0,
+        "outputChars": 713,
+        "output": "Preload manifest (tokens-read-per-session, Set 085):\n  docs/session-constitution.md                    16,575 bytes    270 lines  ~  4,112 tokens  [ceiling 4,200: OK (98% of ceiling)]\n  docs/planning/project-guidance.md               14,646 bytes    268 lines  ~  3,645 tokens  [ceiling 3,645: OK (100% of ceiling)]\n  docs/planning/lessons-learned.md                 9,115 bytes    167 lines  ~  2,269 tokens  [ceiling 2,269: OK (100% of ceiling)]\n  AGENTS.md                                        8,883 bytes    191 lines  ~  2,208 tokens  [ceiling 2,208: OK (100% of ceiling)]\n  TOTAL                                           49,219 bytes    896 lines  ~ 12,234 tokens  [ceiling 12,234: OK (100% of ceiling)]\n"
+      },
+      "baselinePassed": false,
+      "fixedPassed": true,
+      "outcome": "auto-closed",
+      "reason": "baseline discrimination holds: the unchanged criterion FAILS on the pre-fix tree and PASSES on the fixed tree"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** `cli_glyph_guard` only partially enforces the ASCII-only CLI rule it claims to encode. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/planning/project-guidance.md:13 ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The default glyph guard covers all repo CLI/helper source paths that can write console output, including ai_router/scripts, and treats non-ASCII print output controls such as sep/end as violations while preserving legitimate non-output Unicode look-alikes.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** The required Python test suite is left with a stale self-application assertion for the re-derived instruction cap. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The retention settings self-application test is aligned with the shipped `instruction_line_cap` value of 25, or the config is intentionally reverted with the derivation explained so the test and shipped config agree.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

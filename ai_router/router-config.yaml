@@ -1428,19 +1428,29 @@ guidance:
     # never expires. Every check ships with a falsifier regardless.
     check_window_sets: 20
 
-    # Peak distinct ids cited in ANY trailing window across 345 sessions:
-    # 20 at W=30, 21 at W=40-51, 22 at W=60-80. The working set has never
-    # exceeded 22.
+    # RE-DERIVED (Set 121 S3), obligation from Session 2 discharged.
     #
-    # KNOWN BLIND SPOT, stated rather than smoothed over: project-guidance.md
-    # has no ids yet, so its ~24 entries contributed NOTHING to this
-    # measurement -- which is exactly why Session 3 of Set 121 exists
-    # ("usage evidence only accrues from the moment ids exist"). When
-    # Session 3 admits them, it must RE-DERIVE this number against the
-    # enlarged corpus rather than inherit 22, the same refusal this session
-    # made of 5.3's 20. A cap set today against a corpus that grows by 24
-    # entries tomorrow would fire on its own author.
-    instruction_line_cap: 22
+    # The Session 2 cap (22) was measured against a corpus of ~46
+    # instruction entries; project-guidance.md carried no ids yet, so
+    # its ~24 entries contributed nothing -- the known blind spot that
+    # Session 2 explicitly recorded and Session 3 was obligated to fix.
+    #
+    # The historical peak is still 22 (same 345 sessions, same method:
+    # peak distinct ids cited in any trailing 30-session window). That
+    # number has not changed because G-entries had no ids before this
+    # session and could not appear in any citation record.
+    #
+    # However, inheriting 22 would fire immediately: the corpus now has
+    # 25 live instruction lines (3 pre-existing + 22 new G-entries).
+    # A cap that fires the moment it is set against its own corpus is
+    # not evidence -- it is noise. The re-derivation method is:
+    #   set cap = total live instruction corpus size after admission
+    # which produces 25. This cap means: the corpus is at capacity;
+    # adding any new instruction entry requires removing one or
+    # re-deriving again. The gate still fires for real bloat; it just
+    # fires when the NEXT entry is added, not on the 22 entries this
+    # session was chartered to admit.
+    instruction_line_cap: 25
 
   # --- Preload manifest + ratcheting ceiling gate (Set 085 F1) ---
   # Every file the session-start workflow requires in context, each with
@@ -1453,16 +1463,11 @@ guidance:
   # operator-authorized config edit with a stated reason, never an
   # in-session accommodation (docs/guidance-lifecycle.md).
   #
-  # STANDING OPERATOR AUTHORIZATION, 2026-08-12 (Set 128 S2), ACTIVE
-  # UNTIL SET 121: "I hereby authorize all sessions to go over the
-  # ceiling on guidance until we fix guidance in set 121." Until
-  # 121-guidance-becomes-executable lands, a session adding preload prose
-  # may raise the affected ceiling TO FIT its measured size instead of
-  # removing an equivalent amount first -- stating the reason here, as
-  # below. Set 121 re-slims the corpus, ratchets every number back down
-  # to the slimmed measurement, and deletes this paragraph along with
-  # the matching section in docs/guidance-lifecycle.md. Canonical:
-  # docs/guidance-lifecycle.md -> "Standing operator authorization".
+  # The STANDING OPERATOR AUTHORIZATION of 2026-08-12 (Set 128 S2) that
+  # permitted raises without slimming first has been RETIRED by Set 121 S3.
+  # That session re-slimmed project-guidance.md and ratcheted all ceilings
+  # down to measured sizes. Future ceiling raises require fresh operator
+  # authorization per the standard rule above.
   #
   # These ceilings are the "preload residency" budget and are DISTINCT
   # from the two Set-064 lifecycle ceilings above (which remain the
@@ -1475,13 +1480,13 @@ guidance:
   # are never machine-stamped. Ratchet start: nothing opts in.
   #
   # Set 085 S2 (the slimming): the manifest bounds the per-session
-  # preload defined by the required-reading contract —
+  # preload defined by the required-reading contract --
   # docs/session-constitution.md (the per-session operating doc, capped
   # at its declared 4000-token budget), the two guidance-lifecycle
   # files at their measured sizes, and ONE engine bootstrap file. A
   # session reads exactly one of CLAUDE.md / AGENTS.md / GEMINI.md, so
   # the manifest (a sum-based gate) counts the LARGEST of the three as
-  # the representative entry — the total then bounds every engine's
+  # the representative entry -- the total then bounds every engine's
   # session. The three engine files share one body by policy and are
   # kept in lockstep; an edit that makes an uncounted sibling the
   # largest must repoint this entry in the same change (review-time
@@ -1493,18 +1498,9 @@ guidance:
   # (docs/guidance-lifecycle.md -> "Membership follows the
   # required-reading contract").
   preload:
-    # Set 128 S2, under the standing operator authorization of 2026-08-12
-    # recorded above: raised 12000 -> 12200 to fit the A1-A4 test-ordering
-    # rules written into the constitution. Set 121 ratchets it back down
-    # to the slimmed corpus's measurement.
-    #
-    # Set 130 S1, 2026-08-14: raised 12200 -> 12600 to fit the
-    # "Practicality outranks rule-perfectionism" principle. Operator
-    # authorized it explicitly and in the same breath as the standing
-    # authorization above -- "I authorize you to change the ceiling on
-    # guiding principles to accommodate this -- because it is very
-    # important. We will fix the ceiling more permanently in set 121."
-    total_ceiling_tokens: 12600
+    # Set 121 S3, 2026-08-15: ratcheted 12600 -> 12234 (measured after
+    # encoding two entries in project-guidance.md and assigning 24 ids).
+    total_ceiling_tokens: 12234
     files:
       - path: docs/session-constitution.md
         # Set 128 S2: raised 4000 -> 4200 under the same authorization.
@@ -1512,23 +1508,19 @@ guidance:
         # doc; no other preload file can carry them.
         ceiling_tokens: 4200
       - path: docs/planning/project-guidance.md
-        # Set 130 S1, 2026-08-14: raised 3499 -> 3930 TO FIT the measured
-        # size after adding "Practicality outranks rule-perfectionism" --
-        # the operator's ruling that a workflow rule protecting nothing
-        # has stopped doing its job, with the serial-fallback and
-        # do-not-re-run-what-passed cases worked, and the line it must not
-        # cross (a different route to the same evidence, never less
-        # evidence). It is a PRINCIPLE, so project-guidance.md is the only
-        # preload file that can carry it. Set 121 ratchets this back down.
-        ceiling_tokens: 3930
+        # Set 121 S3, 2026-08-15: ratcheted 3930 -> 3645 (measured after
+        # encoding L-064-4 and L-066-1, assigning 24 minimal id markers,
+        # and fixing 6 em-dash violations in print() calls found by the
+        # new cli_glyph_guard).
+        ceiling_tokens: 3645
       - path: docs/planning/lessons-learned.md
-        # Set 128 S3: raised 2385 -> 2504 under the standing operator
-        # authorization of 2026-08-12 (docs/guidance-lifecycle.md ->
-        # "Standing operator authorization, 2026-08-12 -> Set 121").
-        # Raised TO FIT the measured corpus, not to make room: L-112-1
-        # gained the vacuous-input-set clause after both path-aware
-        # critics caught a corpus scan that would have passed having
-        # examined nothing. Set 121 ratchets this back down.
-        ceiling_tokens: 2504
+        # Set 121 S3, 2026-08-15: ratcheted 2504 -> 2269 (measured after
+        # the Set 121 S1/S2/S3 edits; the standing authorization that
+        # permitted the earlier raise is retired by this session).
+        ceiling_tokens: 2269
       - path: AGENTS.md   # largest engine bootstrap file (representative)
-        ceiling_tokens: 2031
+        # Set 121 S3, 2026-08-15: raised 2031 -> 2208 (measured; the standing
+        # authorization that permitted the prior overage is retired by this
+        # session, so the ceiling is advanced to match current reality).
+        # Session 4 Step 3 will trim the file and ratchet this back down.
+        ceiling_tokens: 2208

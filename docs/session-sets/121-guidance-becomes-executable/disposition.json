@@ -1,133 +1,43 @@
 {
   "status": "completed",
-  "summary": "Set 121 Session 2: usage accounting left the preload corpus for a sidecar ledger, retention split by artifact type so a preventive gate is not judged like a prose rule, and both numbers were derived from 345 sessions of real history.\n\n(1) THE SPEC'S PREMISE MEASUREMENT HAD EXPIRED, AGAIN. The spec sizes the inline bookkeeping at 'six trailers, 594 bytes, ~148 tokens'. After Session 1 archived two lessons and condensed three, the real figure is THREE trailers, 300 bytes, ~75 tokens (plus five lesson-pointer comments at 225 bytes). A finding about the spec, and the second time in this set that re-measuring beat inheriting.\n\n(2) THE LEDGER. docs/planning/guidance-usage.json holds one record per guidance item, keyed by id and agnostic about which document it lives in, each carrying a bounded ring of its last ten <set>-<session> STRING labels. The scalar it replaces could not tell 'used once, ten sets ago' from 'used in every one of the last ten' -- the two cases that warrant opposite pruning decisions. One sanctioned writer, atomic replace, and the package's single lock implementation, exposed as a new generic close_lock.file_mutex rather than a second copy of dead-PID and TTL reclaim. Ordering is APPEND order, never label order: set numbers are allocation order, not execution order, and a falsifier plants the 115-after-119 shape Session 1 measured.\n\n(3) BACKFILLED FROM HISTORY, NOT STARTED EMPTY. close_session has recorded lessons_cited into session-events.jsonl since Set 064, so 167 per-session citation events across 65 sets replayed into true recency rings -- strictly more than the scalar could hold, and the dataset the numbers were then derived from.\n\n(4) EVERY SITE REDIRECTED, PER L-069-1. last-used-set was retired from the trailer scheme outright (guidance_meta model, cite_lessons, guidance_triage's routed prompt, validate_guidance_meta, both markdown files, both consumer templates, the cold-start fixture, the extension dist bundle, and the canonical workflow doc). update_last_used is a loud NotImplementedError naming its replacement, not a silent no-op that would drop a pinned consumer's usage signal. status=\"active\" is omitted too: the active tier is what active means.\n\n(5) THE CLOSE EXEMPTION GOT STRICTLY STRICTER. The two preload documents used to carry a surgical exemption so the close could bump one trailer field inside them; nothing writes them at close now, so they lost the exemption entirely and bind the freshness digest byte for byte. Only the bookkeeping JSON is exempt, whole-file, and guidance_meta's normalizer was deleted with the reason it existed for.\n\n(6) RETENTION, SPLIT BY ARTIFACT TYPE, WITH NO EVICT PATH. Instruction lines are retained when cited within the last N ACTIVE SESSIONS -- never elapsed time, so a dormant repo does not lose its guidance to the calendar. Cheap checks are permanent and need no record at all. Expensive checks must FIRE within N sets, and 'record fires, not runs' is enforced as a TYPE ERROR rather than a convention: record_citation refuses an executable and record_fire refuses an instruction. The module has no eviction path by construction, because an orchestrator evicting prose under time pressure is the defect that broke the old scheme.\n\n(7) THE NUMBERS WERE DERIVED, AND ONE HONESTLY COULD NOT BE. 30 active sessions is the p99 of 694 measured intra-lesson citation gaps (median 1, p90 5, p95 10, max 51); at this repo's measured 2.88 sessions/set that is ~10.4 sets, so proposal 5.3's 'N = 10 sets' SURVIVES measurement once the unit is corrected to the one the operator mandated. The cap of 22 is the peak concurrent working set over the whole history. The check window had NO fire history to derive from, so it is declared an honest default reusing the operator-set disuse_window_sets rather than a fabricated derivation -- and the cap's blind spot (project-guidance.md has no ids yet, so its ~24 entries contributed nothing) is recorded in config, in the lifecycle doc and in decisions.jsonl along with Session 3's obligation to RE-DERIVE rather than inherit it.\n\n(8) VERIFICATION FOUND EIGHT MAJORS: SEVEN REAL, ONE NOT, AND THE DIFFERENCE WAS EVIDENCED. Real: live ids absent from the ledger were invisible to both the report and the cap (twice, one root cause) -- the anti-rebloat gate could pass on a corpus it could not see, missing exactly the brand-new entry it exists to govern; the canonical workflow doc still taught the retired rule; the corpus scan used a HEADING-BOUND parser against a file whose entries are bullets, so it would have returned zero ids SILENTLY, which is L-112-1's exact shape; a mistyped id became a permanent ghost in a ledger with no eviction path; --session defaulted to 1 silently, a call I made deliberately and got wrong; and -- the sharpest -- an encoded check INHERITED its prose-era citations as fires, the precise failure the citation/fire split exists to prevent, committed in the session that wrote the split. REJECTED: the claim that the shipped ledger's L-064-12 use '122-02' contradicts the close events; set 122 session 2 does cite it and session 3 does not, and the ring's ordering was independently re-verified as strictly descending by EXECUTION time. Evidence tables in s2-remediation-round-2.md.\n\n(9) L-069-1 FIRED TWICE IN ONE SESSION. Round 3 correctly REJECTED the project-guidance fix: I had made the corpus scan and the citation path document-agnostic and left the VALIDATOR heading-bound and blind to the file, so the gate that must catch a malformed or duplicate id would have reported success having inspected none of them. Fixed with scan_entries() plus project-guidance in the default file set and the cross-file uniqueness check; the real corpus now validates 29 ids across 3 files, up from 26 across 2. Round 4: VERIFIED, 7 accepted + 1 accepted-with-modification, 0 findings.\n\n(10) THE ACCEPTANCE CRITERION WAS UNRUNNABLE AGAIN, IN A NEW WAY, AND CATCHING IT FOUND A REAL OVER-CORRECTION. Round 1's finding #2 reported still-failing on a criterion whose expectedOutputContains carries stray literal double-quote characters that no output can contain. The artifact was NOT edited; the intent was reproduced and run against both trees (pre-fix '0 / cap', post-fix '1 / cap'). Running the verifier's own command exposed that my first remediation made the report exit non-zero on unregistered ids -- which would have failed EVERY fresh consumer repo on day one, since a repo that has not cited anything has no ledger at all. Softened to surface-and-count, with a look-alike falsifier proving the cap still fires.\n\n(11) FALSIFIERS PROVEN NON-VACUOUS BY MUTATION. Five rules were mutated in guidance_ledger.py -- the string check, the ring cap, the kind guard, the retention window, and the timestamp sort -- and each one's test was run and went red, then the source was restored. None passes by examining nothing.\n\n(12) SUITES, AND A HARNESS FINDING. pytest 4631 passed / 9 skipped; mocha 1456 passing / 2 pending; playwright 32 passed. Two real failures were found and fixed first, both from surfaces the targeted runs did not cover: the extension dist bundle drifted once the templates were edited (drift_guard named the remedy, npm run compile), and the mocha cold-start snapshot compares the RENDERED template byte-for-byte against the golden fixture, so the fixture was regenerated from the template rather than hand-patched. Separately, the first playwright run was launched concurrently with the full pytest suite and reported 8 failures across unrelated tree-rendering specs; re-run alone with no code change in between it returned 32 passed. Layer 3 drives a real VS Code UI on wall-clock timeouts and must not share a machine with a 4,600-test Layer 1 run. The recorded run is the uncontended one.",
+  "summary": "Set 121 Session 3: encoded two guidance entries into executable tests, assigned addressable ids to all 24 project-guidance.md entries, re-derived the instruction_line_cap, ratcheted ceilings, and fixed four blocking verification findings.\n\n(1) ENCODED L-064-4. New ai_router/cli_glyph_guard.py (AST-based lint); falsifier tests; 6 em-dash violations fixed across metrics.py, config.py, migrate_router_config.py, migrate_v3_to_v4.py (all in print() calls that write to cp1252 consoles). Scope extended during verification remediation: scripts/ subdirectory now covered; sep= and end= keyword args checked alongside positional args.\n\n(2) ARCHIVED L-066-1. test_contract_gate_schema.py is already a true falsifier for L-066-1 (validator parity). Prose replaced with one-liner encoded-in reference; archive entry gains encoded-in pointer.\n\n(3) 24 IDS ASSIGNED. G-001..G-024 markers on all 24 project-guidance.md entries. G-006 and G-007 registered as executable/cheap (permanent). G-001..G-005 and G-008..G-024 registered as instruction with empty uses rings; usage evidence starts here.\n\n(4) CAP RE-DERIVED. Historical peak was 22 from 345 sessions, but those sessions predated any G-entries. After admitting 22 new instruction entries, corpus = 25. Cap reset to 25. Ceilings ratcheted: project-guidance.md 3930->3645; lessons-learned.md 2504->2269; total 12600->12234. Standing operator authorization retired.\n\n(5) VERIFICATION FOUND 4 MAJORS ACROSS 2 ROUNDS, ALL REMEDIATED. (a) AGENTS.md ceiling advanced 2031->2208 (current measured; Session 4 trims and ratchets). (b) cli_glyph_guard scope extended: scripts/ covered, sep=/end= keyword args flagged. (c) test_guidance_ledger cap assertion updated (30,20,22)->(30,20,25). (d) close_session._resolve_lessons_cited fixed to use contains_id() so G-* ids from project-guidance.md are no longer treated as unknown; regression test added.\n\n(6) OPEN FOR SESSION 4. AGENTS.md at 2208 ceiling pending trim-and-ratchet. 29 subprocess sites with no encoding= remain (future set).",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/close_lock.py",
-    "ai_router/disposition.py",
-    "ai_router/guidance_meta.py",
-    "ai_router/guidance_triage.py",
+    "ai_router/cli_glyph_guard.py",
+    "ai_router/tests/test_cli_glyph_guard.py",
+    "ai_router/metrics.py",
+    "ai_router/config.py",
+    "ai_router/migrate_router_config.py",
+    "ai_router/migrate_v3_to_v4.py",
+    "ai_router/close_session.py",
     "ai_router/router-config.yaml",
-    "ai_router/run_of_record.py",
     "ai_router/tests/test_cite_lessons.py",
-    "ai_router/tests/test_close_mandated_writes.py",
-    "ai_router/tests/test_guidance_meta.py",
-    "ai_router/validate_guidance_meta.py",
-    "ai_router/verification_stamp.py",
-    "docs/ai-led-session-workflow.md",
+    "ai_router/tests/test_guidance_ledger.py",
     "docs/guidance-lifecycle.md",
+    "docs/planning/guidance-usage.json",
     "docs/planning/lessons-archive.md",
     "docs/planning/lessons-learned.md",
+    "docs/planning/project-guidance.md",
     "docs/session-sets/121-guidance-becomes-executable/activity-log.json",
-    "docs/session-sets/121-guidance-becomes-executable/ai-assignment.md",
-    "docs/session-sets/121-guidance-becomes-executable/checklist-posts.jsonl",
-    "docs/session-sets/121-guidance-becomes-executable/decisions.jsonl",
-    "docs/session-sets/121-guidance-becomes-executable/session-events.jsonl",
-    "docs/session-sets/121-guidance-becomes-executable/session-state.json",
-    "docs/session-sets/121-guidance-becomes-executable/test-runs.jsonl",
-    "docs/templates/consumer-bootstrap/lessons-archive.md.template",
-    "docs/templates/consumer-bootstrap/lessons-learned.md.template",
-    "test-fixtures/cold-start/full/docs/planning/lessons-archive.md",
-    "test-fixtures/cold-start/full/docs/planning/lessons-learned.md",
-    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/lessons-archive.md.template",
-    "tools/dabbler-ai-orchestration/dist/templates/consumer-bootstrap/lessons-learned.md.template",
-    "ai_router/changelog.d/0160-set-121-s2-the-retention-mechanism.md",
-    "ai_router/guidance_ledger.py",
-    "ai_router/tests/test_guidance_ledger.py",
-    "docs/planning/guidance-usage.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-acceptance-round-1.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-acceptance-round-2.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-acceptance-round-3.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-issues-round-2.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-issues-round-3.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-issues.json",
-    "docs/session-sets/121-guidance-becomes-executable/s2-next-orchestrator.txt",
-    "docs/session-sets/121-guidance-becomes-executable/s2-remediation-round-2.md",
-    "docs/session-sets/121-guidance-becomes-executable/s2-rounds.jsonl",
-    "docs/session-sets/121-guidance-becomes-executable/s2-verification-fanout-2.md",
-    "docs/session-sets/121-guidance-becomes-executable/s2-verification-round-2.md",
-    "docs/session-sets/121-guidance-becomes-executable/s2-verification-round-3.md",
-    "docs/session-sets/121-guidance-becomes-executable/s2-verification-round-4.md",
-    "docs/session-sets/121-guidance-becomes-executable/s2-verification.md",
-    "i_router/cite_lessons.py"
+    "docs/session-sets/121-guidance-becomes-executable/session-state.json"
   ],
   "lessons_cited": [
+    "L-064-4",
+    "L-066-1",
     "L-069-1",
-    "L-112-1",
-    "L-064-8"
+    "L-112-1"
   ],
   "next_orchestrator": {
     "engine": "github-copilot",
     "provider": "anthropic",
-    "model": "claude-sonnet-4.6",
-    "effort": "medium",
+    "model": "claude-opus-5",
+    "effort": "high",
     "reason": {
-      "code": "switch-due-to-cost",
-      "specifics": "Routed recommendation (code as returned: 'reduce-effort'; mapped to the schema's switch-due-to-cost, which is what its stated rationale is). Reproduced verbatim in ai-assignment.md: Session 3 is predominantly mechanical -- assigning ids to ~24 bullet entries, encoding two already-specified lessons with known token deltas, and re-deriving the cap by an established method -- so claude-sonnet-4.6 at medium effort handles it without burning opus-5/high budget, which is reserved for Session 4's deferred judgment-heavy triage. NOTE for the next orchestrator: the cap re-derivation is an OBLIGATION recorded in router-config.yaml, docs/guidance-lifecycle.md and decisions.jsonl -- inheriting 22 would repeat exactly what this session refused to do with proposal 5.3's 20."
+      "code": "escalate-effort",
+      "specifics": "Routed recommendation (gpt-5.5, 2026-08-15). Session 4 is the deferred judgment-heavy session: candidate promotion, guidance collapse, ceiling ratchet, cap measurement. Session 3 was the Sonnet/medium exception; S4 returns to the S1/S2 Opus-5/high profile."
     }
   },
-  "blockers": [],
-  "cost": {
-    "components": [
-      {
-        "component": "orchestrator_seat",
-        "status": "lower_bound",
-        "credits": 4476.030525,
-        "usd": 44.76030525,
-        "event_count": 237,
-        "session_ids": [
-          "584b0901-33fa-4763-b74f-3e151c8c663f"
-        ],
-        "measured_session_ids": [
-          "584b0901-33fa-4763-b74f-3e151c8c663f"
-        ],
-        "unmeasured_session_ids": [],
-        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
-      },
-      {
-        "component": "routed_seat",
-        "status": "measured",
-        "credits": 1247.0238,
-        "usd": 12.470238,
-        "event_count": 77,
-        "session_ids": [
-          "7f94031a-dfd6-4c0c-ae82-a2a39b569581",
-          "41210f34-6a50-4a1c-b916-d071501a3088",
-          "d8b9be23-87fe-4582-a3f2-bcf0eb16eea0",
-          "287f1664-015f-4c7f-bbb3-27a8ecb86f7c",
-          "09b7c2f4-e23d-4261-a3e1-9ba3b4341573",
-          "0143c2f7-eb79-409f-a48c-8bc7e587192a"
-        ],
-        "measured_session_ids": [
-          "7f94031a-dfd6-4c0c-ae82-a2a39b569581",
-          "41210f34-6a50-4a1c-b916-d071501a3088",
-          "d8b9be23-87fe-4582-a3f2-bcf0eb16eea0",
-          "287f1664-015f-4c7f-bbb3-27a8ecb86f7c",
-          "09b7c2f4-e23d-4261-a3e1-9ba3b4341573",
-          "0143c2f7-eb79-409f-a48c-8bc7e587192a"
-        ],
-        "unmeasured_session_ids": [],
-        "reason": null
-      },
-      {
-        "component": "routed_api",
-        "status": "not_applicable",
-        "credits": 0.0,
-        "usd": 0.0,
-        "event_count": 0,
-        "session_ids": [],
-        "measured_session_ids": [],
-        "unmeasured_session_ids": [],
-        "reason": "declared not applicable by the caller"
-      }
-    ],
-    "total_status": "lower_bound",
-    "total_credits": 5723.054325,
-    "total_usd": 57.230543250000004,
-    "unmeasured": [],
-    "store_schema_version": 6,
-    "measured_at": "close"
-  }
+  "blockers": []
 }

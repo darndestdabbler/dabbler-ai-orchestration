@@ -1,6 +1,128 @@
 {
   "schemaVersion": 1,
   "entries": {
+    "G-001": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-001 Documentation authority. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-002": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-002 Orchestration and verification effort. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-003": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-003 UAT is written for a stranger. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-004": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-004 Practicality outranks rule-perfectionism. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-005": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-005 Prefer removal over addition when fixing. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-006": {
+      "kind": "executable",
+      "cost": "cheap",
+      "uses": [],
+      "note": "ai_router/cli_glyph_guard.py -- L-064-4 ASCII-only CLI glyph rule; falsifier tests/test_cli_glyph_guard.py (Set 121 S3)"
+    },
+    "G-007": {
+      "kind": "executable",
+      "cost": "cheap",
+      "uses": [],
+      "note": "ai_router/tests/test_contract_gate_schema.py -- L-066-1 pure-Python validator parity; already shipped as true falsifier (Set 121 S3)"
+    },
+    "G-008": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-008 A bug is a bug CLASS (L-069-1). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-009": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-009 Before every session, read the preload. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-010": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-010 Open every session-verification prompt with conventions block (L-064-10). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-011": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-011 Save verifier output raw. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-012": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-012 Propagate a consistency fix to every echo (L-065-1). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-013": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-013 Grade verification severity by CONSEQUENCE (L-095-1). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-014": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-014 Log every AI-led session step. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-015": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-015 AI instruction documents reference this file. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-016": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-016 Session-state.json SSOT (L-064-5). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-017": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-017 Author ai-assignment.md via routed analysis. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-018": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-018 When a set's pathAwareCritique is advisory or required. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-019": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-019 Iterative end-of-set dogfood as evidence (L-070-1). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-020": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-020 Any set shipping provisioning must dogfood the true cold start (L-079-3). Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-021": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-021 Obey the spec's Session Set Configuration block at runtime. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-022": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-022 When human gives session instruction. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-023": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-023 When a failure reveals a reusable strategy. Usage evidence starts here (Set 121 S3); no prior history."
+    },
+    "G-024": {
+      "kind": "instruction",
+      "uses": [],
+      "note": "project-guidance.md G-024 Any session touching Explorer-rendering surfaces runs playwright (L-064-12). Usage evidence starts here (Set 121 S3); no prior history."
+    },
     "K-121-1": {
       "kind": "executable",
       "cost": "cheap",
@@ -66,6 +188,7 @@
     "L-064-4": {
       "kind": "instruction",
       "uses": [
+        "121-03",
         "064-03",
         "064-02"
       ]
@@ -139,6 +262,7 @@
     "L-066-1": {
       "kind": "instruction",
       "uses": [
+        "121-03",
         "123-02",
         "119-02",
         "096-02",
@@ -147,8 +271,7 @@
         "083-02",
         "073-01",
         "072-04",
-        "072-03",
-        "072-02"
+        "072-03"
       ]
     },
     "L-067-1": {
@@ -169,6 +292,7 @@
     "L-069-1": {
       "kind": "instruction",
       "uses": [
+        "121-03",
         "121-02",
         "121-01",
         "132-03",
@@ -177,8 +301,7 @@
         "130-02",
         "129-02",
         "122-03",
-        "122-02",
-        "128-02"
+        "122-02"
       ]
     },
     "L-069-2": {
@@ -308,6 +431,7 @@
     "L-112-1": {
       "kind": "instruction",
       "uses": [
+        "121-03",
         "121-02",
         "121-01",
         "132-03",
@@ -316,8 +440,7 @@
         "131-02",
         "131-01",
         "130-03",
-        "130-02",
-        "130-01"
+        "130-02"
       ]
     },
     "L-125-1": {

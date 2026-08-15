@@ -139,7 +139,7 @@ try:
     )
     from check_migrations import summarize_drift  # type: ignore[import-not-found]
     from guidance_config import discover_guidance_files  # type: ignore[import-not-found]
-    from guidance_meta import find_entry  # type: ignore[import-not-found]
+    from guidance_meta import find_entry, contains_id  # type: ignore[import-not-found]
     from guidance_report import summarize_overhead  # type: ignore[import-not-found]
 except ImportError:
     from .disposition import (  # type: ignore[no-redef]
@@ -171,7 +171,7 @@ except ImportError:
     )
     from .check_migrations import summarize_drift  # type: ignore[no-redef]
     from .guidance_config import discover_guidance_files  # type: ignore[no-redef]
-    from .guidance_meta import find_entry  # type: ignore[no-redef]
+    from .guidance_meta import find_entry, contains_id  # type: ignore[no-redef]
     from .guidance_report import summarize_overhead  # type: ignore[no-redef]
 
 
@@ -729,7 +729,7 @@ def _resolve_lessons_cited(
         unknown = [
             lid
             for lid in cited
-            if not any(find_entry(t, lid) is not None for t in texts)
+            if not any(contains_id(t, lid) for t in texts)
         ]
     except Exception:
         # Never let a guidance-metadata read disrupt close-out.

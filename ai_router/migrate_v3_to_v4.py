@@ -837,7 +837,7 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("  (dry run; rerun with --in-place to write changes)")
         if not dry_run and counts["migrated"]:
             print(
-                "  (rollback: see docs/v3-to-v4-rollback-procedure.md — "
+                "  (rollback: see docs/v3-to-v4-rollback-procedure.md -- "
                 "rename session-state.v3.bak.json back to session-state.json)"
             )
         if not dry_run and counts["swept_orchestrator"]:

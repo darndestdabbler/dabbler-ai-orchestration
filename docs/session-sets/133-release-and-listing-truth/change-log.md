@@ -291,3 +291,63 @@ right:
   operator's attestation of 2026-08-15 — staff are using the published
   extension and have reported no major issues — is the evidence of record, and
   the documented remedy stands in for the sweep.
+
+---
+
+## Step 9 — the guidance review (terminal session)
+
+**Outcome: no changes to the preload.** That is a decision, not a skip, and it
+rests on two facts.
+
+`guidance_report --check` reports every preload file at **exactly 100% of its
+ceiling** — constitution 4,059, project-guidance 3,394, lessons-learned 2,269,
+engine file 1,922, total 11,644. Ceilings ratchet down only, so admitting new
+prose means evicting prose that is already load-bearing. Set 121 has just
+finished an encode-or-drop pass over this corpus; there is no slack to spend
+and nothing here earned an eviction.
+
+Three things this set learned are durable. None of them belongs in preload,
+and each is routed to where it will actually be read:
+
+**1. Never hand-author a timestamp a writer already stamps.** This session's
+one self-inflicted defect, and the one verification caught last: four
+hand-typed decision timestamps, one of them chronologically impossible on the
+entry authorizing an exception to a machine-enforced bound. It fails the
+preload admission test on criterion 4 — an **executable gate is available and
+obviously better than an instruction**. `decision_journal` already does
+`timestamp=timestamp or now_iso()`; it should go further and *refuse* a
+caller-supplied timestamp outright, or a gate should assert the journal is
+monotonic. Recorded as a residual for a follow-on router set. A lesson telling
+future orchestrators "don't do that" is exactly the guidance Set 121's rule
+exists to reject.
+
+**2. Confirm a publish against the registry, never against the workflow.**
+This set found an Open VSX publish that had never happened, behind a green job
+on a step that skips non-fatally, and a `0.45.0` row that had claimed it for a
+year. The rule is real and it has now been wrong twice on this row. But its
+trigger is **situational** — it fires at a release, not every session — which
+is the same reason L-078-1 was archived rather than kept resident. It is
+therefore written where a release operator will meet it: in the release-status
+row itself, as *read a green Open VSX job as "did not fail", never as
+"published"*, beside the evidence that makes the point concrete.
+
+**3. A two-cycle round bound is the wrong size when the verifier changes
+provider mid-session.** The bound was passed twice here, each time on its own
+recorded operator attestation, and both passes were justified — once by a
+provider outage that had degraded the verifier to tier 2 and closed off the
+sanctioned third-provider route, once by a genuine defect the extra round
+found. That is the loop working, not grinding. But it is a claim about how the
+bound is *sized*, which is a measurement question, and it belongs to Set 134
+(`134-ceremony-cost-and-what-to-cut`) on its own evidence rather than to a
+guidance edit made from a single session. It is journaled in `decisions.jsonl`
+for that set to pick up.
+
+**Lessons cited at close** (`cite_lessons`, recorded in
+`docs/planning/guidance-usage.json`): `G-004` practicality outranks
+rule-perfectionism, which decided the sourcemap revert; `G-008` a bug is a bug
+class, which turned one fabricated timestamp into a check of all four;
+`G-012` propagate a consistency fix to every echo, which took the Open VSX
+correction back to the `0.45.0` row; `G-013` grade severity by consequence;
+and `L-064-8` a replacement doc inherits the retired doc's claims at its peril,
+which is why the release-status row's inherited "unpublished" and "not yet on
+PyPI" claims were re-checked rather than carried.

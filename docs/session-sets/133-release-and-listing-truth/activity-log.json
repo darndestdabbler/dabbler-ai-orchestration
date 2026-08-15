@@ -215,6 +215,14 @@
       "dateTime": "2026-08-15T14:55:56.500108-04:00",
       "description": "All three declared suites green and fresh against the final tree. pytest 4656 passed / 5 skipped / 1 xfailed in 223s at -n 8 (re-run after the decisions.jsonl correction staled the first green run); the single xfail is the deliberate strict-xfail pinning Session 1's open changelog.check() gap. mocha 1468 passing / 0 failing in 23s. playwright 32 passed / 0 failed in 3.1m. mocha and playwright were not re-run for the journal correction and are not owed -- decisions.jsonl sits under docs/session-sets/, which run_of_record affected confirms is covered by pytest alone.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T14:58:46.907217-04:00",
+      "description": "Closed VERIFIED. close_session passed every gate (checklist_posted WARN, advisory, disclosed not backfilled) and REFUSED the cost block as malformed -- corrected afterwards to Session 1's shape and re-validated clean against _validate_cost, with the gap disclosed since the closeout event cannot carry the figure retroactively. Notification fired after the close succeeded. Step 9 recorded in change-log.md: NO preload changes, on a corpus sitting at exactly 100% of every ceiling; the three durable learnings routed to an executable fix, to the release-status row, and to Set 134 respectively.",
+      "status": "complete"
     }
   ]
 }

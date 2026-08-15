@@ -9,6 +9,10 @@
 >
 > **Created:** 2026-08-08. **Restructured 2026-08-10** from three sessions
 > to four, after the operator's notes and three pre-set consult rounds.
+> **Amended 2026-08-15** (operator ruling): OBS Studio (Windows Graphics
+> Capture via obs-websocket) is Session 4's primary capture candidate;
+> ffmpeg `gdigrab` is the fallback. Pass criteria unchanged. See the
+> operator note of 2026-08-15.
 > **Prerequisites:** Set 112 complete (operator sequencing decision, 2026-08-08).
 > **Session Set:** `docs/session-sets/113-narrated-video-walkthroughs/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
@@ -256,12 +260,26 @@ tooling on its own product.
    first capture are not criteria.
 3. **Run the pilot** against the Work Explorer, using the automation that
    already works (`scripts/vscode-launch.js` + the Layer 3 launch
-   machinery). ffmpeg (`-f gdigrab`) is a **documented optional
-   prerequisite** — never bundled, never in the portable core. **Do not
-   expand:** not cross-platform capture, not native desktop automation
-   beyond what already exists here, not dependency bundling, not audio, not
-   publishing. If the session starts growing, it has failed its own budget —
-   stop and record that.
+   machinery). **OBS Studio is the primary capture candidate** (operator
+   ruling, 2026-08-15): its Windows Graphics Capture source tracks the
+   intended window under occlusion, excludes unrelated desktop pixels, and
+   handles display scaling — the three places ffmpeg `gdigrab` (GDI-based,
+   prone to black frames on hardware-accelerated apps such as Electron, and
+   to occlusion leakage) is most likely to miss the step-2 bar — and
+   obs-websocket, bundled since OBS 28, makes scene setup, start/stop and
+   output paths scriptable. ffmpeg (`-f gdigrab`) is the **fallback**
+   candidate. Both are **documented optional prerequisites** — never
+   bundled, never in the portable core; "dependency absent" (OBS not
+   installed, or running without its websocket reachable) is the
+   clean-failure path the criteria already demand, not a condition to
+   engineer around. The step-2 pass criteria are **unchanged** — whichever
+   backend runs must earn them. **Do not expand:** not cross-platform
+   capture, not native desktop automation beyond what already exists here,
+   not dependency bundling, not audio, not publishing, and **no
+   capture-time zoom via OBS scene transforms** (operator note,
+   2026-08-15 — attention emphasis is a driver/post-processing concern,
+   not a capture concern). If the session starts growing, it has failed
+   its own budget — stop and record that.
 4. **Record the outcome either way.** Pass → ship as an optional Windows
    capability behind the **internal, explicitly unstable** recorder
    interface, with manual-only degradation intact. Fail → keep the
@@ -325,8 +343,9 @@ tooling on its own product.
 
 - **The driver is the expensive part, not the capture.** Round 3's sharpest
   correction, and it lands on the operator, the earlier consults and this
-  spec's first draft equally: ffmpeg records whatever is on screen, but
-  something still has to *make the application do things*. Playwright
+  spec's first draft equally: the capture backend — OBS or ffmpeg — records
+  whatever is on screen, but something still has to *make the application
+  do things*. Playwright
   already drives browsers; nothing drives an arbitrary desktop app. Never
   reason about capture without pricing the driver.
 - **Narration is authoring work, not engineering work.** Writing steps a

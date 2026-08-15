@@ -375,6 +375,72 @@ manual upload."*
 
 ---
 
+## 2026-08-15 — OBS Studio, zoom, and the standalone-recorder question
+
+Recorded while Set 113 sat queued behind Set 133. The operator downloaded
+OBS Studio, noted its extensive API, and asked three things: should the
+video tutorials use it; can the videos have a zoom-like capability; and
+would a standalone tool/agent that lets AI record *any* application be a
+better shape. The goal restated in the operator's words: smallish videos
+that walk through named micro-workflows, with captioning — which matches
+spec decisions 3 and 7 and the sub-minute SharePoint/Teams convention
+as already written.
+
+### Ruled (operator accepted the orchestrator's assessment, 2026-08-15)
+
+- **(a) OBS Studio is Session 4's primary capture candidate**, taking the
+  slot the spec gave ffmpeg `gdigrab`; `gdigrab` stays as the fallback.
+  The grounds are Session 4's own pass criteria, not general preference:
+  OBS's Windows Graphics Capture source tracks the intended window under
+  occlusion, excludes unrelated desktop pixels, and handles display
+  scaling — the three places `gdigrab` (GDI-based, black-frames on
+  hardware-accelerated apps such as Electron/VS Code, leaks occluding
+  windows into the frame) is most likely to miss the
+  ten-consecutive-clean-captures bar. obs-websocket ships bundled since
+  OBS 28, so scene and source creation, start/stop and output paths are
+  all scriptable. OBS remains a **documented optional prerequisite** — a
+  running GUI application the harness launches and configures, never
+  bundled — and "OBS absent, or running without its websocket reachable"
+  is the clean-failure path the criteria already demand. **Session 3 is
+  untouched:** Playwright `recordVideo` stays the primary path for the
+  (a)–(d) web targets, where OBS would add a desktop dependency for no
+  gain. Spec amended same day (header + Session 4 step 3).
+- **(b) No standalone record-any-application tool or agent.** This is the
+  round-3 correction applied: capture is the cheap part, and a generic
+  recorder is idle until something can *drive* an arbitrary application —
+  which nothing does (Playwright drives browsers, full stop). A
+  record-anything tool is the "generic cross-platform desktop recorder /
+  media-tooling subsystem" the non-goals refuse and the complexity note
+  warns about. The reserved **Non-Web Walkthrough Backends** set remains
+  the home for this, with its trigger unchanged: an actual product
+  supplies requirements.
+- **(c) Zoom is a driver and post-processing concern, never a capture
+  concern.** Three tiers, in rising complexity:
+  1. **In-page emphasis — build this one.** The driver knows each step's
+     target element; injecting a highlight (outline, dim-the-rest, click
+     ripple) before the action buys most of what zoom buys for
+     tens-of-seconds captioned videos, works identically for both
+     backends, and lives in the step semantics where it belongs
+     (Sessions 2/3 seam). Session 3 should also record each target's
+     **bounding box in the step-event stream** — the cheap hedge that
+     keeps tier 2 possible later.
+  2. **Post-processing zoom** (e.g. ffmpeg `zoompan` keyed to step-event
+     timestamps and bounding boxes) — deterministic and backend-agnostic,
+     but **deferred until a real reviewer says the videos are hard to
+     follow**.
+  3. **Capture-time zoom via OBS scene transforms — refused.** It needs
+     the Move plugin (another dependency) plus live sync between the
+     driver and transform calls, and the result cannot be regenerated
+     from the scenario source alone, which breaks the one-source rule.
+
+### One boundary restated
+
+The step list remains the caption source (spec decision 3). Stream's
+auto-captions on manually uploaded copies are a bonus, never the
+artifact — otherwise the video and the walkthrough can drift.
+
+---
+
 ## Open items these notes hand to the sessions
 
 **Consulted three times, 2026-08-10, before Session 1.**
@@ -396,6 +462,7 @@ review of the consensus). Round 3 supersedes round 2 where they conflict.
 | 8 | Independent skeptical-user agent driving the UI | **Deferred to a named later set**, web-only, with seeded-defect calibration, no quota, advisory output that never counts as a human reviewer |
 | 9 | Cheap anti-collusion measures available **now**, needing no new set | Freeze operator-approved acceptance criteria **before** implementation; verifier challenges black-box assertions; check tests exercise user-visible outcomes; **forbid the implementer silently weakening tests to get a pass** |
 | 10 | Session count | R3 recommends **four** sessions, not three |
+| 11 | Session 4 capture backend; zoom; standalone recorder | **Operator-ruled 2026-08-15** (post-consult): OBS/WGC primary, `gdigrab` fallback, criteria unchanged; zoom = driver emphasis now, post-processing later, capture-time never; no standalone record-anything tool — reserved follow-on set unchanged |
 
 ### Unrelated finding, surfaced by the round-3 dispatch
 

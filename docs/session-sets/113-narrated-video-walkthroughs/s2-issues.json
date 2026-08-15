@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The exemplar cannot be started by its declared audience without unstated repository context**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `docs/walkthroughs/work-explorer-first-look/scenario.yaml`, `docs/walkthroughs/work-explorer-first-look/walkthrough.md`, `docs/walkthroughs/work-explorer-first-look/training.md`, `docs/walkthroughs/README.md`\n  - **Failure scenario:** The declared audience is “Anyone who has just installed the Dabbler AI Orchestration extension.” A typical extension user does not have the repository checkout, its `tools/dabbler-ai-orchestration` directory, development dependencies, or fixture launcher. Following the first baseline command therefore fails at `cd tools/dabbler-ai-orchestration`, preventing the user from reaching any scenario step. This is probable because possessing only the installed extension is exactly the audience the source declares.\n  - **Acceptance criterion:** `JUDGMENT - Does the exemplar either provide complete instructions for obtaining and entering the repository fixture from its declared starting context, or narrow its audience and prerequisites explicitly to a contributor who already has a prepared repository checkout?`\n  - **Details:** **Violation:** The work repeatedly promises a scenario “authored once in words a stranger can follow,” while the session ends with standalone walkthrough and training documents. **Impact:** The only exemplar—the session’s principal reader-facing deliverable—cannot be executed by its stated audience, materially defeating the standalone walkthrough objective. **Evidence:** Its prerequisites begin with `npm install` already having been run in a repository-relative directory, and setup immediately runs `cd tools/dabbler-ai-orchestration`; nowhere does it require or explain obtaining the repository, identify the repository root, or explain that this is a contributor-only development fixture. The correct fix is to add an explicit obtainable repository/fixture prerequisite and starting-directory instructions, or redefine the audience as contributors with a prepared checkout.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "The declared audience is “Anyone who has just installed the Dabbler AI Orchestration extension.” A typical extension user does not have the repository checkout, its `tools/dabbler-ai-orchestration` directory, development dependencies, or fixture launcher. Following the first baseline command therefore fails at `cd tools/dabbler-ai-orchestration`, preventing the user from reaching any scenario step. This is probable because possessing only the installed extension is exactly the audience the source declares.",
+      "evidencePaths": [
+        "docs/walkthroughs/work-explorer-first-look/scenario.yaml",
+        "docs/walkthroughs/work-explorer-first-look/walkthrough.md",
+        "docs/walkthroughs/work-explorer-first-look/training.md",
+        "docs/walkthroughs/README.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Does the exemplar either provide complete instructions for obtaining and entering the repository fixture from its declared starting context, or narrow its audience and prerequisites explicitly to a contributor who already has a prepared repository checkout?"
+      },
+      "discoveryCall": 1,
+      "discoveryLens": "spec-conformance"
+    },
+    {
+      "description": "** The exemplar’s baseline command assumes an unstated repository-root working directory, so it is not followable by the stated audience without prior context.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `docs/walkthroughs/work-explorer-first-look/scenario.yaml, docs/walkthroughs/work-explorer-first-look/walkthrough.md, ai_router/scenario_render.py`\n  - **Failure scenario:** A typical reader follows the prerequisite by running `npm install` inside `tools/dabbler-ai-orchestration`, remains in that directory, and then follows the generated baseline literally. The renderer emits `cd tools/dabbler-ai-orchestration`, which resolves to a nonexistent nested path. An extension user without a repository checkout cannot run it at all. This is probable because the audience is “Anyone who has just installed” the extension, while neither repository access nor starting from the repository root is stated.\n  - **Acceptance criterion:** `JUDGMENT - The generated walkthrough must explicitly establish possession of the repository checkout and the shell’s starting directory, or render a setup command whose path is unambiguous from any documented starting state.`\n  - **Details:** **Violation:** The scenario is required to be “authored once in words a stranger can follow,” and the walkthrough must stand alone. **Impact:** The only exemplar’s first operational instruction can fail before the baseline is reached, preventing every subsequent step and materially defeating the session’s standalone-walkthrough objective. **Evidence:** The source declares only Node.js, a prior `npm install`, and VS Code as prerequisites; its setup uses relative `cwd: tools/dabbler-ai-orchestration`. `render_walkthrough` and `render_training` emit that verbatim as `cd tools/dabbler-ai-orchestration`, without defining the directory against which it is resolved. The fix is to state the checkout/root prerequisite explicitly or define and render stable working-directory semantics.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A typical reader follows the prerequisite by running `npm install` inside `tools/dabbler-ai-orchestration`, remains in that directory, and then follows the generated baseline literally. The renderer emits `cd tools/dabbler-ai-orchestration`, which resolves to a nonexistent nested path. An extension user without a repository checkout cannot run it at all. This is probable because the audience is “Anyone who has just installed” the extension, while neither repository access nor starting from the repository root is stated.",
+      "evidencePaths": [
+        "docs/walkthroughs/work-explorer-first-look/scenario.yaml",
+        "docs/walkthroughs/work-explorer-first-look/walkthrough.md",
+        "ai_router/scenario_render.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The generated walkthrough must explicitly establish possession of the repository checkout and the shell’s starting directory, or render a setup command whose path is unambiguous from any documented starting state."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "8fd5b98b6667610e5578d75bb9900088719a62e0"
+}

@@ -1,65 +1,123 @@
 {
   "status": "completed",
-  "summary": "Session 1 of 4: the requiresUAT close gate stops demanding a walk and starts demanding an accounting. disposition.uat is now a per-component, facts-only record -- component, method, human reviewer type and count, evidence, findings, and an explicit attested none -- replacing Set 111 S4's binary walked | waived, which the operator retired on 2026-08-10 because a flag that can always be bypassed is not a requirement. Coverage is checked against a new spec key, uatComponents, rather than against whatever records a disposition happens to contain: an armed set declaring no inventory is refused, a declared component with no record is refused and named, and method 'none' with an attestation PASSES -- nothing blocks on how much UAT was done. Reviewer types and component keys are closed vocabularies, which makes 'an AI reviewed it' and a self-assessed confidence score structurally unrecordable rather than merely discouraged. Verification found five blocking findings across two discovery passes, all real and all accepted: two Criticals where the inventory parser silently SHORTENED an inventory (indentationless YAML sequences, and comment lines between entries), which is the fail-open this session exists to prevent, plus three parity defects between the Python validator and disposition.schema.json. Separately, adding the changelog fragment turned the full pytest suite red: nothing re-establishes a partition point on the first contribution after a release fold, so the changelog round-trip guard was sitting disarmed. Fixed for that transition only; the wider question is escalated. BREAKING for consumer repos.",
+  "summary": "Session 2 of 4: one authored scenario now renders four documents that cannot drift apart. ai_router/scenario.py is the platform-neutral model -- stable kebab-case scenario and step ids, prerequisites, a baseline carrying its own observable, reset, recovery, named checkpoints, and per step an action plus the expected observable result -- with closed vocabularies at both levels, so an unknown key, a duplicate key and a '-->' that would break a WebVTT cue are all refused rather than silently absorbed. ai_router/scenario_render.py renders walkthrough.md, training.md, captions.vtt and chapters.json, and its --check re-renders in memory and refuses any committed file whose text differs; the pytest suite runs that over the whole committed tree, which is the divergence gate the session owed. THE DRIVER QUARANTINE IS STRUCTURAL, not conventional: render_all hands each renderer a copy with drivers emptied, and portable_digest never sees driver blocks, so replacing the entire driver block leaves all four documents identical -- asserted, including a stub renderer that proves it is handed {}. ai_router/scenario_lint.py is the advisory second line for selector-shaped text that leaks into portable prose; six rules, each with a planted violation and a legitimate look-alike, and the committed corpus asserted clean. The operator's 2026-08-10 condition on cutting the synced window is honoured in what the documents SAY: both state, verbatim, that reaching any step means replaying a prefix from the baseline or the nearest named checkpoint, and walkthrough.md renders a Where to start table instead of implying a seek bar. Both prose documents also state verbatim that no video is needed and link no media file. One exemplar ships: docs/walkthroughs/work-explorer-first-look, five steps reading the AI Work Explorer on the disposable fixture project npm run walk stages, with every expected result checked against shipped extension code and the pinned uat-matrix fixtures. Verification ran four rounds and found three Majors -- two of them the same defect seen independently by two lenses -- plus eight nits. The Major that mattered: the exemplar declared its audience as anyone who had installed the extension while its baseline needed a repository checkout and an unstated starting directory, so the first command failed before step 1 in a document whose entire claim is that a stranger can follow it. The second Major, found by the supplementary pass, was that the quarantine lint had no CSS id rule at all; the first fix for it was then REJECTED on the fix delta for missing button#save, which is the form browser tooling emits and which survives an unquoted YAML scalar. Both are fixed and the verifier's own executable acceptance criterion was run verbatim. One nit was disputed with deterministic evidence rather than accepted: comparing raw bytes instead of text would fail --check on every Windows clone of this repo (core.autocrlf=true; .gitattributes exempts only the stamped verification artifacts), so the wrong thing was the byte-for-byte CLAIM, which is corrected everywhere, with two tests pinning that the tolerance is line endings and nothing more. Two Minor residuals ship unfixed and named (S2-R1, S2-R2), both found by the final VERIFIED round: neither could be fixed without a delta-scoped remediation-review past the 2-cycle cap, which the orchestrator may not self-authorize, and shipping a named residual beats shipping unverified code.",
   "verification_method": "api",
   "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/changelog.d/.baseline.json",
-    "ai_router/changelog.d/0010-set-113-s1-uat-accounting.md",
-    "ai_router/changelog.py",
-    "ai_router/close_preflight.py",
-    "ai_router/disposition.py",
-    "ai_router/docs/close-out.md",
-    "ai_router/gate_checks.py",
-    "ai_router/schemas/disposition.schema.json",
-    "ai_router/spec_config.py",
-    "ai_router/tests/test_changelog_partition.py",
-    "ai_router/tests/test_disposition.py",
-    "ai_router/tests/test_drift_guard.py",
-    "ai_router/tests/test_lightweight_removal_boundary.py",
-    "ai_router/tests/test_set111_close_gates.py",
-    "ai_router/tests/test_set113_uat_accounting.py",
-    "docs/disposition-schema.md",
+    "ai_router/changelog.d/0011-set-113-s2-scenario-model.md",
+    "ai_router/scenario.py",
+    "ai_router/scenario_lint.py",
+    "ai_router/scenario_render.py",
+    "ai_router/tests/test_scenario_lint.py",
+    "ai_router/tests/test_scenario_model.py",
+    "ai_router/tests/test_scenario_render.py",
     "docs/planning/session-set-authoring-guide.md",
     "docs/session-sets/113-narrated-video-walkthroughs/activity-log.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/ai-assignment.md",
     "docs/session-sets/113-narrated-video-walkthroughs/checklist-posts.jsonl",
     "docs/session-sets/113-narrated-video-walkthroughs/decisions.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/disposition.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-acceptance-round-1.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-acceptance-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-conventions.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-issues-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-issues.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-remediation-round-1.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-remediation-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-rounds.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-verification-fanout-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-verification-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-verification-round-3.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-verification-round-4.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s1-verification.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-acceptance-round-1.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-acceptance-round-2.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-conventions.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-issues-round-2.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-issues-round-3.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-issues.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-remediation-round-1.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-remediation-round-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-rounds.jsonl",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-fanout-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-round-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-round-3.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification-round-4.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s2-verification.md",
     "docs/session-sets/113-narrated-video-walkthroughs/session-events.jsonl",
     "docs/session-sets/113-narrated-video-walkthroughs/session-state.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/spec.md",
     "docs/session-sets/113-narrated-video-walkthroughs/test-runs.jsonl",
-    "tools/dabbler-ai-orchestration/dist/extension.js.map",
-    "tools/dabbler-ai-orchestration/scripts/stage-walk.js"
+    "docs/walkthroughs/README.md",
+    "docs/walkthroughs/work-explorer-first-look/captions.vtt",
+    "docs/walkthroughs/work-explorer-first-look/chapters.json",
+    "docs/walkthroughs/work-explorer-first-look/scenario.yaml",
+    "docs/walkthroughs/work-explorer-first-look/training.md",
+    "docs/walkthroughs/work-explorer-first-look/walkthrough.md",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map"
   ],
   "blockers": [],
+  "residuals": [
+    {
+      "id": "S2-R1",
+      "severity": "minor",
+      "summary": "_StrictLoader's docstring claims SafeLoader behaviour is otherwise unchanged. Replacing the mapping constructor bypasses merge-key ('<<') handling, and an unhashable YAML key raises a bare TypeError instead of ScenarioError. Neither shape appears in an authored scenario, and an unhandled '<<' key is refused by the unknown-key check anyway, so the practical exposure is a misleading docstring rather than a wrong result.",
+      "owner": "Session 3 of Set 113",
+      "why_not_fixed_here": "Found by the round-4 remediation-review, which returned VERIFIED. Both remediation-review cycles were spent, and a shipped-code change after a clean round owes one delta-scoped remediation-review that the orchestrator may not self-authorize. Shipping a named residual beats shipping unverified code."
+    },
+    {
+      "id": "S2-R2",
+      "severity": "minor",
+      "summary": "The advisory lint still misses two selector forms: 'my-button#save' (hyphenated custom-element prefix) and '.primary#save' (the class half carries no hyphen, so the class rule -- which requires one -- misses it, and the id rule declines any prefix following a '.'). '#save' and 'button#save' are both caught. The STRUCTURAL half of the quarantine has no gap; this is the text scan only.",
+      "owner": "Session 3 of Set 113",
+      "why_not_fixed_here": "Same budget reason as S2-R1.",
+      "owed_documentation": "A 'Known gaps in the lint' section for docs/walkthroughs/README.md was written during this session and then REVERTED before close, because it landed after the round-4 VERIFIED stamp and post_round_delta correctly classified it as shipped code -- docs/walkthroughs/ is under no declared test surface. Keeping it would have required an operator-authorized routed round past the remediation cap, which is poor value for one paragraph. Session 3 should write it when it closes these gaps; the full text of both false negatives is in this residual and in s2-remediation-round-2.md, so nothing is lost."
+    }
+  ],
   "next_orchestrator": {
-    "engine": "codex",
-    "provider": "openai",
-    "model": "gpt-5.6-sol",
+    "engine": "gemini",
+    "provider": "google",
+    "model": "current flagship family",
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 authors the portable scenario model and its renderers. The routed Step 3.5 ledger assigns it to openai's current frontier family at high effort with a google verifier, and rotating off anthropic here also keeps Session 2's divergence test from being designed by the lineage that wrote Session 1's gate."
+      "specifics": "Session 3 proves the browser recording path against a web fixture and emits the step-event stream keyed by this session's stable step ids. The routed Step 3.5 ledger assigns it to google at high effort with an anthropic verifier. Rotating off openai also matters here specifically: openai verified every round of this session, so the lineage that signed off the scenario model should not be the one building the first consumer of it. NOTE: this session itself ran on anthropic (claude-opus-5) rather than the openai orchestrator the ledger and Session 1's disposition both recommended -- an operator launch decision, recorded here rather than left implicit. Verifier independence was preserved throughout (anthropic excluded; every round routed to gpt-5-6-sol)."
     }
+  },
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "unknown",
+        "credits": null,
+        "usd": null,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "no conversation ids supplied; nothing to measure (this is not zero)"
+      },
+      {
+        "component": "routed_seat",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      },
+      {
+        "component": "routed_api",
+        "status": "unavailable",
+        "credits": null,
+        "usd": null,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "5 Direct-API call(s) are recorded for this session; their cost is authoritative in router-metrics.jsonl (cost_usd, in dollars) and is not restated here in AI credits"
+      }
+    ],
+    "total_status": "unknown",
+    "total_credits": null,
+    "total_usd": null,
+    "unmeasured": [
+      "orchestrator_seat",
+      "routed_api"
+    ],
+    "store_schema_version": 6,
+    "measured_at": "close"
   },
   "lessons_cited": [
     "L-112-1",
-    "L-064-8"
+    "L-064-8",
+    "L-079-1"
   ]
 }

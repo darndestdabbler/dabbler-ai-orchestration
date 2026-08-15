@@ -1,7 +1,7 @@
 {
   "sessionSetName": "113-narrated-video-walkthroughs",
   "createdDate": "2026-08-15T19:05:28.206925+00:00",
-  "totalSessions": 0,
+  "totalSessions": 4,
   "entries": [
     {
       "sessionNumber": 1,
@@ -106,6 +106,117 @@
       "stepKey": "journal-the-decision",
       "dateTime": "2026-08-15T15:29:17.644551-04:00",
       "description": "Journaled under OPERATOR authority with the operator's own words from operator-notes.md 2026-08-10 as the attestation. First attempted the same record under authority='ai', which decision_journal refused (exit 5, verification-reduction carve-out) - the refusal the spec calls correct, exercised rather than assumed. A second decision journals the mid-set addition of uatComponents to this set's own spec.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "define-the-smallest-platform-neutral-scenario",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "**Define the smallest platform-neutral scenario model.** Stable scenario and step IDs; prerequisites and fixture startup; a known baseline; reset, recovery and checkpoint instructions; per step, the action and the **expected observable result**.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "quarantine-driver-detail",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "**Quarantine driver detail.** Playwright selectors and any other target-specific mechanics live in platform-specific blocks, never in the portable step semantics. This is the seam that actually matters \u2014 round 3 rejected a published recorder-plugin contract as premature abstraction and named this instead.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "render-from-the-one-source-the",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "**Render from the one source:** the manual UAT walkthrough, the training document, the captions, and chapter metadata. **Add a test that fails if the renderings can diverge.** Honour the operator's condition from decision 2 in what the documents actually say: reaching an arbitrary point means replaying a documented prefix from a baseline or a named checkpoint. State that plainly rather than implying random access.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "**Close-out.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T17:08:25.276811-04:00",
+      "description": "Registered session 2 (claude / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "define-the-smallest-platform-neutral-scenario",
+      "dateTime": "2026-08-15T17:27:53.535901-04:00",
+      "description": "Defined the portable scenario model in ai_router/scenario.py: stable kebab-case scenario and step ids, prerequisites, baseline (description/setup/observable), reset, recovery, named checkpoints, and per step an action plus an expected observable result. Closed vocabularies at both levels -- an unknown key is refused, not ignored.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "quarantine-driver-detail",
+      "dateTime": "2026-08-15T17:27:53.535901-04:00",
+      "description": "Quarantined driver detail structurally: drivers: is opaque to the model, no renderer receives it, and portable_digest() is taken over the portable half only, so a selector change leaves all four renderings byte-identical. ai_router/scenario_lint.py is the advisory second line for selector-shaped text that leaks into portable prose; five rules, each with a planted violation and a legitimate look-alike.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "render-from-the-one-source-the",
+      "dateTime": "2026-08-15T17:27:53.535901-04:00",
+      "description": "Rendered four documents from the one source (walkthrough.md, training.md, captions.vtt, chapters.json) via ai_router/scenario_render.py, with --check as the divergence gate over the committed tree. Both prose documents state verbatim that no video is needed and carry the replay rule: reaching any step means replaying a prefix from the baseline or the nearest named checkpoint, never random access. One exemplar authored: docs/walkthroughs/work-explorer-first-look.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-15T17:59:23.202258-04:00",
+      "description": "Four rounds, all routed to gpt-5-6-sol with anthropic excluded. Discovery fan-out (2 lenses) + supplementary found 3 Majors and 8 nits; remediation-review cycle 1 REJECTED one fix (the CSS-id rule missed button#save) and cycle 2 returned VERIFIED with 3 fix verdicts accepted. One nit disputed with deterministic evidence: byte comparison would fail --check on every Windows clone. $1.90.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T17:59:23.203258-04:00",
+      "description": "All three declared suites run after the last code-changing stage: pytest 4893 passed / 5 skipped / 1 xfailed (228s, run at -n 8 per the operator parallelism cap rather than the declared -n auto, recorded in the run's detail field); mocha 1468 passing (23s); playwright 32 passed (180s) on an idle machine. All three recorded via run_of_record.",
       "status": "complete"
     }
   ]

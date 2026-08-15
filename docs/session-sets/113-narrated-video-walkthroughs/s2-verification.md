@@ -1,0 +1,21 @@
+ISSUES FOUND
+
+- **Issue 1: The exemplar cannot be started by its declared audience without unstated repository context**
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/walkthroughs/work-explorer-first-look/scenario.yaml`, `docs/walkthroughs/work-explorer-first-look/walkthrough.md`, `docs/walkthroughs/work-explorer-first-look/training.md`, `docs/walkthroughs/README.md`
+  - **Failure scenario:** The declared audience is “Anyone who has just installed the Dabbler AI Orchestration extension.” A typical extension user does not have the repository checkout, its `tools/dabbler-ai-orchestration` directory, development dependencies, or fixture launcher. Following the first baseline command therefore fails at `cd tools/dabbler-ai-orchestration`, preventing the user from reaching any scenario step. This is probable because possessing only the installed extension is exactly the audience the source declares.
+  - **Acceptance criterion:** `JUDGMENT - Does the exemplar either provide complete instructions for obtaining and entering the repository fixture from its declared starting context, or narrow its audience and prerequisites explicitly to a contributor who already has a prepared repository checkout?`
+  - **Details:** **Violation:** The work repeatedly promises a scenario “authored once in words a stranger can follow,” while the session ends with standalone walkthrough and training documents. **Impact:** The only exemplar—the session’s principal reader-facing deliverable—cannot be executed by its stated audience, materially defeating the standalone walkthrough objective. **Evidence:** Its prerequisites begin with `npm install` already having been run in a repository-relative directory, and setup immediately runs `cd tools/dabbler-ai-orchestration`; nowhere does it require or explain obtaining the repository, identify the repository root, or explain that this is a contributor-only development fixture. The correct fix is to add an explicit obtainable repository/fixture prerequisite and starting-directory instructions, or redefine the audience as contributors with a prepared checkout.
+
+## NITS
+
+- **Nit:** Issue → The claimed byte-for-byte divergence check normalizes line endings, so a generated file converted from LF to CRLF passes. Location → `ai_router/scenario_render.py`, `check_scenario_dir()` uses `Path.read_text()` with universal-newline translation. Fix → Compare `path.read_bytes()` with `text.encode("utf-8")`.
+
+- **Nit:** Issue → The documentation says “no renderer receives” the driver block and calls the quarantine structural, but every renderer receives the complete `Scenario`, including its public `.drivers` mapping. Existing renderers happen not to read it, and the selector-change test protects only the current behavior. Location → `ai_router/scenario_render.py` (`render_all` and renderer signatures), `ai_router/scenario.py` (`Scenario.drivers`), `docs/walkthroughs/README.md`. Fix → Pass a driver-free portable view to renderers, or weaken the structural claim and broaden the regression test to replace arbitrary driver contents.
+
+- **Nit:** Issue → The advertised whole-tree `--check` command exits successfully when no scenarios exist, including after the sole exemplar and all outputs are deleted. The pytest corpus assertion catches this only when pytest is also run. Location → `ai_router/scenario_render.py`, `main()` branch for `not targets`. Fix → Make default `--check` return nonzero when the required corpus is empty.
+
+- **Nit:** Issue → Valid model text can produce invalid WebVTT because narration is inserted without validating internal blank lines or other cue-breaking content. Location → `ai_router/scenario.py` (`narration` accepts arbitrary non-empty text), `ai_router/scenario_render.py` (`render_captions`). Fix → Validate or normalize caption payloads and test multiline narration against a WebVTT parser.
+
+- **Nit:** Issue → The walkthrough’s checkpoint table says the baseline is “the state the setup below leaves you in,” but the setup is rendered above that table. Location → `ai_router/scenario_render.py`, `_checkpoint_table()`. Fix → Change “below” to “above” or remove the directional reference.

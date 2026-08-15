@@ -1,0 +1,17 @@
+ISSUES FOUND
+
+- **Issue 1:** The exemplar’s baseline command assumes an unstated repository-root working directory, so it is not followable by the stated audience without prior context.
+  - **Category:** Completeness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/walkthroughs/work-explorer-first-look/scenario.yaml, docs/walkthroughs/work-explorer-first-look/walkthrough.md, ai_router/scenario_render.py`
+  - **Failure scenario:** A typical reader follows the prerequisite by running `npm install` inside `tools/dabbler-ai-orchestration`, remains in that directory, and then follows the generated baseline literally. The renderer emits `cd tools/dabbler-ai-orchestration`, which resolves to a nonexistent nested path. An extension user without a repository checkout cannot run it at all. This is probable because the audience is “Anyone who has just installed” the extension, while neither repository access nor starting from the repository root is stated.
+  - **Acceptance criterion:** `JUDGMENT - The generated walkthrough must explicitly establish possession of the repository checkout and the shell’s starting directory, or render a setup command whose path is unambiguous from any documented starting state.`
+  - **Details:** **Violation:** The scenario is required to be “authored once in words a stranger can follow,” and the walkthrough must stand alone. **Impact:** The only exemplar’s first operational instruction can fail before the baseline is reached, preventing every subsequent step and materially defeating the session’s standalone-walkthrough objective. **Evidence:** The source declares only Node.js, a prior `npm install`, and VS Code as prerequisites; its setup uses relative `cwd: tools/dabbler-ai-orchestration`. `render_walkthrough` and `render_training` emit that verbatim as `cd tools/dabbler-ai-orchestration`, without defining the directory against which it is resolved. The fix is to state the checkout/root prerequisite explicitly or define and render stable working-directory semantics.
+
+## NITS
+
+- **Nit:** `ai_router/scenario_render.py` claims byte comparison, but `Path.read_text()` performs universal-newline translation. A generated file converted from LF to CRLF can pass `--check` despite not being byte-identical. The semantic impact is small, but the stated byte-level guarantee is false.
+- **Nit:** `ai_router/scenario.py` uses `yaml.safe_load()` without duplicate-key detection. An author who accidentally declares `steps`, `action`, or another key twice silently loses the earlier value, contradicting the validator’s stated goal of refusing source mistakes that drop content.
+- **Nit:** `ai_router/scenario_render.py` passes the complete `Scenario`, including `drivers`, to every renderer. Current renderers do not read it and tests protect current output, but claims that “no renderer receives that block” and that the separation is structurally enforced are inaccurate.
+- **Nit:** `ai_router/scenario.py` permits narration containing blank lines or `-->`; `render_captions()` inserts it unescaped into WebVTT. Such authored text can terminate a cue or produce invalid timing syntax.
+- **Nit:** `ai_router/scenario_render.py` inserts recovery and checkpoint prose directly into Markdown tables without escaping `|` or embedded newlines. Commands or descriptions containing those common characters can produce malformed generated tables.

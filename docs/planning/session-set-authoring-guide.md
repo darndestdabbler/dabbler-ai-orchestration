@@ -1625,6 +1625,22 @@ opt out.
 > `attestation`. Nothing blocks on how much UAT was done — only on
 > whether every declared component got an answer.
 
+### Walkthrough scenarios (Set 113 S2)
+
+A guided look asks the operator to judge *this session's* work. A
+**walkthrough scenario** is the other shape: one micro-workflow of the
+product, authored once in words a stranger can follow, rendering a
+manual walkthrough, a training document, captions and chapter metadata
+that cannot drift apart. Reach for one when a component needs the same
+walk more than once, or by more than one reviewer — a rendered
+`walkthrough.md` is a legitimate `evidence` entry in the UAT accounting
+above.
+
+Canonical: [`docs/walkthroughs/README.md`](../walkthroughs/README.md) —
+the source format, the driver quarantine, the checkpoint-replay rule,
+and `python -m ai_router.scenario_render`. The written documents stand
+alone with no video; recording is Set 113 Sessions 3 and 4, and optional.
+
 ---
 
 ## Repo-specific addendum

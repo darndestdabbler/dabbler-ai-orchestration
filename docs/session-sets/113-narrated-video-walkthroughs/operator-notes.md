@@ -475,3 +475,67 @@ recorded so it is not lost.
 
 
 
+
+---
+
+## 2026-08-16 — The real risk is giving AI desktop capture at all
+
+Recorded as Session 4 closed, and it **reframes Session 5**.
+
+### The observation
+
+> *"The Podman fidelity issue is something that we may want to live with and
+> here is why … giving AI the ability to capture your desktop is more than a
+> bit of a security risk. I think that the tradeoff in showing a Linux OS is
+> worth it."*
+
+### Why this changes the argument rather than just supporting it
+
+Session 4 reserved the sandboxing work on a **supply-chain** argument: OBS
+and ffmpeg are large open-source dependencies, so isolate them. That is
+true and it is the weaker half.
+
+The operator's argument is about **capability**, not dependencies. A
+recorder that works by capturing the screen is, by construction, a facility
+for an AI-driven process to read whatever is on the operator's display —
+their mail, their credentials, another customer's data, a second monitor
+nobody was thinking about. Session 4 constrained that carefully (window
+capture only, never a monitor; a scene asserted to hold exactly one source;
+camera and audio kinds forbidden by criterion), but every one of those
+constraints is *this* harness behaving well. The container removes the
+capability instead of governing it.
+
+**So the priority order in Session 5 inverts.** Measuring OBS's
+`--only-bundled-plugins` first is still right — it is cheap and it may
+dominate on the supply-chain axis — but it does **nothing** for the
+capability risk. A plugin-reduced OBS on the host can still see the host's
+screen. If the capability argument is the one that matters, the container
+is not the expensive alternative to the cheap mitigation; it is the only
+thing that addresses the actual concern.
+
+**And the fidelity cost is accepted.** Recording Linux VS Code rather than
+Windows VS Code is a real difference for training material, and the
+operator has ruled it worth paying. Session 5 does not need to solve it;
+it needs to state it.
+
+### The third option, to be researched now, not built
+
+> *"One final option would be to fire up an Azure VDI desktop for recording.
+> We should just do some research on that now. My government organization
+> may want to consider it for a future capability."*
+
+Researched 2026-08-16; findings in
+[`docs/proposals/2026-08-16-azure-virtual-desktop-as-a-recording-target.md`](../../proposals/2026-08-16-azure-virtual-desktop-as-a-recording-target.md).
+**Research only — nothing is built, and no Azure resource is created.**
+
+The headline, because it bears directly on the trade above: **Azure Virtual
+Desktop session hosts are Windows**, so a recording made there is a
+recording of *Windows* VS Code. The Azure option would therefore buy the
+isolation *without* the fidelity cost the container imposes — at the price
+of money, a tenant, and a network round trip.
+
+The finding that most needs an administrator's attention is in that
+document: AVD's own screen-capture-protection setting has a **"client and
+server"** mode which explicitly *"prevents tools and services within the
+virtual machine … capturing the screen."* An organisation that enables it
+for compliance would block this recorder by design.

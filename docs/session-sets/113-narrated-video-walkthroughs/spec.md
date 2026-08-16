@@ -351,25 +351,41 @@ pixels, host windows or host devices. That is the right shape.
    where the claims are the same — this is the same capture, somewhere
    else — and state plainly which criteria a container cannot be asked to
    meet.
-3. **Measure the cheap mitigation first.** OBS ships
+3. **Read the operator's 2026-08-16 note before ordering the work.** It
+   reframes this session: the risk that matters is **not** that OBS and
+   ffmpeg are large open-source dependencies, it is that a screen recorder
+   is a facility for an AI-driven process to read whatever is on the
+   operator's display. Session 4 governed that carefully; a container
+   **removes** it. So the plugin measurement below is still worth doing —
+   it is cheap, and it may dominate on the supply-chain axis — but it does
+   nothing for the capability risk, and it must not be mistaken for an
+   answer to it. The fidelity cost of a Linux recording is **accepted**
+   (operator, 2026-08-16); state it, do not solve it.
+4. **Measure the cheap mitigation.** OBS ships
    `--only-bundled-plugins`. Session 4 observed the operator's install
    loading a DeckLink SDK, an NVIDIA filters plugin, a CEF browser source
    and an ML background-removal model, none of which this framework wants.
    Measure the plugin surface with and without the flag **before** building
    anything: if it buys most of the risk reduction, the container may not
    be worth its cost, and that is a real answer.
-4. **Build the container and measure what it costs.** VS Code and OBS on a
+5. **Build the container and measure what it costs.** VS Code and OBS on a
    virtual display inside Podman, driven by the existing Layer 3 machinery.
    This repo already has `ai_router/podman_sandbox.py` (Set 069 S4) built
    on the same principle — the container as the trust boundary.
-5. **Name the fidelity trade honestly, because it is the real cost.**
+6. **Name the fidelity trade honestly.**
    Podman on Windows is a Linux VM, so this records **Linux VS Code**, not
    the Windows VS Code staff actually run. For proving the extension works
    that is mostly fine; for a *training* video it is a different product on
    screen. Decide which the artifact is for, and say so.
-6. **Cross-provider verification.**
-7. **Required portion of the full test suite.**
-8. **Close-out.**
+7. **Do not redirect this session to Azure.** The operator asked for
+   research on an Azure VDI recording target and it is done —
+   [`2026-08-16-azure-virtual-desktop-as-a-recording-target.md`](../../proposals/2026-08-16-azure-virtual-desktop-as-a-recording-target.md)
+   — as a *future capability* for their government organisation, not as
+   this session's work. It carries two VERIFY-FIRST items, one of which is
+   that AVD can be configured to block exactly this recorder.
+8. **Cross-provider verification.**
+9. **Required portion of the full test suite.**
+10. **Close-out.**
 
 **Creates:** the isolation measurements, the plugin-surface comparison, and (only if it earns it) a container capture path
 **Touches:** `tools/dabbler-ai-orchestration/scripts/`, `ai_router/podman_sandbox.py`, `docs/`

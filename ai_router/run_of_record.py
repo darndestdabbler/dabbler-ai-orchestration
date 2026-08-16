@@ -127,11 +127,13 @@ from typing import Dict, List, Optional, Sequence, Tuple
 try:
     from .verification_stamp import (  # type: ignore[import-not-found]
         WORK_DIFF_SET_BOOKKEEPING,
+        close_mandated_excludes,
         sha256_hex,
     )
 except ImportError:  # pragma: no cover - direct-script fallback
     from verification_stamp import (  # type: ignore[no-redef]
         WORK_DIFF_SET_BOOKKEEPING,
+        close_mandated_excludes,
         sha256_hex,
     )
 
@@ -900,6 +902,30 @@ def is_active_set_bookkeeping(rel: str, set_rel: Optional[str]) -> bool:
     binding it would make the gate unsatisfiable rather than strict. It
     is exempt from the verification stamp for the same reason.
     """
+    # 2026-08-16 (ad-hoc fix, follow-on to the freshness-contract PR).
+    # CLOSE-MANDATED WRITES were the third mechanism this predicate needed
+    # and the one it did not consult. ``verification_stamp`` lets a writer
+    # declare, in its own source, a file the close MANDATES it produce --
+    # so the freshness digest stops binding it. Two such files land in the
+    # active set directory: ``path-aware-critique.json`` (pull_critique, at
+    # Step 8) and ``session-progress.json`` (close_session, during the
+    # close itself). Both were exempt from the verification stamp and still
+    # staled the RUN OF RECORD, because that exemption was never read here.
+    #
+    # Measured: replaying everything Set 113 S6 wrote after its pytest run,
+    # these two were the only files left binding once the freshness list
+    # covered the rest. ``session-progress.json`` is the worse of the two --
+    # ``close_session`` writes it DURING the close, so a close that has to
+    # be retried finds the run it just recorded already stale.
+    #
+    # The name stays accurate: a ``scope: set`` declaration IS this set's
+    # bookkeeping by construction. Repo-scoped declarations are honoured on
+    # the same call for completeness -- no suite covers ``docs/planning/``
+    # today, so none reaches here, and a future cover should not have to
+    # rediscover this.
+    for pattern in close_mandated_excludes(set_rel):
+        if fnmatch.fnmatch(rel, pattern):
+            return True
     if not set_rel:
         return False
     prefix = set_rel + "/"

@@ -355,6 +355,37 @@ WORK_DIFF_SET_BOOKKEEPING = (
     # gate's ignore patterns give it.
     ".lifecycle.lock",
     ".close_session.lock",
+    # 2026-08-16 (ad-hoc fix after Set 113 S6, operator-directed): the
+    # ORCHESTRATOR-AUTHORED session evidence documents — `sN-outcome.md`,
+    # `sN-reproduction.md`, `sN-conventions.md`, `sN-*-measurement.json`,
+    # and whatever the next session needs to name. The four `s*-` entries
+    # above cover only the MACHINE-generated round artifacts; documents an
+    # orchestrator writes about its own session had no pattern at all.
+    #
+    # They are written after the round BY CONSTRUCTION: an outcome document
+    # reports what verification found, and a reproduction record is cited by
+    # the remediation it justifies. Measured live, Set 113 S6 — the session
+    # was staled TWICE and cost an operator interruption plus $0.96 in
+    # rounds. The second time, the only binding file was
+    # `s6-adjudication-request.md`: the document explaining the first
+    # staleness caused the next one.
+    #
+    # A DIGIT is required after the `s` so `spec.md` — the set's contract,
+    # which must always bind — cannot match. `operator-notes.md` does not
+    # match either.
+    #
+    # THE TRADE, STATED PLAINLY: a freshness-exempt document can be
+    # rewritten after a round that passed. That is the same trade the
+    # framework already makes for `disposition.json`, which carries the
+    # verdict, the residuals and the cost block and has been exempt since
+    # Set 084. Accepting it for the evidence documents beside it is
+    # strictly the smaller concession. And it is bounded on the other side:
+    # this pattern is ALSO in EVIDENCE_VISIBLE_BOOKKEEPING below, so the
+    # verifier still READS every one of these files. Freshness-exemption
+    # and evidence-exclusion are different questions (Set 111 S3), and
+    # suppressing a session's own outcome document from the bundle would
+    # be a self-authorized reduction in verifier visibility.
+    "s[0-9]*-*",
 )
 
 # Set 111 S3: freshness-exemption and evidence-exclusion are DIFFERENT
@@ -387,6 +418,18 @@ EVIDENCE_VISIBLE_BOOKKEEPING = (
     "decisions.jsonl",
     "checklist-posts.jsonl",
     "test-runs.jsonl",
+    # 2026-08-16: the orchestrator-authored session evidence documents.
+    # Freshness-exempt above, but the verifier MUST still read them — they
+    # are the session's own account of what it did, which is exactly what a
+    # reviewer should see. Excluding them would trade a freshness bug for a
+    # visibility bug, and visibility is the one that cannot be
+    # self-authorized. The narrower machine-artifact patterns
+    # (`s*-verification*.md`, `s*-issues*.json`, `s*-remediation-round-*.md`,
+    # `s*-acceptance-round-*.json`) are NOT listed here and stay excluded
+    # from the bundle: those are the loop's own review machinery, and a
+    # round re-reading its predecessors' verdicts is the bias this
+    # separation exists to prevent.
+    "s[0-9]*-*",
     # 2026-08-11: freshness-exempt (above) but the verifier still reads
     # it. Who verified, and under what limitation, is exactly what a
     # reviewer should see -- and Set 123 will add a qualified-verdict
@@ -1005,6 +1048,43 @@ def compute_work_diff_sha256(
     return sha256_hex("\n".join(lines).encode("utf-8"))
 
 
+def describe_work_diff_staleness(
+    session_set_dir: str, base: str, limit: int = 8
+) -> str:
+    """A human-readable ``BOUND BY ...`` clause for a stale digest, or ``""``.
+
+    2026-08-16 (ad-hoc fix after Set 113 S6). :func:`work_diff_binding_paths`
+    has existed since 2026-08-11 and was written for exactly this — "the digest
+    is one SHA-256 over every bound file, so a mismatch says *something*
+    changed and never *what*" — but it had **no production caller**. The
+    diagnostic was built and never wired in, so the spiral it was meant to end
+    kept costing rounds: Set 113 S6 paid for two of them.
+
+    This is the wiring. It adds no new definition of what binds; it reports the
+    existing one, newest-modified first, because the bound file touched most
+    recently is the likely culprit.
+
+    Deliberately best-effort: it runs inside an error path, and an explainer
+    that raises would replace the error it is explaining.
+    """
+    try:
+        rows = work_diff_binding_paths(Path(session_set_dir), base)
+    except Exception:  # noqa: BLE001 - an explainer may not raise
+        return ""
+    if not rows:
+        return ""
+    names = [rel for rel, _ in rows]
+    shown = ", ".join(names[:limit])
+    more = "" if len(names) <= limit else f", +{len(names) - limit} more"
+    return (
+        f" BOUND BY {len(names)} file(s), newest first: {shown}{more}. If one "
+        "of these is written after verification by the sanctioned flow, it "
+        "belongs in verification_stamp.WORK_DIFF_SET_BOOKKEEPING (and, if a "
+        "reviewer should still read it, EVIDENCE_VISIBLE_BOOKKEEPING) -- or "
+        "its writer should declare it via CLOSE_MANDATED_WRITES."
+    )
+
+
 def repo_relative_posix(path: Path, repo_root: Path) -> str:
     """*path* rendered repo-relative with forward slashes (falls back to
     the absolute POSIX form when *path* is outside *repo_root*)."""
@@ -1333,7 +1413,7 @@ def validate_stamped_row(
             "the session's work changed after this row was stamped "
             "(work_diff_sha256 no longer matches the tree diffed from "
             f"evidence_base {str(row.get('evidence_base'))[:12]}) — "
-            f"stale evidence cannot settle this close; re-verify. {detail}"
+            f"stale evidence cannot settle this close; re-verify.{describe_work_diff_staleness(session_set_dir, str(row.get('evidence_base')))} {detail}"
         )
 
     return True, ""

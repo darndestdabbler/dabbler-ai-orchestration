@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T09:29:22.576602-04:00",
+  "generatedAt": "2026-08-16T09:41:27.744779-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
     "activity-log.json": "21b2f0e7adb50cd9b0a441e08fff118a661f176b0c610096df82e206c2c5521f",
-    "session-state.json": "fb1aaba89ed82a66c3b50e5070c3b495ac50fb360551db72186f73f6227473a2",
+    "session-state.json": "1e1d9ab53c6f7923d8f06f733c68143948eca42509657a265221a43239261125",
     "spec.md": "6fdc685ea021cdc9e15de888d5c5cf9a726a79f1397be61b5d185d7642b48a12"
   },
   "orphanEntries": 0,
@@ -427,7 +427,7 @@
     },
     {
       "number": 5,
-      "status": "in-progress",
+      "status": "complete",
       "evidence": "read",
       "steps": [
         {
@@ -531,11 +531,11 @@
           "stepKey": "required-portion-of-the-full-test",
           "description": "**Required portion of the full test suite.**",
           "status": "pending",
-          "state": "in-progress",
-          "box": "[~]",
+          "state": "pending",
+          "box": "[ ]",
           "isPlanned": true,
-          "isActive": true,
-          "startedAt": "2026-08-16T07:27:01.374175-04:00",
+          "isActive": false,
+          "startedAt": null,
           "isTerminal": false
         },
         {
@@ -600,16 +600,14 @@
         }
       ],
       "counts": {
-        "pending": 1,
-        "in-progress": 1,
+        "pending": 2,
+        "in-progress": 0,
         "complete": 12,
         "blocked": 0,
         "unknown": 0,
         "total": 14
       },
-      "current": [
-        "required-portion-of-the-full-test"
-      ],
+      "current": [],
       "remaining": [
         "required-portion-of-the-full-test",
         "close-out"

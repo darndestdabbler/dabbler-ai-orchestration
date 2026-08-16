@@ -176,32 +176,44 @@ steps:
 # portable half above, so editing anything below leaves all four documents
 # byte-identical.
 #
-# Set 113 Session 2 authors the seam, not a driver. The selectors below are
+# Set 113 Session 2 authored the seam, not a driver. The selectors below are
 # the ones the shipped Layer 3 Playwright suite already drives this tree
-# with (`src/test/playwright/electronLaunch.ts`); `status: proposed` says
-# plainly that no driver in this repo consumes this block yet. Session 3
-# builds the first driver -- against a web fixture, not this one.
+# with (`src/test/playwright/electronLaunch.ts`). Session 4 built the driver
+# that consumes this block -- `scripts/record-vscode-walkthrough.js` -- so
+# `status` now says `implemented` rather than `proposed`.
+#
+# The `expect` clauses are quarantined too, and they are deliberately WEAKER
+# than the portable `expect:` prose above. A row being visible is what a
+# driver can check; "a hover card that reads `in progress` followed by
+# `1/3 sessions complete`" is what a READER checks, and pretending the
+# driver had verified it would be the machine claiming credit for the
+# human's half of the walkthrough.
 # ---------------------------------------------------------------------------
 drivers:
   playwright-vscode:
-    status: proposed
+    status: implemented
     launcher: tools/dabbler-ai-orchestration/scripts/vscode-launch.js
+    recorder: tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js
     paneSelector: '.monaco-list-row'
     twistieSelector: '.monaco-tl-twistie'
     steps:
       read-the-module-row:
         rowText: Default
+        expect: { rowText: Default }
       open-the-status-buckets:
         rowText: Default
         click: twistie
+        expect: { rowText: In Progress }
       find-what-is-being-worked-on:
         rowText: In Progress
         click: twistie
         then: { rowText: 001-hello-page, hover: true }
+        expect: { rowText: 001-hello-page }
       find-out-why-something-is-waiting:
         rowText: Not Started
         click: twistie
         then: { rowText: 002-style-the-greeting, hover: true }
+        expect: { rowText: 002-style-the-greeting }
       open-the-spec-from-the-row:
         rowText: 001-hello-page
         click: body

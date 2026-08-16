@@ -545,6 +545,8 @@
     "walk": "npm run compile && node scripts/stage-walk.js",
     "walk:smoke": "npm run compile && node scripts/walk-smoke.js",
     "walkthrough:web": "node scripts/record-web-walkthrough.js",
+    "walkthrough:vscode": "node scripts/record-vscode-walkthrough.js",
+    "pilot:os-capture": "node scripts/measure-os-capture.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

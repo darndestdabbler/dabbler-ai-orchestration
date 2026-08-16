@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T08:04:48.601476-04:00",
+  "generatedAt": "2026-08-16T08:12:48.313387-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "a82a2d50d22a04717757872d5f0355e0a556f725f996fb878989539c1142163e",
+    "activity-log.json": "21b2f0e7adb50cd9b0a441e08fff118a661f176b0c610096df82e206c2c5521f",
     "session-state.json": "fb1aaba89ed82a66c3b50e5070c3b495ac50fb360551db72186f73f6227473a2",
     "spec.md": "6fdc685ea021cdc9e15de888d5c5cf9a726a79f1397be61b5d185d7642b48a12"
   },
@@ -481,7 +481,7 @@
         {
           "stepNumber": 5,
           "stepKey": "build-the-container-and-measure-what",
-          "description": "BUILT AND MEASURED. VS Code on Xvfb inside Podman, captured by ffmpeg x11grab, with ZERO bind mounts - artifacts come out via podman cp afterwards, because a bind mount is a hole in the boundary being measured. Machine verdict PASS: six of six scored criteria, three of three clean runs, scored by a SEPARATE script (container-isolation-verdict.js) that reads the criteria and cannot produce measurements, and refuses to score if the stamped criteria digest no longer matches the file. I1 host-pixel fraction 0.000000 with the detector control at 0.999746; I2 correlation 0.9995, decoy 0.3446, frame stddev 13.61; I3 zero pixel delta; I4 no /dev/video, no /dev/snd, no host X11 socket, video track only; I5 3/3 induced variants failed with named messages; I6 zero containers left, zero volumes, machine in entry state. Image 1722 MB, warm build 46.5s, ~40s per run. TWO DEFECTS IN MY OWN INSTRUMENTS were found and are recorded because each produced a clean-looking result worth nothing: the positive control FAILED OPEN (xsetroot exit 0, capture all black - the X server resets when its last client disconnects; Xvfb -noreset fixes it) and the fact parser silently DROPPED host_x11_socket_present because its regex was [a-z_]+ and the key contains digits. The verdict script now requires each I4 fact to be OBSERVED rather than merely un-contradicted. DEVIATION: OBS was not run inside the container - ffmpeg x11grab was - because step 4 measured OBS carrying 317 MB of bundled surface including an embedded Chromium; journaled as goal-over-letter, and OBS-in-a-container is recorded as UNMEASURED rather than refused. The Dabbler extension is NOT installed in the image, so this proves the capture path is isolated and does NOT prove the Work Explorer renders under software rendering.",
+          "description": "CORRECTED RE-LOG, superseding this step description written before remediation. The earlier text said OBS was not run and the Dabbler extension was not installed; both are now false. OBS 30.2.3.1 IS installed in the image and run inside the container under Mesa software rendering with no GPU device passed in, and the published 0.51.0 VSIX IS installed and asserted (darndestdabbler.dabbler-ai-orchestration) against a Dabbler-shaped fixture workspace. OBS starts, renders and records; it did NOT produce a clean capture of the target because its own window stays mapped on the display it captures (obs_main_window_mapped: 1 on every run), so the scored path is ffmpeg and OBS is recorded as feasible-and-unfinished with window suppression as the named next problem. What the extension evidence does NOT establish, stated precisely: installation and a mapped window are not activation, and neither is rendering. Final verdict PASS - six scored criteria (I1-I6) plus I7 on presence, three clean runs, and a fourth run interrupted at 25s while capture was OBSERVED producing bytes, excluded from the clean count. Five verification rounds, eight distinct Majors, all remediated; the last one found that stopping the shared Podman machine could strand an operator unrelated workloads, so the variant now refuses to run when any container outside this harness is running and demonstrates restoration by comparing the container INVENTORY rather than the VM status string.",
           "status": "complete",
           "state": "complete",
           "box": "[x]",
@@ -499,7 +499,7 @@
           "box": "[x]",
           "isPlanned": false,
           "isActive": false,
-          "startedAt": "2026-08-16T06:40:41.587871-04:00",
+          "startedAt": "2026-08-16T08:12:48.027839-04:00",
           "isTerminal": true
         },
         {

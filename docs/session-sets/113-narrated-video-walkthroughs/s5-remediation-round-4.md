@@ -338,3 +338,66 @@ interruption can no longer satisfy I6.
 **PASS.** Six scored criteria (I1-I6) plus I7 on presence, three clean runs,
 and one interrupted run -- excluded from the clean count -- whose interruption
 during active artifact production was observed rather than timed.
+
+
+---
+
+## Round 5 — six fixes accepted, and one new Major about the fix itself
+
+Fix verdicts: **six accepted**, one accepted-with-modification, **none
+rejected**. L1 (OBS and the real extension), L2/L10 (degradation through the
+documented entrypoint), L3 and L11/L12 (the interruption and its observation),
+L9 (the isolated plugin probe) are all settled.
+
+The new Major is the sharpest kind: it is about a change an *earlier* round
+pushed me into.
+
+### The machine-stopped variant was safe for this machine and unsafe as a command
+
+Round 1's acceptance criterion required the declared `podman-machine-stopped`
+variant to run literally, so I stopped the machine for real. Round 5 pointed
+out what that traded away: **`podman-machine-default` is shared by every local
+Podman workload.** Every invocation of the documented command reached
+`inducedVariants()` and stopped it unconditionally; restarting the VM does not
+restart containers that have no restart policy; and the harness then published
+`machineLeftInEntryState: true` on the strength of a **VM status string** that
+knows nothing about what was running inside.
+
+On this machine nothing else was running, so nothing was harmed. As a
+*documented command* it was a hazard, and that distinction is the finding.
+
+**Fixed by refusing rather than by trying harder.** The harness now takes a
+full container inventory first. If **any** container it does not own is
+running, it does **not** stop the machine: it records the refusal, the names of
+the containers it protected, and marks the variant not-run — which fails I5,
+correctly, because the declared variant did not happen. Only when nothing
+foreign is running does it stop, and restoration is then demonstrated by
+comparing the **inventory** (same containers, same states) rather than the VM
+status.
+
+Measured on the re-run, with no foreign containers present:
+`stopped=true restored=true inventoryPreserved=true`.
+
+### The nit that had now drifted twice
+
+The cost table disagreed with the committed measurement again — a second or two
+in three places, after a re-run changed the numbers under a hand-written table.
+Correcting the digits a second time would have been treating the symptom, so
+**the transcription step is gone**: the table and the interruption figures are
+now generated from `s5-container-isolation-measurement.json`.
+
+The other nit was real too: `session-progress.json` still carried a Step 5
+description saying OBS was not run and the extension was not installed, both of
+which remediation had made false. A corrected step entry supersedes it.
+
+## Where this leaves the loop
+
+**The bound is reached and the loop is SUSPENDED.** Rounds 4 and 5 both ran on
+the operator's explicit authorization of "up to two more", and that
+authorization is now spent. The remaining finding is **remediated but
+unreviewed**: no verifier has judged the refusal-based fix above.
+
+That is stated plainly rather than closed over, and it is the operator's call —
+accept the fix, dismiss the finding, or authorize a further round. **This
+session does not have the authority to settle it**, and self-authorizing one
+more round is exactly what the bound exists to prevent.

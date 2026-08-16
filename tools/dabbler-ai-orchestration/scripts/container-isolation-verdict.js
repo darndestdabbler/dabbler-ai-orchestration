@@ -213,6 +213,7 @@ function main() {
     declaredNames.every((d) => ranNames.includes(d));
   const postconditionsOk = ranRecords.every(
     (v) =>
+      v.notRun !== true &&
       v.walkthroughCompleted === true &&
       v.manifestStillWritten === true &&
       v.videoArtifactCount === 0 &&
@@ -306,7 +307,12 @@ function main() {
       // The machine-stopped variant is the one thing in this harness that can
       // leave the operator's environment broken, so its restoration is scored
       // rather than trusted.
-      (!m.machineStopVariant || m.machineStopVariant.restored === true) &&
+      // Restoration means the CONTAINER INVENTORY came back, not merely that
+      // the VM reports running again (round 5). A refused variant fails here
+      // too: it means the measurement could not be taken safely.
+      (!m.machineStopVariant ||
+        (m.machineStopVariant.restored === true &&
+          m.machineStopVariant.inventoryPreserved === true)) &&
       (m.harnessContainersLeftBehind || []).length === 0,
     measured: {
       midRunFailureInduced: Boolean(failureRun),
@@ -329,6 +335,10 @@ function main() {
       tempFilesClean: noTempFiles,
       machineLeftInEntryState: m.machineLeftInEntryState,
       machineStopVariantRestored: m.machineStopVariant ? m.machineStopVariant.restored : null,
+      machineStopVariantSkipped: m.machineStopVariant ? Boolean(m.machineStopVariant.skipped) : null,
+      foreignContainerInventoryPreserved: m.machineStopVariant
+        ? m.machineStopVariant.inventoryPreserved
+        : null,
     },
   };
 

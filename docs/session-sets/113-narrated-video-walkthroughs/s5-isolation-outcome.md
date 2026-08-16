@@ -88,7 +88,7 @@ them.
 | I3 | usable resolution | **PASS** | **0 px** delta, 1280x800 | ≤ 2 px |
 | I4 | no camera, no audio, no host display | **PASS** | 0 `/dev/video*`, 0 `/dev/snd`, no host X11 socket, video track only | all four |
 | I5 | dependency absent fails clearly | **PASS** | 3 of 3 declared variants, each driving **the documented entrypoint** as a child process: exit 0, manifest written, **0** video artifacts, dependency named, post-capture step ran | all postconditions |
-| I6 | deterministic cleanup | **PASS** | a **fourth** run interrupted at 22 s **while capture was active** (exit 137, 0 frames), excluded from the clean count; cleanup ran; 0 containers, 0 harness volumes, 0 zero-byte, 0 temp files; machine in entry state | zero leftovers |
+| I6 | deterministic cleanup | **PASS** | a **fourth** run interrupted at 25 s **while capture was observed producing bytes** (48 bytes written; exit 137, 0 frames), excluded from the clean count; cleanup ran; 0 containers, 0 harness volumes, 0 zero-byte, 0 temp files; machine in entry state | zero leftovers |
 | I7 | cost is recorded | **PASS** *(presence only)* | all four required fields present | present |
 
 **The marker was genuinely on the host and genuinely in front.** A magenta
@@ -119,16 +119,16 @@ because a bind mount is a hole in the boundary being measured.
 | | measured |
 | :--- | ---: |
 | image size | **1,900 MB** |
-| cold build (`--no-cache`) | **56.7 s** |
+| cold build (`--no-cache`) | **56.1 s** |
 | warm build | 1.9 s |
-| container cold start to capture | **24.5 s** |
+| container cold start to capture | **24.4 s** |
 | capture wall clock | 12 s |
 
-Every figure above is read from the committed measurement rather than
-transcribed from a console log. An earlier version of this table was
-transcribed, and drifted from the JSON by a second or two in three places —
-small, and exactly the kind of drift that makes a reader stop trusting the
-larger numbers.
+Every figure above is **generated from the committed measurement**, not
+transcribed. It was transcribed twice, and drifted from the JSON both
+times — by a second or two in three places, then again after a re-run.
+Small, and exactly the kind of drift that makes a reader stop trusting
+the larger numbers, which is why the transcription step is now gone.
 
 The cold number is a genuinely cold build. `podman rmi` alone was **not**
 enough — it drops the tag while the layer cache survives, and reported 2.9

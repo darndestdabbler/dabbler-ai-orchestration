@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 5,
+  "verificationRound": 5,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "49d3f6b9c04e631bb03e8ef8dc88abb6bfadc9be",
+  "fixedTree": "d021b1e3974f370ce1b29ab64199a07f94244ced",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T12:12:49.736104+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "The documented measurement command unconditionally stops the shared default Podman machine and does not restore pre-existing container workloads** - **Category:** Correctness - **Severity:** Major - * ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The stopped-machine variant must run against a harness-owned disposable Podman machine, or must demonstrably preserve and restore every pre-existing container and its running state without unconditionally stopping the operator’s shared default machine.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

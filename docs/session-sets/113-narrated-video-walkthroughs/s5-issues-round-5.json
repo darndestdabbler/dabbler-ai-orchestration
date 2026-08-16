@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 5,
+  "verificationRound": 5,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The documented measurement command unconditionally stops the shared default Podman machine and does not restore pre-existing container workloads**\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/measure-container-isolation.js`, `docs/session-sets/113-narrated-video-walkthroughs/s5-isolation-outcome.md`\n  - **Failure scenario:** An operator reproduces the documented measurement while ordinary development or service containers are running in `podman-machine-default`. Every normal invocation reaches `inducedVariants()`, executes `podman machine stop`, and later restarts only the VM. Containers without restart policies remain stopped, but the script reports restoration because it compares only the machine-list state string. This is probable because the default Podman machine is shared by all local Podman workloads, and the destructive variant runs unconditionally rather than only in an isolated test environment.\n  - **Acceptance criterion:** `JUDGMENT - The stopped-machine variant must run against a harness-owned disposable Podman machine, or must demonstrably preserve and restore every pre-existing container and its running state without unconditionally stopping the operator’s shared default machine.`\n  - **Details:**\n    - **Violation:** I6 claims deterministic cleanup with the “machine in entry state,” and the remediation decision says the environment is restored. The implementation equates that invariant solely with `restoredState === entryState`.\n    - **Impact:** Reproducing the measurement can interrupt unrelated workloads and leave them stopped while publishing `machineLeftInEntryState: true`. A reasonable reviewer should not approve a documented measurement command with an unconditional, incompletely restored machine-wide side effect.\n    - **Evidence:** `inducedVariants()` calls `podman([\"machine\", \"stop\"])` without checking for pre-existing workloads, then calls `podman([\"machine\", \"start\"])`. `machineState()` observes only `podman machine list`; neither container inventory nor prior running state is captured or restored. The correct fix is to use a disposable harness-owned machine or fully preserve and restore workload state.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "An operator reproduces the documented measurement while ordinary development or service containers are running in `podman-machine-default`. Every normal invocation reaches `inducedVariants()`, executes `podman machine stop`, and later restarts only the VM. Containers without restart policies remain stopped, but the script reports restoration because it compares only the machine-list state string. This is probable because the default Podman machine is shared by all local Podman workloads, and the destructive variant runs unconditionally rather than only in an isolated test environment.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/scripts/measure-container-isolation.js",
+        "docs/session-sets/113-narrated-video-walkthroughs/s5-isolation-outcome.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The stopped-machine variant must run against a harness-owned disposable Podman machine, or must demonstrably preserve and restore every pre-existing container and its running state without unconditionally stopping the operator’s shared default machine."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 declared OBS/VS Code stack is now exercised and limitations are reported",
+      "verdict": "fix-accepted",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 degradation behavior now drives the documented measurement entrypoint",
+      "verdict": "fix-accepted",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 failure-path cleanup is exercised by a distinct interrupted run",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 cost fields are present, but the narrative still drifts from the measurement",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L4",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 plugin probe now uses an isolated source-free OBS configuration",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    },
+    {
+      "finding": "L10",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L10"
+    },
+    {
+      "finding": "L11 interruption now occurs before capture completion and artifact analysis",
+      "verdict": "fix-accepted",
+      "ledgerId": "L11"
+    },
+    {
+      "finding": "L12 capture activity and host-marker teardown are now observed",
+      "verdict": "fix-accepted",
+      "ledgerId": "L12"
+    }
+  ]
+}

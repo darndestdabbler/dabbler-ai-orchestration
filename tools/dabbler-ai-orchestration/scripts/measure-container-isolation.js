@@ -172,6 +172,25 @@ function harnessVolumeCount() {
   return out === "" ? 0 : out.split(/\r?\n/).length;
 }
 
+/**
+ * Every container on the machine with its state -- not just ours.
+ *
+ * `machine list` reports whether the VM is running and nothing about what was
+ * running INSIDE it, so comparing that string alone let this harness publish
+ * `machineLeftInEntryState: true` while an operator's unrelated workloads sat
+ * stopped. Verification round 5, and it is right: the default Podman machine
+ * is shared by every local Podman workload.
+ */
+function containerInventory() {
+  const res = podman(["ps", "-a", "--format", "{{.Names}}\t{{.State}}\t{{.Labels}}"]);
+  const out = (res.stdout || "").trim();
+  if (!out) return [];
+  return out.split(/\r?\n/).map((line) => {
+    const [name, state, labels] = line.split("\t");
+    return { name, state, harnessOwned: String(labels || "").includes(LABEL) };
+  });
+}
+
 function harnessContainerNames() {
   const res = podman([
     "ps", "-a", "--filter", "label=" + LABEL, "--format", "{{.Names}}",
@@ -679,36 +698,94 @@ function inducedVariants(measurement) {
     "re-ran the documented entrypoint with DABBLER_PODMAN pointing at a path that does not exist"
   );
 
-  // THE DECLARED VARIANT, RUN LITERALLY. An earlier version substituted a
-  // non-existent connection name and declared the substitution; the
-  // acceptance criterion required exact set equality with the declared names
-  // and still failed. A renamed variant is a variant not run.
+  // THE DECLARED VARIANT, RUN LITERALLY -- BUT NOT UNCONDITIONALLY.
+  //
+  // An earlier version substituted a non-existent connection name for this and
+  // was rejected, so the machine is stopped for real. Verification round 5
+  // then caught what that traded away: `podman-machine-default` is SHARED by
+  // every local Podman workload, and stopping it unconditionally can leave an
+  // operator's unrelated containers stopped while this harness publishes
+  // "machine left in entry state" on the strength of a VM status string.
+  //
+  // So: inventory first, refuse if anything that is not ours is running, and
+  // demonstrate restoration by comparing the inventory rather than the VM
+  // state. A measurement that cannot be taken safely is NOT taken, and the
+  // refusal is recorded where the verdict can see it -- which will fail I5,
+  // correctly, because the declared variant did not run.
   const entryState = machineState();
-  const stopRes = podman(["machine", "stop"]);
-  const stoppedState = machineState();
-  runVariant(
-    "podman-machine-stopped",
-    {},
-    "stopped the Podman machine for real and re-ran the documented entrypoint against it"
+  const inventoryBefore = containerInventory();
+  const foreignRunning = inventoryBefore.filter(
+    (c) => !c.harnessOwned && /^up|running/i.test(String(c.state))
   );
-  let restore = podman(["machine", "start"]);
-  if (restore.status !== 0) {
-    log("machine restart failed once, retrying: " + (restore.stderr || "").trim().slice(0, 200));
-    restore = podman(["machine", "start"]);
+
+  if (foreignRunning.length > 0) {
+    measurement.machineStopVariant = {
+      skipped: true,
+      reason:
+        "REFUSED to stop the shared Podman machine: " + foreignRunning.length +
+        " container(s) not owned by this harness are running (" +
+        foreignRunning.map((c) => c.name).join(", ") +
+        "). Stopping the default machine would interrupt them, and restarting " +
+        "the VM does not restart containers without restart policies.",
+      foreignRunning: foreignRunning.map((c) => c.name),
+      entryState,
+    };
+    variants.push({
+      variant: "podman-machine-stopped",
+      induced: "NOT RUN -- refused, see machineStopVariant.reason",
+      notRun: true,
+      entrypoint: "measure-container-isolation.js (the documented command)",
+      walkthroughCompleted: false,
+      manifestStillWritten: false,
+      videoArtifactCount: 0,
+      errorMentionsContainerDependency: false,
+      postCaptureStepRan: false,
+      message: measurement.machineStopVariant.reason,
+    });
+    log("machine-stopped variant: REFUSED (" + foreignRunning.length + " foreign container(s) running)");
+  } else {
+    const stopRes = podman(["machine", "stop"]);
+    const stoppedState = machineState();
+    runVariant(
+      "podman-machine-stopped",
+      {},
+      "stopped the Podman machine for real and re-ran the documented entrypoint " +
+        "against it, after confirming no container outside this harness was running"
+    );
+    let restore = podman(["machine", "start"]);
+    if (restore.status !== 0) {
+      log("machine restart failed once, retrying: " + (restore.stderr || "").trim().slice(0, 200));
+      restore = podman(["machine", "start"]);
+    }
+    const restoredState = machineState();
+    const inventoryAfter = containerInventory();
+    // Compare the INVENTORY, not the VM status string: same containers, same
+    // states. That is what "restored" has to mean.
+    const key = (list) =>
+      list
+        .filter((c) => !c.harnessOwned)
+        .map((c) => c.name + "=" + c.state)
+        .sort()
+        .join("|");
+    const inventoryPreserved = key(inventoryBefore) === key(inventoryAfter);
+    measurement.machineStopVariant = {
+      skipped: false,
+      entryState,
+      stopStatus: stopRes.status,
+      stateWhileStopped: stoppedState,
+      restartStatus: restore.status,
+      restoredState,
+      foreignContainersBefore: inventoryBefore.filter((c) => !c.harnessOwned),
+      foreignContainersAfter: inventoryAfter.filter((c) => !c.harnessOwned),
+      inventoryPreserved,
+      restored: restoredState === entryState && inventoryPreserved,
+    };
+    log(
+      "machine-stopped variant: stopped=" + (stopRes.status === 0) +
+        " restored=" + measurement.machineStopVariant.restored +
+        " inventoryPreserved=" + inventoryPreserved
+    );
   }
-  const restoredState = machineState();
-  measurement.machineStopVariant = {
-    entryState,
-    stopStatus: stopRes.status,
-    stateWhileStopped: stoppedState,
-    restartStatus: restore.status,
-    restoredState,
-    restored: restoredState === entryState,
-  };
-  log(
-    "machine-stopped variant: stopped=" + (stopRes.status === 0) +
-      " restored=" + (restoredState === entryState)
-  );
 
   // The bogus tag must genuinely not exist. An earlier attempt at this
   // variant BUILT the image under that name, so on the next run the tag was

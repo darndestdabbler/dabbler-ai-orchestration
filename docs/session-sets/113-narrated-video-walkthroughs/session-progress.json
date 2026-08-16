@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T14:38:58.242811-04:00",
+  "generatedAt": "2026-08-16T18:15:45.283541-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "c953ed7235e56a8d2acdea12cd9e8f1bb5b8baa783cf5ff593a9e9f29f13cf6a",
-    "session-state.json": "f8a9c6c579803e18307080f159b45ed70ab64479b7fbc053702b0549ebbacebf",
-    "spec.md": "6fdc685ea021cdc9e15de888d5c5cf9a726a79f1397be61b5d185d7642b48a12"
+    "activity-log.json": "e8c1f48af58dd76f5abc8e4cd603119c40cf7f9ddc3bdec8f8c0d2b6ab52b9aa",
+    "session-state.json": "531082c898a6519f4c9a03e56d19a693c7c6cfe358bea974d5e4f6b1a1d8cba2",
+    "spec.md": "4088678eed35f7ac7ef367cc3801f17c93e0368f78e30fbce9c0783ec9bb536c"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -740,19 +740,118 @@
     },
     {
       "number": 7,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 7 (claude / claude-opus-5).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T16:17:07.681937-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "show-the-pointer",
+          "description": "WEB PATH DONE AND PROVED. A synthetic pointer is drawn into the page (scripts/pointer.js) and walked to each action's target before the click; Chromium's recordVideo composites no system cursor, so this is the only mechanism that can work there. Proved in the ARTIFACT, not in the code: check-pointer-visible.js crops the recorded frames at the instant before the pointer set off and the instant it arrived, and passes only when the target region changed and a control region did not -- 6 of 6 probes, 5-9% of each crop. The falsifier is a real control: --no-pointer records with IDENTICAL timing and an IDENTICAL probe list and fails on the pixels, 0.00000 at every target. The first version of this check PASSED the control, because both sampled frames straddled the emphasis fade and the typing; fixed by holding the page still around both instants and by deriving the ~200ms gap between the run clock and the video's own zero. VS CODE PATH: the driver half is done and proved, the CAPTURE half turns out to be broken and that was not the diagnosis. The real Windows pointer is now walked to each target, calibrated against the window by measurement rather than by DPI arithmetic (residual 0px, 6 probes); it is opt-in, announces itself, and restores the entry position on every exit path. Three defects found on the way: the driver read its own script from the stdin it needed for commands, its type compilation was still running when the first moves were sent, and real pointer motion goes to whatever window is IN FRONT. But the recorded frames still show no cursor, and measurement says why: OBS window capture on WGC ignores the cursor setting entirely, and BitBlt honours it while black-framing the Electron window. Escalated with evidence rather than fixed by switching backends unmeasured.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T16:17:07.697728-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "build-the-long-form-recording-pipeline",
+          "description": "TIME COMPRESSION SHIPPED AND PROVED END TO END; the long-form capture harness is blocked behind the same operator decision as step 2. ai_router/speed_ramp.py derives which stretches of a recording were WAITING from session-events.jsonl and activity-log.json -- the framework's own timestamps -- and emits a speed-ramp plan as a reviewable file (segments, rates, and why each one), then applies it with one ffmpeg setpts filter. The invariant is the point and it is built structurally: the real-time intervals are constructed FIRST from a pad around every mark, and quiet is whatever is left, so nothing the record says happened can be inside a compressed segment. Proved on real data (this set's own session 6: 2h58m of record, 29 marks, plans to 6m08s) and applied to a real video (predicted 22.46s, produced 22.52s). 26 falsifiers in ai_router/tests/test_speed_ramp.py, including one that fails if nothing is compressed at all -- otherwise 'no mark was compressed' passes vacuously. The plan states what fraction it is compressing and shouts when that is nearly all of it, because an orchestrator session writes a mark every few minutes and a person reading the screen looks exactly like a suite running.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T17:11:46.637537-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "author-and-record-the-single-module",
+          "description": "AUTHORED, NOT RECORDED, and the recordings are blocked on a decision that is the operator's rather than on anything left to build. docs/tutorials/single-module-walkthrough.md defines the toy project (`unit-converter`: one module, three session sets, six sessions, one recording each) and it is chosen against three stated requirements -- small enough to finish, big enough that a DECOMPOSITION has something real to decide (temperature breaks the multiply-by-a-factor shape the other two families share), and needing no domain knowledge explained. Set 1 is the set the tutorial exists for: a plan authored WITH the AI and then cut into sets, which is the half of the lifecycle Set 108's walk could not prove. It says on the page that the human must DISAGREE with the first plan on camera -- a recording of a plan being accepted unchanged teaches that the AI is right, which is not what this framework claims. Two things are owed and both are named on the page: a capture backend that draws a cursor (measured, operator's call) and a human driving, because a tutorial showing AI author a plan cannot be scripted. The written walkthrough stands alone with no video, which is spec decision 4 and is why authoring it now is not premature.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T17:11:46.639538-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "publication-safety-pass-before-anything-leaves",
+          "description": "docs/walkthroughs/publication-safety-checklist.md: per video, with a human watching the video, covering window titles, absolute paths, repository and remote names, notification toasts, secrets in terminal output and environment, the cost and model gauges, open browser tabs and the taskbar -- plus a BEFORE-you-record half, because most of the list is far cheaper to prevent than to find. 'Do not publish this one' is stated as a valid outcome and needs no justification beyond the finding. Per-video outcomes are recorded as a small JSON record where a `publish` decision with a non-empty findings list must carry a sentence per finding -- that sentence is the whole value of writing it down. It deliberately does NOT scan automatically: a checker that finds nothing is indistinguishable from one that looks for nothing, and a video that has passed a scan invites less human attention than one that has not. Nothing here uploads anything. NOT YET EXERCISED against a real video, because there is no video to run it against.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T17:15:37.269242-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "cross-provider-verification",
+          "description": "Four rounds, $2.73, all on gpt-5-6-sol with anthropic excluded. Discovery raised 10 findings across two lenses -- six distinct -- and the supplementary pass added one. FOUR were real defects in this session's own work and one of them was a REGRESSION I had just introduced: having measured that BitBlt is the only OBS method whose cursor setting does anything, I wired the physical pointer to select it, and the same measurement shows BitBlt black-frames an Electron window. The second remediation cycle then caught two more real ones -- the top-layer promotion only worked if the pointer was promoted LAST (and the measurement that 'proved' it opened the modal before the pointer existed, the one ordering under which the broken code passes), and a compact hover repaint could still clear the shape rule. Both fixed and re-measured; those two fix verdicts were accepted. FIVE Majors remain at the enforced bound and the loop is SUSPENDED, not ground: three of them are one blocked deliverable (no capture backend draws a cursor) and two are acknowledged limits of instruments I built. Written up as s7-adjudication-request.md -- three questions, a recommendation and a stated default for each. Nothing is disputed: on all five the verifier reads the code right.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T17:15:37.271230-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All three layers run after the last code change and recorded to the run of record: pytest 5091 passed / 5 skipped / 1 xfailed in 7m26s (-n 8, the operator's parallelism cap), mocha 1580 passing in 2m, playwright 37 passed in 4m42s at 4 workers -- Layer 3 is owed because this session drives a rendering surface (L-064-12), and it is also where the pointer changes would surface. Run BEFORE the operator's adjudication rather than after, deliberately: the loop is suspended on a decision that is theirs, and having the suites already green takes an hour off whatever they choose.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T17:57:35.868516-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 8,
+          "stepKey": "close-out-mid-set-with-a",
+          "description": "**Close-out**, mid-set, with a `next_orchestrator` handover.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 7,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 8
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out-mid-set-with-a"
+      ]
     },
     {
       "number": 8,

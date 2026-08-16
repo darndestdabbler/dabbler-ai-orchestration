@@ -78,6 +78,14 @@ uatComponents:            # Set 113 S1's own gate, applied to this set. The TERM
   - Single-module tutorial recording set   # added 2026-08-16 with Session 7; journaled
   - Multi-module tutorial recording set    # added 2026-08-16 with Session 8; journaled
 pathAwareCritique: advisory
+# Re-planned 2026-08-16 at Session 7's close: the set went from EIGHT to
+# NINE sessions on operator direction. Session 7's measurement established
+# that no capture backend draws a cursor, and placing the fix outside the
+# set would have ended a set about narrated video with no video in it.
+# Session 8 is now the backend; the old Session 8 became Session 9 and is
+# still set-terminal. Sessions 8 and 9 run on the operator's WORK COMPUTER,
+# on a Copilot seat -- see Session 8's prerequisites block.
+#
 # Declared 2026-08-16, when the admission test was run against the whole
 # amended spec and reported four sessions over cap. Sessions 7 and 8 were
 # TRIMMED rather than excepted where trimming was honest -- 7 merged capture
@@ -97,6 +105,11 @@ sessionSizeException: 6 - a diagnosis session, where reproducing both failures
   and judging the servant violation on its own merits are the evidence the
   fix and its falsifier rest on. Splitting it would hand a later session a
   diagnosis it did not make.
+sessionSizeException: 8 - five work steps, of which the first two are one
+  sequential measurement (the criteria pass, then the harness that can only
+  be built once a backend has cleared it) and the last is a decision rather
+  than work. Splitting it would hand a later session a backend it did not
+  measure, which is precisely the mistake Session 7 refused to make.
 sessionSizeException: 7 - four work steps after trimming, and none is
   droppable: the pointer must be fixed BEFORE recording (operator ordering
   ruling) or the tutorial is recorded twice, the pipeline is what makes a
@@ -191,7 +204,7 @@ truthful record.
 
 ## Sessions
 
-### Session 1 of 8: Truthful UAT accounting
+### Session 1 of 9: Truthful UAT accounting
 
 The gate first, because it is the part that is useful even if every later
 session is cancelled.
@@ -228,7 +241,7 @@ session is cancelled.
 
 ---
 
-### Session 2 of 8: Portable scenario source and standalone rendering
+### Session 2 of 9: Portable scenario source and standalone rendering
 
 **Steps:**
 
@@ -259,7 +272,7 @@ session is cancelled.
 
 ---
 
-### Session 3 of 8: Browser recording proof
+### Session 3 of 9: Browser recording proof
 
 The portable recording path, proved where the framework's actual products
 live. **Not** against this repo's extension.
@@ -294,7 +307,7 @@ live. **Not** against this repo's extension.
 
 ---
 
-### Session 4 of 8: Bounded Windows OS-capture dogfood
+### Session 4 of 9: Bounded Windows OS-capture dogfood
 
 **Strictly bounded. One session. It ends in a measurement either way.**
 
@@ -358,7 +371,7 @@ tooling on its own product.
 
 ---
 
-### Session 5 of 8: Containerised capture — measure the isolation
+### Session 5 of 9: Containerised capture — measure the isolation
 
 **Added 2026-08-16 on operator direction**, after Session 4 put two large
 open-source media stacks (OBS Studio, ffmpeg) into this framework's
@@ -431,7 +444,7 @@ pixels, host windows or host devices. That is the right shape.
 
 ---
 
-### Session 6 of 8: Why the pull critique could not reach two providers
+### Session 6 of 9: Why the pull critique could not reach two providers
 
 **Added 2026-08-16 on operator direction.** Session 4's advisory
 path-aware critique produced **no artifact** across three attempts: google
@@ -473,7 +486,7 @@ succeeded every time, openai failed every time, in two distinct ways.
 
 ---
 
-### Session 7 of 8: Show the pointer, then record the single-module tutorial
+### Session 7 of 9: Show the pointer, then record the single-module tutorial
 
 **Added 2026-08-16 on operator direction**, with the first tutorial video.
 Two pieces of work, and **the order between them is a requirement rather
@@ -573,34 +586,138 @@ scenario has misread it.
 
 ---
 
-### Session 8 of 8: The multi-module tutorial, and the set's accounting
+### Session 8 of 9: A capture backend that draws the cursor
+
+**Re-planned 2026-08-16, at Session 7's close, on operator direction.** The
+session that was here — the multi-module tutorial and the set's accounting —
+is now **Session 9**, and this session is the thing that has to happen first
+if either tutorial is to have a video at all.
+
+**Why the set grew instead of deferring.** Session 7 measured that **no
+capture backend draws a cursor** (`s7-cursor-capture-backends.json`): OBS
+window capture on WGC puts the workbench in frame and **no cursor**, OBS
+BitBlt draws the cursor onto a **black frame** because it cannot read a
+hardware-accelerated Electron surface, and only `ffmpeg gdigrab` over the
+window's desktop rectangle produces both. The operator adjudicated the
+`gdigrab` route on 2026-08-16 and it was first placed in a reserved
+follow-on set — which would have ended this set with two written tutorials
+and **no video**, against a direction whose whole point was two videos. The
+operator's ruling: extend the set. This session does the backend; Session 9
+stays terminal and does the accounting, so a terminal session is not also
+building a capture stack.
+
+**THE MACHINE CHANGES HERE, and it is a prerequisite rather than a note.**
+Sessions 1–7 ran on the operator's personal machine, whose API credits are
+now nearly exhausted and cannot be topped up. Sessions 8 and 9 run on the
+operator's **work computer**, which is a **Copilot seat**: it carries no
+`DABBLER_*` provider keys by design, and their absence is not an error.
+Before anything routes there:
+
+- `python -m ai_router.verify_type --set COPILOT_CLI` — `project-verify-type.txt`
+  is **gitignored machine state**, so a fresh checkout has none and the
+  router exits 3 until it is resolved. `transport.profile` is derived from
+  it; a stale `local-overrides.yaml` key is refused at load.
+- OBS Studio, `ffmpeg` and `ffprobe` on `PATH`, and a VS Code that can run
+  the extension. Everything this session measures is Windows-only.
+- **Copilot capacity is very limited.** Spend the routed budget on
+  verification and almost nothing else.
+
+**Steps:**
+
+1. Register. Read `s7-pointer-outcome.md` and `s7-cursor-capture-backends.json`
+   first — the diagnosis is made and does not need remaking.
+2. **Measure `gdigrab` against the Session 4 pilot's seven criteria, and
+   ship nothing until it passes them.** This is a gate the operator's own
+   authorisation put there, not ceremony: `s4-pilot-criteria.json` is the
+   committed contract and `measure-os-capture.js` is the harness that
+   evaluated OBS against it. Two criteria are where a desktop-rectangle
+   capture is *expected* to be weakest, and they are the reason the gate
+   exists rather than an afterthought:
+   - **C2, no unrelated desktop pixels.** `gdigrab` reads the composited
+     desktop, so anything that comes to the front — a toast, an alert,
+     another window — lands in the frame. OBS's window capture is immune to
+     this and `gdigrab` is not. **These videos are destined for a public
+     URL**, so this is the criterion that decides whether the backend is
+     usable at all, and a mitigation (refuse to record when another window
+     overlaps the rectangle; abort on occlusion mid-capture) is in scope.
+   - **Window-follow.** A desktop rectangle is fixed and a window can move.
+     Decide and measure one of: re-read the window rectangle per frame,
+     pin the window for the length of a capture, or abort when it moves.
+   The other five still have to be met, not assumed — and **C7's no-audio
+   clause is the one OBS structurally could not satisfy and `gdigrab`
+   already does** (`s4-ffmpeg-fallback-measurement.json`).
+   **Do not re-litigate Session 4's `gdigrab` result.** It measured
+   `gdigrab title=<window>`, which black-frames for the same reason BitBlt
+   does. This session measures `-i desktop` over the window's rectangle,
+   which is a different mode and was measured to work.
+3. **Build the long-form, human-driven capture harness** — Session 7's
+   step 3 owed it and could not build it on a backend that cannot do the
+   job (residual `S7-R2`). It records a **real** session in a **real** VS
+   Code window, not the Extension Development Host: start before
+   `start_session`, stop after `close_session`, one recording per session,
+   named by set and session. **It observes and nothing more** — it must not
+   write `session-state.json`, drive the orchestrator, or make a session
+   behave differently because it is being recorded. Wire
+   `python -m ai_router.speed_ramp` in as the post-processing step; it is
+   finished and proved, and it wants `--recording` so it samples the video
+   as well as the record.
+4. **Prove the pointer is visible, in the artifact.** `check-pointer-visible.js`
+   and `measure-pointer-visibility.js` already exist and already discriminate:
+   re-run them against the new backend and expect the VS Code path to
+   *pass* where it recorded `FAIL` on 2026-08-16, with the control still
+   failing. Nothing about this session is done until that artifact flips.
+5. **Decide what happens to the Session 4 gate.** The shipped recorder
+   fails closed on capture because the pilot's verdict is FAIL, and no
+   waiver is on file. A new backend does not silently unlock it: either
+   re-measure to a PASS the gate can read, or leave the gate shut and say
+   what the operator would have to sign. **Not the orchestrator's call to
+   waive.**
+6. **Cross-provider verification.**
+7. **Required portion of the full test suite** — this session drives a
+   rendering surface, so Layer 3 is owed (`L-064-12`).
+8. **Close-out**, mid-set, with a `next_orchestrator` handover.
+
+**Creates:** a measured capture backend that puts the workbench and the cursor in one frame, or a written refusal saying which criterion it failed; the long-form capture harness; the VS Code pointer-visibility artifact, flipped
+**Touches:** extension `scripts/`, the set directory
+**Ends with:** a recording of a real VS Code session shows a pointer that moves, proved in its frames, or the set knows precisely which criterion says it cannot.
+**Progress keys:** `backendMeasured`, `longFormHarness`, `vscodePointerProved`, `captureGateDecided`
+
+---
+
+### Session 9 of 9: The multi-module tutorial, and the set's accounting
 
 **Added 2026-08-16 on operator direction.** The second tutorial, and the
 **set-terminal** session — it inherits `change-log.md`, the Step 9 review
 and this set's own UAT accounting from Session 6.
 
-> **AMENDED 2026-08-16, after Session 7's measurement and the operator's
-> adjudication on it.** **This session's recordings are blocked by exactly
-> what blocked Session 7's**: no capture backend draws a cursor, and the
-> authorised route (`gdigrab` over the window's desktop rectangle) is a
-> reserved follow-on set gated behind a measurement pass, deliberately not
-> this one — Session 8 is set-terminal and carries the whole set's
-> accounting. So Session 8 **authors** the multi-module tutorial exactly as
-> Session 7 authored the single-module one, and **records nothing**. Both
-> tutorials' videos are owed to the reserved set. The written walkthroughs
-> stand alone with no video, which is spec decision 4 and is what makes
-> this an acceptable end state rather than a deferral of the deliverable.
-> Session 8 also owes the set's UAT accounting for all seven declared
-> components — including the one that must **not** default to `none`,
-> because the operator watched the Session 4 pilot recording on 2026-08-16
-> and returned a finding: a developer, count 1, method `watched`.
+> **RE-PLANNED 2026-08-16 at Session 7's close, and this session MOVED from
+> 8 to 9.** Its recordings were blocked by the same thing that blocked
+> Session 7's — no capture backend draws a cursor — and the first placement
+> of the fix, a reserved follow-on set, would have ended this set with two
+> written tutorials and no video at all. The operator extended the set
+> instead: **Session 8 builds the backend and the long-form harness**, and
+> this session records on top of them. That ordering is the same ruling as
+> 2026-08-16's original one — get the cursor working *before* recording, or
+> the tutorial gets recorded twice.
+>
+> **It also runs on the operator's WORK COMPUTER**, on a Copilot seat with
+> no `DABBLER_*` keys; see Session 8's prerequisites, which apply here
+> unchanged.
+>
+> **Two things this session must not do.** It must not re-litigate the two
+> accepted residuals `S7-R4` and `S7-R5` (the pointer check matches a
+> bounding-box profile, and the ramp cannot see a person reading a static
+> screen) — both are operator-adjudicated. And it must not record anything
+> until Session 8's pointer-visibility artifact has flipped to a pass; a
+> tutorial recorded without a visible cursor is the exact waste the
+> ordering ruling exists to prevent.
 
 **Steps:**
 
 1. Register.
 2. **Record the multi-module tutorial:** a purpose-built toy repository with
    **three modules, one session set each**, individual sessions as
-   individual recordings, waiting compressed out. **Reuse Session 7's
+   individual recordings, waiting compressed out. **Reuse Session 8's
    harness unchanged.** If it cannot be reused unchanged, say plainly what
    had to generalise and why — that is the signal that the capability was
    fitted to one example, and it is worth more written down than worked
@@ -690,27 +807,11 @@ and this set's own UAT accounting from Session 6.
   a stale video is regenerated rather than patched.
 - **Non-Web Walkthrough Backends** — native desktop or 3270 driving and
   capture. **Trigger:** an actual product supplies requirements.
-- **A Capture Backend That Draws The Cursor** — **reserved 2026-08-16 on
-  operator adjudication, and its trigger has already fired.** Session 7
-  measured three backends against two instruments
-  (`s7-cursor-capture-backends.json`): OBS window capture on WGC puts the
-  workbench in frame and **no cursor at all**, OBS BitBlt draws the cursor
-  onto a **black frame** because it cannot read a hardware-accelerated
-  Electron surface, and only `ffmpeg gdigrab -i desktop` over the window's
-  rectangle produces both. The operator authorised the `gdigrab` route
-  **gated behind a measurement pass against the Session 4 pilot's seven
-  criteria** — not a swap. Two of those criteria are where a desktop
-  rectangle is weakest and are the point of the pass: **C2**, because a
-  rectangle takes whatever comes to the front into the frame, and
-  window-follow, because it does not track a window that moves. Both matter
-  more than usual here: these videos are destined for a public URL.
-  **This set does not build it**, and the placement is deliberate — Session
-  8 is set-terminal and carries the whole set's accounting, and the S4
-  pilot that wrote those seven criteria was itself a session.
-  **It owes: the long-form human-driven capture harness (Session 7 step 3),
-  and the recordings for BOTH tutorials** — this set produces the two
-  written walkthroughs, which stand alone (spec decision 4), and neither
-  set of videos.
+> **A third reservation was promoted into this set on 2026-08-16**, at
+> Session 7's close and on operator direction: *A Capture Backend That
+> Draws The Cursor* became **Session 8**, because leaving it outside would
+> have ended a set about narrated video with no video in it. Its evidence
+> is `s7-cursor-capture-backends.json`.
 
 ## Risks this set should expect
 

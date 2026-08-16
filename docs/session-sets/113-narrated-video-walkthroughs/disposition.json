@@ -129,15 +129,16 @@
       {
         "component": "routed_api",
         "status": "measured",
-        "credits": null,
+        "credits": 0.0,
         "usd": 2.8213,
         "event_count": 6,
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "four verification rounds ($1.4561 discovery, $0.5227 supplementary, $0.3934 and $0.4301 remediation-review) plus two step-3.5 analysis calls at $0.0095 each -- the first was paid and then lost to a bug in my own harness, and is counted rather than quietly dropped"
+        "reason": "four verification rounds ($1.4561 discovery, $0.5227 supplementary, $0.3934 and $0.4301 remediation-review) plus two step-3.5 analysis calls at $0.0095 each -- the first was paid and then lost to a bug in my own harness, and is counted rather than quietly dropped. credits is 0.0 because this component bills in USD and has no credit meter; the USD figure is the measurement."
       }
-    ]
+    ],
+    "measured_at": "close"
   },
   "uat": {
     "attestation": "Session 6 is a router-internal transport diagnosis. It creates NO human-observable surface: its deliverables are a reproduction, a diagnosis, four fixes inside ai_router/, 38 falsifiers, and the evidence documents. None of the seven declared uatComponents was touched by it, so every one is recorded 'not-applicable' for THIS session rather than 'none' -- 'none' would claim a reviewable surface existed and nobody looked, which is not what happened. The set-terminal accounting is Session 8's under uatScope: per-set, and the spec says so in Session 6 step 8. ONE THING SESSION 8 MUST NOT DEFAULT TO 'none': the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched' against the Windows OS-capture pilot -- recorded in operator-notes.md so it does not evaporate. What THIS session can claim instead of a reviewer is automated evidence: 5021 pytest, 1548 mocha and 37 Playwright tests green after the last code change, every fix mutation-tested, and a cross-provider VERIFIED verdict that found and closed six Majors first.",

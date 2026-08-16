@@ -579,6 +579,22 @@ scenario has misread it.
 **set-terminal** session — it inherits `change-log.md`, the Step 9 review
 and this set's own UAT accounting from Session 6.
 
+> **AMENDED 2026-08-16, after Session 7's measurement and the operator's
+> adjudication on it.** **This session's recordings are blocked by exactly
+> what blocked Session 7's**: no capture backend draws a cursor, and the
+> authorised route (`gdigrab` over the window's desktop rectangle) is a
+> reserved follow-on set gated behind a measurement pass, deliberately not
+> this one — Session 8 is set-terminal and carries the whole set's
+> accounting. So Session 8 **authors** the multi-module tutorial exactly as
+> Session 7 authored the single-module one, and **records nothing**. Both
+> tutorials' videos are owed to the reserved set. The written walkthroughs
+> stand alone with no video, which is spec decision 4 and is what makes
+> this an acceptable end state rather than a deferral of the deliverable.
+> Session 8 also owes the set's UAT accounting for all seven declared
+> components — including the one that must **not** default to `none`,
+> because the operator watched the Session 4 pilot recording on 2026-08-16
+> and returned a finding: a developer, count 1, method `watched`.
+
 **Steps:**
 
 1. Register.
@@ -674,6 +690,27 @@ and this set's own UAT accounting from Session 6.
   a stale video is regenerated rather than patched.
 - **Non-Web Walkthrough Backends** — native desktop or 3270 driving and
   capture. **Trigger:** an actual product supplies requirements.
+- **A Capture Backend That Draws The Cursor** — **reserved 2026-08-16 on
+  operator adjudication, and its trigger has already fired.** Session 7
+  measured three backends against two instruments
+  (`s7-cursor-capture-backends.json`): OBS window capture on WGC puts the
+  workbench in frame and **no cursor at all**, OBS BitBlt draws the cursor
+  onto a **black frame** because it cannot read a hardware-accelerated
+  Electron surface, and only `ffmpeg gdigrab -i desktop` over the window's
+  rectangle produces both. The operator authorised the `gdigrab` route
+  **gated behind a measurement pass against the Session 4 pilot's seven
+  criteria** — not a swap. Two of those criteria are where a desktop
+  rectangle is weakest and are the point of the pass: **C2**, because a
+  rectangle takes whatever comes to the front into the frame, and
+  window-follow, because it does not track a window that moves. Both matter
+  more than usual here: these videos are destined for a public URL.
+  **This set does not build it**, and the placement is deliberate — Session
+  8 is set-terminal and carries the whole set's accounting, and the S4
+  pilot that wrote those seven criteria was itself a session.
+  **It owes: the long-form human-driven capture harness (Session 7 step 3),
+  and the recordings for BOTH tutorials** — this set produces the two
+  written walkthroughs, which stand alone (spec decision 4), and neither
+  set of videos.
 
 ## Risks this set should expect
 

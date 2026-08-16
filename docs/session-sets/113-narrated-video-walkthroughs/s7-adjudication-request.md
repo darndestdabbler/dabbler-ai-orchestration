@@ -140,3 +140,38 @@ Session 7 delivered, proved in artifacts rather than in tests:
 
 Not delivered: the long-form capture harness and the six tutorial
 recordings, both blocked on Question 1.
+
+---
+
+# Operator adjudication — 2026-08-16
+
+> *"I will take all your recommendations."*
+
+All three recommendations accepted. Journaled in `decisions.jsonl` under
+`authority: human` with that attestation.
+
+**An adjudication settles the STOP, not the truth.** None of the five
+findings is closed by this. Each becomes an owed residual with a named
+owner:
+
+| # | finding | disposition | owner |
+|---|---|---|---|
+| 1 | VS Code recordings will not show a pointer | residual — route authorised | the reserved backend set |
+| 3 | no long-form human-driven capture harness | residual — blocked on the backend | the reserved backend set |
+| 5 | no tutorial recordings | residual — blocked on the backend | the reserved backend set |
+| 2 | the pointer check matches a profile, not cursor pixels | **accepted residual** | none; stated, not owed |
+| 4 | a static read longer than 45s is still compressible | **accepted residual** | none; stated, not owed |
+
+**Placement, which the operator left to me and which I am recording so it
+can be overturned at Step 9.** The backend work is a **reserved follow-on
+set**, not Session 8's first step. Session 8 is set-terminal and already
+carries `change-log.md`, the Step 9 review and the UAT record for all seven
+declared components; the Session 4 pilot that wrote the seven criteria was
+itself a whole session; and a terminal session that grows a new engineering
+deliverable stops being terminal.
+
+**The consequence, said plainly rather than left to be discovered:**
+**Session 8's multi-module tutorial recordings are blocked by exactly what
+blocked Session 7's.** Session 8 authors its tutorial and completes the
+set's accounting; both tutorials' recordings are owed to the reserved set.
+That is option (c) reached deliberately.

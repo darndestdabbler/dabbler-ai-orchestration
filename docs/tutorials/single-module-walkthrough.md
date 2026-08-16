@@ -181,6 +181,12 @@ Two things, and the first is an operator decision:
    functionality working before recording the purpose-built new
    tutorials."*
 
+   **Adjudicated 2026-08-16.** The operator authorised the `gdigrab`
+   desktop-rectangle route, **gated behind a measurement pass against the
+   Session 4 pilot's seven criteria** rather than swapped in. It is a
+   reserved follow-on set, not part of Set 113, and **these six recordings
+   are owed to it**.
+
 2. **A human driving.** These are not scripted scenarios. A tutorial that
    shows *AI helping to author a plan* cannot be scripted, because the AI's
    output differs every run — which is the whole reason Set 108's walk

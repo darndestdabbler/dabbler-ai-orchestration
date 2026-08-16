@@ -416,6 +416,22 @@
       "dateTime": "2026-08-15T21:02:35.759841-04:00",
       "description": "Built the pilot: a dependency-free obs-websocket v5 client, an OBS capture backend that creates its own scene collection and profile and puts everything back, a Playwright-Electron driver that consumes the scenario driver block Session 2 quarantined, a dependency-free PNG decoder for the pixel measurements, and the measurement harness itself. Four defects found and fixed before the measurement run, each by probing rather than reasoning: --websocket_port does not ENABLE the obs-websocket server; a leftover .sentinel marker raises a modal crash dialog that hangs the next launch; RecQuality=Small makes OBS accept StartRecord and never start the output, silently; and cleanup predicted OBS filenames instead of observing them, so it deleted nothing and reported success.",
       "status": "in-progress"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "run-the-pilot-against-the-work",
+      "dateTime": "2026-08-15T21:43:47.272205-04:00",
+      "description": "Pilot run, twice. Round 1: 10 captures + a supplementary clean run, which found C4 failing -- the last caption cue ended 32-83ms after the recording did, on all eleven. Fixed by holding the recording 750ms past the last step, then the WHOLE pilot was re-run against the fixed recorder rather than patching a number. Round 2: 10/10 clean captures, correlation 0.9996 every time against a decoy at 0.2987, zero occluder pixels with an occluder covering 80.8 percent of the target and holding focus, 0px dimension delta including across a deliberate resize, anchor uncertainty 106-110ms, all three dependency-absent variants named and degrading correctly, 14 cleanup attempts with zero leftovers. OBS confirmed left as found by an independent check, not just by the harness reporting on itself.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "record-the-outcome-either-way",
+      "dateTime": "2026-08-15T21:43:47.272205-04:00",
+      "description": "Outcome recorded either way, as the spec requires. Machine verdict FAIL on C2 and C7; the spec own bar -- ten consecutive clean captures, no wrong-window capture, no privacy leakage -- was met. C2 leakage measured exactly zero while its detector CONTROL came in at 0.441 against a 0.50 bar, because the occluder doubles as C1 structured decoy and includes browser chrome; deliberately NOT retuned, since adjusting the instrument to pass is the same sin as moving the threshold. C7 cannot be satisfied through OBS at all: four configurations tried, a silent audio track is always muxed. Recorder ships PROVISIONALLY -- waiving a criterion reduces verification, which is inside the hard carve-out, so it goes to the operator as guided-look item A. Six residuals recorded; four follow-on sets reserved with triggers, one of which is satisfied today.",
+      "status": "complete"
     }
   ]
 }

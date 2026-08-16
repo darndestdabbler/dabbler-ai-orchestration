@@ -12,7 +12,47 @@
 > Raw numbers: [`s4-os-capture-measurement.json`](s4-os-capture-measurement.json).
 > Reproduce: `npm run pilot:os-capture` from `tools/dabbler-ai-orchestration`.
 
-<!-- FILLED AFTER ROUND 2 -->
+## The verdict
+
+**Machine verdict: FAIL.** Ten clean captures out of ten required; five of
+seven criteria met; **C2 and C7 unmet**, both analysed below.
+
+**The spec's own bar was met.** *Ten consecutive clean captures from a
+fresh fixture, with no wrong-window capture and no privacy leakage* — that
+is exactly what the numbers show. The FAIL comes from two additional
+clauses this session set for itself, one of which is unsatisfiable through
+OBS at all and one of which is a mis-calibrated control on a claim that
+otherwise passes absolutely. Both statements are true; the record keeps
+both rather than picking the flattering one.
+
+| | criterion | verdict | measured | bar |
+| :--- | :--- | :--- | :--- | :--- |
+| C1 | window selection is repeatable | **PASS** | 0.9996 on every capture; decoy 0.2987 | >= 0.90; decoy <= 0.70 |
+| C2 | no unrelated desktop pixels | **FAIL** | leakage **0.000000**; detector control 0.441 | <= 0.0005; control >= 0.50 |
+| C3 | usable resolution under scaling | **PASS** | 0 px delta; 1440x900 -> 1024x700 followed | <= 2 px |
+| C4 | step events align with captions | **PASS** | anchor 106-110 ms; every cue inside the recording | <= 1500 ms |
+| C5 | absent dependency fails clearly | **PASS** | 3 of 3 variants named, walkthrough completed, 0 video artifacts | all three |
+| C6 | deterministic cleanup | **PASS** | 14 attempts, 0 problems, incl. 3 part-way failures | zero leftovers |
+| C7 | no monitor capture, no camera, no audio | **FAIL** | only `window_capture` ever created; 1 source per scene; **1 audio track** | 0 audio tracks |
+
+Two rounds were run. **Round 1 found C4 failing** — the last caption cue
+ended 32-83 ms after the recording did, on all eleven of its captures — and
+round 2 re-measured the whole pilot against the fixed recorder rather than
+patching a number. Round 1's numbers are otherwise identical to round 2's.
+
+**Cleanup was confirmed independently**, not only by the harness reporting
+on itself: after the pilot, OBS is not running, `server_enabled` is back to
+`false` with the operator's own password untouched, the only scene
+collection and profile are their own `Untitled`, and no `.sentinel` run
+markers remain.
+
+**The occluder was genuinely occluding.** It covered **80.8%** of the
+target window and held foreground focus at the moment of capture, and the
+capture was byte-for-byte indistinguishable from the unoccluded frame
+(correlation 1.000 in all ten). Without that geometry, "no magenta in
+frame" would have been equally consistent with an occluder that opened
+somewhere else.
+
 
 ## What the pilot actually establishes
 
@@ -41,12 +81,14 @@ reader could over-read this:
 3. **One machine, one OBS version, one GPU.** OBS 32.2.1, obs-websocket
    5.7.4, Windows 11.
 
-## The three unmet criteria, and what kind of thing each one is
+## The three criteria that did not come out first time
 
 They are not the same kind of finding and should not be read as three of
-anything.
+anything. One was a real defect and is now fixed and passing; one is a
+mis-calibrated control on a claim that passes absolutely; one cannot be
+satisfied at all.
 
-### C4 — a real defect, found by the criteria and fixed
+### C4 — a real defect, found by the criteria and fixed (now PASS)
 
 The last caption cue ended **32–83 ms after the recording did**, on every
 one of the first eleven captures. The cue window is derived from the
@@ -61,8 +103,12 @@ were only ever compared because C4 said to compare them.
 
 Fixed by holding the recording open 750 ms after the last step, which also
 replaces a hard cut on the frame of the final click with a beat of
-stillness the viewer can read the result in. Re-measured across a full
-second round of captures rather than asserted.
+stillness the viewer can read the result in.
+
+**Re-measured, not asserted.** The whole pilot was run a second time
+against the fixed recorder — ten captures, the resize variant and all three
+dependency-absent variants — rather than patching one number in round 1's
+record. C4 passes in round 2 with every cue inside its recording.
 
 ### C2 — the claim passes; the control's threshold was mis-set
 
@@ -124,10 +170,11 @@ are true and the record keeps both.
 | id | severity | what is owed | owner |
 | :--- | :--- | :--- | :--- |
 | S4-R1 | minor | C7's no-audio-track clause is unsatisfiable through OBS configuration. The track is provably silent. Needs an operator ruling (guided-look item A) on whether that is acceptable, or the recorder does not ship. | operator |
-| S4-R2 | minor | C2's detector control measured 0.44 against a 0.50 bar because the occluder doubles as C1's structured decoy and includes browser chrome. Deliberately **not** retuned. A future pilot should use two windows — a plain fill for the leakage control, a structured one for the decoy. | a future pilot, if one runs |
+| S4-R2 | minor | C2's detector control measured 0.441 against a 0.50 bar because the occluder doubles as C1's structured decoy and includes browser chrome. Deliberately **not** retuned. A future pilot should use two windows — a plain fill for the leakage control, a structured one for the decoy. | a future pilot, if one runs |
 | S4-R3 | minor | No display scale other than 100% was exercised, by choice: changing the operator's live scaling would disrupt their desktop. The resize variant covers the same failure mode indirectly. | unowned; re-measure if a scaled machine is available |
 | S4-R4 | minor | C1 measures OBS's capture source, not the encoded file. A source-perfect, file-black capture would pass. Corroborated by file size and by the human watching it. | closed by guided-look item 1 |
-| S4-R5 | minor | A ten-run pilot leaves roughly 430 MB of gitignored video under `.walkthrough-runs/`. Harmless, and worth knowing before running it on a small disk. | none |
+| S4-R5 | minor | A ten-run pilot leaves roughly 430 MB of gitignored video under `.walkthrough-runs/`, and this session ran it twice. Harmless, and worth knowing before running it on a small disk. | none |
+| S4-R6 | minor | One fix landed **after** the round-2 captures: cleanup ownership on the rethrow path, so that a non-dependency failure from `configure()` (the ambiguity refusal) cannot leave OBS running and the websocket config rewritten. It is on a path no measured run took, so the measurement's claims are unaffected — but it is not itself covered by a capture. The sibling class was checked in the browser recorder (G-008) and is absent there. | recorded; no re-measurement owed |
 
 ## Follow-on sets
 

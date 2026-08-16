@@ -86,8 +86,11 @@
         "sceneCollectionRemoved": true,
         "profileRemoved": true,
         "vscodeProcessGone": true,
-        "noZeroByteOrTempFilesInRunDir": true
-      }
+        "noZeroByteOrTempFilesInRunDir": true,
+        "obsWebsocketConfigRestored": true,
+        "obsSentinelNotLeftBehind": true
+      },
+      "restoreNote": "The pilot enables obs-websocket's server (one boolean in the operator's config) because neither --websocket_port nor --websocket_password turns it on, and puts the file back byte-for-byte afterwards. It also clears and does not leave OBS's .sentinel run markers, whose leftovers raise a modal 'crash detected' dialog on the next launch -- which is how a harness silently hangs a later run."
     },
     "C7": {
       "name": "no-monitor-capture-ever",
@@ -96,9 +99,16 @@
       "forbiddenInputKinds": [
         "monitor_capture",
         "display_capture",
-        "game_capture"
+        "game_capture",
+        "dshow_input",
+        "wasapi_input_capture",
+        "wasapi_output_capture",
+        "wasapi_process_output_capture"
       ],
-      "everyCapturedWindowOwnedByHarness": true
+      "everyCapturedWindowOwnedByHarness": true,
+      "sceneMustContainExactlyOneSource": true,
+      "recordingMustHaveNoAudioTrack": true,
+      "amendment": "AMENDED before the first capture (journaled). Probing the environment found the operator's DEFAULT OBS scene collection carries a live webcam (NexiGo N940P), a microphone and Desktop Audio. The harness already creates its own scene collection, but an unasserted safety property is a hope -- and this one is the operator's camera. Camera and audio input kinds are now forbidden explicitly, the harness's scene must contain exactly the one window-capture source it created, and the recording must carry no audio track. Captures taken before this amendment: zero."
     }
   },
   "honestFail": "Any criterion unmet, or fewer than ten consecutive clean runs, is a FAIL. A fail ships no recorder; the measurements are the deliverable and manual-only degradation stays intact."

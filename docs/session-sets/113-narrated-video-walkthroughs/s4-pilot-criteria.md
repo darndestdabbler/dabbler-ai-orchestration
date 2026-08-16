@@ -101,12 +101,31 @@ happy path. The OBS process the harness launched is gone; the scene
 collection and profile it created are removed; the VS Code process is
 gone; no zero-byte or temporary leftovers remain.
 
-### C7 — No monitor capture, ever
+Two Windows-specific obligations, both found by probing. The pilot
+**enables obs-websocket's server** — one boolean in the operator's config,
+because neither `--websocket_port` nor `--websocket_password` turns it on
+— and must put that file back byte-for-byte. And it must not leave OBS's
+`.sentinel` run markers behind: a leftover marker raises a modal *"crash
+detected"* dialog on the next launch, which is how an automated harness
+silently hangs a later run rather than failing one.
+
+### C7 — No monitor capture, no camera, no audio
 
 The pilot never captures the screen. `monitor_capture`, `display_capture`
 and `game_capture` are forbidden input kinds, and every captured window
 must belong to a process the harness itself launched. This is why the C2
 control captures the occluder window rather than the desktop.
+
+**Amended before the first capture** (journaled in `decisions.jsonl`).
+Probing the environment found that the operator's **default OBS scene
+collection carries a live webcam, a microphone and Desktop Audio**. The
+harness always creates its own scene collection, so those sources were
+never going to be in frame — but an unasserted safety property is a hope,
+and this one is the operator's camera. So the forbidden list now names the
+camera and audio input kinds too (`dshow_input`, `wasapi_*`), the
+harness's scene must contain **exactly** the one window-capture source it
+created, and the recording must carry **no audio track**. Captures taken
+before this amendment: **zero**.
 
 ## Cleanliness of the operator's own OBS
 

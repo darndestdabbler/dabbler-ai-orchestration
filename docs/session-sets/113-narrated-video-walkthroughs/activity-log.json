@@ -930,6 +930,22 @@
       "dateTime": "2026-08-16T17:15:37.271230-04:00",
       "description": "docs/walkthroughs/publication-safety-checklist.md: per video, with a human watching the video, covering window titles, absolute paths, repository and remote names, notification toasts, secrets in terminal output and environment, the cost and model gauges, open browser tabs and the taskbar -- plus a BEFORE-you-record half, because most of the list is far cheaper to prevent than to find. 'Do not publish this one' is stated as a valid outcome and needs no justification beyond the finding. Per-video outcomes are recorded as a small JSON record where a `publish` decision with a non-empty findings list must carry a sentence per finding -- that sentence is the whole value of writing it down. It deliberately does NOT scan automatically: a checker that finds nothing is indistinguishable from one that looks for nothing, and a video that has passed a scan invites less human attention than one that has not. Nothing here uploads anything. NOT YET EXERCISED against a real video, because there is no video to run it against.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T17:57:35.868516-04:00",
+      "description": "Four rounds, $2.73, all on gpt-5-6-sol with anthropic excluded. Discovery raised 10 findings across two lenses -- six distinct -- and the supplementary pass added one. FOUR were real defects in this session's own work and one of them was a REGRESSION I had just introduced: having measured that BitBlt is the only OBS method whose cursor setting does anything, I wired the physical pointer to select it, and the same measurement shows BitBlt black-frames an Electron window. The second remediation cycle then caught two more real ones -- the top-layer promotion only worked if the pointer was promoted LAST (and the measurement that 'proved' it opened the modal before the pointer existed, the one ordering under which the broken code passes), and a compact hover repaint could still clear the shape rule. Both fixed and re-measured; those two fix verdicts were accepted. FIVE Majors remain at the enforced bound and the loop is SUSPENDED, not ground: three of them are one blocked deliverable (no capture backend draws a cursor) and two are acknowledged limits of instruments I built. Written up as s7-adjudication-request.md -- three questions, a recommendation and a stated default for each. Nothing is disputed: on all five the verifier reads the code right.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-16T17:57:35.869521-04:00",
+      "description": "All three layers run after the last code change and recorded to the run of record: pytest 5091 passed / 5 skipped / 1 xfailed in 7m26s (-n 8, the operator's parallelism cap), mocha 1580 passing in 2m, playwright 37 passed in 4m42s at 4 workers -- Layer 3 is owed because this session drives a rendering surface (L-064-12), and it is also where the pointer changes would surface. Run BEFORE the operator's adjudication rather than after, deliberately: the loop is suspended on a decision that is theirs, and having the suites already green takes an hour off whatever they choose.",
+      "status": "complete"
     }
   ]
 }

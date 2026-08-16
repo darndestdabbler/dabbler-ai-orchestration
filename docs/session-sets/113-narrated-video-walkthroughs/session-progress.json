@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T05:34:51.937933-04:00",
+  "generatedAt": "2026-08-16T05:38:36.081414-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "f7638e26001c7c694b73e18244ebf5a479362367487ca7280449c31846b117f3",
+    "activity-log.json": "24f99a928fda216de15b2bd1a117c84b7906fb2f6abbdcc76be4fa875846ac69",
     "session-state.json": "fb1aaba89ed82a66c3b50e5070c3b495ac50fb360551db72186f73f6227473a2",
-    "spec.md": "68b6fedb8b8ddc5110a553d8b0701f0b2356ad5d871375291ebc07c6255176e0"
+    "spec.md": "6fdc685ea021cdc9e15de888d5c5cf9a726a79f1397be61b5d185d7642b48a12"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -561,15 +561,27 @@
           "isActive": false,
           "startedAt": null,
           "isTerminal": true
+        },
+        {
+          "stepNumber": 12,
+          "stepKey": "spec-admission-after-amendment",
+          "description": "Ran spec_admission against the amended spec, which is the check the authoring guide says to run at authoring rather than discover at hour three. It reported FOUR sessions over the 7-step cap - and two of them (5 and 6) were already over before this amendment, added by Session 4 this morning with no exception declared, so the amendment did not create that condition but would have quietly doubled it. Trimmed where trimming was honest rather than excepting by default: Session 7 merged capture and time-compression into one pipeline step (N=5 -> 4), and Session 8 folded its quality bar into the recording step and its publication conventions into the safety pass (N=4 -> 2, now under cap with no exception). Declared sessionSizeException for 5, 6 and 7 with per-session reasons; Session 5s reason names six declared work steps honestly rather than the four I first wrote, because two of its steps are a reading instruction and a guardrail. 277 targeted tests green.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T05:34:20.923477-04:00",
+          "isTerminal": true
         }
       ],
       "counts": {
         "pending": 8,
         "in-progress": 1,
-        "complete": 2,
+        "complete": 3,
         "blocked": 0,
         "unknown": 0,
-        "total": 11
+        "total": 12
       },
       "current": [
         "read-the-operator-s-2026-08"

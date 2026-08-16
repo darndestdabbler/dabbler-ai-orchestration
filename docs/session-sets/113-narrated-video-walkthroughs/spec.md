@@ -78,6 +78,32 @@ uatComponents:            # Set 113 S1's own gate, applied to this set. The TERM
   - Single-module tutorial recording set   # added 2026-08-16 with Session 7; journaled
   - Multi-module tutorial recording set    # added 2026-08-16 with Session 8; journaled
 pathAwareCritique: advisory
+# Declared 2026-08-16, when the admission test was run against the whole
+# amended spec and reported four sessions over cap. Sessions 7 and 8 were
+# TRIMMED rather than excepted where trimming was honest -- 7 merged capture
+# and time-compression into one pipeline step, 8 folded its quality bar into
+# the recording step and its conventions into the safety pass, which took 8
+# from N=4 to N=2 and needs no exception. What follows is what could not be
+# trimmed without losing work.
+sessionSizeException: 5 - six declared work steps, of which two (read the
+  operator's note; do not redirect to Azure) are a reading instruction and a
+  guardrail rather than work, and the remaining four are one sequential
+  measurement: criteria first, plugin surface before the container
+  (so the cheap mitigation can dominate and cancel the expensive one), then
+  the container, then the trade it forces. Splitting it re-pays container
+  setup to no benefit, and the plugin measurement exists precisely so the
+  later steps may not be needed.
+sessionSizeException: 6 - a diagnosis session, where reproducing both failures
+  and judging the servant violation on its own merits are the evidence the
+  fix and its falsifier rest on. Splitting it would hand a later session a
+  diagnosis it did not make.
+sessionSizeException: 7 - four work steps after trimming, and none is
+  droppable: the pointer must be fixed BEFORE recording (operator ordering
+  ruling) or the tutorial is recorded twice, the pipeline is what makes a
+  long session watchable, the recording is the deliverable, and the safety
+  pass is what stands between a public artifact and an incident. The
+  alternative is splitting into two sessions, which the operator's direction
+  of 2026-08-16 (two more sessions, not three) does not leave open.
 prerequisites:
   - slug: 112-remove-lightweight-tier
     condition: complete
@@ -493,25 +519,28 @@ scenario has misread it.
      nothing about what a viewer sees.
    - **Do not expand:** no click ripples, no highlight animations, no cursor
      theming, no input replay.
-3. **Build the long-form capture harness, and keep it small.** Start and
-   stop capture around a **real** session in a **real** VS Code window —
-   not the Extension Development Host, because the operator is driving the
-   shipped product. One recording per session, named by set and session
-   number. **It observes and nothing more:** it must not write to
-   `session-state.json`, drive the orchestrator, or make a session behave
-   differently because it is being recorded.
-4. **Derive the fast-forward from the framework's own record.** This is the
-   one place this framework has an advantage over a video editor: a Dabbler
-   session already writes `session-events.jsonl` and `activity-log.json`
-   with real timestamps, so *which stretches were waiting* is **derivable**
-   rather than eyeballed. Emit a **speed-ramp plan** — segments and rates,
-   as a text artifact — and apply it with ffmpeg (`setpts`; there is no
-   audio track, which is what keeps this a one-filter problem). The plan
-   being a file is the point: an edit decision list can be regenerated and
-   reviewed, and a timeline inside an editor cannot. **State the applied
-   compression per segment in the run record**, and never compress an
-   interval where something happened.
-5. **Author and record the single-module tutorial.** A **purpose-built toy
+3. **Build the long-form recording pipeline** — capture and
+   time-compression together, because they are one path from a real
+   session to a watchable file, and splitting them across steps would only
+   have split the same work across two logs.
+   - **Capture:** start and stop around a **real** session in a **real** VS
+     Code window, not the Extension Development Host, because the operator
+     is driving the shipped product. One recording per session, named by
+     set and session number. **It observes and nothing more:** it must not
+     write to `session-state.json`, drive the orchestrator, or make a
+     session behave differently because it is being recorded.
+   - **Time compression, derived from the framework's own record.** This is
+     the one place this framework has an advantage over a video editor: a
+     Dabbler session already writes `session-events.jsonl` and
+     `activity-log.json` with real timestamps, so *which stretches were
+     waiting* is **derivable** rather than eyeballed. Emit a **speed-ramp
+     plan** — segments and rates, as a text artifact — and apply it with
+     ffmpeg (`setpts`; there is no audio track, which keeps this a
+     one-filter problem). The plan being a file is the point: an edit
+     decision list can be regenerated and reviewed, and a timeline inside
+     an editor cannot. **State the applied compression per segment**, and
+     never compress an interval where something happened.
+4. **Author and record the single-module tutorial.** A **purpose-built toy
    project** (operator ruling, 2026-08-16), one module, **three session
    sets**, each session its own recording — and it must show **AI helping to
    author the plan and decompose it into session sets**, which is precisely
@@ -524,7 +553,7 @@ scenario has misread it.
    project is too big. **Shrink the project, not the tutorial** — dropping
    steps is how a lifecycle demonstration quietly stops demonstrating the
    lifecycle.
-6. **Publication safety pass, before anything leaves the machine.** Every
+5. **Publication safety pass, before anything leaves the machine.** Every
    prior recording in this set was for internal review; these are destined
    for a public URL, and a public video is unrecallable. Check, per video,
    with a written checklist and a human confirming: window titles, absolute
@@ -532,15 +561,15 @@ scenario has misread it.
    terminal output or environment, the cost and model gauges, open browser
    tabs, the taskbar. **"Do not publish this one" is a valid outcome.**
    Nothing in this session uploads anything.
-7. **Cross-provider verification.**
-8. **Required portion of the full test suite** — this session drives a
+6. **Cross-provider verification.**
+7. **Required portion of the full test suite** — this session drives a
    rendering surface, so Layer 3 is owed (`L-064-12`).
-9. **Close-out**, mid-set, with a `next_orchestrator` handover.
+8. **Close-out**, mid-set, with a `next_orchestrator` handover.
 
 **Creates:** pointer visibility on both recorders with its falsifier, the long-form capture harness, the event-derived speed-ramp, the single-module tutorial recordings and its written walkthrough, the publication safety checklist
 **Touches:** extension `scripts/`, `ai_router/`, `docs/tutorials/`, `docs/walkthroughs/`
 **Ends with:** every recording this framework makes shows a pointer that moves, and a watchable single-module tutorial exists as one video per session, with the waiting compressed out and the compression stated.
-**Progress keys:** `pointerVisible`, `longFormCapture`, `fastForwardDerived`, `singleModuleRecorded`, `safetyPassRun`
+**Progress keys:** `pointerVisible`, `recordingPipeline`, `singleModuleRecorded`, `safetyPassRun`
 
 ---
 
@@ -560,24 +589,24 @@ and this set's own UAT accounting from Session 6.
    had to generalise and why — that is the signal that the capability was
    fitted to one example, and it is worth more written down than worked
    around.
-3. **Make it show what the single-module tutorial cannot.** Otherwise it is
-   the same video three times at three times the cost: module declaration,
-   the Explorer grouped by module, review routed by ownership, and work
+   **It must show what the single-module tutorial cannot**, or it is the
+   same video three times at three times the cost: module declaration, the
+   Explorer grouped by module, review routed by ownership, and work
    proceeding **in parallel** across modules while nobody waits. If those
    four are not visible on screen, this session has produced a longer video
    rather than a second tutorial.
-4. **Safety pass again, per video** — not once per set. Session 7's
-   checklist, run again, because the risk is per artifact.
-5. **Say where these go, and build no pipeline.** Publication stays a human
-   upload (operator, 2026-08-10). Record the conventions rather than the
-   machinery: the product version belongs in the title, and a stale video is
+3. **Clear each video for publication, and build no pipeline.** Session 7's
+   safety checklist, run again **per video** — not once per set, because
+   the risk is per artifact. Then record the conventions rather than the
+   machinery: publication stays a human upload (operator, 2026-08-10), the
+   product version belongs in the title, and a stale video is
    **regenerated, not patched**. Note in the reservation record that the
    *Training Publication and Retention* trigger has fired — a public
    audience now exists — without treating that as licence to build it here.
-6. **Cross-provider verification.**
-7. **Required portion of the full test suite** — the full matrix once, at
+4. **Cross-provider verification.**
+5. **Required portion of the full test suite** — the full matrix once, at
    the release boundary.
-8. **Close-out**, set-terminal. The UAT accounting covers **all seven
+6. **Close-out**, set-terminal. The UAT accounting covers **all seven
    declared components**. One record is already owed and must not default
    to `none`: the operator **watched** the Session 4 pilot recording on
    2026-08-16 and returned a finding, which is a developer, count 1, method

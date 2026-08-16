@@ -578,6 +578,14 @@
       "dateTime": "2026-08-16T05:34:20.923477-04:00",
       "description": "Still pending. Re-logged at its planned key to undo the displacement caused by the mislabelled entry above: the pass criteria for the container run have NOT been set yet, and the projection must not imply otherwise.",
       "status": "pending"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 12,
+      "stepKey": "spec-admission-after-amendment",
+      "dateTime": "2026-08-16T05:38:35.787720-04:00",
+      "description": "Ran spec_admission against the amended spec, which is the check the authoring guide says to run at authoring rather than discover at hour three. It reported FOUR sessions over the 7-step cap - and two of them (5 and 6) were already over before this amendment, added by Session 4 this morning with no exception declared, so the amendment did not create that condition but would have quietly doubled it. Trimmed where trimming was honest rather than excepting by default: Session 7 merged capture and time-compression into one pipeline step (N=5 -> 4), and Session 8 folded its quality bar into the recording step and its publication conventions into the safety pass (N=4 -> 2, now under cap with no exception). Declared sessionSizeException for 5, 6 and 7 with per-session reasons; Session 5s reason names six declared work steps honestly rather than the four I first wrote, because two of its steps are a reading instruction and a guardrail. 277 targeted tests green.",
+      "status": "complete"
     }
   ]
 }

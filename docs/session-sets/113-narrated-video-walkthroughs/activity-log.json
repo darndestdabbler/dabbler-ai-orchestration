@@ -329,6 +329,85 @@
       "dateTime": "2026-08-15T19:35:01.452489-04:00",
       "description": "All three declared suites run to completion after the last code-changing edit and recorded via run_of_record: pytest 4978 passed / 5 skipped / 1 xfailed (235s, at -n 8 per the operator parallelism cap rather than the declared -n auto); mocha 1492 passing (17s, +24 for the new webWalkthroughRecorder suite); playwright 37 passed (180s, +5 for expectation-wait.spec.ts). Layer 3 is owed by this session's own spec step 6 and by L-064-12, since package.json counts as product. The FIRST full pytest run found 5 failures - every one a fixture artifact of the new empty-evidence guard, in files not previously run - so they were fixed and the WHOLE suite re-run rather than re-running the five, which is the point of the policy.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "set-the-pass-criteria-before-the",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "**Set the pass criteria before the first capture.** It passes only if it can repeatedly select the intended window; exclude unrelated desktop pixels; preserve usable resolution under the operator's normal display scaling; align step events with captions; fail clearly when the dependency is absent; and clean up deterministically. Bar: **ten consecutive clean captures from a fresh fixture, with no wrong-window capture and no privacy leakage.** No audio. Criteria decided after the first capture are not criteria.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "run-the-pilot-against-the-work",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "**Run the pilot** against the Work Explorer, using the automation that already works (`scripts/vscode-launch.js` + the Layer 3 launch machinery). **OBS Studio is the primary capture candidate** (operator ruling, 2026-08-15): its Windows Graphics Capture source tracks the intended window under occlusion, excludes unrelated desktop pixels, and handles display scaling \u2014 the three places ffmpeg `gdigrab` (GDI-based, prone to black frames on hardware-accelerated apps such as Electron, and to occlusion leakage) is most likely to miss the step-2 bar \u2014 and obs-websocket, bundled since OBS 28, makes scene setup, start/stop and output paths scriptable. ffmpeg (`-f gdigrab`) is the **fallback** candidate. Both are **documented optional prerequisites** \u2014 never bundled, never in the portable core; \"dependency absent\" (OBS not installed, or running without its websocket reachable) is the clean-failure path the criteria already demand, not a condition to engineer around. The step-2 pass criteria are **unchanged** \u2014 whichever backend runs must earn them. **Do not expand:** not cross-platform capture, not native desktop automation beyond what already exists here, not dependency bundling, not audio, not publishing, and **no capture-time zoom via OBS scene transforms** (operator note, 2026-08-15 \u2014 attention emphasis is a driver/post-processing concern, not a capture concern). If the session starts growing, it has failed its own budget \u2014 stop and record that.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 4,
+      "stepKey": "record-the-outcome-either-way",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "**Record the outcome either way.** Pass \u2192 ship as an optional Windows capability behind the **internal, explicitly unstable** recorder interface, with manual-only degradation intact. Fail \u2192 keep the measurements as the durable deliverable, keep manual-only degradation, and defer desktop capture **with evidence**. **Reserve the follow-on sets** named below so they are not lost.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-including-the-adviso",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "**Cross-provider verification**, including the advisory path-aware critique.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "**Required portion of the full test suite** \u2014 the full matrix once, at the release boundary.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 7,
+      "stepKey": "close-out-including-this-set-s",
+      "dateTime": "2026-08-15T20:17:11.254324-04:00",
+      "description": "**Close-out**, including this set's own dogfood UAT \u2014 its scenario document plus, if the pilot passed, its own narrated recording \u2014 `change-log.md`, and the Step 9 review.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-15T20:17:11.258678-04:00",
+      "description": "Registered session 4 (claude / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 2,
+      "stepKey": "set-the-pass-criteria-before-the",
+      "dateTime": "2026-08-15T20:24:51.971699-04:00",
+      "description": "Pass criteria fixed BEFORE the first capture: s4-pilot-criteria.json (machine-readable, read by the harness, digest recorded in every measurement) plus s4-pilot-criteria.md. Seven criteria C1-C7 each with an instrument and, where the claim is unfalsifiable without one, a control. Hardened pre-capture against the two false-pass modes the Step 3.5 routed analysis named: title ambiguity (refuse on multiple matches) and scaling myopia (window-resize variant, and the 100%-scaling limitation recorded rather than papered over). Committed before any capture ran.",
+      "status": "complete"
     }
   ]
 }

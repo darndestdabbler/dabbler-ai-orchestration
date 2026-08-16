@@ -161,6 +161,28 @@ launch rather than failing it; `RecQuality=Small` makes OBS accept
 filenames instead of observing them, so it deleted nothing and reported
 success.
 
+## The fallback, measured
+
+The spec named ffmpeg `gdigrab` as the fallback capture candidate, and
+verification twice refused to let it go unmeasured — correctly, since C7 is
+a capture criterion and gdigrab offers no audio device at all. The operator
+installed ffmpeg so the question could be answered rather than argued.
+
+**It produced a uniformly black frame.** Every pixel of the 1440×900
+capture decoded to `(0,0,0)`; eight seconds of video came out at 16 KB
+against ~37 MB for a comparable OBS capture. That is the documented GDI
+failure on hardware-accelerated windows, and Electron is exactly that.
+
+So the fallback **satisfies the one clause OBS cannot** (no audio track)
+and **fails the one that matters most** (it captures nothing). It confirms
+the operator's ruling that made OBS primary rather than overturning it —
+and that ruling now rests on a measurement instead of on reasoning.
+
+The failure was caught by an instrument written for it: the correlation
+returns `0` for a zero-variance frame, a choice made when the instruments
+were built because *"a black frame is the failure gdigrab produces and
+scoring it 1.0 would make the likeliest capture failure look perfect."*
+
 ## What this set deliberately did not build
 
 No video library, no CI recording, no voice synthesis, no committed
@@ -170,6 +192,10 @@ asked about and refused: capture is the cheap half, and a generic recorder
 is idle until something can **drive** an arbitrary application, which
 nothing does.
 
-Four follow-on sets are reserved with triggers in
-[`docs/proposals/2026-08-15-set-113-follow-on-reservations.md`](../../proposals/2026-08-15-set-113-follow-on-reservations.md).
-Exactly one trigger is satisfied today.
+Five follow-on sets are reserved with triggers in
+[`docs/proposals/2026-08-15-set-113-follow-on-reservations.md`](../../proposals/2026-08-15-set-113-follow-on-reservations.md)
+— the four the spec named, plus **Sandboxing the Capture Dependencies**,
+which the operator raised as this session closed: open-source media stacks
+are a risk surface in an age of AI-assisted exploitation, and the question
+is whether OBS and ffmpeg can be isolated rather than merely optional. Two
+of the five triggers are satisfied today.

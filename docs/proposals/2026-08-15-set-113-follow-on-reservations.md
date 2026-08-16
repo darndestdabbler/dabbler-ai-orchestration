@@ -1,7 +1,9 @@
 # Set 113 follow-on sets — RESERVED, with triggers
 
-> **Status: reservation record, written by Set 113 Session 4 (2026-08-15).**
-> Four sets the Set 113 spec names as *"to reserve, not to build here"*.
+> **Status: reservation record, written by Set 113 Session 4 (2026-08-15;
+> a fifth entry added 2026-08-16 on operator direction).** Four sets the
+> Set 113 spec names as *"to reserve, not to build here"*, plus one the
+> operator raised while Session 4 was closing.
 > **No set numbers are reserved yet** — numbering is the operator's call.
 > This document exists so the reservations are not lost with the set that
 > made them, and so each trigger is written down where a future session can
@@ -22,14 +24,14 @@ standing complexity note warns about (*"this could quickly become dozens of
 sets with thousands of lines of code"*).
 
 So each entry below states its trigger **and whether that trigger is
-satisfied today**. One is.
+satisfied today**. Two are.
 
 ---
 
 ## 1. Independent Black-Box UI Critique
 
-**Trigger: a standing concern, satisfied today.** This is the only one of
-the four whose trigger is already met.
+**Trigger: a standing concern, satisfied today.** One of two whose trigger
+is already met (the other is entry 5).
 
 Provider-diverse exploratory web E2E against what round 3 of the Set 113
 consults named **common-mode self-verification failure** — the operator's
@@ -138,3 +140,83 @@ and until something does, a capture backend for one has nothing to record.
 This is also where a *"record any application"* tool or agent belongs. The
 operator asked about one on 2026-08-15 and ruled it out for exactly this
 reason.
+
+---
+
+## 5. Sandboxing the Capture Dependencies (added 2026-08-16, operator)
+
+**Trigger: a standing security concern, satisfied today.** The second of
+the five whose trigger is already met.
+
+### The operator's framing
+
+> *"Especially in the age of AI-powered exploitation of software
+> vulnerabilities, open source software is generally considered more risky.
+> Yes, OBS Studio is also open source. What we may want to consider is this
+> — whatever system we end up using — if possible, use it in a container to
+> limit the risk."*
+
+Set 113 Session 4 made this concrete rather than theoretical. To record one
+walkthrough of this repository's own product, the framework now expects
+**two large third-party media dependencies** on a developer's machine:
+
+- **OBS Studio** — a GUI application the harness launches, configures over
+  a local websocket, and drives. Session 4 measured its plugin surface
+  incidentally: the operator's install loads a DeckLink SDK, an NVIDIA
+  filters plugin, a CEF-based browser source, an AJA output plugin and a
+  machine-learning background-removal model, none of which this framework
+  wants.
+- **ffmpeg** — installed during Session 4 to measure the fallback. A
+  full build links a very large codec and container surface, and its
+  historic CVE record is exactly the shape the operator names.
+
+Neither is bundled, and both are correctly documented as optional. The
+question this set would answer is **whether they can be isolated rather
+than merely optional**.
+
+### What this repository already has to build on
+
+**`ai_router/podman_sandbox.py` (Set 069 S4)** is a working Podman cage
+built on the identical principle — *"model-authored code runs only inside a
+real container"* — with the container as the trust boundary rather than
+human approval. That is the same argument one rung along: here the
+untrusted thing is not model-authored code but a large third-party media
+stack.
+
+### What makes this genuinely hard, and must be scoped honestly
+
+Containerising a **capture** dependency is not the same as containerising a
+*compute* one, and a set that does not say so up front will overrun:
+
+1. **Capture needs the host's display.** A container cannot Windows-Graphics-
+   Capture a window belonging to a process on the host without being handed
+   deep access to the host session — which is most of the isolation given
+   back. This is the crux and should be settled before anything is built.
+2. **Windows containers are not Linux containers.** The capture target is a
+   Windows GUI application, and Podman/WSL2 does not put the host's
+   desktop inside the guest.
+3. **The portable path may be the better lever.** Session 3's browser
+   recorder drives Chromium, which containerises conventionally — so the
+   *web* recorder (the one that serves every real target) may be
+   containerisable even if the Windows OS-capture path is not. That
+   asymmetry is worth measuring before deciding.
+4. **A cheaper mitigation may dominate.** Session 4 already established
+   that the recorder creates its own OBS profile and scene collection,
+   deletes every input it did not create, and restores the operator's
+   configuration byte-for-byte. Running OBS with `--only-bundled-plugins`
+   (an existing OBS flag) would cut the loaded plugin surface without any
+   container at all. Measure that first; it may buy most of the risk
+   reduction for none of the complexity.
+
+### The shape worth reserving
+
+**Measure before building**, the same way Session 4 did: fix the criteria
+first, establish what isolation is actually achievable for each dependency,
+and record a verdict either way. A defensible outcome is *"the web path
+containerises, the Windows capture path cannot, and here is the
+plugin-surface reduction that is achievable instead"* — that is a real
+answer, and it is cheaper than a media-sandboxing subsystem nobody can
+finish.
+
+**Do not let this become the generic-recorder set in disguise.** The
+complexity note binds here too.

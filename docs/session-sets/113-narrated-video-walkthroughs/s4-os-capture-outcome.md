@@ -199,65 +199,69 @@ as non-blocking reduces verification, which is inside the decision-rights
 hard carve-out, so whether a provably silent audio track is acceptable is
 item A of the guided look.
 
-## The ffmpeg fallback — OPEN, and it needs the operator
-
-**This is the one thing this session could not settle, and it is recorded
-as open rather than argued closed.**
+## The ffmpeg fallback — MEASURED, and it confirms the ruling
 
 The spec names ffmpeg `gdigrab` as the fallback capture candidate.
-Verification raised its absence twice: once in discovery, and again in the
-remediation review, where the first attempt to close it by *recording* it
-rather than *doing* it was **fix-rejected**. That rejection lands one blow
-squarely, and it is worth repeating rather than softening:
+Verification raised its absence twice, and rejected the first attempt to
+close it by *recording* rather than *doing*. The rejection landed:
 
 > *"The claim that OBS 'did not fail at capture' improperly narrows the
 > trigger: C7 is part of the authoritative capture criteria, OBS's verdict
 > is FAIL, and the outcome itself acknowledges that ffmpeg `-an` could
 > satisfy C7."*
 
-That is correct. C7 is a capture criterion; the verdict is FAIL; and the
-fallback is the one thing most likely to satisfy the clause OBS cannot.
+**The operator installed ffmpeg so it could be measured, and it was.**
+Raw record: [`s4-ffmpeg-fallback-measurement.json`](s4-ffmpeg-fallback-measurement.json).
+Reproduce with `node scripts/measure-ffmpeg-fallback.js`.
 
-### What was measured, rather than assumed
+The probe drives the **same** fixture window through the **same**
+instruments against the **same** committed criteria. It deliberately does
+not build a second recorder — wiring gdigrab into the driver, the event
+stream and the manifest is the expansion the Session 4 budget forbids —
+because the only question worth answering is whether the fallback could do
+what OBS could not.
 
-The first version of this section said "ffmpeg is not installed". That was
-true but lazy, so it was checked properly:
+### The result
 
-| Candidate | Result |
-| :--- | :--- |
-| `ffmpeg` on `PATH` | absent |
-| Playwright's bundled `ffmpeg-win64.exe` (present, v7.0.1) | built `--disable-everything`; `-devices` lists **none**, so **no `gdigrab`** |
-| winget / Chocolatey / Scoop shims, `C:fmpeg`, Program Files | absent |
-| `winget` and `choco` themselves | **available** — an install is one command |
+| | criterion | ffmpeg `gdigrab` | OBS |
+| :--- | :--- | :--- | :--- |
+| C1 | captures the intended window | **FAIL — 0.0000** | PASS — 0.9996 |
+| C2 | no unrelated pixels | **vacuous** | 0 leakage, detector control 0.441 |
+| C3 | physical pixel size | 0 px delta — *of nothing* | 0 px delta |
+| C7 | no audio track | **PASS — video stream only** | FAIL — silent track always muxed |
 
-So the fallback is not merely unmeasured, it is **unreachable without
-installing third-party software on the operator's machine**.
+**gdigrab produced a uniformly black frame.** Not approximately black:
+every pixel of the 1440×900 capture decoded to `(0,0,0)`, luminance
+min = max = mean = 0. The 8-second video came out at **16 KB**, against
+~37 MB for a comparable OBS capture — the compression of a static black
+screen. This is the documented GDI failure mode on hardware-accelerated
+windows, and Electron is exactly that.
 
-### Why this session stopped instead of proceeding
+**C2's pass is vacuous and must not be read as one.** No occluder pixels
+leaked into the frame because *no pixels of any kind were captured*. A
+leakage test over a black frame passes for the wrong reason. It is recorded
+as `VACUOUS`, not `PASS`.
 
-Two reasons, and the second is the one the spec cares about.
+**C1's failure was caught by an instrument built for it.** The correlation
+came back exactly `0`, which is what the comparison returns for a
+zero-variance frame — a deliberate choice made when the instruments were
+written, because *"a black frame is the failure gdigrab produces and
+scoring it 1.0 would make the likeliest capture failure look perfect."*
+That test was written before this measurement existed, and it is the reason
+this result reads as a failure rather than as a suspiciously tidy pass.
 
-1. **Installing software on the operator's machine is their decision.**
-   This session was careful to restore every byte it touched outside the
-   repository; downloading and installing a media toolchain unprompted
-   would be the one place it did the opposite.
-2. **Measuring the fallback honestly means building a second capture
-   backend** — process management, window targeting, output handling, and
-   its own pass through all seven criteria. The spec's Session 4 budget
-   says: *"Do not expand ... If the session starts growing, it has failed
-   its own budget — stop and record that."* There is a real tension between
-   that sentence and the sentence naming the fallback, and resolving a
-   spec-versus-spec tension about scope is not this session's call.
+### What it settles
 
-The remediation review's own acceptance criterion offers exactly two
-routes: run the fallback against the unchanged criteria, **or** record an
-explicit operator ruling that ffmpeg's absence terminates fallback
-evaluation. This session can produce neither on its own authority — and
-manufacturing the second would be inventing an operator ruling, which is
-the worst available option.
+**The fallback satisfies the one clause OBS cannot, and fails the one that
+matters most.** It is not a usable substitute: a recorder that captures
+nothing has no audio-track problem to solve.
 
-**So it is escalated, with the decision journaled and the options stated.**
-Residual **S4-R7**, owner: operator.
+So the measurement **confirms the operator's 2026-08-15 ruling rather than
+overturning it** — OBS is primary precisely because gdigrab is GDI-based
+and black-frames on hardware-accelerated applications. That ruling was made
+on reasoning; it now rests on a measurement.
+
+Residual **S4-R7 is closed.**
 
 ## Residuals
 
@@ -269,12 +273,16 @@ Residual **S4-R7**, owner: operator.
 | S4-R4 | minor | C1 measures OBS's capture source, not the encoded file. A source-perfect, file-black capture would pass. Corroborated by file size and by the human watching it. | closed by guided-look item 1 |
 | S4-R5 | minor | A ten-run pilot leaves roughly 430 MB of gitignored video under `.walkthrough-runs/`, and this session ran it twice. Harmless, and worth knowing before running it on a small disk. | none |
 | S4-R6 | minor | Cleanup ownership on the rethrow path was fixed after the round-2 captures, so that a non-dependency failure from `configure()` cannot leave OBS running and the config rewritten. It is now **covered by measurement** — the induced-failure variants exercise exactly that path — but it was not covered by the ten. The sibling class was checked in the browser recorder (G-008) and is absent there. | closed by the induced-failure variants |
-| S4-R7 | **major, OPEN** | The spec's **ffmpeg `gdigrab` fallback is unmeasured and unreachable** without installing third-party software: no system ffmpeg exists, and Playwright's bundled build has no devices at all. Verification rejected closing this by recording it. Needs an operator ruling — install and measure, or rule the evaluation terminated. This is the session's one unresolved blocking finding. | **operator** |
+| S4-R7 | **CLOSED** | The ffmpeg `gdigrab` fallback is **measured**. The operator installed ffmpeg; the probe found it produces a uniformly black frame on the Electron window (every pixel `(0,0,0)`, 16 KB for 8 seconds) while satisfying C7's no-audio-track clause. It confirms the ruling that made OBS primary. | closed |
 
 ## Follow-on sets
 
 Reserved, with triggers, in
 [`docs/proposals/2026-08-15-set-113-follow-on-reservations.md`](../../proposals/2026-08-15-set-113-follow-on-reservations.md).
-Of the four, exactly one has a satisfied trigger today: **Independent
-Black-Box UI Critique**. The other three wait on a real terminal target, a
-non-org audience, and an actual non-web product supplying requirements.
+Of the five, two have satisfied triggers today: **Independent Black-Box UI
+Critique**, and **Sandboxing the Capture Dependencies** — added on operator
+direction as this session closed, on the grounds that open-source media
+stacks are a risk surface in an age of AI-assisted exploitation and this
+session has just added two large ones to the documented prerequisites. The
+other three wait on a real terminal target, a non-org audience, and an
+actual non-web product supplying requirements.

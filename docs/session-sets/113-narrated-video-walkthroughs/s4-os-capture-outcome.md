@@ -287,6 +287,28 @@ Residual **S4-R7 is closed.**
 | S4-R9 | minor | The advisory **path-aware critique could not reach two providers**: google succeeded three times, openai failed three times — once on the servant-integrity guard (it paraphrased grep output instead of reporting bytes), twice with HTTP 400 from the Responses API. The same openai models answered five verification calls fine, so the ordinary routed path works and the pull-critique path does not. Advisory gate, does not block the close. Not worked around with a same-provider second critic. | a follow-on look at the pull-critique openai transport |
 | S4-R7 | **CLOSED** | The ffmpeg `gdigrab` fallback is **measured**. The operator installed ffmpeg; the probe found it produces a uniformly black frame on the Electron window (every pixel `(0,0,0)`, 16 KB for 8 seconds) while satisfying C7's no-audio-track clause. It confirms the ruling that made OBS primary. | closed |
 
+## What this session cost, including what nobody measured
+
+Recorded here rather than by rewriting the closed disposition, which is the
+Set 109 precedent: an understatement is disclosed, not edited away.
+
+| | |
+| :--- | :--- |
+| Routed calls attributed to session 4 | **8 calls, $3.3917** |
+| What `disposition.cost` says | 7 calls, $2.9602 |
+| The gap | the operator-authorized round 5 ($0.4315), which happened **after** the cost block was authored |
+| Path-aware critique attempts | **3 runs, cost unknown** |
+| Orchestrator seat | **unknown** — no conversation ids supplied; this is not zero |
+
+**The path-aware critique spend appears in no ledger at all.** Three runs
+completed a google critic that read the repository with tools, and none of
+them wrote a row to `ai_router/router-metrics.jsonl`. That is a second,
+independent reason Session 6 should look at `pull_critique`: whatever is
+wrong with its openai transport, its **accounting** is also absent, so a
+set can spend on critiques and report zero. Unmeasured is not free, and a
+total that dropped these would report unmeasured spend as zero — which is
+the one thing the cost schema exists to prevent.
+
 ## Follow-on sets
 
 Reserved, with triggers, in

@@ -51,9 +51,9 @@
     {
       "number": 4,
       "title": "Bounded Windows OS-capture dogfood",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-15T20:17:11.236659-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-16T04:45:40.124108-04:00",
       "orchestrator": {
         "engine": "claude",
         "provider": "anthropic",
@@ -61,6 +61,24 @@
         "effort": "high",
         "identityProvenance": "direct"
       },
+      "verificationVerdict": "VERIFIED"
+    },
+    {
+      "number": 5,
+      "title": "Containerised capture \u2014 measure the isolation",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 6,
+      "title": "Why the pull critique could not reach two providers",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
       "verificationVerdict": null
     }
   ]

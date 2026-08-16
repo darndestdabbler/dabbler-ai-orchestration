@@ -69,8 +69,15 @@
     "s5-obs-container-measurement.json is retained as raw OBS evidence in a SUPERSEDED shape; its stale fields are named inside the file itself and it is never scored."
   ],
   "next_orchestrator": {
-    "recommendation": "Session 6: diagnose why the advisory path-aware critique could not reach two providers. Start from the sharpest fact, which is already known -- the same openai models answered five session-verification calls in Session 4 without trouble, so the ordinary routed path works and the pull-critique path does not, and the difference between the two transports is where the answer is.",
-    "before_starting": "Adjudicate this session's open blocker first, or carry it forward explicitly. Session 8 is now the set-terminal session and owes change-log.md, the Step 9 review and the UAT accounting for all seven declared components -- including a record that must NOT default to none: the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched'."
+    "engine": "claude",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": "Session 6 diagnoses why the advisory path-aware critique could not reach two providers, and the sharpest fact is already known: the SAME openai models answered five session-verification calls in Session 4 without trouble, so the ordinary routed path works and the pull-critique path does not -- the difference between the two transports is where the answer is. Keep the same engine and effort: this is a transport diagnosis against a cross-provider verifier, so the orchestrator must stay on a provider the verifier excludes, and anthropic is what the registry excludes today. BEFORE STARTING, adjudicate this session's open blocker or carry it forward explicitly -- round 5's Major is remediated but unreviewed and the loop is suspended. AND NOTE THE SET GREW: Session 8 is now set-terminal and owes change-log.md, the Step 9 review, and the UAT accounting for all SEVEN declared components -- including one record that must not default to 'none', because the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched'.",
+    "carried_forward": {
+      "recommendation": "Session 6: diagnose why the advisory path-aware critique could not reach two providers. Start from the sharpest fact, which is already known -- the same openai models answered five session-verification calls in Session 4 without trouble, so the ordinary routed path works and the pull-critique path does not, and the difference between the two transports is where the answer is.",
+      "before_starting": "Adjudicate this session's open blocker first, or carry it forward explicitly. Session 8 is now the set-terminal session and owes change-log.md, the Step 9 review and the UAT accounting for all seven declared components -- including a record that must NOT default to none: the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched'."
+    }
   },
   "lessons_cited": [
     "L-079-1",

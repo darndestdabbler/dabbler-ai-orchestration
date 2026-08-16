@@ -89,8 +89,20 @@ requirements to build against.
 ## 3. Training Publication and Retention
 
 **Trigger, narrowed by the operator on 2026-08-10: a public or non-org
-audience needs durable video, or videos outgrow manual upload. NOT
-satisfied today.**
+audience needs durable video, or videos outgrow manual upload. FIRED
+2026-08-16 — the first half of it.** The operator directed two tutorial
+videos for a **public** destination — *"We will post these on the web
+somewhere — perhaps on YouTube"* — which is exactly the non-org audience
+the boundary paragraph below reserves this for.
+
+**What that does and does not license.** It does not promote this
+reservation into Set 113. Sessions 7 and 8 produce publication-**ready**
+files and a **human uploads them**, which is the same manual model the
+operator described for SharePoint, applied to a different channel. What
+fires is the *trigger for a later set*: the moment there is a public
+audience, retention, stale-content policy, accessibility review and
+version association stop being conventions somebody remembers and start
+being somebody's job. Two of the four are already partly answered below.
 
 Largely pre-empted. An existing SharePoint library or Teams channel already
 supplies storage, discoverability, access control and retention, and
@@ -103,6 +115,13 @@ Two conventions hold in the meantime, and neither is code:
    viewer can tell whether they are watching the build they are running.
 2. **Treat the upload as disposable.** The authored step list is the
    source; a stale video is deleted and regenerated, never patched.
+
+**The public channel changes one thing materially: a safety pass.** An
+org-internal video is seen by colleagues who already have access to the
+paths, repository names and gauges it shows. A public one is not
+recallable and is watched by strangers. Set 113 Session 7 builds that
+checklist and Session 8 runs it again per video; a publication set
+inherits it rather than reinventing it.
 
 **One boundary worth restating.** SharePoint and Teams are org-internal.
 That is the right home for training the operator's staff and the business

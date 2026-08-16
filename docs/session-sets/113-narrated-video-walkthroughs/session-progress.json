@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T04:45:40.124108-04:00",
+  "generatedAt": "2026-08-16T05:34:51.937933-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "9fef6297c5b60a110f2d5a3281ecebf8a552f1f8aab26468e9669fd18e4d6d2d",
-    "session-state.json": "b2bbca0ae5db49b69d20050a42ab1b568b14d0dce07f2efdfeae526456436d0a",
-    "spec.md": "53832b730fd7e93f4658e9258961240474bb5fb56cae4fcd1018b17ff7138103"
+    "activity-log.json": "f7638e26001c7c694b73e18244ebf5a479362367487ca7280449c31846b117f3",
+    "session-state.json": "fb1aaba89ed82a66c3b50e5070c3b495ac50fb360551db72186f73f6227473a2",
+    "spec.md": "68b6fedb8b8ddc5110a553d8b0701f0b2356ad5d871375291ebc07c6255176e0"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -427,6 +427,167 @@
     },
     {
       "number": 5,
+      "status": "in-progress",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 5 (claude / claude-opus-5, high) with --total-sessions 8, which is what put the two new tutorial sessions into session-state.json.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T05:31:58.740701-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "set-the-pass-criteria-before-the",
+          "description": "Still pending. Re-logged at its planned key to undo the displacement caused by the mislabelled entry above: the pass criteria for the container run have NOT been set yet, and the projection must not imply otherwise.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T05:33:43.881245-04:00",
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "read-the-operator-s-2026-08",
+          "description": "**Read the operator's 2026-08-16 note before ordering the work.** It reframes this session: the risk that matters is **not** that OBS and ffmpeg are large open-source dependencies, it is that a screen recorder is a facility for an AI-driven process to read whatever is on the operator's display. Session 4 governed that carefully; a container **removes** it. So the plugin measurement below is still worth doing \u2014 it is cheap, and it may dominate on the supply-chain axis \u2014 but it does nothing for the capability risk, and it must not be mistaken for an answer to it. The fidelity cost of a Linux recording is **accepted** (operator, 2026-08-16); state it, do not solve it.",
+          "status": "pending",
+          "state": "in-progress",
+          "box": "[~]",
+          "isPlanned": true,
+          "isActive": true,
+          "startedAt": "2026-08-16T05:34:20.923477-04:00",
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "measure-the-cheap-mitigation",
+          "description": "**Measure the cheap mitigation.** OBS ships `--only-bundled-plugins`. Session 4 observed the operator's install loading a DeckLink SDK, an NVIDIA filters plugin, a CEF browser source and an ML background-removal model, none of which this framework wants. Measure the plugin surface with and without the flag **before** building anything: if it buys most of the risk reduction, the container may not be worth its cost, and that is a real answer.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "build-the-container-and-measure-what",
+          "description": "**Build the container and measure what it costs.** VS Code and OBS on a virtual display inside Podman, driven by the existing Layer 3 machinery. This repo already has `ai_router/podman_sandbox.py` (Set 069 S4) built on the same principle \u2014 the container as the trust boundary.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "name-the-fidelity-trade-honestly",
+          "description": "**Name the fidelity trade honestly.** Podman on Windows is a Linux VM, so this records **Linux VS Code**, not the Windows VS Code staff actually run. For proving the extension works that is mostly fine; for a *training* video it is a different product on screen. Decide which the artifact is for, and say so.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "do-not-redirect-this-session-to",
+          "description": "**Do not redirect this session to Azure.** The operator asked for research on an Azure VDI recording target and it is done \u2014 [`2026-08-16-azure-virtual-desktop-as-a-recording-target.md`](../../proposals/2026-08-16-azure-virtual-desktop-as-a-recording-target.md) \u2014 as a *future capability* for their government organisation, not as this session's work. It carries two VERIFY-FIRST items, one of which is that AVD can be configured to block exactly this recorder.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 8,
+          "stepKey": "cross-provider-verification",
+          "description": "**Cross-provider verification.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 9,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "**Required portion of the full test suite.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 10,
+          "stepKey": "close-out",
+          "description": "**Close-out.**",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 11,
+          "stepKey": "operator-direction-extend-to-eight",
+          "description": "CORRECTED RE-LOG of the entry first written as step 2, which was wrong: step 2 is a planned spec step (set the pass criteria) and logging unplanned work under its number displaced it from the projection. Unplanned work gets a number past the plan, not a planned one. Content unchanged: recorded the operator direction that arrived before this session started, as spec and journal rather than as chat. Two amendments - the pointer feedback, and two tutorial-video sessions taking the set from six sessions to eight (7 records the single-module tutorial after making the pointer visible; 8 records the multi-module tutorial and is now set-terminal, so Session 6 closes mid-set). Diagnosed the cursor report before writing it down: capture-side cursor drawing was already ON in both backends, and the gap is that synthesised debug-protocol clicks never move a pointer, which makes it driver work in two different shapes. uatComponents grew to seven; the S1 test pinning those names by name rather than by count was updated with it, and the Training Publication reservation was marked TRIGGER FIRED because a public audience now exists. Four decisions journaled: three under operator authority (the extension, the pointer placement and ordering, the toy-project ruling as external-consequence), one under AI authority (the inventory growth).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": true
+        }
+      ],
+      "counts": {
+        "pending": 8,
+        "in-progress": 1,
+        "complete": 2,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 11
+      },
+      "current": [
+        "read-the-operator-s-2026-08"
+      ],
+      "remaining": [
+        "set-the-pass-criteria-before-the",
+        "read-the-operator-s-2026-08",
+        "measure-the-cheap-mitigation",
+        "build-the-container-and-measure-what",
+        "name-the-fidelity-trade-honestly",
+        "do-not-redirect-this-session-to",
+        "cross-provider-verification",
+        "required-portion-of-the-full-test",
+        "close-out"
+      ]
+    },
+    {
+      "number": 6,
       "status": "not-started",
       "evidence": "read",
       "steps": [],
@@ -442,7 +603,23 @@
       "remaining": []
     },
     {
-      "number": 6,
+      "number": 7,
+      "status": "not-started",
+      "evidence": "read",
+      "steps": [],
+      "counts": {
+        "pending": 0,
+        "in-progress": 0,
+        "complete": 0,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 0
+      },
+      "current": [],
+      "remaining": []
+    },
+    {
+      "number": 8,
       "status": "not-started",
       "evidence": "read",
       "steps": [],

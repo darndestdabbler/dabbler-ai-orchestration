@@ -27,6 +27,15 @@
 > first amendment — the inventory has to name what the terminal session
 > will owe an accounting for, or an omitted component becomes the new form
 > of evaporation. It does **not** change an arming flag. Journaled.
+> **Amended 2026-08-16** (before Session 5, operator direction): two
+> **tutorial-video sessions** are added, 7 and 8, and the set grows from six
+> to eight. Session 8 becomes the set-terminal session; Session 6 no longer
+> is. `uatComponents` grows two entries for what they create, on the same
+> reasoning as both earlier amendments. **No arming flag changes.** The
+> operator also ruled that the pointer-visibility work lands inside Session
+> 7, and that both tutorials record the **host**, not the container. See the
+> operator note of 2026-08-16, *"The recordings work; show the pointer, and
+> make two tutorials"*. Journaled.
 > **Prerequisites:** Set 112 complete (operator sequencing decision, 2026-08-08).
 > **Session Set:** `docs/session-sets/113-narrated-video-walkthroughs/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
@@ -60,12 +69,14 @@ requiresUAT: true         # A set whose deliverable IS the UAT experience must b
 requiresE2E: true         # Sessions 3 and 4 drive real rendering surfaces (a browser fixture and the Extension Development Host).
 uatStyle: ad-hoc
 uatScope: per-set
-uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 6) owes one record per line.
+uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 8) owes one record per line.
   - Rendered walkthrough and training document
   - Static generated index
   - Recorded web scenario
   - Windows OS-capture pilot
   - Containerised capture path   # added 2026-08-16 with Session 5; journaled
+  - Single-module tutorial recording set   # added 2026-08-16 with Session 7; journaled
+  - Multi-module tutorial recording set    # added 2026-08-16 with Session 8; journaled
 pathAwareCritique: advisory
 prerequisites:
   - slug: 112-remove-lightweight-tier
@@ -154,7 +165,7 @@ truthful record.
 
 ## Sessions
 
-### Session 1 of 6: Truthful UAT accounting
+### Session 1 of 8: Truthful UAT accounting
 
 The gate first, because it is the part that is useful even if every later
 session is cancelled.
@@ -191,7 +202,7 @@ session is cancelled.
 
 ---
 
-### Session 2 of 6: Portable scenario source and standalone rendering
+### Session 2 of 8: Portable scenario source and standalone rendering
 
 **Steps:**
 
@@ -222,7 +233,7 @@ session is cancelled.
 
 ---
 
-### Session 3 of 6: Browser recording proof
+### Session 3 of 8: Browser recording proof
 
 The portable recording path, proved where the framework's actual products
 live. **Not** against this repo's extension.
@@ -257,7 +268,7 @@ live. **Not** against this repo's extension.
 
 ---
 
-### Session 4 of 6: Bounded Windows OS-capture dogfood
+### Session 4 of 8: Bounded Windows OS-capture dogfood
 
 **Strictly bounded. One session. It ends in a measurement either way.**
 
@@ -321,7 +332,7 @@ tooling on its own product.
 
 ---
 
-### Session 5 of 6: Containerised capture — measure the isolation
+### Session 5 of 8: Containerised capture — measure the isolation
 
 **Added 2026-08-16 on operator direction**, after Session 4 put two large
 open-source media stacks (OBS Studio, ffmpeg) into this framework's
@@ -394,7 +405,7 @@ pixels, host windows or host devices. That is the right shape.
 
 ---
 
-### Session 6 of 6: Why the pull critique could not reach two providers
+### Session 6 of 8: Why the pull critique could not reach two providers
 
 **Added 2026-08-16 on operator direction.** Session 4's advisory
 path-aware critique produced **no artifact** across three attempts: google
@@ -423,13 +434,159 @@ succeeded every time, openai failed every time, in two distinct ways.
    plants the legitimate shape and asserts it does not.
 6. **Cross-provider verification.**
 7. **Required portion of the full test suite.**
-8. **Close-out**, including this set's `change-log.md` refresh and the
-   Step 9 review — this is now the set-terminal session.
+8. **Close-out**. This session was set-terminal when it was added on
+   2026-08-16 and **is no longer**: Sessions 7 and 8 were added later the
+   same day, so `change-log.md`, the Step 9 review and the set's UAT
+   accounting move to **Session 8**. Close mid-set, with a
+   `next_orchestrator` handover.
 
 **Creates:** the reproduction, the diagnosis, and the fix or a documented refusal
 **Touches:** `ai_router/pull_critique.py`, `ai_router/pull_verifier.py`, `ai_router/providers.py`, `ai_router/tests/`
 **Ends with:** the automated path-aware critique either reaches two providers on this seat, or the reason it cannot is written down where the next session will find it.
 **Progress keys:** `failuresReproduced`, `transportDiagnosed`, `falsifierShipped`, `outcomeRecorded`
+
+---
+
+### Session 7 of 8: Show the pointer, then record the single-module tutorial
+
+**Added 2026-08-16 on operator direction**, with the first tutorial video.
+Two pieces of work, and **the order between them is a requirement rather
+than a preference** (operator, 2026-08-16): *"We should get the cursor
+functionality working before recording the purpose-built new tutorials."*
+A tutorial recorded without a visible pointer is a tutorial that gets
+recorded twice, and the second recording is the expensive one — a real
+session set driven by a real engine, not a scripted replay.
+
+**This session changes genre, and that is the thing most likely to go
+wrong.** Sessions 2–4 drive the product with Playwright through an authored
+step list, in tens of seconds. This one records a **human** doing real work
+over minutes. The capture backend is the same; the driver is gone, because
+the driver is a person. Anything that tries to make this look like one more
+scenario has misread it.
+
+**Steps:**
+
+1. Register. Read the operator notes, and in particular the second note of
+   2026-08-16.
+2. **Show the pointer.** The diagnosis is already made and does not need
+   repeating — capture-side cursor drawing is **already on** (`cursor: true`
+   on the OBS window-capture input, `-draw_mouse 1` in the ffmpeg fallback),
+   and nothing ever moved a pointer, because synthesised debug-protocol
+   clicks do not. Two mechanisms, because the two paths fail differently:
+   - **VS Code path:** move the **physical** Windows pointer to the target
+     before each synthesised click, interpolated across a few frames so the
+     recording shows motion rather than teleportation. This **takes over the
+     operator's real mouse** for the length of a capture, so it is opt-in,
+     it announces itself on the console before it starts, and it restores
+     the entry position on every exit path including failure. Never a
+     default; never in the portable core.
+   - **Web path:** draw a **synthetic** pointer into the page, because
+     Chromium's `recordVideo` composites no cursor at all and physical
+     pointer motion would change nothing there. It extends the emphasis
+     injection the web recorder already performs rather than adding a second
+     mechanism.
+   - **Prove it in the artifact, not in the code.** Session 4's discipline:
+     assert that a pointer is *visible in the recorded frames* near the
+     target's bounding box at the moment of the click, and ship the
+     falsifier — the same check against a recording made with the feature
+     off must fail. A unit test asserting that a flag was passed proves
+     nothing about what a viewer sees.
+   - **Do not expand:** no click ripples, no highlight animations, no cursor
+     theming, no input replay.
+3. **Build the long-form capture harness, and keep it small.** Start and
+   stop capture around a **real** session in a **real** VS Code window —
+   not the Extension Development Host, because the operator is driving the
+   shipped product. One recording per session, named by set and session
+   number. **It observes and nothing more:** it must not write to
+   `session-state.json`, drive the orchestrator, or make a session behave
+   differently because it is being recorded.
+4. **Derive the fast-forward from the framework's own record.** This is the
+   one place this framework has an advantage over a video editor: a Dabbler
+   session already writes `session-events.jsonl` and `activity-log.json`
+   with real timestamps, so *which stretches were waiting* is **derivable**
+   rather than eyeballed. Emit a **speed-ramp plan** — segments and rates,
+   as a text artifact — and apply it with ffmpeg (`setpts`; there is no
+   audio track, which is what keeps this a one-filter problem). The plan
+   being a file is the point: an edit decision list can be regenerated and
+   reviewed, and a timeline inside an editor cannot. **State the applied
+   compression per segment in the run record**, and never compress an
+   interval where something happened.
+5. **Author and record the single-module tutorial.** A **purpose-built toy
+   project** (operator ruling, 2026-08-16), one module, **three session
+   sets**, each session its own recording — and it must show **AI helping to
+   author the plan and decompose it into session sets**, which is precisely
+   the half of the lifecycle Set 108's walk could not prove, because an
+   orchestrator cannot drive it. The written walkthrough renders from the
+   Session 2 scenario source as always: the documents stand alone and the
+   video is the enhancement.
+   **Sizing rule, and it is load-bearing:** if a recorded session runs more
+   than about fifteen minutes of wall clock before compression, the toy
+   project is too big. **Shrink the project, not the tutorial** — dropping
+   steps is how a lifecycle demonstration quietly stops demonstrating the
+   lifecycle.
+6. **Publication safety pass, before anything leaves the machine.** Every
+   prior recording in this set was for internal review; these are destined
+   for a public URL, and a public video is unrecallable. Check, per video,
+   with a written checklist and a human confirming: window titles, absolute
+   paths, repository and remote names, notification toasts, secrets in
+   terminal output or environment, the cost and model gauges, open browser
+   tabs, the taskbar. **"Do not publish this one" is a valid outcome.**
+   Nothing in this session uploads anything.
+7. **Cross-provider verification.**
+8. **Required portion of the full test suite** — this session drives a
+   rendering surface, so Layer 3 is owed (`L-064-12`).
+9. **Close-out**, mid-set, with a `next_orchestrator` handover.
+
+**Creates:** pointer visibility on both recorders with its falsifier, the long-form capture harness, the event-derived speed-ramp, the single-module tutorial recordings and its written walkthrough, the publication safety checklist
+**Touches:** extension `scripts/`, `ai_router/`, `docs/tutorials/`, `docs/walkthroughs/`
+**Ends with:** every recording this framework makes shows a pointer that moves, and a watchable single-module tutorial exists as one video per session, with the waiting compressed out and the compression stated.
+**Progress keys:** `pointerVisible`, `longFormCapture`, `fastForwardDerived`, `singleModuleRecorded`, `safetyPassRun`
+
+---
+
+### Session 8 of 8: The multi-module tutorial, and the set's accounting
+
+**Added 2026-08-16 on operator direction.** The second tutorial, and the
+**set-terminal** session — it inherits `change-log.md`, the Step 9 review
+and this set's own UAT accounting from Session 6.
+
+**Steps:**
+
+1. Register.
+2. **Record the multi-module tutorial:** a purpose-built toy repository with
+   **three modules, one session set each**, individual sessions as
+   individual recordings, waiting compressed out. **Reuse Session 7's
+   harness unchanged.** If it cannot be reused unchanged, say plainly what
+   had to generalise and why — that is the signal that the capability was
+   fitted to one example, and it is worth more written down than worked
+   around.
+3. **Make it show what the single-module tutorial cannot.** Otherwise it is
+   the same video three times at three times the cost: module declaration,
+   the Explorer grouped by module, review routed by ownership, and work
+   proceeding **in parallel** across modules while nobody waits. If those
+   four are not visible on screen, this session has produced a longer video
+   rather than a second tutorial.
+4. **Safety pass again, per video** — not once per set. Session 7's
+   checklist, run again, because the risk is per artifact.
+5. **Say where these go, and build no pipeline.** Publication stays a human
+   upload (operator, 2026-08-10). Record the conventions rather than the
+   machinery: the product version belongs in the title, and a stale video is
+   **regenerated, not patched**. Note in the reservation record that the
+   *Training Publication and Retention* trigger has fired — a public
+   audience now exists — without treating that as licence to build it here.
+6. **Cross-provider verification.**
+7. **Required portion of the full test suite** — the full matrix once, at
+   the release boundary.
+8. **Close-out**, set-terminal. The UAT accounting covers **all seven
+   declared components**. One record is already owed and must not default
+   to `none`: the operator **watched** the Session 4 pilot recording on
+   2026-08-16 and returned a finding, which is a developer, count 1, method
+   `watched` — a real human review, the set's first, and not a manual walk.
+
+**Creates:** the multi-module tutorial recordings and its written walkthrough, the set's UAT accounting, the change log, the Step 9 review
+**Touches:** `docs/tutorials/`, `docs/walkthroughs/`, the set directory
+**Ends with:** two publication-ready tutorial video sets exist, the set's record says per component what a human actually did, and nothing this set built is closed over silently.
+**Progress keys:** `multiModuleRecorded`, `moduleDistinctivesShown`, `safetyPassRun`, `setAccountingWritten`
 
 ---
 
@@ -444,6 +601,17 @@ succeeded every time, openai failed every time, in two distinct ways.
   stream and an artifact-agnostic run manifest into ignored output.
 - A measured verdict on Windows OS-level capture, and the optional recorder
   only if it earned it.
+- A measured answer on whether the capture dependencies can be isolated, and
+  what that isolation costs in fidelity.
+- The automated path-aware critique reaching two providers, or the reason it
+  cannot, written where the next session will find it.
+- A visible, moving pointer in every recording this framework makes, proved
+  against recorded frames rather than against a flag.
+- Two publication-ready tutorial video sets - one single-module repository
+  across three session sets, one multi-module repository with three modules
+  and a set each - recorded per session, with the waiting compressed out by
+  a plan derived from the framework's own timestamps, and each video
+  cleared by a written publication safety pass.
 - Reservations for the follow-on sets, with their triggers stated.
 
 ## Follow-on sets to reserve, not to build here
@@ -498,6 +666,21 @@ succeeded every time, openai failed every time, in two distinct ways.
   standing complexity budget — *"this could quickly become dozens of sets
   with thousands of lines of code"* — binds hardest here. The pilot's value
   is the measurement; shipping a recorder is the optional upside.
+- **Sessions 7 and 8 are the roadmap risk now, not Session 4.** Session 4's
+  budget was bounded by a measurement that ends either way; a tutorial is
+  bounded by nothing except the authoring taste of whoever writes it, and it
+  is recorded in real time against a capacity-constrained engine seat. The
+  sizing rule in Session 7 step 5 is the brake, and the brake only works if
+  the project shrinks rather than the tutorial.
+- **These are the first artifacts this set makes that cannot be recalled.**
+  Everything before them was for internal review, where a mistake is fixed
+  by re-recording. A video on a public URL has been seen. The safety pass is
+  load-bearing, not polish, and it is per video.
+- **A tutorial can drift from the product in a way a scenario cannot.** The
+  scenario renderings are gated by a divergence test; a recording of a human
+  driving a real session has no such gate, and the only honest answer is the
+  convention this set already chose - the product version in the title, and
+  regeneration rather than patching.
 - **This set's deliverable is judged by taste.** The word to beat, from Set
   111, is "pleasurable" — and the operator's bar is that the reviewer does
   very little work and still gains confidence.

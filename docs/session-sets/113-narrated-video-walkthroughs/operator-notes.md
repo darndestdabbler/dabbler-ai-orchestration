@@ -539,3 +539,125 @@ document: AVD's own screen-capture-protection setting has a **"client and
 server"** mode which explicitly *"prevents tools and services within the
 virtual machine … capturing the screen."* An organisation that enables it
 for compliance would block this recorder by design.
+
+---
+
+## 2026-08-16 — The recordings work; show the pointer, and make two tutorials
+
+Recorded before Session 5, after the operator watched the Session 4 pilot
+recording — item 1 of the guided look, `s4-uat-walk.md`.
+
+### This is the first human review any component of this set has had
+
+The set's closed disposition says, in the operator's own inventory, *"NO
+HUMAN HAS REVIEWED ANY COMPONENT of this set"*, with four components at
+method `none`. That sentence was true when it was written and is now out of
+date: the operator watched a real recording and reported back on it.
+
+**The terminal session owes that record**, and this note exists so the fact
+does not evaporate between here and there. What can be claimed, precisely:
+a **developer**, count **1**, **watched** the Windows OS-capture pilot
+recording and the page it sits on, and returned a finding. It is not a
+manual walk and must not be recorded as one. Sessions 1–4 are already
+accounted for under `uatScope: per-set`; this changes what the set-terminal
+accounting can honestly say, not what any closed session claimed.
+
+### The observation
+
+> *"So far, they look great, but I believe that there is a way to show the
+> cursor moving. If so, we should enable that."*
+
+### Orchestrator's read — the capture is not the problem, the driver is
+
+Checked before writing this, because the obvious reading is wrong:
+
+- **Cursor capture is already on.** `obs-capture.js` creates its Windows
+  Graphics Capture source with `cursor: options.captureCursor !== false`,
+  and the pilot never passes the flag — so every one of the twenty-four
+  captures had cursor drawing enabled. The ffmpeg fallback likewise passes
+  `-draw_mouse 1` for video.
+- **Nothing moved the pointer.** Both recorders drive with Playwright, and
+  `locator.click()` synthesises input through the debug protocol; it never
+  moves the real Windows pointer. OBS therefore recorded a cursor sitting
+  wherever the operator had left it — faithfully, and uselessly.
+- **The browser path is a different problem with the same symptom.**
+  Chromium's `recordVideo` does not composite the cursor into the video at
+  all, so no amount of pointer motion would appear there.
+
+So this is **driver work, in two shapes**: move the physical pointer before
+each synthesised click on the VS Code path, and draw a synthetic pointer
+into the page on the web path. Both are cheap. The Windows one has a real
+cost worth surfacing before it surprises anyone — moving the physical
+pointer **takes over the operator's actual mouse** for the length of a
+capture, which is fine for a recording session and unacceptable as a
+background behaviour. It must be opt-in, and it must be visible in the
+console before it starts.
+
+**Ruling (operator, 2026-08-16):** the pointer work lands **inside Session
+7**, the first tutorial session, rather than as a session of its own or as
+an unrelated step bolted onto Session 5's measurement. Session 7 is where
+what a Dabbler recording *looks like* becomes the product, and Session 5 is
+a measurement whose evidence should not be muddied by an unrelated code
+change.
+
+### Two more sessions — the tutorial videos
+
+> *"I would like for us to author yet two more sessions all without the
+> container for these — (1) a full video recording tutorial walkthrough of
+> a single-module repo development experience with three sets and with
+> individual sessions as individual recordings and with fast forwarding
+> through the waiting parts, including showing AI helping with authoring a
+> plan and decomposing into session sets, (2) a full video recording
+> tutorial walkthrough of a multi-module repo development experience with
+> three modules, each having one session set — with individual sessions as
+> individual recordings and with fast forwarding through the waiting parts.
+> We will post these on the web somewhere — perhaps on YouTube."*
+
+**"All without the container" is a ruling, and it is the right one.**
+Session 5 accepts a Linux recording because for *proving the extension
+works* the operating system on screen is incidental. For **training
+material aimed at staff who run Windows**, the operating system on screen
+is part of the content: a video showing a product they do not recognise
+teaches them something false in the first three seconds. These two sessions
+therefore record the host — the same Windows VS Code the audience runs —
+and Session 5's fidelity trade is explicitly not inherited. Sessions 7 and
+8 are **downstream of no Session 5 outcome**; whatever the container
+measurement says, it does not gate them.
+
+**Ruling (operator, 2026-08-16):** the recordings are made against
+**purpose-built toy projects**, not against the operator's real repositories
+and not against the existing large tutorials. Two reasons, both binding:
+each recorded session must run in **minutes**, because a real session set
+recorded end to end is hours of wall clock and real engine spend against a
+seat the operator has already described as capacity-constrained; and
+nothing of the operator's own work may appear on screen in something
+destined for a public URL.
+
+### What this genre changes, and what it does not
+
+- **These are human-driven recordings, not scripted scenarios.** Everything
+  Sessions 2–4 built drives the product with Playwright through an authored
+  step list. A tutorial that shows *AI helping to author a plan* cannot be
+  scripted: the AI's output differs every run. A human drives; the recorder
+  starts, stops and post-processes. That is a different harness sharing the
+  same capture backend, and it must not be smuggled in as "one more
+  scenario".
+- **"Fast forwarding through the waiting parts" is post-processing**, which
+  is where Session 4's ruling already put attention emphasis. It is also
+  the one place this framework has an unfair advantage: a Dabbler session
+  already writes `session-events.jsonl` and `activity-log.json` with real
+  timestamps, so which stretches of a recording were *waiting* is
+  **derivable from the framework's own record** rather than eyeballed.
+- **Publication remains out of scope and manual.** The reserved *Training
+  Publication and Retention* set had a narrowed trigger — *"a public or
+  non-org audience needs durable video"*. **That trigger has now fired.**
+  It does not follow that this set builds a pipeline: Sessions 7 and 8
+  produce upload-ready files and a human uploads them, exactly as the
+  operator's 2026-08-10 SharePoint note already described.
+- **A public destination adds one obligation these sessions must carry.**
+  Every prior recording in this set was for internal review. A video posted
+  to YouTube is unrecallable, and it is a recording of the operator's real
+  machine — window titles, absolute paths, repository names, model and cost
+  gauges, whatever notification happens to arrive. A **publication safety
+  pass** is not optional polish here; it is the step that makes the
+  difference between an artifact and an incident.

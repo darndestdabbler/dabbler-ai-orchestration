@@ -664,8 +664,15 @@ class TestInventoryParserFailsTowardDeclaringMore:
         it, which turned `len == 4` into a failure that looked like a parser
         bug and was not. The names catch strictly more -- a dropped entry, a
         reordered one, and a trailing `#` comment the parser failed to
-        strip, which is the defect this test was written for. The last entry
-        carries such a comment in the spec on purpose.
+        strip, which is the defect this test was written for. The last three
+        entries carry such a comment in the spec on purpose, so the strip is
+        exercised on a run of them and not only on a final line.
+
+        Grew again the same day, to eight sessions and seven components,
+        when the operator added the two tutorial-video sessions. That is the
+        second deliberate change to this tuple in one day, which is the
+        argument for the shape rather than against it: each time, the
+        failure named exactly which entry moved.
         """
         cfg = parse_session_set_config(
             pathlib.Path(
@@ -678,6 +685,8 @@ class TestInventoryParserFailsTowardDeclaringMore:
             "Recorded web scenario",
             "Windows OS-capture pilot",
             "Containerised capture path",
+            "Single-module tutorial recording set",
+            "Multi-module tutorial recording set",
         )
         assert all("#" not in c for c in cfg.uat_components)
 

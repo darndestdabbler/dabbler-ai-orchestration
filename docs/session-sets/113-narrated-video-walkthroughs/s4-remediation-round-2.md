@@ -153,3 +153,96 @@ leftover process, collection or unrestored config, and — the half that
 matters most — on a capture failure that cleaned up perfectly while
 destroying the user's walkthrough. Two more plant a bad supplementary run
 and assert C1 and C2 catch it.
+
+---
+
+# Round 3 — the remediation review, and the one finding that is not mine to close
+
+Round 3 reviewed the fix delta and returned **3 fix-accepted, 2
+accepted-with-modification, 1 fix-rejected**, with one blocking finding
+carried forward.
+
+## Accepted outright
+
+- **L3 / L6** — capture failures degrade without destroying the walkthrough.
+- **L7** — ordinary recorder runs no longer enable obs-websocket.
+- **L9** — supplementary recordings are now evaluated against the per-run
+  criteria.
+
+## Accepted with modification, and both modifications made
+
+### L1 — `announceStatus()` failed open
+
+> *"the direct CLI still runs under `FAIL`, and `announceStatus()` fails
+> open when the measurement is missing or unreadable."*
+
+Correct, and the fix is one branch: a missing or unreadable measurement is
+**not** evidence of approval, so it now prints the not-approved notice
+naming that it could not read the record, instead of staying silent. A
+checkout without the pilot record can no longer present this as an ordinary
+tool.
+
+### L4 — two of the three injections proved less than the prose claimed
+
+> *"the variants named `configure` and `start` inject immediately before
+> those operations, not inside or after them."*
+
+Exactly right, and the sharpest observation of the round. Both injections
+moved **after** their operations — after `configure()` returns, and after
+`startRecording()` returns.
+
+More importantly the claim is now **evidence rather than placement**. The
+seam hands the live session to the pilot before throwing, so each induced
+failure records the OBS state at the instant it threw, and the evaluator
+**requires** that state to be post-operation:
+
+| induced at | collection | scene items | recording active |
+| :--- | :--- | :--- | :--- |
+| `configure` | `dabbler-walkthrough-collection` | 1 | **false** — created, not yet recording |
+| `start` | `dabbler-walkthrough-collection` | 1 | **true** |
+| `stop` | `dabbler-walkthrough-collection` | 1 | **true** |
+
+Three falsifiers pin it: no recorded state fails C6, `sceneItems: 0` fails
+C6, and a `start` failure with no live recording fails C6.
+
+The same nit noted an *"unexplained singular `inducedFailure`"* still in the
+measurement showing `walkthroughStillCompleted: false`. It was a leftover
+from an earlier instrument that induced a **driver** failure rather than a
+capture one — a different experiment, superseded by the plural field, read
+by nothing, and genuinely confusing sitting beside it. Removed.
+
+## Fix-rejected — and escalated rather than re-argued
+
+**L2, the ffmpeg fallback.** The attempt to close it by *recording* it
+rather than *doing* it was rejected, and the rejection lands:
+
+> *"The claim that OBS 'did not fail at capture' improperly narrows the
+> trigger: C7 is part of the authoritative capture criteria, OBS's verdict
+> is FAIL, and the outcome itself acknowledges that ffmpeg `-an` could
+> satisfy C7."*
+
+Accepted. What changed in response is the **evidence**, not the argument:
+the vague "ffmpeg is not installed" became a checked reachability table —
+no ffmpeg on `PATH`, Playwright's bundled build compiled
+`--disable-everything` with **no devices at all** and therefore no
+`gdigrab`, no package-manager shim, no `C:\ffmpeg`. The fallback is not
+merely unmeasured; it is unreachable without installing third-party
+software on the operator's machine.
+
+**This session stops here rather than spending its last remediation cycle.**
+The review's own acceptance criterion offers two routes — run the fallback,
+or record an explicit operator ruling that its absence terminates the
+evaluation — and this session can produce neither on its own authority.
+Installing software on the operator's machine is their decision, and
+building a second capture backend is the expansion the spec's own Session 4
+budget forbids in the same breath as it names the fallback. Resolving a
+spec-versus-spec tension about scope is an operator adjudication.
+
+Manufacturing the ruling would be the worst option available, so it is
+**journaled and escalated**: `decisions.jsonl`, authority `human`, tiebreak
+`escalate-to-human`, residual **S4-R7**.
+
+## Verdict, unchanged
+
+Still **FAIL on C2 and C7**, same reasons, same measurements. Nothing was
+softened to move a number. 54 tests passing.

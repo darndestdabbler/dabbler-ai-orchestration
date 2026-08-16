@@ -112,6 +112,41 @@ async function ensureSyntheticPointer(page, at) {
           "translate(" + args.start.x + "px, " + args.start.y + "px)";
         document.body.appendChild(node);
       }
+      // The TOP LAYER, not merely a large z-index.
+      //
+      // A native `<dialog>` opened with showModal(), and any open popover,
+      // render in the browser's top layer, which is above every ordinary
+      // stacking context no matter what z-index anything claims. A pointer
+      // that is an ordinary child of <body> therefore vanishes the moment a
+      // walkthrough targets a control inside a modal -- and modals are
+      // exactly where a walkthrough wants a pointer, because that is where a
+      // viewer is most likely to lose track of what was clicked.
+      //
+      // Promoting it as a manual popover puts it in the same layer. Guarded
+      // and re-tried on every call, because showPopover() throws if the
+      // element is already showing and the API is absent on older engines --
+      // where the z-index above is still the best available answer, and is
+      // correct everywhere except under a top-layer element.
+      if (typeof node.showPopover === "function") {
+        try {
+          if (node.getAttribute("popover") !== "manual") {
+            node.setAttribute("popover", "manual");
+          }
+          if (!node.matches(":popover-open")) node.showPopover();
+          // A popover gets a default border, background, padding and margin
+          // from the UA stylesheet, and inherits `position: fixed` semantics
+          // it already had. Clear them, or the arrow arrives inside a box.
+          node.style.border = "0";
+          node.style.background = "transparent";
+          node.style.padding = "0";
+          node.style.margin = "0";
+          node.style.overflow = "visible";
+          node.style.width = "auto";
+          node.style.height = "auto";
+        } catch (err) {
+          /* an engine that refuses the promotion still has the z-index */
+        }
+      }
       return { x: Number(node.dataset.x), y: Number(node.dataset.y) };
     },
     { id: POINTER_ID, svg: POINTER_SVG, start: at }

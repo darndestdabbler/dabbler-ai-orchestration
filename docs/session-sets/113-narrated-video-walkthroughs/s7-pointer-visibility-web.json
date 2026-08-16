@@ -25,12 +25,19 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 6837,
-      "afterMillis": 7931,
+      "beforeMillis": 6843,
+      "afterMillis": 7930,
       "outcome": "passed",
-      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
       "targetChangedFraction": 0.0523,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": {
+        "x": 10,
+        "y": 10,
+        "width": 18,
+        "height": 27
+      },
+      "shape": "compact, cursor-sized, and anchored at the hotspot"
     },
     {
       "stepId": "add-a-task",
@@ -45,12 +52,19 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 8476,
-      "afterMillis": 9558,
+      "beforeMillis": 8490,
+      "afterMillis": 9577,
       "outcome": "passed",
-      "detail": "something appeared at the target between the two frames and nowhere else in the control",
-      "targetChangedFraction": 0.09088,
-      "controlChangedFraction": 0
+      "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
+      "targetChangedFraction": 0.08992,
+      "controlChangedFraction": 0,
+      "changedBox": {
+        "x": 8,
+        "y": 6,
+        "width": 20,
+        "height": 31
+      },
+      "shape": "compact, cursor-sized, and anchored at the hotspot"
     },
     {
       "stepId": "add-a-second-task",
@@ -65,12 +79,19 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 16854,
-      "afterMillis": 17949,
+      "beforeMillis": 16856,
+      "afterMillis": 17954,
       "outcome": "passed",
-      "detail": "something appeared at the target between the two frames and nowhere else in the control",
-      "targetChangedFraction": 0.05293,
-      "controlChangedFraction": 0
+      "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
+      "targetChangedFraction": 0.0523,
+      "controlChangedFraction": 0,
+      "changedBox": {
+        "x": 10,
+        "y": 10,
+        "width": 18,
+        "height": 27
+      },
+      "shape": "compact, cursor-sized, and anchored at the hotspot"
     },
     {
       "stepId": "add-a-second-task",
@@ -85,12 +106,19 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 18502,
-      "afterMillis": 19590,
+      "beforeMillis": 18523,
+      "afterMillis": 19634,
       "outcome": "passed",
-      "detail": "something appeared at the target between the two frames and nowhere else in the control",
-      "targetChangedFraction": 0.0896,
-      "controlChangedFraction": 0
+      "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
+      "targetChangedFraction": 0.08897,
+      "controlChangedFraction": 0,
+      "changedBox": {
+        "x": 10,
+        "y": 9,
+        "width": 18,
+        "height": 28
+      },
+      "shape": "compact, cursor-sized, and anchored at the hotspot"
     },
     {
       "stepId": "mark-one-done",
@@ -105,12 +133,19 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 25889,
-      "afterMillis": 26997,
+      "beforeMillis": 25871,
+      "afterMillis": 26960,
       "outcome": "passed",
-      "detail": "something appeared at the target between the two frames and nowhere else in the control",
-      "targetChangedFraction": 0.05325,
-      "controlChangedFraction": 0
+      "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
+      "targetChangedFraction": 0.05357,
+      "controlChangedFraction": 0,
+      "changedBox": {
+        "x": 11,
+        "y": 10,
+        "width": 18,
+        "height": 27
+      },
+      "shape": "compact, cursor-sized, and anchored at the hotspot"
     },
     {
       "stepId": "filter-to-open",
@@ -125,12 +160,19 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 35872,
-      "afterMillis": 36966,
+      "beforeMillis": 35876,
+      "afterMillis": 36967,
       "outcome": "passed",
-      "detail": "something appeared at the target between the two frames and nowhere else in the control",
-      "targetChangedFraction": 0.05261,
-      "controlChangedFraction": 0
+      "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
+      "targetChangedFraction": 0.05198,
+      "controlChangedFraction": 0,
+      "changedBox": {
+        "x": 9,
+        "y": 10,
+        "width": 19,
+        "height": 27
+      },
+      "shape": "compact, cursor-sized, and anchored at the hotspot"
     }
   ],
   "counts": {
@@ -144,6 +186,6 @@
     "width": 1280,
     "height": 800
   },
-  "recordingStartOffsetMillis": 179,
-  "recordingStartOffsetBasis": "the run's last event was at 44139ms and the file is 43960ms long"
+  "recordingStartOffsetMillis": 190,
+  "recordingStartOffsetBasis": "the run's last event was at 44150ms and the file is 43960ms long"
 }

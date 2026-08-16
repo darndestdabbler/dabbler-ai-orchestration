@@ -1,0 +1,94 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 7,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "fb334c94d5d137f3fbd0bebe72da2fc13c340cd8",
+  "fixedTree": "3f05fba5a36953af43d9de95f3d22ea1bfc38693",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T21:38:27.264308+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The VS Code pointer path is knowingly wired to a black-frame backend and its required artifact proof fails. - **Category:** Correctness / Completeness - **Severity:** Major - **Evidence paths:** `t ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A recording made through the supported VS Code recorder must show both a real non-development-host VS Code window and the moving pointer at every click target, its feature-off control must fail the same pixel check, and pointer/backend unavailability must prevent an apparently successful cursor-enabled recording.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The pointer visibility checker can pass without proving that a cursor is visible at every click. - **Category:** Correctness / False Positive - **Severity:** Major - **Evidence paths:** `tools/dabb ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A cursor-hidden recording in which real mouse movement causes target hover changes must fail the visibility check, and an overall pass must require affirmative cursor evidence for every synthesized click rather than allowing indecisive probes.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "** The required human-driven long-form capture harness was not built. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-vscode-wal ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The tree contains and documents an opt-in start/stop harness for a human-driven session in a normal VS Code window, names one recording by set and session, and demonstrably does not write lifecycle state or drive the orchestrator.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "** The speed-ramp algorithm does not derive waiting intervals; it treats every unmarked gap as waiting. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/speed_ramp.py ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Given a representative human session record containing active intervals between lifecycle events, the generated plan must preserve those intervals at 1x and compress only intervals whose event semantics establish that the session was waiting.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 4,
+      "summary": "** The single-module tutorial deliverable is only a proposed outline; the project, generated walkthrough source, recordings, ramp plans, and per-video completion evidence are absent. - **Category:** C ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The purpose-built one-module project and three session sets exist; the written walkthrough is rendered from its Session 2 scenario source; every declared session has a named recording showing the required real AI/human lifecycle; each raw session satisfies the approximately fifteen-minute sizing rule; and each watchable output has a reviewable per-segment ramp plan and human publication-safety record.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 5,
+      "summary": "Enabling the physical pointer selects the backend already measured to black-frame VS Code - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/script ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A real Windows run with the physical-pointer option must record both the VS Code workbench and cursor, pass the artifact visibility check, and use a capture backend that has passed the applicable capture-pilot criteria.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 6,
+      "summary": "The speed-ramp treats every unmarked gap as waiting, so ordinary human work is compressed - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/speed_ramp.py`, `ai_router/ ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Given a representative human session containing both an active-work interval and a bounded known-wait interval, the generated plan must leave the complete active interval at 1× and compress only the known wait.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 7,
+      "summary": "The pixel checker can pass without proving that a cursor is visible - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/check-pointer-visibl ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A recording with no cursor pixels but a target-local hover change must fail, every required click must be conclusively measured before the run can pass, and frame timestamps must be synchronized from an actual recording-start/end anchor rather than an unrelated last event.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 8,
+      "summary": "No long-form human-session capture harness was built - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js`, `to ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A documented harness must start and stop one recording around a manually driven session in an ordinary VS Code window, name it by set and session, avoid all session-state/orchestrator writes, and feed the resulting file and recorded start time into the speed-ramp workflow.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 9,
+      "summary": "The promised single-module tutorial package does not exist beyond an outline - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/tutorials/single-module-walkthrough.md`, `to ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The repository must contain the purpose-built one-module project and three authored session sets, a written walkthrough rendered from the required scenario source, one recording per session showing AI-assisted planning/decomposition, reviewed speed-ramp plans and processed videos, evidence that each raw session stayed within the sizing rule, and one human publication-safety decision per video.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

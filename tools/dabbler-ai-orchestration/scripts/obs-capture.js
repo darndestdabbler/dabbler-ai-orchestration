@@ -62,15 +62,22 @@ const USER_INI = path.join(OBS_CONFIG_ROOT, "user.ini");
 // black-frame on hardware-accelerated Electron, and does not leak the
 // occluding window into the frame.
 const CAPTURE_METHOD_WGC = 2;
-// The older BitBlt path, and the ONLY one of the two that draws the system
-// cursor into the frame (Set 113 Session 7, measured: same window, same
-// parked pointer, same `cursor: true` setting -- BitBlt has an arrow in it
-// and WGC has nothing at all). It is not the default, because everything in
-// the comment above about WGC is still true and a recording with no pointer
-// in it is worth more than a recording with a black frame in it. It is
-// chosen only by a run that has said it needs the pointer to be visible,
-// which is the one case where the trade goes the other way.
-const CAPTURE_METHOD_BITBLT = 1;
+// The older BitBlt path is deliberately NOT offered, and the measurement
+// that ruled it out is worth stating here so nobody re-adds it.
+//
+// BitBlt is the only OBS window-capture method whose `cursor` setting does
+// anything -- which for one commit made it look like the answer to "show the
+// cursor moving". It is not. Measured on the same window with the same
+// parked pointer (`s7-cursor-capture-backends.json`): BitBlt draws the
+// cursor onto an ENTIRELY BLACK frame, because it cannot read a
+// hardware-accelerated Electron surface, which is the reason the comment
+// above gives for choosing WGC in the first place. Selecting it to make a
+// cursor visible trades a recording with no pointer for a recording with no
+// product.
+//
+// WGC ignores the `cursor` setting entirely. So neither OBS method puts the
+// workbench and the cursor in one frame, and that is a capture-backend
+// question rather than a setting -- see `s7-pointer-outcome.md`.
 // Match candidate windows by executable, not by title. Title matching is
 // the single likeliest way this captures the wrong window in a real
 // environment, so the caller narrows by title itself and we REFUSE on more
@@ -397,14 +404,13 @@ class ObsCaptureSession {
       inputName: this.inputName,
       inputKind: "window_capture",
       inputSettings: {
-        method: options.needCursorVisible
-          ? CAPTURE_METHOD_BITBLT
-          : CAPTURE_METHOD_WGC,
+        method: CAPTURE_METHOD_WGC,
         priority: MATCH_PRIORITY_EXE,
-        // Enabled all along, and all along it did nothing on the WGC path.
-        // The setting is honoured by BitBlt and ignored by WGC, which is why
-        // twenty-four captures with cursor drawing "on" contained no cursor
-        // and nobody could see why from the settings.
+        // Enabled, and measured to do nothing on this method. Kept anyway:
+        // it is correct, it costs nothing, and it is what a future OBS or a
+        // future method would honour. What it must not do is imply that a
+        // capture made with it has a cursor in it -- twenty-four of Session
+        // 4's captures had this true and no cursor.
         cursor: options.captureCursor !== false,
         client_area: true,
       },
@@ -713,7 +719,6 @@ class ObsCaptureSession {
 module.exports = {
   ObsCaptureSession,
   CAPTURE_METHOD_WGC,
-  CAPTURE_METHOD_BITBLT,
   ObsUnavailableError,
   DEFAULT_OBS_EXE,
   WEBSOCKET_CONFIG,

@@ -142,6 +142,112 @@ function extractFrame(videoPath, millis, cropRect, outPath) {
   return { ok: true, path: outPath };
 }
 
+/**
+ * Where the change is, and what shape it is -- not merely how much of it.
+ *
+ * Verification's discovery pass was right that a bare "something changed"
+ * test can pass on something that is not a pointer, and it named the case
+ * this instrument actually met: a VS Code row that shows a HOVER TOOLTIP
+ * scored 6.5% on a recording with no cursor in it anywhere. A tooltip is a
+ * consequence of the pointer being there, which is why it is tempting, and
+ * it is not a pointer.
+ *
+ * A cursor has three properties a tooltip, a repaint and a re-render do not
+ * all share: it is SMALL, it is COMPACT, and its top-left corner is AT the
+ * hotspot, because the hotspot is the arrow's tip. So the changed region's
+ * bounding box is measured and judged, and a change that is not
+ * cursor-shaped is reported as INDECISIVE rather than as a pass.
+ */
+function changedRegion(bufferA, bufferB, tolerance) {
+  const a = decodePng(bufferA);
+  const b = decodePng(bufferB);
+  if (a.width !== b.width || a.height !== b.height) {
+    throw new Error("frame crops are different sizes and cannot be differenced");
+  }
+  let changed = 0;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -1;
+  let maxY = -1;
+  for (let y = 0; y < a.height; y += 1) {
+    for (let x = 0; x < a.width; x += 1) {
+      const p = (y * a.width + x) * a.channels;
+      const q = (y * b.width + x) * b.channels;
+      if (
+        Math.abs(a.data[p] - b.data[q]) > tolerance ||
+        Math.abs(a.data[p + 1] - b.data[q + 1]) > tolerance ||
+        Math.abs(a.data[p + 2] - b.data[q + 2]) > tolerance
+      ) {
+        changed += 1;
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const total = a.width * a.height;
+  if (!changed) {
+    return { fraction: 0, changed: 0, box: null, total };
+  }
+  return {
+    fraction: changed / total,
+    changed,
+    box: {
+      x: minX,
+      y: minY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+    },
+    total,
+  };
+}
+
+/**
+ * Is a changed region shaped like a cursor arriving at `hotspot`?
+ *
+ * `hotspot` is given in crop coordinates. The bounds are generous multiples
+ * of the glyph rather than tight fits, because the same rule has to accept a
+ * 22x30 synthetic arrow and a real Windows cursor at whatever size the
+ * operator's display scaling makes it.
+ */
+function looksLikeACursor(region, hotspot, cropSize) {
+  if (!region.box) return { ok: false, why: "nothing changed at all" };
+  const scale = cropSize / CROP.size;
+  const maxSide = Math.round(44 * scale);
+  const slack = Math.round(14 * scale);
+  if (region.box.width > maxSide || region.box.height > maxSide) {
+    return {
+      ok: false,
+      why:
+        "the change is " +
+        region.box.width +
+        "x" +
+        region.box.height +
+        ", larger than a cursor -- something in the UI moved or repainted",
+    };
+  }
+  if (
+    Math.abs(region.box.x - hotspot.x) > slack ||
+    Math.abs(region.box.y - hotspot.y) > slack
+  ) {
+    return {
+      ok: false,
+      why:
+        "the change starts at " +
+        region.box.x +
+        "," +
+        region.box.y +
+        " rather than at the hotspot " +
+        hotspot.x +
+        "," +
+        hotspot.y +
+        " -- a cursor's tip is AT the point it was sent to",
+    };
+  }
+  return { ok: true, why: "compact, cursor-sized, and anchored at the hotspot" };
+}
+
 /** Fraction of pixels that differ by more than `tolerance` on any channel. */
 function changedFraction(bufferA, bufferB, tolerance) {
   const a = decodePng(bufferA);
@@ -431,11 +537,12 @@ function checkRun(options) {
         continue;
       }
 
-      const targetChanged = changedFraction(
+      const region = changedRegion(
         fs.readFileSync(beforeTarget),
         fs.readFileSync(afterTarget),
         CHANNEL_TOLERANCE
       );
+      const targetChanged = region.fraction;
       const controlChanged = changedFraction(
         fs.readFileSync(beforeControl),
         fs.readFileSync(afterControl),
@@ -443,6 +550,13 @@ function checkRun(options) {
       );
       entry.targetChangedFraction = Number(targetChanged.toFixed(5));
       entry.controlChangedFraction = Number(controlChanged.toFixed(5));
+      entry.changedBox = region.box;
+      // The hotspot in CROP coordinates. `cropFor` clamps at the frame's
+      // edge, so this is derived from the rectangle actually used rather
+      // than assumed to be the nominal offset.
+      const hotspot = { x: probe.to.x - rect.x, y: probe.to.y - rect.y };
+      const shape = looksLikeACursor(region, hotspot, cropSize);
+      entry.shape = shape.why;
 
       if (controlChanged > CONTROL_MAX_CHANGED) {
         entry.outcome = "indecisive";
@@ -451,12 +565,22 @@ function checkRun(options) {
           entry.controlChangedFraction +
           "), so a change at the target cannot be attributed to a pointer";
         report.counts.indecisive += 1;
-      } else if (targetChanged >= ARRIVAL_MIN_CHANGED) {
+      } else if (targetChanged >= ARRIVAL_MIN_CHANGED && shape.ok) {
         entry.outcome = "passed";
         entry.detail =
-          "something appeared at the target between the two frames and " +
-          "nowhere else in the control";
+          "a cursor-shaped mark appeared with its tip at the target, and " +
+          "nothing moved in the control";
         report.counts.passed += 1;
+      } else if (targetChanged >= ARRIVAL_MIN_CHANGED) {
+        // Enough changed, but not in the shape a cursor makes. Reported as
+        // INDECISIVE rather than as a pass: the honest reading is that this
+        // probe cannot tell you whether a pointer arrived, not that one did.
+        entry.outcome = "indecisive";
+        entry.detail =
+          "something appeared at the target but it is not shaped like a " +
+          "cursor: " +
+          shape.why;
+        report.counts.indecisive += 1;
       } else {
         entry.outcome = "failed";
         entry.detail =
@@ -533,6 +657,8 @@ if (require.main === module) {
 
 module.exports = {
   CROP,
+  changedRegion,
+  looksLikeACursor,
   CONTROL,
   CHANNEL_TOLERANCE,
   ARRIVAL_MIN_CHANGED,

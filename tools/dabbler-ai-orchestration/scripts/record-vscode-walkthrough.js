@@ -596,12 +596,6 @@ async function recordVscodeWalkthrough(options) {
           outDir,
           width: result.window.physical.width,
           height: result.window.physical.height,
-          // A run that is walking a pointer to each target needs a capture
-          // backend that draws one. This is the ONLY thing that changes
-          // between a pointer run and its control -- the control asks for
-          // the same backend, so the falsifier differs in the pointer and
-          // in nothing else.
-          needCursorVisible: Boolean(opts.physicalPointer || opts.pointerControl),
           windowMatch: (candidate) => {
             const name = String(candidate.name || "").toLowerCase();
             return (
@@ -748,6 +742,18 @@ async function recordVscodeWalkthrough(options) {
         physical = new pointer.PhysicalPointer(log).open();
         await physical.waitUntilReady();
         const calibration = await pointer.calibratePhysicalPointer(page, physical);
+        // Said before the run rather than discovered afterwards. Moving the
+        // pointer is now proved to work and the capture is proved not to
+        // draw it, so a run that asked for a visible pointer and gets a
+        // recording without one must be told why by the thing it ran.
+        if (opts.video) {
+          log(
+            "NOTE: no OBS window-capture method composites the system cursor " +
+              "-- WGC ignores the setting and BitBlt black-frames the " +
+              "workbench (measured: s7-cursor-capture-backends.json). The " +
+              "pointer will MOVE, and this recording will not show it."
+          );
+        }
         log(
           "physical pointer calibrated: scale " +
             calibration.scale.x.toFixed(3) +

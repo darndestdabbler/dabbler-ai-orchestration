@@ -21,10 +21,18 @@ segments and rates, in a file -- and not a state inside an editor:
   segment, which a viewer is owed and an editor cannot tell you.
 
 The rule the plan obeys, and it is the one that matters: **an interval in
-which something happened is never compressed.**  Quiet is inferred from
-the absence of marks in the framework's own record, and every mark is
-padded on both sides before anything is sped up, so a step that produced
-one timestamp still plays at real speed around it.
+which something happened is never compressed.**  Every mark is padded on
+both sides before anything is sped up, so a step that produced one
+timestamp still plays at real speed around it.
+
+Quiet is established from **two** sources, because one of them is not
+enough.  The framework's record is authoritative about what happened and
+**sparse** -- an orchestrator session writes a timestamp every few minutes
+-- so on a human-driven tutorial a person reading the screen, typing a
+prompt or scrolling a diff looks exactly like a suite running.  So the
+**recording itself** is sampled for movement and anything moving is a mark
+too.  The two sources can only ever *add* real-time segments; neither can
+remove one.
 
 CLI
 ---
@@ -77,6 +85,21 @@ class Mark:
     seconds: float
     source: str
     label: str
+
+
+# How often the recording itself is sampled for movement, and how much
+# movement counts. Four seconds is fine enough to catch a person typing and
+# coarse enough that an hour of video is 900 tiny frames; the threshold sits
+# above encoder shimmer on a still screen and well below a cursor moving
+# across a line of text.
+DEFAULT_SCREEN_SAMPLE_SECONDS = 4.0
+DEFAULT_SCREEN_CHANGE_THRESHOLD = 0.004
+
+# The size each sampled frame is reduced to before comparison. Small on
+# purpose: this is asking "did the screen change", not "what changed", and a
+# thumbnail answers that while keeping an hour of video in a few megabytes.
+SCREEN_SAMPLE_WIDTH = 64
+SCREEN_SAMPLE_HEIGHT = 36
 
 
 @dataclass(frozen=True)
@@ -185,6 +208,99 @@ def collect_marks(
     return marks
 
 
+def marks_from_frames(
+    frames: Sequence[bytes],
+    sample_seconds: float,
+    threshold: float,
+) -> list[Mark]:
+    """Turn a series of sampled frames into marks wherever the screen moved.
+
+    Split out from the ffmpeg call so the rule can be tested without a video
+    file.  The comparison is a mean absolute difference over the whole
+    thumbnail, which is deliberately crude: the question is *did anything
+    move*, and a person typing one character moves enough pixels to clear a
+    threshold set above encoder shimmer.
+
+    Both ends of a change are marked.  A sample that differs from the one
+    before it means the screen moved at some point in between, and marking
+    only the later of the two would leave the beginning of that stretch
+    eligible for compression.
+    """
+
+    marks: list[Mark] = []
+    for index in range(1, len(frames)):
+        earlier = frames[index - 1]
+        later = frames[index]
+        if len(earlier) != len(later) or not earlier:
+            continue
+        total = sum(abs(a - b) for a, b in zip(earlier, later))
+        if total / (len(earlier) * 255.0) < threshold:
+            continue
+        marks.append(
+            Mark(
+                seconds=(index - 1) * sample_seconds,
+                source="recording",
+                label="the screen changed",
+            )
+        )
+        marks.append(
+            Mark(
+                seconds=index * sample_seconds,
+                source="recording",
+                label="the screen changed",
+            )
+        )
+    return marks
+
+
+def collect_screen_marks(
+    video: Path,
+    *,
+    sample_seconds: float = DEFAULT_SCREEN_SAMPLE_SECONDS,
+    threshold: float = DEFAULT_SCREEN_CHANGE_THRESHOLD,
+) -> list[Mark]:
+    """Marks derived from the recording itself: the screen is the ground truth.
+
+    The framework's own record is the *authoritative* source for what
+    happened, and it is also **sparse** — an orchestrator session writes a
+    timestamp every few minutes.  On a human-driven tutorial recording that
+    sparseness is a real hazard: a person reading the screen, typing a
+    prompt, or scrolling through a diff produces no ledger entry at all and
+    looks exactly like a suite running.
+
+    So the recording is asked too.  Anything the screen shows moving is a
+    mark, and marks are never compressed — which means the two sources can
+    only ever *add* real-time segments, never remove one.
+
+    Returns an empty list rather than raising when ffmpeg is missing or the
+    file cannot be decoded: this is a second opinion, and the plan is still
+    buildable without it (less safely, which the caller is told).
+    """
+
+    if shutil.which("ffmpeg") is None:
+        return []
+    argv = [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        str(video),
+        "-vf",
+        f"fps=1/{sample_seconds},scale={SCREEN_SAMPLE_WIDTH}:{SCREEN_SAMPLE_HEIGHT},format=gray",
+        "-f",
+        "rawvideo",
+        "-",
+    ]
+    completed = subprocess.run(argv, capture_output=True)
+    if completed.returncode != 0 or not completed.stdout:
+        return []
+    size = SCREEN_SAMPLE_WIDTH * SCREEN_SAMPLE_HEIGHT
+    raw = completed.stdout
+    frames = [raw[start : start + size] for start in range(0, len(raw) - size + 1, size)]
+    return marks_from_frames(frames, sample_seconds, threshold)
+
+
 def build_segments(
     marks: Sequence[Mark],
     duration_seconds: float,
@@ -206,18 +322,19 @@ def build_segments(
     if duration_seconds <= 0:
         raise SpeedRampError("the recording has no duration to plan over")
 
-    keep: list[list[float]] = []
+    keep: list[list] = []
     for mark in marks:
         start = max(0.0, mark.seconds - pad_seconds)
         end = min(duration_seconds, mark.seconds + pad_seconds)
         if keep and start <= keep[-1][1]:
             keep[-1][1] = max(keep[-1][1], end)
+            keep[-1][2].add(mark.source)
         else:
-            keep.append([start, end])
+            keep.append([start, end, {mark.source}])
 
     segments: list[Segment] = []
     cursor = 0.0
-    for start, end in keep:
+    for start, end, sources in keep:
         if start > cursor:
             segments.extend(
                 _quiet_segments(
@@ -233,7 +350,11 @@ def build_segments(
                 start_seconds=round(start, 3),
                 end_seconds=round(end, 3),
                 rate=1.0,
-                reason="the framework's own record says something happened here",
+                # Which source vouched for this stretch, not just that one
+                # did. The two disagree usefully: the record knows what a
+                # step WAS, and the recording knows that a person was doing
+                # something the record never heard about.
+                reason=_kept_because(sources),
             )
         )
         cursor = end
@@ -248,6 +369,19 @@ def build_segments(
             )
         )
     return [segment for segment in segments if segment.source_duration > 0.05]
+
+
+def _kept_because(sources) -> str:
+    from_record = {"session-events.jsonl", "activity-log.json"} & set(sources)
+    from_screen = "recording" in sources
+    if from_record and from_screen:
+        return "the record says something happened here, and the screen moved"
+    if from_screen:
+        return (
+            "the screen moved here, though the framework's record says nothing "
+            "-- this is someone working"
+        )
+    return "the framework's own record says something happened here"
 
 
 def _quiet_segments(
@@ -279,7 +413,7 @@ def _quiet_segments(
             start_seconds=round(start, 3),
             end_seconds=round(end, 3),
             rate=round(max(1.0, rate), 3),
-            reason=f"nothing was recorded for {span:.1f}s",
+            reason=f"nothing in the record and nothing moving for {span:.1f}s",
         )
     ]
 
@@ -289,11 +423,22 @@ def build_plan(
     session_number: int,
     recording_start: datetime,
     duration_seconds: float,
+    *,
+    recording: Path | None = None,
+    screen_marks: bool = True,
     **kwargs,
 ) -> dict:
     marks = collect_marks(
         session_set_dir, session_number, recording_start, duration_seconds
     )
+    screen: list[Mark] = []
+    if recording is not None and screen_marks:
+        screen = [
+            mark
+            for mark in collect_screen_marks(recording)
+            if 0 <= mark.seconds <= duration_seconds
+        ]
+        marks = sorted(marks + screen, key=lambda mark: mark.seconds)
     if not marks:
         raise SpeedRampError(
             "the framework's record has no timestamps inside this recording "
@@ -317,6 +462,8 @@ def build_plan(
         if output_duration
         else None,
         "markCount": len(marks),
+        "screenMarkCount": len(screen),
+        "screenMarksUsed": bool(recording is not None and screen_marks),
         "compressedSegmentCount": len(compressed),
         "compressedSourceFraction": round(
             sum(segment.source_duration for segment in compressed) / duration_seconds,
@@ -354,7 +501,13 @@ def render_plan(plan: dict) -> str:
             if plan.get("compressionRatio")
             else ""
         ),
-        f"  marks           {plan['markCount']} from the framework's own record",
+        f"  marks           {plan['markCount']} "
+        + (
+            f"({plan['markCount'] - plan.get('screenMarkCount', 0)} from the "
+            f"record, {plan.get('screenMarkCount', 0)} from the screen)"
+            if plan.get("screenMarksUsed")
+            else "from the framework's own record ONLY"
+        ),
         "",
         f"  {'from':>9}  {'to':>9}  {'rate':>7}  why",
     ]
@@ -369,6 +522,12 @@ def render_plan(plan: dict) -> str:
         "  Every segment above at 1.0x plays at real speed. Nothing the "
         "record\n  says happened is inside a compressed segment."
     )
+    if not plan.get("screenMarksUsed"):
+        lines.append(
+            "  The recording itself was NOT sampled, so 'quiet' here means "
+            "only that the\n  framework wrote nothing -- a person reading the "
+            "screen looks the same.\n  Pass --recording to sample it."
+        )
     fraction = plan.get("compressedSourceFraction")
     if fraction is not None:
         lines.append(
@@ -491,6 +650,8 @@ def _cmd_plan(args: argparse.Namespace) -> int:
         args.session,
         _parse_timestamp(args.recording_start),
         duration,
+        recording=Path(args.recording) if args.recording else None,
+        screen_marks=not args.no_screen_marks,
         quiet_threshold=args.quiet_threshold,
         quiet_target=args.quiet_target,
         max_rate=args.max_rate,
@@ -532,6 +693,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     plan_parser.add_argument("--duration-seconds", type=float, default=None)
     plan_parser.add_argument("--recording", default=None, help="read the length from this file")
     plan_parser.add_argument("--out", default=None)
+    plan_parser.add_argument(
+        "--no-screen-marks",
+        action="store_true",
+        help=(
+            "do not sample the recording for movement. The framework's record "
+            "is sparse, so this makes the plan blind to anything a person did "
+            "that wrote no timestamp."
+        ),
+    )
     plan_parser.add_argument(
         "--quiet-threshold", type=float, default=DEFAULT_QUIET_THRESHOLD_SECONDS
     )

@@ -276,3 +276,90 @@ class TestPlanShape:
             assert later["start_seconds"] == pytest.approx(
                 earlier["end_seconds"], abs=0.06
             ), "a gap between segments is a stretch of video that vanishes"
+
+
+class TestScreenDerivedMarks:
+    """The record is authoritative and sparse; the screen fills the gap.
+
+    A person reading the screen, typing a prompt or scrolling a diff writes
+    no ledger entry and looks exactly like a suite running.  These are the
+    falsifiers for the second source that fixes that -- including the one
+    that matters most: a still screen must NOT produce marks, or the fix
+    would simply refuse to compress anything and look like it worked.
+    """
+
+    @staticmethod
+    def _frame(value: int, size: int = 16) -> bytes:
+        return bytes([value] * size)
+
+    def test_a_still_screen_produces_no_marks(self):
+        frames = [self._frame(120) for _ in range(6)]
+        assert speed_ramp.marks_from_frames(frames, 4.0, 0.004) == []
+
+    def test_encoder_shimmer_is_not_movement(self):
+        # One level of drift across the whole thumbnail is 1/255 = 0.0039,
+        # just under the bar. The look-alike for real movement.
+        frames = [self._frame(120), self._frame(121), self._frame(120)]
+        assert speed_ramp.marks_from_frames(frames, 4.0, 0.004) == []
+
+    def test_a_screen_that_moved_produces_marks(self):
+        frames = [self._frame(120), self._frame(200), self._frame(200)]
+        marks = speed_ramp.marks_from_frames(frames, 4.0, 0.004)
+        assert marks, "movement produced no mark, so nothing would be protected"
+        assert all(mark.source == "recording" for mark in marks)
+
+    def test_both_ends_of_a_change_are_marked(self):
+        # Marking only the later sample would leave the beginning of the
+        # stretch -- where the movement actually started -- compressible.
+        frames = [self._frame(120), self._frame(200)]
+        seconds = sorted(
+            mark.seconds for mark in speed_ramp.marks_from_frames(frames, 4.0, 0.004)
+        )
+        assert seconds == [0.0, 4.0]
+
+    def test_ragged_or_empty_frames_are_skipped_not_crashed_on(self):
+        frames = [b"", self._frame(120), bytes([1, 2, 3])]
+        assert speed_ramp.marks_from_frames(frames, 4.0, 0.004) == []
+
+    def test_screen_marks_protect_a_stretch_the_record_would_compress(self, tmp_path):
+        _write_set(tmp_path, events=[0.0], activity=[])
+        record_only = speed_ramp.build_segments(
+            speed_ramp.collect_marks(tmp_path, 1, BASE, 600.0), 600.0
+        )
+        with_screen = speed_ramp.build_segments(
+            speed_ramp.collect_marks(tmp_path, 1, BASE, 600.0)
+            + [_mark(300.0), _mark(304.0)],
+            600.0,
+        )
+        compressed_before = sum(
+            segment.source_duration for segment in record_only if segment.rate > 1.0
+        )
+        compressed_after = sum(
+            segment.source_duration for segment in with_screen if segment.rate > 1.0
+        )
+        assert compressed_after < compressed_before, (
+            "adding evidence that a person was working did not protect anything"
+        )
+
+    def test_a_plan_built_without_sampling_the_recording_says_so(self, tmp_path):
+        _write_set(tmp_path, events=[0.0], activity=[600.0])
+        plan = speed_ramp.build_plan(tmp_path, 1, BASE, 600.0)
+        assert plan["screenMarksUsed"] is False
+        assert "NOT sampled" in speed_ramp.render_plan(plan)
+
+    def test_a_segment_says_which_source_vouched_for_it(self, tmp_path):
+        _write_set(tmp_path, events=[0.0], activity=[])
+        segments = speed_ramp.build_segments(
+            speed_ramp.collect_marks(tmp_path, 1, BASE, 600.0)
+            + [
+                speed_ramp.Mark(
+                    seconds=300.0, source="recording", label="the screen changed"
+                )
+            ],
+            600.0,
+        )
+        reasons = " ".join(segment.reason for segment in segments)
+        assert "the screen moved here" in reasons, (
+            "a stretch kept only because the screen moved is reported as though "
+            "the record had vouched for it"
+        )

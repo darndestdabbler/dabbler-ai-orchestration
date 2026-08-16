@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 7,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "e214dc3338f9cbd6d139f9ec09fec09eb43b90b9",
+  "fixedTree": "75c299a34b37bdb0c66a72a66471203190539458",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T21:38:44.246491+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The synthetic web pointer disappears behind native top-layer UI - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/pointer.js`, `tools/d ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A recorded web walkthrough targeting controls inside both an open native `<dialog>` and an open top-layer popover must visibly show the synthetic pointer at each target, with the corresponding feature-off recording failing the same artifact check.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

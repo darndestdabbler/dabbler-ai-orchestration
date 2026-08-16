@@ -1,0 +1,25 @@
+{
+  "measurement": "the synthetic pointer is visible over a native modal dialog, which renders in the browser's top layer above every z-index",
+  "startedAt": "2026-08-16T21:31:50.157Z",
+  "modalColour": [
+    12,
+    74,
+    110
+  ],
+  "hotspot": {
+    "x": 300,
+    "y": 200
+  },
+  "crop": {
+    "x": 290,
+    "y": 190,
+    "width": 56,
+    "height": 56
+  },
+  "minForeignFraction": 0.02,
+  "promoted": 0.09024,
+  "control": 0,
+  "verdict": "PASS",
+  "reason": "the pointer is drawn over the modal (0.09024 of the crop is not the modal's colour) and is hidden behind it without the top-layer promotion (0)",
+  "finishedAt": "2026-08-16T21:31:50.762Z"
+}

@@ -39,6 +39,16 @@ const checker = require("../../../scripts/check-pointer-visible.js") as {
   ARRIVAL_MIN_CHANGED: number;
   CONTROL_MAX_CHANGED: number;
   parseArgs: (argv: string[]) => Record<string, unknown>;
+  looksLikeACursor: (
+    region: {
+      fraction?: number;
+      changed?: number;
+      total?: number;
+      box: { x: number; y: number; width: number; height: number } | null;
+    },
+    hotspot: { x: number; y: number },
+    cropSize: number
+  ) => { ok: boolean; why: string };
   cropFor: (
     point: { x: number; y: number },
     frame: { width: number; height: number },
@@ -294,6 +304,84 @@ suite("Set 113 S7 - pointer visibility", () => {
       assert.ok(
         source.includes("not a pointer failure"),
         "the degraded path is not distinguished from a real failure"
+      );
+    });
+  });
+
+  suite("a change is only a pointer when it is shaped like one", () => {
+    // Verification's discovery pass caught the bare "something changed" test
+    // passing on something that was not a cursor, and named the case this
+    // instrument actually met: a VS Code hover TOOLTIP scored 6.5% on a
+    // recording with no cursor in it anywhere.
+    const hotspot = { x: 10, y: 10 };
+    const cursorish = {
+      fraction: 0.06,
+      changed: 190,
+      box: { x: 10, y: 10, width: 19, height: 28 },
+      total: 3136,
+    };
+
+    test("a compact mark with its tip at the hotspot is a cursor", () => {
+      const verdict = checker.looksLikeACursor(cursorish, hotspot, 56);
+      assert.strictEqual(verdict.ok, true, verdict.why);
+    });
+
+    test("a tooltip-sized repaint is not", () => {
+      const tooltip = {
+        fraction: 0.35,
+        changed: 1100,
+        box: { x: 0, y: 0, width: 56, height: 40 },
+        total: 3136,
+      };
+      assert.strictEqual(checker.looksLikeACursor(tooltip, hotspot, 56).ok, false);
+    });
+
+    test("a cursor-sized mark somewhere else in the crop is not", () => {
+      const elsewhere = {
+        fraction: 0.06,
+        changed: 190,
+        box: { x: 34, y: 30, width: 19, height: 28 },
+        total: 3136,
+      };
+      const verdict = checker.looksLikeACursor(elsewhere, hotspot, 56);
+      assert.strictEqual(verdict.ok, false);
+      assert.ok(/tip is AT the point/.test(verdict.why));
+    });
+
+    test("no change at all is not a cursor either", () => {
+      assert.strictEqual(
+        checker.looksLikeACursor({ fraction: 0, changed: 0, box: null }, hotspot, 56)
+          .ok,
+        false
+      );
+    });
+
+    test("the bounds scale with the crop, so a 200% cursor still passes", () => {
+      // At double scaling the frame is the window's physical pixels, the crop
+      // doubles, and so does the cursor. A rule tuned to 56px would reject
+      // every probe on a scaled display.
+      const big = {
+        fraction: 0.06,
+        changed: 760,
+        box: { x: 20, y: 20, width: 38, height: 56 },
+        total: 12544,
+      };
+      assert.strictEqual(
+        checker.looksLikeACursor(big, { x: 20, y: 20 }, 112).ok,
+        true
+      );
+    });
+
+    test("a shape that is not a cursor is indecisive, never a pass", () => {
+      // The distinction matters: "I cannot tell" and "there was no pointer"
+      // are different claims, and only one of them should fail a run.
+      const source = fs.readFileSync(
+        path.join(SCRIPTS, "check-pointer-visible.js"),
+        "utf8"
+      );
+      assert.ok(
+        source.includes("not shaped like a "),
+        "an unrecognised shape does not report itself as indecisive"
       );
     });
   });

@@ -59,3 +59,5 @@
 {"sessionNumber": 6, "postedAt": "2026-08-16T14:14:01.079164-04:00", "stepCount": 9, "surface": "markdown", "inProgressStepKeys": []}
 {"sessionNumber": 7, "postedAt": "2026-08-16T16:17:17.989550-04:00", "stepCount": 8, "surface": "markdown", "inProgressStepKeys": ["show-the-pointer"]}
 {"sessionNumber": 7, "postedAt": "2026-08-16T17:15:37.618677-04:00", "stepCount": 8, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 7, "postedAt": "2026-08-16T17:27:09.470557-04:00", "stepCount": 8, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 7, "postedAt": "2026-08-16T17:29:34.375674-04:00", "stepCount": 8, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}

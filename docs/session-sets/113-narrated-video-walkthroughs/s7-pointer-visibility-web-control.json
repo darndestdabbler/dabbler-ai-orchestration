@@ -25,12 +25,14 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 6843,
-      "afterMillis": 7850,
+      "beforeMillis": 6814,
+      "afterMillis": 7841,
       "outcome": "failed",
       "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
       "targetChangedFraction": 0,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": null,
+      "shape": "nothing changed at all"
     },
     {
       "stepId": "add-a-task",
@@ -45,12 +47,14 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 8396,
-      "afterMillis": 9399,
+      "beforeMillis": 8391,
+      "afterMillis": 9404,
       "outcome": "failed",
       "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
       "targetChangedFraction": 0,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": null,
+      "shape": "nothing changed at all"
     },
     {
       "stepId": "add-a-second-task",
@@ -65,12 +69,14 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 16826,
-      "afterMillis": 17843,
+      "beforeMillis": 16823,
+      "afterMillis": 17846,
       "outcome": "failed",
       "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
       "targetChangedFraction": 0,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": null,
+      "shape": "nothing changed at all"
     },
     {
       "stepId": "add-a-second-task",
@@ -85,12 +91,14 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 18390,
-      "afterMillis": 19401,
+      "beforeMillis": 18418,
+      "afterMillis": 19425,
       "outcome": "failed",
       "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
       "targetChangedFraction": 0,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": null,
+      "shape": "nothing changed at all"
     },
     {
       "stepId": "mark-one-done",
@@ -105,12 +113,14 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 25841,
-      "afterMillis": 26865,
+      "beforeMillis": 25857,
+      "afterMillis": 26877,
       "outcome": "failed",
       "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
       "targetChangedFraction": 0,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": null,
+      "shape": "nothing changed at all"
     },
     {
       "stepId": "filter-to-open",
@@ -125,12 +135,14 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 35852,
-      "afterMillis": 36861,
+      "beforeMillis": 35851,
+      "afterMillis": 36873,
       "outcome": "failed",
       "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
       "targetChangedFraction": 0,
-      "controlChangedFraction": 0
+      "controlChangedFraction": 0,
+      "changedBox": null,
+      "shape": "nothing changed at all"
     }
   ],
   "counts": {
@@ -144,6 +156,6 @@
     "width": 1280,
     "height": 800
   },
-  "recordingStartOffsetMillis": 202,
-  "recordingStartOffsetBasis": "the run's last event was at 44122ms and the file is 43920ms long"
+  "recordingStartOffsetMillis": 170,
+  "recordingStartOffsetBasis": "the run's last event was at 44130ms and the file is 43960ms long"
 }

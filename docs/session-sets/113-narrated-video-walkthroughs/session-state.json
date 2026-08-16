@@ -108,6 +108,15 @@
     },
     {
       "number": 8,
+      "title": "A capture backend that draws the cursor",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 9,
       "title": "The multi-module tutorial, and the set's accounting",
       "status": "not-started",
       "startedAt": null,

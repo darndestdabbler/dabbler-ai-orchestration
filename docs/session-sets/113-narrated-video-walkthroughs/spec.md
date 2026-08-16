@@ -65,7 +65,8 @@
 
 ```yaml
 tier: full
-requiresUAT: true         # A set whose deliverable IS the UAT experience must be judged as an experience. Its own walk is the acceptance test — and Session 4 is what keeps that walk possible on this repo's own product.
+totalSessions: 9          # Re-planned 2026-08-16 at Session 7's close: EIGHT to NINE. Declared here so the boundary writers derive the count from the spec instead of from a stale sessions[] length.
+requiresUAT: true           # A set whose deliverable IS the UAT experience must be judged as an experience. Its own walk is the acceptance test — and Session 4 is what keeps that walk possible on this repo's own product.
 requiresE2E: true         # Sessions 3 and 4 drive real rendering surfaces (a browser fixture and the Extension Development Host).
 uatStyle: ad-hoc
 uatScope: per-set
@@ -93,7 +94,8 @@ pathAwareCritique: advisory
 # the recording step and its conventions into the safety pass, which took 8
 # from N=4 to N=2 and needs no exception. What follows is what could not be
 # trimmed without losing work.
-sessionSizeException: 5 - six declared work steps, of which two (read the
+sessionSizeException: >-
+  5 - six declared work steps, of which two (read the
   operator's note; do not redirect to Azure) are a reading instruction and a
   guardrail rather than work, and the remaining four are one sequential
   measurement: criteria first, plugin surface before the container
@@ -101,16 +103,19 @@ sessionSizeException: 5 - six declared work steps, of which two (read the
   the container, then the trade it forces. Splitting it re-pays container
   setup to no benefit, and the plugin measurement exists precisely so the
   later steps may not be needed.
-sessionSizeException: 6 - a diagnosis session, where reproducing both failures
+sessionSizeException: >-
+  6 - a diagnosis session, where reproducing both failures
   and judging the servant violation on its own merits are the evidence the
   fix and its falsifier rest on. Splitting it would hand a later session a
   diagnosis it did not make.
-sessionSizeException: 8 - five work steps, of which the first two are one
+sessionSizeException: >-
+  8 - five work steps, of which the first two are one
   sequential measurement (the criteria pass, then the harness that can only
   be built once a backend has cleared it) and the last is a decision rather
   than work. Splitting it would hand a later session a backend it did not
   measure, which is precisely the mistake Session 7 refused to make.
-sessionSizeException: 7 - four work steps after trimming, and none is
+sessionSizeException: >-
+  7 - four work steps after trimming, and none is
   droppable: the pointer must be fixed BEFORE recording (operator ordering
   ruling) or the tutorial is recorded twice, the pipeline is what makes a
   long session watchable, the recording is the deliverable, and the safety

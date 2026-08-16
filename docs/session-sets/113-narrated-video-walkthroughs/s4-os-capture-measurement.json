@@ -1,0 +1,1035 @@
+{
+  "measurement": "Windows OS capture of the AI Work Explorer, via OBS Studio",
+  "criteriaFile": "s4-pilot-criteria.json",
+  "criteriaSha256": "sha256:3ed9f6781717d5be54ea5a50ae645740343e6590210c22bf17890cee6b7d0ecf",
+  "platform": "win32 10.0.26200",
+  "node": "v25.8.1",
+  "startedAt": "2026-08-16T01:03:01.974Z",
+  "runs": [
+    {
+      "observations": {
+        "index": 1,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": 0.2978,
+        "magentaFractionInDecoyCapture": 0.441219,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 57600,
+        "lastCueEndMs": 57643
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 57.6
+      },
+      "anchor": {
+        "anchorMillis": 1786842198833,
+        "uncertaintyMillis": 109
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 43277873
+    },
+    {
+      "observations": {
+        "index": 2,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49033,
+        "lastCueEndMs": 49116
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.033
+      },
+      "anchor": {
+        "anchorMillis": 1786842279558,
+        "uncertaintyMillis": 110
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36841599
+    },
+    {
+      "observations": {
+        "index": 3,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49033,
+        "lastCueEndMs": 49087
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.033
+      },
+      "anchor": {
+        "anchorMillis": 1786842351934,
+        "uncertaintyMillis": 109
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36841599
+    },
+    {
+      "observations": {
+        "index": 4,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49066,
+        "lastCueEndMs": 49116
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.066
+      },
+      "anchor": {
+        "anchorMillis": 1786842424382,
+        "uncertaintyMillis": 109
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36866648
+    },
+    {
+      "observations": {
+        "index": 5,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49066,
+        "lastCueEndMs": 49098
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.066
+      },
+      "anchor": {
+        "anchorMillis": 1786842496689,
+        "uncertaintyMillis": 106
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36866649
+    },
+    {
+      "observations": {
+        "index": 6,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49000,
+        "lastCueEndMs": 49061
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49
+      },
+      "anchor": {
+        "anchorMillis": 1786842568850,
+        "uncertaintyMillis": 106
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36816556
+    },
+    {
+      "observations": {
+        "index": 7,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49066,
+        "lastCueEndMs": 49126
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.066
+      },
+      "anchor": {
+        "anchorMillis": 1786842641777,
+        "uncertaintyMillis": 107
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36866648
+    },
+    {
+      "observations": {
+        "index": 8,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49100,
+        "lastCueEndMs": 49136
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.1
+      },
+      "anchor": {
+        "anchorMillis": 1786842714282,
+        "uncertaintyMillis": 109
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36891668
+    },
+    {
+      "observations": {
+        "index": 9,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49633,
+        "lastCueEndMs": 49666
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.633
+      },
+      "anchor": {
+        "anchorMillis": 1786842788723,
+        "uncertaintyMillis": 109
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 37292379
+    },
+    {
+      "observations": {
+        "index": 10,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49633,
+        "lastCueEndMs": 49689
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.633
+      },
+      "anchor": {
+        "anchorMillis": 1786842863212,
+        "uncertaintyMillis": 110
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 37292378
+    }
+  ],
+  "dependencyAbsent": [
+    {
+      "variant": "websocket-unreachable",
+      "kind": "unreachable",
+      "message": "No OBS websocket is listening at ws://127.0.0.1:45999. OBS is an optional prerequisite for OS capture: start OBS, or run without recording.",
+      "mentionsObs": true,
+      "walkthroughStillCompleted": true,
+      "manifestWritten": true,
+      "osVideoArtifacts": 0,
+      "stepsCompleted": 5,
+      "cleanupProblems": []
+    },
+    {
+      "variant": "websocket-auth-rejected",
+      "kind": "auth-rejected",
+      "message": "OBS started (pid 19072) but its websocket never became reachable on port 44667: OBS rejected the websocket password at ws://127.0.0.1:44667 (close 4009).",
+      "mentionsObs": true,
+      "walkthroughStillCompleted": true,
+      "manifestWritten": true,
+      "osVideoArtifacts": 0,
+      "stepsCompleted": 5,
+      "cleanupProblems": []
+    },
+    {
+      "variant": "obs-executable-absent",
+      "kind": "obs-not-installed",
+      "message": "OBS Studio was not found at C:\\Users\\denmi\\AppData\\Local\\Temp\\no-such-obs-here\\obs64.exe. OBS is an optional prerequisite for OS capture; install it, or record without a video.",
+      "mentionsObs": true,
+      "walkthroughStillCompleted": true,
+      "manifestWritten": true,
+      "osVideoArtifacts": 0,
+      "stepsCompleted": 5,
+      "cleanupProblems": []
+    }
+  ],
+  "resizeVariant": {
+    "observations": {
+      "index": 90,
+      "correlationWithTarget": 0.9992,
+      "frameSize": {
+        "width": 1024,
+        "height": 700
+      },
+      "windowPhysical": {
+        "width": 1024,
+        "height": 700
+      },
+      "dimensionDeltaPx": 0,
+      "scaleFactor": 1,
+      "magentaFractionUnderOcclusion": 0,
+      "correlationUnderOcclusion": 1,
+      "sceneItemCount": 1,
+      "inputKinds": [
+        "window_capture"
+      ],
+      "specialInputs": {
+        "desktop1": null,
+        "desktop2": null,
+        "mic1": null,
+        "mic2": null,
+        "mic3": null,
+        "mic4": null
+      },
+      "decoyCorrelation": null,
+      "magentaFractionInDecoyCapture": null,
+      "errors": []
+    },
+    "timing": {
+      "cues": 5,
+      "steps": 5,
+      "allCuesInsideRecording": false,
+      "recordingDurationMs": 49066,
+      "lastCueEndMs": 49108
+    },
+    "container": {
+      "handlers": [
+        "vide",
+        "soun"
+      ],
+      "durationSeconds": 49.066
+    },
+    "anchor": {
+      "anchorMillis": 1786842936900,
+      "uncertaintyMillis": 106
+    },
+    "stepsCompleted": 5,
+    "stepCount": 5,
+    "usable": true,
+    "failure": null,
+    "cleanupProblems": [],
+    "obs": {
+      "version": "32.2.1",
+      "websocket": "5.7.4",
+      "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+      "canvas": {
+        "width": 1024,
+        "height": 700
+      }
+    },
+    "videoBytes": 36865943
+  },
+  "inducedFailure": null,
+  "finishedAt": "2026-08-16T01:20:26.713Z",
+  "supplementaryRuns": [
+    {
+      "observations": {
+        "index": 11,
+        "correlationWithTarget": 0.9996,
+        "frameSize": {
+          "width": 1440,
+          "height": 900
+        },
+        "windowPhysical": {
+          "width": 1440,
+          "height": 900
+        },
+        "dimensionDeltaPx": 0,
+        "scaleFactor": 1,
+        "magentaFractionUnderOcclusion": 0,
+        "correlationUnderOcclusion": 1,
+        "sceneItemCount": 1,
+        "inputKinds": [
+          "window_capture"
+        ],
+        "specialInputs": {
+          "desktop1": null,
+          "desktop2": null,
+          "mic1": null,
+          "mic2": null,
+          "mic3": null,
+          "mic4": null
+        },
+        "decoyCorrelation": null,
+        "magentaFractionInDecoyCapture": null,
+        "occluder": {
+          "geometry": {
+            "x": 280,
+            "y": 130,
+            "width": 1296,
+            "height": 808,
+            "focused": true,
+            "visibility": "visible"
+          },
+          "targetLogical": {
+            "x": 240,
+            "y": 90,
+            "width": 1440,
+            "height": 900
+          },
+          "overlapFractionOfTarget": 0.808,
+          "heldFocus": true
+        },
+        "errors": []
+      },
+      "timing": {
+        "cues": 5,
+        "steps": 5,
+        "allCuesInsideRecording": false,
+        "recordingDurationMs": 49166,
+        "lastCueEndMs": 49210
+      },
+      "container": {
+        "handlers": [
+          "vide",
+          "soun"
+        ],
+        "durationSeconds": 49.166
+      },
+      "videoContaminatedByControls": false,
+      "anchor": {
+        "anchorMillis": 1786843252254,
+        "uncertaintyMillis": 108
+      },
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "usable": true,
+      "failure": null,
+      "cleanupProblems": [],
+      "obs": {
+        "version": "32.2.1",
+        "websocket": "5.7.4",
+        "window": "[Code.exe]: [Extension Development Host] Dabbler UAT fixture workspace",
+        "canvas": {
+          "width": 1440,
+          "height": 900
+        }
+      },
+      "videoBytes": 36941773
+    }
+  ],
+  "evaluation": {
+    "criteria": [
+      {
+        "id": "C1",
+        "name": "window-selection-repeatable",
+        "passed": true,
+        "detail": {
+          "minCorrelationAcrossRuns": 0.9996,
+          "threshold": 0.9,
+          "decoyCorrelation": 0.2978,
+          "decoyMustBeAtMost": 0.7
+        }
+      },
+      {
+        "id": "C2",
+        "name": "no-unrelated-desktop-pixels",
+        "passed": false,
+        "detail": {
+          "worstMagentaFractionInTarget": 0,
+          "threshold": 0.0005,
+          "detectorControl": 0.441219,
+          "detectorMustBeAtLeast": 0.5,
+          "correlationHeldUnderOcclusion": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ]
+        }
+      },
+      {
+        "id": "C3",
+        "name": "usable-resolution-under-display-scaling",
+        "passed": true,
+        "detail": {
+          "worstDimensionDeltaPx": 0,
+          "threshold": 2,
+          "baselineFrame": {
+            "width": 1440,
+            "height": 900
+          },
+          "resizedFrame": {
+            "width": 1024,
+            "height": 700
+          },
+          "resizedDeltaPx": 0,
+          "frameFollowedTheResize": true,
+          "displayScaleExercised": 1,
+          "scalingCaveat": "One display scale was exercised. A pass here is a claim about that scale and no other."
+        }
+      },
+      {
+        "id": "C4",
+        "name": "step-events-align-with-captions",
+        "passed": false,
+        "detail": {
+          "worstAnchorUncertaintyMillis": 110,
+          "threshold": 1500,
+          "cuesEqualStepCount": true,
+          "allCuesWithinRecording": false,
+          "recordingDurationsMs": [
+            57600,
+            49033,
+            49033,
+            49066,
+            49066,
+            49000,
+            49066,
+            49100,
+            49633,
+            49633
+          ]
+        }
+      },
+      {
+        "id": "C5",
+        "name": "dependency-absent-fails-clearly",
+        "passed": true,
+        "detail": [
+          {
+            "variant": "websocket-unreachable",
+            "ran": true,
+            "kind": "unreachable",
+            "mentionsObs": true,
+            "walkthroughStillCompleted": true,
+            "manifestWritten": true,
+            "osVideoArtifacts": 0
+          },
+          {
+            "variant": "websocket-auth-rejected",
+            "ran": true,
+            "kind": "auth-rejected",
+            "mentionsObs": true,
+            "walkthroughStillCompleted": true,
+            "manifestWritten": true,
+            "osVideoArtifacts": 0
+          },
+          {
+            "variant": "obs-executable-absent",
+            "ran": true,
+            "kind": "obs-not-installed",
+            "mentionsObs": true,
+            "walkthroughStillCompleted": true,
+            "manifestWritten": true,
+            "osVideoArtifacts": 0
+          }
+        ]
+      },
+      {
+        "id": "C6",
+        "name": "deterministic-cleanup",
+        "passed": true,
+        "detail": {
+          "attemptsChecked": 14,
+          "attemptsWithProblems": 0,
+          "problems": [],
+          "partWayFailuresIncluded": 3,
+          "note": "The dependency-absent variants ARE the part-way failures C6 asks for: each dies mid-setup, after OBS was launched or its config written, and must still put everything back."
+        }
+      },
+      {
+        "id": "C7",
+        "name": "no-monitor-capture-ever",
+        "passed": false,
+        "detail": {
+          "inputKindsCreated": [
+            "window_capture"
+          ],
+          "forbiddenKinds": [
+            "monitor_capture",
+            "display_capture",
+            "game_capture",
+            "dshow_input",
+            "wasapi_input_capture",
+            "wasapi_output_capture",
+            "wasapi_process_output_capture"
+          ],
+          "noForbiddenKindEverCreated": true,
+          "everySceneHeldExactlyOneSource": true,
+          "audioTracksPerRecording": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "noAudioTrack": false,
+          "audioNote": "OBS muxes an audio track regardless of configuration. No audio SOURCE exists -- a freshly created scene collection has zero inputs and every special input is null -- so the track can only carry silence. The criterion as written is nevertheless NOT met, and is reported unmet rather than reworded after the fact."
+        }
+      }
+    ],
+    "cleanRuns": 10,
+    "runsRequired": 10,
+    "barRunsMet": true,
+    "runsMeasured": 10,
+    "supplementaryRuns": 1,
+    "runsExcludedAsControlContaminated": 1,
+    "unmet": [
+      "C2",
+      "C4",
+      "C7"
+    ],
+    "verdict": "FAIL"
+  }
+}

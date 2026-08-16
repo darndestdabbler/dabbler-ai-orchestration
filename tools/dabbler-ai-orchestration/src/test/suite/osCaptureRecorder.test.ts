@@ -18,7 +18,13 @@
 // magenta absent.
 
 import * as assert from "assert";
+import * as fs from "fs";
+import * as path from "path";
 import * as zlib from "zlib";
+// A local TS import keeps this file on the CommonJS load path under
+// ts-node, which is what makes the `require` calls below legal. It earns
+// its place with a real assertion at the bottom of the file.
+import { readSessionSets } from "../../utils/fileSystem";
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const recorder = require("../../../scripts/record-vscode-walkthrough.js") as {
@@ -457,10 +463,10 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
         magentaFractionUnderOcclusion: 0,
         correlationUnderOcclusion: 0.99,
         sceneItemCount: 1,
-        inputKinds: ["window_capture"],
+        inputKinds: ["window_capture"] as string[],
         decoyCorrelation: index === 1 ? 0.11 : null,
         magentaFractionInDecoyCapture: index === 1 ? 0.82 : null,
-        errors: [],
+        errors: [] as string[],
       },
       timing: {
         cues: 5,
@@ -468,13 +474,13 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
         allCuesInsideRecording: true,
         recordingDurationMs: 46000,
       },
-      container: { handlers: ["vide"], durationSeconds: 46 },
+      container: { handlers: ["vide"] as string[], durationSeconds: 46 },
       anchor: { uncertaintyMillis: 110 },
       stepsCompleted: 5,
       stepCount: 5,
       usable: true,
       failure: null,
-      cleanupProblems: [],
+      cleanupProblems: [] as string[],
       videoBytes: 34612776,
     });
     // Shaped like the real pilot: run 1 carries the controls, so its video
@@ -501,7 +507,7 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
         walkthroughStillCompleted: true,
         manifestWritten: true,
         osVideoArtifacts: 0,
-        cleanupProblems: [],
+        cleanupProblems: [] as string[],
       })),
     };
   }
@@ -660,5 +666,38 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
     m.supplementaryRuns = [];
     m.runs[4].observations.decoyCorrelation = 0.1;
     assert.strictEqual(verdict.evaluate(m, realCriteria).cleanRuns, 8);
+  });
+});
+
+suite("Set 113 S4 - the criteria the harness resolves by path", () => {
+  test("the session set the pilot hardcodes is a real session set", () => {
+    // The harness resolves its criteria file through a hardcoded set
+    // directory and REFUSES to run when it is missing. That refusal is
+    // correct, but it turns a rename of the set directory into "the pilot
+    // will not start" with no hint as to why. This asserts the path still
+    // resolves, using the project's own session-set reader rather than a
+    // second opinion here about what a set directory looks like.
+    // `readSessionSets` takes the WORKSPACE ROOT and joins docs/session-sets
+    // itself, so this passes the root rather than the sets directory.
+    const repoRoot = path.resolve(__dirname, "..", "..", "..", "..", "..");
+    const setsRoot = path.join(repoRoot, "docs", "session-sets");
+    if (!fs.existsSync(setsRoot)) return;
+    const slugs = readSessionSets(repoRoot).map((s) => s.name);
+    assert.ok(
+      slugs.includes("113-narrated-video-walkthroughs"),
+      "the pilot's criteria path names a set that no longer exists; found " +
+        slugs.length +
+        " sets",
+    );
+    assert.ok(
+      fs.existsSync(
+        path.join(
+          setsRoot,
+          "113-narrated-video-walkthroughs",
+          "s4-pilot-criteria.json",
+        ),
+      ),
+      "the committed pass criteria are missing; the pilot would refuse to run",
+    );
   });
 });

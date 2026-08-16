@@ -59,6 +59,11 @@ const DRIVER_NAME = "playwright-vscode";
 // workbench, not a pacing knob.
 const EXPECT_TIMEOUT_MS = 20000;
 
+// How long the recording stays open after the last step. Comfortably more
+// than the 32-83ms cue overhang the pilot measured, and short enough that
+// it reads as a beat rather than a pause.
+const TAIL_HOLD_MS = 750;
+
 function log(msg) {
   console.log("[walkthrough:vscode] " + msg);
 }
@@ -409,6 +414,15 @@ async function recordVscodeWalkthrough(options) {
         connectPassword: opts.obsConnectPassword,
         launchEnabled: opts.obsLaunch !== false,
       });
+      // Cleanup ownership is handed to the `finally` block IMMEDIATELY, and
+      // that ordering is load-bearing. `configure` can fail with something
+      // that is not an ObsUnavailableError -- the refusal to guess between
+      // two matching windows is a plain Error -- and that path rethrows. If
+      // the handle were only published on success, a rethrow would leave OBS
+      // running and the operator's websocket config rewritten, with nothing
+      // holding a reference to put either back.
+      capture = session;
+
       // FAILURE TO RECORD MUST NEVER FAIL THE WALKTHROUGH. An unavailable
       // OBS degrades to the no-video path here rather than throwing out of
       // the run: the written documents are the deliverable and the video is
@@ -434,7 +448,6 @@ async function recordVscodeWalkthrough(options) {
             );
           },
         });
-        capture = session;
         result.obs = {
           version: version.obsVersion,
           websocket: version.obsWebSocketVersion,
@@ -442,7 +455,14 @@ async function recordVscodeWalkthrough(options) {
           canvas: configured.canvas,
         };
       } catch (err) {
+        // Anything that is not a missing dependency is a real failure and
+        // propagates -- with `capture` still set, so the `finally` block
+        // stops OBS and restores everything it touched.
         if (!(err instanceof ObsUnavailableError)) throw err;
+        // A missing dependency is the degraded path: put back what the
+        // failed attempt already changed, and drop the handle so the
+        // `finally` block does not clean up a second time.
+        capture = null;
         result.obsUnavailableKind = err.kind;
         result.obsUnavailableMessage = err.message;
         notes.push(
@@ -509,6 +529,20 @@ async function recordVscodeWalkthrough(options) {
     await closeEvents();
 
     if (capture) {
+      // Hold the recording open past the last caption cue before stopping.
+      //
+      // MEASURED, not guessed. The pilot's C4 criterion caught the last cue
+      // ending 32-83ms AFTER the recording did, across all eleven captures:
+      // the cue window is derived from the run-finished event, and StopRecord
+      // lands a few frames earlier than that event's timestamp. Nobody would
+      // see it -- but a caption sidecar that runs past its own video is
+      // wrong, and it is wrong in the direction that makes a player clamp or
+      // drop the final cue.
+      //
+      // The hold is worth having on its own terms too: ending on the exact
+      // frame of the last click is a hard cut, and a beat of stillness is
+      // what lets a viewer read the result they were just told to look at.
+      await page.waitForTimeout(TAIL_HOLD_MS);
       const recording = await capture.stopRecording();
       result.recording = recording;
       if (recording && recording.outputPath && fs.existsSync(recording.outputPath)) {
@@ -660,6 +694,7 @@ if (require.main === module) {
 module.exports = {
   DRIVER_NAME,
   EXPECT_TIMEOUT_MS,
+  TAIL_HOLD_MS,
   parseArgs,
   validateDriverBlock,
   locateStepTarget,

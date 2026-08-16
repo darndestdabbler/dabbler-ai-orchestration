@@ -104,11 +104,11 @@ command-line flags turns it on, so something has to write one boolean.
 - **The tool enables it and puts it back** — one less manual step, but a
   tool that silently reconfigures OBS.
 
-### C. A 46-second recording is 34.6 MB. Is that small enough?
+### C. A sub-minute recording is about 37 MB. Is that small enough?
 
-At OBS's default quality. It is comfortably inside the sub-minute
-SharePoint/Teams convention and uploads by hand without complaint, but it
-is not small.
+At OBS's default quality, consistently across the pilot's ten captures. It
+sits inside the sub-minute SharePoint/Teams convention and uploads by hand
+without complaint, but it is not small.
 
 - **Leave it** — default quality, no knob, revisit if it ever bites.
 - **Set a lower quality** — smaller files, one more setting the recorder

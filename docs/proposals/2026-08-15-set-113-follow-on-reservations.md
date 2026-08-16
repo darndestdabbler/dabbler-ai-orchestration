@@ -107,12 +107,16 @@ public consumers of the published VS Code extension or the PyPI package. If
 narrated video is ever wanted for those audiences, it is a different
 channel and a different decision.
 
-**A Session 4 datum for whoever picks this up.** A 46-second capture of the
-Work Explorer at 1440x900, recorded with OBS's default simple-output
-quality, came out at **34.6 MB**. That is fine for manual upload and
-comfortably inside the sub-minute convention, but it is not small, and
-anyone who wants many of these should expect to set a recording quality
-rather than take the default.
+**A Session 4 datum for whoever picks this up.** A sub-minute capture of
+the Work Explorer at 1440x900, recorded at OBS's default simple-output
+quality, comes out around **37 MB** — consistently, across the pilot's ten.
+That uploads by hand without complaint and sits inside the sub-minute
+convention, but it is not small, and anyone who wants many of these should
+expect to set a recording quality rather than take the default.
+
+(The duration is deliberately not restated here. It is derived from the
+scenario source and rendered into all four generated documents; Session 2
+learned that repeating it in prose gives it somewhere to drift.)
 
 ---
 

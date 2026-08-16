@@ -95,6 +95,12 @@
       "severity": "minor",
       "summary": "The Session 4 verification conventions block stated two suite baselines from memory and got both wrong -- mocha '~1821' (that figure belongs to a whole-src glob, not this suite's declared command; the real number is 1548) and Layer 3 '28 specs' (37). Neither error favoured this session; both understated the coverage that ran. Recorded rather than quietly corrected, because a conventions block exists to stop rounds burning findings on the agreed baseline and one carrying wrong numbers does that job worse.",
       "owner": "recorded; fix the habit, not the file"
+    },
+    {
+      "id": "S4-R9",
+      "severity": "minor",
+      "summary": "THE ADVISORY PATH-AWARE CRITIQUE COULD NOT REACH TWO PROVIDERS ON THIS SEAT, so no path-aware-critique.json was produced. Three attempts, google succeeding every time and openai failing every time, in two distinct ways: (1) the default openai critic raised DeterministicServantViolation -- 'grep: tool result does not match raw ground truth' -- which is the servant-integrity guard correctly refusing a critic that paraphrased tool output rather than reporting its bytes; (2) openai pinned to gpt-5-6-sol and then to gpt-5-5 both returned HTTP 400 from https://api.openai.com/v1/responses. The second is the sharper signal: the SAME openai models answered five session-verification calls in this session without trouble, so the ordinary routed path works while the pull-critique path (tool-using, Responses API) does not. That is a router-side defect worth its own look, not a provider outage. The gate is ADVISORY and does not block the close; the documented manual flow (two clean-context passes in a Copilot editor) remains available. Not worked around by using anthropic as the second critic: anthropic is this orchestrator's own provider, and manufacturing a passing artifact from a same-provider second opinion would satisfy the letter of '>= 2 distinct providers' while defeating the independence it exists for.",
+      "owner": "a follow-on look at the pull-critique openai transport"
     }
   ],
   "next_orchestrator": null,

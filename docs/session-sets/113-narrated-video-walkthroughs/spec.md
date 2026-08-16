@@ -22,6 +22,11 @@
 > `uatScope: per-set`. The four entries are the human-observable surfaces
 > Sessions 2-4 create, read off this spec's own Creates lines. Journaled
 > in `decisions.jsonl`.
+> **Amended 2026-08-16** (Session 4): a fifth `uatComponents` entry for the
+> containerised capture path Session 5 may create. Same reasoning as the
+> first amendment — the inventory has to name what the terminal session
+> will owe an accounting for, or an omitted component becomes the new form
+> of evaporation. It does **not** change an arming flag. Journaled.
 > **Prerequisites:** Set 112 complete (operator sequencing decision, 2026-08-08).
 > **Session Set:** `docs/session-sets/113-narrated-video-walkthroughs/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
@@ -55,11 +60,12 @@ requiresUAT: true         # A set whose deliverable IS the UAT experience must b
 requiresE2E: true         # Sessions 3 and 4 drive real rendering surfaces (a browser fixture and the Extension Development Host).
 uatStyle: ad-hoc
 uatScope: per-set
-uatComponents:            # Set 113 S1's own gate, applied to this set. Session 4 owes one record per line.
+uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 6) owes one record per line.
   - Rendered walkthrough and training document
   - Static generated index
   - Recorded web scenario
   - Windows OS-capture pilot
+  - Containerised capture path   # added 2026-08-16 with Session 5; journaled
 pathAwareCritique: advisory
 prerequisites:
   - slug: 112-remove-lightweight-tier
@@ -148,7 +154,7 @@ truthful record.
 
 ## Sessions
 
-### Session 1 of 4: Truthful UAT accounting
+### Session 1 of 6: Truthful UAT accounting
 
 The gate first, because it is the part that is useful even if every later
 session is cancelled.
@@ -185,7 +191,7 @@ session is cancelled.
 
 ---
 
-### Session 2 of 4: Portable scenario source and standalone rendering
+### Session 2 of 6: Portable scenario source and standalone rendering
 
 **Steps:**
 
@@ -216,7 +222,7 @@ session is cancelled.
 
 ---
 
-### Session 3 of 4: Browser recording proof
+### Session 3 of 6: Browser recording proof
 
 The portable recording path, proved where the framework's actual products
 live. **Not** against this repo's extension.
@@ -251,7 +257,7 @@ live. **Not** against this repo's extension.
 
 ---
 
-### Session 4 of 4: Bounded Windows OS-capture dogfood
+### Session 4 of 6: Bounded Windows OS-capture dogfood
 
 **Strictly bounded. One session. It ends in a measurement either way.**
 
@@ -315,6 +321,102 @@ tooling on its own product.
 
 ---
 
+### Session 5 of 6: Containerised capture — measure the isolation
+
+**Added 2026-08-16 on operator direction**, after Session 4 put two large
+open-source media stacks (OBS Studio, ffmpeg) into this framework's
+documented prerequisites. The operator's framing:
+
+> *"Especially in the age of AI-powered exploitation of software
+> vulnerabilities, open source software is generally considered more risky.
+> Yes, OBS Studio is also open source. What we may want to consider is this
+> — whatever system we end up using — if possible, use it in a container to
+> limit the risk."*
+
+**The operator also supplied the shape that makes it tractable**, and it
+corrects this spec's first framing of the problem. Session 4's reservation
+said a container cannot capture a *host* window without being handed back
+most of the isolation — true, and the wrong question. The operator's
+proposal is to **put both the target and the capturer inside**: VS Code and
+OBS in the same container, capturing a display that never leaves it. Then
+no capture crosses the boundary, and the media stack never sees host
+pixels, host windows or host devices. That is the right shape.
+
+**Steps:**
+
+1. Register.
+2. **Set the pass criteria before the first container run.** Session 4's
+   discipline, reused deliberately: criteria committed first, read by the
+   harness, digest stamped into the measurement. Reuse `s4-pilot-criteria`
+   where the claims are the same — this is the same capture, somewhere
+   else — and state plainly which criteria a container cannot be asked to
+   meet.
+3. **Measure the cheap mitigation first.** OBS ships
+   `--only-bundled-plugins`. Session 4 observed the operator's install
+   loading a DeckLink SDK, an NVIDIA filters plugin, a CEF browser source
+   and an ML background-removal model, none of which this framework wants.
+   Measure the plugin surface with and without the flag **before** building
+   anything: if it buys most of the risk reduction, the container may not
+   be worth its cost, and that is a real answer.
+4. **Build the container and measure what it costs.** VS Code and OBS on a
+   virtual display inside Podman, driven by the existing Layer 3 machinery.
+   This repo already has `ai_router/podman_sandbox.py` (Set 069 S4) built
+   on the same principle — the container as the trust boundary.
+5. **Name the fidelity trade honestly, because it is the real cost.**
+   Podman on Windows is a Linux VM, so this records **Linux VS Code**, not
+   the Windows VS Code staff actually run. For proving the extension works
+   that is mostly fine; for a *training* video it is a different product on
+   screen. Decide which the artifact is for, and say so.
+6. **Cross-provider verification.**
+7. **Required portion of the full test suite.**
+8. **Close-out.**
+
+**Creates:** the isolation measurements, the plugin-surface comparison, and (only if it earns it) a container capture path
+**Touches:** `tools/dabbler-ai-orchestration/scripts/`, `ai_router/podman_sandbox.py`, `docs/`
+**Ends with:** a measured answer on whether the capture dependencies can be isolated, what that costs in fidelity, and whether the cheap mitigation dominates.
+**Progress keys:** `isolationCriteriaSet`, `pluginSurfaceMeasured`, `containerRunMeasured`, `fidelityTradeRecorded`
+
+---
+
+### Session 6 of 6: Why the pull critique could not reach two providers
+
+**Added 2026-08-16 on operator direction.** Session 4's advisory
+path-aware critique produced **no artifact** across three attempts: google
+succeeded every time, openai failed every time, in two distinct ways.
+
+**Steps:**
+
+1. Register.
+2. **Reproduce both failures before changing anything.** (a) The default
+   openai critic raised `DeterministicServantViolation` — *"grep: tool
+   result does not match raw ground truth"* — the servant-integrity guard
+   refusing a critic that paraphrased tool output instead of reporting its
+   bytes. (b) Pinned to `gpt-5-6-sol` and then `gpt-5-5`, openai returned
+   **HTTP 400** from `https://api.openai.com/v1/responses`.
+3. **Start from the sharpest fact, which is already known.** The *same*
+   openai models answered five `session-verification` calls in Session 4
+   without trouble. So the ordinary routed path works and the
+   pull-critique path does not — this is a router-side defect, not a
+   provider outage, and the difference between the two transports is where
+   the answer is.
+4. **Judge the servant violation on its merits, separately.** A critic that
+   summarises its own evidence is exactly what that guard exists to catch,
+   so (a) may be the guard working correctly rather than a bug. Say which.
+5. **Ship a falsifier, not just a fix** (L-112-1): a test that plants the
+   failing transport shape and asserts the critique refuses, and one that
+   plants the legitimate shape and asserts it does not.
+6. **Cross-provider verification.**
+7. **Required portion of the full test suite.**
+8. **Close-out**, including this set's `change-log.md` refresh and the
+   Step 9 review — this is now the set-terminal session.
+
+**Creates:** the reproduction, the diagnosis, and the fix or a documented refusal
+**Touches:** `ai_router/pull_critique.py`, `ai_router/pull_verifier.py`, `ai_router/providers.py`, `ai_router/tests/`
+**Ends with:** the automated path-aware critique either reaches two providers on this seat, or the reason it cannot is written down where the next session will find it.
+**Progress keys:** `failuresReproduced`, `transportDiagnosed`, `falsifierShipped`, `outcomeRecorded`
+
+---
+
 ## End-of-set deliverables
 
 - A UAT record that states, per component, what was done and by whom — with
@@ -329,6 +431,13 @@ tooling on its own product.
 - Reservations for the follow-on sets, with their triggers stated.
 
 ## Follow-on sets to reserve, not to build here
+
+> **Two reservations were promoted into this set on 2026-08-16**, on
+> operator direction, and are therefore **no longer reserved**: sandboxing
+> the capture dependencies became **Session 5**, and the pull-critique
+> transport failure became **Session 6**. The full reservation record,
+> including the three that remain reserved and their triggers, is
+> [`docs/proposals/2026-08-15-set-113-follow-on-reservations.md`](../../proposals/2026-08-15-set-113-follow-on-reservations.md).
 
 - **Independent Black-Box UI Critique** — provider-diverse exploratory web
   E2E against the common-mode self-verification failure. Web-only to start;

@@ -24,14 +24,16 @@ standing complexity note warns about (*"this could quickly become dozens of
 sets with thousands of lines of code"*).
 
 So each entry below states its trigger **and whether that trigger is
-satisfied today**. Two are.
+satisfied today**. **Two have since been promoted into Set 113 itself** —
+sandboxing as Session 5 and the pull-critique transport failure as Session
+6 — leaving three genuinely reserved, none of whose triggers is met.
 
 ---
 
 ## 1. Independent Black-Box UI Critique
 
-**Trigger: a standing concern, satisfied today.** One of two whose trigger
-is already met (the other is entry 5).
+**Trigger: a standing concern, satisfied today.** The only *reserved* set
+whose trigger is met, now that entry 5 has been promoted into Set 113.
 
 Provider-diverse exploratory web E2E against what round 3 of the Set 113
 consults named **common-mode self-verification failure** — the operator's
@@ -143,10 +145,22 @@ reason.
 
 ---
 
-## 5. Sandboxing the Capture Dependencies (added 2026-08-16, operator)
+## 5. Sandboxing the Capture Dependencies — PROMOTED to Set 113 Session 5
 
-**Trigger: a standing security concern, satisfied today.** The second of
-the five whose trigger is already met.
+> **No longer reserved.** The operator promoted this into Set 113 itself
+> on 2026-08-16, as **Session 5**. Everything below is retained because it
+> is that session's brief, not because it is still waiting for a trigger.
+>
+> **The operator also supplied the shape that makes it tractable, and it
+> corrects the framing below.** The objection recorded here — that a
+> container cannot capture a *host* window without being handed back most
+> of the isolation — is true and is the wrong question. Put **both** the
+> target and the capturer inside: VS Code and OBS in one container,
+> capturing a display that never leaves it. No capture crosses the
+> boundary, and the media stack never sees host pixels, windows or devices.
+> The cost is fidelity, not feasibility: Podman on Windows is a Linux VM,
+> so what gets recorded is Linux VS Code rather than the Windows VS Code
+> staff actually run.
 
 ### The operator's framing
 
@@ -220,3 +234,20 @@ finish.
 
 **Do not let this become the generic-recorder set in disguise.** The
 complexity note binds here too.
+
+
+---
+
+## 6. The pull-critique transport failure — PROMOTED to Set 113 Session 6
+
+> **No longer reserved.** Promoted by the operator on 2026-08-16 as Set 113
+> **Session 6**, after Session 4's advisory path-aware critique produced no
+> artifact across three attempts.
+
+Recorded here so the reservation list stays a complete index of what came
+out of this set. The brief lives in the spec; the evidence is Session 4's
+residual **S4-R9**. The sharpest fact to start from: the *same* openai
+models answered five `session-verification` calls in Session 4 without
+trouble, so the ordinary routed path works while the pull-critique path
+(tool-using, Responses API) returns HTTP 400 — a router-side defect rather
+than a provider outage.

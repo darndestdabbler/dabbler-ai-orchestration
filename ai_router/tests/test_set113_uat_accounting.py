@@ -655,14 +655,30 @@ class TestInventoryParserFailsTowardDeclaringMore:
             "Static index",
         )
 
-    def test_this_sets_own_spec_declares_its_four_components(self):
+    def test_this_sets_own_spec_declares_its_components_cleanly(self):
+        """The parser against this repository's own live spec.
+
+        Asserting the exact NAMES rather than a count, because a count is a
+        drift surface that says nothing useful when it breaks: Set 113 grew
+        from four sessions to six on 2026-08-16 and the inventory grew with
+        it, which turned `len == 4` into a failure that looked like a parser
+        bug and was not. The names catch strictly more -- a dropped entry, a
+        reordered one, and a trailing `#` comment the parser failed to
+        strip, which is the defect this test was written for. The last entry
+        carries such a comment in the spec on purpose.
+        """
         cfg = parse_session_set_config(
             pathlib.Path(
                 "docs/session-sets/113-narrated-video-walkthroughs/spec.md"
             )
         )
-        assert cfg.uat_components is not None
-        assert len(cfg.uat_components) == 4
+        assert cfg.uat_components == (
+            "Rendered walkthrough and training document",
+            "Static generated index",
+            "Recorded web scenario",
+            "Windows OS-capture pilot",
+            "Containerised capture path",
+        )
         assert all("#" not in c for c in cfg.uat_components)
 
 

@@ -432,6 +432,22 @@
       "dateTime": "2026-08-15T21:43:47.272205-04:00",
       "description": "Outcome recorded either way, as the spec requires. Machine verdict FAIL on C2 and C7; the spec own bar -- ten consecutive clean captures, no wrong-window capture, no privacy leakage -- was met. C2 leakage measured exactly zero while its detector CONTROL came in at 0.441 against a 0.50 bar, because the occluder doubles as C1 structured decoy and includes browser chrome; deliberately NOT retuned, since adjusting the instrument to pass is the same sin as moving the threshold. C7 cannot be satisfied through OBS at all: four configurations tried, a silent audio track is always muxed. Recorder ships PROVISIONALLY -- waiving a criterion reduces verification, which is inside the hard carve-out, so it goes to the operator as guided-look item A. Six residuals recorded; four follow-on sets reserved with triggers, one of which is satisfied today.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification-including-the-adviso",
+      "dateTime": "2026-08-16T04:40:11.269216-04:00",
+      "description": "Five verification rounds. Round 1 two-lens discovery (8 blocking), round 2 supplementary (1), rounds 3-4 remediation review, round 5 an OPERATOR-AUTHORIZED round that returned VERIFIED with 0 findings and 0 fix verdicts rejected. Seven distinct defects found and fixed, none disputed -- including two in the instruments built to prevent false positives, and a recorder gate that took three attempts because the first two were prose and a warning rather than a gate. The ADVISORY path-aware critique produced no artifact: google succeeded three times, openai failed three times (once on the servant-integrity guard, twice HTTP 400 from the Responses API while the same models answered five verification calls fine). Recorded as S4-R9 and promoted to Session 6 rather than worked around with a same-provider second critic.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-16T04:40:11.269216-04:00",
+      "description": "All three expensive suites run after the last code change and recorded: pytest 4986 passed / 5 skipped / 1 xfailed (at the operator 8-worker cap, route journaled per G-004), mocha 1548 passed, Layer 3 playwright 37 passed. Extending the uatComponents inventory broke Set 113 S1 own test, which pinned this spec at four components -- fixed by asserting the exact NAMES instead of a count, which catches strictly more (a dropped entry, a reordered one, and the trailing-comment strip the test was written for) and removes the drift surface.",
+      "status": "complete"
     }
   ]
 }

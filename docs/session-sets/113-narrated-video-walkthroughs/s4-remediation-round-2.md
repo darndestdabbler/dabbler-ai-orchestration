@@ -123,14 +123,11 @@ reference. Two falsifiers pin it.
 
 *(finding 2)*
 
-Accepted as a real gap in the record, and closed by **recording it rather
-than by doing it**. ffmpeg is not installed on this machine, and installing
-software on the operator's machine is their decision. The outcome document
-now carries a section stating that, the argument that the fallback's
-trigger is arguably unmet (OBS did not fail at *capture*), and the
-hypothesis worth having for whoever runs it: `-an` would satisfy C7's
-unmet audio clause, while GDI capture would very likely fail C1 and C2 for
-the reasons that made OBS primary. Residual **S4-R7**.
+Accepted as a real gap in the record. The first attempt closed it by
+**recording it rather than doing it**, and **round 3 rejected that** — see
+the round 3 section below, which supersedes this paragraph. The finding is
+now **open and escalated to the operator**, with the reachability facts
+measured rather than asserted. Residual **S4-R7**.
 
 ---
 
@@ -147,7 +144,7 @@ record.
 
 ## Tests
 
-51 passing. Nine new falsifiers cover the two evaluator defects: C6 refuses
+54 passing after round 3 (51 at the end of round 2). Nine falsifiers cover the two evaluator defects: C6 refuses
 to pass on setup failures alone, on a missing induction point, on a
 leftover process, collection or unrestored config, and — the half that
 matters most — on a capture failure that cleaned up perfectly while

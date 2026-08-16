@@ -1,0 +1,238 @@
+{
+  "measuredAt": "2026-08-16T10:35:41.415Z",
+  "set": "113-narrated-video-walkthroughs",
+  "session": 5,
+  "step": "5 - build the container and measure what it costs",
+  "criteriaSha256": "sha256:51c8fc41b56a5ae8c072e4b23270dbacc2e77add7b06b4961c73ec2719741985",
+  "podmanExe": "C:\\Users\\denmi\\AppData\\Local\\Programs\\Podman\\podman.exe",
+  "podmanVersion": "podman version 6.0.2",
+  "machineStateOnEntry": "podman-machine-default*:true",
+  "image": "dabbler-capture-base:s5",
+  "display": "1280x800",
+  "recordSeconds": 12,
+  "runs": [
+    {
+      "index": 0,
+      "mode": "magenta-control",
+      "name": "s5-run-magenta-control-0",
+      "exitStatus": 0,
+      "wallClockSeconds": 17.9,
+      "facts": {
+        "display_geometry": "1280x800",
+        "dev_video_nodes": "0",
+        "dev_snd_nodes": "0",
+        "dev_dri_nodes": "0",
+        "host_x11_socket_present": "no",
+        "mode": "magenta-control",
+        "target_process_count": "0",
+        "mapped_window_count": "0",
+        "mapped_window_names": "",
+        "ffmpeg_exit": "0",
+        "capture_bytes": "19265",
+        "still_bytes": "4938",
+        "frame_count": "12"
+      },
+      "structural": {
+        "argv": "podman run --name s5-run-magenta-control-0 dabbler-capture-base:s5 1280 800 12 /out magenta-control",
+        "forbiddenFlagsPresent": [],
+        "forbiddenMountsPresent": [],
+        "bindMountCount": 0
+      },
+      "analysis": {
+        "frameCount": 12,
+        "maxMagentaFraction": 0.99974609375,
+        "minCorrelationToInside": 0.9845926724470982,
+        "minFrameStdDev": 0.02524693526861898,
+        "frameDimensions": "1280x800",
+        "insideDimensions": "1280x800"
+      },
+      "tracks": {
+        "handlers": [
+          "vide"
+        ],
+        "durationSeconds": 12
+      },
+      "cleanup": {
+        "removeStatus": 0,
+        "containerStillListed": false,
+        "volumeCount": 0
+      }
+    },
+    {
+      "index": 1,
+      "mode": "target",
+      "name": "s5-run-target-1",
+      "exitStatus": 0,
+      "wallClockSeconds": 29.5,
+      "facts": {
+        "display_geometry": "1280x800",
+        "dev_video_nodes": "0",
+        "dev_snd_nodes": "0",
+        "dev_dri_nodes": "0",
+        "host_x11_socket_present": "no",
+        "mode": "target",
+        "target_process_count": "13",
+        "mapped_window_count": "4",
+        "mapped_window_names": "Welcome - capture - Visual Studio Code|code|Chromium clipboard",
+        "ffmpeg_exit": "0",
+        "capture_bytes": "79739",
+        "still_bytes": "98933",
+        "frame_count": "12"
+      },
+      "structural": {
+        "argv": "podman run --name s5-run-target-1 dabbler-capture-base:s5 1280 800 12 /out target",
+        "forbiddenFlagsPresent": [],
+        "forbiddenMountsPresent": [],
+        "bindMountCount": 0
+      },
+      "analysis": {
+        "frameCount": 12,
+        "maxMagentaFraction": 0,
+        "minCorrelationToInside": 0.9995511346597021,
+        "minFrameStdDev": 13.621414766743444,
+        "frameDimensions": "1280x800",
+        "insideDimensions": "1280x800",
+        "decoyCorrelation": 0.3442876785625273
+      },
+      "tracks": {
+        "handlers": [
+          "vide"
+        ],
+        "durationSeconds": 12
+      },
+      "cleanup": {
+        "removeStatus": 0,
+        "containerStillListed": false,
+        "volumeCount": 0
+      }
+    },
+    {
+      "index": 2,
+      "mode": "target",
+      "name": "s5-run-target-2",
+      "exitStatus": 0,
+      "wallClockSeconds": 29.5,
+      "facts": {
+        "display_geometry": "1280x800",
+        "dev_video_nodes": "0",
+        "dev_snd_nodes": "0",
+        "dev_dri_nodes": "0",
+        "host_x11_socket_present": "no",
+        "mode": "target",
+        "target_process_count": "13",
+        "mapped_window_count": "4",
+        "mapped_window_names": "Welcome - capture - Visual Studio Code|code|Chromium clipboard",
+        "ffmpeg_exit": "0",
+        "capture_bytes": "79739",
+        "still_bytes": "98933",
+        "frame_count": "12"
+      },
+      "structural": {
+        "argv": "podman run --name s5-run-target-2 dabbler-capture-base:s5 1280 800 12 /out target",
+        "forbiddenFlagsPresent": [],
+        "forbiddenMountsPresent": [],
+        "bindMountCount": 0
+      },
+      "analysis": {
+        "frameCount": 12,
+        "maxMagentaFraction": 0,
+        "minCorrelationToInside": 0.9995511346597021,
+        "minFrameStdDev": 13.621414766743444,
+        "frameDimensions": "1280x800",
+        "insideDimensions": "1280x800",
+        "decoyCorrelation": 0.3442876785625273
+      },
+      "tracks": {
+        "handlers": [
+          "vide"
+        ],
+        "durationSeconds": 12
+      },
+      "cleanup": {
+        "removeStatus": 0,
+        "containerStillListed": false,
+        "volumeCount": 0
+      }
+    },
+    {
+      "index": 3,
+      "mode": "target",
+      "name": "s5-run-target-3",
+      "exitStatus": 0,
+      "wallClockSeconds": 29.5,
+      "facts": {
+        "display_geometry": "1280x800",
+        "dev_video_nodes": "0",
+        "dev_snd_nodes": "0",
+        "dev_dri_nodes": "0",
+        "host_x11_socket_present": "no",
+        "mode": "target",
+        "target_process_count": "13",
+        "mapped_window_count": "4",
+        "mapped_window_names": "Welcome - capture - Visual Studio Code|code|Chromium clipboard",
+        "ffmpeg_exit": "0",
+        "capture_bytes": "81126",
+        "still_bytes": "98072",
+        "frame_count": "12"
+      },
+      "structural": {
+        "argv": "podman run --name s5-run-target-3 dabbler-capture-base:s5 1280 800 12 /out target",
+        "forbiddenFlagsPresent": [],
+        "forbiddenMountsPresent": [],
+        "bindMountCount": 0
+      },
+      "analysis": {
+        "frameCount": 12,
+        "maxMagentaFraction": 0,
+        "minCorrelationToInside": 0.9995333670374815,
+        "minFrameStdDev": 13.606339189720137,
+        "frameDimensions": "1280x800",
+        "insideDimensions": "1280x800",
+        "decoyCorrelation": 0.34456338659393143
+      },
+      "tracks": {
+        "handlers": [
+          "vide"
+        ],
+        "durationSeconds": 12
+      },
+      "cleanup": {
+        "removeStatus": 0,
+        "containerStillListed": false,
+        "volumeCount": 0
+      }
+    }
+  ],
+  "cost": {
+    "imageBuildSeconds": 1.5,
+    "imageBytes": 1722328146,
+    "note": "Build time is a WARM number: the base image and apt metadata were already local from earlier builds in this session. A cold build on a fresh machine pays a download this does not measure, and the difference is not estimated here because it was not observed."
+  },
+  "magentaControl": {
+    "magentaFraction": 0.99974609375,
+    "fired": true
+  },
+  "inducedVariants": [
+    {
+      "variant": "podman-executable-absent",
+      "induced": "invoked a path that does not exist",
+      "failed": true,
+      "message": "spawnSync C:\\Users\\denmi\\AppData\\Local\\Temp\\definitely-not-podman.exe ENOENT"
+    },
+    {
+      "variant": "podman-machine-unreachable",
+      "induced": "pointed the client at a non-existent connection, INSTEAD OF stopping the operator's machine, which is state this harness does not own",
+      "substitutionDeclared": true,
+      "failed": true,
+      "message": "Error: read cli flags: connection \"definitely-not-a-connection\" not found"
+    },
+    {
+      "variant": "image-absent",
+      "induced": "ran a tag that was never built",
+      "failed": true,
+      "message": "Error: unable to copy from source docker://localhost/definitely-no-such-image:s5: initializing source docker://localhost/definitely-no-such-image:s5: fetching manifest s5 in localhost/definitely-no-such-image: pinging container registry localhost: Get \"https://localhost/v2/\": dial tcp 127.0.0.1:443:"
+    }
+  ],
+  "machineStateOnExit": "podman-machine-default*:true",
+  "machineLeftInEntryState": true
+}

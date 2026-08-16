@@ -87,3 +87,4 @@ ai_router/pricing-proposal.json
 # never in CI, because a headless runner records a different thing than the
 # operator's machine shows.
 tools/dabbler-ai-orchestration/.walkthrough-runs/
+tools/dabbler-ai-orchestration/.s5-scratch/

@@ -1,0 +1,98 @@
+{
+  "verdict": "PASS",
+  "scoredAt": "2026-08-16T10:38:43.258Z",
+  "criteriaSha256": "sha256:51c8fc41b56a5ae8c072e4b23270dbacc2e77add7b06b4961c73ec2719741985",
+  "measurementCriteriaSha256": "sha256:51c8fc41b56a5ae8c072e4b23270dbacc2e77add7b06b4961c73ec2719741985",
+  "barRunsRequired": 3,
+  "cleanRunsObserved": 3,
+  "criteriaUnmet": [],
+  "results": {
+    "I1": {
+      "name": "host-is-invisible",
+      "pass": true,
+      "measured": {
+        "worstHostPixelFraction": 0,
+        "positiveControl": 0.99974609375,
+        "structuralAssertionsClean": true,
+        "bindMountsUsed": 0
+      },
+      "bar": {
+        "maxMagentaFractionInFrames": 0.0005,
+        "minMagentaFractionInPositiveControl": 0.5
+      }
+    },
+    "I2": {
+      "name": "target-is-actually-visible",
+      "pass": true,
+      "measured": {
+        "minCorrelationToInside": 0.9995333670374815,
+        "worstDecoyCorrelation": 0.34456338659393143,
+        "minFrameStdDev": 13.606339189720137
+      },
+      "bar": {
+        "minCorrelation": 0.9,
+        "decoyMaxCorrelation": 0.7,
+        "minFrameStdDev": 8
+      }
+    },
+    "I3": {
+      "name": "usable-resolution",
+      "pass": true,
+      "measured": {
+        "worstDimensionDeltaPx": 0,
+        "geometries": [
+          "1280x800",
+          "1280x800",
+          "1280x800"
+        ]
+      },
+      "bar": {
+        "maxDimensionDeltaPx": 2
+      }
+    },
+    "I4": {
+      "name": "no-camera-no-audio-no-host-display",
+      "pass": true,
+      "measured": {
+        "noDevVideoNodes": true,
+        "noDevSndNodes": true,
+        "noHostX11SocketPresent": true,
+        "recordingMustHaveNoAudioTrack": true,
+        "allFactsObserved": true
+      }
+    },
+    "I5": {
+      "name": "dependency-absent-fails-clearly",
+      "pass": true,
+      "measured": {
+        "variantsDeclared": 3,
+        "variantsRun": 3,
+        "allFailedWithAMessage": true,
+        "substitutionsDeclared": [
+          "podman-machine-unreachable"
+        ]
+      }
+    },
+    "I6": {
+      "name": "deterministic-cleanup",
+      "pass": true,
+      "measured": {
+        "containersStillListed": 0,
+        "maxVolumeCount": 0,
+        "machineLeftInEntryState": true
+      }
+    },
+    "I7": {
+      "name": "cost-is-recorded",
+      "pass": null,
+      "scored": false,
+      "measured": {
+        "imageBuildSeconds": 1.5,
+        "imageBytes": 1722328146,
+        "note": "Build time is a WARM number: the base image and apt metadata were already local from earlier builds in this session. A cold build on a fresh machine pays a download this does not measure, and the difference is not estimated here because it was not observed."
+      },
+      "note": "Recorded rather than scored, exactly as the criteria say. The cost decision is the operator's."
+    }
+  },
+  "honestFail": "Any of I1 through I6 unmet, or fewer than three consecutive clean runs, is a FAIL. A fail ships no container capture path; the measurements are the deliverable, manual-only degradation stays intact, and the Session 4 host path -- itself already gated closed on its own FAIL -- is not disturbed either way. I1 unmet is worse than a fail: it would mean the container does not deliver the one thing it exists for, and it must be reported in those words."
+}

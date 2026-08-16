@@ -1,0 +1,72 @@
+# Set 113 Session 5 -- the capture container, base layer.
+#
+# VS Code and a capturer on a virtual display that never leaves the
+# container. The operator's framing, 2026-08-16: put BOTH the target and the
+# capturer inside, and no capture crosses the boundary.
+#
+# INTERNAL AND EXPLICITLY UNSTABLE. This is a measurement rig, not a shipped
+# capability. Nothing outside Session 5's harness should depend on it.
+#
+# Deliberately NOT here:
+#   - No X11 socket from the host, no /dev/dri, no /dev/snd, no /dev/video*.
+#     The whole claim is that these are absent, and the criteria assert it.
+#   - No window manager. Electron maps its own top-level window on a bare X
+#     server; a WM would be more surface for no measured benefit. If a
+#     window fails to map, that is a finding to record, not a dependency to
+#     add reflexively.
+#   - No GPU. Mesa's software rasteriser is the point: a container that
+#     needed the host's GPU would be handed back a device node, which is
+#     exactly the isolation this session is testing.
+FROM docker.io/library/debian:13-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# xvfb          the virtual display that never leaves the container
+# x11-utils     xdpyinfo/xwininfo, so geometry and mapped windows are READ
+#               rather than assumed
+# x11-xserver-utils  xsetroot, used ONLY to paint the root window magenta for
+#               criterion I1's positive control -- the control has to come
+#               out of the same capture pipeline as the measurement, or it
+#               proves the detector works on some other path
+# ffmpeg        the capturer for this layer (x11grab) and the frame extractor
+# ca-certificates/gpg/wget  only to add Microsoft's signed VS Code repo
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      xvfb \
+      x11-utils \
+      x11-xserver-utils \
+      ffmpeg \
+      ca-certificates \
+      gpg \
+      wget \
+ && rm -rf /var/lib/apt/lists/*
+
+# VS Code from Microsoft's own signed repository rather than a downloaded
+# .deb, so the image is reproducible from a package name instead of a URL
+# that rots.
+RUN wget -qO- https://packages.microsoft.com/keys/microsoft.asc \
+      | gpg --dearmor > /usr/share/keyrings/microsoft.gpg \
+ && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/code stable main" \
+      > /etc/apt/sources.list.d/vscode.list \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends code \
+ && rm -rf /var/lib/apt/lists/*
+
+# A non-root user, because VS Code refuses to run as root without
+# --no-sandbox, and disabling the sandbox to work around a choice we control
+# would be trading away a real protection for convenience inside the very
+# session whose subject is isolation.
+RUN useradd --create-home --shell /bin/bash capture \
+ && mkdir -p /out && chown capture:capture /out
+USER capture
+WORKDIR /home/capture
+
+COPY --chown=capture:capture run-capture.sh /home/capture/run-capture.sh
+# Strip CR unconditionally. This repo is developed on Windows, so a checkout
+# can hand the build a CRLF shell script -- which fails as `$'': command
+# not found` on the first line and a syntax error on the last, a message that
+# says nothing about line endings. Cheaper to normalise here than to depend
+# on every future clone having the right .gitattributes.
+RUN sed -i 's/\r$//' /home/capture/run-capture.sh
+
+ENTRYPOINT ["/bin/bash", "/home/capture/run-capture.sh"]

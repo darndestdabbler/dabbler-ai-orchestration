@@ -618,6 +618,38 @@
       "dateTime": "2026-08-16T06:19:58.601433-04:00",
       "description": "MEASURED, and the cheap mitigation does NOT dominate. OBS --only-bundled-plugins removes exactly ONE module of 25 (obs-backgroundremoval.dll, 4 percent by module count) and OBS logs \"Third-party plugins disabled.\" to confirm the flag took effect. What SURVIVES the flag is the point: 24 bundled modules totalling 317 MB, including obs-browser.dll (a full embedded Chromium/CEF), win-dshow.dll (the DirectShow camera path), the DeckLink SDK, NVIDIA video-effects filters, a VST plugin host, VLC integration and obs-websocket (a scriptable remote-control server). By bytes the removal is larger than by count - the machine-wide plugin dir is 101 MB, mostly one ONNX background-removal model - and both denominators are reported rather than the flattering one. Measured two ways that could have disagreed: static enumeration of all three Windows plugin locations, and OBS launched twice with its own log read back. Harness: scripts/measure-obs-plugin-surface.js, refuses to run without the criteria file and stamps its SHA-256. A parser defect was found and fixed mid-measurement - the first cut matched raw indentation and reported 0 modules for two launches that had plainly loaded 25, because every OBS log line carries a timestamp prefix; that is a defect which reads exactly like a finding, and it is documented in the function it broke.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 3,
+      "stepKey": "read-the-operator-s-2026-08",
+      "dateTime": "2026-08-16T06:40:41.587871-04:00",
+      "description": "Read before ordering the work, and it changed the order. The operator note reframes the risk as CAPABILITY (a recorder is a facility for an AI-driven process to read the operator display) rather than supply chain, so the plugin measurement runs first because the spec says so and because it may dominate on the supply-chain axis, while knowing it does NOTHING for the capability risk. The Linux fidelity cost is accepted by operator ruling; this session states it in the outcome rather than solving it.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 5,
+      "stepKey": "build-the-container-and-measure-what",
+      "dateTime": "2026-08-16T06:40:41.587871-04:00",
+      "description": "BUILT AND MEASURED. VS Code on Xvfb inside Podman, captured by ffmpeg x11grab, with ZERO bind mounts - artifacts come out via podman cp afterwards, because a bind mount is a hole in the boundary being measured. Machine verdict PASS: six of six scored criteria, three of three clean runs, scored by a SEPARATE script (container-isolation-verdict.js) that reads the criteria and cannot produce measurements, and refuses to score if the stamped criteria digest no longer matches the file. I1 host-pixel fraction 0.000000 with the detector control at 0.999746; I2 correlation 0.9995, decoy 0.3446, frame stddev 13.61; I3 zero pixel delta; I4 no /dev/video, no /dev/snd, no host X11 socket, video track only; I5 3/3 induced variants failed with named messages; I6 zero containers left, zero volumes, machine in entry state. Image 1722 MB, warm build 46.5s, ~40s per run. TWO DEFECTS IN MY OWN INSTRUMENTS were found and are recorded because each produced a clean-looking result worth nothing: the positive control FAILED OPEN (xsetroot exit 0, capture all black - the X server resets when its last client disconnects; Xvfb -noreset fixes it) and the fact parser silently DROPPED host_x11_socket_present because its regex was [a-z_]+ and the key contains digits. The verdict script now requires each I4 fact to be OBSERVED rather than merely un-contradicted. DEVIATION: OBS was not run inside the container - ffmpeg x11grab was - because step 4 measured OBS carrying 317 MB of bundled surface including an embedded Chromium; journaled as goal-over-letter, and OBS-in-a-container is recorded as UNMEASURED rather than refused. The Dabbler extension is NOT installed in the image, so this proves the capture path is isolated and does NOT prove the Work Explorer renders under software rendering.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 6,
+      "stepKey": "name-the-fidelity-trade-honestly",
+      "dateTime": "2026-08-16T06:40:41.587871-04:00",
+      "description": "Named from the runs rather than from theory: the captured window is titled Welcome - capture - Visual Studio Code, on a bare X display with NO window manager, so no title-bar controls, no Windows chrome, Linux font rendering throughout. The trade is not slightly worse video - it is the right tool for one job and the wrong tool for the other. For proving a UI behaves, the container is good and the host path can see the host screen; for training staff who run Windows, the container puts the wrong product on screen in the first three seconds. The operator accepted the fidelity cost on 2026-08-16 AND bounded it the same day by ruling Sessions 7 and 8 record the host; this session endorses that split on evidence. Recommendation: keep the container as an internal VERIFICATION capability, do not promote it to a shipped feature here, and note the Session 4 host recorder stays gated closed on its own FAIL - two paths, two verdicts, neither a licence for the other.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 7,
+      "stepKey": "do-not-redirect-this-session-to",
+      "dateTime": "2026-08-16T06:40:41.587871-04:00",
+      "description": "Honoured. The Azure VDI research was completed on 2026-08-16 before this session started (docs/proposals/2026-08-16-azure-virtual-desktop-as-a-recording-target.md) and nothing in this session extended it, built on it, or created an Azure resource. Its two VERIFY-FIRST items stand, including that AVD screen-capture protection has a client-and-server mode which would block exactly this recorder by design.",
+      "status": "complete"
     }
   ]
 }

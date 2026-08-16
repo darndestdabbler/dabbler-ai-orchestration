@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T05:38:36.081414-04:00",
+  "generatedAt": "2026-08-16T06:02:08.021506-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "24f99a928fda216de15b2bd1a117c84b7906fb2f6abbdcc76be4fa875846ac69",
+    "activity-log.json": "f59ba8914294d0f8c383725c2d74feec884caacbe248fbd88d4513ecf907568d",
     "session-state.json": "fb1aaba89ed82a66c3b50e5070c3b495ac50fb360551db72186f73f6227473a2",
     "spec.md": "6fdc685ea021cdc9e15de888d5c5cf9a726a79f1397be61b5d185d7642b48a12"
   },
@@ -573,15 +573,27 @@
           "isActive": false,
           "startedAt": "2026-08-16T05:34:20.923477-04:00",
           "isTerminal": true
+        },
+        {
+          "stepNumber": 13,
+          "stepKey": "container-host-blocked",
+          "description": "The operator installed Podman Desktop, Podman 6.0.2 and initialised a machine. The machine does not start: podman machine start ends in \"ssh error: machine not in running state\", reproduced on a FRESHLY created machine so it is not a corrupted VM. Traced below Podman: its WSL machine does not use WSL systemd support at all, it launches systemd itself in a private PID namespace via /root/bootstrap, and that systemd starts and exits within about 25 seconds with an empty log, so sshd never listens and the ssh connection podman uses has nothing to reach. The Docker Desktop named-pipe warning printed alongside is a red herring. Most likely cause, stated as hypothesis not finding: Fedora 44 systemd on WSL 2.1.5.0 with a January 2024 kernel; wsl --update is the obvious first thing to try and is the operator's call. Recorded in s5-podman-bootstrap-failure.md including a wrong hypothesis of mine that had to be rolled back - adding [boot] systemd=true to the distro wsl.conf, which made the distro unbootable and was recovered by podman machine rm plus init after taking an export. The plugin-surface measurement is unaffected and needs no container, which is why the spec ordered it first.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T05:38:35.787720-04:00",
+          "isTerminal": true
         }
       ],
       "counts": {
         "pending": 8,
         "in-progress": 1,
-        "complete": 3,
+        "complete": 4,
         "blocked": 0,
         "unknown": 0,
-        "total": 12
+        "total": 13
       },
       "current": [
         "read-the-operator-s-2026-08"

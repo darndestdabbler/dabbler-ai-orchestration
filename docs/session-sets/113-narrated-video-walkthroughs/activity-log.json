@@ -586,6 +586,14 @@
       "dateTime": "2026-08-16T05:38:35.787720-04:00",
       "description": "Ran spec_admission against the amended spec, which is the check the authoring guide says to run at authoring rather than discover at hour three. It reported FOUR sessions over the 7-step cap - and two of them (5 and 6) were already over before this amendment, added by Session 4 this morning with no exception declared, so the amendment did not create that condition but would have quietly doubled it. Trimmed where trimming was honest rather than excepting by default: Session 7 merged capture and time-compression into one pipeline step (N=5 -> 4), and Session 8 folded its quality bar into the recording step and its publication conventions into the safety pass (N=4 -> 2, now under cap with no exception). Declared sessionSizeException for 5, 6 and 7 with per-session reasons; Session 5s reason names six declared work steps honestly rather than the four I first wrote, because two of its steps are a reading instruction and a guardrail. 277 targeted tests green.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 13,
+      "stepKey": "container-host-blocked",
+      "dateTime": "2026-08-16T06:02:07.715564-04:00",
+      "description": "The operator installed Podman Desktop, Podman 6.0.2 and initialised a machine. The machine does not start: podman machine start ends in \"ssh error: machine not in running state\", reproduced on a FRESHLY created machine so it is not a corrupted VM. Traced below Podman: its WSL machine does not use WSL systemd support at all, it launches systemd itself in a private PID namespace via /root/bootstrap, and that systemd starts and exits within about 25 seconds with an empty log, so sshd never listens and the ssh connection podman uses has nothing to reach. The Docker Desktop named-pipe warning printed alongside is a red herring. Most likely cause, stated as hypothesis not finding: Fedora 44 systemd on WSL 2.1.5.0 with a January 2024 kernel; wsl --update is the obvious first thing to try and is the operator's call. Recorded in s5-podman-bootstrap-failure.md including a wrong hypothesis of mine that had to be rolled back - adding [boot] systemd=true to the distro wsl.conf, which made the distro unbootable and was recovered by podman machine rm plus init after taking an export. The plugin-surface measurement is unaffected and needs no container, which is why the spec ordered it first.",
+      "status": "complete"
     }
   ]
 }

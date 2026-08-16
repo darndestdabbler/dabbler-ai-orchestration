@@ -408,6 +408,14 @@
       "dateTime": "2026-08-15T20:24:51.971699-04:00",
       "description": "Pass criteria fixed BEFORE the first capture: s4-pilot-criteria.json (machine-readable, read by the harness, digest recorded in every measurement) plus s4-pilot-criteria.md. Seven criteria C1-C7 each with an instrument and, where the claim is unfalsifiable without one, a control. Hardened pre-capture against the two false-pass modes the Step 3.5 routed analysis named: title ambiguity (refuse on multiple matches) and scaling myopia (window-resize variant, and the 100%-scaling limitation recorded rather than papered over). Committed before any capture ran.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 4,
+      "stepNumber": 3,
+      "stepKey": "run-the-pilot-against-the-work",
+      "dateTime": "2026-08-15T21:02:35.759841-04:00",
+      "description": "Built the pilot: a dependency-free obs-websocket v5 client, an OBS capture backend that creates its own scene collection and profile and puts everything back, a Playwright-Electron driver that consumes the scenario driver block Session 2 quarantined, a dependency-free PNG decoder for the pixel measurements, and the measurement harness itself. Four defects found and fixed before the measurement run, each by probing rather than reasoning: --websocket_port does not ENABLE the obs-websocket server; a leftover .sentinel marker raises a modal crash dialog that hangs the next launch; RecQuality=Small makes OBS accept StartRecord and never start the output, silently; and cleanup predicted OBS filenames instead of observing them, so it deleted nothing and reported success.",
+      "status": "in-progress"
     }
   ]
 }

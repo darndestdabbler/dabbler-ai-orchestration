@@ -327,6 +327,49 @@ deferred until a real reviewer says the videos are hard to follow, which
 is why each step's target bounding box is recorded in the stream even
 though nothing reads it yet.
 
+### The awkward host: recording VS Code itself
+
+**Windows only, optional, and internal.** Everything above is the portable
+path and covers every target that reaches a browser. This is the exception
+that proves why the seam exists: Playwright's `recordVideo` was measured to
+break the **VS Code workbench** specifically, so the one product this
+framework cannot record with the portable path is its own.
+
+```bash
+npm run walkthrough:vscode              # record the Work Explorer
+npm run walkthrough:vscode -- --no-video   # the degraded path
+```
+
+**OBS Studio is a documented optional prerequisite. It is never bundled**,
+and "OBS absent" is a supported outcome rather than an error to engineer
+around — the run still drives the UI, still writes a manifest and an index,
+and says plainly that there is no recording. Three things have to be true
+before a recording happens, and each one failing is reported by name:
+
+1. **OBS Studio is installed** (28 or newer, which is when obs-websocket
+   became bundled).
+2. **Its websocket server is enabled** — in OBS, *Tools → WebSocket Server
+   Settings → Enable WebSocket server*. This is a one-time manual step.
+   Passing `--websocket_port` on the command line overrides the port but
+   does **not** enable the server, which is a trap worth knowing about
+   because OBS logs the override and then never listens.
+3. **Exactly one Extension Development Host window is open.** The recorder
+   enumerates every window OBS offers and **refuses** when more than one
+   matches, rather than taking the first — on a developer's machine there
+   is routinely a second `Code.exe` window, and silently recording the
+   wrong one is worse than not recording.
+
+The recorder builds its **own** OBS scene collection and profile, uses
+them, and removes them afterwards. It does not touch your existing OBS
+setup, it captures **only** the window it launched, and it never captures a
+monitor. That last point is not decoration: a default OBS scene collection
+routinely carries a webcam and a microphone, and borrowing one would put
+both into a recording nobody asked for.
+
+**What it does not do**, deliberately: no in-page emphasis (the workbench is
+another product's DOM, and injecting a stylesheet into it is the sort of
+cleverness that breaks on their next release), and no zoom at any stage.
+
 ### Measured, not assumed
 
 `node scripts/measure-browser-record.js` reruns the control experiment
@@ -341,7 +384,7 @@ is why that finding is platform-specific and must not be generalised.
 - [`work-explorer-first-look/`](work-explorer-first-look/) — reading where
   every session set stands, off the AI Work Explorer tree, on the
   disposable fixture project that `npm run walk` stages. Its driver block
-  is `proposed`: nothing in this repo drives it yet.
+  is `implemented`, and `npm run walkthrough:vscode` is what drives it.
 - [`task-board-first-task/`](task-board-first-task/) — adding, completing
   and filtering a task on a deliberately tiny sample web page. Its driver
   block is `shipped`, and it is what Session 3 actually recorded.

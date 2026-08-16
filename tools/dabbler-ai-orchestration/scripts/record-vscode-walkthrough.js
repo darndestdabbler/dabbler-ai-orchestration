@@ -63,10 +63,6 @@ function log(msg) {
   console.log("[walkthrough:vscode] " + msg);
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * An interpreter that can import `ai_router`.
  *

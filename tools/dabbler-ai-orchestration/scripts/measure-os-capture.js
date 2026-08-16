@@ -28,7 +28,7 @@ const path = require("path");
 const { chromium } = require("@playwright/test");
 
 const { recordVscodeWalkthrough } = require("./record-vscode-walkthrough.js");
-const { ObsCaptureSession } = require("./obs-capture.js");
+const { evaluate } = require("./os-capture-verdict.js");
 const { decodePng, comparePngs, colorFraction, grayscaleGrid, correlate } =
   require("./png-metrics.js");
 
@@ -195,6 +195,7 @@ async function pilotRun(index, criteria, options) {
     specialInputs: null,
     decoyCorrelation: null,
     magentaFractionInDecoyCapture: null,
+    occluder: null,
     errors: [],
   };
 
@@ -243,6 +244,46 @@ async function pilotRun(index, criteria, options) {
         // claim under test, not an assumption.
         const occluder = await openOccluder(runResult.window.logical);
         try {
+          // IS THE OCCLUDER ACTUALLY OCCLUDING? Without this, C2 has a
+          // false pass hiding in it: "no magenta in the target frame" is
+          // equally consistent with a capture that correctly ignores an
+          // overlapping window and with an occluder that opened somewhere
+          // else entirely. The magenta detector control proves the detector
+          // works; this proves there was something for it to find.
+          //
+          // Reported as geometry rather than as a boolean, so a partial
+          // overlap is visible as a partial overlap.
+          const geom = await occluder.page.evaluate(() => ({
+            x: window.screenX,
+            y: window.screenY,
+            width: window.outerWidth,
+            height: window.outerHeight,
+            focused: document.hasFocus(),
+            visibility: document.visibilityState,
+          }));
+          const target = runResult.window.logical;
+          const overlapWidth = Math.max(
+            0,
+            Math.min(geom.x + geom.width, target.x + target.width) -
+              Math.max(geom.x, target.x)
+          );
+          const overlapHeight = Math.max(
+            0,
+            Math.min(geom.y + geom.height, target.y + target.height) -
+              Math.max(geom.y, target.y)
+          );
+          observations.occluder = {
+            geometry: geom,
+            targetLogical: target,
+            overlapFractionOfTarget: Number(
+              (
+                (overlapWidth * overlapHeight) /
+                Math.max(1, target.width * target.height)
+              ).toFixed(4)
+            ),
+            heldFocus: geom.focused,
+          };
+
           const occludedFrame = await capture.grabSourceFrame();
           const decoded = decodePng(occludedFrame);
           observations.magentaFractionUnderOcclusion = Number(
@@ -347,6 +388,11 @@ async function pilotRun(index, criteria, options) {
     observations,
     timing,
     container,
+    // The controls repoint the live capture at the decoy part way through,
+    // so this run's VIDEO is not a recording of the walkthrough even though
+    // its measurements are sound. Flagged here so the verdict can exclude
+    // it in code rather than a reader having to remember.
+    videoContaminatedByControls: opts.withControls === true,
     anchor: result.anchor,
     stepsCompleted: result.stepsCompleted,
     stepCount: result.stepCount,
@@ -430,9 +476,77 @@ async function dependencyAbsentVariants() {
 // ---------------------------------------------------------------------- main
 
 async function main() {
+  // Re-derive the verdict from a measurement already on disk, without
+  // recapturing anything. Useful when the criteria are re-read later, and
+  // it is what makes the verdict auditable: anyone can recompute it from
+  // the committed numbers and the committed thresholds.
+  if (process.argv.includes("--evaluate-only")) {
+    const criteria = JSON.parse(fs.readFileSync(CRITERIA_PATH, "utf8"));
+    const measurement = JSON.parse(fs.readFileSync(MEASUREMENT_PATH, "utf8"));
+    measurement.criteriaSha256 = sha256(CRITERIA_PATH);
+    measurement.evaluation = evaluate(measurement, criteria);
+    fs.writeFileSync(
+      MEASUREMENT_PATH,
+      JSON.stringify(measurement, null, 2) + "\n",
+      "utf8"
+    );
+    log(
+      "VERDICT " +
+        measurement.evaluation.verdict +
+        " (" +
+        measurement.evaluation.cleanRuns +
+        "/" +
+        measurement.evaluation.runsRequired +
+        " clean runs" +
+        (measurement.evaluation.unmet.length
+          ? "; unmet: " + measurement.evaluation.unmet.join(", ")
+          : "") +
+        ")"
+    );
+    for (const f of measurement.evaluation.criteria) {
+      log("  " + f.id + " " + (f.passed ? "PASS" : "FAIL") + " - " + f.name);
+    }
+    return;
+  }
+
   if (process.platform !== "win32") {
     log("this pilot measures Windows OS capture; refusing to pretend on " + process.platform);
     process.exitCode = 2;
+    return;
+  }
+
+  // One more clean run, appended to an existing measurement. This exists
+  // for exactly one reason: the control-carrying run's video is not a clean
+  // capture, so the ten-capture bar needs a tenth uncontaminated recording
+  // rather than a redefinition of "clean".
+  const supplementaryFlag = process.argv.indexOf("--supplementary-run");
+  if (supplementaryFlag !== -1) {
+    const index = Number(process.argv[supplementaryFlag + 1] || 11);
+    const criteria = JSON.parse(fs.readFileSync(CRITERIA_PATH, "utf8"));
+    const measurement = JSON.parse(fs.readFileSync(MEASUREMENT_PATH, "utf8"));
+    log("supplementary run " + index);
+    const run = await pilotRun(index, criteria, {});
+    measurement.supplementaryRuns = (measurement.supplementaryRuns || []).concat([run]);
+    measurement.evaluation = evaluate(measurement, criteria);
+    fs.writeFileSync(
+      MEASUREMENT_PATH,
+      JSON.stringify(measurement, null, 2) + "\n",
+      "utf8"
+    );
+    log(
+      "  correlation=" + run.observations.correlationWithTarget +
+        " magenta=" + run.observations.magentaFractionUnderOcclusion +
+        " occluderOverlap=" +
+        (run.observations.occluder
+          ? run.observations.occluder.overlapFractionOfTarget
+          : "n/a") +
+        " cleanup=" + JSON.stringify(run.cleanupProblems)
+    );
+    log(
+      "VERDICT " + measurement.evaluation.verdict +
+        " (" + measurement.evaluation.cleanRuns + "/" +
+        measurement.evaluation.runsRequired + " clean runs)"
+    );
     return;
   }
   if (!fs.existsSync(CRITERIA_PATH)) {
@@ -487,6 +601,22 @@ async function main() {
   measurement.dependencyAbsent = await dependencyAbsentVariants();
 
   measurement.finishedAt = new Date().toISOString();
+  // The verdict is DERIVED from the criteria file, not announced. Every
+  // threshold it applies came off disk before the first capture.
+  measurement.evaluation = evaluate(measurement, criteria);
+  log(
+    "VERDICT " +
+      measurement.evaluation.verdict +
+      " (" +
+      measurement.evaluation.cleanRuns +
+      "/" +
+      measurement.evaluation.runsRequired +
+      " clean runs" +
+      (measurement.evaluation.unmet.length
+        ? "; unmet: " + measurement.evaluation.unmet.join(", ")
+        : "") +
+      ")"
+  );
   fs.writeFileSync(
     MEASUREMENT_PATH,
     JSON.stringify(measurement, null, 2) + "\n",

@@ -712,3 +712,129 @@ class TestCli:
         assert "duration=234.6s" in capsys.readouterr().out
         records = ror.read_records(str(set_dir))
         assert records[-1].duration_seconds == 234.55
+
+
+# ===========================================================================
+# 2026-08-16 (ad-hoc, follow-on to the freshness-contract PR) — the run of
+# record must honour CLOSE-MANDATED WRITES.
+#
+# The freshness digest, the close backstop's delta anchor and this gate all
+# ask "did the work change since we checked?". The first two consult BOTH
+# shared mechanisms — the bookkeeping list AND the writers' own
+# close-mandated declarations. This one consulted only the list, so two files
+# a writer had already declared still staled the run of record.
+# ===========================================================================
+
+
+class TestRunOfRecordHonoursCloseMandatedWrites:
+    SET = "docs/session-sets/113-narrated-video-walkthroughs"
+
+    def test_the_step8_critique_artifact_does_not_stale_the_run(self):
+        # PLANT THE DEFECT: pull_critique writes this at Step 8, AFTER the
+        # suites have been run and recorded. It is declared close-mandated,
+        # and the freshness stamp has honoured that since the previous PR --
+        # this gate did not.
+        assert ror.is_active_set_bookkeeping(
+            f"{self.SET}/path-aware-critique.json", self.SET
+        )
+
+    def test_the_close_projection_does_not_stale_the_run(self):
+        # The worse of the two: close_session writes session-progress.json
+        # DURING the close, so a close that has to be retried found the run
+        # it had just recorded already stale.
+        assert ror.is_active_set_bookkeeping(
+            f"{self.SET}/session-progress.json", self.SET
+        )
+
+    def test_it_reads_the_declarations_rather_than_a_local_copy(self):
+        # THE RULE, not the two instances. A THIRD writer that declares a
+        # close-mandated set-scoped write must be exempt here with nothing
+        # in run_of_record edited -- that is the whole point of source-level
+        # discovery, and it is what stops this recurring a fourth time.
+        import verification_stamp as vstamp
+
+        declared = {
+            d.path for d in vstamp.discover_close_mandated_writes()
+            if d.scope == "set"
+        }
+        assert declared, "corpus non-empty (L-112-1): no set-scoped declarations"
+        for name in declared:
+            assert ror.is_active_set_bookkeeping(f"{self.SET}/{name}", self.SET), name
+
+    def test_a_synthetic_new_writer_is_exempt_with_no_edit_here(self, tmp_path):
+        # The class, proved the way test_close_mandated_writes.py proves it:
+        # declare a brand-new writer in a throwaway package tree and assert
+        # the exemption lands without touching this module.
+        import verification_stamp as vstamp
+
+        pkg = tmp_path / "pkg"
+        pkg.mkdir()
+        (pkg / "brand_new_writer.py").write_text(
+            'CLOSE_MANDATED_WRITES = (\n'
+            '    {\n'
+            '        "path": "brand-new-artifact.json",\n'
+            '        "scope": "set",\n'
+            '        "bound": "whole-file",\n'
+            '        "reason": "a fourth writer nobody edited a list for",\n'
+            '    },\n'
+            ')\n',
+            encoding="utf-8",
+        )
+        pats = vstamp.close_mandated_excludes(self.SET, package_dir=str(pkg))
+        assert f"{self.SET}/brand-new-artifact.json" in pats
+
+    def test_the_look_alikes_still_bind(self):
+        # The counterweight: exempting declared writes must not exempt the
+        # set's actual work. spec.md is the contract; operator-notes.md is
+        # the operator's input. Both must stale a run of record.
+        for name in ("spec.md", "operator-notes.md"):
+            assert not ror.is_active_set_bookkeeping(
+                f"{self.SET}/{name}", self.SET
+            ), name
+
+    def test_another_sets_artifact_is_not_exempt(self):
+        # The exclusion is scoped to the ACTIVE set. Another set's
+        # path-aware-critique.json is an ordinary changed file -- a
+        # set-number collision or a resurrected artifact there is exactly
+        # what the suite is meant to catch.
+        other = "docs/session-sets/999-some-other-set"
+        assert not ror.is_active_set_bookkeeping(
+            f"{other}/path-aware-critique.json", self.SET
+        )
+
+    def test_no_active_set_means_nothing_is_exempt_by_set_scope(self):
+        # With no set in play, set-scoped patterns are dropped rather than
+        # applied repo-wide (close_mandated_excludes' own contract).
+        assert not ror.is_active_set_bookkeeping(
+            f"{self.SET}/path-aware-critique.json", None
+        )
+
+    def test_the_digest_actually_changes_behaviour(self, tmp_path):
+        # End to end through surface_digest, not just the predicate: writing
+        # a declared close-mandated artifact must leave the digest EQUAL,
+        # while writing spec.md must change it.
+        import subprocess as sp
+
+        repo = tmp_path / "repo"
+        setd = repo / "docs" / "session-sets" / "777-x"
+        setd.mkdir(parents=True)
+        (setd / "spec.md").write_text("spec\n", encoding="utf-8")
+        sp.run(["git", "init", "-q", str(repo)], check=True)
+        sp.run(["git", "-C", str(repo), "add", "-A"], check=True)
+
+        covers = ("docs/session-sets/",)
+        before = ror.surface_digest(
+            str(repo), covers, session_set_dir=str(setd))
+        assert before is not None
+
+        (setd / "path-aware-critique.json").write_text("{}\n", encoding="utf-8")
+        after_artifact = ror.surface_digest(
+            str(repo), covers, session_set_dir=str(setd))
+        assert after_artifact == before, (
+            "a declared close-mandated write staled the run of record"
+        )
+
+        (setd / "spec.md").write_text("spec CHANGED\n", encoding="utf-8")
+        after_work = ror.surface_digest(
+            str(repo), covers, session_set_dir=str(setd))
+        assert after_work != before, "real work no longer stales the run"

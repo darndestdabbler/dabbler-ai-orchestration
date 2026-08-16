@@ -18,7 +18,9 @@
 // magenta absent.
 
 import * as assert from "assert";
+import * as crypto from "crypto";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import * as zlib from "zlib";
 // A local TS import keeps this file on the CommonJS load path under
@@ -374,7 +376,6 @@ suite("Set 113 S4 - obs-websocket and capture helpers", () => {
     // base64(sha256(base64(sha256(password + salt)) + challenge)). Pinned
     // against a hand-computed vector: a wrong hash here fails as
     // "unreachable", which sends whoever debugs it to look at firewalls.
-    const crypto = require("crypto") as typeof import("crypto");
     const password = "supersecret";
     const salt = "salty";
     const challenge = "chally";
@@ -411,9 +412,6 @@ suite("Set 113 S4 - obs-websocket and capture helpers", () => {
 
 suite("Set 113 S4 - caption timing instrument", () => {
   test("cue windows are read out of real WebVTT", () => {
-    const fs = require("fs") as typeof import("fs");
-    const os = require("os") as typeof import("os");
-    const path = require("path") as typeof import("path");
     const file = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-vtt-")),
       "captions.vtt",
@@ -434,9 +432,6 @@ suite("Set 113 S4 - caption timing instrument", () => {
   test("a file with no cues yields no cues rather than throwing", () => {
     // C4 compares cue count against step count; a parser that threw on an
     // empty caption file would turn a measurable failure into a crash.
-    const fs = require("fs") as typeof import("fs");
-    const os = require("os") as typeof import("os");
-    const path = require("path") as typeof import("path");
     const file = path.join(
       fs.mkdtempSync(path.join(os.tmpdir(), "dabbler-vtt-empty-")),
       "captions.vtt",

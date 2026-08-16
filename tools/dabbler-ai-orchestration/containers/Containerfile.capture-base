@@ -21,6 +21,19 @@ FROM docker.io/library/debian:13-slim
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# obs-studio    THE SPEC'S PRIMARY CANDIDATE, added on verification finding
+#               (round 1, Major): a session that substitutes a different
+#               capturer has not answered whether the DECLARED dependency can
+#               be isolated. ffmpeg stays, so the two are measured side by
+#               side rather than one standing in for the other.
+# mesa/libgl    OBS needs OpenGL. No GPU device is passed in -- by design,
+#               since handing back /dev/dri is the isolation this session is
+#               testing -- so it must render through llvmpipe in software.
+# xdotool       to UNMAP OBS's own window. With no window manager there is no
+#               tray for --minimize-to-tray to minimise into, so OBS renders
+#               its GUI onto the display and then screen-captures itself: the
+#               first OBS run came out 27% magenta and 70% OBS. Measured, not
+#               guessed.
 # xvfb          the virtual display that never leaves the container
 # x11-utils     xdpyinfo/xwininfo, so geometry and mapped windows are READ
 #               rather than assumed
@@ -36,6 +49,11 @@ RUN apt-get update \
       x11-utils \
       x11-xserver-utils \
       ffmpeg \
+      obs-studio \
+      libgl1-mesa-dri \
+      mesa-utils \
+      xdotool \
+      procps \
       ca-certificates \
       gpg \
       wget \
@@ -61,6 +79,12 @@ RUN useradd --create-home --shell /bin/bash capture \
 USER capture
 WORKDIR /home/capture
 
+# The REAL extension, not a stand-in. Same reasoning as OBS above: the plan
+# names the Dabbler extension, and stock VS Code proves nothing about whether
+# the Work Explorer survives Linux software rendering. This is the published
+# 0.51.0 package, installed at run time so the install itself is a recorded
+# fact rather than a build-time assumption.
+COPY --chown=capture:capture dabbler.vsix /home/capture/dabbler.vsix
 COPY --chown=capture:capture run-capture.sh /home/capture/run-capture.sh
 # Strip CR unconditionally. This repo is developed on Windows, so a checkout
 # can hand the build a CRLF shell script -- which fails as `$'': command

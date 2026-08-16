@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-08-16T10:19:14.127Z",
+  "measuredAt": "2026-08-16T11:18:31.771Z",
   "set": "113-narrated-video-walkthroughs",
   "session": 5,
   "step": "4 - measure the cheap mitigation",
@@ -172,8 +172,17 @@
       "label": "without-flag",
       "args": [],
       "ok": true,
-      "logFile": "2026-08-16 06-19-14.txt",
+      "logFile": "2026-08-16 07-18-32.txt",
       "obsVersion": "32.2.1",
+      "isolatedCollectionUsed": true,
+      "liveSourceKindsSeenInLog": [],
+      "cleanup": {
+        "scenesRemoved": [
+          "dabbler-plugin-probe.json"
+        ],
+        "profilesRemoved": [],
+        "sentinelsRestored": 0
+      },
       "loadedModules": [
         "coreaudio-encoder.dll",
         "decklink-captions.dll",
@@ -213,7 +222,7 @@
         "decklink.dll"
       ],
       "thirdPartyPluginsDisabledLogged": false,
-      "commandLineLogged": "--minimize-to-tray --multi"
+      "commandLineLogged": "--minimize-to-tray --multi --collection dabbler-plugin-probe --profile dabbler-plugin-probe --scene Empty"
     },
     "withFlag": {
       "label": "with-flag",
@@ -221,8 +230,17 @@
         "--only-bundled-plugins"
       ],
       "ok": true,
-      "logFile": "2026-08-16 06-19-19.txt",
+      "logFile": "2026-08-16 07-18-37.txt",
       "obsVersion": "32.2.1",
+      "isolatedCollectionUsed": true,
+      "liveSourceKindsSeenInLog": [],
+      "cleanup": {
+        "scenesRemoved": [
+          "dabbler-plugin-probe.json"
+        ],
+        "profilesRemoved": [],
+        "sentinelsRestored": 0
+      },
       "loadedModules": [
         "coreaudio-encoder.dll",
         "decklink-captions.dll",
@@ -261,7 +279,7 @@
         "decklink.dll"
       ],
       "thirdPartyPluginsDisabledLogged": true,
-      "commandLineLogged": "--minimize-to-tray --multi --only-bundled-plugins"
+      "commandLineLogged": "--minimize-to-tray --multi --collection dabbler-plugin-probe --profile dabbler-plugin-probe --scene Empty --only-bundled-plugins"
     },
     "removedByFlag": [
       "obs-backgroundremoval.dll"

@@ -1,0 +1,197 @@
+# Set 113 Session 5 — remediation, rounds 1 and 2
+
+Five Major findings across two discovery passes. Both discovery lenses
+(spec-conformance and failure-scenario) independently found the same four;
+the supplementary pass found the fifth. **Three of the five were false
+passes in this session's own verdict script** — the harness reported PASS on
+criteria it had not tested — which is the part worth stating first, because
+a verdict that grades itself generously is worse than no verdict.
+
+All five are fixed. Nothing was waived, and no criterion threshold was
+moved: the criteria file is byte-identical to the one committed before the
+first container run, and the verdict script refuses to score a measurement
+whose stamped digest does not match it.
+
+---
+
+## F1 — the experiment substituted ffmpeg for OBS, and stock VS Code for the extension
+
+**Round 1, both lenses, Major.** The spec's step 5 names *"VS Code and OBS
+on a virtual display inside Podman"*. What ran was VS Code and ffmpeg, with
+stock VS Code rather than the Dabbler extension. The verifier's reasoning
+was exact and is accepted in full: *"An AI-authored `goal-over-letter`
+journal entry does not discharge an explicit operator-approved session
+plan"*, and a session that measures a different dependency has not answered
+whether the declared one can be isolated.
+
+**Fixed by doing the work.**
+
+- `obs-studio`, Mesa's software rasteriser and `xdotool` added to the image.
+- OBS seeded with its own profile and scene collection and run for real,
+  recording through its own pipeline with no GPU device passed in.
+- The **published 0.51.0 VSIX** is copied into the image and installed at
+  run time, and the install is a recorded fact:
+  `extensions_installed=darndestdabbler.dabbler-ai-orchestration`. A fixture
+  workspace shaped like a Dabbler repo is opened so the Work Explorer has
+  something to render.
+- The verdict now requires the target to have actually started —
+  `target_process_count > 0` and `mapped_window_count > 0` — before I2 can
+  pass at all.
+
+**Result, reported honestly rather than favourably: OBS runs in the
+container and does NOT meet the predeclared I2 instrument** (correlation
+0.085 against a 0.90 bar), so the scored PASS is the ffmpeg path and OBS is
+documented separately with its two solved obstacles and one unexplained
+disagreement. See the outcome document §3. The bar was not moved to
+accommodate it.
+
+**What remains unproven and is now stated in the outcome:** the extension
+*activates*; nobody has looked at whether the Work Explorer *renders*
+correctly under software rendering, and no criterion here measures that.
+
+## F2 — I5 passed without exercising the degradation guarantee
+
+**Round 1, both lenses, Major.** I5 requires *"the walkthrough still
+completes without a video"* plus `manifestStillWritten` and
+`videoArtifactCount: 0`. The harness ran three bare `podman` commands and
+scored their exit codes; the verdict checked only that at least three
+records existed and each carried a non-empty message. The set's cardinal
+guarantee — **FAILURE TO RECORD MUST NEVER FAIL THE WALKTHROUGH** — was
+certified without being tested.
+
+**Fixed by building the thing the criterion was about.**
+`containerCaptureEntrypoint()` attempts a container capture and, on **any**
+failure, writes a run manifest describing what happened and returns
+normally. It never throws. All three variants now drive it, and the verdict
+scores the criterion's own postconditions per variant: walkthrough
+completed, manifest written, zero video artifacts, dependency named. It also
+now checks the **exact declared variant identities** rather than a count, so
+a renamed or dropped variant fails instead of passing.
+
+**And the declared variant is now run literally.** An earlier version of
+this fix substituted a non-existent connection name for
+`podman-machine-stopped` and declared the substitution; the round-1
+acceptance criterion was executable and still FAILED on the fixed tree,
+because it requires exact set equality with the declared variant names. The
+verifier was right and the substitution is withdrawn: the machine is now
+**stopped for real**, the entrypoint runs against it, and the restart is
+**verified** rather than assumed -- `stopped=true restored=true` -- because
+I6 requires the machine to be left in its entry state and this is the one
+variant that can violate it. The verdict scores that restoration.
+
+A second, quieter defect surfaced with it: the harness recorded
+`manifestWritten` while the criterion names `manifestStillWritten`. Same
+fact, different name -- and a criterion checked against a renamed field is a
+criterion that has quietly stopped being checked.
+
+Measured: 3 of 3 variants degrade correctly.
+
+## F3 — I6 passed with no induced failure and no filesystem check
+
+**Round 1, both lenses, Major.** I6 requires assertions *"after every run
+and after one deliberately induced mid-run failure"*, including
+`noZeroByteOrTempFilesInRunDir`. No failure was induced, no files were
+inspected, and cleanup sat on the normal control flow — so a decode error or
+a failed `podman cp` would have left a headed browser window and a container
+behind while the criterion reported deterministic cleanup.
+
+**Fixed.** Cleanup moved into a `finally`; a real mid-run exception is thrown
+on the last target run from where a decode or copy error would land, so the
+`finally` is the thing under test rather than a claim about it; zero-byte and
+temporary files are counted **inside** the container and on the host; harness
+volumes are counted **by label** instead of counting every volume on the
+machine, which would have failed an operator with unrelated volumes.
+
+Measured: failure induced, cleanup ran, 0 containers left, 0 harness
+volumes, 0 zero-byte files, 0 temp files, machine in its entry state.
+
+## F4 — the cost record was incomplete and contradicted the outcome
+
+**Round 1, both lenses, Major.** I7 declares four required fields;
+`coldStartSeconds` did not exist, and the verdict copied `m.cost` without
+checking. The outcome said "46.5 s warm build" and "~40 s per run" while the
+JSON said 1.5 s and 29.5 s.
+
+**Fixed in three places.**
+
+- The verdict now scores I7 on **presence** of the required fields. The
+  criteria say `passFail: false` *and* list required fields; the honest
+  reading of both halves is that presence is required and values are not
+  judged. That implements the criterion rather than amending it.
+- `coldStartSeconds` and `captureWallClockSeconds` are measured, the latter
+  reported by the container itself.
+- **The cold build is genuinely cold.** `podman rmi` alone was not enough —
+  it drops the tag while the layer cache survives, and reported 2.9 seconds.
+  That is this same defect one layer down, found while fixing it.
+  `--no-cache` gives **55.7 s**.
+
+Every number in the outcome document is now regenerated from the committed
+measurement rather than transcribed from a console log.
+
+## F5 — the plugin probe launched the operator's live OBS configuration
+
+**Round 2 (supplementary), Major, and the most serious of the five.** The
+probe launched OBS with only `--minimize-to-tray` and `--multi`, so OBS
+restored **the operator's current scene collection** — which Session 4 had
+already recorded as carrying a live webcam (NexiGo N940P), a microphone and
+Desktop Audio. A probe written to measure recorder risk could have
+initialised the operator's camera to do it, in a session whose entire
+subject is not exposing the host.
+
+**Fixed.** The probe seeds its **own empty collection and profile**, launches
+with `--collection/--profile/--scene` pointing at them, and asserts from
+OBS's own log that no `dshow_input`, `wasapi_*`, `monitor_capture`,
+`window_capture` or `game_capture` source initialised. Measured: `[]` on
+both launches, with `isolatedCollectionUsed: true`. What it created is
+removed by **observing what appeared** rather than predicting OBS's slug
+rules — the lesson Session 4's `obs-capture.js` already paid for. The
+operator's `.sentinel` recovery markers are now **stashed and restored**
+instead of deleted.
+
+---
+
+## Nits addressed in the same pass
+
+- Forbidden **environment names** were declared in I1 and never checked.
+- The verdict ignored `target_process_count` / `mapped_window_count`, so a
+  non-black error dialog would have satisfied I2 as well as a running
+  editor.
+- Marker foreground was *requested* (`bringToFront()`) and then claimed as
+  fact; it is now **observed** after the run via the window's own
+  `document.hasFocus()`.
+- Harness volume counting was machine-wide; now label-scoped.
+- `run-capture.sh` described `<outdir>` as *"the one bind-mounted path"*
+  while the harness deliberately uses **zero** bind mounts.
+- `session-progress.json` was stale in the reviewed tree; regenerated.
+
+## Nit acknowledged and NOT actioned
+
+The round-2 nit that the plugin measurement's ordering claim was
+contradicted by the cost note. The ordering was in fact honoured — the
+plugin surface was measured before the container was built — and the
+contradiction was in the **note's wording**, which described a warm build
+while claiming the mitigation ran first. The note is rewritten; no ordering
+changed, because none needed to.
+
+## Two instrument defects found by this session in itself
+
+Kept in the record because each produced a clean-looking result that was
+worth nothing, which is the failure mode this whole set exists to resist.
+
+1. **The positive control failed open.** `xsetroot -solid magenta` returned
+   exit 0 and produced an all-black capture: the X server resets when its
+   last client disconnects, wiping a root background set by a command that
+   then exits. `Xvfb -noreset` fixes it. Before the fix, I1 would have
+   "passed" on a control that measured nothing — exactly how Session 4's C2
+   came to be scored FAIL beside a clean `0.000000`.
+2. **A fact parser silently dropped the fact I4 needs most.** The
+   `FACT key=value` regex was `[a-z_]+`, which cannot match the digits in
+   `host_x11_socket_present`. The verdict now requires each I4 fact to be
+   **observed**, not merely un-contradicted — the omitted-component failure
+   mode in different clothes.
+
+## Verdict after remediation
+
+**PASS**, seven of seven scored criteria, three of three clean runs, against
+the same criteria file, scored by a script that reads the criteria and
+cannot produce measurements.

@@ -650,6 +650,14 @@
       "dateTime": "2026-08-16T06:40:41.587871-04:00",
       "description": "Honoured. The Azure VDI research was completed on 2026-08-16 before this session started (docs/proposals/2026-08-16-azure-virtual-desktop-as-a-recording-target.md) and nothing in this session extended it, built on it, or created an Azure resource. Its two VERIFY-FIRST items stand, including that AVD screen-capture protection has a client-and-server mode which would block exactly this recorder by design.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 8,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T07:27:01.374175-04:00",
+      "description": "Round 1 discovery (2-way fan-out, gpt-5-6-sol, spec-conformance and failure-scenario lenses) returned ISSUES_FOUND with 8 records = 4 distinct Majors, both lenses agreeing on all four. Round 2 supplementary found a fifth Major. THREE OF THE FIVE WERE FALSE PASSES IN MY OWN VERDICT SCRIPT. All five remediated, nothing waived, no threshold moved - the criteria file is byte-identical to the pre-run commit and the verdict refuses to score a measurement whose stamped digest does not match. F1 ffmpeg/stock-VS-Code substitution: OBS installed and RUN in the container (it works - and does NOT meet the predeclared I2 instrument, 0.085 vs 0.90, reported as such rather than by moving the bar), published 0.51.0 VSIX installed and asserted. F2 I5 certified the set cardinal degradation guarantee without testing it: built a real capture entrypoint that always writes a manifest and never throws; all three variants drive it; postconditions scored per variant. F3 I6 had no induced failure: cleanup moved into a finally, a real mid-run exception thrown, zero-byte and temp files counted inside and outside. F4 cost record incomplete and self-contradictory: --no-cache cold build (57.2s, because podman rmi alone keeps the layer cache and reported 2.9s - the same defect one layer down), all four required fields now present and SCORED on presence. F5 (supplementary, most serious) the plugin probe launched the operator LIVE OBS config which carries a webcam and microphone: now seeds its own empty collection, asserts zero live source kinds in OBS own log, and stashes/restores the operator sentinel markers instead of deleting them. Round-1 acceptance harness had one EXECUTABLE criterion still failing after the first fix - it required exact set equality with the declared variant names - so the podman-machine-stopped substitution was withdrawn and the machine is now stopped for real with a VERIFIED restart (stopped=true restored=true); journaled as a reversal of my own earlier decision. Verdict after remediation: PASS 7/7, 3/3 clean runs.",
+      "status": "complete"
     }
   ]
 }

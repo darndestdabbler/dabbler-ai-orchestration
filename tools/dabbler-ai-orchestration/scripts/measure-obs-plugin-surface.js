@@ -20,8 +20,23 @@
 //      log read back for the modules it loaded. Says what really happens,
 //      and depends on OBS starting cleanly.
 //
-// It never records anything, creates no scene, and connects to no
-// websocket. It launches OBS, waits for the log, and kills it.
+// IT LAUNCHES OBS INTO AN ISOLATED, SOURCE-FREE SCENE COLLECTION, and that
+// is a correction rather than a nicety. The first version launched OBS with
+// only --minimize-to-tray and --multi, which means OBS restored THE
+// OPERATOR'S CURRENT SCENE COLLECTION -- and Session 4 had already recorded
+// that this operator's collection carries a live webcam (NexiGo N940P), a
+// microphone and Desktop Audio. A probe written to measure recorder risk
+// would have initialised the operator's camera to do it. Verification round
+// 2 caught it, and it was right to call it Major.
+//
+// So the probe now seeds its OWN empty collection and profile, launches with
+// --collection/--profile/--scene pointing at them, asserts from OBS's own log
+// that no camera, monitor or window source initialised, and removes what it
+// created by OBSERVING what appeared rather than predicting the filenames --
+// the lesson Session 4's obs-capture.js already paid for.
+//
+// It never records anything and connects to no websocket. It launches OBS,
+// waits for the log, and kills it.
 //
 // Output is ASCII-only (Windows cp1252 console lesson, L-079-1).
 
@@ -30,6 +45,7 @@
 const cp = require("child_process");
 const crypto = require("crypto");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..");
@@ -57,6 +73,22 @@ const OBS_INSTALL_ROOT = path.join(
 const OBS_CONFIG_ROOT = path.join(process.env.APPDATA || "", "obs-studio");
 const OBS_LOG_DIR = path.join(OBS_CONFIG_ROOT, "logs");
 const SENTINEL_DIR = path.join(OBS_CONFIG_ROOT, ".sentinel");
+const SCENES_DIR = path.join(OBS_CONFIG_ROOT, "basic", "scenes");
+const PROFILES_DIR = path.join(OBS_CONFIG_ROOT, "basic", "profiles");
+const PROBE_NAME = "dabbler-plugin-probe";
+
+// Source kinds that must NOT appear in the probe's log. This is the
+// assertion that makes "isolated" a measurement instead of a promise.
+const LIVE_SOURCE_KINDS = [
+  "dshow_input",
+  "wasapi_input_capture",
+  "wasapi_output_capture",
+  "wasapi_process_output_capture",
+  "monitor_capture",
+  "display_capture",
+  "window_capture",
+  "game_capture",
+];
 
 // The three places OBS looks for plugins on Windows. The first is what
 // "bundled" means; the other two are what `--only-bundled-plugins` is
@@ -227,16 +259,120 @@ function parseModules(logText) {
 }
 
 
-function clearSentinels() {
+/**
+ * OBS's `.sentinel` markers raise a modal "crash detected" dialog on the
+ * next launch if left behind, which is how an automated probe silently HANGS
+ * a later run. They must be cleared -- but the first version deleted every
+ * pre-existing one permanently, erasing the operator's own recovery and
+ * safe-mode state (verification round 2 nit). They are now MOVED ASIDE and
+ * put back.
+ */
+function stashSentinels() {
   const before = listDir(SENTINEL_DIR);
+  const stash = fs.mkdtempSync(path.join(os.tmpdir(), "obs-sentinel-"));
   for (const f of before) {
+    try {
+      fs.renameSync(path.join(SENTINEL_DIR, f), path.join(stash, f));
+    } catch {
+      /* best effort */
+    }
+  }
+  return { stash, names: before };
+}
+
+function restoreSentinels(stashed) {
+  if (!stashed) return;
+  // Anything the probe's own launch created is removed; anything that was
+  // the operator's is put back exactly where it was.
+  for (const f of listDir(SENTINEL_DIR)) {
     try {
       fs.unlinkSync(path.join(SENTINEL_DIR, f));
     } catch {
       /* best effort */
     }
   }
-  return before.length;
+  for (const f of stashed.names) {
+    try {
+      fs.renameSync(path.join(stashed.stash, f), path.join(SENTINEL_DIR, f));
+    } catch {
+      /* best effort */
+    }
+  }
+  try {
+    fs.rmSync(stashed.stash, { recursive: true, force: true });
+  } catch {
+    /* best effort */
+  }
+}
+
+/**
+ * An empty scene collection and a minimal profile, so OBS has something of
+ * OURS to load instead of the operator's. Returns the on-disk snapshot the
+ * cleanup compares against: what APPEARED is removed, because OBS owns the
+ * slug rules and predicting them is how Session 4 left a file behind while
+ * its own survival check passed.
+ */
+function seedIsolatedConfig() {
+  fs.mkdirSync(SCENES_DIR, { recursive: true });
+  fs.mkdirSync(path.join(PROFILES_DIR, PROBE_NAME), { recursive: true });
+
+  const before = {
+    scenes: new Set(listDir(SCENES_DIR)),
+    profiles: new Set(listDir(PROFILES_DIR)),
+  };
+
+  fs.writeFileSync(
+    path.join(SCENES_DIR, PROBE_NAME + ".json"),
+    JSON.stringify(
+      {
+        current_scene: "Empty",
+        current_program_scene: "Empty",
+        name: PROBE_NAME,
+        scene_order: [{ name: "Empty" }],
+        sources: [
+          {
+            id: "scene",
+            versioned_id: "scene",
+            name: "Empty",
+            enabled: true,
+            muted: false,
+            volume: 1.0,
+            settings: { custom_size: false, id_counter: 0, items: [] },
+          },
+        ],
+      },
+      null,
+      4
+    ),
+    "utf8"
+  );
+  fs.writeFileSync(
+    path.join(PROFILES_DIR, PROBE_NAME, "basic.ini"),
+    "[General]\nName=" + PROBE_NAME + "\n",
+    "utf8"
+  );
+  return before;
+}
+
+function removeIsolatedConfig(before) {
+  if (!before) return { scenesRemoved: [], profilesRemoved: [] };
+  const scenesRemoved = listDir(SCENES_DIR).filter((f) => !before.scenes.has(f));
+  for (const f of scenesRemoved) {
+    try {
+      fs.unlinkSync(path.join(SCENES_DIR, f));
+    } catch {
+      /* best effort */
+    }
+  }
+  const profilesRemoved = listDir(PROFILES_DIR).filter((f) => !before.profiles.has(f));
+  for (const f of profilesRemoved) {
+    try {
+      fs.rmSync(path.join(PROFILES_DIR, f), { recursive: true, force: true });
+    } catch {
+      /* best effort */
+    }
+  }
+  return { scenesRemoved, profilesRemoved };
 }
 
 function killObs(pid) {
@@ -264,9 +400,18 @@ function sleep(ms) {
 async function observeLaunch(label, extraArgs) {
   const before = newestLog();
   const beforeName = before ? before.name : null;
-  clearSentinels();
+  const stashed = stashSentinels();
+  const configBefore = seedIsolatedConfig();
 
-  const args = ["--minimize-to-tray", "--multi", ...extraArgs];
+  const args = [
+    "--minimize-to-tray",
+    "--multi",
+    // The three flags that keep the operator's own sources out of this.
+    "--collection", PROBE_NAME,
+    "--profile", PROBE_NAME,
+    "--scene", "Empty",
+    ...extraArgs,
+  ];
   const proc = cp.spawn(OBS_EXE, args, {
     cwd: path.dirname(OBS_EXE),
     stdio: "ignore",
@@ -295,7 +440,8 @@ async function observeLaunch(label, extraArgs) {
   if (logFile) await sleep(2000);
   killObs(proc.pid);
   await sleep(1500);
-  clearSentinels();
+  const removed = removeIsolatedConfig(configBefore);
+  restoreSentinels(stashed);
 
   if (!logFile) {
     return {
@@ -303,16 +449,26 @@ async function observeLaunch(label, extraArgs) {
       args: extraArgs,
       ok: false,
       reason: "no new OBS log containing a 'Loaded Modules:' block appeared within 60s",
+      cleanup: { ...removed, sentinelsRestored: stashed.names.length },
     };
   }
   const text = fs.readFileSync(logFile.full, "utf8");
   const parsed = parseModules(text);
+  // The isolation assertion. Not "we did not create a scene" -- that was the
+  // claim that turned out to be worthless -- but "OBS's own log shows no
+  // capture or audio-input source initialising".
+  const liveSourcesSeen = LIVE_SOURCE_KINDS.filter((kind) =>
+    new RegExp("\\b" + kind + "\\b").test(text)
+  );
   return {
     label,
     args: extraArgs,
     ok: true,
     logFile: logFile.name,
     obsVersion: (text.match(/OBS\s+([\d.]+)/) || [null, null])[1],
+    isolatedCollectionUsed: /dabbler-plugin-probe/i.test(text),
+    liveSourceKindsSeenInLog: liveSourcesSeen,
+    cleanup: { ...removed, sentinelsRestored: stashed.names.length },
     ...parsed,
   };
 }

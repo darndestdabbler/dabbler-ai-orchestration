@@ -69,11 +69,24 @@ function main() {
   const controlBar = c.I1.control.minMagentaFractionInPositiveControl;
   const worstLeak = Math.max(...targets.map((r) => r.analysis.maxMagentaFraction ?? 1));
   const controlValue = control ? control.analysis.maxMagentaFraction : null;
+  // forbiddenEnvPresent was declared in the criteria and never checked
+  // (verification round 1 nit). The hardening flags are checked too: they
+  // are the policy this harness borrowed from ai_router/podman_sandbox.py,
+  // and an unasserted safety property is a hope.
   const structuralClean = targets.every(
     (r) =>
       r.structural.forbiddenFlagsPresent.length === 0 &&
-      r.structural.forbiddenMountsPresent.length === 0
+      r.structural.forbiddenMountsPresent.length === 0 &&
+      (r.structural.forbiddenEnvPresent || []).length === 0 &&
+      r.structural.networkNone === true &&
+      r.structural.noNewPrivileges === true
   );
+  // capDropAll is REPORTED, not required. It was measured to break
+  // Chromium's sandbox (2 VS Code processes and no mapped window, against 15
+  // without it), and the alternative -- keeping the flag and passing
+  // --no-sandbox -- was refused. Scoring a flag the harness deliberately does
+  // not pass would either fail every run or quietly stop meaning anything.
+  const capDropAll = targets.every((r) => r.structural.capDropAll === true);
   results.I1 = {
     name: c.I1.name,
     pass: worstLeak <= leakBar && controlValue >= controlBar && structuralClean,
@@ -81,6 +94,8 @@ function main() {
       worstHostPixelFraction: worstLeak,
       positiveControl: controlValue,
       structuralAssertionsClean: structuralClean,
+      capDropAllUsed: capDropAll,
+      capDropOmittedReason: targets.length ? targets[0].structural.capDropOmittedReason : null,
       bindMountsUsed: targets.reduce((n, r) => n + r.structural.bindMountCount, 0),
     },
     bar: {
@@ -93,16 +108,32 @@ function main() {
   const minCorr = Math.min(...targets.map((r) => r.analysis.minCorrelationToInside ?? 0));
   const worstDecoy = Math.max(...targets.map((r) => r.analysis.decoyCorrelation ?? 1));
   const minSd = Math.min(...targets.map((r) => r.analysis.minFrameStdDev ?? 0));
+  // The target must have actually STARTED. Without this, a non-black error
+  // dialog satisfies I2 just as well as a running Work Explorer -- the
+  // false pass verification round 1 flagged as a nit and which would have
+  // become a Major the first time VS Code failed to launch.
+  const targetStarted = targets.every(
+    (r) =>
+      Number(r.facts.target_process_count) > 0 &&
+      Number(r.facts.mapped_window_count) > 0
+  );
+  const extensionInstalled = targets.every((r) =>
+    String(r.facts.extensions_installed || "").includes("dabbler-ai-orchestration")
+  );
   results.I2 = {
     name: c.I2.name,
     pass:
       minCorr >= c.I2.minCorrelation &&
       worstDecoy <= c.I2.control.decoyMaxCorrelation &&
-      minSd >= c.I2.blackFrameGuard.minFrameStdDev,
+      minSd >= c.I2.blackFrameGuard.minFrameStdDev &&
+      targetStarted,
     measured: {
       minCorrelationToInside: minCorr,
       worstDecoyCorrelation: worstDecoy,
       minFrameStdDev: minSd,
+      targetProcessesAndWindowsPresent: targetStarted,
+      dabblerExtensionInstalled: extensionInstalled,
+      mappedWindowNames: targets.map((r) => r.facts.mapped_window_names),
     },
     bar: {
       minCorrelation: c.I2.minCorrelation,
@@ -151,43 +182,126 @@ function main() {
   };
 
   // --- I5 ---------------------------------------------------------------
-  const declared = c.I5.variants.length;
-  const ran = (m.inducedVariants || []).length;
-  const allFailedClearly = (m.inducedVariants || []).every((v) => v.failed && v.message);
+  // REWRITTEN after verification round 1 (Major, both lenses). The old
+  // version scored "at least three records exist and each has a nonempty
+  // message", which certified the set's cardinal degradation guarantee --
+  // FAILURE TO RECORD MUST NEVER FAIL THE WALKTHROUGH -- without testing it.
+  // Now: the exact declared variant identities must be present (allowing the
+  // one declared substitution), and each must satisfy the criterion's OWN
+  // postconditions.
+  const declaredNames = c.I5.variants.slice();
+  const ranRecords = m.inducedVariants || [];
+  const ranNames = ranRecords.map((v) => v.variant);
+  const substituted = ranRecords.filter((v) => v.substitutionDeclared).map((v) => v.variant);
+  // A declared variant is satisfied by its own name, or by a record that
+  // explicitly declares itself a substitution for it.
+  // EXACT set equality with the declared names. The earlier version accepted
+  // any record that declared itself a substitution, which is how
+  // `podman-machine-stopped` came to be scored by a variant that never
+  // stopped a machine.
+  const identitiesOk =
+    declaredNames.length === ranRecords.length &&
+    new Set(ranNames).size === ranNames.length &&
+    declaredNames.every((d) => ranNames.includes(d));
+  const postconditionsOk = ranRecords.every(
+    (v) =>
+      v.walkthroughCompleted === true &&
+      v.manifestStillWritten === true &&
+      v.videoArtifactCount === 0 &&
+      v.errorMentionsContainerDependency === true
+  );
   results.I5 = {
     name: c.I5.name,
-    pass: ran >= declared && allFailedClearly,
+    pass: identitiesOk && postconditionsOk && ranRecords.length >= declaredNames.length,
     measured: {
-      variantsDeclared: declared,
-      variantsRun: ran,
-      allFailedWithAMessage: allFailedClearly,
-      substitutionsDeclared: (m.inducedVariants || [])
-        .filter((v) => v.substitutionDeclared)
-        .map((v) => v.variant),
+      variantsDeclared: declaredNames,
+      variantsRun: ranNames,
+      identitiesOk,
+      postconditionsOk,
+      substitutionsDeclared: substituted,
+      perVariant: ranRecords.map((v) => ({
+        variant: v.variant,
+        walkthroughCompleted: v.walkthroughCompleted,
+        manifestStillWritten: v.manifestStillWritten,
+        videoArtifactCount: v.videoArtifactCount,
+        errorMentionsContainerDependency: v.errorMentionsContainerDependency,
+      })),
     },
   };
 
   // --- I6 ---------------------------------------------------------------
+  // REWRITTEN after verification round 1 (Major). The criterion says "after
+  // every run AND after one deliberately induced mid-run failure", and
+  // requires noZeroByteOrTempFilesInRunDir. The old version induced no
+  // failure and looked at no files, so it certified deterministic cleanup on
+  // the happy path only -- which is the one path where cleanup was never in
+  // doubt.
+  const failureRun = m.runs.find((r) => r.inducedMidRunFailure);
+  const cleanupAlwaysRan = m.runs.every(
+    (r) => r.cleanup && r.cleanup.removeStatus === 0 && !r.cleanup.containerStillListed
+  );
+  const noZeroByte = m.runs.every(
+    (r) =>
+      (r.cleanup.zeroByteFilesInContainer === null ||
+        r.cleanup.zeroByteFilesInContainer === 0) &&
+      r.cleanup.zeroByteFilesOnHost === 0
+  );
+  const noTempFiles = m.runs.every(
+    (r) => r.cleanup.tempFilesInContainer === null || r.cleanup.tempFilesInContainer === 0
+  );
+  const noHarnessVolumes = m.runs.every((r) => r.cleanup.harnessVolumeCount === 0);
   results.I6 = {
     name: c.I6.name,
     pass:
-      m.runs.every((r) => r.cleanup.removeStatus === 0 && !r.cleanup.containerStillListed) &&
-      m.runs.every((r) => r.cleanup.volumeCount === 0) &&
-      m.machineLeftInEntryState === true,
+      cleanupAlwaysRan &&
+      noZeroByte &&
+      noTempFiles &&
+      noHarnessVolumes &&
+      Boolean(failureRun) &&
+      Boolean(failureRun && failureRun.cleanup.cleanupRanAfterFailure) &&
+      !(failureRun && failureRun.cleanup.containerStillListed) &&
+      m.machineLeftInEntryState === true &&
+      // The machine-stopped variant is the one thing in this harness that can
+      // leave the operator's environment broken, so its restoration is scored
+      // rather than trusted.
+      (!m.machineStopVariant || m.machineStopVariant.restored === true) &&
+      (m.harnessContainersLeftBehind || []).length === 0,
     measured: {
+      midRunFailureInduced: Boolean(failureRun),
+      cleanupRanAfterInducedFailure: Boolean(
+        failureRun && failureRun.cleanup.cleanupRanAfterFailure
+      ),
       containersStillListed: m.runs.filter((r) => r.cleanup.containerStillListed).length,
-      maxVolumeCount: Math.max(...m.runs.map((r) => r.cleanup.volumeCount)),
+      harnessContainersLeftBehind: m.harnessContainersLeftBehind || [],
+      maxHarnessVolumeCount: Math.max(...m.runs.map((r) => r.cleanup.harnessVolumeCount || 0)),
+      zeroByteFilesClean: noZeroByte,
+      tempFilesClean: noTempFiles,
       machineLeftInEntryState: m.machineLeftInEntryState,
+      machineStopVariantRestored: m.machineStopVariant ? m.machineStopVariant.restored : null,
     },
   };
 
   // --- I7 (recorded, not scored) ----------------------------------------
+  // The criteria say `passFail: false` AND `requires: {imageBytes,
+  // imageBuildSeconds, coldStartSeconds, captureWallClockSeconds}`. The old
+  // version read the first half and copied `m.cost` unchecked, so a missing
+  // coldStartSeconds passed silently (verification round 1, Major). The
+  // honest reading of both halves: PRESENCE is required, VALUES are not
+  // judged. That is implementing the criterion, not amending it.
+  const requiredCostFields = Object.keys(c.I7.requires || {});
+  const missingCostFields = requiredCostFields.filter(
+    (k) => !m.cost || m.cost[k] === undefined || m.cost[k] === null
+  );
   results.I7 = {
     name: c.I7.name,
-    pass: null,
-    scored: false,
+    pass: missingCostFields.length === 0,
+    scoredOn: "presence of the required fields only; the values are not judged",
     measured: m.cost,
-    note: "Recorded rather than scored, exactly as the criteria say. The cost decision is the operator's.",
+    missingRequiredFields: missingCostFields,
+    note:
+      "Values are the operator's decision, as the criteria say. Presence is " +
+      "this verdict's business, because a required field that is absent is " +
+      "an unmet predeclared requirement however unjudged its value would be.",
   };
 
   const barRuns = criteria.bar.runs;
@@ -199,6 +313,10 @@ function main() {
       r.exitStatus === 0
   ).length;
 
+  // I7 is scored ON PRESENCE (see above), so it belongs in the list. The
+  // criteria's honestFail clause names I1-I6 as the fail condition, so I7 is
+  // reported separately rather than folded into the verdict, and a missing
+  // cost field is surfaced as its own line instead of vanishing.
   const scored = ["I1", "I2", "I3", "I4", "I5", "I6"];
   const unmet = scored.filter((k) => !results[k].pass);
   const verdict = unmet.length === 0 && cleanRuns >= barRuns ? "PASS" : "FAIL";
@@ -211,6 +329,7 @@ function main() {
     barRunsRequired: barRuns,
     cleanRunsObserved: cleanRuns,
     criteriaUnmet: unmet,
+    costFieldsMissing: results.I7.missingRequiredFields,
     results,
     honestFail: criteria.honestFail,
   };
@@ -223,7 +342,9 @@ function main() {
     );
   }
   process.stdout.write(
-    "  clean runs " + cleanRuns + "/" + barRuns + "\n[verdict] wrote " +
+    "  I7 " + (results.I7.pass ? "PASS" : "FAIL") + "  " + results.I7.name +
+      " (presence only)\n" +
+      "  clean runs " + cleanRuns + "/" + barRuns + "\n[verdict] wrote " +
       path.relative(REPO_ROOT, OUT_PATH) + "\n"
   );
   process.exitCode = verdict === "PASS" ? 0 : 1;

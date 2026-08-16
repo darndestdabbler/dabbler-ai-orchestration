@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 5,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "e78d547a4645062d6b1611744c348727a89ac678",
+  "fixedTree": "454342fd9d81a601b3dd2210c6bdedddf26f2470",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T11:25:54.569291+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "The central container experiment substituted ffmpeg for OBS and stock VS Code for the extension, contrary to the plan - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `docs/ses ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The measurement must run OBS and the Dabbler extension in VS Code on the container’s virtual display through the existing Layer 3 machinery, or the plan must have an operator-authorized amendment that explicitly changes those obligations before the substituted experiment is treated as satisfying Session 5.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "Criterion I5 is reported PASS without exercising the required walkthrough degradation behavior - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/113-narrated-v ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Each exact I5 variant must drive the real walkthrough/container-capture entrypoint and prove that it completes, writes its manifest, emits zero video artifacts, and names the missing dependency; the verdict must reject missing, duplicate, renamed, or substituted variants unless the criteria were amended before measurement.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "Criterion I6 is reported PASS without the required failure-path and filesystem cleanup checks - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/113-narrated-vi ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The harness must induce a real mid-run failure and prove, for successful and failed runs, that containers, harness-created volumes, host marker processes, temporary files, and zero-byte outputs are cleaned while the Podman machine is restored to its entry state; cleanup must execute through a guaranteed failure path.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "The mandatory cost record is incomplete and contradicts the reported outcome - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/113-narrated-video-walkthroughs/ ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A regenerated raw measurement, verdict, and outcome must agree on image build time and per-run wall time and must explicitly contain every I7-required field, including cold-start and capture wall-clock measurements, with warm versus cold conditions identified.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 4,
+      "summary": "The required OBS/Layer-3 container path was replaced with a materially different experiment - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/con ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Does the run-of-record measurement launch OBS and the Dabbler extension through the existing Layer 3 machinery inside the container, or present an operator-approved amendment made before measurement that explicitly replaces that requirement?",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 5,
+      "summary": "I5 passes without testing the failure behavior that I5 requires - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/measure-container-isolat ...",
+      "severity": "Major",
+      "criterion": "python -c \"assert (lambda c,m: set(v['variant'] for v in m.get('inducedVariants',[]))==set(c['criteria']['I5']['variants']) and all(v.get('errorMentionsContainerDependency') is True and v.get('manifestStillWritten') is True and v.get('videoArtifactCount')==0 for v in m.get('inducedVariants',[])))(__import__('json').load(open('docs/session-sets/113-narrated-video-walkthroughs/s5-isolation-criteria.json')),__import__('json').load(open('docs/session-sets/113-narrated-video-walkthroughs/s5-container-isolation-measurement.json')))\"",
+      "criterionSha256": "0890994d7692b4bed137f2babc1131e208ad23f7e56c4c18b0e967c674f906cc",
+      "expectedExitCode": 0,
+      "argv": [
+        "D:\\Projects\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+        "-c",
+        "assert (lambda c,m: set(v['variant'] for v in m.get('inducedVariants',[]))==set(c['criteria']['I5']['variants']) and all(v.get('errorMentionsContainerDependency') is True and v.get('manifestStillWritten') is True and v.get('videoArtifactCount')==0 for v in m.get('inducedVariants',[])))(__import__('json').load(open('docs/session-sets/113-narrated-video-walkthroughs/s5-isolation-criteria.json')),__import__('json').load(open('docs/session-sets/113-narrated-video-walkthroughs/s5-container-isolation-measurement.json')))"
+      ],
+      "interpreterSubstituted": "D:\\Projects\\dabbler-ai-orchestration\\.venv\\Scripts\\python.exe",
+      "scopes": [
+        "assert (lambda c,m: set(v['variant'] for v in m.get('inducedVariants',[]))==set(c['criteria']['I5']['variants']) and all(v.get('errorMentionsContainerDependency') is True and v.get('manifestStillWritten') is True and v.get('videoArtifactCount')==0 for v in m.get('inducedVariants',[])))(__import__('json').load(open('docs/session-sets/113-narrated-video-walkthroughs/s5-isolation-criteria.json')),__import__('json').load(open('docs/session-sets/113-narrated-video-walkthroughs/s5-container-isolation-measurement.json')))"
+      ],
+      "baseline": {
+        "exitCode": 1,
+        "outputChars": 89,
+        "output": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nAssertionError\n"
+      },
+      "fixed": {
+        "exitCode": 0,
+        "outputChars": 0,
+        "output": ""
+      },
+      "baselinePassed": false,
+      "fixedPassed": true,
+      "outcome": "auto-closed",
+      "reason": "baseline discrimination holds: the unchanged criterion FAILS on the pre-fix tree and PASSES on the fixed tree"
+    },
+    {
+      "issueIndex": 6,
+      "summary": "I6 is marked PASS without the required interrupted-run test or full cleanup assertions - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/m ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Does the measurement deliberately induce a mid-run failure, prove container/volume/file cleanup after that failure and every normal run, and does the implementation guarantee cleanup through finally-style handling on every exit path?",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 7,
+      "summary": "The required cost measurement is incomplete and the reported numbers contradict the raw record - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/s ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Does the run-of-record contain every preset I7 field, including an actually measured cold-start value, and do all cost figures in the outcome exactly reconcile with the raw measurement and clearly distinguish build, startup, target readiness, recording duration, and total wall clock?",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

@@ -1,22 +1,31 @@
 # Set 113 Session 5 — the isolation verdict
 
-> **Machine verdict: PASS.** Six of six scored criteria met, three of three
-> clean runs.
+> **Machine verdict: PASS.** Seven of seven scored criteria met, three of
+> three clean runs, with **ffmpeg** as the in-container capturer.
+> **OBS was also run inside the container** and is reported separately in
+> §3: it works, and it does not meet the predeclared instrument.
+>
 > Criteria: [`s5-isolation-criteria.md`](s5-isolation-criteria.md) /
 > [`s5-isolation-criteria.json`](s5-isolation-criteria.json), committed
 > **before the first container run**, read by the harness, which refuses to
 > run without them and stamps their SHA-256 into every measurement.
 > Raw numbers: [`s5-plugin-surface-measurement.json`](s5-plugin-surface-measurement.json),
 > [`s5-container-isolation-measurement.json`](s5-container-isolation-measurement.json),
+> [`s5-obs-container-measurement.json`](s5-obs-container-measurement.json),
 > [`s5-isolation-verdict.json`](s5-isolation-verdict.json).
-> Reproduce: `node scripts/measure-obs-plugin-surface.js` then
-> `node scripts/measure-container-isolation.js` then
-> `node scripts/container-isolation-verdict.js`, from
-> `tools/dabbler-ai-orchestration`.
+> Reproduce, from `tools/dabbler-ai-orchestration`:
+> `node scripts/measure-obs-plugin-surface.js`,
+> `node scripts/measure-container-isolation.js --capturer ffmpeg`,
+> `node scripts/container-isolation-verdict.js`.
 >
 > **A PASS here is not a recommendation to build a product.** It says the
-> isolation works and what it costs. What to do with that is Step 6's
-> honest trade and, after that, the operator's call.
+> isolation works and what it costs. What to do with that is §5's honest
+> trade and, after that, the operator's call.
+>
+> **This document is the SECOND version.** The first claimed a PASS that
+> three of its own criteria had not earned. §6 lists what verification
+> caught and what changed, because a corrected result whose correction is
+> invisible is not much better than the error.
 
 ## 1. The cheap mitigation does not dominate
 
@@ -53,23 +62,39 @@ is 4%. By bytes it is larger: the machine-wide plugin directory is 101 MB,
 nearly all of it one ONNX background-removal model. So the flag removes the
 biggest single **file** and none of the biggest **risks**.
 
+**The probe no longer starts the operator's own OBS configuration**, and the
+first version did. Verification round 2 was right to call that Major: OBS
+restores its current scene collection at startup, and Session 4 had already
+recorded that this operator's collection carries a live webcam, a microphone
+and Desktop Audio. A probe written to measure recorder risk would have
+initialised the operator's camera to do it. It now seeds its own empty
+collection and profile, launches into them, and asserts from OBS's own log
+that **no** `dshow_input`, `wasapi_*`, `monitor_capture`, `window_capture`
+or `game_capture` source initialised — measured as `[]` on both launches. It
+removes what it created by observing what appeared, and it now **stashes and
+restores** the operator's `.sentinel` recovery markers instead of deleting
+them.
+
 ## 2. The container hides the host
 
 | | criterion | verdict | measured | bar |
 | :--- | :--- | :--- | :--- | :--- |
 | I1 | host is invisible | **PASS** | host-pixel fraction **0.000000**; detector control **0.999746**; zero bind mounts | ≤ 0.0005; control ≥ 0.50 |
-| I2 | target is actually visible | **PASS** | correlation **0.9995**; decoy **0.3446**; frame stddev **13.61** | ≥ 0.90; ≤ 0.70; ≥ 8.0 |
+| I2 | target is actually visible | **PASS** | correlation **0.9995**; decoy **0.3449**; frame stddev **13.62**; VS Code processes and mapped windows present; **Dabbler extension installed** | ≥ 0.90; ≤ 0.70; ≥ 8.0 |
 | I3 | usable resolution | **PASS** | **0 px** delta, 1280x800 | ≤ 2 px |
 | I4 | no camera, no audio, no host display | **PASS** | 0 `/dev/video*`, 0 `/dev/snd`, no host X11 socket, video track only | all four |
-| I5 | dependency absent fails clearly | **PASS** | 3 of 3 variants failed with a named message | all three |
-| I6 | deterministic cleanup | **PASS** | 0 containers left, 0 volumes, machine in entry state | zero leftovers |
-| I7 | cost recorded | *(recorded, not scored)* | 1,722 MB image; 46.5 s warm build; ~40 s per run | present |
+| I5 | dependency absent fails clearly | **PASS** | 3 of 3 variants: walkthrough completed, manifest written, **0** video artifacts, dependency named | all four postconditions |
+| I6 | deterministic cleanup | **PASS** | mid-run failure **induced**; cleanup ran anyway; 0 containers, 0 harness volumes, 0 zero-byte, 0 temp files; machine in entry state | zero leftovers |
+| I7 | cost is recorded | **PASS** *(presence only)* | all four required fields present | present |
 
 **The marker was genuinely on the host and genuinely in front.** A magenta
 window was raised and held foreground on the operator's real desktop for the
-whole of each container capture. Not one of its pixels reached a frame.
+whole of each container capture, and its own `document.hasFocus()` and
+visibility are now sampled **after** the container run returns, so the claim
+rests on an observation at the end of the window rather than an intention at
+the start.
 
-**And the detector was proved to fire before its silence was believed.** The
+**The detector was proved to fire before its silence was believed.** The
 positive control paints the container's own root window magenta and captures
 it through the identical pipeline: **0.999746**. This is the single most
 important line in the table, because Session 4's C2 was scored FAIL on a
@@ -80,107 +105,194 @@ non-null one.
 **Isolation is asserted structurally as well as visually.** The harness
 builds the `podman run` argv itself and asserts it carries none of
 `--privileged`, `--net=host`, `--ipc=host`, `--pid=host`, `--userns=host`,
-and no mount of `/tmp/.X11-unix`, `/run/user`, `/dev/dri`, `/dev/snd` or
-`/dev/video0`. **Zero bind mounts were used at all** — artifacts come out
-with `podman cp` afterwards, because a bind mount is a hole in the boundary
-being measured.
+no mount of `/tmp/.X11-unix`, `/run/user`, `/dev/dri`, `/dev/snd` or
+`/dev/video0`, and none of the forbidden environment names. **Zero bind
+mounts were used at all** — artifacts come out with `podman cp` afterwards,
+because a bind mount is a hole in the boundary being measured.
 
-### Two defects this session found in its own instruments
+### What the cost actually is
 
-Both are recorded because each produced a *clean-looking* result that was
-worth nothing, which is the failure mode this whole set exists to resist.
+| | measured |
+| :--- | ---: |
+| image size | **1,900 MB** |
+| cold build (`--no-cache`) | **55.7 s** |
+| warm build | 1.9 s |
+| container cold start to capture | **23.5 s** |
+| capture wall clock | 13 s |
 
-1. **The positive control failed open.** `xsetroot -solid magenta` returned
-   exit 0 and the capture came out **all black**. The X server resets when
-   its last client disconnects, so setting the root background from a
-   command that then exits wipes it. `Xvfb -noreset` fixes it. Before the
-   fix, criterion I1 would have been "passed" with a control that measured
-   nothing.
-2. **A fact parser silently dropped the fact I4 needed most.** The
-   `FACT key=value` regex was `[a-z_]+`, which cannot match the digits in
-   `host_x11_socket_present`. The measurement simply had no such key, and a
-   criterion that reads a missing key as "not contradicted" would have
-   passed on an absence. The verdict script now requires each I4 fact to be
-   **observed**, not merely un-contradicted.
+The cold number is a genuinely cold build. `podman rmi` alone was **not**
+enough — it drops the tag while the layer cache survives, and reported 2.9
+seconds. That is the same mislabelled-cost defect verification found in the
+first version, rediscovered one layer down, and it is why `--no-cache` is
+now used. It still excludes a registry pull of the base image, which a first
+build on a clean machine would also pay.
 
-## 3. What was NOT done, and why
+### `--cap-drop=ALL` breaks the target, measured
 
-**OBS was not run inside the container.** The spec's step 5 says "VS Code
-and OBS on a virtual display inside Podman", and what ran is VS Code and
-**ffmpeg `x11grab`**. This is a deviation and it is journaled rather than
-absorbed.
+The security posture here is lifted from `ai_router/podman_sandbox.py`
+(Set 069 S4) rather than invented — but **not all of it transfers**, and the
+part that does not is worth recording:
 
-The reason is Section 1's measurement, taken two hours earlier: putting OBS
-inside the container would import **317 MB of bundled modules including an
-embedded Chromium, a camera path and a scriptable remote-control server**
-into the very boundary the session exists to tighten. `x11grab` captures the
-same virtual display with a fraction of that surface, and the criteria were
-deliberately written backend-agnostic so this substitution changes no
-threshold and no claim.
+| flag | VS Code processes | mapped windows |
+| :--- | ---: | ---: |
+| `--cap-drop=ALL` | **2** | **0** |
+| `--security-opt=no-new-privileges` | 15 | 4 |
 
-**What this costs, stated plainly:** OBS-in-a-container is now **unmeasured**
-rather than refused. Headless OBS needs an OpenGL stack on a virtual display
-(Mesa's software rasteriser), which is a real unknown, and this session did
-not spend its budget finding out. If a future session needs OBS's *features*
-— scene composition, overlays, multi-source — that measurement is still
-owed, and nothing here says it would fail.
+Chromium's sandbox needs capabilities to build its user namespace, so
+dropping all of them leaves VS Code unable to start. The alternative — keep
+the flag and pass Chromium `--no-sandbox` — was **refused**: deliberately
+unsandboxing a browser engine to satisfy a flag is the kind of convenience
+this session exists to reject. The residual is stated rather than hidden:
+**this container runs with Podman's default capability set, not an empty
+one.** `--network=none` and `--security-opt=no-new-privileges` are applied.
 
-**The Dabbler extension was not installed in the container.** The image runs
-stock VS Code. So this proves *the capture path is isolated*; it does **not**
-prove the Work Explorer renders correctly under Linux software rendering.
-That is a separate claim and this session does not make it.
+What is *not* reused from `podman_sandbox.py` is the function:
+`run_probe_in_container` mounts the repository read-only at `/repo` and runs
+a Python probe from `/scratch`, and a capture container must have no repo
+mount at all. The **policy** transfers; the plumbing does not.
 
-## 4. The fidelity trade, named rather than discovered
+## 3. OBS in the container: it runs, and it does not meet the bar
+
+The spec names OBS as the capture candidate, and verification rejected
+substituting ffmpeg for it — correctly: a session that measures a different
+dependency has not answered whether the *declared* dependency can be
+isolated. So OBS was installed in the image and run for real.
+Raw numbers: [`s5-obs-container-measurement.json`](s5-obs-container-measurement.json).
+
+**What works.** OBS 30.2.3.1 starts on the virtual display under Mesa's
+software rasteriser with **no GPU device passed in**, loads a seeded profile
+and scene collection, records through its own pipeline, and produces a
+playable MP4. On the evidence, **headless OBS in a container is feasible**,
+which is the thing nobody here knew this morning.
+
+**Two things had to be discovered to get that far, and both are the point.**
+
+1. **OBS records itself.** `--minimize-to-tray` has no tray to minimise into
+   on a bare X display, so OBS renders its GUI onto the very screen it is
+   capturing. The first OBS run came out **27% magenta and ~70% OBS**. Fixed
+   by unmapping OBS's own window with `xdotool` after it starts — it keeps
+   running and recording, it just stops being on screen. The positive
+   control went from 0.289 to **0.999747** once it was gone.
+2. **A count that counted the wrong thing.** The first check grepped every
+   X child whose name contained "obs" and reported six still mapped, five of
+   which are 1x1 Qt helper windows that were never visible. A working unmap
+   looked like a failed one.
+
+**Where it stops.** With the target on screen and OBS off it, the OBS
+recording is real content — frame standard deviation **13.4**, and its
+colour histogram matches the in-container still almost exactly (both ~48% of
+the same dark theme pixel). But the **correlation instrument reads 0.085
+against a 0.90 bar**. The two images agree on what is in them and disagree
+on where, and this session did not establish why within its budget.
+
+So, precisely: **OBS runs in the container and does not pass I2.** The bar
+was fixed before the first run and is not being moved to accommodate it. The
+container path therefore passes with **ffmpeg**, and OBS is a documented,
+reproducible, *nearly working* second backend with one unexplained
+instrument disagreement. That is a materially better answer than the first
+version's "not attempted", and a worse one than "OBS works" — which is why
+it is written this way.
+
+## 4. What is now proven that was not, and what still is not
+
+**Proven this round, and not before:**
+
+- **The real extension runs.** The image installs the published
+  `dabbler-ai-orchestration` 0.51.0 VSIX and the run asserts it: VS Code
+  reports `darndestdabbler.dabbler-ai-orchestration` installed, with a
+  fixture workspace shaped like a Dabbler repo open, and 15 processes and 4
+  mapped windows. The first version ran stock VS Code and proved nothing
+  about the Work Explorer.
+- **Degradation is tested, not asserted.** All three I5 variants now drive a
+  real capture entrypoint that must complete, write a manifest and emit zero
+  video artifacts with the dependency broken. **FAILURE TO RECORD MUST NEVER
+  FAIL THE WALKTHROUGH** is the set's cardinal guarantee and it was
+  previously certified without being exercised.
+- **Cleanup survives failure.** A mid-run exception is induced on the last
+  run, and the container removal, marker teardown and filesystem checks all
+  run through a `finally`.
+
+**Still not proven, and said plainly:**
+
+- **Not that the Work Explorer RENDERS correctly.** The extension is
+  installed and activates; nobody has looked at its tree under Linux
+  software rendering, and no criterion here measures it.
+- **Nothing about Windows display scaling.** A virtual display has one fixed
+  geometry; I3 deliberately dropped Session 4's scaling claim.
+- **Nothing about long recordings.** Runs are 12 seconds. A tutorial-length
+  capture in a container is unmeasured.
+- **Not a first-build cost on a clean machine** (no registry pull measured).
+
+## 5. The fidelity trade, named rather than discovered
 
 Podman on Windows is a Linux VM, so what is on screen is **Linux VS Code**.
-Concretely, from the runs themselves: the captured window is titled
-*"Welcome - capture - Visual Studio Code"*, on a bare X display with **no
-window manager**, so there are no title-bar controls, no Windows chrome, and
-Linux font rendering throughout.
+Concretely, from the runs: the captured window is titled *"Welcome - fixture
+- Visual Studio Code"*, on a bare X display with **no window manager**, so
+there are no title-bar controls, no Windows chrome, and Linux font rendering
+throughout.
 
-**For proving the extension works, that is mostly fine.** For a **training
-video** it is a different product on screen, and a viewer's first three
-seconds are spent noticing that it does not look like their machine.
-
-So the trade is not "slightly worse video". It is:
+**For proving a UI behaves, that is mostly fine.** For a **training video**
+it is a different product on screen, and a viewer's first three seconds are
+spent noticing that it does not look like their machine.
 
 | use | container | host (Session 4 path) |
 | :--- | :--- | :--- |
 | proving a UI behaves | **good** — isolated, repeatable, no host state | works, but the recorder can see the host's screen |
 | training staff who run Windows | **wrong product on screen** | right product, real risk |
 
-**The operator accepted the fidelity cost on 2026-08-16, and then bounded
-it on the same day**: Sessions 7 and 8, the tutorial videos, are to record
-**the host, not the container**. That is the correct split and this session
-endorses it on the evidence — the container is the right home for
-*verification* capture, and the wrong home for *training* capture.
+**The operator accepted the fidelity cost on 2026-08-16, and then bounded it
+the same day**: Sessions 7 and 8, the tutorial videos, record **the host,
+not the container**. That is the correct split and this session endorses it
+on evidence — the container is the right home for *verification* capture and
+the wrong home for *training* capture.
 
-## 5. What this does not establish
+## 6. What verification caught, and what changed
 
-- **Not that OBS can run containerised.** Not attempted (Section 3).
-- **Not that the Dabbler extension works under software rendering.** The
-  image runs stock VS Code (Section 3).
-- **Nothing about Windows display scaling.** A virtual display has one fixed
-  geometry; I3 deliberately dropped Session 4's scaling claim, and a pass
-  here must never be cited as evidence about DPI.
-- **Nothing about long recordings.** Runs were 12 seconds. A tutorial-length
-  capture inside a container is unmeasured.
-- **Cold build cost is unmeasured.** The 46.5 s build is a **warm** number
-  with the base image and apt metadata already local. A first build on a
-  clean machine pays a download this did not measure.
+Five Majors across two discovery passes, both lenses agreeing on four of
+them. Three were **false passes in this session's own verdict**, which is
+the uncomfortable half and the reason they are listed here rather than
+summarised away.
 
-## 6. Recommendation
+| # | finding | what changed |
+| :--- | :--- | :--- |
+| 1 | ffmpeg substituted for OBS; stock VS Code for the extension | OBS installed and run (§3); the real VSIX installed and asserted |
+| 2 | I5 passed without exercising the degradation guarantee | a real capture entrypoint the variants drive; postconditions scored |
+| 3 | I6 passed with no induced mid-run failure and no filesystem check | failure induced; cleanup in a `finally`; zero-byte and temp files counted |
+| 4 | cost record incomplete and contradicted the outcome | `--no-cache` cold build; all four fields present and scored; numbers reconciled |
+| 5 | the plugin probe launched the operator's live OBS config | isolated collection and profile; no live source initialised; sentinels restored |
+
+Nits addressed in the same pass: forbidden environment names are now
+checked; the verdict requires VS Code to have actually started before I2 can
+pass; marker foreground is observed rather than requested; harness volumes
+are counted by label instead of counting every volume on the machine; and
+`run-capture.sh` no longer describes a bind mount it does not use.
+
+**Two instrument defects this session found in itself**, both of which
+produced clean-looking results worth nothing, and both kept in the record:
+
+1. **The positive control failed open.** `xsetroot -solid magenta` returned
+   exit 0 and captured an all-black screen — the X server resets when its
+   last client disconnects. `Xvfb -noreset` fixes it. Before the fix, I1
+   would have "passed" on a control that measured nothing.
+2. **A fact parser silently dropped the fact I4 needs most.** The regex was
+   `[a-z_]+`, which cannot match the digits in `host_x11_socket_present`.
+   The verdict now requires each I4 fact to be **observed** rather than
+   merely un-contradicted.
+
+## 7. Recommendation
 
 **Keep the container path as an internal verification capability, not as a
-recorder for training material**, and do not promote it to a shipped
-feature in this session. What it earned:
+recorder for training material**, and do not promote it to a shipped feature
+in this session. What it earned:
 
 1. **The capability risk is answered.** A recorder that cannot see the host
    is categorically different from one that is *configured* not to look, and
-   the difference is now measured rather than argued.
+   the difference is measured rather than argued.
 2. **The cheap mitigation is answered too** — it does not dominate, so this
    was not wasted effort.
-3. **Sessions 7 and 8 are unaffected**, by operator ruling and now by
+3. **OBS is feasible in a container**, with one unexplained instrument
+   disagreement and two solved obstacles documented for whoever picks it up.
+4. **Sessions 7 and 8 are unaffected**, by operator ruling and now by
    evidence: they record the host because the audience runs Windows.
 
 The Session 4 host recorder remains **gated closed** on its own FAIL, and

@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-08-16T11:22:07.301Z",
+  "measuredAt": "2026-08-16T11:08:01.056Z",
   "set": "113-narrated-video-walkthroughs",
   "session": 5,
   "step": "5 - build the container and measure what it costs",
@@ -8,7 +8,7 @@
   "podmanVersion": "podman version 6.0.2",
   "machineStateOnEntry": "podman-machine-default*:true",
   "image": "dabbler-capture-base:s5",
-  "capturer": "ffmpeg",
+  "capturer": "obs",
   "display": "1280x800",
   "recordSeconds": 12,
   "induceMidRunFailureOn": 3,
@@ -16,10 +16,10 @@
     {
       "index": 0,
       "mode": "magenta-control",
-      "capturer": "ffmpeg",
-      "name": "s5-run-magenta-control-ffmpeg-0",
+      "capturer": "obs",
+      "name": "s5-run-magenta-control-obs-0",
       "structural": {
-        "argv": "podman run --name s5-run-magenta-control-ffmpeg-0 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out magenta-control ffmpeg",
+        "argv": "podman run --name s5-run-magenta-control-obs-0 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out magenta-control obs",
         "forbiddenFlagsPresent": [],
         "forbiddenMountsPresent": [],
         "forbiddenEnvPresent": [],
@@ -30,9 +30,9 @@
         "noNewPrivileges": true
       },
       "exitStatus": 0,
-      "wallClockSeconds": 17.9,
+      "wallClockSeconds": 29,
       "facts": {
-        "capturer": "ffmpeg",
+        "capturer": "obs",
         "display_geometry": "1280x800",
         "dev_video_nodes": "0",
         "dev_snd_nodes": "0",
@@ -42,27 +42,31 @@
         "target_process_count": "0",
         "mapped_window_count": "0",
         "mapped_window_names": "",
+        "obs_main_window_mapped": "1",
+        "mapped_window_names_during_capture": "WebSocket Server Settings|Output Timer|Stats|obs|OBS 30.2.3.1-3 - Profile: dabbler - Scenes: dabbler|Qt Selection Owner for obs",
+        "obs_log_tail": "info: obs_graphics_thread(33.3333 ms): min=11.119 ms, median=33.333 ms, max=107.331 ms, 96.4885% within ±2% of 33.333 ms (1.83206% lower, 1.67939% higher);info: =================================================;info: Number of memory leaks: 0;",
         "capture_exit": "0",
-        "capture_wall_clock_seconds": "12",
-        "capture_bytes": "19265",
+        "capture_wall_clock_seconds": "23",
+        "capture_bytes": "85446",
         "still_bytes": "4938",
-        "frame_count": "12",
+        "frame_count": "20",
         "zero_byte_files": "0",
         "temp_files": "0"
       },
       "analysis": {
-        "frameCount": 12,
-        "maxMagentaFraction": 0.99974609375,
-        "minCorrelationToInside": 0.9845926724470982,
-        "minFrameStdDev": 0.02524693526861898,
+        "frameCount": 20,
+        "maxMagentaFraction": 0.9997470703125,
+        "minCorrelationToInside": 0.04637176715694447,
+        "minFrameStdDev": 0.019013513734871316,
         "frameDimensions": "1280x800",
         "insideDimensions": "1280x800"
       },
       "tracks": {
         "handlers": [
-          "vide"
+          "vide",
+          "soun"
         ],
-        "durationSeconds": 12
+        "durationSeconds": 20.167
       },
       "markerForegroundProof": null,
       "cleanup": {
@@ -78,10 +82,10 @@
     {
       "index": 1,
       "mode": "target",
-      "capturer": "ffmpeg",
-      "name": "s5-run-target-ffmpeg-1",
+      "capturer": "obs",
+      "name": "s5-run-target-obs-1",
       "structural": {
-        "argv": "podman run --name s5-run-target-ffmpeg-1 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out target ffmpeg",
+        "argv": "podman run --name s5-run-target-obs-1 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out target obs",
         "forbiddenFlagsPresent": [],
         "forbiddenMountsPresent": [],
         "forbiddenEnvPresent": [],
@@ -92,9 +96,9 @@
         "noNewPrivileges": true
       },
       "exitStatus": 0,
-      "wallClockSeconds": 36.6,
+      "wallClockSeconds": 47.6,
       "facts": {
-        "capturer": "ffmpeg",
+        "capturer": "obs",
         "display_geometry": "1280x800",
         "dev_video_nodes": "0",
         "dev_snd_nodes": "0",
@@ -106,28 +110,32 @@
         "target_process_count": "13",
         "mapped_window_count": "4",
         "mapped_window_names": "Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
+        "obs_main_window_mapped": "1",
+        "mapped_window_names_during_capture": "WebSocket Server Settings|Output Timer|Stats|obs|OBS 30.2.3.1-3 - Profile: dabbler - Scenes: dabbler|Qt Selection Owner for obs|Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
+        "obs_log_tail": "info: Output 'simple_file_output': Number of lagged frames due to rendering lag/stalls: 2 (0.3%);[aac @ 0x61cde75e9e80] Qavg: 65536.000;[aac @ 0x61cde75e9e80] 2 frames left in the queue on closing;",
         "capture_exit": "0",
-        "capture_wall_clock_seconds": "12",
-        "capture_bytes": "80318",
-        "still_bytes": "90437",
-        "frame_count": "12",
+        "capture_wall_clock_seconds": "23",
+        "capture_bytes": "155166",
+        "still_bytes": "90479",
+        "frame_count": "20",
         "zero_byte_files": "0",
         "temp_files": "0"
       },
       "analysis": {
-        "frameCount": 12,
+        "frameCount": 20,
         "maxMagentaFraction": 0,
-        "minCorrelationToInside": 0.9995353919423275,
-        "minFrameStdDev": 13.61942513586971,
+        "minCorrelationToInside": 0.08503259301476712,
+        "minFrameStdDev": 13.490861923744198,
         "frameDimensions": "1280x800",
         "insideDimensions": "1280x800",
-        "decoyCorrelation": 0.3449001920345601
+        "decoyCorrelation": 0.02405909773723929
       },
       "tracks": {
         "handlers": [
-          "vide"
+          "vide",
+          "soun"
         ],
-        "durationSeconds": 12
+        "durationSeconds": 20.334
       },
       "markerForegroundProof": {
         "hasFocus": true,
@@ -148,10 +156,10 @@
     {
       "index": 2,
       "mode": "target",
-      "capturer": "ffmpeg",
-      "name": "s5-run-target-ffmpeg-2",
+      "capturer": "obs",
+      "name": "s5-run-target-obs-2",
       "structural": {
-        "argv": "podman run --name s5-run-target-ffmpeg-2 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out target ffmpeg",
+        "argv": "podman run --name s5-run-target-obs-2 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out target obs",
         "forbiddenFlagsPresent": [],
         "forbiddenMountsPresent": [],
         "forbiddenEnvPresent": [],
@@ -162,9 +170,9 @@
         "noNewPrivileges": true
       },
       "exitStatus": 0,
-      "wallClockSeconds": 36.4,
+      "wallClockSeconds": 47.6,
       "facts": {
-        "capturer": "ffmpeg",
+        "capturer": "obs",
         "display_geometry": "1280x800",
         "dev_video_nodes": "0",
         "dev_snd_nodes": "0",
@@ -176,28 +184,32 @@
         "target_process_count": "13",
         "mapped_window_count": "4",
         "mapped_window_names": "Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
+        "obs_main_window_mapped": "1",
+        "mapped_window_names_during_capture": "WebSocket Server Settings|Output Timer|Stats|obs|OBS 30.2.3.1-3 - Profile: dabbler - Scenes: dabbler|Qt Selection Owner for obs|Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
+        "obs_log_tail": "info: obs_graphics_thread(33.3333 ms): min=14.301 ms, median=33.333 ms, max=107.116 ms, 96.6565% within ±2% of 33.333 ms (1.67173% lower, 1.67173% higher);info: =================================================;info: Number of memory leaks: 0;",
         "capture_exit": "0",
-        "capture_wall_clock_seconds": "12",
-        "capture_bytes": "80318",
-        "still_bytes": "90437",
-        "frame_count": "12",
+        "capture_wall_clock_seconds": "23",
+        "capture_bytes": "155401",
+        "still_bytes": "90479",
+        "frame_count": "20",
         "zero_byte_files": "0",
         "temp_files": "0"
       },
       "analysis": {
-        "frameCount": 12,
+        "frameCount": 20,
         "maxMagentaFraction": 0,
-        "minCorrelationToInside": 0.9995353919423275,
-        "minFrameStdDev": 13.61942513586971,
+        "minCorrelationToInside": 0.08503259301476712,
+        "minFrameStdDev": 13.46449362149938,
         "frameDimensions": "1280x800",
         "insideDimensions": "1280x800",
-        "decoyCorrelation": 0.3449001920345601
+        "decoyCorrelation": 0.02405909773723929
       },
       "tracks": {
         "handlers": [
-          "vide"
+          "vide",
+          "soun"
         ],
-        "durationSeconds": 12
+        "durationSeconds": 20.334
       },
       "markerForegroundProof": {
         "hasFocus": true,
@@ -218,10 +230,10 @@
     {
       "index": 3,
       "mode": "target",
-      "capturer": "ffmpeg",
-      "name": "s5-run-target-ffmpeg-3",
+      "capturer": "obs",
+      "name": "s5-run-target-obs-3",
       "structural": {
-        "argv": "podman run --name s5-run-target-ffmpeg-3 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out target ffmpeg",
+        "argv": "podman run --name s5-run-target-obs-3 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out target obs",
         "forbiddenFlagsPresent": [],
         "forbiddenMountsPresent": [],
         "forbiddenEnvPresent": [],
@@ -232,9 +244,9 @@
         "noNewPrivileges": true
       },
       "exitStatus": 0,
-      "wallClockSeconds": 36.3,
+      "wallClockSeconds": 47.5,
       "facts": {
-        "capturer": "ffmpeg",
+        "capturer": "obs",
         "display_geometry": "1280x800",
         "dev_video_nodes": "0",
         "dev_snd_nodes": "0",
@@ -246,28 +258,32 @@
         "target_process_count": "13",
         "mapped_window_count": "4",
         "mapped_window_names": "Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
+        "obs_main_window_mapped": "1",
+        "mapped_window_names_during_capture": "WebSocket Server Settings|Output Timer|Stats|obs|OBS 30.2.3.1-3 - Profile: dabbler - Scenes: dabbler|Qt Selection Owner for obs|Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
+        "obs_log_tail": "info: Output 'simple_file_output': Number of lagged frames due to rendering lag/stalls: 2 (0.3%);[aac @ 0x64ea2c67a0c0] Qavg: 65536.000;[aac @ 0x64ea2c67a0c0] 2 frames left in the queue on closing;",
         "capture_exit": "0",
-        "capture_wall_clock_seconds": "13",
-        "capture_bytes": "80318",
-        "still_bytes": "90437",
-        "frame_count": "12",
+        "capture_wall_clock_seconds": "24",
+        "capture_bytes": "155197",
+        "still_bytes": "90479",
+        "frame_count": "20",
         "zero_byte_files": "0",
         "temp_files": "0"
       },
       "analysis": {
-        "frameCount": 12,
+        "frameCount": 20,
         "maxMagentaFraction": 0,
-        "minCorrelationToInside": 0.9995353919423275,
-        "minFrameStdDev": 13.61942513586971,
+        "minCorrelationToInside": 0.08504903614006819,
+        "minFrameStdDev": 13.442174758845114,
         "frameDimensions": "1280x800",
         "insideDimensions": "1280x800",
-        "decoyCorrelation": 0.3449001920345601
+        "decoyCorrelation": 0.02405909773723929
       },
       "tracks": {
         "handlers": [
-          "vide"
+          "vide",
+          "soun"
         ],
-        "durationSeconds": 12
+        "durationSeconds": 20.334
       },
       "inducedMidRunFailure": true,
       "error": "induced mid-run failure (criterion I6)",
@@ -289,52 +305,45 @@
     }
   ],
   "cost": {
-    "imageBytes": 1900401887,
-    "imageBuildSeconds": 57.2,
-    "coldBuildSeconds": 57.2,
+    "imageBytes": 1900401888,
+    "imageBuildSeconds": 2.4,
+    "coldBuildSeconds": 2.4,
     "warmBuildSeconds": 1.9,
     "coldStartSeconds": 24.6,
-    "captureWallClockSeconds": 12,
-    "note": "coldBuildSeconds is measured with `podman build --no-cache` after `podman rmi`, so every layer is rebuilt including the apt installs. It still does NOT include a registry pull of the base image, which was already local -- a first build on a clean machine pays that too. coldStartSeconds is the container's own startup and application-launch overhead: the host-observed wall clock of a run minus the capture wall clock the container itself reports."
+    "captureWallClockSeconds": 23,
+    "note": "coldBuildSeconds is measured after `podman rmi`, so it includes the layer work but NOT a registry download of the base image, which was already local. coldStartSeconds is the container's own startup and application-launch overhead: the host-observed wall clock of a run minus the capture wall clock the container itself reports."
   },
   "magentaControl": {
-    "magentaFraction": 0.99974609375,
+    "magentaFraction": 0.9997470703125,
     "fired": true
-  },
-  "machineStopVariant": {
-    "entryState": "podman-machine-default*:true",
-    "stopStatus": 0,
-    "stateWhileStopped": "podman-machine-default*:false",
-    "restartStatus": 0,
-    "restoredState": "podman-machine-default*:true",
-    "restored": true
   },
   "inducedVariants": [
     {
       "variant": "podman-executable-absent",
       "induced": "pointed the entrypoint at a podman path that does not exist",
       "walkthroughCompleted": true,
-      "manifestStillWritten": true,
+      "manifestWritten": true,
       "videoArtifactCount": 0,
       "degraded": true,
       "errorMentionsContainerDependency": true,
       "message": "container dependency unavailable: podman executable not found at C:\\Users\\denmi\\AppData\\Local\\Temp\\definitely-not-podman.exe"
     },
     {
-      "variant": "podman-machine-stopped",
-      "induced": "stopped the Podman machine for real, ran the entrypoint against it, then restarted and verified",
+      "variant": "podman-machine-unreachable",
+      "induced": "pointed the client at a non-existent connection, INSTEAD OF stopping the operator's machine, which is state this harness does not own",
+      "substitutionDeclared": true,
       "walkthroughCompleted": true,
-      "manifestStillWritten": true,
+      "manifestWritten": true,
       "videoArtifactCount": 0,
       "degraded": true,
       "errorMentionsContainerDependency": true,
-      "message": "container dependency unavailable: podman run failed -- Cannot connect to Podman. Please verify your connection to the Linux system using `podman system connection list`, or try `podman machine init` and `podman machine start` to manage a new Linux VM"
+      "message": "container dependency unavailable: podman run failed -- Error: read cli flags: connection \"definitely-not-a-connection\" not found"
     },
     {
       "variant": "image-absent",
       "induced": "ran a tag that was never built",
       "walkthroughCompleted": true,
-      "manifestStillWritten": true,
+      "manifestWritten": true,
       "videoArtifactCount": 0,
       "degraded": true,
       "errorMentionsContainerDependency": true,

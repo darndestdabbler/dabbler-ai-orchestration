@@ -496,14 +496,14 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
       // the walkthrough intact.
       inducedFailures: ["configure", "start", "stop"].map((point) => ({
         inducedAt: point,
-        stateAtFailure:
-          point === "stop"
-            ? {
-                inputs: ["window_capture"],
-                currentSceneCollection: "dabbler-walkthrough-collection",
-                recordingActive: true,
-              }
-            : null,
+        stateAtFailure: {
+          inputs: ["window_capture"] as string[],
+          sceneItems: 1,
+          currentSceneCollection: "dabbler-walkthrough-collection",
+          // Active at start and stop; not yet at configure. This is the
+          // shape that proves the failure was induced AFTER the operation.
+          recordingActive: point !== "configure",
+        },
         walkthroughStillCompleted: true,
         manifestWritten: true,
         osVideoArtifacts: 0,
@@ -671,6 +671,29 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
   test("a degraded run that still emits a video artifact fails C6", () => {
     const m = passingMeasurement();
     m.inducedFailures[2].osVideoArtifacts = 1;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("an induced failure with no recorded state fails C6", () => {
+    // Verification's nit: an injection sitting BEFORE its operation proves
+    // less than the prose claims. C6 now requires the live OBS state at the
+    // instant of the throw, so "post-operation" is evidence, not wording.
+    const m = passingMeasurement();
+    (m.inducedFailures[0] as Record<string, unknown>).stateAtFailure = null;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("a failure induced before the scene exists fails C6", () => {
+    const m = passingMeasurement();
+    m.inducedFailures[0].stateAtFailure.sceneItems = 0;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("a 'start' failure with no live recording fails C6", () => {
+    // If the recording is not active, the failure was induced before
+    // startRecording returned, which is the pre-operation case.
+    const m = passingMeasurement();
+    m.inducedFailures[1].stateAtFailure.recordingActive = false;
     assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
   });
 

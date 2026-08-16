@@ -199,30 +199,65 @@ as non-blocking reduces verification, which is inside the decision-rights
 hard carve-out, so whether a provably silent audio track is acceptable is
 item A of the guided look.
 
-## The ffmpeg fallback, and why it was not measured
+## The ffmpeg fallback — OPEN, and it needs the operator
 
-The spec names ffmpeg `gdigrab` as the **fallback** capture candidate.
-Verification flagged that it was never evaluated after OBS returned a
-`FAIL`, and that is a fair reading of the letter. Three facts, recorded
-rather than argued away:
+**This is the one thing this session could not settle, and it is recorded
+as open rather than argued closed.**
 
-1. **ffmpeg is not installed on this machine** (`where ffmpeg` finds
-   nothing). Installing software on the operator's machine is their
-   decision, not this session's.
-2. **OBS did not fail at capture.** The fallback's purpose is to try
-   another backend when the primary cannot meet the bar; OBS met every
-   capture criterion — window selection, leakage, resolution, timing,
-   cleanup — and the two unmet clauses are a mis-calibrated control and a
-   container behaviour. Neither is a reason to reach for a backend the
-   operator's own 2026-08-15 ruling moved *away* from.
-3. **The interesting hypothesis is recorded for whoever runs it.** ffmpeg
-   with `-an` would produce **no audio track at all**, which is exactly
-   C7's unmet clause — so `gdigrab` might satisfy the one thing OBS cannot.
-   It would very likely fail C1 and C2 instead: it is GDI-based, prone to
-   black frames on hardware-accelerated Electron, and leaks occluding
-   windows into the frame, which is why OBS was made primary.
+The spec names ffmpeg `gdigrab` as the fallback capture candidate.
+Verification raised its absence twice: once in discovery, and again in the
+remediation review, where the first attempt to close it by *recording* it
+rather than *doing* it was **fix-rejected**. That rejection lands one blow
+squarely, and it is worth repeating rather than softening:
 
-Recorded as residual **S4-R7** rather than treated as done.
+> *"The claim that OBS 'did not fail at capture' improperly narrows the
+> trigger: C7 is part of the authoritative capture criteria, OBS's verdict
+> is FAIL, and the outcome itself acknowledges that ffmpeg `-an` could
+> satisfy C7."*
+
+That is correct. C7 is a capture criterion; the verdict is FAIL; and the
+fallback is the one thing most likely to satisfy the clause OBS cannot.
+
+### What was measured, rather than assumed
+
+The first version of this section said "ffmpeg is not installed". That was
+true but lazy, so it was checked properly:
+
+| Candidate | Result |
+| :--- | :--- |
+| `ffmpeg` on `PATH` | absent |
+| Playwright's bundled `ffmpeg-win64.exe` (present, v7.0.1) | built `--disable-everything`; `-devices` lists **none**, so **no `gdigrab`** |
+| winget / Chocolatey / Scoop shims, `C:fmpeg`, Program Files | absent |
+| `winget` and `choco` themselves | **available** — an install is one command |
+
+So the fallback is not merely unmeasured, it is **unreachable without
+installing third-party software on the operator's machine**.
+
+### Why this session stopped instead of proceeding
+
+Two reasons, and the second is the one the spec cares about.
+
+1. **Installing software on the operator's machine is their decision.**
+   This session was careful to restore every byte it touched outside the
+   repository; downloading and installing a media toolchain unprompted
+   would be the one place it did the opposite.
+2. **Measuring the fallback honestly means building a second capture
+   backend** — process management, window targeting, output handling, and
+   its own pass through all seven criteria. The spec's Session 4 budget
+   says: *"Do not expand ... If the session starts growing, it has failed
+   its own budget — stop and record that."* There is a real tension between
+   that sentence and the sentence naming the fallback, and resolving a
+   spec-versus-spec tension about scope is not this session's call.
+
+The remediation review's own acceptance criterion offers exactly two
+routes: run the fallback against the unchanged criteria, **or** record an
+explicit operator ruling that ffmpeg's absence terminates fallback
+evaluation. This session can produce neither on its own authority — and
+manufacturing the second would be inventing an operator ruling, which is
+the worst available option.
+
+**So it is escalated, with the decision journaled and the options stated.**
+Residual **S4-R7**, owner: operator.
 
 ## Residuals
 
@@ -234,7 +269,7 @@ Recorded as residual **S4-R7** rather than treated as done.
 | S4-R4 | minor | C1 measures OBS's capture source, not the encoded file. A source-perfect, file-black capture would pass. Corroborated by file size and by the human watching it. | closed by guided-look item 1 |
 | S4-R5 | minor | A ten-run pilot leaves roughly 430 MB of gitignored video under `.walkthrough-runs/`, and this session ran it twice. Harmless, and worth knowing before running it on a small disk. | none |
 | S4-R6 | minor | Cleanup ownership on the rethrow path was fixed after the round-2 captures, so that a non-dependency failure from `configure()` cannot leave OBS running and the config rewritten. It is now **covered by measurement** — the induced-failure variants exercise exactly that path — but it was not covered by the ten. The sibling class was checked in the browser recorder (G-008) and is absent there. | closed by the induced-failure variants |
-| S4-R7 | minor | The spec's **ffmpeg `gdigrab` fallback was not measured**. ffmpeg is not installed here and installing it is an operator decision; OBS did not fail at capture, so the fallback's trigger is arguably unmet. Recorded with its hypothesis: `-an` would satisfy C7's audio clause, while GDI capture would very likely fail C1 and C2 for the reasons that made OBS primary. | operator, if the audio clause is judged blocking |
+| S4-R7 | **major, OPEN** | The spec's **ffmpeg `gdigrab` fallback is unmeasured and unreachable** without installing third-party software: no system ffmpeg exists, and Playwright's bundled build has no devices at all. Verification rejected closing this by recording it. Needs an operator ruling — install and measure, or rule the evaluation terminated. This is the session's one unresolved blocking finding. | **operator** |
 
 ## Follow-on sets
 

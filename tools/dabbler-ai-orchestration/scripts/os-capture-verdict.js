@@ -216,9 +216,27 @@ function evaluate(measurement, criteria) {
       f.manifestWritten === true &&
       f.osVideoArtifacts === 0 &&
       f.stepsCompleted === f.stepCount;
-    return { point, ran: f !== null, cleanedUp, degraded, detail: f };
+    // The failure must be PROVED post-operation, not asserted. Each point
+    // carries the live OBS state at the instant it threw: the collection
+    // and the single window-capture input must already exist, and the
+    // recording must be active at 'start' and 'stop' but not yet at
+    // 'configure'. Verification's nit was that the earlier injections sat
+    // BEFORE their operations and so proved less than the prose claimed.
+    const st = f && f.stateAtFailure;
+    const postOperation =
+      !!st &&
+      st.sceneItems === 1 &&
+      Array.isArray(st.inputs) &&
+      st.inputs.length === 1 &&
+      st.inputs[0] === "window_capture" &&
+      typeof st.currentSceneCollection === "string" &&
+      st.currentSceneCollection.length > 0 &&
+      st.recordingActive === (point !== "configure");
+    return { point, ran: f !== null, cleanedUp, degraded, postOperation, detail: f };
   });
-  const inducedOk = inducedDetail.every((d) => d.ran && d.cleanedUp && d.degraded);
+  const inducedOk = inducedDetail.every(
+    (d) => d.ran && d.cleanedUp && d.degraded && d.postOperation
+  );
   record(
     "C6",
     c.C6.name,

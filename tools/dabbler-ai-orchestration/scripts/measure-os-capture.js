@@ -520,19 +520,23 @@ async function inducedPostSetupFailures() {
       obsPort: 44680,
       mayEnableWebsocketConfig: true,
       induceFailureAt: point,
-      // For the 'stop' point the capture is fully live when the hook runs,
-      // so record what actually existed at that moment. For the earlier
-      // points there is deliberately nothing yet.
-      afterStart: async ({ capture }) => {
-        if (!capture) return;
-        const inputs = await capture.client.request("GetInputList", {});
-        const collections = await capture.client.request(
+      // Read the live OBS state at the INSTANT of the induced failure, at
+      // whichever of the three points it is. This is what turns "the
+      // collection, profile and input all existed by now" from a claim in a
+      // comment into a fact in the record.
+      onInduce: async (_point, session) => {
+        const inputs = await session.client.request("GetInputList", {});
+        const collections = await session.client.request(
           "GetSceneCollectionList",
           {}
         );
-        const status = await capture.client.request("GetRecordStatus", {});
+        const items = await session.client.request("GetSceneItemList", {
+          sceneName: session.sceneName,
+        });
+        const status = await session.client.request("GetRecordStatus", {});
         stateAtFailure = {
           inputs: inputs.inputs.map((i) => i.inputKind),
+          sceneItems: items.sceneItems.length,
           currentSceneCollection: collections.currentSceneCollectionName,
           recordingActive: status.outputActive,
         };

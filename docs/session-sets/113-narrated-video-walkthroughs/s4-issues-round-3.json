@@ -1,0 +1,73 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 3,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "The required ffmpeg fallback remains unevaluated**\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/measure-os-capture.js`, `docs/session-sets/113-narrated-video-walkthroughs/s4-os-capture-outcome.md`\n  - **Failure scenario:** The operator must decide whether to defer OS capture or waive the failed criteria. This is the current, certain decision path because the authoritative verdict remains `FAIL`. The fallback most likely to change C7—ffmpeg with `-an`—has no pilot execution or criteria evaluation, so the operator must decide without the fallback evidence the session promised. The outcome explicitly records this as unresolved S4-R7.\n  - **Acceptance criterion:** JUDGMENT - The durable pilot record must either contain an ffmpeg `gdigrab` attempt evaluated against the unchanged criteria after the OBS failure, or contain an explicit operator ruling that ffmpeg’s absence terminates fallback evaluation.\n  - **Details:** **Violation:** The plan states that “ffmpeg (`-f gdigrab`) is the fallback candidate,” while the outcome admits, “the spec’s ffmpeg `gdigrab` fallback was not measured.” The claim that OBS “did not fail at capture” improperly narrows the trigger: C7 is part of the authoritative capture criteria, OBS’s verdict is `FAIL`, and the outcome itself acknowledges that ffmpeg `-an` could satisfy C7. **Impact:** This leaves the session’s central measured-answer objective incomplete and can cause an unnecessary waiver or deferral, changing a reasonable operator’s merge decision. **Evidence:** `measure-os-capture.js` still drives only the OBS recorder and contains no ffmpeg attempt, while the outcome records the omission as a residual rather than an evaluated dependency-absent result or an operator-approved stop. The correct resolution is to run the fallback after its prerequisite is made available, or obtain an explicit operator decision that installation will not be authorized and record that as the fallback outcome.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "The operator must decide whether to defer OS capture or waive the failed criteria. This is the current, certain decision path because the authoritative verdict remains `FAIL`. The fallback most likely to change C7—ffmpeg with `-an`—has no pilot execution or criteria evaluation, so the operator must decide without the fallback evidence the session promised. The outcome explicitly records this as unresolved S4-R7.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/scripts/measure-os-capture.js",
+        "docs/session-sets/113-narrated-video-walkthroughs/s4-os-capture-outcome.md"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The durable pilot record must either contain an ffmpeg `gdigrab` attempt evaluated against the unchanged criteria after the OBS failure, or contain an explicit operator ruling that ffmpeg’s absence terminates fallback evaluation."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 unapproved recorder exposure",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 ffmpeg fallback was not evaluated",
+      "verdict": "fix-rejected",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 capture failures now degrade without destroying the walkthrough",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 C6 now includes a post-setup induced cleanup failure",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7 ordinary recorder runs no longer enable obs-websocket",
+      "verdict": "fix-accepted",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L4",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 supplementary recordings are now evaluated against per-run criteria",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    }
+  ]
+}

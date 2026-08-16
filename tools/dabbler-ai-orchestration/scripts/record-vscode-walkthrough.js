@@ -88,14 +88,24 @@ function log(msg) {
  *
  * Never set outside the pilot.
  */
-function induceIf(opts, point) {
-  if (opts.induceFailureAt === point) {
-    throw new Error(
-      "INDUCED capture failure at '" + point + "' (pilot test seam). A " +
-        "capture failure must degrade to no video, never destroy the " +
-        "walkthrough."
-    );
+async function induceIf(opts, point, session) {
+  if (opts.induceFailureAt !== point) return;
+  // Hand the caller the LIVE session first, so the pilot can record what
+  // actually existed at the instant of failure. Without this the claim
+  // "the collection, profile and input all existed by now" is prose; with
+  // it, the measurement carries the state it was true of.
+  if (typeof opts.onInduce === "function") {
+    try {
+      await opts.onInduce(point, session);
+    } catch {
+      /* observing must never change the failure being induced */
+    }
   }
+  throw new Error(
+    "INDUCED capture failure at '" + point + "' (pilot test seam). A " +
+      "capture failure must degrade to no video, never destroy the " +
+      "walkthrough."
+  );
 }
 
 /**
@@ -471,7 +481,6 @@ async function recordVscodeWalkthrough(options) {
       try {
         session.prepareHost();
         const version = await session.launch();
-        induceIf(opts, "configure");
         const configured = await session.configure({
           outDir,
           width: result.window.physical.width,
@@ -484,6 +493,13 @@ async function recordVscodeWalkthrough(options) {
             );
           },
         });
+        // AFTER configure() has returned: the scene collection, the profile
+        // and the window-capture input all exist by now, which is what
+        // makes this a post-operation failure rather than a pre-operation
+        // one. Verification's nit on the first version was exact -- the
+        // injection sat before the call and so proved less than the prose
+        // claimed.
+        await induceIf(opts, "configure", session);
         result.obs = {
           version: version.obsVersion,
           websocket: version.obsWebSocketVersion,
@@ -541,10 +557,11 @@ async function recordVscodeWalkthrough(options) {
       // output never becomes active. That raised out of the whole run
       // before this guard existed, taking the walkthrough with it.
       try {
-        induceIf(opts, "start");
         const anchor = await capture.startRecording();
         anchorMillis = anchor.anchorMillis;
         result.anchor = anchor;
+        // AFTER startRecording() has returned: the recording is live.
+        await induceIf(opts, "start", capture);
       } catch (err) {
         result.obsUnavailableKind =
           err instanceof ObsUnavailableError ? err.kind : "recording-start-failed";
@@ -629,7 +646,7 @@ async function recordVscodeWalkthrough(options) {
       // take the walkthrough with it.
       let recording = null;
       try {
-        induceIf(opts, "stop");
+        await induceIf(opts, "stop", capture);
         recording = await capture.stopRecording();
       } catch (err) {
         notes.push(
@@ -781,9 +798,22 @@ function announceStatus() {
       )
     ).evaluation;
   } catch {
-    /* no measurement on this machine; say nothing rather than guess */
+    /* handled below -- absence is reported, never treated as approval */
   }
-  if (!evaluation || evaluation.verdict === "PASS") return;
+  // FAIL CLOSED. An unreadable or missing measurement is not evidence of
+  // approval, and staying silent would let a checkout without the pilot
+  // record present this as an ordinary tool. Verification caught the first
+  // version failing open here.
+  if (!evaluation) {
+    log(
+      "NOT APPROVED FOR USE. The OS-capture pilot's measurement could not " +
+        "be read, so nothing here has been verified as passing. See " +
+        "docs/session-sets/113-narrated-video-walkthroughs/" +
+        "s4-os-capture-outcome.md."
+    );
+    return;
+  }
+  if (evaluation.verdict === "PASS") return;
   log(
     "NOT APPROVED FOR USE. The OS-capture pilot's verdict is " +
       evaluation.verdict +

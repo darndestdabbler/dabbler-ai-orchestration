@@ -3,7 +3,8 @@
 > **Machine verdict: PASS.** Seven of seven scored criteria met, three of
 > three clean runs, with **ffmpeg** as the in-container capturer.
 > **OBS was also run inside the container** and is reported separately in
-> §3: it works, and it does not meet the predeclared instrument.
+> §3: it starts, renders in software and records, and this session did not
+> obtain a clean OBS capture of the target.
 >
 > Criteria: [`s5-isolation-criteria.md`](s5-isolation-criteria.md) /
 > [`s5-isolation-criteria.json`](s5-isolation-criteria.json), committed
@@ -22,10 +23,11 @@
 > isolation works and what it costs. What to do with that is §5's honest
 > trade and, after that, the operator's call.
 >
-> **This document is the SECOND version.** The first claimed a PASS that
-> three of its own criteria had not earned. §6 lists what verification
-> caught and what changed, because a corrected result whose correction is
-> invisible is not much better than the error.
+> **This document is the THIRD version.** The first claimed a PASS that
+> three of its own criteria had not earned; the second fixed them in ways
+> the fix-delta review then rejected as still not testing the real thing.
+> §6 lists every finding and what changed, because a corrected result whose
+> correction is invisible is not much better than the error.
 
 ## 1. The cheap mitigation does not dominate
 
@@ -83,8 +85,8 @@ them.
 | I2 | target is actually visible | **PASS** | correlation **0.9995**; decoy **0.3449**; frame stddev **13.62**; VS Code processes and mapped windows present; **Dabbler extension installed** | ≥ 0.90; ≤ 0.70; ≥ 8.0 |
 | I3 | usable resolution | **PASS** | **0 px** delta, 1280x800 | ≤ 2 px |
 | I4 | no camera, no audio, no host display | **PASS** | 0 `/dev/video*`, 0 `/dev/snd`, no host X11 socket, video track only | all four |
-| I5 | dependency absent fails clearly | **PASS** | 3 of 3 variants: walkthrough completed, manifest written, **0** video artifacts, dependency named | all four postconditions |
-| I6 | deterministic cleanup | **PASS** | mid-run failure **induced**; cleanup ran anyway; 0 containers, 0 harness volumes, 0 zero-byte, 0 temp files; machine in entry state | zero leftovers |
+| I5 | dependency absent fails clearly | **PASS** | 3 of 3 declared variants, each driving **the documented entrypoint** as a child process: exit 0, manifest written, **0** video artifacts, dependency named, post-capture step ran | all postconditions |
+| I6 | deterministic cleanup | **PASS** | a **fourth** run interrupted at 22 s **while capture was active** (exit 137, 0 frames), excluded from the clean count; cleanup ran; 0 containers, 0 harness volumes, 0 zero-byte, 0 temp files; machine in entry state | zero leftovers |
 | I7 | cost is recorded | **PASS** *(presence only)* | all four required fields present | present |
 
 **The marker was genuinely on the host and genuinely in front.** A magenta
@@ -115,10 +117,16 @@ because a bind mount is a hole in the boundary being measured.
 | | measured |
 | :--- | ---: |
 | image size | **1,900 MB** |
-| cold build (`--no-cache`) | **55.7 s** |
+| cold build (`--no-cache`) | **56.7 s** |
 | warm build | 1.9 s |
-| container cold start to capture | **23.5 s** |
-| capture wall clock | 13 s |
+| container cold start to capture | **24.5 s** |
+| capture wall clock | 12 s |
+
+Every figure above is read from the committed measurement rather than
+transcribed from a console log. An earlier version of this table was
+transcribed, and drifted from the JSON by a second or two in three places —
+small, and exactly the kind of drift that makes a reader stop trusting the
+larger numbers.
 
 The cold number is a genuinely cold build. `podman rmi` alone was **not**
 enough — it drops the tag while the layer cache survives, and reported 2.9
@@ -178,20 +186,28 @@ which is the thing nobody here knew this morning.
    which are 1x1 Qt helper windows that were never visible. A working unmap
    looked like a failed one.
 
-**Where it stops.** With the target on screen and OBS off it, the OBS
-recording is real content — frame standard deviation **13.4**, and its
-colour histogram matches the in-container still almost exactly (both ~48% of
-the same dark theme pixel). But the **correlation instrument reads 0.085
-against a 0.90 bar**. The two images agree on what is in them and disagree
-on where, and this session did not establish why within its budget.
+**Where it stops, and a correction to the previous version of this
+document.** The OBS recording is real content — frame standard deviation
+**13.4**, colour histogram nearly identical to the in-container still — but
+the **correlation instrument reads 0.085 against a 0.90 bar**.
 
-So, precisely: **OBS runs in the container and does not pass I2.** The bar
-was fixed before the first run and is not being moved to accommodate it. The
-container path therefore passes with **ffmpeg**, and OBS is a documented,
-reproducible, *nearly working* second backend with one unexplained
-instrument disagreement. That is a materially better answer than the first
-version's "not attempted", and a worse one than "OBS works" — which is why
-it is written this way.
+The previous version called that disagreement *unexplained*. It is not, and
+saying so was unsupported: **every OBS run records
+`obs_main_window_mapped: 1`**, and `mapped_window_names_during_capture`
+still lists `OBS 30.2.3.1-3`. The `xdotool` unmap moved the window enough to
+clear the *control* frame — which is why the control went from 0.289 to
+0.999747 — but OBS's main window was **still mapped** during the target
+captures. So the OBS result is **confounded**, not mysterious: the most
+likely reading is that OBS's own GUI is still contributing to what it
+records, and nothing here rules that out.
+
+So, precisely: **OBS runs in a container, and this session did not obtain a
+clean OBS capture of the target.** The bar was fixed before the first run
+and is not being moved to accommodate it. The container path therefore
+passes with **ffmpeg**; OBS is feasible-and-unfinished, with the window
+suppression as the named next problem rather than an instrument mystery.
+That is a materially better answer than the first version's "not attempted",
+and an honest distance from "OBS works".
 
 ## 4. What is now proven that was not, and what still is not
 
@@ -203,14 +219,21 @@ it is written this way.
   fixture workspace shaped like a Dabbler repo open, and 15 processes and 4
   mapped windows. The first version ran stock VS Code and proved nothing
   about the Work Explorer.
-- **Degradation is tested, not asserted.** All three I5 variants now drive a
-  real capture entrypoint that must complete, write a manifest and emit zero
-  video artifacts with the dependency broken. **FAILURE TO RECORD MUST NEVER
-  FAIL THE WALKTHROUGH** is the set's cardinal guarantee and it was
-  previously certified without being exercised.
-- **Cleanup survives failure.** A mid-run exception is induced on the last
-  run, and the container removal, marker teardown and filesystem checks all
-  run through a `finally`.
+- **Degradation is tested through the command an operator actually runs.**
+  Each of the three declared variants re-executes
+  `measure-container-isolation.js` as a child process with the dependency
+  genuinely broken — a missing podman binary, a **stopped machine**, an
+  absent image with the build skipped so the tag stays absent — and each must
+  exit 0, write the manifest, name the dependency, run its post-capture step
+  and produce no video. **FAILURE TO RECORD MUST NEVER FAIL THE WALKTHROUGH**
+  is the set's cardinal guarantee; it was first certified without being
+  exercised at all, then certified by a private helper that always reported
+  success, and is now exercised against the documented entrypoint.
+- **Cleanup survives a real interruption.** A **fourth** run is force-removed
+  from the host at 22 seconds, *while capture is active* — it exits 137 with
+  zero frames — and the container removal, marker teardown and filesystem
+  checks all run through a `finally`. It is **not** counted among the three
+  clean runs, which the previous version did.
 
 **Still not proven, and said plainly:**
 
@@ -261,11 +284,33 @@ summarised away.
 | 4 | cost record incomplete and contradicted the outcome | `--no-cache` cold build; all four fields present and scored; numbers reconciled |
 | 5 | the plugin probe launched the operator's live OBS config | isolated collection and profile; no live source initialised; sentinels restored |
 
+**Round 3 (fix-delta review) then rejected two of those five fixes**, and
+both rejections were correct:
+
+| # | rejection | what changed |
+| :--- | :--- | :--- |
+| L2 | I5 was tested through a private helper that always set `completed = true`, while the documented script threw out of `buildImage()` under the same failures and wrote no manifest at all | the script itself degrades on every dependency failure and writes its manifest; the variants re-execute **it** |
+| L3 | the "mid-run" failure was thrown *after* capture, copying, decoding and track analysis had all succeeded — and the error-marked run was still counted as one of three clean runs | a distinct fourth run, force-removed **during** capture, excluded from the clean count |
+
+Two further defects surfaced while fixing those, and are worth recording
+because each would have passed silently: the `image-absent` variant was
+**building** the image under its bogus tag, so it measured a fully
+successful run and proved the opposite of its name; and the variant's video
+count listed only the top directory level, where a successful child writes
+nothing, so a variant that failed to degrade would still have reported zero
+video artifacts.
+
 Nits addressed in the same pass: forbidden environment names are now
 checked; the verdict requires VS Code to have actually started before I2 can
 pass; marker foreground is observed rather than requested; harness volumes
 are counted by label instead of counting every volume on the machine; and
-`run-capture.sh` no longer describes a bind mount it does not use.
+`run-capture.sh` no longer describes a bind mount it does not use; the
+extension check is now part of I2's pass expression rather than merely
+recorded beside it; the plugin probe's `ok` now **fails** when a safety
+assertion fails instead of reporting success regardless; and the probe
+snapshots the profile directory **before** creating its own, which is why it
+now removes `dabbler-plugin-probe` from both `scenes` and `profiles` where
+it previously leaked the profile every run.
 
 **Two instrument defects this session found in itself**, both of which
 produced clean-looking results worth nothing, and both kept in the record:
@@ -290,8 +335,10 @@ in this session. What it earned:
    the difference is measured rather than argued.
 2. **The cheap mitigation is answered too** — it does not dominate, so this
    was not wasted effort.
-3. **OBS is feasible in a container**, with one unexplained instrument
-   disagreement and two solved obstacles documented for whoever picks it up.
+3. **OBS is feasible in a container** and not yet usable in one: it starts,
+   renders in software and records, and its own window is still on the
+   display it captures. The named next problem is window suppression, not an
+   instrument mystery.
 4. **Sessions 7 and 8 are unaffected**, by operator ruling and now by
    evidence: they record the host because the audience runs Windows.
 

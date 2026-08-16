@@ -76,6 +76,9 @@ const SENTINEL_DIR = path.join(OBS_CONFIG_ROOT, ".sentinel");
 const SCENES_DIR = path.join(OBS_CONFIG_ROOT, "basic", "scenes");
 const PROFILES_DIR = path.join(OBS_CONFIG_ROOT, "basic", "profiles");
 const PROBE_NAME = "dabbler-plugin-probe";
+// Built from a named constant so the literal cannot be mangled by tooling
+// that rewrites escapes -- it already was once, producing a JS syntax error.
+const NL = String.fromCharCode(10);
 
 // Source kinds that must NOT appear in the probe's log. This is the
 // assertion that makes "isolated" a measurement instead of a promise.
@@ -311,16 +314,74 @@ function restoreSentinels(stashed) {
  * cleanup compares against: what APPEARED is removed, because OBS owns the
  * slug rules and predicting them is how Session 4 left a file behind while
  * its own survival check passed.
+ *
+ * The snapshot is taken BEFORE anything of ours is created. The first
+ * version created the probe's profile directory first, so cleanup never saw
+ * it as new and `profilesRemoved` was always empty -- the leak verification
+ * round 3 caught.
  */
 function seedIsolatedConfig() {
   fs.mkdirSync(SCENES_DIR, { recursive: true });
-  fs.mkdirSync(path.join(PROFILES_DIR, PROBE_NAME), { recursive: true });
+  fs.mkdirSync(PROFILES_DIR, { recursive: true });
 
   const before = {
     scenes: new Set(listDir(SCENES_DIR)),
     profiles: new Set(listDir(PROFILES_DIR)),
   };
 
+  // Refuse to overwrite a same-named collection or profile that is NOT ours,
+  // and clean up one that IS. A leftover from an interrupted probe run is
+  // this probe's own litter, and a guard that dead-ends on it stops the tool
+  // rather than protecting anything.
+  if (before.scenes.has(PROBE_NAME + ".json") || before.profiles.has(PROBE_NAME)) {
+    let recognised = true;
+    if (before.profiles.has(PROBE_NAME)) {
+      try {
+        // Match on the profile's own Name= key, not byte equality with what
+        // we wrote. OBS TAKES OWNERSHIP of a profile it loads and rewrites
+        // basic.ini -- here, prepending a UTF-8 BOM -- so an exact-content
+        // rule can never recognise our own leftover after a single launch.
+        const ini = fs
+          .readFileSync(path.join(PROFILES_DIR, PROBE_NAME, "basic.ini"), "utf8")
+          .replace(/^﻿/, "");
+        recognised = /^\s*Name\s*=\s*dabbler-plugin-probe\s*$/m.test(ini);
+      } catch {
+        recognised = false;
+      }
+    }
+    if (recognised && before.scenes.has(PROBE_NAME + ".json")) {
+      try {
+        const j = JSON.parse(
+          fs.readFileSync(path.join(SCENES_DIR, PROBE_NAME + ".json"), "utf8")
+        );
+        recognised = j.name === PROBE_NAME;
+      } catch {
+        recognised = false;
+      }
+    }
+    if (!recognised) {
+      throw new Error(
+        "refusing to overwrite an existing OBS collection or profile named '" +
+          PROBE_NAME +
+          "' whose contents this probe does not recognise. Rename or remove it " +
+          "first; this probe will not clobber operator state."
+      );
+    }
+    try {
+      fs.rmSync(path.join(SCENES_DIR, PROBE_NAME + ".json"), { force: true });
+    } catch {
+      /* best effort */
+    }
+    try {
+      fs.rmSync(path.join(PROFILES_DIR, PROBE_NAME), { recursive: true, force: true });
+    } catch {
+      /* best effort */
+    }
+    before.scenes.delete(PROBE_NAME + ".json");
+    before.profiles.delete(PROBE_NAME);
+  }
+
+  fs.mkdirSync(path.join(PROFILES_DIR, PROBE_NAME), { recursive: true });
   fs.writeFileSync(
     path.join(SCENES_DIR, PROBE_NAME + ".json"),
     JSON.stringify(
@@ -348,7 +409,7 @@ function seedIsolatedConfig() {
   );
   fs.writeFileSync(
     path.join(PROFILES_DIR, PROBE_NAME, "basic.ini"),
-    "[General]\nName=" + PROBE_NAME + "\n",
+    "[General]" + NL + "Name=" + PROBE_NAME + NL,
     "utf8"
   );
   return before;
@@ -463,7 +524,12 @@ async function observeLaunch(label, extraArgs) {
   return {
     label,
     args: extraArgs,
-    ok: true,
+    // `ok` now FAILS when a safety assertion fails. Recording the assertion
+    // and then reporting ok:true regardless is fail-open (round 3 nit), and
+    // this probe's whole justification is that it does not touch live
+    // sources.
+    ok: liveSourcesSeen.length === 0 && /dabbler-plugin-probe/i.test(text),
+    safetyAssertionsMet: liveSourcesSeen.length === 0,
     logFile: logFile.name,
     obsVersion: (text.match(/OBS\s+([\d.]+)/) || [null, null])[1],
     isolatedCollectionUsed: /dabbler-plugin-probe/i.test(text),

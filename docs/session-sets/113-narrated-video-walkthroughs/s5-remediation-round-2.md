@@ -190,8 +190,96 @@ worth nothing, which is the failure mode this whole set exists to resist.
    **observed**, not merely un-contradicted — the omitted-component failure
    mode in different clothes.
 
-## Verdict after remediation
+## Verdict after round-1 and round-2 remediation
 
-**PASS**, seven of seven scored criteria, three of three clean runs, against
-the same criteria file, scored by a script that reads the criteria and
-cannot produce measurements.
+**PASS**, seven of seven scored criteria -- but see below: the fix-delta
+review rejected two of these fixes.
+
+---
+
+## Round 3 — the fix-delta review rejected two of the five fixes
+
+Both rejections were correct, and both were the same mistake in different
+clothes: **a test that certifies itself**.
+
+### L2 rejected — I5 was tested through a private helper, not the real command
+
+`containerCaptureEntrypoint()` lived inside the measurement script, always
+set `completed = true`, and was only ever called after the image build and
+the normal runs had already succeeded. Meanwhile the script an operator
+actually runs threw out of `buildImage()` the moment podman was missing --
+so under the very dependency failures I5 declares, the documented command
+aborted with no manifest at all while I5 reported PASS.
+
+**Fixed.** The script degrades on every dependency failure: it writes its own
+run manifest, records `postCaptureStep: "ran"`, and exits 0 with no video.
+Each of the three declared variants now re-executes
+`measure-container-isolation.js` **as a child process** with the dependency
+genuinely broken, and the verdict requires the record to name that
+entrypoint.
+
+Two further defects surfaced while fixing it, each of which would have
+passed silently:
+
+- **`image-absent` was building the image.** Pointing `DABBLER_S5_IMAGE` at
+  a bogus tag simply built the image under that name, so the child ran a
+  complete successful measurement -- the variant proving the opposite of what
+  it claims. It now skips the build and requires the tag to exist, and the
+  bogus tag is removed before every run because an earlier attempt had left
+  it in the image store.
+- **The video count looked only at the top directory level**, where a child
+  that captured successfully writes nothing. A variant that failed to degrade
+  would have reported zero video artifacts and passed. It is recursive now.
+
+### L3 rejected — the "mid-run" failure fired after everything had succeeded
+
+The induced exception was thrown after `podman run` returned and after all
+three `podman cp` calls, `analyseRun()` and `readTracks()` had completed.
+That tests the teardown of a **successful** run. Worse, the error-marked run
+was still counted toward "three consecutive clean runs", so
+`cleanRunsObserved` read 3 when only two runs were undisturbed.
+
+**Fixed.** There is now a distinct **fourth** run, spawned asynchronously and
+force-removed from the host at 22 seconds **while capture is active**: it
+exits 137 with zero frames and genuinely partial artifacts. It is excluded
+from the clean-run count, and the verdict requires the induced failure to
+carry `killedMidCapture: true` -- an exception thrown after a clean capture
+can no longer satisfy I6.
+
+A quieter defect went with it: `cleanupRanAfterFailure` was keyed off a
+thrown exception, and an interrupted child throws nothing -- so the one run
+that *was* the failure reported that cleanup had not run after a failure.
+
+### The nit that turned out to be a real leak
+
+Round 3 noted that `seedIsolatedConfig()` created the probe's profile
+directory **before** taking its snapshot, so cleanup never treated it as new.
+It was right, and the evidence was on disk: a `dabbler-plugin-probe` profile
+left in the operator's OBS configuration from earlier runs. The snapshot is
+taken first now, and the probe removes both the collection and the profile --
+confirmed by `profilesRemoved: ["dabbler-plugin-probe"]` and by the
+operator's profile directory containing only their own `Untitled` again.
+
+Fixing it exposed one more: the guard added to avoid clobbering operator
+state **dead-ended on the probe's own litter**, because it demanded byte
+equality with what it had written and OBS rewrites a profile it loads (here,
+prepending a UTF-8 BOM). It now recognises its own leftovers by the profile's
+`Name=` key and cleans them, and still refuses anything it does not
+recognise.
+
+### The claim this round forced me to withdraw
+
+The previous document said OBS's remaining I2 failure was an *unexplained*
+correlation disagreement. Round 3 pointed at the measurement:
+`obs_main_window_mapped: 1` on every OBS run. The unmap cleared the control
+frame but did **not** remove OBS's window during the target captures, so the
+OBS result is **confounded rather than mysterious**. That correction is in
+the outcome document, and it moves OBS from "works except for something
+strange" to "feasible, with window suppression as the named next problem".
+
+## Verdict after round-3 remediation
+
+**PASS**, seven of seven scored criteria, **three** clean runs plus one
+deliberately interrupted run that is not counted among them, all against the
+same criteria file committed before the first container run.
+

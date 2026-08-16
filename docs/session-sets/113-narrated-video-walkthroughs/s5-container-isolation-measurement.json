@@ -1,17 +1,17 @@
 {
-  "measuredAt": "2026-08-16T11:22:07.301Z",
+  "measuredAt": "2026-08-16T11:46:13.802Z",
   "set": "113-narrated-video-walkthroughs",
   "session": 5,
   "step": "5 - build the container and measure what it costs",
   "criteriaSha256": "sha256:51c8fc41b56a5ae8c072e4b23270dbacc2e77add7b06b4961c73ec2719741985",
   "podmanExe": "C:\\Users\\denmi\\AppData\\Local\\Programs\\Podman\\podman.exe",
   "podmanVersion": "podman version 6.0.2",
+  "scratchDir": "D:\\Projects\\dabbler-ai-orchestration\\tools\\dabbler-ai-orchestration\\.s5-scratch",
   "machineStateOnEntry": "podman-machine-default*:true",
   "image": "dabbler-capture-base:s5",
   "capturer": "ffmpeg",
   "display": "1280x800",
   "recordSeconds": 12,
-  "induceMidRunFailureOn": 3,
   "runs": [
     {
       "index": 0,
@@ -29,6 +29,7 @@
         "capDropOmittedReason": "--cap-drop=ALL breaks Chromium's sandbox setup: measured at 2 VS Code processes and 0 mapped windows with it, 15 processes without it. Not traded for --no-sandbox. Container runs with Podman's default caps.",
         "noNewPrivileges": true
       },
+      "interrupted": false,
       "exitStatus": 0,
       "wallClockSeconds": 17.9,
       "facts": {
@@ -43,7 +44,7 @@
         "mapped_window_count": "0",
         "mapped_window_names": "",
         "capture_exit": "0",
-        "capture_wall_clock_seconds": "12",
+        "capture_wall_clock_seconds": "13",
         "capture_bytes": "19265",
         "still_bytes": "4938",
         "frame_count": "12",
@@ -91,8 +92,9 @@
         "capDropOmittedReason": "--cap-drop=ALL breaks Chromium's sandbox setup: measured at 2 VS Code processes and 0 mapped windows with it, 15 processes without it. Not traded for --no-sandbox. Container runs with Podman's default caps.",
         "noNewPrivileges": true
       },
+      "interrupted": false,
       "exitStatus": 0,
-      "wallClockSeconds": 36.6,
+      "wallClockSeconds": 36.5,
       "facts": {
         "capturer": "ffmpeg",
         "display_geometry": "1280x800",
@@ -161,8 +163,9 @@
         "capDropOmittedReason": "--cap-drop=ALL breaks Chromium's sandbox setup: measured at 2 VS Code processes and 0 mapped windows with it, 15 processes without it. Not traded for --no-sandbox. Container runs with Podman's default caps.",
         "noNewPrivileges": true
       },
+      "interrupted": false,
       "exitStatus": 0,
-      "wallClockSeconds": 36.4,
+      "wallClockSeconds": 36.3,
       "facts": {
         "capturer": "ffmpeg",
         "display_geometry": "1280x800",
@@ -231,8 +234,9 @@
         "capDropOmittedReason": "--cap-drop=ALL breaks Chromium's sandbox setup: measured at 2 VS Code processes and 0 mapped windows with it, 15 processes without it. Not traded for --no-sandbox. Container runs with Podman's default caps.",
         "noNewPrivileges": true
       },
+      "interrupted": false,
       "exitStatus": 0,
-      "wallClockSeconds": 36.3,
+      "wallClockSeconds": 36.4,
       "facts": {
         "capturer": "ffmpeg",
         "display_geometry": "1280x800",
@@ -247,7 +251,7 @@
         "mapped_window_count": "4",
         "mapped_window_names": "Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
         "capture_exit": "0",
-        "capture_wall_clock_seconds": "13",
+        "capture_wall_clock_seconds": "12",
         "capture_bytes": "80318",
         "still_bytes": "90437",
         "frame_count": "12",
@@ -269,8 +273,6 @@
         ],
         "durationSeconds": 12
       },
-      "inducedMidRunFailure": true,
-      "error": "induced mid-run failure (criterion I6)",
       "markerForegroundProof": {
         "hasFocus": true,
         "visibilityState": "visible",
@@ -284,16 +286,73 @@
         "zeroByteFilesInContainer": 0,
         "tempFilesInContainer": 0,
         "zeroByteFilesOnHost": 0,
+        "cleanupRanAfterFailure": false
+      }
+    },
+    {
+      "index": 4,
+      "mode": "interrupt",
+      "capturer": "ffmpeg",
+      "name": "s5-run-interrupt-ffmpeg-4",
+      "structural": {
+        "argv": "podman run --name s5-run-interrupt-ffmpeg-4 --label dabbler-s5-isolation=1 --network=none --security-opt=no-new-privileges dabbler-capture-base:s5 1280 800 12 /out interrupt ffmpeg",
+        "forbiddenFlagsPresent": [],
+        "forbiddenMountsPresent": [],
+        "forbiddenEnvPresent": [],
+        "bindMountCount": 0,
+        "networkNone": true,
+        "capDropAll": false,
+        "capDropOmittedReason": "--cap-drop=ALL breaks Chromium's sandbox setup: measured at 2 VS Code processes and 0 mapped windows with it, 15 processes without it. Not traded for --no-sandbox. Container runs with Podman's default caps.",
+        "noNewPrivileges": true
+      },
+      "interrupted": true,
+      "interruptedAtSeconds": 22,
+      "killedMidCapture": true,
+      "exitStatus": 137,
+      "wallClockSeconds": 32.5,
+      "facts": {
+        "capturer": "ffmpeg",
+        "display_geometry": "1280x800",
+        "dev_video_nodes": "0",
+        "dev_snd_nodes": "0",
+        "dev_dri_nodes": "0",
+        "host_x11_socket_present": "no",
+        "extension_install_exit": "0",
+        "extensions_installed": "darndestdabbler.dabbler-ai-orchestration",
+        "mode": "target",
+        "target_process_count": "13",
+        "mapped_window_count": "4",
+        "mapped_window_names": "Welcome - fixture - Visual Studio Code|code|Chromium clipboard"
+      },
+      "stderrTail": "",
+      "analysis": {
+        "frameCount": 0,
+        "maxMagentaFraction": null,
+        "minCorrelationToInside": null,
+        "minFrameStdDev": null,
+        "frameDimensions": null,
+        "insideDimensions": null
+      },
+      "tracks": null,
+      "inducedMidRunFailure": true,
+      "markerForegroundProof": null,
+      "cleanup": {
+        "removeStatus": 0,
+        "containerStillListed": false,
+        "harnessVolumeCount": 0,
+        "zeroByteFilesInContainer": null,
+        "tempFilesInContainer": null,
+        "zeroByteFilesOnHost": 0,
         "cleanupRanAfterFailure": true
       }
     }
   ],
   "cost": {
-    "imageBytes": 1900401887,
-    "imageBuildSeconds": 57.2,
-    "coldBuildSeconds": 57.2,
+    "imageBytes": 1900401888,
+    "imageBuildSeconds": 56.7,
+    "coldBuildSeconds": 56.7,
     "warmBuildSeconds": 1.9,
-    "coldStartSeconds": 24.6,
+    "coldStartSeconds": 24.5,
     "captureWallClockSeconds": 12,
     "note": "coldBuildSeconds is measured with `podman build --no-cache` after `podman rmi`, so every layer is rebuilt including the apt installs. It still does NOT include a registry pull of the base image, which was already local -- a first build on a clean machine pays that too. coldStartSeconds is the container's own startup and application-launch overhead: the host-observed wall clock of a run minus the capture wall clock the container itself reports."
   },
@@ -312,33 +371,42 @@
   "inducedVariants": [
     {
       "variant": "podman-executable-absent",
-      "induced": "pointed the entrypoint at a podman path that does not exist",
+      "induced": "re-ran the documented entrypoint with DABBLER_PODMAN pointing at a path that does not exist",
+      "entrypoint": "measure-container-isolation.js (the documented command)",
+      "childExitStatus": 0,
       "walkthroughCompleted": true,
       "manifestStillWritten": true,
       "videoArtifactCount": 0,
       "degraded": true,
+      "postCaptureStepRan": true,
       "errorMentionsContainerDependency": true,
       "message": "container dependency unavailable: podman executable not found at C:\\Users\\denmi\\AppData\\Local\\Temp\\definitely-not-podman.exe"
     },
     {
       "variant": "podman-machine-stopped",
-      "induced": "stopped the Podman machine for real, ran the entrypoint against it, then restarted and verified",
+      "induced": "stopped the Podman machine for real and re-ran the documented entrypoint against it",
+      "entrypoint": "measure-container-isolation.js (the documented command)",
+      "childExitStatus": 0,
       "walkthroughCompleted": true,
       "manifestStillWritten": true,
       "videoArtifactCount": 0,
       "degraded": true,
+      "postCaptureStepRan": true,
       "errorMentionsContainerDependency": true,
-      "message": "container dependency unavailable: podman run failed -- Cannot connect to Podman. Please verify your connection to the Linux system using `podman system connection list`, or try `podman machine init` and `podman machine start` to manage a new Linux VM"
+      "message": "container dependency unavailable: image build failed -- Cannot connect to Podman. Please verify your connection to the Linux system using `podman system connection list`, or try `podman machine init` and `podman machine start` to manage a new Linux VM"
     },
     {
       "variant": "image-absent",
-      "induced": "ran a tag that was never built",
+      "induced": "re-ran the documented entrypoint against a tag that was never built, with the build skipped so the tag stays absent",
+      "entrypoint": "measure-container-isolation.js (the documented command)",
+      "childExitStatus": 0,
       "walkthroughCompleted": true,
       "manifestStillWritten": true,
       "videoArtifactCount": 0,
       "degraded": true,
+      "postCaptureStepRan": true,
       "errorMentionsContainerDependency": true,
-      "message": "container dependency unavailable: podman run failed -- Error: unable to copy from source docker://localhost/definitely-no-such-image:s5: initializing source docker://localhost/definitely-no-such-image:s5: fetching manifest s5 in localhost/definitely-no-such-image: pinging container registry localhos"
+      "message": "container dependency unavailable: image localhost/definitely-no-such-image:s5 is not present and the build was skipped"
     }
   ],
   "machineStateOnExit": "podman-machine-default*:true",

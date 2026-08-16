@@ -62,12 +62,18 @@ const CRITERIA_PATH = path.join(SET_DIR, "s5-isolation-criteria.json");
 const OUT_PATH = path.join(SET_DIR, "s5-container-isolation-measurement.json");
 const CONTAINERS_DIR = path.join(EXTENSION_ROOT, "containers");
 const SCRATCH = path.join(EXTENSION_ROOT, ".s5-scratch");
+// The walkthrough manifest THIS SCRIPT writes, on every exit path, lives at
+// <scratch>/run-manifest.json. Criterion I5 is about the documented
+// entrypoint completing without a video, so the manifest has to be this
+// script's own artifact rather than a helper's -- see writeManifest().
 
 const PODMAN =
   process.env.DABBLER_PODMAN ||
   path.join(process.env.LOCALAPPDATA || "", "Programs", "Podman", "podman.exe");
 
-const IMAGE = "dabbler-capture-base:s5";
+// Overridable so the I5 variants can break the dependency on the DOCUMENTED
+// entrypoint rather than on a private helper.
+const IMAGE = process.env.DABBLER_S5_IMAGE || "dabbler-capture-base:s5";
 const LABEL = "dabbler-s5-isolation";
 const WIDTH = 1280;
 const HEIGHT = 800;
@@ -282,6 +288,23 @@ async function openHostMarker() {
 }
 
 function buildImage(measurement, { cold }) {
+  // The image-absent variant must find NO image, and the first attempt at it
+  // did not: pointing DABBLER_S5_IMAGE at a bogus tag simply built the image
+  // under that name, so the child ran a full successful measurement and the
+  // variant proved nothing. Skipping the build is what makes the tag absent.
+  if (process.env.DABBLER_S5_SKIP_BUILD) {
+    const exists = podman(["image", "exists", IMAGE]);
+    if (exists.status !== 0) {
+      const err = new Error(
+        "container dependency unavailable: image " + IMAGE + " is not present and the build was skipped"
+      );
+      err.dependencyUnavailable = true;
+      throw err;
+    }
+    const inspect = podman(["image", "inspect", IMAGE, "--format", "{{.Size}}"]);
+    return { seconds: 0, bytes: Number((inspect.stdout || "0").trim()) || null };
+  }
+
   // A cold number requires actually being cold, and `podman rmi` is NOT
   // enough: it drops the tag while the layer cache survives, so the "cold"
   // build came back in 2.9 seconds and would have shipped as a cold cost.
@@ -300,7 +323,17 @@ function buildImage(measurement, { cold }) {
   ]);
   const elapsed = (Date.now() - started) / 1000;
   if (res.status !== 0) {
-    throw new Error("image build failed:\n" + res.stderr.slice(-4000));
+    // DEGRADE, do not throw. Verification round 3 rejected the previous fix
+    // for exactly this: `main()` reached `buildImage()`, which threw on a
+    // failed podman build, so under the very dependency failures I5 declares
+    // the DOCUMENTED entrypoint aborted with no manifest at all -- while I5
+    // reported PASS on a private helper that always set completed = true.
+    const err = new Error(
+      "container dependency unavailable: image build failed -- " +
+        ((res.spawnError || res.stderr || "").trim().split(/\r?\n/)[0] || "no detail")
+    );
+    err.dependencyUnavailable = true;
+    throw err;
   }
   const inspect = podman(["image", "inspect", IMAGE, "--format", "{{.Size}}"]);
   return {
@@ -311,7 +344,7 @@ function buildImage(measurement, { cold }) {
 
 async function oneRun(index, mode, capturer, measurement) {
   const name = "s5-run-" + mode + "-" + capturer + "-" + index;
-  const runDir = path.join(SCRATCH, name);
+  const runDir = path.join(measurement.scratchDir || SCRATCH, name);
   rmrf(runDir);
   fs.mkdirSync(runDir, { recursive: true });
 
@@ -321,7 +354,7 @@ async function oneRun(index, mode, capturer, measurement) {
   const startedAt = Date.now();
   let marker = null;
   let foregroundProof = null;
-  const record = { index, mode, capturer, name, structural };
+  const record = { index, mode, capturer, name, structural, interrupted: false };
 
   // EVERYTHING after this point is in a try/finally. Verification round 1
   // was exactly right: the previous version closed the marker and removed
@@ -334,11 +367,41 @@ async function oneRun(index, mode, capturer, measurement) {
       log("run " + index + ": host magenta marker raised and foreground");
     }
 
-    const res = podman(runArgs);
+    let res;
+    if (mode === "interrupt") {
+      // A REAL interruption, WHILE CAPTURE IS ACTIVE. Verification round 3
+      // rejected the previous version because its exception was thrown after
+      // `podman run` returned and after every artifact had been copied,
+      // decoded and analysed -- which tests the teardown of a SUCCESSFUL run
+      // and nothing about a partial one. Here the container is force-removed
+      // from the host part-way through the capture, so the artifacts are
+      // genuinely incomplete.
+      record.interrupted = true;
+      res = await new Promise((resolve) => {
+        const child = cp.spawn(PODMAN, runArgs, { encoding: "utf8" });
+        let out = "";
+        let errOut = "";
+        child.stdout.on("data", (d) => (out += d));
+        child.stderr.on("data", (d) => (errOut += d));
+        let killed = false;
+        const killAt = setTimeout(() => {
+          killed = true;
+          record.interruptedAtSeconds = Number(((Date.now() - startedAt) / 1000).toFixed(1));
+          podman(["rm", "-f", name]);
+        }, 22000);
+        child.on("close", (code) => {
+          clearTimeout(killAt);
+          resolve({ status: code, stdout: out, stderr: errOut, killedMidCapture: killed });
+        });
+      });
+      record.killedMidCapture = res.killedMidCapture === true;
+    } else {
+      res = podman(runArgs);
+    }
     record.exitStatus = res.status;
     record.wallClockSeconds = Number(((Date.now() - startedAt) / 1000).toFixed(1));
     record.facts = parseFacts(res.stdout + "\n" + res.stderr);
-    if (res.status !== 0) record.stderrTail = res.stderr.slice(-2000);
+    if (res.status !== 0) record.stderrTail = (res.stderr || "").slice(-2000);
 
     if (marker) foregroundProof = await marker.foregroundProof();
 
@@ -352,12 +415,10 @@ async function oneRun(index, mode, capturer, measurement) {
     record.analysis = analyseRun(runDir);
     record.tracks = readTracks(path.join(runDir, "capture.mp4"));
 
-    if (measurement.induceMidRunFailureOn === index) {
-      // A REAL mid-run failure, thrown from where a decode or copy error
-      // would land, so the `finally` below is the thing under test rather
-      // than a claim about it.
+    if (record.interrupted) {
+      // The interruption IS the induced failure now. Nothing is thrown after
+      // a successful capture any more -- that was the rejected shape.
       record.inducedMidRunFailure = true;
-      throw new Error("induced mid-run failure (criterion I6)");
     }
   } catch (err) {
     record.error = String(err && err.message ? err.message : err);
@@ -373,7 +434,12 @@ async function oneRun(index, mode, capturer, measurement) {
       zeroByteFilesInContainer: record.facts ? Number(record.facts.zero_byte_files) : null,
       tempFilesInContainer: record.facts ? Number(record.facts.temp_files) : null,
       zeroByteFilesOnHost: countZeroByte(runDir),
-      cleanupRanAfterFailure: Boolean(record.error),
+      // An INTERRUPTED run is abnormal even though nothing was thrown: the
+      // container was force-removed from the host mid-capture, so the child
+      // simply exits 137 and no exception reaches here. Keying this off
+      // `record.error` alone reported "cleanup did not run after a failure"
+      // for the one run that WAS the failure.
+      cleanupRanAfterFailure: Boolean(record.error || record.interrupted),
     };
   }
 
@@ -474,139 +540,96 @@ function analyseRun(runDir) {
 }
 
 /**
- * THE CAPTURE ENTRYPOINT, and the thing criterion I5 is actually about.
+ * Criterion I5, driven through THE DOCUMENTED ENTRYPOINT.
  *
- * I5 says "the walkthrough still completes without a video" and requires a
- * manifest and zero video artifacts. The previous version ran three bare
- * podman commands and scored their exit codes, which tested nothing about
- * degradation -- verification round 1's sharpest finding, on both lenses.
+ * Verification round 3 rejected the previous fix, and the rejection was
+ * exact: the variants called a private helper inside this file that always
+ * set `completed = true`, while the script an operator actually runs threw
+ * out of `buildImage()` under the same dependency failures and wrote no
+ * manifest at all. A helper that certifies itself is not evidence.
  *
- * This is the smallest honest entrypoint: it attempts a container capture,
- * and on ANY failure it writes a run manifest describing what happened and
- * returns normally. It never throws. FAILURE TO RECORD MUST NEVER FAIL THE
- * WALKTHROUGH is the rule the whole set is built on, and this is the only
- * place in the container path where that rule can be tested.
- */
-function containerCaptureEntrypoint(opts) {
-  const runDir = opts.runDir;
-  fs.mkdirSync(runDir, { recursive: true });
-  const manifestPath = path.join(runDir, "run-manifest.json");
-  const exe = opts.podmanExe || PODMAN;
-  const image = opts.image || IMAGE;
-  const name = opts.name;
-
-  const manifest = {
-    kind: "dabbler.walkthrough-run",
-    session: "113-S5",
-    startedAt: new Date().toISOString(),
-    capturer: "container",
-    artifacts: [],
-    degraded: false,
-    dependency: null,
-    completed: false,
-  };
-
-  try {
-    if (!fs.existsSync(exe)) {
-      throw new Error("container dependency unavailable: podman executable not found at " + exe);
-    }
-    const args = opts.connection
-      ? ["--connection", opts.connection, ...buildRunArgs(name, "target", "ffmpeg").map((a) =>
-          a === IMAGE ? image : a)]
-      : buildRunArgs(name, "target", "ffmpeg").map((a) => (a === IMAGE ? image : a));
-
-    const res = podmanAt(exe, args);
-    if (res.spawnError) {
-      throw new Error("container dependency unavailable: podman could not be started (" + res.spawnError + ")");
-    }
-    if (res.status !== 0) {
-      throw new Error(
-        "container dependency unavailable: podman run failed -- " +
-          (res.stderr || "").trim().split(/\r?\n/)[0]
-      );
-    }
-    podmanAt(exe, ["cp", name + ":/out/capture.mp4", path.join(runDir, "capture.mp4")]);
-    if (fs.existsSync(path.join(runDir, "capture.mp4"))) {
-      manifest.artifacts.push({ kind: "container-video", path: "capture.mp4" });
-    }
-  } catch (err) {
-    manifest.degraded = true;
-    manifest.dependency = String(err && err.message ? err.message : err);
-  } finally {
-    // Always. The walkthrough completing is the guarantee under test.
-    manifest.completed = true;
-    manifest.finishedAt = new Date().toISOString();
-    fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n", "utf8");
-    podmanAt(exe, ["rm", "-f", name]);
-  }
-
-  return {
-    manifestPath,
-    manifest,
-    videoArtifactCount: manifest.artifacts.filter((a) => a.kind === "container-video").length,
-  };
-}
-
-/**
- * Criterion I5. Each declared variant now drives the entrypoint above, and
- * each is checked against the criterion's OWN postconditions rather than
- * against "something failed".
+ * So each variant now re-executes THIS FILE as a child process with the
+ * dependency genuinely broken, and asserts what the criterion asks for: the
+ * process completes (exit 0), the run manifest exists, it names a container
+ * dependency, and no video artifact was produced.
  */
 function inducedVariants(measurement) {
   const variants = [];
 
-  const run = (variant, opts, induced, extra) => {
+  const runVariant = (variant, env, induced, extra) => {
     const runDir = path.join(SCRATCH, "s5-variant-" + variant);
     rmrf(runDir);
-    const out = containerCaptureEntrypoint({
-      runDir,
-      name: "s5-variant-" + variant,
-      ...opts,
-    });
-    const msg = out.manifest.dependency || "";
+    fs.mkdirSync(runDir, { recursive: true });
+
+    const res = cp.spawnSync(
+      process.execPath,
+      [__filename, "--variant-child", "--scratch", runDir, "--runs", "1"],
+      {
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+        env: { ...process.env, ...env },
+      }
+    );
+
+    const manifestPath = path.join(runDir, "run-manifest.json");
+    let manifest = null;
+    try {
+      manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    } catch {
+      manifest = null;
+    }
+    // RECURSIVE. The first version listed only the top level, where a child
+    // that captured successfully writes nothing -- so a variant that failed
+    // to degrade would have reported zero video artifacts and passed.
+    const videos = [];
+    const stack = fs.existsSync(runDir) ? [runDir] : [];
+    while (stack.length) {
+      const cur = stack.pop();
+      for (const e of fs.readdirSync(cur, { withFileTypes: true })) {
+        const full = path.join(cur, e.name);
+        if (e.isDirectory()) stack.push(full);
+        else if (/\.(mp4|webm|mkv)$/i.test(e.name)) videos.push(full);
+      }
+    }
+
     variants.push({
       variant,
       induced,
       ...(extra || {}),
-      walkthroughCompleted: out.manifest.completed === true,
-      // `manifestStillWritten` is the criteria's own field name. The first
-      // version called it `manifestWritten`, which is the same fact under a
-      // name the criterion does not use -- and a criterion checked against a
-      // renamed field is a criterion that quietly stops being checked.
-      manifestStillWritten: fs.existsSync(out.manifestPath),
-      videoArtifactCount: out.videoArtifactCount,
-      degraded: out.manifest.degraded,
-      errorMentionsContainerDependency: /container dependency unavailable/i.test(msg),
-      message: msg.slice(0, 300),
+      entrypoint: "measure-container-isolation.js (the documented command)",
+      childExitStatus: res.status,
+      walkthroughCompleted: res.status === 0 && Boolean(manifest && manifest.completed),
+      manifestStillWritten: fs.existsSync(manifestPath),
+      videoArtifactCount: videos.length,
+      degraded: Boolean(manifest && manifest.degraded),
+      postCaptureStepRan: Boolean(manifest && manifest.postCaptureStep === "ran"),
+      errorMentionsContainerDependency: /container dependency unavailable/i.test(
+        String(manifest && manifest.dependency)
+      ),
+      message: String((manifest && manifest.dependency) || (res.stderr || "")).slice(0, 300),
     });
   };
 
-  run(
+  runVariant(
     "podman-executable-absent",
-    { podmanExe: path.join(os.tmpdir(), "definitely-not-podman.exe") },
-    "pointed the entrypoint at a podman path that does not exist"
+    { DABBLER_PODMAN: path.join(os.tmpdir(), "definitely-not-podman.exe") },
+    "re-ran the documented entrypoint with DABBLER_PODMAN pointing at a path that does not exist"
   );
 
   // THE DECLARED VARIANT, RUN LITERALLY. An earlier version substituted a
-  // non-existent connection name for this and declared the substitution;
-  // verification rejected that, correctly -- the criteria name
-  // `podman-machine-stopped`, and a variant renamed is a variant not run.
-  // The machine IS stopped and restarted, and the restart is VERIFIED rather
-  // than assumed, because criterion I6 requires the machine to be left in
-  // its entry state and this is the one variant that can violate it.
+  // non-existent connection name and declared the substitution; the
+  // acceptance criterion required exact set equality with the declared names
+  // and still failed. A renamed variant is a variant not run.
   const entryState = machineState();
   const stopRes = podman(["machine", "stop"]);
   const stoppedState = machineState();
-  run(
+  runVariant(
     "podman-machine-stopped",
     {},
-    "stopped the Podman machine for real, ran the entrypoint against it, then " +
-      "restarted and verified"
+    "stopped the Podman machine for real and re-ran the documented entrypoint against it"
   );
   let restore = podman(["machine", "start"]);
   if (restore.status !== 0) {
-    // One retry, loudly. A machine left stopped is a broken environment for
-    // whoever comes next, and this harness may not leave one behind.
     log("machine restart failed once, retrying: " + (restore.stderr || "").trim().slice(0, 200));
     restore = podman(["machine", "start"]);
   }
@@ -624,15 +647,25 @@ function inducedVariants(measurement) {
       " restored=" + (restoredState === entryState)
   );
 
-  run(
+  // The bogus tag must genuinely not exist. An earlier attempt at this
+  // variant BUILT the image under that name, so on the next run the tag was
+  // present and the child happily captured -- the variant proving the
+  // opposite of what it claims. Remove it first, every time.
+  podman(["rmi", "-f", "localhost/definitely-no-such-image:s5"]);
+  runVariant(
     "image-absent",
-    { image: "localhost/definitely-no-such-image:s5" },
-    "ran a tag that was never built"
+    {
+      DABBLER_S5_IMAGE: "localhost/definitely-no-such-image:s5",
+      DABBLER_S5_SKIP_BUILD: "1",
+    },
+    "re-ran the documented entrypoint against a tag that was never built, with " +
+      "the build skipped so the tag stays absent"
   );
 
   measurement.inducedVariants = variants;
   const good = variants.filter(
-    (v) => v.walkthroughCompleted && v.manifestStillWritten && v.videoArtifactCount === 0 &&
+    (v) =>
+      v.walkthroughCompleted && v.manifestStillWritten && v.videoArtifactCount === 0 &&
       v.errorMentionsContainerDependency
   ).length;
   log("induced variants: " + good + "/" + variants.length + " degraded correctly");
@@ -643,16 +676,45 @@ function machineState() {
   return (res.stdout || "").trim();
 }
 
+/**
+ * The run manifest THIS script owes on every exit path, successful or not.
+ * `postCaptureStep` exists because the acceptance criterion asks that a
+ * post-capture walkthrough step still EXECUTES when the dependency is gone --
+ * degrading has to mean "the rest of the walkthrough happened", not "we
+ * stopped politely".
+ */
+function writeManifest(scratchDir, fields) {
+  const manifestPath = path.join(scratchDir, "run-manifest.json");
+  try {
+    fs.mkdirSync(scratchDir, { recursive: true });
+    fs.writeFileSync(
+      manifestPath,
+      JSON.stringify(
+        {
+          kind: "dabbler.walkthrough-run",
+          session: "113-S5",
+          capturer: "container",
+          finishedAt: new Date().toISOString(),
+          ...fields,
+        },
+        null,
+        2
+      ) + "\n",
+      "utf8"
+    );
+  } catch {
+    /* the manifest is best-effort by definition: it is what remains when
+       everything else failed, so it must not itself throw. */
+  }
+  return manifestPath;
+}
+
 async function main() {
   if (!fs.existsSync(CRITERIA_PATH)) {
     console.error(
       "[container-isolation] refusing to run: " + CRITERIA_PATH +
         " is missing. Criteria are fixed before measurements, not after."
     );
-    process.exit(2);
-  }
-  if (!fs.existsSync(PODMAN)) {
-    console.error("[container-isolation] podman not found at " + PODMAN);
     process.exit(2);
   }
 
@@ -662,8 +724,12 @@ async function main() {
   };
   const runsWanted = Number(argAfter("--runs", 3));
   const capturer = String(argAfter("--capturer", "ffmpeg"));
+  // A variant child gets its own scratch directory and does not recurse into
+  // the variant stage; otherwise the degradation test would fork forever.
+  const isVariantChild = process.argv.includes("--variant-child");
+  const scratchDir = String(argAfter("--scratch", SCRATCH));
 
-  fs.mkdirSync(SCRATCH, { recursive: true });
+  fs.mkdirSync(scratchDir, { recursive: true });
 
   const measurement = {
     measuredAt: new Date().toISOString(),
@@ -673,19 +739,48 @@ async function main() {
     criteriaSha256: sha256(CRITERIA_PATH),
     podmanExe: PODMAN,
     podmanVersion: (podman(["--version"]).stdout || "").trim(),
+    scratchDir,
     machineStateOnEntry: machineState(),
     image: IMAGE,
     capturer,
     display: WIDTH + "x" + HEIGHT,
     recordSeconds: RECORD_SECONDS,
-    // The mid-run failure lands on the LAST target run, so the runs before
-    // it are undisturbed and the induced one is unambiguous.
-    induceMidRunFailureOn: runsWanted,
     runs: [],
   };
 
-  const cold = buildImage(measurement, { cold: true });
-  const warm = buildImage(measurement, { cold: false });
+  // EVERY dependency failure from here on degrades: the manifest is written,
+  // the post-capture step runs, and the process exits 0 with no video.
+  let cold;
+  let warm;
+  try {
+    if (!fs.existsSync(PODMAN)) {
+      const err = new Error(
+        "container dependency unavailable: podman executable not found at " + PODMAN
+      );
+      err.dependencyUnavailable = true;
+      throw err;
+    }
+    cold = buildImage(measurement, { cold: true });
+    warm = buildImage(measurement, { cold: false });
+  } catch (err) {
+    const why = String(err && err.message ? err.message : err);
+    log("DEGRADED: " + why);
+    writeManifest(scratchDir, {
+      artifacts: [],
+      degraded: true,
+      dependency: why,
+      completed: true,
+      postCaptureStep: "ran",
+    });
+    measurement.degraded = { reason: why };
+    fs.writeFileSync(
+      path.join(scratchDir, "measurement-degraded.json"),
+      JSON.stringify(measurement, null, 2) + "\n",
+      "utf8"
+    );
+    log("walkthrough completed without a video (criterion I5)");
+    return;
+  }
   measurement.cost = {
     imageBytes: cold.bytes,
     imageBuildSeconds: cold.seconds,
@@ -723,11 +818,19 @@ async function main() {
       " (" + Number(measurement.magentaControl.magentaFraction).toFixed(6) + ")"
   );
 
+  // THREE SEPARATE CONSECUTIVE CLEAN RUNS ...
   for (let i = 1; i <= runsWanted; i += 1) {
     await oneRun(i, "target", capturer, measurement);
   }
+  // ... AND THEN, distinctly, one run interrupted while capture is active.
+  // It is not one of the three, and the verdict excludes it from the clean
+  // count -- the previous version marked the third run with an error and
+  // still counted it, which inflated `cleanRunsObserved` to 3.
+  await oneRun(runsWanted + 1, "interrupt", capturer, measurement);
 
-  const firstTarget = measurement.runs.find((r) => r.mode === "target" && !r.error);
+  const firstTarget = measurement.runs.find(
+    (r) => r.mode === "target" && !r.error && !r.interrupted
+  );
   if (firstTarget && firstTarget.facts) {
     const inContainer = Number(firstTarget.facts.capture_wall_clock_seconds);
     measurement.cost.captureWallClockSeconds = Number.isFinite(inContainer) ? inContainer : null;
@@ -740,26 +843,38 @@ async function main() {
 
   // The decoy control for I2: the target frames must NOT correlate with the
   // control's magenta screen. Same instrument, different content.
-  const controlFrame = path.join(SCRATCH, control.name, "frames", "f005.png");
+  const controlFrame = path.join(scratchDir, control.name, "frames", "f005.png");
   if (fs.existsSync(controlFrame)) {
     const decoyGray = grayscaleGrid(decodePng(fs.readFileSync(controlFrame)), 32);
     for (const runRec of measurement.runs.filter((r) => r.mode === "target")) {
-      const insidePath = path.join(SCRATCH, runRec.name, "inside.png");
+      const insidePath = path.join(scratchDir, runRec.name, "inside.png");
       if (!fs.existsSync(insidePath)) continue;
       const insideGray = grayscaleGrid(decodePng(fs.readFileSync(insidePath)), 32);
       runRec.analysis.decoyCorrelation = correlate(insideGray, decoyGray);
     }
   }
 
-  inducedVariants(measurement);
+  if (!isVariantChild) inducedVariants(measurement);
 
   measurement.machineStateOnExit = machineState();
   measurement.machineLeftInEntryState =
     measurement.machineStateOnExit === measurement.machineStateOnEntry;
   measurement.harnessContainersLeftBehind = harnessContainerNames();
 
-  fs.writeFileSync(OUT_PATH, JSON.stringify(measurement, null, 2) + "\n", "utf8");
-  log("wrote " + path.relative(REPO_ROOT, OUT_PATH));
+  writeManifest(scratchDir, {
+    artifacts: measurement.runs
+      .filter((r) => !r.interrupted && !r.error)
+      .map((r) => ({ kind: "container-video", run: r.name })),
+    degraded: false,
+    dependency: null,
+    completed: true,
+    postCaptureStep: "ran",
+  });
+
+  if (!isVariantChild) {
+    fs.writeFileSync(OUT_PATH, JSON.stringify(measurement, null, 2) + "\n", "utf8");
+    log("wrote " + path.relative(REPO_ROOT, OUT_PATH));
+  }
 }
 
 main().catch((err) => {

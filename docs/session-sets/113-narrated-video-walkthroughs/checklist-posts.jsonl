@@ -39,3 +39,4 @@
 {"sessionNumber": 5, "postedAt": "2026-08-16T06:42:10.965117-04:00", "stepCount": 14, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
 {"sessionNumber": 5, "postedAt": "2026-08-16T06:47:30.827082-04:00", "stepCount": 14, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
 {"sessionNumber": 5, "postedAt": "2026-08-16T06:50:55.789650-04:00", "stepCount": 14, "surface": "text", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 5, "postedAt": "2026-08-16T07:29:44.215572-04:00", "stepCount": 14, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}

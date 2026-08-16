@@ -59,7 +59,12 @@ function main() {
     process.exit(3);
   }
 
-  const targets = m.runs.filter((r) => r.mode === "target");
+  // The interrupted run is NOT a target run for scoring purposes. Verification
+  // round 3 rejected the previous shape because an error-marked run was still
+  // counted toward "three consecutive clean runs", inflating cleanRunsObserved
+  // to 3 when only two runs were undisturbed.
+  const targets = m.runs.filter((r) => r.mode === "target" && !r.interrupted);
+  const interruptedRuns = m.runs.filter((r) => r.interrupted);
   const control = m.runs.find((r) => r.mode === "magenta-control");
   const c = criteria.criteria;
   const results = {};
@@ -126,7 +131,10 @@ function main() {
       minCorr >= c.I2.minCorrelation &&
       worstDecoy <= c.I2.control.decoyMaxCorrelation &&
       minSd >= c.I2.blackFrameGuard.minFrameStdDev &&
-      targetStarted,
+      targetStarted &&
+      // Recorded but not required, in the previous version -- fail-open the
+      // moment a run stopped installing it (verification round 3 nit).
+      extensionInstalled,
     measured: {
       minCorrelationToInside: minCorr,
       worstDecoyCorrelation: worstDecoy,
@@ -208,16 +216,30 @@ function main() {
       v.walkthroughCompleted === true &&
       v.manifestStillWritten === true &&
       v.videoArtifactCount === 0 &&
-      v.errorMentionsContainerDependency === true
+      v.errorMentionsContainerDependency === true &&
+      // The criterion asks that the walkthrough still COMPLETES, which means
+      // the work after the capture happened -- not that the process exited
+      // politely. Round 3's acceptance criterion names this explicitly.
+      v.postCaptureStepRan === true
+  );
+  // And it must have been the DOCUMENTED entrypoint, not a helper that
+  // certifies itself. This is the whole substance of the round-3 rejection.
+  const drivenThroughEntrypoint = ranRecords.every((v) =>
+    String(v.entrypoint || "").includes("measure-container-isolation.js")
   );
   results.I5 = {
     name: c.I5.name,
-    pass: identitiesOk && postconditionsOk && ranRecords.length >= declaredNames.length,
+    pass:
+      identitiesOk &&
+      postconditionsOk &&
+      drivenThroughEntrypoint &&
+      ranRecords.length >= declaredNames.length,
     measured: {
       variantsDeclared: declaredNames,
       variantsRun: ranNames,
       identitiesOk,
       postconditionsOk,
+      drivenThroughEntrypoint,
       substitutionsDeclared: substituted,
       perVariant: ranRecords.map((v) => ({
         variant: v.variant,
@@ -225,6 +247,8 @@ function main() {
         manifestStillWritten: v.manifestStillWritten,
         videoArtifactCount: v.videoArtifactCount,
         errorMentionsContainerDependency: v.errorMentionsContainerDependency,
+        postCaptureStepRan: v.postCaptureStepRan,
+        childExitStatus: v.childExitStatus,
       })),
     },
   };
@@ -236,7 +260,13 @@ function main() {
   // failure and looked at no files, so it certified deterministic cleanup on
   // the happy path only -- which is the one path where cleanup was never in
   // doubt.
-  const failureRun = m.runs.find((r) => r.inducedMidRunFailure);
+  // The induced failure must be an interruption WHILE CAPTURE IS ACTIVE.
+  // Round 3 rejected an exception thrown after the container had exited and
+  // every artifact had been copied, decoded and analysed: that tests the
+  // teardown of a successful run.
+  const failureRun = m.runs.find(
+    (r) => r.inducedMidRunFailure && r.interrupted && r.killedMidCapture === true
+  );
   const cleanupAlwaysRan = m.runs.every(
     (r) => r.cleanup && r.cleanup.removeStatus === 0 && !r.cleanup.containerStillListed
   );
@@ -268,6 +298,9 @@ function main() {
       (m.harnessContainersLeftBehind || []).length === 0,
     measured: {
       midRunFailureInduced: Boolean(failureRun),
+      interruptedWhileCaptureActive: Boolean(failureRun && failureRun.killedMidCapture),
+      interruptedAtSeconds: failureRun ? failureRun.interruptedAtSeconds : null,
+      interruptedRunsExcludedFromCleanCount: interruptedRuns.length,
       cleanupRanAfterInducedFailure: Boolean(
         failureRun && failureRun.cleanup.cleanupRanAfterFailure
       ),
@@ -305,8 +338,13 @@ function main() {
   };
 
   const barRuns = criteria.bar.runs;
+  // `targets` already excludes interrupted runs; `!r.error` excludes any run
+  // that raised at all. A run that carries an error is not a clean run, and
+  // saying so is the whole of round 3's second rejection.
   const cleanRuns = targets.filter(
     (r) =>
+      !r.error &&
+      !r.interrupted &&
       (r.analysis.maxMagentaFraction ?? 1) <= leakBar &&
       (r.analysis.minCorrelationToInside ?? 0) >= c.I2.minCorrelation &&
       (r.analysis.minFrameStdDev ?? 0) >= c.I2.blackFrameGuard.minFrameStdDev &&

@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-08-16T11:18:31.771Z",
+  "measuredAt": "2026-08-16T11:53:23.487Z",
   "set": "113-narrated-video-walkthroughs",
   "session": 5,
   "step": "4 - measure the cheap mitigation",
@@ -172,7 +172,8 @@
       "label": "without-flag",
       "args": [],
       "ok": true,
-      "logFile": "2026-08-16 07-18-32.txt",
+      "safetyAssertionsMet": true,
+      "logFile": "2026-08-16 07-53-23.txt",
       "obsVersion": "32.2.1",
       "isolatedCollectionUsed": true,
       "liveSourceKindsSeenInLog": [],
@@ -180,7 +181,9 @@
         "scenesRemoved": [
           "dabbler-plugin-probe.json"
         ],
-        "profilesRemoved": [],
+        "profilesRemoved": [
+          "dabbler-plugin-probe"
+        ],
         "sentinelsRestored": 0
       },
       "loadedModules": [
@@ -230,7 +233,8 @@
         "--only-bundled-plugins"
       ],
       "ok": true,
-      "logFile": "2026-08-16 07-18-37.txt",
+      "safetyAssertionsMet": true,
+      "logFile": "2026-08-16 07-53-28.txt",
       "obsVersion": "32.2.1",
       "isolatedCollectionUsed": true,
       "liveSourceKindsSeenInLog": [],
@@ -238,7 +242,9 @@
         "scenesRemoved": [
           "dabbler-plugin-probe.json"
         ],
-        "profilesRemoved": [],
+        "profilesRemoved": [
+          "dabbler-plugin-probe"
+        ],
         "sentinelsRestored": 0
       },
       "loadedModules": [

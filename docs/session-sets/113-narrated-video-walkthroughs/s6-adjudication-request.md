@@ -128,3 +128,32 @@ waiting.
 that anchors at round-completion will re-litigate every settled finding whenever
 a session writes its evidence documents after its last round. That is a
 generalizable trap, not a Set 113 problem, and it belongs in a follow-on.
+
+---
+
+## Resolution (operator, 2026-08-16): "I authorize one round"
+
+Round 6 ran with `--operator-authorized-round`, anchored at the session's base
+commit `bd25afe8` so the verifier saw the session's **actual** work — 1363
+insertions across `pull_verifier.py`, `pull_critique.py`, `conftest.py` and the
+three test files — instead of the twelve-file documentation delta.
+
+**Verdict: VERIFIED. 0 blocking, 0 minor. $0.7431.**
+
+The same verifier model (`gpt-5-6-sol`) that produced round 5's five Majors
+returned none when shown the source. That is the disputed finding settled by
+**evidence rather than by argument**: the variable that changed was the diff
+anchor, not the code.
+
+The dispute is therefore resolved as **scoping artifact — dismissed**, and the
+five round-5 findings are recorded as such rather than as waived defects. No
+residual is owed for them, because nothing was left unfixed.
+
+**The generalizable trap stands and is owed to a follow-on**, unchanged by this
+outcome: a delta-scoped backstop anchored at round-completion will re-litigate
+every settled finding whenever a session writes its evidence documents after
+its last verification round. It cost this session an operator interruption and
+$0.9607 in rounds 5 and 6 to discover something `git diff --name-only` shows
+for free. The cheap guard is for the backstop to notice that its delta contains
+no source under any declared test surface and say so, instead of reporting
+absent remediations.

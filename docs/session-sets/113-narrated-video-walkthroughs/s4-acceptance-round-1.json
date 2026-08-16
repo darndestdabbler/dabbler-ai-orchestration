@@ -1,0 +1,78 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "09bde64ae3252e44c17cbeafede7229fef0680da",
+  "fixedTree": "ac95822a0311e8b91faa0ba69a858bb63d8ee653",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T02:10:51.272055+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "A recorder is included despite the authoritative verdict being `FAIL` - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `docs/session-sets/113-narrated-video-walkthroughs/s4-pilo ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The tree contains the Windows recorder only if a re-measurement against the unchanged pre-capture criteria returns PASS; otherwise the recorder and its entrypoint are absent and the outcome records deferral.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "The required ffmpeg fallback was never evaluated after OBS failed - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/measure-os-capture.js ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The durable outcome contains a measured ffmpeg gdigrab verdict against the unchanged criteria, or a recorded clean dependency-absent outcome showing that the optional fallback could not be run.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 2,
+      "summary": "Several recording failures abort and delete the walkthrough instead of degrading to no video - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scr ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Ambiguous-window refusal and start/stop recording failures still drive every scenario step, finalize the run, write the manifest and index with zero os-video artifacts, and return the documented no-video outcome.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 3,
+      "summary": "C6 is reported as passed without its required post-setup induced failure - **Category:** False Positive - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/measure-os-c ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The pilot deliberately fails after OBS profile, scene, and input creation, records that induced failure in the measurement, independently verifies every C6 cleanup obligation afterward, and makes C6 fail if any obligation is absent or unchecked.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 4,
+      "summary": "A recorder is exposed despite the authoritative pilot verdict being `FAIL` - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/package.json, tools/d ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "While the authoritative verdict remains FAIL and no operator waiver exists, the Windows recorder must not be invocable or documented as available; alternatively, a new measurement must produce PASS before it is exposed.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 5,
+      "summary": "Several capture failures still destroy the walkthrough instead of degrading to no video - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/ ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "Induced window-ambiguity and recording-start/stop failures must each clean up OBS and still complete the driven walkthrough, finalize the manifest/index, emit zero os-video artifacts, and return the documented degraded result.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 6,
+      "summary": "The shipped path silently enables obs-websocket despite documentation and an unresolved operator decision saying it does not - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `to ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "With server_enabled=false, the shipped command must leave the OBS configuration byte-for-byte unchanged and degrade to no video unless the operator explicitly authorizes automatic toggling and the implementation and documentation are changed consistently.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 7,
+      "summary": "C6 is reported `PASS` without exercising or verifying the cleanup obligations fixed in the criteria - **Category:** False Positive - **Severity:** Major - **Evidence paths:** `tools/dabbler-ai-orchest ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A re-run must include an induced failure after OBS scene/profile creation and independently verify every C6 requirement, while the evaluator must fail C6 when that induced result or any required cleanup observation is absent.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

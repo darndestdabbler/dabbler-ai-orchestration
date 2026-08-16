@@ -2,8 +2,15 @@
 // Windows OS-capture walkthrough recorder for the AI Work Explorer
 // (Set 113 Session 4).
 //
-//   npm run walkthrough:vscode
-//   npm run walkthrough:vscode -- --no-video    (prove the degraded path)
+//   node scripts/record-vscode-walkthrough.js
+//   node scripts/record-vscode-walkthrough.js --no-video
+//
+// NOT APPROVED FOR USE, and deliberately not an npm script. The Session 4
+// pilot's authoritative verdict is FAIL, and no operator ruling waiving the
+// unmet criteria exists yet, so this must not be presented as an available
+// feature -- a registered `npm run` entry is indistinguishable from shipped
+// functionality. It is reachable directly, because the guided look needs to
+// run it, and it says what it is on every run.
 //
 // INTERNAL AND EXPLICITLY UNSTABLE, and Windows-only. This is the awkward
 // half of the two-backend seam the operator's 2026-08-10 note describes:
@@ -66,6 +73,29 @@ const TAIL_HOLD_MS = 750;
 
 function log(msg) {
   console.log("[walkthrough:vscode] " + msg);
+}
+
+/**
+ * An internal test seam: throw a PLAIN Error at a named point in the
+ * capture lifecycle.
+ *
+ * It exists because "a capture failure degrades to no video instead of
+ * destroying the walkthrough" is a claim, and the pilot's job is to
+ * measure claims rather than accept them. The plain-Error type is the
+ * point: the paths that were broken threw plain Errors -- `configure()`
+ * refusing to guess between two Extension Development Hosts is one -- and
+ * a catch that only recognised `ObsUnavailableError` let them through.
+ *
+ * Never set outside the pilot.
+ */
+function induceIf(opts, point) {
+  if (opts.induceFailureAt === point) {
+    throw new Error(
+      "INDUCED capture failure at '" + point + "' (pilot test seam). A " +
+        "capture failure must degrade to no video, never destroy the " +
+        "walkthrough."
+    );
+  }
 }
 
 /**
@@ -413,6 +443,11 @@ async function recordVscodeWalkthrough(options) {
         obsExe: opts.obsExe,
         connectPassword: opts.obsConnectPassword,
         launchEnabled: opts.obsLaunch !== false,
+        // Opt-in, and only the pilot opts in. The shipped recorder must not
+        // reconfigure the user's OBS: "installed with its websocket
+        // disabled" is a supported missing-dependency state, and the
+        // documented fix is one click in OBS's own UI.
+        mayEnableWebsocketConfig: opts.mayEnableWebsocketConfig === true,
       });
       // Cleanup ownership is handed to the `finally` block IMMEDIATELY, and
       // that ordering is load-bearing. `configure` can fail with something
@@ -436,6 +471,7 @@ async function recordVscodeWalkthrough(options) {
       try {
         session.prepareHost();
         const version = await session.launch();
+        induceIf(opts, "configure");
         const configured = await session.configure({
           outDir,
           width: result.window.physical.width,
@@ -455,27 +491,42 @@ async function recordVscodeWalkthrough(options) {
           canvas: configured.canvas,
         };
       } catch (err) {
-        // Anything that is not a missing dependency is a real failure and
-        // propagates -- with `capture` still set, so the `finally` block
-        // stops OBS and restores everything it touched.
-        if (!(err instanceof ObsUnavailableError)) throw err;
-        // A missing dependency is the degraded path: put back what the
-        // failed attempt already changed, and drop the handle so the
-        // `finally` block does not clean up a second time.
+        // EVERY capture failure degrades. Not only a missing dependency.
+        //
+        // The first cut caught `ObsUnavailableError` alone and rethrew
+        // anything else, which meant two realistic failures destroyed the
+        // whole walkthrough: `configure()`'s refusal to guess between two
+        // matching Extension Development Hosts throws a plain Error, and a
+        // developer with a second host open hits it routinely. The run then
+        // skipped every step, deleted its own output directory, and exited
+        // non-zero -- so a person who wanted a walkthrough and could not
+        // have a video got NEITHER.
+        //
+        // Failure to record must never fail the walkthrough. That is the
+        // spec's rule, and it does not have an exception for the failures
+        // this driver happens to find embarrassing.
         capture = null;
-        result.obsUnavailableKind = err.kind;
-        result.obsUnavailableMessage = err.message;
+        result.obsUnavailableKind =
+          err instanceof ObsUnavailableError ? err.kind : "capture-setup-failed";
+        result.obsUnavailableMessage = String((err && err.message) || err);
         notes.push(
-          "OS capture was unavailable (" + err.kind + "): " + err.message +
+          "OS capture was unavailable (" + result.obsUnavailableKind + "): " +
+            result.obsUnavailableMessage +
             " The walkthrough document stands alone and is unaffected."
         );
-        log("OS capture unavailable (" + err.kind + ") - continuing without it");
+        log(
+          "OS capture unavailable (" + result.obsUnavailableKind +
+            ") - continuing without it"
+        );
         // Anything the failed attempt already changed is put back now,
         // rather than left for a cleanup that no longer knows about it.
         try {
           result.cleanupProblems = await session.cleanup();
-        } catch {
-          /* the run itself is unaffected */
+        } catch (cleanupErr) {
+          result.cleanupProblems = [
+            "cleanup after failed setup threw: " +
+              String((cleanupErr && cleanupErr.message) || cleanupErr),
+          ];
         }
       }
     } else {
@@ -485,9 +536,40 @@ async function recordVscodeWalkthrough(options) {
     }
 
     if (capture) {
-      const anchor = await capture.startRecording();
-      anchorMillis = anchor.anchorMillis;
-      result.anchor = anchor;
+      // Starting the recording is a capture concern like any other, and it
+      // fails in a way the pilot measured: OBS accepts StartRecord and its
+      // output never becomes active. That raised out of the whole run
+      // before this guard existed, taking the walkthrough with it.
+      try {
+        induceIf(opts, "start");
+        const anchor = await capture.startRecording();
+        anchorMillis = anchor.anchorMillis;
+        result.anchor = anchor;
+      } catch (err) {
+        result.obsUnavailableKind =
+          err instanceof ObsUnavailableError ? err.kind : "recording-start-failed";
+        result.obsUnavailableMessage = String((err && err.message) || err);
+        notes.push(
+          "recording could not be started (" + result.obsUnavailableKind +
+            "): " + result.obsUnavailableMessage +
+            " The walkthrough continued without a video."
+        );
+        log(
+          "recording could not be started (" + result.obsUnavailableKind +
+            ") - continuing without it"
+        );
+        try {
+          result.cleanupProblems = await capture.cleanup();
+        } catch (cleanupErr) {
+          result.cleanupProblems = [
+            "cleanup after failed start threw: " +
+              String((cleanupErr && cleanupErr.message) || cleanupErr),
+          ];
+        }
+        capture = null;
+        anchorMillis = Date.now();
+        result.anchor = { anchorMillis, uncertaintyMillis: 0 };
+      }
     } else {
       anchorMillis = Date.now();
       result.anchor = { anchorMillis, uncertaintyMillis: 0 };
@@ -543,7 +625,20 @@ async function recordVscodeWalkthrough(options) {
       // frame of the last click is a hard cut, and a beat of stillness is
       // what lets a viewer read the result they were just told to look at.
       await page.waitForTimeout(TAIL_HOLD_MS);
-      const recording = await capture.stopRecording();
+      // Stopping is a capture concern too, and a stop that throws must not
+      // take the walkthrough with it.
+      let recording = null;
+      try {
+        induceIf(opts, "stop");
+        recording = await capture.stopRecording();
+      } catch (err) {
+        notes.push(
+          "the recording could not be stopped cleanly (" +
+            String((err && err.message) || err) +
+            "); the walkthrough document stands alone and is unaffected"
+        );
+        log("recording could not be stopped cleanly - continuing");
+      }
       result.recording = recording;
       if (recording && recording.outputPath && fs.existsSync(recording.outputPath)) {
         const target = path.join(outDir, "recording.mp4");
@@ -622,10 +717,16 @@ async function recordVscodeWalkthrough(options) {
       }
     }
     if (launched) {
+      // A VS Code that will not close is a leftover process, which is
+      // exactly what C6 is about -- so the failure is REPORTED rather than
+      // swallowed. Suppressing it here is how a cleanup criterion passes
+      // while a host stays running.
       try {
         await launched.app.close();
-      } catch {
-        /* already gone */
+      } catch (err) {
+        result.cleanupProblems = (result.cleanupProblems || []).concat([
+          "VS Code did not close: " + String((err && err.message) || err),
+        ]);
       }
       for (const dir of [launched.userDataDir, launched.extensionsDir, launched.stateRoot]) {
         try {
@@ -654,8 +755,49 @@ async function recordVscodeWalkthrough(options) {
   return result;
 }
 
+/**
+ * Say what this is, derived from the pilot's own record rather than from a
+ * sentence here that would go stale the moment the verdict changed.
+ *
+ * Verification found the recorder "presented as available despite the
+ * authoritative verdict being FAIL", and it was right: prose in an outcome
+ * document gates nothing. When the verdict becomes PASS -- or the operator
+ * records a waiver and the evaluation is recomputed -- this notice stops
+ * printing by itself.
+ */
+function announceStatus() {
+  let evaluation = null;
+  try {
+    evaluation = JSON.parse(
+      fs.readFileSync(
+        path.join(
+          REPO_ROOT,
+          "docs",
+          "session-sets",
+          "113-narrated-video-walkthroughs",
+          "s4-os-capture-measurement.json"
+        ),
+        "utf8"
+      )
+    ).evaluation;
+  } catch {
+    /* no measurement on this machine; say nothing rather than guess */
+  }
+  if (!evaluation || evaluation.verdict === "PASS") return;
+  log(
+    "NOT APPROVED FOR USE. The OS-capture pilot's verdict is " +
+      evaluation.verdict +
+      " (unmet: " +
+      (evaluation.unmet || []).join(", ") +
+      "). See docs/session-sets/113-narrated-video-walkthroughs/" +
+      "s4-os-capture-outcome.md. Running it anyway is fine for review; " +
+      "relying on it is not."
+  );
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  announceStatus();
   let result;
   try {
     result = await recordVscodeWalkthrough(options);

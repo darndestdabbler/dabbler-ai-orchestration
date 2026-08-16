@@ -81,12 +81,30 @@ reader could over-read this:
 3. **One machine, one OBS version, one GPU.** OBS 32.2.1, obs-websocket
    5.7.4, Windows 11.
 
-## The three criteria that did not come out first time
+## The criteria that did not come out first time
 
-They are not the same kind of finding and should not be read as three of
-anything. One was a real defect and is now fixed and passing; one is a
+They are not the same kind of finding and should not be read as a count.
+Two were real defects and are now fixed and passing (C4, and C6 after
+verification caught it passing on the wrong evidence); one is a
 mis-calibrated control on a claim that passes absolutely; one cannot be
 satisfied at all.
+
+### C6 — passed on the wrong evidence, now passed on the right evidence
+
+C6 asks for cleanup **including when the run fails part way**, proved by an
+induced mid-run failure. The first cut passed it on the three
+dependency-absent variants and asserted in its own note that those *"ARE
+the part-way failures C6 asks for"*. They are not: all three die during
+setup, and two of them before a scene collection or profile exists at all,
+so they exercise a cleanup with nothing to undo. Verification caught the
+claim.
+
+There are now three induced failures, one at each point a capture can fail
+— `configure`, `start`, `stop` — each throwing a **plain** Error, because
+that is the type the broken paths threw. Each must both clean up completely
+and leave the walkthrough intact. All three do: walkthrough completed,
+manifest written, zero video artifacts, no OBS process, no leftover
+collection, profile or run marker, config restored.
 
 ### C4 — a real defect, found by the criteria and fixed (now PASS)
 
@@ -153,17 +171,58 @@ guided look.
 
 ## What ships, and under what condition
 
-The recorder is present, documented and usable
-(`npm run walkthrough:vscode`). It is **provisional pending the operator's
-ruling on guided-look item A**, and this session does not self-authorize
-the waiver: adjudicating a criterion as non-blocking reduces verification,
-which is inside the decision-rights hard carve-out.
+**Nothing ships.** The criteria say a fail ships no recorder, and the
+verdict is FAIL.
 
-What the spec's own bar asked for — *ten consecutive clean captures from a
-fresh fixture, with no wrong-window capture and no privacy leakage* — was
-met. What the machine verdict says is FAIL, because this session set itself
-three additional clauses and two of them did not come out. Both statements
-are true and the record keeps both.
+The first version of this section called the recorder *provisional* and
+left `npm run walkthrough:vscode` registered and documented. Verification
+rejected that in both discovery lenses, correctly: *"calling it provisional
+in prose does not enforce a gate"*, and a user cannot distinguish "present
+pending approval" from shipped functionality. So:
+
+- **The npm entry is gone.** The recorder is reachable only as
+  `node scripts/record-vscode-walkthrough.js`.
+- **The documentation says it is not approved for use**, at the top of its
+  own section, with a link here.
+- **The recorder announces its own status on every run**, read from the
+  pilot's committed evaluation rather than from a sentence that would go
+  stale. When the verdict becomes `PASS` — or the operator records a waiver
+  and the evaluation is recomputed — the notice stops printing by itself.
+
+The code itself remains in the tree because **the measurement cannot exist
+without it**: the pilot harness drives the recorder, and deleting the
+recorder would delete the evidence this session was budgeted to produce.
+What was removed is every surface that presented it as available.
+
+This session does **not** self-authorize a waiver. Adjudicating a criterion
+as non-blocking reduces verification, which is inside the decision-rights
+hard carve-out, so whether a provably silent audio track is acceptable is
+item A of the guided look.
+
+## The ffmpeg fallback, and why it was not measured
+
+The spec names ffmpeg `gdigrab` as the **fallback** capture candidate.
+Verification flagged that it was never evaluated after OBS returned a
+`FAIL`, and that is a fair reading of the letter. Three facts, recorded
+rather than argued away:
+
+1. **ffmpeg is not installed on this machine** (`where ffmpeg` finds
+   nothing). Installing software on the operator's machine is their
+   decision, not this session's.
+2. **OBS did not fail at capture.** The fallback's purpose is to try
+   another backend when the primary cannot meet the bar; OBS met every
+   capture criterion — window selection, leakage, resolution, timing,
+   cleanup — and the two unmet clauses are a mis-calibrated control and a
+   container behaviour. Neither is a reason to reach for a backend the
+   operator's own 2026-08-15 ruling moved *away* from.
+3. **The interesting hypothesis is recorded for whoever runs it.** ffmpeg
+   with `-an` would produce **no audio track at all**, which is exactly
+   C7's unmet clause — so `gdigrab` might satisfy the one thing OBS cannot.
+   It would very likely fail C1 and C2 instead: it is GDI-based, prone to
+   black frames on hardware-accelerated Electron, and leaks occluding
+   windows into the frame, which is why OBS was made primary.
+
+Recorded as residual **S4-R7** rather than treated as done.
 
 ## Residuals
 
@@ -174,7 +233,8 @@ are true and the record keeps both.
 | S4-R3 | minor | No display scale other than 100% was exercised, by choice: changing the operator's live scaling would disrupt their desktop. The resize variant covers the same failure mode indirectly. | unowned; re-measure if a scaled machine is available |
 | S4-R4 | minor | C1 measures OBS's capture source, not the encoded file. A source-perfect, file-black capture would pass. Corroborated by file size and by the human watching it. | closed by guided-look item 1 |
 | S4-R5 | minor | A ten-run pilot leaves roughly 430 MB of gitignored video under `.walkthrough-runs/`, and this session ran it twice. Harmless, and worth knowing before running it on a small disk. | none |
-| S4-R6 | minor | One fix landed **after** the round-2 captures: cleanup ownership on the rethrow path, so that a non-dependency failure from `configure()` (the ambiguity refusal) cannot leave OBS running and the websocket config rewritten. It is on a path no measured run took, so the measurement's claims are unaffected — but it is not itself covered by a capture. The sibling class was checked in the browser recorder (G-008) and is absent there. | recorded; no re-measurement owed |
+| S4-R6 | minor | Cleanup ownership on the rethrow path was fixed after the round-2 captures, so that a non-dependency failure from `configure()` cannot leave OBS running and the config rewritten. It is now **covered by measurement** — the induced-failure variants exercise exactly that path — but it was not covered by the ten. The sibling class was checked in the browser recorder (G-008) and is absent there. | closed by the induced-failure variants |
+| S4-R7 | minor | The spec's **ffmpeg `gdigrab` fallback was not measured**. ffmpeg is not installed here and installing it is an operator decision; OBS did not fail at capture, so the fallback's trigger is arguably unmet. Recorded with its hypothesis: `-an` would satisfy C7's audio clause, while GDI capture would very likely fail C1 and C2 for the reasons that made OBS primary. | operator, if the audio clause is judged blocking |
 
 ## Follow-on sets
 

@@ -27,10 +27,19 @@
 
 ### Added
 
-- **(Set 113 S4) An optional Windows walkthrough recorder for the VS Code
-  product, behind an internal and explicitly unstable interface.**
-  `npm run walkthrough:vscode` drives the AI Work Explorer through the
-  authored scenario and records that window with OBS Studio.
+- **(Set 113 S4) A Windows walkthrough recorder for the VS Code product,
+  behind an internal and explicitly unstable interface — NOT APPROVED FOR
+  USE.** `node scripts/record-vscode-walkthrough.js` drives the AI Work
+  Explorer through the authored scenario and records that window with OBS
+  Studio.
+
+  **There is deliberately no `npm run` entry.** The pilot's verdict is
+  `FAIL` and no operator ruling waiving the unmet criteria exists, so the
+  recorder must not be presented as available: a registered script is
+  indistinguishable from shipped functionality. It reads the pilot's own
+  committed evaluation and announces its status on every run, and that
+  notice stops printing by itself when the verdict changes. The code is in
+  the tree only because the measurement cannot exist without it.
 
   It shares everything shareable with the browser recorder — the same
   scenario source, the same `walkthrough_run plan` handover, the same
@@ -40,10 +49,20 @@
   operator's 2026-08-10 note asked for. `--no-video` exercises the degraded
   path.
 
-  **OBS is never bundled.** It is a documented optional prerequisite, and
-  all three ways it can be missing — not installed, websocket unreachable,
-  password rejected — produce a named failure and a walkthrough that still
-  finishes and still writes a manifest carrying no video.
+  **OBS is never bundled, and the recorder never reconfigures it.** It is a
+  documented optional prerequisite; enabling obs-websocket is one click the
+  human makes in OBS's own UI, and "installed with the websocket off" is a
+  supported missing-dependency state rather than something to fix behind
+  the user's back. Only the pilot harness enables it, and it restores the
+  file byte-for-byte.
+
+  **No capture failure costs you the walkthrough**, and that is measured
+  rather than claimed. OBS missing, websocket unreachable, password
+  rejected, more than one matching window, a recording that will not start
+  or will not stop — each produces a named failure, and the run still
+  drives every step and writes its documents and manifest. The pilot
+  induces a plain-`Error` failure at each of the three points a capture can
+  fail and asserts the walkthrough survives all three.
 
   **It captures one window and never a screen.** The recorder builds its
   own OBS scene collection and profile, deletes every input it did not
@@ -92,6 +111,15 @@
   line in OBS's own log, no recording. The first cut let the poll time out
   and reported "OBS produced no output file", which names the symptom and
   hides the cause.
+
+- **(Set 113 S4) Capture failures destroyed the walkthrough instead of
+  degrading.** Only `ObsUnavailableError` was caught; everything else
+  propagated, deleted the run directory and exited non-zero. Two realistic
+  failures did exactly that — the refusal to guess between two Extension
+  Development Hosts throws a plain `Error`, and a developer with a second
+  host open hits it routinely — so a person who wanted a walkthrough and
+  could not have a video got **neither**. Every capture failure now
+  degrades, at setup, at start and at stop.
 
 - **(Set 113 S4) Cleanup predicted OBS's filenames instead of observing
   them.** OBS slugs a scene-collection name by its own rules

@@ -491,6 +491,31 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
         r.observations.windowPhysical = { width: 1024, height: 700 };
         return r;
       })(),
+      // C6's real evidence: a plain-Error failure induced at each point a
+      // capture can fail, each of which must clean up completely AND leave
+      // the walkthrough intact.
+      inducedFailures: ["configure", "start", "stop"].map((point) => ({
+        inducedAt: point,
+        stateAtFailure:
+          point === "stop"
+            ? {
+                inputs: ["window_capture"],
+                currentSceneCollection: "dabbler-walkthrough-collection",
+                recordingActive: true,
+              }
+            : null,
+        walkthroughStillCompleted: true,
+        manifestWritten: true,
+        osVideoArtifacts: 0,
+        stepsCompleted: 5,
+        stepCount: 5,
+        cleanupProblems: [] as string[],
+        obsProcessRemaining: 0,
+        sceneCollectionsLeftBehind: [] as string[],
+        profilesLeftBehind: [] as string[],
+        websocketConfigRestored: true,
+        sentinelsLeftBehind: [] as string[],
+      })),
       dependencyAbsent: [
         "websocket-unreachable",
         "websocket-auth-rejected",
@@ -595,6 +620,71 @@ suite("Set 113 S4 - the pilot verdict, and its ability to fail", () => {
     const m = passingMeasurement();
     m.runs[5].cleanupProblems = ["obs process 1234 still running"];
     assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("C6 cannot pass on setup failures alone", () => {
+    // The finding verification caught: the dependency-absent variants all
+    // die during SETUP, two of them before a scene collection exists, so
+    // they exercise a cleanup with nothing to undo. C6 asks for a failure
+    // AFTER everything exists, and must refuse to pass without one.
+    const m = passingMeasurement();
+    m.inducedFailures = [];
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("a missing induction point fails C6", () => {
+    const m = passingMeasurement();
+    m.inducedFailures = m.inducedFailures.filter((f) => f.inducedAt !== "stop");
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("an induced failure that leaves OBS running fails C6", () => {
+    const m = passingMeasurement();
+    m.inducedFailures[1].obsProcessRemaining = 1;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("an induced failure that leaves a scene collection fails C6", () => {
+    const m = passingMeasurement();
+    m.inducedFailures[0].sceneCollectionsLeftBehind = ["stray.json"];
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("an induced failure that does not restore the config fails C6", () => {
+    const m = passingMeasurement();
+    m.inducedFailures[2].websocketConfigRestored = false;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("a capture failure that DESTROYS the walkthrough fails C6", () => {
+    // The other half, and the one that matters most: cleaning up perfectly
+    // while deleting the user's walkthrough is not success. This is the
+    // defect verification found in the recorder, pinned in the evaluator.
+    const m = passingMeasurement();
+    m.inducedFailures[0].walkthroughStillCompleted = false;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+    const noManifest = passingMeasurement();
+    noManifest.inducedFailures[1].manifestWritten = false;
+    assert.ok(verdict.evaluate(noManifest, realCriteria).unmet.includes("C6"));
+  });
+
+  test("a degraded run that still emits a video artifact fails C6", () => {
+    const m = passingMeasurement();
+    m.inducedFailures[2].osVideoArtifacts = 1;
+    assert.ok(verdict.evaluate(m, realCriteria).unmet.includes("C6"));
+  });
+
+  test("a supplementary run is judged against C1-C4, not just counted", () => {
+    // The supplementary pass caught this: cleanRuns included
+    // supplementaryRuns while C1-C4 were evaluated over `runs` alone, so
+    // the recording that SUPPLIES the tenth capture was never checked.
+    const m = passingMeasurement();
+    m.supplementaryRuns[0].observations.correlationWithTarget = 0.3;
+    const result = verdict.evaluate(m, realCriteria);
+    assert.ok(result.unmet.includes("C1"), "a bad supplementary run must fail C1");
+    const leaky = passingMeasurement();
+    leaky.supplementaryRuns[0].observations.magentaFractionUnderOcclusion = 0.4;
+    assert.ok(verdict.evaluate(leaky, realCriteria).unmet.includes("C2"));
   });
 
   test("a leftover from a PART-WAY failure fails C6 too", () => {

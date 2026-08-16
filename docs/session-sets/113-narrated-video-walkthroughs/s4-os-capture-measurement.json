@@ -977,7 +977,24 @@
     },
     "videoBytes": 37441880
   },
-  "inducedFailure": null,
+  "inducedFailure": {
+    "inducedAfter": "startRecording returned",
+    "stateAtFailure": {
+      "inputs": [
+        "window_capture"
+      ],
+      "currentSceneCollection": "dabbler-walkthrough-collection",
+      "recordingActive": true
+    },
+    "walkthroughStillCompleted": false,
+    "manifestWritten": false,
+    "cleanupProblems": [],
+    "obsProcessRemaining": 0,
+    "sceneCollectionsLeftBehind": [],
+    "profilesLeftBehind": [],
+    "websocketConfigRestored": true,
+    "sentinelsLeftBehind": []
+  },
   "finishedAt": "2026-08-16T01:40:57.019Z",
   "evaluation": {
     "criteria": [
@@ -1002,6 +1019,7 @@
           "detectorControl": 0.441219,
           "detectorMustBeAtLeast": 0.5,
           "correlationHeldUnderOcclusion": [
+            1,
             1,
             1,
             1,
@@ -1041,7 +1059,7 @@
         "name": "step-events-align-with-captions",
         "passed": true,
         "detail": {
-          "worstAnchorUncertaintyMillis": 110,
+          "worstAnchorUncertaintyMillis": 216,
           "threshold": 1500,
           "cuesEqualStepCount": true,
           "allCuesWithinRecording": true,
@@ -1055,7 +1073,8 @@
             49800,
             49866,
             49800,
-            49866
+            49866,
+            50066
           ]
         }
       },
@@ -1098,11 +1117,83 @@
         "name": "deterministic-cleanup",
         "passed": true,
         "detail": {
-          "attemptsChecked": 14,
+          "attemptsChecked": 15,
           "attemptsWithProblems": 0,
           "problems": [],
-          "partWayFailuresIncluded": 3,
-          "note": "The dependency-absent variants ARE the part-way failures C6 asks for: each dies mid-setup, after OBS was launched or its config written, and must still put everything back."
+          "setupFailuresIncluded": 3,
+          "inducedFailures": [
+            {
+              "point": "configure",
+              "ran": true,
+              "cleanedUp": true,
+              "degraded": true,
+              "detail": {
+                "inducedAt": "configure",
+                "stateAtFailure": null,
+                "walkthroughStillCompleted": true,
+                "manifestWritten": true,
+                "osVideoArtifacts": 0,
+                "stepsCompleted": 5,
+                "stepCount": 5,
+                "cleanupProblems": [],
+                "obsProcessRemaining": 0,
+                "sceneCollectionsLeftBehind": [],
+                "profilesLeftBehind": [],
+                "websocketConfigRestored": true,
+                "sentinelsLeftBehind": []
+              }
+            },
+            {
+              "point": "start",
+              "ran": true,
+              "cleanedUp": true,
+              "degraded": true,
+              "detail": {
+                "inducedAt": "start",
+                "stateAtFailure": null,
+                "walkthroughStillCompleted": true,
+                "manifestWritten": true,
+                "osVideoArtifacts": 0,
+                "stepsCompleted": 5,
+                "stepCount": 5,
+                "cleanupProblems": [],
+                "obsProcessRemaining": 0,
+                "sceneCollectionsLeftBehind": [],
+                "profilesLeftBehind": [],
+                "websocketConfigRestored": true,
+                "sentinelsLeftBehind": []
+              }
+            },
+            {
+              "point": "stop",
+              "ran": true,
+              "cleanedUp": true,
+              "degraded": true,
+              "detail": {
+                "inducedAt": "stop",
+                "stateAtFailure": {
+                  "inputs": [
+                    "window_capture"
+                  ],
+                  "currentSceneCollection": "dabbler-walkthrough-collection",
+                  "recordingActive": true
+                },
+                "walkthroughStillCompleted": true,
+                "manifestWritten": true,
+                "osVideoArtifacts": 0,
+                "stepsCompleted": 5,
+                "stepCount": 5,
+                "cleanupProblems": [],
+                "obsProcessRemaining": 0,
+                "sceneCollectionsLeftBehind": [],
+                "profilesLeftBehind": [],
+                "websocketConfigRestored": true,
+                "sentinelsLeftBehind": []
+              }
+            }
+          ],
+          "inducedFailuresPassed": true,
+          "note": "The dependency-absent variants die during SETUP and are not the part-way failure C6 asks for. The induced failures are: each throws a PLAIN Error at one of the three points a capture can fail, and each must both clean up completely AND leave the walkthrough intact with no video."
         }
       },
       {
@@ -1125,6 +1216,7 @@
           "noForbiddenKindEverCreated": true,
           "everySceneHeldExactlyOneSource": true,
           "audioTracksPerRecording": [
+            1,
             1,
             1,
             1,
@@ -1238,6 +1330,59 @@
         }
       },
       "videoBytes": 37834187
+    }
+  ],
+  "inducedFailures": [
+    {
+      "inducedAt": "configure",
+      "stateAtFailure": null,
+      "walkthroughStillCompleted": true,
+      "manifestWritten": true,
+      "osVideoArtifacts": 0,
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "cleanupProblems": [],
+      "obsProcessRemaining": 0,
+      "sceneCollectionsLeftBehind": [],
+      "profilesLeftBehind": [],
+      "websocketConfigRestored": true,
+      "sentinelsLeftBehind": []
+    },
+    {
+      "inducedAt": "start",
+      "stateAtFailure": null,
+      "walkthroughStillCompleted": true,
+      "manifestWritten": true,
+      "osVideoArtifacts": 0,
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "cleanupProblems": [],
+      "obsProcessRemaining": 0,
+      "sceneCollectionsLeftBehind": [],
+      "profilesLeftBehind": [],
+      "websocketConfigRestored": true,
+      "sentinelsLeftBehind": []
+    },
+    {
+      "inducedAt": "stop",
+      "stateAtFailure": {
+        "inputs": [
+          "window_capture"
+        ],
+        "currentSceneCollection": "dabbler-walkthrough-collection",
+        "recordingActive": true
+      },
+      "walkthroughStillCompleted": true,
+      "manifestWritten": true,
+      "osVideoArtifacts": 0,
+      "stepsCompleted": 5,
+      "stepCount": 5,
+      "cleanupProblems": [],
+      "obsProcessRemaining": 0,
+      "sceneCollectionsLeftBehind": [],
+      "profilesLeftBehind": [],
+      "websocketConfigRestored": true,
+      "sentinelsLeftBehind": []
     }
   ]
 }

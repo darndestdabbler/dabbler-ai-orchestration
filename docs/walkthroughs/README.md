@@ -327,17 +327,26 @@ deferred until a real reviewer says the videos are hard to follow, which
 is why each step's target bounding box is recorded in the stream even
 though nothing reads it yet.
 
-### The awkward host: recording VS Code itself
+### The awkward host: recording VS Code itself — NOT APPROVED FOR USE
 
-**Windows only, optional, and internal.** Everything above is the portable
-path and covers every target that reaches a browser. This is the exception
-that proves why the seam exists: Playwright's `recordVideo` was measured to
-break the **VS Code workbench** specifically, so the one product this
-framework cannot record with the portable path is its own.
+**Windows only, internal, and currently ungated by an operator decision.**
+Everything above is the portable path and covers every target that reaches
+a browser. This is the exception that proves why the seam exists:
+Playwright's `recordVideo` was measured to break the **VS Code workbench**
+specifically, so the one product this framework cannot record with the
+portable path is its own.
+
+> **Status: the Session 4 pilot's verdict is FAIL**, on two of its own
+> criteria — see
+> [`s4-os-capture-outcome.md`](../session-sets/113-narrated-video-walkthroughs/s4-os-capture-outcome.md).
+> There is deliberately **no `npm run` entry**, because a registered script
+> is indistinguishable from a shipped feature, and the recorder announces
+> its own status on every run. Run it to review it; do not rely on it until
+> the operator has ruled.
 
 ```bash
-npm run walkthrough:vscode              # record the Work Explorer
-npm run walkthrough:vscode -- --no-video   # the degraded path
+node scripts/record-vscode-walkthrough.js              # record the Work Explorer
+node scripts/record-vscode-walkthrough.js --no-video   # the degraded path
 ```
 
 **OBS Studio is a documented optional prerequisite. It is never bundled**,
@@ -349,15 +358,28 @@ before a recording happens, and each one failing is reported by name:
 1. **OBS Studio is installed** (28 or newer, which is when obs-websocket
    became bundled).
 2. **Its websocket server is enabled** — in OBS, *Tools → WebSocket Server
-   Settings → Enable WebSocket server*. This is a one-time manual step.
-   Passing `--websocket_port` on the command line overrides the port but
-   does **not** enable the server, which is a trap worth knowing about
-   because OBS logs the override and then never listens.
+   Settings → Enable WebSocket server*. **You do this once, yourself**, and
+   the recorder will not do it for you: "OBS installed with its websocket
+   off" is a supported missing-dependency state, and a tool that silently
+   rewrites another application's configuration is not a documented
+   optional prerequisite. (Only the pilot harness enables it, and it
+   restores the file byte-for-byte.) Passing `--websocket_port` on OBS's
+   command line overrides the port but does **not** enable the server,
+   which is a trap worth knowing: OBS logs the override and then never
+   listens.
 3. **Exactly one Extension Development Host window is open.** The recorder
    enumerates every window OBS offers and **refuses** when more than one
    matches, rather than taking the first — on a developer's machine there
    is routinely a second `Code.exe` window, and silently recording the
    wrong one is worse than not recording.
+
+**No capture failure costs you the walkthrough.** Whatever goes wrong —
+OBS missing, websocket off, password rejected, more than one matching
+window, a recording that will not start or will not stop — the run drives
+every step, writes its documents and its manifest, and reports why there is
+no video. That is measured rather than claimed: the pilot induces a failure
+at each of the three points a capture can fail and asserts the walkthrough
+survives all three.
 
 The recorder builds its **own** OBS scene collection and profile, uses
 them, and removes them afterwards. It does not touch your existing OBS
@@ -384,7 +406,9 @@ is why that finding is platform-specific and must not be generalised.
 - [`work-explorer-first-look/`](work-explorer-first-look/) — reading where
   every session set stands, off the AI Work Explorer tree, on the
   disposable fixture project that `npm run walk` stages. Its driver block
-  is `implemented`, and `npm run walkthrough:vscode` is what drives it.
+  is `implemented`, and `scripts/record-vscode-walkthrough.js` is what
+  drives it — see the *not approved for use* note above before relying on
+  anything it produces.
 - [`task-board-first-task/`](task-board-first-task/) — adding, completing
   and filtering a task on a deliberately tiny sample web page. Its driver
   block is `shipped`, and it is what Session 3 actually recorded.

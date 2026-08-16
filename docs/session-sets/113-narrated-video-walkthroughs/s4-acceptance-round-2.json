@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 4,
+  "verificationRound": 2,
+  "baselineRound": 2,
+  "baselineIsOwnRound": true,
+  "baselineTree": "5a06a716116ebba1372e765c60c3d7634d8dca6f",
+  "fixedTree": "7a99821ee2b7327ed14ec3d440ac840c23dcf35b",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T02:10:52.500777+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The evaluator counts supplementary recordings toward the ten-clean-run bar without evaluating those recordings against the per-run criteria - **Category:** False Positive - **Severity:** Major - ** ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The evaluator must select one ordered set of ten qualifying clean recordings and apply every `bar.allOfPerRun` criterion to that same set; a supplementary recording with a failing C1, C2, C3, or C4 observation must prevent `barRunsMet` and the overall verdict from passing.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

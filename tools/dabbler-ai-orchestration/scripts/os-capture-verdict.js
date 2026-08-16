@@ -24,7 +24,19 @@
 function evaluate(measurement, criteria) {
   const c = criteria.criteria;
   const bar = criteria.bar;
-  const runs = measurement.runs || [];
+  // EVERY recording that can count toward the bar is evaluated against the
+  // per-run criteria. The first cut evaluated C1-C4 over `runs` alone while
+  // counting `supplementaryRuns` toward cleanRuns -- so the supplementary
+  // recording, which is the one that SUPPLIES the tenth capture on the
+  // designed path, was never checked against a single criterion. A
+  // wrong-window supplementary capture with leaked pixels and broken
+  // caption timing would still have counted as clean. Found by the
+  // supplementary verification pass, in the instrument built to prevent
+  // exactly this kind of false positive.
+  const runs = (measurement.runs || []).concat(
+    measurement.supplementaryRuns || []
+  );
+  const primaryRuns = measurement.runs || [];
   const variants = measurement.dependencyAbsent || [];
   const resize = measurement.resizeVariant || null;
   const controlRun = runs.find(
@@ -87,10 +99,12 @@ function evaluate(measurement, criteria) {
     resize.observations.dimensionDeltaPx !== null &&
     resize.observations.dimensionDeltaPx <= c.C3.maxDimensionDeltaPx &&
     resize.observations.frameSize !== null &&
-    runs.length > 0 &&
-    runs[0].observations.frameSize !== null &&
-    (resize.observations.frameSize.width !== runs[0].observations.frameSize.width ||
-      resize.observations.frameSize.height !== runs[0].observations.frameSize.height);
+    primaryRuns.length > 0 &&
+    primaryRuns[0].observations.frameSize !== null &&
+    (resize.observations.frameSize.width !==
+      primaryRuns[0].observations.frameSize.width ||
+      resize.observations.frameSize.height !==
+        primaryRuns[0].observations.frameSize.height);
   record(
     "C3",
     c.C3.name,
@@ -100,14 +114,18 @@ function evaluate(measurement, criteria) {
     {
       worstDimensionDeltaPx: max(deltas),
       threshold: c.C3.maxDimensionDeltaPx,
-      baselineFrame: runs.length ? runs[0].observations.frameSize : null,
+      baselineFrame: primaryRuns.length
+        ? primaryRuns[0].observations.frameSize
+        : null,
       resizedFrame: resize ? resize.observations.frameSize : null,
       resizedDeltaPx: resize ? resize.observations.dimensionDeltaPx : null,
       // The resize variant only means anything if the frame ACTUALLY
       // changed size. A capture pinned to a fixed canvas would report a
       // delta of 0 against a window it was ignoring.
       frameFollowedTheResize: resizeOk,
-      displayScaleExercised: runs.length ? runs[0].observations.scaleFactor : null,
+      displayScaleExercised: primaryRuns.length
+        ? primaryRuns[0].observations.scaleFactor
+        : null,
       scalingCaveat:
         "One display scale was exercised. A pass here is a claim about " +
         "that scale and no other.",
@@ -169,19 +187,57 @@ function evaluate(measurement, criteria) {
     .concat(resize ? [resize] : [])
     .map((r) => r.cleanupProblems || [])
     .concat(variants.map((v) => v.cleanupProblems || []));
+  // THE PART-WAY FAILURE C6 ACTUALLY ASKS FOR.
+  //
+  // The first cut passed C6 on the dependency-absent variants and asserted
+  // in its own note that those "ARE the part-way failures". They are not:
+  // all three die during setup, and two of them before a scene collection
+  // or profile exists at all, so they exercise a cleanup with nothing to
+  // undo. Verification caught the claim. C6 now requires a failure induced
+  // AFTER OBS is running, the collection and profile exist, an input exists
+  // and a recording is in flight -- and requires that nothing survives it.
+  const induced = measurement.inducedFailures || [];
+  const inducedPoints = ["configure", "start", "stop"];
+  const inducedDetail = inducedPoints.map((point) => {
+    const f = induced.find((x) => x.inducedAt === point) || null;
+    const cleanedUp =
+      f !== null &&
+      (f.cleanupProblems || []).length === 0 &&
+      (f.sceneCollectionsLeftBehind || []).length === 0 &&
+      (f.profilesLeftBehind || []).length === 0 &&
+      (f.sentinelsLeftBehind || []).length === 0 &&
+      f.obsProcessRemaining === 0 &&
+      f.websocketConfigRestored === true;
+    // The other half, and the one verification said was missing: a capture
+    // failure must degrade to no video, not destroy the walkthrough.
+    const degraded =
+      f !== null &&
+      f.walkthroughStillCompleted === true &&
+      f.manifestWritten === true &&
+      f.osVideoArtifacts === 0 &&
+      f.stepsCompleted === f.stepCount;
+    return { point, ran: f !== null, cleanedUp, degraded, detail: f };
+  });
+  const inducedOk = inducedDetail.every((d) => d.ran && d.cleanedUp && d.degraded);
   record(
     "C6",
     c.C6.name,
-    cleanupSets.length > 0 && cleanupSets.every((p) => p.length === 0),
+    cleanupSets.length > 0 &&
+      cleanupSets.every((p) => p.length === 0) &&
+      inducedOk,
     {
       attemptsChecked: cleanupSets.length,
       attemptsWithProblems: cleanupSets.filter((p) => p.length > 0).length,
       problems: cleanupSets.filter((p) => p.length > 0),
-      partWayFailuresIncluded: variants.length,
+      setupFailuresIncluded: variants.length,
+      inducedFailures: inducedDetail,
+      inducedFailuresPassed: inducedOk,
       note:
-        "The dependency-absent variants ARE the part-way failures C6 asks " +
-        "for: each dies mid-setup, after OBS was launched or its config " +
-        "written, and must still put everything back.",
+        "The dependency-absent variants die during SETUP and are not the " +
+        "part-way failure C6 asks for. The induced failures are: each " +
+        "throws a PLAIN Error at one of the three points a capture can " +
+        "fail, and each must both clean up completely AND leave the " +
+        "walkthrough intact with no video.",
     }
   );
 
@@ -243,9 +299,8 @@ function evaluate(measurement, criteria) {
     r.stepsCompleted === r.stepCount &&
     r.videoBytes > 0 &&
     !carriedControls(r);
-  const allRuns = runs.concat(measurement.supplementaryRuns || []);
-  const cleanRuns = allRuns.filter(isClean).length;
-  const contaminated = allRuns.filter(carriedControls).length;
+  const cleanRuns = runs.filter(isClean).length;
+  const contaminated = runs.filter(carriedControls).length;
   const unmet = findings.filter((f) => !f.passed).map((f) => f.id);
 
   return {
@@ -253,7 +308,7 @@ function evaluate(measurement, criteria) {
     cleanRuns,
     runsRequired: bar.runs,
     barRunsMet: cleanRuns >= bar.runs,
-    runsMeasured: runs.length,
+    runsMeasured: primaryRuns.length,
     supplementaryRuns: (measurement.supplementaryRuns || []).length,
     runsExcludedAsControlContaminated: contaminated,
     unmet,

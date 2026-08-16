@@ -117,6 +117,17 @@ class ObsCaptureSession {
     // against whatever is (or is not) already listening -- the honest way
     // to exercise "OBS is not running".
     this.launchEnabled = opts.launchEnabled !== false;
+    // Whether this session may WRITE obs-websocket's config to turn the
+    // server on. DEFAULT FALSE, and that default is the whole point.
+    //
+    // Enabling the websocket is documented as a one-time thing the human
+    // does in OBS's own UI, and the shipped recorder must not quietly do it
+    // for them: "OBS installed with its websocket disabled" is the
+    // supported missing-dependency state, so a user who runs the recorder
+    // in that state must get a no-video walkthrough, not a reconfigured
+    // OBS. Only the PILOT opts in, and only because it restores the file
+    // byte-for-byte afterwards.
+    this.mayEnableWebsocketConfig = opts.mayEnableWebsocketConfig === true;
     this.tag = opts.tag || "dabbler";
     this.launchTimeoutMs = opts.launchTimeoutMs || 60000;
 
@@ -154,7 +165,7 @@ class ObsCaptureSession {
       );
     }
 
-    if (fs.existsSync(WEBSOCKET_CONFIG)) {
+    if (this.mayEnableWebsocketConfig && fs.existsSync(WEBSOCKET_CONFIG)) {
       const original = fs.readFileSync(WEBSOCKET_CONFIG, "utf8");
       this.restore.websocketConfig = original;
       const cfg = JSON.parse(original);

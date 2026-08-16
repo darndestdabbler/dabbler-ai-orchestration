@@ -15,13 +15,23 @@ From the repository root:
 
 ```bash
 cd tools/dabbler-ai-orchestration
-npm run walkthrough:vscode
+node scripts/record-vscode-walkthrough.js
 ```
 
 It stages a throwaway sample project, opens a second VS Code against it,
 drives five steps of the AI Work Explorer while OBS records that window,
 and prints the path of a page to open. It takes about a minute and a half.
 Nothing it does touches your own work.
+
+It will print **"NOT APPROVED FOR USE"** first. That is correct and
+expected — the pilot's verdict is FAIL on two criteria, which is what
+decision A below is about — and it is why this is a plain `node` command
+rather than an `npm run` script.
+
+**One-time setup:** in OBS, *Tools -> WebSocket Server Settings -> Enable
+WebSocket server*. The recorder will not do this for you, deliberately. If
+you skip it, the command still works and still produces a page — it just
+says there is no video, which is item 4's answer arriving early.
 
 **If OBS is not running with its websocket enabled**, the command still
 finishes and still prints a page — it just says there is no video. That is
@@ -60,7 +70,8 @@ Use the player's captions button, then scrub to about halfway.
 
 ### 4. The version with no video
 
-Run `npm run walkthrough:vscode -- --no-video` and open the page it prints.
+Run `node scripts/record-vscode-walkthrough.js --no-video` and open the
+page it prints.
 
 **Look at:** what sits where the player was.
 

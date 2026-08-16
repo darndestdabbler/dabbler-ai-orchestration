@@ -29,6 +29,12 @@ const { chromium } = require("@playwright/test");
 
 const { recordVscodeWalkthrough } = require("./record-vscode-walkthrough.js");
 const { evaluate } = require("./os-capture-verdict.js");
+const {
+  SCENES_DIR,
+  PROFILES_DIR,
+  SENTINEL_DIR,
+  WEBSOCKET_CONFIG,
+} = require("./obs-capture.js");
 const { decodePng, comparePngs, colorFraction, grayscaleGrid, correlate } =
   require("./png-metrics.js");
 
@@ -204,6 +210,10 @@ async function pilotRun(index, criteria, options) {
     keep: true,
     windowSize: opts.windowSize,
     obsPort: 44667 + (index % 7),
+    // The PILOT may enable obs-websocket, because it restores the file
+    // byte-for-byte afterwards and C6 asserts that it did. The shipped
+    // recorder may not.
+    mayEnableWebsocketConfig: true,
     afterStart: async ({ capture, page, result: runResult }) => {
       if (!capture) {
         observations.errors.push(
@@ -440,7 +450,10 @@ async function dependencyAbsentVariants() {
     log("  variant " + c.name);
     const outDir = path.join(RUN_ROOT, "absent-" + c.name);
     const result = await recordVscodeWalkthrough(
-      Object.assign({ out: outDir, keep: true }, c.opts)
+      Object.assign(
+        { out: outDir, keep: true, mayEnableWebsocketConfig: true },
+        c.opts
+      )
     );
     const manifestPath = path.join(outDir, "manifest.json");
     let osVideoArtifacts = null;
@@ -471,6 +484,130 @@ async function dependencyAbsentVariants() {
     );
   }
   return variants;
+}
+
+/**
+ * Failures induced AFTER setup, at each point a capture can fail, and what
+ * survives them.
+ *
+ * This replaces a weaker first cut in two ways, both of which verification
+ * asked for. The dependency-absent variants all die during SETUP -- two of
+ * them before a scene collection or profile exists at all -- so they
+ * exercise a cleanup with nothing to undo, and passing C6 on that evidence
+ * was a false positive. And "a capture failure degrades to no video rather
+ * than destroying the walkthrough" was a claim in prose; here it is
+ * measured at each of the three points a capture can fail.
+ *
+ * Every induced failure is a PLAIN Error, because that is the type that was
+ * getting through: a catch that only recognised ObsUnavailableError let the
+ * window-ambiguity refusal destroy the run.
+ */
+async function inducedPostSetupFailures() {
+  const points = ["configure", "start", "stop"];
+  const results = [];
+
+  for (const point of points) {
+    log("  induced failure at '" + point + "'");
+    const outDir = path.join(RUN_ROOT, "induced-failure-" + point);
+    const scenesBefore = new Set(listObsDir(SCENES_DIR));
+    const profilesBefore = new Set(listObsDir(PROFILES_DIR));
+    const websocketBefore = readIfPresent(WEBSOCKET_CONFIG);
+    let stateAtFailure = null;
+
+    const result = await recordVscodeWalkthrough({
+      out: outDir,
+      keep: true,
+      obsPort: 44680,
+      mayEnableWebsocketConfig: true,
+      induceFailureAt: point,
+      // For the 'stop' point the capture is fully live when the hook runs,
+      // so record what actually existed at that moment. For the earlier
+      // points there is deliberately nothing yet.
+      afterStart: async ({ capture }) => {
+        if (!capture) return;
+        const inputs = await capture.client.request("GetInputList", {});
+        const collections = await capture.client.request(
+          "GetSceneCollectionList",
+          {}
+        );
+        const status = await capture.client.request("GetRecordStatus", {});
+        stateAtFailure = {
+          inputs: inputs.inputs.map((i) => i.inputKind),
+          currentSceneCollection: collections.currentSceneCollectionName,
+          recordingActive: status.outputActive,
+        };
+      },
+    });
+
+    let osVideoArtifacts = null;
+    const manifestPath = path.join(outDir, "manifest.json");
+    if (fs.existsSync(manifestPath)) {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+      osVideoArtifacts = (manifest.artifacts || []).filter(
+        (a) => a.kind === "os-video"
+      ).length;
+    }
+
+    results.push({
+      inducedAt: point,
+      stateAtFailure,
+      // The degradation half: the walkthrough must survive a capture
+      // failure and still produce its documents.
+      walkthroughStillCompleted: result.usable,
+      manifestWritten: fs.existsSync(manifestPath),
+      osVideoArtifacts,
+      stepsCompleted: result.stepsCompleted,
+      stepCount: result.stepCount,
+      // The cleanup half: nothing the harness created may survive.
+      cleanupProblems: result.cleanupProblems || [],
+      obsProcessRemaining: obsProcessCount(),
+      sceneCollectionsLeftBehind: listObsDir(SCENES_DIR).filter(
+        (e) => !scenesBefore.has(e)
+      ),
+      profilesLeftBehind: listObsDir(PROFILES_DIR).filter(
+        (e) => !profilesBefore.has(e)
+      ),
+      websocketConfigRestored:
+        readIfPresent(WEBSOCKET_CONFIG) === websocketBefore,
+      sentinelsLeftBehind: listObsDir(SENTINEL_DIR),
+    });
+    log(
+      "    completed=" + result.usable +
+        " manifest=" + fs.existsSync(manifestPath) +
+        " osVideo=" + osVideoArtifacts +
+        " cleanup=" + JSON.stringify(result.cleanupProblems || [])
+    );
+  }
+  return results;
+}
+
+function listObsDir(dir) {
+  try {
+    return fs.readdirSync(dir);
+  } catch {
+    return [];
+  }
+}
+
+function readIfPresent(file) {
+  try {
+    return fs.readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** How many OBS processes are running right now. */
+function obsProcessCount() {
+  try {
+    const out = require("child_process").execSync(
+      'tasklist /FI "IMAGENAME eq obs64.exe" /NH /FO CSV',
+      { encoding: "utf8" }
+    );
+    return (out.match(/obs64\.exe/gi) || []).length;
+  } catch {
+    return 0;
+  }
 }
 
 // ---------------------------------------------------------------------- main
@@ -512,6 +649,30 @@ async function main() {
   if (process.platform !== "win32") {
     log("this pilot measures Windows OS capture; refusing to pretend on " + process.platform);
     process.exitCode = 2;
+    return;
+  }
+
+  // Run only the induced post-setup failure and fold it into an existing
+  // measurement. C6 cannot pass without it, so it has its own entry point
+  // rather than requiring a whole re-run to supply one variant.
+  if (process.argv.includes("--induced-failure-only")) {
+    const criteria = JSON.parse(fs.readFileSync(CRITERIA_PATH, "utf8"));
+    const measurement = JSON.parse(fs.readFileSync(MEASUREMENT_PATH, "utf8"));
+    log("C6 induced post-setup failure");
+    measurement.inducedFailures = await inducedPostSetupFailures();
+    measurement.evaluation = evaluate(measurement, criteria);
+    fs.writeFileSync(
+      MEASUREMENT_PATH,
+      JSON.stringify(measurement, null, 2) + "\n",
+      "utf8"
+    );
+    log(
+      "VERDICT " +
+        measurement.evaluation.verdict +
+        (measurement.evaluation.unmet.length
+          ? "; unmet: " + measurement.evaluation.unmet.join(", ")
+          : "")
+    );
     return;
   }
 
@@ -575,7 +736,7 @@ async function main() {
     runs: [],
     dependencyAbsent: [],
     resizeVariant: null,
-    inducedFailure: null,
+    inducedFailures: null,
   };
 
   const total = criteria.bar.runs;
@@ -599,6 +760,9 @@ async function main() {
 
   log("C5 dependency-absent variants");
   measurement.dependencyAbsent = await dependencyAbsentVariants();
+
+  log("C6 induced post-setup failure");
+  measurement.inducedFailures = await inducedPostSetupFailures();
 
   measurement.finishedAt = new Date().toISOString();
   // The verdict is DERIVED from the criteria file, not announced. Every

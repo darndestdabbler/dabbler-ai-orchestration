@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T08:24:07.601365-04:00",
+  "generatedAt": "2026-08-16T09:29:22.576602-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
     "activity-log.json": "21b2f0e7adb50cd9b0a441e08fff118a661f176b0c610096df82e206c2c5521f",

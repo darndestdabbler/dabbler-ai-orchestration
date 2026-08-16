@@ -684,7 +684,22 @@ function inducedVariants(measurement) {
       manifestStillWritten: fs.existsSync(manifestPath),
       videoArtifactCount: videos.length,
       degraded: Boolean(manifest && manifest.degraded),
-      postCaptureStepRan: Boolean(manifest && manifest.postCaptureStep === "ran"),
+      // DERIVED FROM THE ARTIFACT the child was supposed to produce, and from
+      // its contents -- not from any field the child wrote about itself.
+      postCaptureStepRan: (() => {
+        const idx = path.join(runDir, "walkthrough-index.html");
+        if (!fs.existsSync(idx)) return false;
+        const text = fs.readFileSync(idx, "utf8");
+        return (
+          text.includes("<!-- dabbler:post-capture-step -->") &&
+          /<li>/.test(text) &&
+          fs.statSync(idx).size > 100
+        );
+      })(),
+      postCaptureArtifactBytes: (() => {
+        const idx = path.join(runDir, "walkthrough-index.html");
+        return fs.existsSync(idx) ? fs.statSync(idx).size : 0;
+      })(),
       errorMentionsContainerDependency: /container dependency unavailable/i.test(
         String(manifest && manifest.dependency)
       ),
@@ -817,11 +832,48 @@ function machineState() {
 }
 
 /**
+ * THE POST-CAPTURE WALKTHROUGH STEP, performed rather than claimed.
+ *
+ * Round 6 rejected the previous shape and was right: the degraded path wrote
+ * `postCaptureStep: "ran"` into the manifest and the parent read that same
+ * field straight back out as `postCaptureStepRan: true`. Nothing executed. A
+ * criterion whose evidence is a string the code under test writes about
+ * itself is not a criterion, and this is the third time that pattern has been
+ * caught in this session.
+ *
+ * What a walkthrough actually owes after capture is the READABLE ARTIFACT --
+ * the thing a reviewer opens when there is no video. So the step is: render
+ * the run's step list to a standalone document. It runs on the degraded path
+ * too, which is the whole point: FAILURE TO RECORD MUST NEVER FAIL THE
+ * WALKTHROUGH means the document still gets written when the recorder is
+ * gone.
+ *
+ * The parent then derives `postCaptureStepRan` from that FILE and its
+ * contents, never from a field the child asserted.
+ */
+function performPostCaptureStep(scratchDir, { degraded, dependency, runs }) {
+  const indexPath = path.join(scratchDir, "walkthrough-index.html");
+  const steps = [
+    "Start a virtual display inside the container",
+    "Install the Dabbler extension and open the fixture workspace",
+    "Record the display",
+    "Extract frames and write the run manifest",
+  ];
+  const body =
+    "<!-- dabbler:post-capture-step -->\n" +
+    "<h1>Container capture walkthrough</h1>\n" +
+    "<p>Recording: " +
+    (degraded ? "UNAVAILABLE -- " + String(dependency || "") : String(runs || 0) + " run(s)") +
+    "</p>\n<ol>\n" +
+    steps.map((t) => "  <li>" + t + "</li>").join("\n") +
+    "\n</ol>\n";
+  fs.mkdirSync(scratchDir, { recursive: true });
+  fs.writeFileSync(indexPath, body, "utf8");
+  return indexPath;
+}
+
+/**
  * The run manifest THIS script owes on every exit path, successful or not.
- * `postCaptureStep` exists because the acceptance criterion asks that a
- * post-capture walkthrough step still EXECUTES when the dependency is gone --
- * degrading has to mean "the rest of the walkthrough happened", not "we
- * stopped politely".
  */
 function writeManifest(scratchDir, fields) {
   const manifestPath = path.join(scratchDir, "run-manifest.json");
@@ -905,12 +957,14 @@ async function main() {
   } catch (err) {
     const why = String(err && err.message ? err.message : err);
     log("DEGRADED: " + why);
+    // PERFORM it, then record only what it produced.
+    const indexPath = performPostCaptureStep(scratchDir, { degraded: true, dependency: why });
     writeManifest(scratchDir, {
       artifacts: [],
       degraded: true,
       dependency: why,
       completed: true,
-      postCaptureStep: "ran",
+      postCaptureArtifact: path.basename(indexPath),
     });
     measurement.degraded = { reason: why };
     fs.writeFileSync(
@@ -1001,14 +1055,17 @@ async function main() {
     measurement.machineStateOnExit === measurement.machineStateOnEntry;
   measurement.harnessContainersLeftBehind = harnessContainerNames();
 
+  const okRuns = measurement.runs.filter((r) => !r.interrupted && !r.error);
+  const indexPath = performPostCaptureStep(scratchDir, {
+    degraded: false,
+    runs: okRuns.length,
+  });
   writeManifest(scratchDir, {
-    artifacts: measurement.runs
-      .filter((r) => !r.interrupted && !r.error)
-      .map((r) => ({ kind: "container-video", run: r.name })),
+    artifacts: okRuns.map((r) => ({ kind: "container-video", run: r.name })),
     degraded: false,
     dependency: null,
     completed: true,
-    postCaptureStep: "ran",
+    postCaptureArtifact: path.basename(indexPath),
   });
 
   if (!isVariantChild) {

@@ -1,0 +1,95 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 5,
+  "verificationRound": 6,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "I5 still certifies the post-capture walkthrough step by writing the assertion itself\n\n- **Category:** Correctness\n- **Severity:** Major\n- **Evidence paths:** `tools/dabbler-ai-orchestration/scripts/measure-container-isolation.js`, `tools/dabbler-ai-orchestration/scripts/container-isolation-verdict.js`\n- **Failure scenario:** Podman is absent, stopped, or the image is unavailable—ordinary first-run and degraded-dependency states. The entrypoint writes `postCaptureStep: \"ran\"` without executing or observing a distinct post-capture walkthrough operation, and the parent converts that same field directly into `postCaptureStepRan: true`. I5 therefore passes even though the behavior it claims to protect remains untested. This is probable because all three declared variants deterministically use this self-reporting path.\n- **Acceptance criterion:** `JUDGMENT - Each I5 variant must execute a distinct, externally observable post-capture walkthrough action through the documented entrypoint, and the parent must derive postCaptureStepRan from that action's result or artifact rather than from a manifest field that the degraded catch path assigns unconditionally.`\n- **Details:**  \n  - **Violation:** The implementation states that “the acceptance criterion asks that a post-capture walkthrough step still EXECUTES,” but the degraded path only calls `writeManifest(... postCaptureStep: \"ran\")`; no separate walkthrough action establishes that claim.  \n  - **Impact:** A reviewer is still given a false PASS for the cardinal guarantee that recording failure does not prevent the rest of the walkthrough. This repeats the substantive false-certification problem behind L2/L6 and leaves the Round 3 L10 remediation incomplete.  \n  - **Evidence:** `runVariant()` computes `postCaptureStepRan` solely from `manifest.postCaptureStep === \"ran\"`, and `container-isolation-verdict.js` trusts that Boolean. The producer and verifier therefore consume the same unsubstantiated declaration. The fix is to perform an actual downstream step and verify its independently produced effect.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "Podman is absent, stopped, or the image is unavailable—ordinary first-run and degraded-dependency states. The entrypoint writes `postCaptureStep: \"ran\"` without executing or observing a distinct post-capture walkthrough operation, and the parent converts that same field directly into `postCaptureStepRan: true`. I5 therefore passes even though the behavior it claims to protect remains untested. This is probable because all three declared variants deterministically use this self-reporting path.",
+      "evidencePaths": [
+        "tools/dabbler-ai-orchestration/scripts/measure-container-isolation.js",
+        "tools/dabbler-ai-orchestration/scripts/container-isolation-verdict.js"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "Each I5 variant must execute a distinct, externally observable post-capture walkthrough action through the documented entrypoint, and the parent must derive postCaptureStepRan from that action's result or artifact rather than from a manifest field that the degraded catch path assigns unconditionally."
+      }
+    }
+  ],
+  "phase": "remediation-review",
+  "fixVerdicts": [
+    {
+      "finding": "L1 OBS and extension are now exercised, but Layer 3 reuse remains partial",
+      "verdict": "accepted-with-modification",
+      "ledgerId": "L1"
+    },
+    {
+      "finding": "L2 walkthrough degradation remains self-certified",
+      "verdict": "fix-rejected",
+      "ledgerId": "L2"
+    },
+    {
+      "finding": "L3 failure-path cleanup and filesystem checks",
+      "verdict": "fix-accepted",
+      "ledgerId": "L3"
+    },
+    {
+      "finding": "L4 mandatory cost record",
+      "verdict": "fix-accepted",
+      "ledgerId": "L4"
+    },
+    {
+      "finding": "L5",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L1",
+      "ledgerId": "L5"
+    },
+    {
+      "finding": "L6",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L6"
+    },
+    {
+      "finding": "L7",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L3",
+      "ledgerId": "L7"
+    },
+    {
+      "finding": "L8",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L4",
+      "ledgerId": "L8"
+    },
+    {
+      "finding": "L9 isolated OBS plugin probe configuration",
+      "verdict": "fix-accepted",
+      "ledgerId": "L9"
+    },
+    {
+      "finding": "L10",
+      "verdict": "duplicate-of",
+      "duplicateOf": "L2",
+      "ledgerId": "L10"
+    },
+    {
+      "finding": "L11 interruption now occurs during artifact production",
+      "verdict": "fix-accepted",
+      "ledgerId": "L11"
+    },
+    {
+      "finding": "L12 capture activity is observed and the host marker participates",
+      "verdict": "fix-accepted",
+      "ledgerId": "L12"
+    },
+    {
+      "finding": "L13 shared Podman workloads are inventoried and protected",
+      "verdict": "fix-accepted",
+      "ledgerId": "L13"
+    }
+  ]
+}

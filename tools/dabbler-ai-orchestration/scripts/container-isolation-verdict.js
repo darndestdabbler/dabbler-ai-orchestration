@@ -220,8 +220,12 @@ function main() {
       v.errorMentionsContainerDependency === true &&
       // The criterion asks that the walkthrough still COMPLETES, which means
       // the work after the capture happened -- not that the process exited
-      // politely. Round 3's acceptance criterion names this explicitly.
-      v.postCaptureStepRan === true
+      // politely. Round 6 rejected the first attempt at this because the
+      // evidence was a string the child wrote about itself; it is now derived
+      // from a rendered document, and the document's SIZE is required too so
+      // an empty file cannot satisfy a boolean.
+      v.postCaptureStepRan === true &&
+      Number(v.postCaptureArtifactBytes) > 100
   );
   // And it must have been the DOCUMENTED entrypoint, not a helper that
   // certifies itself. This is the whole substance of the round-3 rejection.
@@ -249,6 +253,7 @@ function main() {
         videoArtifactCount: v.videoArtifactCount,
         errorMentionsContainerDependency: v.errorMentionsContainerDependency,
         postCaptureStepRan: v.postCaptureStepRan,
+        postCaptureArtifactBytes: v.postCaptureArtifactBytes,
         childExitStatus: v.childExitStatus,
       })),
     },

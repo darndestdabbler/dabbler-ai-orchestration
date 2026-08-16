@@ -48,23 +48,14 @@
     "tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js",
     "tools/dabbler-ai-orchestration/src/test/suite/osCaptureRecorder.test.ts"
   ],
-  "blockers": [
-    {
-      "what": "Round 5's Major is remediated but UNREVIEWED, and the verification loop is suspended.",
-      "detail": "The documented measurement command stopped the shared podman-machine-default unconditionally and reported restoration from a VM status string that knows nothing about what was running inside it. Fixed by refusing to stop the machine when any container not owned by this harness is running, and by comparing the container INVENTORY across the stop. No verifier has judged that fix: rounds 4 and 5 consumed the operator's authorization of 'up to two more', and the bounded loop refuses a further cycle on this session's own authority.",
-      "who_decides": "operator",
-      "options": [
-        "accept the fix as-is",
-        "dismiss the finding",
-        "authorize one more round"
-      ]
-    }
-  ],
+  "blockers": [],
   "residuals": [
-    "OBS in the container is feasible and unfinished: it runs, renders in software and records, but its own window stays mapped on the display it captures (obs_main_window_mapped: 1 on every run), so no clean OBS capture of the target was obtained. Window suppression is the named next problem.",
-    "The Dabbler extension is installed and VS Code runs with it; activation and Work Explorer RENDERING under Linux software rendering are unobserved and unmeasured.",
-    "The container runs with Podman's default capability set. --cap-drop=ALL was measured to break Chromium's sandbox and the --no-sandbox workaround was refused.",
-    "No first-build cost on a clean machine: the cold build is --no-cache but the base image was already local, so no registry pull is included.",
+    "ADJUDICATED AT THE BOUND, OWNER: operator. Round 6 rejected the post-capture-step evidence as self-certifying (the degraded path wrote postCaptureStep: \"ran\" and the parent read that same field back). It is FIXED -- the step now renders a standalone walkthrough document on the degraded path and the parent derives the fact from that FILE (marker comment, list items, size floor), measured at 454/581/448 bytes across the three declared variants -- and the fix is UNREVIEWED, because the authorized rounds are spent. Strictly better than what was rejected; not independently confirmed.",
+    "OBS in the container is feasible and unfinished: it runs, renders under Mesa software rendering and records, but its own window stays mapped on the display it captures (obs_main_window_mapped: 1 on every run), so no clean OBS capture of the target was obtained. Window suppression is the named next problem.",
+    "The Dabbler extension is INSTALLED and VS Code runs with it; activation and Work Explorer RENDERING under Linux software rendering are unobserved and unmeasured.",
+    "The container runs with Podman default capabilities. --cap-drop=ALL was measured to break Chromium sandbox setup (2 VS Code processes and 0 mapped windows, against 15 and 4) and the --no-sandbox workaround was refused.",
+    "Layer 3 reuse remains partial: the harness drives Podman directly rather than through the existing Layer 3 machinery, and round 6 recorded that as accepted-with-modification rather than resolved.",
+    "No first-build cost on a clean machine: the cold build uses --no-cache but the base image was already local, so no registry pull is included.",
     "Runs are 12 seconds. A tutorial-length capture inside a container is unmeasured.",
     "s5-obs-container-measurement.json is retained as raw OBS evidence in a SUPERSEDED shape; its stale fields are named inside the file itself and it is never scored."
   ],

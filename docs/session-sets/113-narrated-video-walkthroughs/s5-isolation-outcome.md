@@ -87,7 +87,7 @@ them.
 | I2 | target is actually visible | **PASS** | correlation **0.9995**; decoy **0.3449**; frame stddev **13.62**; VS Code processes and mapped windows present; **Dabbler extension installed** | ≥ 0.90; ≤ 0.70; ≥ 8.0 |
 | I3 | usable resolution | **PASS** | **0 px** delta, 1280x800 | ≤ 2 px |
 | I4 | no camera, no audio, no host display | **PASS** | 0 `/dev/video*`, 0 `/dev/snd`, no host X11 socket, video track only | all four |
-| I5 | dependency absent fails clearly | **PASS** | 3 of 3 declared variants, each driving **the documented entrypoint** as a child process: exit 0, manifest written, **0** video artifacts, dependency named, post-capture step ran | all postconditions |
+| I5 | dependency absent fails clearly | **PASS** | 3 of 3 declared variants, each driving **the documented entrypoint** as a child process: exit 0, manifest written, **0** video artifacts, dependency named, and a post-capture walkthrough document actually rendered (454/581/448 bytes) rather than asserted | all postconditions |
 | I6 | deterministic cleanup | **PASS** | a **fourth** run interrupted at 25 s **while capture was observed producing bytes** (48 bytes written; exit 137, 0 frames), excluded from the clean count; cleanup ran; 0 containers, 0 harness volumes, 0 zero-byte, 0 temp files; machine in entry state | zero leftovers |
 | I7 | cost is recorded | **PASS** *(presence only)* | all four required fields present | present |
 

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 5,
+  "verificationRound": 4,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "49d3f6b9c04e631bb03e8ef8dc88abb6bfadc9be",
+  "fixedTree": "6eacc70094c94de606d0e5547de1835b1297d670",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T12:04:32.074713+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** The interruption harness asserts that capture was active without observing it, and omits the host marker from the interrupted run - **Category:** Correctness - **Severity:** Major - **Evidence path ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The interrupted run must independently observe that the recorder is active and has begun producing the capture before force-removing it, must run with the same headed host marker as a target run, and must verify both artifact and marker cleanup after that interruption.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

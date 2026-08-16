@@ -264,8 +264,19 @@ function main() {
   // Round 3 rejected an exception thrown after the container had exited and
   // every artifact had been copied, decoded and analysed: that tests the
   // teardown of a successful run.
+  // The induced failure must be an interruption whose capture-active state was
+  // OBSERVED -- a growing capture file inside the container -- not inferred
+  // from a timer, and it must have exercised the same headed-marker teardown
+  // a target run does. Round 4 rejected the timer-only version because a
+  // slower start would have removed the container before recording began and
+  // still been scored as an interruption during capture.
   const failureRun = m.runs.find(
-    (r) => r.inducedMidRunFailure && r.interrupted && r.killedMidCapture === true
+    (r) =>
+      r.inducedMidRunFailure &&
+      r.interrupted &&
+      r.killedMidCapture === true &&
+      r.captureObservedActive === true &&
+      r.markerRaised === true
   );
   const cleanupAlwaysRan = m.runs.every(
     (r) => r.cleanup && r.cleanup.removeStatus === 0 && !r.cleanup.containerStillListed
@@ -289,6 +300,7 @@ function main() {
       noHarnessVolumes &&
       Boolean(failureRun) &&
       Boolean(failureRun && failureRun.cleanup.cleanupRanAfterFailure) &&
+      Boolean(failureRun && failureRun.markerClosed) &&
       !(failureRun && failureRun.cleanup.containerStillListed) &&
       m.machineLeftInEntryState === true &&
       // The machine-stopped variant is the one thing in this harness that can
@@ -298,8 +310,14 @@ function main() {
       (m.harnessContainersLeftBehind || []).length === 0,
     measured: {
       midRunFailureInduced: Boolean(failureRun),
-      interruptedWhileCaptureActive: Boolean(failureRun && failureRun.killedMidCapture),
+      interruptedWhileCaptureActive: Boolean(failureRun && failureRun.captureObservedActive),
+      captureBytesAtInterrupt:
+        failureRun && failureRun.interruptObservation
+          ? failureRun.interruptObservation.sizeAtInterrupt
+          : null,
       interruptedAtSeconds: failureRun ? failureRun.interruptedAtSeconds : null,
+      markerRaisedOnFailureRun: Boolean(failureRun && failureRun.markerRaised),
+      markerClosedOnFailureRun: Boolean(failureRun && failureRun.markerClosed),
       interruptedRunsExcludedFromCleanCount: interruptedRuns.length,
       cleanupRanAfterInducedFailure: Boolean(
         failureRun && failureRun.cleanup.cleanupRanAfterFailure

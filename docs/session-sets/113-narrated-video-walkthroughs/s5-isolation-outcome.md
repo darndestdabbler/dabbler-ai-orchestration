@@ -1,7 +1,9 @@
 # Set 113 Session 5 — the isolation verdict
 
-> **Machine verdict: PASS.** Seven of seven scored criteria met, three of
-> three clean runs, with **ffmpeg** as the in-container capturer.
+> **Machine verdict: PASS.** **Six scored criteria** (I1-I6) met, plus I7 on
+> presence of its required fields -- I7's *values* are deliberately not
+> judged, so it is reported beside the verdict rather than inside it. Three
+> clean runs, with **ffmpeg** as the in-container capturer.
 > **OBS was also run inside the container** and is reported separately in
 > §3: it starts, renders in software and records, and this session did not
 > obtain a clean OBS capture of the target.
@@ -165,7 +167,14 @@ The spec names OBS as the capture candidate, and verification rejected
 substituting ffmpeg for it — correctly: a session that measures a different
 dependency has not answered whether the *declared* dependency can be
 isolated. So OBS was installed in the image and run for real.
-Raw numbers: [`s5-obs-container-measurement.json`](s5-obs-container-measurement.json).
+Raw numbers: [`s5-obs-container-measurement.json`](s5-obs-container-measurement.json)
+-- **a superseded shape, retained as raw OBS evidence and never scored.** It
+was written before rounds 3 and 4 corrected the harness, so it still carries
+the withdrawn `podman-machine-unreachable` substitution, the post-success
+"mid-run" failure, and a 2.4-second `coldBuildSeconds` taken after `podman
+rmi` alone. Those fields are listed as stale inside the file itself. What it
+is still good for is the only record of OBS actually running in the
+container.
 
 **What works.** OBS 30.2.3.1 starts on the virtual display under Mesa's
 software rasteriser with **no GPU device passed in**, loads a seeded profile
@@ -213,12 +222,16 @@ and an honest distance from "OBS works".
 
 **Proven this round, and not before:**
 
-- **The real extension runs.** The image installs the published
-  `dabbler-ai-orchestration` 0.51.0 VSIX and the run asserts it: VS Code
-  reports `darndestdabbler.dabbler-ai-orchestration` installed, with a
-  fixture workspace shaped like a Dabbler repo open, and 15 processes and 4
-  mapped windows. The first version ran stock VS Code and proved nothing
-  about the Work Explorer.
+- **The real extension is installed and VS Code runs with it.** The image
+  installs the published `dabbler-ai-orchestration` 0.51.0 VSIX and the run
+  asserts it: VS Code reports `darndestdabbler.dabbler-ai-orchestration`
+  installed, with a fixture workspace shaped like a Dabbler repo open, and 15
+  processes and 4 mapped windows. The first version ran stock VS Code and
+  proved nothing at all about it.
+  **What that does NOT establish, precisely:** installation and a mapped
+  window are not activation, and neither is rendering. Nothing here observes
+  the extension activating or the Work Explorer drawing its tree. Saying it
+  "runs" would be over-reading the evidence by one step.
 - **Degradation is tested through the command an operator actually runs.**
   Each of the three declared variants re-executes
   `measure-container-isolation.js` as a child process with the dependency

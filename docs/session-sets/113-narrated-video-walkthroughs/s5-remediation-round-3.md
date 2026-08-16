@@ -283,3 +283,58 @@ strange" to "feasible, with window suppression as the named next problem".
 deliberately interrupted run that is not counted among them, all against the
 same criteria file committed before the first container run.
 
+
+
+---
+
+## Round 4 — one rejection left, and it was about assuming instead of observing
+
+Three fixes accepted (cost record, isolated plugin probe, degradation through
+the documented entrypoint). One rejected.
+
+### L11 rejected — the interruption asserted "capture was active" without observing it
+
+The interrupt fired on a **fixed 22-second timer** and set
+`killedMidCapture: true` unconditionally when it expired. It checked neither a
+recorder process nor an artifact. So on any run where VS Code started a little
+slower, the container would have been removed **before recording began** and
+I6 would still have certified an interruption during capture. The measurement
+itself makes the risk concrete: it records **24.5 seconds** of non-capture wall
+time, against a 22-second timer.
+
+The same finding caught a second gap: `openHostMarker()` ran only for
+`mode === "target"`, so the failure run never raised the headed marker and
+**marker teardown on the failure path was never exercised** -- which is exactly
+the cleanup surface a mid-run failure exists to test.
+
+**Fixed by observing.** The harness now polls the running container --
+`stat -c %s /out/capture.mp4` -- and interrupts only when the capture file is
+**present and growing**, recording the whole poll series. The interrupted run
+raises the same headed marker as a target run, and its teardown is observed via
+the browser's own `isConnected()` rather than assumed from having called
+`close()`.
+
+Measured on the re-run: 23 polls, sizes `0 ... 0, 48`, interrupted at **25.1 s**
+with **48 bytes** of capture written -- three seconds later than the old fixed
+timer would have fired, which is the margin the timer was silently gambling
+with. Marker raised: yes. Marker closed: yes. The verdict now requires
+`captureObservedActive`, `markerRaised` and `markerClosed`, so a timer-only
+interruption can no longer satisfy I6.
+
+### The three nits, all actioned
+
+- **"Seven of seven scored"** overstated it: I7 is presence-only and sits
+  outside the verdict's scored set. The outcome now says six scored criteria
+  plus I7 on presence.
+- **The OBS side-measurement carried superseded shapes** while being linked as
+  raw evidence. It now carries a `_supersededEvidenceNotice` naming each stale
+  field, and the outcome says so where it links it.
+- **"The real extension runs"** was one step past the evidence. Installation
+  and a mapped window are not activation, and neither is rendering. The
+  outcome now says exactly that.
+
+## Verdict after round-4 remediation
+
+**PASS.** Six scored criteria (I1-I6) plus I7 on presence, three clean runs,
+and one interrupted run -- excluded from the clean count -- whose interruption
+during active artifact production was observed rather than timed.

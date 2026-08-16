@@ -362,7 +362,11 @@ async function oneRun(index, mode, capturer, measurement) {
   // failed `podman cp` left a headed browser window and a container behind
   // -- while criterion I6 reported deterministic cleanup.
   try {
-    if (mode === "target") {
+    if (mode === "target" || mode === "interrupt") {
+      // The interrupted run raises the marker TOO. Verification round 4 was
+      // right: skipping it meant the failure path never exercised headed
+      // marker teardown, which is precisely the cleanup surface a mid-run
+      // failure is supposed to test.
       marker = await openHostMarker();
       log("run " + index + ": host magenta marker raised and foreground");
     }
@@ -384,17 +388,69 @@ async function oneRun(index, mode, capturer, measurement) {
         child.stdout.on("data", (d) => (out += d));
         child.stderr.on("data", (d) => (errOut += d));
         let killed = false;
-        const killAt = setTimeout(() => {
-          killed = true;
-          record.interruptedAtSeconds = Number(((Date.now() - startedAt) / 1000).toFixed(1));
-          podman(["rm", "-f", name]);
-        }, 22000);
+        let finished = false;
+
+        // OBSERVE, do not assume. The previous version fired a fixed 22-second
+        // timer and set killedMidCapture unconditionally when it expired --
+        // so on any run where VS Code started a little slower, the container
+        // would have been removed BEFORE recording began and I6 would still
+        // have reported an interruption during capture. Startup here is
+        // genuinely variable: this same measurement records 24.5 s of
+        // non-capture wall time.
+        //
+        // The condition is the capture file existing and GROWING inside the
+        // container, which is the only direct evidence that artifact
+        // production is under way.
+        const observation = { polls: 0, sizes: [], observedActiveAtSeconds: null };
+        const poll = setInterval(() => {
+          if (finished) return;
+          observation.polls += 1;
+          const probe = podman([
+            "exec", name, "sh", "-c",
+            "stat -c %s /out/capture.mp4 2>/dev/null || echo 0",
+          ]);
+          const size = Number((probe.stdout || "0").trim()) || 0;
+          observation.sizes.push(size);
+          const growing =
+            observation.sizes.length >= 2 &&
+            size > 0 &&
+            size > observation.sizes[observation.sizes.length - 2];
+          if (growing && !killed) {
+            killed = true;
+            observation.observedActiveAtSeconds = Number(
+              ((Date.now() - startedAt) / 1000).toFixed(1)
+            );
+            observation.sizeAtInterrupt = size;
+            record.interruptedAtSeconds = observation.observedActiveAtSeconds;
+            clearInterval(poll);
+            podman(["rm", "-f", name]);
+          }
+          if (observation.polls > 90 && !killed) {
+            // Never observed capture starting. That is a failed EXPERIMENT,
+            // not a passed criterion, and it must not masquerade as one.
+            clearInterval(poll);
+          }
+        }, 1000);
+
         child.on("close", (code) => {
-          clearTimeout(killAt);
-          resolve({ status: code, stdout: out, stderr: errOut, killedMidCapture: killed });
+          finished = true;
+          clearInterval(poll);
+          resolve({
+            status: code,
+            stdout: out,
+            stderr: errOut,
+            killedMidCapture: killed,
+            observation,
+          });
         });
       });
       record.killedMidCapture = res.killedMidCapture === true;
+      record.interruptObservation = res.observation;
+      // The claim the verdict scores: capture was OBSERVED producing bytes at
+      // the moment of the interruption.
+      record.captureObservedActive =
+        res.killedMidCapture === true &&
+        Boolean(res.observation && res.observation.sizeAtInterrupt > 0);
     } else {
       res = podman(runArgs);
     }
@@ -423,8 +479,15 @@ async function oneRun(index, mode, capturer, measurement) {
   } catch (err) {
     record.error = String(err && err.message ? err.message : err);
   } finally {
-    if (marker) await marker.browser.close().catch(() => {});
+    let markerClosed = null;
+    if (marker) {
+      await marker.browser.close().catch(() => {});
+      // Observed, not assumed: an already-closed browser reports disconnected.
+      markerClosed = marker.browser.isConnected ? !marker.browser.isConnected() : true;
+    }
     record.markerForegroundProof = foregroundProof;
+    record.markerRaised = Boolean(marker);
+    record.markerClosed = markerClosed;
 
     const rmRes = podman(["rm", "-f", name]);
     record.cleanup = {

@@ -44,7 +44,7 @@
         "mapped_window_names": "",
         "obs_main_window_mapped": "1",
         "mapped_window_names_during_capture": "WebSocket Server Settings|Output Timer|Stats|obs|OBS 30.2.3.1-3 - Profile: dabbler - Scenes: dabbler|Qt Selection Owner for obs",
-        "obs_log_tail": "info: obs_graphics_thread(33.3333 ms): min=11.119 ms, median=33.333 ms, max=107.331 ms, 96.4885% within ±2% of 33.333 ms (1.83206% lower, 1.67939% higher);info: =================================================;info: Number of memory leaks: 0;",
+        "obs_log_tail": "info: obs_graphics_thread(33.3333\u00a0ms): min=11.119\u00a0ms, median=33.333\u00a0ms, max=107.331\u00a0ms, 96.4885% within \u00b12% of 33.333\u00a0ms (1.83206% lower, 1.67939% higher);info: =================================================;info: Number of memory leaks: 0;",
         "capture_exit": "0",
         "capture_wall_clock_seconds": "23",
         "capture_bytes": "85446",
@@ -186,7 +186,7 @@
         "mapped_window_names": "Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
         "obs_main_window_mapped": "1",
         "mapped_window_names_during_capture": "WebSocket Server Settings|Output Timer|Stats|obs|OBS 30.2.3.1-3 - Profile: dabbler - Scenes: dabbler|Qt Selection Owner for obs|Welcome - fixture - Visual Studio Code|code|Chromium clipboard",
-        "obs_log_tail": "info: obs_graphics_thread(33.3333 ms): min=14.301 ms, median=33.333 ms, max=107.116 ms, 96.6565% within ±2% of 33.333 ms (1.67173% lower, 1.67173% higher);info: =================================================;info: Number of memory leaks: 0;",
+        "obs_log_tail": "info: obs_graphics_thread(33.3333\u00a0ms): min=14.301\u00a0ms, median=33.333\u00a0ms, max=107.116\u00a0ms, 96.6565% within \u00b12% of 33.333\u00a0ms (1.67173% lower, 1.67173% higher);info: =================================================;info: Number of memory leaks: 0;",
         "capture_exit": "0",
         "capture_wall_clock_seconds": "23",
         "capture_bytes": "155401",
@@ -352,5 +352,16 @@
   ],
   "machineStateOnExit": "podman-machine-default*:true",
   "machineLeftInEntryState": true,
-  "harnessContainersLeftBehind": []
+  "harnessContainersLeftBehind": [],
+  "_supersededEvidenceNotice": {
+    "status": "SUPERSEDED SHAPE - retained as raw OBS evidence only, never scored",
+    "why": "This file was written before verification rounds 3 and 4 corrected the harness. Several fields carry shapes that were later rejected and must not be read as current.",
+    "staleFields": {
+      "inducedVariants[].variant=podman-machine-unreachable": "a substitution for the declared podman-machine-stopped; withdrawn, the machine is now stopped for real",
+      "inducedVariants[].manifestWritten": "renamed to manifestStillWritten, the criterion's own field name",
+      "runs[].inducedMidRunFailure": "was thrown AFTER a successful capture; the current harness interrupts during observed artifact production and uses a separate run",
+      "cost.coldBuildSeconds": "2.4 s, obtained after `podman rmi` only, which keeps the layer cache. The current harness uses --no-cache and measures ~57 s"
+    },
+    "whatItIsStillGoodFor": "It is the only record of OBS actually running inside the container: the seeded profile and scene collection, the software-rendered capture, the obs_main_window_mapped facts, and the frame statistics behind the I2 correlation of 0.085."
+  }
 }

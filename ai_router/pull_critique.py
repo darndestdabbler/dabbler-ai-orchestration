@@ -113,6 +113,50 @@ DEFAULT_PROVIDERS: Tuple[Tuple[str, Optional[str]], ...] = (
 # here rather than a gate-time rejection.
 _ARTIFACT_SCHEMA_VERSION = PATH_AWARE_CRITIQUE_ARTIFACT_SCHEMA_VERSIONS[0]
 
+# 2026-08-16 (ad-hoc fix after Set 113 S6, operator-directed). The constitution
+# puts this producer at STEP 8 -- "if the set's pathAwareCritique is
+# advisory/required, RUN the multi-provider path-aware critique NOW" -- which is
+# after the session's verification round has already stamped its evidence. So
+# writing the artifact staled the stamp of a verification that had just passed,
+# and the close backstop answered with a fresh metered round. Measured live in
+# Set 113 S6: the backstop's round 5 was handed a delta of twelve documentation
+# and bookkeeping files with zero source in it, correctly reported that five
+# settled findings had no remediation there, and cost $0.9607 plus an operator
+# interruption to establish that nothing was wrong.
+#
+# ``whole-file``, on the same reasoning as the raw verification artifacts this
+# sits beside (``s*-verification*.md`` / ``s*-issues*.json`` are already exempt):
+# every byte is machine-written from the critics' own routed responses, it is
+# schema-validated by ``validate_path_aware_critique_artifact``, and the
+# close-out gate reads it directly. There is no orchestrator prose in it for a
+# post-verification rewrite to smuggle through.
+#
+# Declared HERE rather than added to ``verification_stamp``'s list because the
+# writer is the thing that knows: ``discover_close_mandated_writes`` reads this
+# at source level with ``ast.literal_eval`` -- no import, no side effects -- so
+# a future producer becomes exempt without anyone remembering to edit a list
+# somewhere else. That is the drift this whole mechanism exists to stop, and
+# this file is the third writer to use it.
+#
+# The path is spelled LITERALLY, not as
+# ``PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME``: the declaration is read without
+# importing the module, so a name reference fails closed (silently exempting
+# nothing) rather than resolving. ``test_close_mandated_writes.py`` asserts the
+# literal agrees with the constant.
+CLOSE_MANDATED_WRITES = (
+    {
+        "path": "path-aware-critique.json",
+        "scope": "set",
+        "bound": "whole-file",
+        "reason": (
+            "pull_critique writes the Set 066 path-aware-critique artifact at "
+            "Step 8, after the session's verification round has stamped its "
+            "evidence; the artifact is machine-written from the critics' "
+            "routed responses and validated by its own close-out gate"
+        ),
+    },
+)
+
 
 class PullCritiqueError(Exception):
     """The producer could not assemble a valid multi-provider artifact."""

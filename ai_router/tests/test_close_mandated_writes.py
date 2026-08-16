@@ -403,3 +403,274 @@ class TestTheGateItselfStillSettlesTheClose:
         ok, reason = self._validate(repo, row)
         assert not ok
         assert "work changed after this row was stamped" in reason
+
+
+# ===========================================================================
+# 2026-08-16 (ad-hoc fix after Set 113 S6) — the freshness contract.
+#
+# Set 113 S6 was staled TWICE between verifying and closing, cost $0.9607 in
+# rounds and an operator interruption, and the second staleness was caused by
+# the document explaining the first one. Three rules, each with a planted
+# violation and a planted look-alike (L-112-1).
+# ===========================================================================
+
+
+class TestOrchestratorEvidenceIsFreshnessExempt:
+    """Rule 1: `sN-*` session evidence documents may be written after the
+    round that verified the work, because they DESCRIBE that round."""
+
+    SET = "docs/session-sets/113-narrated-video-walkthroughs"
+
+    def _exempt(self):
+        import fnmatch
+        from verification_stamp import (
+            WORK_DIFF_SET_BOOKKEEPING, close_mandated_excludes)
+        pats = ([f"{self.SET}/{n}" for n in WORK_DIFF_SET_BOOKKEEPING]
+                + close_mandated_excludes(self.SET))
+        return lambda rel: any(fnmatch.fnmatch(rel, p) for p in pats)
+
+    @pytest.mark.parametrize("name", [
+        "s6-outcome.md",
+        "s6-reproduction.md",
+        "s6-reproduction-measurement.json",
+        "s6-conventions.md",
+        "s6-critique-proof.json",
+        "s6-adjudication-request.md",   # the one that staled Set 113 S6 twice
+        "s12-whatever-the-next-session-invents.md",
+    ])
+    def test_planted_evidence_document_does_not_bind(self, name):
+        assert self._exempt()(f"{self.SET}/{name}"), name
+
+    @pytest.mark.parametrize("name", [
+        "spec.md",              # THE CONTRACT -- must always bind
+        "operator-notes.md",    # operator input -- must always bind
+        "uat-checklist.md",
+        "some-deliverable.md",
+    ])
+    def test_the_look_alikes_still_bind(self, name):
+        # A digit is required after the `s`, so `spec.md` cannot match the
+        # evidence pattern however tempting the prefix looks.
+        assert not self._exempt()(f"{self.SET}/{name}"), name
+
+    def test_source_outside_the_set_dir_always_binds(self):
+        exempt = self._exempt()
+        for rel in ("ai_router/pull_verifier.py",
+                    "ai_router/tests/test_pull_verifier.py",
+                    "tools/dabbler-ai-orchestration/src/extension.ts"):
+            assert not exempt(rel), rel
+
+    def test_evidence_documents_stay_VISIBLE_to_the_verifier(self):
+        # The counterweight, and the one that matters most: freshness-exemption
+        # must not become evidence-exclusion. PHASED_EVIDENCE_SET_EXCLUDES is
+        # DERIVED from the freshness list, so a naive addition would have
+        # hidden a session's own outcome document from the round reviewing it
+        # -- a verification reduction no orchestrator may self-authorize.
+        from verification_stamp import (
+            EVIDENCE_VISIBLE_BOOKKEEPING, PHASED_EVIDENCE_SET_EXCLUDES)
+        assert "s[0-9]*-*" in EVIDENCE_VISIBLE_BOOKKEEPING
+        assert "s[0-9]*-*" not in PHASED_EVIDENCE_SET_EXCLUDES
+
+    def test_the_loops_own_round_artifacts_stay_excluded(self):
+        # ...while the machine-generated round artifacts remain out of the
+        # bundle. A round re-reading its predecessors' verdicts is the bias
+        # that separation exists to prevent.
+        from verification_stamp import PHASED_EVIDENCE_SET_EXCLUDES
+        for pat in ("s*-verification*.md", "s*-issues*.json",
+                    "s*-remediation-round-*.md", "s*-acceptance-round-*.json"):
+            assert pat in PHASED_EVIDENCE_SET_EXCLUDES, pat
+
+
+class TestPullCritiqueDeclaresItsArtifact:
+    """Rule 2: the Step-8 path-aware critique artifact is a close-mandated
+    write, declared by its WRITER rather than by a list somewhere else."""
+
+    def test_the_declaration_is_discovered(self):
+        from verification_stamp import discover_close_mandated_writes
+        decls = {d.path: d for d in discover_close_mandated_writes()}
+        assert "path-aware-critique.json" in decls
+        d = decls["path-aware-critique.json"]
+        assert d.scope == "set"
+        assert d.whole_file is True
+
+    def test_the_literal_agrees_with_the_constant(self):
+        # The declaration is read with ast.literal_eval and WITHOUT importing
+        # the module, so the path must be spelled literally -- and a literal
+        # can drift from the constant it mirrors. Same guard cite_lessons has.
+        import pull_critique
+        from path_aware_critique import PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME
+        declared = {e["path"] for e in pull_critique.CLOSE_MANDATED_WRITES}
+        assert PATH_AWARE_CRITIQUE_ARTIFACT_FILENAME in declared
+
+    def test_the_artifact_no_longer_binds_the_digest(self):
+        import fnmatch
+        from verification_stamp import close_mandated_excludes
+        SET = "docs/session-sets/113-narrated-video-walkthroughs"
+        pats = close_mandated_excludes(SET)
+        assert any(fnmatch.fnmatch(f"{SET}/path-aware-critique.json", p)
+                   for p in pats)
+
+    def test_a_sibling_json_in_the_set_dir_is_not_swept_up(self):
+        # THE LOOK-ALIKE: the declaration exempts exactly one filename, not
+        # every .json beside it.
+        import fnmatch
+        from verification_stamp import close_mandated_excludes
+        SET = "docs/session-sets/113-narrated-video-walkthroughs"
+        pats = close_mandated_excludes(SET)
+        assert not any(fnmatch.fnmatch(f"{SET}/spec-config.json", p)
+                       for p in pats)
+
+
+class TestStalenessNamesTheBindingFiles:
+    """Rule 3: the digest is one hash over many files, so a mismatch must say
+    WHICH file moved. Both Set 113 S6 diagnoses were thirty seconds once the
+    list was visible, and neither error showed it."""
+
+    def test_it_names_a_planted_binding_file(self, tmp_path):
+        import subprocess as sp
+        from verification_stamp import describe_work_diff_staleness
+
+        repo = tmp_path / "repo"
+        (repo / "docs/session-sets/999-x").mkdir(parents=True)
+        sp.run(["git", "init", "-q", str(repo)], check=True)
+        sp.run(["git", "-C", str(repo), "config", "user.email", "t@t"], check=True)
+        sp.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+        setd = repo / "docs/session-sets/999-x"
+        (setd / "spec.md").write_text("spec\n", encoding="utf-8")
+        sp.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        sp.run(["git", "-C", str(repo), "commit", "-qm", "base"], check=True)
+        base = sp.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                      capture_output=True, text=True).stdout.strip()
+
+        # PLANT THE DEFECT: a file that binds, changed after the stamp.
+        (setd / "spec.md").write_text("spec CHANGED\n", encoding="utf-8")
+        msg = describe_work_diff_staleness(str(setd), base)
+        assert "spec.md" in msg
+        assert "BOUND BY" in msg
+        # ...and it points at the two mechanisms that fix it.
+        assert "WORK_DIFF_SET_BOOKKEEPING" in msg
+        assert "CLOSE_MANDATED_WRITES" in msg
+
+    def test_an_exempt_document_is_not_named(self, tmp_path):
+        # THE LOOK-ALIKE: writing session evidence must produce no clause at
+        # all, because it binds nothing.
+        import subprocess as sp
+        from verification_stamp import describe_work_diff_staleness
+
+        repo = tmp_path / "repo"
+        (repo / "docs/session-sets/999-x").mkdir(parents=True)
+        sp.run(["git", "init", "-q", str(repo)], check=True)
+        sp.run(["git", "-C", str(repo), "config", "user.email", "t@t"], check=True)
+        sp.run(["git", "-C", str(repo), "config", "user.name", "t"], check=True)
+        setd = repo / "docs/session-sets/999-x"
+        (setd / "spec.md").write_text("spec\n", encoding="utf-8")
+        sp.run(["git", "-C", str(repo), "add", "-A"], check=True)
+        sp.run(["git", "-C", str(repo), "commit", "-qm", "base"], check=True)
+        base = sp.run(["git", "-C", str(repo), "rev-parse", "HEAD"],
+                      capture_output=True, text=True).stdout.strip()
+
+        (setd / "s6-outcome.md").write_text("what happened\n", encoding="utf-8")
+        assert describe_work_diff_staleness(str(setd), base) == ""
+
+    def test_the_explainer_never_raises(self):
+        # It runs inside an error path: failing to explain must never replace
+        # the error being explained.
+        from verification_stamp import describe_work_diff_staleness
+        assert describe_work_diff_staleness("/nope/not/a/repo", "deadbeef") == ""
+
+    def test_the_GATE_ITSELF_names_the_file(self, tmp_path):
+        # THE RULE, not the helper. The first version of these tests exercised
+        # describe_work_diff_staleness directly and passed happily when the
+        # call was deleted from the gate's message -- caught by mutation
+        # testing, and exactly L-112-1's warning about asserting a substring
+        # instead of the rule. This drives validate_stamped_row.
+        from stamp_fixtures import write_stamped_evidence
+        from verification_stamp import validate_stamped_row
+
+        set_dir = tmp_path / "docs" / "session-sets" / "999-x"
+        set_dir.mkdir(parents=True)
+        (set_dir / "spec.md").write_text("spec\n", encoding="utf-8")
+        row = write_stamped_evidence(set_dir)
+
+        # A valid row settles.
+        ok, _ = validate_stamped_row(
+            row, session_set_dir=str(set_dir), session_number=1,
+            orchestrator_effective_provider="anthropic",
+        )
+        assert ok
+
+        # PLANT THE DEFECT: change a BINDING file after the stamp.
+        (set_dir / "spec.md").write_text("spec CHANGED\n", encoding="utf-8")
+        ok, reason = validate_stamped_row(
+            row, session_set_dir=str(set_dir), session_number=1,
+            orchestrator_effective_provider="anthropic",
+        )
+        assert not ok
+        assert "spec.md" in reason, reason
+        assert "BOUND BY" in reason, reason
+
+    def test_the_gate_stays_settled_when_only_evidence_is_written(
+        self, tmp_path
+    ):
+        # THE LOOK-ALIKE, end to end: writing a session evidence document
+        # after a passing round must leave the row VALID. This is the whole
+        # point of the fix, asserted through the gate rather than a pattern.
+        from stamp_fixtures import write_stamped_evidence
+        from verification_stamp import validate_stamped_row
+
+        set_dir = tmp_path / "docs" / "session-sets" / "999-y"
+        set_dir.mkdir(parents=True)
+        (set_dir / "spec.md").write_text("spec\n", encoding="utf-8")
+        row = write_stamped_evidence(set_dir)
+
+        (set_dir / "s1-outcome.md").write_text("what happened\n", encoding="utf-8")
+        (set_dir / "s1-reproduction.md").write_text("how\n", encoding="utf-8")
+        (set_dir / "path-aware-critique.json").write_text("{}\n", encoding="utf-8")
+
+        ok, reason = validate_stamped_row(
+            row, session_set_dir=str(set_dir), session_number=1,
+            orchestrator_effective_provider="anthropic",
+        )
+        assert ok, reason
+
+
+class TestTheFreshnessDefinitionIsSHARED:
+    """Rule 4, and the durable one: THREE consumers ask 'did the work change?'
+    -- the verification stamp, `test_run_fresh`, and the close backstop's
+    delta anchor. They already share one definition. This asserts they cannot
+    quietly stop sharing it, which is the drift that would re-open all of the
+    above."""
+
+    def test_every_consumer_imports_the_shared_list(self):
+        import ast
+        from pathlib import Path
+        import verification_stamp
+
+        pkg = Path(verification_stamp.__file__).parent
+        consumers = ("run_of_record.py", "post_round_delta.py")
+        for name in consumers:
+            src = (pkg / name).read_text(encoding="utf-8")
+            assert "WORK_DIFF_SET_BOOKKEEPING" in src, name
+            # Structural, beside the textual: it must be IMPORTED, never
+            # re-declared. A local re-listing is exactly how the three would
+            # drift apart.
+            tree = ast.parse(src)
+            assigned = {
+                t.id
+                for node in ast.walk(tree)
+                if isinstance(node, ast.Assign)
+                for t in node.targets
+                if isinstance(t, ast.Name)
+            }
+            assert "WORK_DIFF_SET_BOOKKEEPING" not in assigned, (
+                f"{name} re-declares the shared freshness list instead of "
+                "importing it"
+            )
+
+    def test_the_corpus_is_non_empty(self):
+        # A scan that matched nothing must not read as a pass (L-112-1 /
+        # corpus_scan_guard): assert the consumers exist at all.
+        from pathlib import Path
+        import verification_stamp
+        pkg = Path(verification_stamp.__file__).parent
+        for name in ("run_of_record.py", "post_round_delta.py"):
+            assert (pkg / name).is_file(), name

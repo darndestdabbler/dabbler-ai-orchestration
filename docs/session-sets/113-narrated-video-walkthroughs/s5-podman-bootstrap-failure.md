@@ -1,8 +1,21 @@
-# Set 113 Session 5 — the container host does not start
+# Set 113 Session 5 — the container host would not start (resolved)
 
-> **Status: BLOCKED, at the layer below Podman.** This is a measurement,
-> not a workaround, and it is written before any attempt to route around
-> the problem — the same discipline Session 4 used for its pilot.
+> **Status: RESOLVED 2026-08-16 by `wsl --update`.** The hypothesis below
+> was recorded *before* the fix was attempted and is now confirmed: WSL went
+> from **2.1.5.0 / kernel 5.15.146.1** to **2.7.11.0 / kernel 6.18.33.2**,
+> and the machine started on the first attempt afterwards. Verified beyond
+> the success message — `podman run` pulled an image and executed a
+> container, reporting 20 CPUs and 32 GB in the VM. **The document is kept
+> whole**, including the wrong hypothesis, because a diagnosis that was
+> written down before the outcome was known is worth more than one
+> reconstructed after it.
+>
+> **No distro change is needed, and the operator offered one.** Podman's
+> machine is its *own* Fedora 44 image (`quay.io/podman/machine-os:6.0`) in
+> a WSL distro named `podman-machine-default`. The operator's Ubuntu distro
+> is a separate distro that Podman never touches, so switching it to Fedora
+> would have cost real effort and changed nothing. What was two years stale
+> was the WSL **platform** — shared by every distro — not the distro.
 
 ## What was asked for
 

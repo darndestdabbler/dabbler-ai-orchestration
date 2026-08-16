@@ -594,6 +594,14 @@
       "dateTime": "2026-08-16T06:02:07.715564-04:00",
       "description": "The operator installed Podman Desktop, Podman 6.0.2 and initialised a machine. The machine does not start: podman machine start ends in \"ssh error: machine not in running state\", reproduced on a FRESHLY created machine so it is not a corrupted VM. Traced below Podman: its WSL machine does not use WSL systemd support at all, it launches systemd itself in a private PID namespace via /root/bootstrap, and that systemd starts and exits within about 25 seconds with an empty log, so sshd never listens and the ssh connection podman uses has nothing to reach. The Docker Desktop named-pipe warning printed alongside is a red herring. Most likely cause, stated as hypothesis not finding: Fedora 44 systemd on WSL 2.1.5.0 with a January 2024 kernel; wsl --update is the obvious first thing to try and is the operator's call. Recorded in s5-podman-bootstrap-failure.md including a wrong hypothesis of mine that had to be rolled back - adding [boot] systemd=true to the distro wsl.conf, which made the distro unbootable and was recovered by podman machine rm plus init after taking an export. The plugin-surface measurement is unaffected and needs no container, which is why the spec ordered it first.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 5,
+      "stepNumber": 14,
+      "stepKey": "container-host-unblocked",
+      "dateTime": "2026-08-16T06:10:51.816187-04:00",
+      "description": "UNBLOCKED. The operator ran wsl --update: WSL went from 2.1.5.0 / kernel 5.15.146.1 to 2.7.11.0 / kernel 6.18.33.2, and podman machine start succeeded on the first attempt after a wsl --shutdown. Confirms the hypothesis that was written down BEFORE the fix was attempted. Verified past the success message rather than trusting it - podman run pulled alpine and executed a container, reporting kernel 6.18.33.2-microsoft-standard-WSL2, 20 CPUs and 32 GB in the VM (the 2GiB in podman machine list is a display default, not the live allocation). Also answered the operator offer to switch their WSL distro to Fedora: not needed, and it would have cost real effort for nothing - podman machine is its OWN Fedora 44 image in a distro named podman-machine-default, and their Ubuntu distro is separate and untouched by podman. What was two years stale was the WSL platform, which every distro shares.",
+      "status": "complete"
     }
   ]
 }

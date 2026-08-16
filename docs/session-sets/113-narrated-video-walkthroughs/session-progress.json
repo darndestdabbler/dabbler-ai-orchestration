@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T06:02:08.021506-04:00",
+  "generatedAt": "2026-08-16T06:10:52.126640-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "f59ba8914294d0f8c383725c2d74feec884caacbe248fbd88d4513ecf907568d",
+    "activity-log.json": "bda11f68673233506cf5a04ed67f7cc1e5f8bd1f1ffcdc9c0014fc7dea0dd08a",
     "session-state.json": "fb1aaba89ed82a66c3b50e5070c3b495ac50fb360551db72186f73f6227473a2",
     "spec.md": "6fdc685ea021cdc9e15de888d5c5cf9a726a79f1397be61b5d185d7642b48a12"
   },
@@ -585,15 +585,27 @@
           "isActive": false,
           "startedAt": "2026-08-16T05:38:35.787720-04:00",
           "isTerminal": true
+        },
+        {
+          "stepNumber": 14,
+          "stepKey": "container-host-unblocked",
+          "description": "UNBLOCKED. The operator ran wsl --update: WSL went from 2.1.5.0 / kernel 5.15.146.1 to 2.7.11.0 / kernel 6.18.33.2, and podman machine start succeeded on the first attempt after a wsl --shutdown. Confirms the hypothesis that was written down BEFORE the fix was attempted. Verified past the success message rather than trusting it - podman run pulled alpine and executed a container, reporting kernel 6.18.33.2-microsoft-standard-WSL2, 20 CPUs and 32 GB in the VM (the 2GiB in podman machine list is a display default, not the live allocation). Also answered the operator offer to switch their WSL distro to Fedora: not needed, and it would have cost real effort for nothing - podman machine is its OWN Fedora 44 image in a distro named podman-machine-default, and their Ubuntu distro is separate and untouched by podman. What was two years stale was the WSL platform, which every distro shares.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T06:02:07.715564-04:00",
+          "isTerminal": true
         }
       ],
       "counts": {
         "pending": 8,
         "in-progress": 1,
-        "complete": 4,
+        "complete": 5,
         "blocked": 0,
         "unknown": 0,
-        "total": 13
+        "total": 14
       },
       "current": [
         "read-the-operator-s-2026-08"

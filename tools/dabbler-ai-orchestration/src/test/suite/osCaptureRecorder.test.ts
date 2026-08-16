@@ -38,6 +38,7 @@ const recorder = require("../../../scripts/record-vscode-walkthrough.js") as {
     keep: boolean;
   };
   validateDriverBlock: (plan: unknown) => unknown;
+  captureApproval: () => { approved: boolean; reason: string };
 };
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const metrics = require("../../../scripts/png-metrics.js") as {
@@ -807,5 +808,64 @@ suite("Set 113 S4 - the criteria the harness resolves by path", () => {
       ),
       "the committed pass criteria are missing; the pilot would refuse to run",
     );
+  });
+});
+
+suite("Set 113 S4 - capture is gated, not merely announced", () => {
+  test("capture is refused while the committed verdict is not PASS", () => {
+    // Verification rejected two weaker versions of this gate. Prose in an
+    // outcome document gates nothing, and a notice that printed and then
+    // recorded anyway "leaves the operator's decision right advisory rather
+    // than enforced". A failed pilot ships no recorder, so the CLI fails
+    // closed -- and this test reads the REAL committed measurement, so it
+    // starts passing for the right reason the moment a genuine PASS or a
+    // committed operator waiver exists.
+    const approval = recorder.captureApproval();
+    const measurementPath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "..",
+      "..",
+      "..",
+      "docs",
+      "session-sets",
+      "113-narrated-video-walkthroughs",
+      "s4-os-capture-measurement.json",
+    );
+    const waiverPath = path.resolve(
+      path.dirname(measurementPath),
+      "s4-operator-waiver.json",
+    );
+    if (!fs.existsSync(measurementPath)) return;
+    const verdict = JSON.parse(fs.readFileSync(measurementPath, "utf8"))
+      .evaluation?.verdict;
+    const waived = fs.existsSync(waiverPath);
+
+    if (verdict === "PASS" || waived) {
+      assert.strictEqual(
+        approval.approved,
+        true,
+        "a PASS verdict or a committed waiver must approve capture",
+      );
+    } else {
+      assert.strictEqual(
+        approval.approved,
+        false,
+        "capture must be refused while the pilot's verdict is " + verdict,
+      );
+      assert.ok(
+        /FAIL|could not be read/.test(approval.reason),
+        "the refusal must say why: " + approval.reason,
+      );
+    }
+  });
+
+  test("the refusal names a route that does not require capture", () => {
+    // A gate that only says no is a dead end. The degraded path captures
+    // nothing and is therefore never gated, which is what keeps the
+    // walkthrough itself reachable.
+    assert.strictEqual(recorder.parseArgs(["--no-video"]).video, false);
+    assert.strictEqual(recorder.parseArgs([]).video, true);
   });
 });

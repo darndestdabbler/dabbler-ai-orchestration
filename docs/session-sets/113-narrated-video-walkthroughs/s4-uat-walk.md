@@ -11,32 +11,27 @@ most useful thing you can tell us.
 
 ## Before you start
 
-From the repository root:
+**Nothing to run for most of this.** The pilot already recorded ten clean
+walkthroughs on this machine and left them on disk. Open this file in a
+browser:
+
+```
+tools/dabbler-ai-orchestration/.walkthrough-runs/pilot/run-11/index.html
+```
+
+That is a real recording of the real AI Work Explorer being driven through
+the five authored steps, with its captions and its step list. Items 1 to 3
+are all on that one page.
+
+**The recorder itself will refuse to capture**, on purpose. The pilot's
+verdict is FAIL on two criteria, and a failed pilot ships no recorder — so
+the command now stops rather than warning and recording anyway. Decision A
+below is what would change that. You can see the refusal in one second:
 
 ```bash
 cd tools/dabbler-ai-orchestration
 node scripts/record-vscode-walkthrough.js
 ```
-
-It stages a throwaway sample project, opens a second VS Code against it,
-drives five steps of the AI Work Explorer while OBS records that window,
-and prints the path of a page to open. It takes about a minute and a half.
-Nothing it does touches your own work.
-
-It will print **"NOT APPROVED FOR USE"** first. That is correct and
-expected — the pilot's verdict is FAIL on two criteria, which is what
-decision A below is about — and it is why this is a plain `node` command
-rather than an `npm run` script.
-
-**One-time setup:** in OBS, *Tools -> WebSocket Server Settings -> Enable
-WebSocket server*. The recorder will not do this for you, deliberately. If
-you skip it, the command still works and still produces a page — it just
-says there is no video, which is item 4's answer arriving early.
-
-**If OBS is not running with its websocket enabled**, the command still
-finishes and still prints a page — it just says there is no video. That is
-the intended behaviour, not a failure, and item 4 asks you to look at it on
-purpose.
 
 ---
 
@@ -70,10 +65,13 @@ Use the player's captions button, then scrub to about halfway.
 
 ### 4. The version with no video
 
-Run `node scripts/record-vscode-walkthrough.js --no-video` and open the
-page it prints.
+Run this — it is allowed, because it captures nothing:
 
-**Look at:** what sits where the player was.
+```bash
+node scripts/record-vscode-walkthrough.js --no-video
+```
+
+**Look at:** what sits where the player was, on the page it prints.
 
 *Does this page tell you plainly that there is no recording, rather than
 looking broken?*

@@ -33,13 +33,14 @@
   Explorer through the authored scenario and records that window with OBS
   Studio.
 
-  **There is deliberately no `npm run` entry.** The pilot's verdict is
-  `FAIL` and no operator ruling waiving the unmet criteria exists, so the
-  recorder must not be presented as available: a registered script is
-  indistinguishable from shipped functionality. It reads the pilot's own
-  committed evaluation and announces its status on every run, and that
-  notice stops printing by itself when the verdict changes. The code is in
-  the tree only because the measurement cannot exist without it.
+  **It refuses to capture, and there is deliberately no `npm run` entry.**
+  A failed pilot ships no recorder, so the CLI reads the pilot's committed
+  verdict and **fails closed** — a gate, not a warning. `--no-video` is
+  never gated, because it captures nothing and the walkthrough is the
+  deliverable; and the pilot's direct import still works, because without
+  it the measurement cannot be reproduced. Two routes unlock capture and a
+  session can take neither on its own authority: re-measure to `PASS`, or
+  commit an operator waiver carrying `waivedBy` and `attestation`.
 
   It shares everything shareable with the browser recorder — the same
   scenario source, the same `walkthrough_run plan` handover, the same
@@ -95,6 +96,24 @@
   credit for the reader's half of the walkthrough. Editing the block leaves
   all four generated documents byte-identical, which `scenario_render
   --check` confirms.
+
+### Measured (fallback)
+
+- **(Set 113 S4) ffmpeg `gdigrab`, the spec's fallback capture candidate,
+  measured against the same committed criteria.** It produced a
+  **uniformly black frame** on the Electron window — every pixel `(0,0,0)`,
+  eight seconds of video at 16 KB against ~37 MB for a comparable OBS
+  capture — while carrying a **video stream and no audio track at all**.
+
+  So the fallback satisfies the one clause OBS structurally cannot (C7) and
+  fails the one that matters most (C1, it captures nothing). It **confirms**
+  the ruling that made OBS primary rather than overturning it, and that
+  ruling now rests on a measurement. Reproduce with
+  `node scripts/measure-ffmpeg-fallback.js`; raw record in
+  `s4-ffmpeg-fallback-measurement.json`.
+
+  The apparent C2 pass over that frame is recorded as **vacuous**: no
+  occluder pixels leaked because no pixels of any kind were captured.
 
 ### Fixed
 

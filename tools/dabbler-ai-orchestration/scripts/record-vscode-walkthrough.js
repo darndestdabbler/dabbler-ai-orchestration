@@ -59,6 +59,14 @@ const EXTENSION_ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, "..", "..");
 const DEFAULT_SCENARIO = path.join("docs", "walkthroughs", "work-explorer-first-look");
 const DEFAULT_OUT_ROOT = path.join(EXTENSION_ROOT, ".walkthrough-runs");
+// Where the pilot's committed record lives. The CLI reads its own approval
+// from there rather than from a sentence in this file.
+const SET_DIR = path.join(
+  REPO_ROOT,
+  "docs",
+  "session-sets",
+  "113-narrated-video-walkthroughs"
+);
 
 const DRIVER_NAME = "playwright-vscode";
 
@@ -773,61 +781,106 @@ async function recordVscodeWalkthrough(options) {
 }
 
 /**
- * Say what this is, derived from the pilot's own record rather than from a
- * sentence here that would go stale the moment the verdict changed.
+ * Whether CAPTURE is approved, read from the committed record.
  *
- * Verification found the recorder "presented as available despite the
- * authoritative verdict being FAIL", and it was right: prose in an outcome
- * document gates nothing. When the verdict becomes PASS -- or the operator
- * records a waiver and the evaluation is recomputed -- this notice stops
- * printing by itself.
+ * Verification rejected two weaker versions of this. Prose in an outcome
+ * document gates nothing; and a warning that prints and then records anyway
+ * *"leaves the operator's decision right advisory rather than enforced"*.
+ * The contract is that a failed pilot ships no recorder, so the CLI
+ * entrypoint FAILS CLOSED.
+ *
+ * Two things are deliberately still allowed, because the criterion is about
+ * capture and not about the walkthrough:
+ *
+ *   * `--no-video` runs. Nothing is captured, so nothing is gated -- and
+ *     the degraded path is exactly what a reader should be able to see.
+ *   * The pilot imports `recordVscodeWalkthrough` directly. The acceptance
+ *     criterion permits "pilot-only imports needed to retain or reproduce
+ *     measurements", and without them the measurement cannot be
+ *     reproduced at all.
  */
-function announceStatus() {
+function captureApproval() {
   let evaluation = null;
   try {
     evaluation = JSON.parse(
-      fs.readFileSync(
-        path.join(
-          REPO_ROOT,
-          "docs",
-          "session-sets",
-          "113-narrated-video-walkthroughs",
-          "s4-os-capture-measurement.json"
-        ),
-        "utf8"
-      )
+      fs.readFileSync(path.join(SET_DIR, "s4-os-capture-measurement.json"), "utf8")
     ).evaluation;
   } catch {
-    /* handled below -- absence is reported, never treated as approval */
+    /* handled below -- absence is never treated as approval */
   }
-  // FAIL CLOSED. An unreadable or missing measurement is not evidence of
-  // approval, and staying silent would let a checkout without the pilot
-  // record present this as an ordinary tool. Verification caught the first
-  // version failing open here.
-  if (!evaluation) {
-    log(
-      "NOT APPROVED FOR USE. The OS-capture pilot's measurement could not " +
-        "be read, so nothing here has been verified as passing. See " +
-        "docs/session-sets/113-narrated-video-walkthroughs/" +
-        "s4-os-capture-outcome.md."
+
+  // An operator waiver is the other route to approval, and it has to be
+  // COMMITTED rather than asserted: the whole point is that this session
+  // cannot grant it to itself.
+  let waiver = null;
+  try {
+    waiver = JSON.parse(
+      fs.readFileSync(path.join(SET_DIR, "s4-operator-waiver.json"), "utf8")
     );
-    return;
+  } catch {
+    /* no waiver on disk */
   }
-  if (evaluation.verdict === "PASS") return;
-  log(
-    "NOT APPROVED FOR USE. The OS-capture pilot's verdict is " +
-      evaluation.verdict +
-      " (unmet: " +
-      (evaluation.unmet || []).join(", ") +
-      "). See docs/session-sets/113-narrated-video-walkthroughs/" +
-      "s4-os-capture-outcome.md. Running it anyway is fine for review; " +
-      "relying on it is not."
-  );
+  if (waiver && waiver.attestation && waiver.waivedBy) {
+    return {
+      approved: true,
+      reason:
+        "operator waiver on file (" + waiver.waivedBy + "): " +
+        waiver.attestation,
+    };
+  }
+
+  if (!evaluation) {
+    return {
+      approved: false,
+      reason:
+        "the OS-capture pilot's measurement could not be read, so nothing " +
+        "here has been verified as passing. Absence of evidence is not " +
+        "approval.",
+    };
+  }
+  if (evaluation.verdict === "PASS") {
+    return { approved: true, reason: "the pilot's committed verdict is PASS" };
+  }
+  return {
+    approved: false,
+    reason:
+      "the OS-capture pilot's verdict is " + evaluation.verdict +
+      " (unmet: " + (evaluation.unmet || []).join(", ") + ")",
+  };
 }
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
-  announceStatus();
+
+  // FAIL CLOSED on capture. A failed pilot ships no recorder, and a gate
+  // that only warns is not a gate.
+  if (options.video) {
+    const approval = captureApproval();
+    if (!approval.approved) {
+      log("REFUSING to capture: " + approval.reason + ".");
+      log(
+        "  A failed pilot ships no recorder. See docs/session-sets/" +
+          "113-narrated-video-walkthroughs/s4-os-capture-outcome.md."
+      );
+      log(
+        "  To see the walkthrough without capture:  " +
+          "node scripts/record-vscode-walkthrough.js --no-video"
+      );
+      log(
+        "  To reproduce the measurement:            " +
+          "npm run pilot:os-capture"
+      );
+      log(
+        "  To approve capture: record an operator waiver at docs/session-" +
+          "sets/113-narrated-video-walkthroughs/s4-operator-waiver.json " +
+          '({"waivedBy": "...", "attestation": "..."}), or re-measure to a ' +
+          "PASS verdict."
+      );
+      process.exitCode = 2;
+      return;
+    }
+    log("capture approved: " + approval.reason + ".");
+  }
   let result;
   try {
     result = await recordVscodeWalkthrough(options);
@@ -868,6 +921,7 @@ module.exports = {
   EXPECT_TIMEOUT_MS,
   TAIL_HOLD_MS,
   parseArgs,
+  captureApproval,
   validateDriverBlock,
   locateStepTarget,
   performStep,

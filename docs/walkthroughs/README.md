@@ -339,15 +339,22 @@ portable path is its own.
 > **Status: the Session 4 pilot's verdict is FAIL**, on two of its own
 > criteria — see
 > [`s4-os-capture-outcome.md`](../session-sets/113-narrated-video-walkthroughs/s4-os-capture-outcome.md).
-> There is deliberately **no `npm run` entry**, because a registered script
-> is indistinguishable from a shipped feature, and the recorder announces
-> its own status on every run. Run it to review it; do not rely on it until
-> the operator has ruled.
+> A failed pilot ships no recorder, so **the command refuses to capture**.
+> It is not an `npm run` entry either, because a registered script is
+> indistinguishable from a shipped feature. This is a gate rather than a
+> warning: a notice that printed and then recorded anyway would leave the
+> release decision advisory instead of enforced.
 
 ```bash
-node scripts/record-vscode-walkthrough.js              # record the Work Explorer
-node scripts/record-vscode-walkthrough.js --no-video   # the degraded path
+node scripts/record-vscode-walkthrough.js              # REFUSES: verdict is FAIL
+node scripts/record-vscode-walkthrough.js --no-video   # runs -- captures nothing
+npm run pilot:os-capture                               # reproduces the measurement
 ```
+
+**Two routes unlock capture**, and neither is available to a session on its
+own authority: re-measure to a `PASS` verdict, or commit an operator waiver
+at `docs/session-sets/113-narrated-video-walkthroughs/s4-operator-waiver.json`
+carrying `waivedBy` and `attestation`.
 
 **OBS Studio is a documented optional prerequisite. It is never bundled**,
 and "OBS absent" is a supported outcome rather than an error to engineer

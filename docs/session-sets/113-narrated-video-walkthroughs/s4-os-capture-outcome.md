@@ -180,14 +180,25 @@ rejected that in both discovery lenses, correctly: *"calling it provisional
 in prose does not enforce a gate"*, and a user cannot distinguish "present
 pending approval" from shipped functionality. So:
 
-- **The npm entry is gone.** The recorder is reachable only as
-  `node scripts/record-vscode-walkthrough.js`.
+- **The npm entry is gone.**
+- **The CLI REFUSES to capture** while the committed verdict is not `PASS`
+  and no committed operator waiver exists. This is the third version of
+  this fix: verification rejected prose in an outcome document ("*calling
+  it provisional does not enforce a gate*"), then rejected a notice that
+  printed and recorded anyway ("*leaves the operator's decision right
+  advisory rather than enforced*"). It now fails closed, reads its approval
+  from the committed record, and names the two routes that would unlock it.
+- **`--no-video` is deliberately never gated.** It captures nothing, so
+  there is nothing to gate — and it keeps the walkthrough itself reachable,
+  which is the deliverable. A gate that only says no is a dead end.
+- **The pilot's direct import still works**, which the acceptance criterion
+  explicitly permits: without it the measurement cannot be reproduced.
 - **The documentation says it is not approved for use**, at the top of its
   own section, with a link here.
-- **The recorder announces its own status on every run**, read from the
-  pilot's committed evaluation rather than from a sentence that would go
-  stale. When the verdict becomes `PASS` — or the operator records a waiver
-  and the evaluation is recomputed — the notice stops printing by itself.
+
+**Two routes unlock capture, and a session cannot take either on its own
+authority:** re-measure to a `PASS` verdict, or commit an operator waiver
+at `s4-operator-waiver.json` carrying `waivedBy` and `attestation`.
 
 The code itself remains in the tree because **the measurement cannot exist
 without it**: the pilot harness drives the recorder, and deleting the

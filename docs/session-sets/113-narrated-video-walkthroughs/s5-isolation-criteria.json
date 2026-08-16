@@ -1,0 +1,131 @@
+{
+  "criteriaVersion": 1,
+  "set": "113-narrated-video-walkthroughs",
+  "session": 5,
+  "authoredBefore": "the first container run",
+  "prose": "s5-isolation-criteria.md",
+  "reuses": {
+    "from": "s4-pilot-criteria.json",
+    "note": "This is the same capture somewhere else, so claims that did not change keep their instruments and their thresholds. I1 reuses C2's magenta detector and its control. I2 reuses C1's normalized-cross-correlation instrument and its decoy control. I3 reuses C3's dimension tolerance. I4 restates C7 in container terms. I5 reuses C5's induced-variant shape. I6 reuses C6's post-run assertions. Where a threshold is inherited it is inherited exactly, so a change in result cannot be a change in yardstick."
+  },
+  "bar": {
+    "runs": 3,
+    "consecutive": true,
+    "freshContainerPerRun": true,
+    "maxHostPixelCaptures": 0,
+    "maxBlackFrameCaptures": 0,
+    "allOfPerRun": ["I1", "I2", "I3", "I4"],
+    "runCountRationale": "THREE, not Session 4's ten, and the reduction is argued rather than assumed. Session 4's ten bought down a REPEATABILITY risk that was specific to the host: eleven candidate windows existed, two of them Code.exe, and a driver that matched wrongly would do so intermittently. A container has one display and one application on it, so that failure mode is absent by construction rather than by luck. What this session must establish is a PROPERTY -- that host pixels cannot reach the capture -- and a property is established by the control in I1, not by repetition. Three runs guard against a one-off fluke in the surrounding machinery; they are not claimed to do more."
+  },
+  "criteria": {
+    "I1": {
+      "name": "host-is-invisible",
+      "claim": "Nothing on the operator's host desktop can appear in a capture made inside the container. This is the whole point of the session and everything else is secondary to it.",
+      "instrument": "A pure-magenta (255,0,255) marker window is raised and held FOREGROUND ON THE HOST for the duration of a container capture; every extracted frame is scanned for pixels within L-infinity distance 24 of magenta.",
+      "maxMagentaFractionInFrames": 0.0005,
+      "control": {
+        "claim": "The magenta detector fires when magenta is genuinely in frame.",
+        "instrument": "The same detector is run against a frame that genuinely contains the marker, captured inside the container.",
+        "minMagentaFractionInPositiveControl": 0.5,
+        "rationale": "Without this control, 'no magenta found' is equally consistent with a detector that cannot find magenta at all -- the exact failure Session 4's C2 hit, where the criterion was scored FAIL because its control was miscalibrated even though the leakage measurement itself was a clean 0.000000."
+      },
+      "structural": {
+        "claim": "Isolation is a property of how the container is run, not only of what the frames show, so the run command itself is asserted.",
+        "forbiddenRunFlags": [
+          "--privileged",
+          "--net=host",
+          "--network=host",
+          "--ipc=host",
+          "--pid=host",
+          "--userns=host"
+        ],
+        "forbiddenMountTargets": [
+          "/tmp/.X11-unix",
+          "/run/user",
+          "/dev/dri",
+          "/dev/snd",
+          "/dev/video0"
+        ],
+        "forbiddenEnvNames": ["DISPLAY_HOST", "WAYLAND_DISPLAY", "PULSE_SERVER"],
+        "note": "A capture that shows no host pixels because nothing happened to be on screen is not evidence. A container that was never handed a host socket, a host device or a host namespace CANNOT show host pixels, and that is a claim about the configuration which can be asserted directly."
+      }
+    },
+    "I2": {
+      "name": "target-is-actually-visible",
+      "claim": "The capture contains the running application, not a black or empty frame.",
+      "instrument": "Normalized cross-correlation between an extracted video frame and a screenshot taken INSIDE the container at the same moment, both reduced to 32x32 grayscale.",
+      "minCorrelation": 0.9,
+      "control": {
+        "claim": "The instrument can tell the intended content from different content.",
+        "decoyMaxCorrelation": 0.7
+      },
+      "blackFrameGuard": {
+        "claim": "A uniformly black or uniformly single-coloured recording is refused explicitly rather than passing a correlation test against an equally black screenshot.",
+        "minFrameStdDev": 8.0,
+        "rationale": "This is the headless-capture failure mode, and it is the one place a container is MORE likely to fail than the host: software rendering on a virtual display can produce a video whose frames are empty while every surrounding assertion still passes. Two black images correlate perfectly."
+      }
+    },
+    "I3": {
+      "name": "usable-resolution",
+      "claim": "The recording is at the virtual display's pixel geometry, not a downscaled or letterboxed size.",
+      "instrument": "Recorded frame dimensions compared with the virtual display geometry the container was configured with.",
+      "maxDimensionDeltaPx": 2
+    },
+    "I4": {
+      "name": "no-camera-no-audio-no-host-display",
+      "claim": "The container has no path to a camera, a microphone, an audio server or the host's display, and the recording carries no audio track.",
+      "instrument": "Device nodes enumerated inside the running container; the produced file's stream list read back.",
+      "requires": {
+        "noDevVideoNodes": true,
+        "noDevSndNodes": true,
+        "noHostX11SocketPresent": true,
+        "recordingMustHaveNoAudioTrack": true
+      },
+      "note": "Session 4 had to forbid these as OBS input kinds because the operator's own OBS profile carried a live webcam and a microphone. Inside a container the same guarantee is stronger and cheaper: the devices are not present to be selected. That difference IS the session's argument, so it is measured rather than asserted in prose."
+    },
+    "I5": {
+      "name": "dependency-absent-fails-clearly",
+      "claim": "Every way the container dependency can be missing produces a named failure, and the walkthrough still completes without a video.",
+      "instrument": "Induced variants, each run for real, not simulated.",
+      "variants": ["podman-executable-absent", "podman-machine-stopped", "image-absent"],
+      "requires": {
+        "errorMentionsContainerDependency": true,
+        "manifestStillWritten": true,
+        "videoArtifactCount": 0
+      },
+      "note": "FAILURE TO RECORD MUST NEVER FAIL THE WALKTHROUGH is the rule the whole set is built on, and a new capture backend is a new way to break it."
+    },
+    "I6": {
+      "name": "deterministic-cleanup",
+      "claim": "Nothing the harness created outlives the run, including when the run fails part way.",
+      "instrument": "Post-run assertions after every run and after one deliberately induced mid-run failure.",
+      "requires": {
+        "containerRemoved": true,
+        "noDanglingVolumes": true,
+        "noZeroByteOrTempFilesInRunDir": true,
+        "hostPodmanMachineLeftInEntryState": true
+      },
+      "note": "hostPodmanMachineLeftInEntryState is deliberately weaker than 'the machine is stopped': the operator may have started it themselves and a harness that stops it would be destroying state it does not own. Entry state is recorded on the way in and restored on the way out."
+    },
+    "I7": {
+      "name": "cost-is-recorded",
+      "claim": "What the container costs is written down, because 'measure what it costs' is half of this session's charter.",
+      "instrument": "Recorded per run, and required to be PRESENT rather than to be under any threshold.",
+      "requires": {
+        "imageBytes": true,
+        "imageBuildSeconds": true,
+        "coldStartSeconds": true,
+        "captureWallClockSeconds": true
+      },
+      "passFail": false,
+      "note": "No threshold is set, on purpose. A number invented before the first measurement would be a guess wearing a criterion's clothing, and the decision this feeds -- whether the container is worth its cost -- is the operator's, not a threshold's."
+    }
+  },
+  "cannotBeAskedToMeet": {
+    "windows-fidelity": "Podman on Windows is a Linux VM, so this records LINUX VS Code, not the Windows VS Code staff run. The operator accepted this cost on 2026-08-16 and the session is told to state it, not solve it. No criterion may be written that a Linux recording passes by pretending to be a Windows one.",
+    "display-scaling": "Session 4's C3 carried a scaling caveat because Windows display scaling is a real source of downscaled captures. A virtual display has one fixed geometry and no DPI story, so I3 keeps the dimension check and drops the scaling claim entirely. A pass here says NOTHING about display scaling, and must not be cited as if it did.",
+    "window-selection-among-competitors": "Session 4's C1 refused to record when more than one window matched, because eleven candidates existed on the host. The container display holds one application. I2 therefore inherits C1's instrument to prove the capture is NOT BLACK, which is the live risk here, and abandons the disambiguation claim, which has nothing to disambiguate.",
+    "caption-alignment": "Session 4's C4 proved that captions retimed from the step-event stream land inside the recording. That is a property of walkthrough_run finalize, which this session does not modify, and re-measuring it in a container would re-prove someone else's code. It is INHERITED, and the inheritance is stated here so that its absence from the results table is a documented decision rather than a gap."
+  },
+  "honestFail": "Any of I1 through I6 unmet, or fewer than three consecutive clean runs, is a FAIL. A fail ships no container capture path; the measurements are the deliverable, manual-only degradation stays intact, and the Session 4 host path -- itself already gated closed on its own FAIL -- is not disturbed either way. I1 unmet is worse than a fail: it would mean the container does not deliver the one thing it exists for, and it must be reported in those words."
+}

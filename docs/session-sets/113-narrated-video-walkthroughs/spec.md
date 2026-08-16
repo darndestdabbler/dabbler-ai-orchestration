@@ -69,7 +69,7 @@ requiresUAT: true         # A set whose deliverable IS the UAT experience must b
 requiresE2E: true         # Sessions 3 and 4 drive real rendering surfaces (a browser fixture and the Extension Development Host).
 uatStyle: ad-hoc
 uatScope: per-set
-uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 8) owes one record per line.
+uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 9, after the 2026-08-16 re-plan) owes one record per line.
   - Rendered walkthrough and training document
   - Static generated index
   - Recorded web scenario

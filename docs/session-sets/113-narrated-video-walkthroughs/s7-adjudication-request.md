@@ -175,3 +175,23 @@ deliverable stops being terminal.
 blocked Session 7's.** Session 8 authors its tutorial and completes the
 set's accounting; both tutorials' recordings are owed to the reserved set.
 That is option (c) reached deliberately.
+
+---
+
+# Superseded the same day — read this before the section above
+
+**The operator overturned the placement**, and the sections above are kept
+as the record of what was asked and answered rather than as current
+instructions. Option (c) would have ended a set about narrated video with
+**no video in it**, which is not what the two-tutorial direction was for.
+
+The set was **extended to nine sessions**. **Session 8** is now *A capture
+backend that draws the cursor* — the `gdigrab` measurement against the
+Session 4 criteria, plus the long-form harness Session 7 owed. **Session 9**
+is the old Session 8: both tutorials' recordings and the set's accounting,
+still set-terminal. Wherever the text above says "Session 8" as the terminal
+session or as the one that authors and records nothing, read **Session 9**.
+
+Both run on the operator's **work computer**, on a Copilot seat — the
+personal machine's API credits are nearly exhausted. See Session 8's
+prerequisites block in `spec.md`.

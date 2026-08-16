@@ -1,85 +1,108 @@
 {
-  "status": "completed",
-  "summary": "Session 3 of 4: one command now produces a watchable, captioned recording of a real web UI being driven, and degrades honestly to the Session 2 document when it cannot. STEP 2 MEASURED THE PREMISE RATHER THAN ASSUMING IT. This repo had measured only the failing case -- Set 111 S4 ran the same VS Code launch twice, differing only in whether Playwright's recordVideo was passed, and recorded that passing it broke the automation it was meant to record. The spec calls that platform-specific and forbids generalising it, so the browser claim was measured the same way: the same fixed probe, the same fixture web app, run twice, one option different. Arm A drove the UI AND wrote a 30KB video; arm B drove it and wrote nothing -- the exact inversion of the workbench table. scripts/measure-browser-record.js reproduces it and exits non-zero if it ever stops holding; the raw record is s3-browser-record-measurement.json. The fixture (src/test/fixtures/task-board) is dependency-free vanilla HTML/CSS/JS served over HTTP on an ephemeral port, standing in for the .NET / Java / Python / vanilla-JS targets the operator named -- which are one platform, not four, once they reach a browser. THE MANIFEST IS THE HEDGE THE SET AGREED TO PAY FOR, and it is written so nothing anywhere assumes an MP4: zero or more typed artifacts, each with an explicit media type, a closed vocabulary naming terminal-cast and transcript alongside video, and an EMPTY artifact list is valid -- failure to record must never fail the walkthrough. A manifest that lists a file nobody wrote is refused. One layer down from Session 1: the inventory is the AUTHORED SCENARIO, not the event stream, so a run that stopped at step 3 reports steps 4 and 5 as not-reached rather than omitting them. Both degraded paths were proven by running them, not asserted: --no-video yields a manifest with no video and an index that says so where the player would be, and a planted failing expectation yields outcome=failed with the unreached steps present and marked. TIMING SAYS WHAT IT KNOWS: nothing reports the instant recording begins, so the driver brackets newContext() and carries the width of the bracket as anchor.uncertaintyMillis (5-7ms measured) instead of implying frame accuracy. Captions retime through the EXISTING WebVTT writer via a windows_ms parameter rather than a second copy of the cue arithmetic; called without windows the output is byte-for-byte the committed --check-gated rendering. The driver does not parse scenario.yaml -- walkthrough_run plan hands it the portable steps and its own quarantined block as JSON -- so the repo keeps exactly one scenario parser, and the quarantine survives the trip: the driver block is passed through verbatim and validated by its own consumer. VERIFICATION FOUND THREE REAL DEFECTS, ALL THE SAME SHAPE: each worked on the bundled fixture and failed on a real consumer application. (1) Critical -- the recorder hard-required a repository-local .venv; the finding would have been satisfied by DOCUMENTING it, which was refused as satisfying the letter while leaving the goal false, since a consumer repo installing dabbler-ai-router from PyPI has no repo venv at all and the recorder would have worked in exactly one checkout. It now resolves the first interpreter that can genuinely import ai_router, probing by importing. (2) Major -- the index showed no captions over file://, which is its own documented viewing path; the limitation had been DOCUMENTED rather than fixed, and prose under a player is not synchronised captioning. The sidecar element is gone and the cues are embedded and added through addTextTrack, verified empirically over file:// (one track, five cues, correct cue active at 20s, no console errors, visible in a screenshot). (3) Major -- step expectations took one immediate snapshot, which works only against a synchronous fixture and fails on every server-backed target the recorder advertises; they now wait with a bounded timeout, proved by a Playwright spec that plants the delay the fixture does not have and asserts the control (a single snapshot WOULD have failed on that same page). Writing that spec surfaced a second defect: the failure path re-read the element with no timeout, doubling the cost of every failed step. ROUND 1 VERIFIED NOTHING, AND THAT IS THIS SESSION'S MOST CONSEQUENTIAL FINDING. The work had been committed before verify_session ran, and verify_session diffs the working tree against HEAD, so the bundle was empty. Both findings correctly said the verifier had been handed nothing -- but with only spec.md to cite, the Set 119 doc-only severity cap recorded them at Minor, and the round printed 'MINOR-ONLY ... effectively VERIFIED' with instructions to close. A session that verified nothing was one instruction from closing as verified. Fixed at the source rather than by making the cap cleverer (the cap is operator-attested and behaved correctly on its input; the input should never have been routed): assemble_evidence now raises EvidenceEmptyError when the bundle carries no diff and no untracked contents, naming --diff-base, and close_backstop handles it explicitly instead of reporting a provider failure. The class was already known and already fixed at ONE site -- resolve_backstop_diff_base exists precisely because 'a plain HEAD diff at close time is empty -- it would hand the verifier nothing' -- and the interactive path never got the same treatment, which is G-008 exactly. Blast radius was measured: two shared test fixtures were pristine trees, meaning every run() test had been exercising routing and verdict logic over an empty bundle. Round 2, against the real delta, found the three defects above; round 3 (remediation-review) returned VERIFIED with 3 fix verdicts accepted, 0 rejected, and explicitly resolved the round-1 findings.",
+  "status": "requires_review",
+  "summary": "Session 4 of 4, the set-terminal session: a bounded Windows OS-capture pilot against this repository's own product, ending in a measurement. THE CRITERIA WERE MADE CHECKABLE, NOT JUST WRITTEN DOWN. The spec says criteria decided after the first capture are not criteria, so they were committed as a machine-readable file BEFORE any capture, the harness reads that file, refuses to run without it, and stamps its SHA-256 into every measurement it writes; the verdict is then computed from it by a separate pure module that contains no threshold of its own. Anyone can recompute the verdict from the committed numbers and the committed thresholds with --evaluate-only. Seven criteria, each with an instrument, and a CONTROL wherever the claim would otherwise be unfalsifiable -- a correlation threshold with no decoy cannot tell a working instrument from one that returns 1.0 for everything, and a leakage scan with nothing to find passes whether or not the detector works. The criteria were amended ONCE, before the first capture and with the amendment journaled, after probing found the operator's default OBS scene collection carries a live webcam, a microphone and Desktop Audio. The harness always builds its own scene collection so none of that was ever going to be in frame -- but an unasserted safety property is a hope, and this one is the operator's camera. WHAT THE PILOT ESTABLISHES. Windows Graphics Capture through OBS records the AI Work Explorer cleanly and repeatably: correlation 0.9996 against a Playwright screenshot of the same window on every capture, against a decoy that scored 0.2978; zero occluder pixels in frame with an occluder covering 80.8% of the target and holding foreground focus; frame dimensions exactly equal to the window's physical pixels, and following a deliberate resize; anchor uncertainty around 110ms against a 1500ms bar; deterministic cleanup across every attempt including three induced part-way failures. WHAT IT DOES NOT ESTABLISH, stated rather than left to be assumed. One display scale (100%) was exercised -- changing the operator's live scaling would disrupt the desktop they work on, so a window-resize variant covers the same dimension-blindness failure mode and the gap is recorded. And C1 measures OBS's capture SOURCE, not the encoded file: a capture that was perfect at the source and black in the file would pass it. The file is corroborated only by its size and by a human watching it. FOUR DEFECTS FOUND BY PROBING RATHER THAN BY REASONING, before the measurement ran: --websocket_port is honoured and does not ENABLE the server; a leftover .sentinel marker raises a modal crash dialog that HANGS the next launch rather than failing it; RecQuality=Small makes OBS accept StartRecord and never start the output, with no websocket error and no line in OBS's own log; and cleanup PREDICTED OBS's filenames instead of observing them, so it deleted nothing and reported success -- the worst of both. Two settings were removed rather than a workaround added. THE CRITERIA CAUGHT A REAL DEFECT IN THE PRODUCT, which is the whole point of writing them first. The last caption cue ended 32-83ms AFTER the recording did, on every one of the first eleven captures. Nothing else in the session would have found it -- the videos look fine and the captions look fine, and the two were only ever compared because a criterion said to. Fixed by holding the recording 750ms past the last step, which also replaces a hard cut on the frame of the final click with a beat the viewer can read the result in, and re-measured across a full second round of captures rather than asserted. THREE CRITERIA ARE REPORTED UNMET, and they are three different kinds of thing. C4 was a real defect and is fixed. C2's substantive claim passes absolutely (zero leakage) while its detector CONTROL came in at 0.44 against a 0.50 bar, because the occluder doubles as C1's structured decoy and the captured window includes browser chrome -- deliberately NOT retuned, since adjusting the instrument to pass is the same sin as moving the threshold. C7's no-audio-track clause cannot be satisfied through OBS configuration at all: four configurations were tried and OBS muxes a track regardless, though no audio SOURCE exists, so the track can only carry silence. THE RECORDER SHIPS PROVISIONALLY, and this session does not self-authorize that. Adjudicating a criterion as non-blocking reduces verification, which is inside the decision-rights hard carve-out, so whether a provably silent audio track is acceptable is put to the operator as item A of the guided look rather than settled here. What the spec's own bar asked for -- ten consecutive clean captures from a fresh fixture, no wrong-window capture, no privacy leakage -- was met. What the machine verdict says is FAIL, because this session set itself extra clauses and two did not come out. Both statements are true and the record keeps both. A METHODOLOGICAL FLAW WAS CAUGHT IN THE HARNESS ITSELF: the run carrying the controls repoints the live capture at the decoy part way through, so its VIDEO is not a recording of the walkthrough even though its measurements are sound. It is excluded from the ten in CODE -- derived from the record rather than trusted to a flag -- and a supplementary run supplies the tenth clean capture. VERIFICATION RAN FOUR ROUNDS AND FOUND SEVEN DISTINCT DEFECTS, every one accepted and none disputed. The most serious: capture failures DESTROYED the walkthrough instead of degrading -- only ObsUnavailableError was caught, so the ambiguity refusal (a plain Error, hit routinely by a developer with a second Extension Development Host open) deleted the run directory and exited non-zero, leaving someone who wanted a walkthrough and could not have a video with NEITHER. Two more were defects in the instruments built to prevent false positives: C6 passed on the dependency-absent variants while asserting in its own note that those were the part-way failures it asked for (they die during setup, two before a scene collection exists), and supplementary runs counted toward the ten-clean-run bar without being evaluated against C1-C4 -- so on the designed path the one recording that supplies the tenth capture was the one recording nobody checked. THE GATE TOOK THREE ATTEMPTS AND VERIFICATION REJECTED THE FIRST TWO: 'provisional' in an outcome document ('calling it provisional in prose does not enforce a gate'), then a notice that printed the FAIL verdict and recorded anyway ('leaves the operator's decision right advisory rather than enforced'). The CLI now fails closed, reads its approval from the committed record, and names the two routes that would unlock it -- neither available to a session on its own authority. THE FFMPEG FALLBACK IS MEASURED, on operator direction after the documented-not-done version was rejected: gdigrab produced a UNIFORMLY BLACK FRAME on the Electron window (every pixel 0,0,0; eight seconds at 16 KB against ~37 MB for a comparable OBS capture) while carrying a video stream and no audio track. It satisfies the one clause OBS structurally cannot and fails the one that matters most, confirming the operator's 2026-08-15 ruling rather than overturning it. That black frame read as a failure only because a falsifier written before the measurement existed makes a zero-variance frame score 0 rather than 1. SUITES: pytest 4986 passed / 5 skipped / 1 xfailed, mocha 1548 passed, Layer 3 37 passed, all green and all recorded after the last code change. ONE ITEM IS OPEN AND IT IS THE OPERATOR'S: the gate fix landed after the loop reached its bound of two remediation-review cycles, so it is remediated but unverified, and only an operator-authorized round can confirm it.",
   "verification_method": "api",
   "verification_verdict": "ISSUES_FOUND",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/walkthrough_run.py",
-    "ai_router/walkthrough_index.py",
-    "ai_router/scenario_render.py",
-    "ai_router/verify_session.py",
-    "ai_router/close_backstop.py",
-    "ai_router/tests/test_walkthrough_run.py",
-    "ai_router/tests/test_walkthrough_index.py",
-    "ai_router/tests/test_scenario_render.py",
-    "ai_router/tests/test_verify_session.py",
-    "ai_router/tests/test_verify_session_phases.py",
-    "ai_router/tests/test_close_backstop.py",
-    "ai_router/changelog.d/0012-set-113-s3-browser-recording.md",
+    "ai_router/changelog.d/0013-set-113-s4-os-capture-pilot.md",
+    "docs/proposals/2026-08-15-set-113-follow-on-reservations.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/activity-log.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/change-log.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/checklist-posts.jsonl",
+    "docs/session-sets/113-narrated-video-walkthroughs/decisions.jsonl",
+    "docs/session-sets/113-narrated-video-walkthroughs/disposition.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-acceptance-round-1.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-acceptance-round-2.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-conventions.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-ffmpeg-fallback-measurement.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues-round-2.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues-round-3.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues-round-4.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-os-capture-measurement.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-os-capture-outcome.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-pilot-criteria.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-pilot-criteria.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-remediation-round-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-rounds.jsonl",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-uat-walk.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-fanout-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-round-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-round-3.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-round-4.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/session-events.jsonl",
+    "docs/session-sets/113-narrated-video-walkthroughs/session-state.json",
     "docs/walkthroughs/README.md",
-    "docs/walkthroughs/task-board-first-task/scenario.yaml",
-    "docs/walkthroughs/task-board-first-task/walkthrough.md",
-    "docs/walkthroughs/task-board-first-task/training.md",
-    "docs/walkthroughs/task-board-first-task/captions.vtt",
-    "docs/walkthroughs/task-board-first-task/chapters.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s3-browser-record-measurement.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s3-remediation-round-2.md",
-    "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js",
-    "tools/dabbler-ai-orchestration/scripts/web-fixture-server.js",
-    "tools/dabbler-ai-orchestration/scripts/measure-browser-record.js",
-    "tools/dabbler-ai-orchestration/src/test/fixtures/task-board/index.html",
-    "tools/dabbler-ai-orchestration/src/test/fixtures/task-board/app.js",
-    "tools/dabbler-ai-orchestration/src/test/fixtures/task-board/app.css",
-    "tools/dabbler-ai-orchestration/src/test/suite/webWalkthroughRecorder.test.ts",
-    "tools/dabbler-ai-orchestration/src/test/playwright/expectation-wait.spec.ts",
+    "docs/walkthroughs/work-explorer-first-look/scenario.yaml",
     "tools/dabbler-ai-orchestration/package.json",
-    ".gitignore"
+    "tools/dabbler-ai-orchestration/scripts/measure-ffmpeg-fallback.js",
+    "tools/dabbler-ai-orchestration/scripts/measure-os-capture.js",
+    "tools/dabbler-ai-orchestration/scripts/obs-capture.js",
+    "tools/dabbler-ai-orchestration/scripts/obs-websocket-client.js",
+    "tools/dabbler-ai-orchestration/scripts/os-capture-verdict.js",
+    "tools/dabbler-ai-orchestration/scripts/png-metrics.js",
+    "tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js",
+    "tools/dabbler-ai-orchestration/src/test/suite/osCaptureRecorder.test.ts"
   ],
   "blockers": [],
   "residuals": [
     {
-      "id": "S3-R1",
+      "id": "S4-R1",
+      "severity": "minor",
+      "summary": "C7's no-audio-track clause cannot be satisfied through OBS configuration: four configurations were tried and a track is always muxed. No audio SOURCE exists -- a fresh scene collection has zero inputs and every special input is null -- so the track can only carry silence. Whether that is acceptable is guided-look item A, and adjudicating it reduces verification, which is inside the hard carve-out.",
+      "owner": "operator"
+    },
+    {
+      "id": "S4-R2",
+      "severity": "minor",
+      "summary": "C2's detector CONTROL measured 0.441 against a 0.50 bar, because the occluder doubles as C1's structured decoy and the captured window includes browser chrome. Deliberately NOT retuned: adjusting the instrument to pass is the same sin as moving the threshold. The substantive claim passes absolutely (zero leakage, 80.8% occlusion, focus held). A future pilot should use two windows -- a plain fill for the leakage control, a structured one for the decoy.",
+      "owner": "a future pilot, if one runs"
+    },
+    {
+      "id": "S4-R3",
+      "severity": "minor",
+      "summary": "Only one display scale (100%) was exercised. Changing the operator's live scaling would disrupt the desktop they work on, so a window-resize variant covers the same dimension-blindness failure mode instead. A pass here is a claim about 100% scaling and no other.",
+      "owner": "unowned; re-measure if a scaled machine is available"
+    },
+    {
+      "id": "S4-R4",
+      "severity": "minor",
+      "summary": "C1 measures OBS's capture SOURCE, not the encoded file: a source-perfect, file-black capture would pass it. Corroborated indirectly by file size (~37 MB per capture, where the ffmpeg black frame came to 16 KB for 8 seconds) and directly only by a human watching it, which is guided-look item 1.",
+      "owner": "closed by guided-look item 1"
+    },
+    {
+      "id": "S4-R5",
+      "severity": "minor",
+      "summary": "A ten-run pilot leaves roughly 430 MB of gitignored video under .walkthrough-runs/, and this session ran it twice. Harmless, and worth knowing before running it on a small disk.",
+      "owner": "none"
+    },
+    {
+      "id": "S4-R6",
       "severity": "major",
-      "summary": "verify_session's DEFAULT diff base is still HEAD. The empty-evidence guard now refuses the resulting bundle loudly, so the failure is no longer silent -- but the better fix is to default the base to the session-derived pre-session ref, exactly as close_backstop.resolve_backstop_diff_base already does, so a session that commits before verifying gets the right bundle instead of a refusal it must fix by hand. DELIBERATELY DEFERRED, not overlooked: it changes behaviour for every set on the close path, and belongs in a session that can verify it as its own subject rather than in a remediation pass of a session about video walkthroughs. Journaled in decisions.jsonl with the alternatives.",
-      "owner": "a named follow-on set (operator to schedule)"
+      "summary": "THE ONE OPEN ITEM. The recorder gate -- the CLI failing closed on capture -- was written in response to round 4's rejection and therefore landed AFTER the bounded loop reached its limit of two remediation-review cycles. It is remediated, covered by two tests (one of which reads the REAL committed measurement rather than a fixture, so it starts passing for the right reason the moment a genuine PASS or a committed waiver exists), and confirmed by hand -- the CLI refuses capture and --no-video still runs. It is NOT confirmed by a verification round, and only an operator-authorized round can supply one. Verification rejected the two previous attempts at this same fix, which is the argument for checking the third.",
+      "owner": "operator"
     },
     {
-      "id": "S3-R2",
+      "id": "S4-R7",
       "severity": "minor",
-      "summary": "The backstop's diff base is derived with git's one-second commit-timestamp resolution, so a session whose commits share a second with its own registration can resolve a base that already contains the work. Previously invisible (the empty bundle was routed like any other); now it surfaces as an explicit refusal naming --diff-base. Surfaced by the close_backstop test fixture, which this session fixed the same way its own neighbouring test already documented. Real sessions commit minutes to hours after registering, so exposure is low.",
-      "owner": "the same follow-on as S3-R1"
+      "summary": "CLOSED. The ffmpeg gdigrab fallback is measured: a uniformly black frame on the Electron window, with no audio track. It confirms the ruling that made OBS primary.",
+      "owner": "closed"
     },
     {
-      "id": "S3-R3",
+      "id": "S4-R8",
       "severity": "minor",
-      "summary": "Round 1 of this session's verification is a NULL ROUND: its evidence bundle was empty and it reviewed nothing. Its artifacts (s3-verification.md, s3-verification-fanout-2.md, s3-issues.json) are kept unaltered as the record of the defect they exposed, and it consumed one of the two bounded discovery passes. A later probe run, aborted by a command timeout while the tree was temporarily stashed, overwrote s3-verification.md; the original was recovered from the stash and restored, and that probe's routed call ($0.1599, 22:58:42Z) is in router-metrics.jsonl with no corresponding round in s3-rounds.jsonl. The rounds ledger itself is correct: exactly three rounds.",
-      "owner": "Session 3 (recorded, no action owed)"
-    },
-    {
-      "id": "S3-R4",
-      "severity": "minor",
-      "summary": "Sequencing, stated rather than implied, and CORRECTED after the close preflight contradicted the first version of this note. Landing AFTER the remediation-review round returned VERIFIED: the changelog fragment; fixture-only fixes to test_close_preflight.py and test_orchestrator_identity.py, whose pristine trees hit the new empty-evidence guard when the FULL pytest suite ran; and a new 'Captions you can actually see' section in docs/walkthroughs/README.md. This note first claimed no shipped code changed after the round. That was WRONG: post_round_delta classifies the README as shipped, because it is the canonical documentation for the scenario format and a claim a reader relies on, not a test file. The A4 obligation was paid rather than argued away -- round 4, a delta-scoped remediation-review, VERIFIED with 0 findings -- and the README section was NOT reverted to dodge the gate, since it documents behaviour this session changed.",
-      "owner": "Session 3 (recorded, no action owed)"
-    },
-    {
-      "id": "S3-R5",
-      "severity": "minor",
-      "summary": "Own-goal worth recording because it is a trap any session can walk into. A helper script parked in the scratchpad directory was named disposition.py. This repo's modules import their siblings by BARE name (`from disposition import ...`), and Python puts a script's own directory first on sys.path -- so running any scratchpad helper that reached ai_router's import chain resolved `disposition` to the scratchpad file and EXECUTED it, silently rewriting disposition.json with stale content. Caught because the helper printed on import. The scratchpad copies were deleted and the disposition re-applied and re-checked. No repo file is at fault; the lesson is that a scratchpad script must never share a name with a module in a bare-import package.",
-      "owner": "Session 3 (recorded, no action owed)"
+      "summary": "The Session 4 verification conventions block stated two suite baselines from memory and got both wrong -- mocha '~1821' (that figure belongs to a whole-src glob, not this suite's declared command; the real number is 1548) and Layer 3 '28 specs' (37). Neither error favoured this session; both understated the coverage that ran. Recorded rather than quietly corrected, because a conventions block exists to stop rounds burning findings on the agreed baseline and one carrying wrong numbers does that job worse.",
+      "owner": "recorded; fix the habit, not the file"
     }
   ],
-  "next_orchestrator": {
-    "engine": "codex",
-    "provider": "openai",
-    "model": "current frontier family",
-    "effort": "high",
-    "reason": {
-      "code": "continue-current-trajectory",
-      "specifics": "Session 4 is the bounded Windows OS-capture pilot and the set-terminal session. The routed Step 3.5 analysis (google/gemini-pro, anthropic excluded) recommends openai at high effort with an anthropic verifier, and its stated grounds hold: the session's risk is controlling an external GUI process (OBS via obs-websocket, ffmpeg gdigrab as fallback) and the failure modes are startup/shutdown races, wrong-window capture and non-deterministic cleanup. Session 3 corroborates two of those in miniature -- the events stream had to be made idempotent to close because both the happy path and the cleanup path close it, and the first recording came out uniformly grey because the fixture re-rendered and destroyed the emphasised node. Both were cheap here and will not be cheap against an external capture process. NOTE: the same routed analysis also recommended 'Terminal Walkthroughs and Cast Artifacts' as the next SET with a trigger of 'ten consecutive clean captures'; that contradicts this set's own spec, which reserves it under 'a real terminal target exists'. The spec governs -- do not act on the routed suggestion. See the Session 3 addendum in ai-assignment.md."
-    },
-    "first_action": "Set the pass criteria BEFORE the first capture and write them down -- criteria decided after the first capture are not criteria. Then confirm OBS is installed with its websocket reachable, and prove the dependency-absent path fails clearly before proving the happy one."
-  },
+  "next_orchestrator": null,
+  "lessons_cited": [
+    "L-112-1",
+    "L-079-1",
+    "L-064-8"
+  ],
   "cost": {
     "components": [
       {
@@ -109,11 +132,11 @@
         "status": "unavailable",
         "credits": null,
         "usd": null,
-        "event_count": 8,
+        "event_count": 0,
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "8 Direct-API calls are recorded for this session; their cost is authoritative in router-metrics.jsonl (cost_usd, in dollars) and is not restated here in AI credits. In dollars they sum to $2.2754: one planning call for the Step 3.5 assignment analysis (google/gemini-pro, $0.0055) and seven session-verification calls (openai/gpt-5-6-sol, $2.2699). THREE of those bought no verification and are named rather than netted out, because money spent on a round that verified nothing is still money spent: round 1's two calls ($0.2815) reviewed an EMPTY evidence bundle, and one aborted probe ($0.1599, 22:58:42Z) has no corresponding round in s3-rounds.jsonl. Round 4 ($0.2821) is the A4 delta-scoped review owed because documentation classified as shipped changed after round 3."
+        "reason": "7 Direct-API calls are recorded for this session; their cost is authoritative in ai_router/router-metrics.jsonl (cost_usd, in dollars) and is not restated here in AI credits. In dollars they sum to $2.9602: two planning calls for the Step 3.5 assignment analysis ($0.0107 + $0.0114) and five session-verification calls ($2.9381). ONE OF THE TWO PLANNING CALLS BOUGHT NOTHING and is named rather than netted out -- the first attempt read an attribute the RouteResult does not carry and lost its own output, which is L-079-1's persist-before-printing rule paid for a second time. The five verification calls are rounds 1 (two-lens discovery fan-out), 2 (supplementary) and 3-4 (remediation review)."
       }
     ],
     "total_status": "unknown",
@@ -126,9 +149,29 @@
     "store_schema_version": 6,
     "measured_at": "close"
   },
-  "lessons_cited": [
-    "L-112-1",
-    "L-079-1",
-    "L-064-8"
-  ]
+  "uat": {
+    "attestation": "Written by the orchestrator, not by the operator, and it records that fact rather than substituting for it. NO HUMAN HAS REVIEWED ANY COMPONENT of this set. Every entry is method 'none' with its own attestation, which Session 1 made a valid and passing answer on the operator's ruling of 2026-08-10 -- the gate demands an accounting, not a walk. What this set can honestly claim is automated evidence: 4986 pytest, 1548 mocha and 37 Layer 3 tests green, a browser recording proved with a control in Session 3, and 24 OS captures measured against criteria fixed before the first one. What it cannot claim is that anybody looked. The guided look is written and offered; whether to spend ten minutes on it is the operator's decision.",
+    "components": [
+      {
+        "component": "Rendered walkthrough and training document",
+        "method": "none",
+        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. Automated evidence in place of a reviewer: scenario_render --check gates all four renderings against a digest of the portable half, and Session 4 rewrote the quarantined driver block entirely while leaving every generated document byte-identical -- so the divergence claim is proved rather than asserted."
+      },
+      {
+        "component": "Static generated index",
+        "method": "none",
+        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. Automated evidence: every one of the 24 pilot captures produced an index, and both degraded paths were exercised by running them -- --no-video, and three induced capture failures -- each yielding an index that says there is no recording rather than looking broken. Whether it READS well is exactly what a human would add, and is item 2 of the guided look."
+      },
+      {
+        "component": "Recorded web scenario",
+        "method": "none",
+        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. Session 3's component, unchanged by Session 4. Its premise was measured with a control (measure-browser-record.js exits non-zero if browser recordVideo ever stops working), and its captions were verified empirically over file://. No human has watched the result."
+      },
+      {
+        "component": "Windows OS-capture pilot",
+        "method": "none",
+        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. The most heavily automated component and still unreviewed by a person: 24 captures across two rounds against criteria committed before the first one, with controls, plus a measured ffmpeg fallback. The one thing the instruments cannot cover is whether the video is FOLLOWABLE -- C1 measures OBS's capture source, not the encoded file -- and that is item 1 of the guided look."
+      }
+    ]
+  }
 }

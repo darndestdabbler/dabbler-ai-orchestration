@@ -40,6 +40,14 @@
 //      transform, and produces something that cannot be regenerated from
 //      the scenario source alone.
 //
+// ONE THING IT CAN NOW DO, ON REQUEST (Set 113 Session 7): `--physical-
+// pointer` moves the REAL Windows pointer to each target before the
+// synthesised click, so OBS -- which has been drawing the system cursor all
+// along -- has a cursor worth drawing. It is opt-in and never a default,
+// because it TAKES OVER THE OPERATOR'S MOUSE for the length of the run. The
+// web recorder's synthetic pointer is a different mechanism for a different
+// reason and is not interchangeable with this one.
+//
 // Output is ASCII-only (Windows cp1252 console lesson, L-079-1).
 
 "use strict";
@@ -54,6 +62,7 @@ const { _electron } = require("@playwright/test");
 const { makeUatWorkspace } = require("./make-uat-workspace.js");
 const { findCodeBinary, electronEnv, makeLaunchStateDirs } = require("./vscode-launch.js");
 const { ObsCaptureSession, ObsUnavailableError } = require("./obs-capture.js");
+const pointer = require("./pointer.js");
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, "..", "..");
@@ -170,6 +179,7 @@ function parseArgs(argv) {
     out: null,
     video: true,
     keep: false,
+    physicalPointer: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -177,6 +187,10 @@ function parseArgs(argv) {
     else if (arg === "--out") options.out = argv[++i];
     else if (arg === "--no-video") options.video = false;
     else if (arg === "--keep") options.keep = true;
+    // Opt-in, every time, and never inferred from anything else. Taking over
+    // someone's mouse is not a thing to do because a heuristic thought a
+    // recording would look better for it.
+    else if (arg === "--physical-pointer") options.physicalPointer = true;
     else throw new Error("unrecognised argument: " + arg);
   }
   return options;
@@ -271,15 +285,90 @@ async function locateStepTarget(page, block, mechanics) {
   };
 }
 
+// How long the workbench is held still on each side of the two instants the
+// pointer visibility check samples. OBS's start-up bracket is wider than a
+// browser context's, so this is wider than the web recorder's -- both
+// instants must sit in the middle of a window in which nothing but the
+// pointer is moving, or the check measures the workbench instead.
+const POINTER_QUIET_MS = 320;
+
+/**
+ * Walk the REAL pointer to a locator before the synthesised click lands on
+ * it, and record the probe the visibility check reads.
+ *
+ * Two coordinate spaces meet here and the conversion is the whole trick.
+ * `boundingBox()` is in the renderer's CSS pixels; `SetCursorPos` wants
+ * physical screen pixels; and the recorded frame is the window's physical
+ * pixels with its own origin. The calibration solves the first to the
+ * second by measurement, and the frame coordinate is the CSS point times
+ * the display's scale factor -- which is the same arithmetic the pilot
+ * already uses to state the capture canvas size.
+ */
+async function approachWithPointer(page, locator, mouse, stepId, label) {
+  if (!mouse) return null;
+  const box = await locator.boundingBox().catch(() => null);
+  if (!box) return null;
+  const client = {
+    x: box.x + box.width / 2,
+    y: box.y + box.height / 2,
+  };
+  const screen = mouse.calibration.toScreen(client.x, client.y);
+  const previous = mouse.pointer.lastKnown
+    ? {
+        x: Math.round(
+          (mouse.pointer.lastKnown.x - mouse.calibration.origin.x) /
+            mouse.calibration.scale.x *
+            mouse.scaleFactor
+        ),
+        y: Math.round(
+          (mouse.pointer.lastKnown.y - mouse.calibration.origin.y) /
+            mouse.calibration.scale.y *
+            mouse.scaleFactor
+        ),
+      }
+    : null;
+
+  await page.waitForTimeout(POINTER_QUIET_MS);
+  const departedAtMillis = mouse.since();
+  await page.waitForTimeout(POINTER_QUIET_MS);
+
+  if (mouse.move) await mouse.pointer.approach(screen.x, screen.y);
+  else await pointer.sleep(pointer.APPROACH_TOTAL_MS);
+
+  await page.waitForTimeout(POINTER_QUIET_MS);
+  const arrivedAtMillis = mouse.since();
+  await page.waitForTimeout(POINTER_QUIET_MS);
+
+  const probe = {
+    stepId,
+    selector: label,
+    // Frame pixels, not CSS pixels: the recording is the window at its
+    // physical size, so the check's crop has to be too.
+    to: {
+      x: Math.round(client.x * mouse.scaleFactor),
+      y: Math.round(client.y * mouse.scaleFactor),
+    },
+    screen,
+    departedAtMillis,
+    arrivedAtMillis,
+    previousPosition: mouse.move ? previous : null,
+  };
+  mouse.probes.push(probe);
+  return probe;
+}
+
 /** Run one step's quarantined mechanics. */
-async function performStep(page, block, mechanics) {
+async function performStep(page, block, mechanics, mouse, stepId) {
   const primary = rowLocator(page, block, mechanics.rowText);
   await primary.waitFor({ state: "visible", timeout: EXPECT_TIMEOUT_MS });
 
   if (mechanics.click === "twistie") {
-    await primary.locator(block.twistieSelector).first().click();
+    const twistie = primary.locator(block.twistieSelector).first();
+    await approachWithPointer(page, twistie, mouse, stepId, "twistie");
+    await twistie.click();
     await page.waitForTimeout(500);
   } else if (mechanics.click === "body") {
+    await approachWithPointer(page, primary, mouse, stepId, "row");
     await primary.click();
     await page.waitForTimeout(900);
   } else {
@@ -290,6 +379,13 @@ async function performStep(page, block, mechanics) {
   if (mechanics.then) {
     const secondary = rowLocator(page, block, mechanics.then.rowText);
     await secondary.waitFor({ state: "visible", timeout: EXPECT_TIMEOUT_MS });
+    await approachWithPointer(
+      page,
+      secondary,
+      mouse,
+      stepId,
+      mechanics.then.hover ? "then-hover" : "then-click"
+    );
     if (mechanics.then.hover) {
       await secondary.hover();
       await page.waitForTimeout(900);
@@ -385,6 +481,13 @@ async function recordVscodeWalkthrough(options) {
   let launched = null;
   let capture = null;
   let anchorMillis = 0;
+  // Held here rather than inside the try, so the `finally` can put the
+  // operator's mouse back even if the failure happened before the first
+  // step. Restoring on the happy path only is how a crashed run leaves
+  // someone's pointer parked in a tree row.
+  let physical = null;
+  let topmost = false;
+  const pointerProbes = [];
   const since = () => Date.now() - anchorMillis;
 
   try {
@@ -493,6 +596,12 @@ async function recordVscodeWalkthrough(options) {
           outDir,
           width: result.window.physical.width,
           height: result.window.physical.height,
+          // A run that is walking a pointer to each target needs a capture
+          // backend that draws one. This is the ONLY thing that changes
+          // between a pointer run and its control -- the control asks for
+          // the same backend, so the falsifier differs in the pointer and
+          // in nothing else.
+          needCursorVisible: Boolean(opts.physicalPointer || opts.pointerControl),
           windowMatch: (candidate) => {
             const name = String(candidate.name || "").toLowerCase();
             return (
@@ -605,6 +714,105 @@ async function recordVscodeWalkthrough(options) {
       await opts.afterStart({ capture, page, app, result });
     }
 
+    // The physical pointer is opened AFTER the recording has started, so
+    // the takeover lasts no longer than the capture it exists for, and it
+    // is set up inside its own try: a machine where PowerShell cannot drive
+    // the cursor, or a window the probe moves cannot reach, degrades to the
+    // recording this recorder has always made rather than losing the run.
+    let mouse = null;
+    if (opts.physicalPointer) {
+      try {
+        // Bring the workbench to the front FIRST. Real pointer motion is
+        // delivered to whatever window is on top at that point, so a
+        // workbench sitting behind anything else hears nothing at all --
+        // which is what happened the first time this ran, against a OneNote
+        // window the operator had left open. This is also what a person
+        // recording their screen would do without thinking about it.
+        //
+        // `focus()` alone is not enough and was measured not to be: Windows
+        // refuses SetForegroundWindow to a process that is not already the
+        // foreground one, so the second attempt found a Chrome window on top
+        // instead of the OneNote one. Always-on-top goes through SetWindowPos
+        // with HWND_TOPMOST, which is not subject to that restriction. It is
+        // set only for a run that asked for the physical pointer, and it is
+        // put back in the cleanup.
+        await app.evaluate(async ({ BrowserWindow }) => {
+          const w = BrowserWindow.getAllWindows()[0];
+          w.show();
+          w.setAlwaysOnTop(true, "screen-saver");
+          w.moveTop();
+          w.focus();
+        });
+        topmost = true;
+        await page.waitForTimeout(400);
+        physical = new pointer.PhysicalPointer(log).open();
+        await physical.waitUntilReady();
+        const calibration = await pointer.calibratePhysicalPointer(page, physical);
+        log(
+          "physical pointer calibrated: scale " +
+            calibration.scale.x.toFixed(3) +
+            "x" +
+            calibration.scale.y.toFixed(3) +
+            ", residual " +
+            calibration.residualPixels +
+            "px"
+        );
+        mouse = {
+          pointer: physical,
+          calibration,
+          probes: pointerProbes,
+          since,
+          scaleFactor: result.window.scaleFactor,
+          move: true,
+        };
+        result.pointer = {
+          mode: "physical",
+          scale: calibration.scale,
+          origin: calibration.origin,
+          residualPixels: calibration.residualPixels,
+          entry: physical.entry,
+        };
+      } catch (err) {
+        if (physical) physical.close();
+        physical = null;
+        notes.push(
+          "the physical pointer could not be used (" +
+            String((err && err.message) || err) +
+            "); the walkthrough was driven without it"
+        );
+        log("physical pointer unavailable - continuing without it");
+        result.pointer = {
+          mode: "unavailable",
+          reason: String((err && err.message) || err),
+        };
+      }
+    } else if (opts.pointerControl) {
+      // The falsifier's control: the SAME timing, the SAME probe list, and
+      // no pointer moved. A visibility check handed this must fail on the
+      // pixels rather than on an empty probe list, which is the only way it
+      // is evidence about pixels at all.
+      mouse = {
+        pointer: { lastKnown: null },
+        calibration: {
+          toScreen: () => ({ x: 0, y: 0 }),
+          origin: { x: 0, y: 0 },
+          scale: { x: 1, y: 1 },
+        },
+        probes: pointerProbes,
+        since,
+        scaleFactor: result.window.scaleFactor,
+        move: false,
+      };
+      result.pointer = { mode: "off" };
+      notes.push(
+        "run made with the pointer control: the pointer timing was honoured " +
+          "and no pointer was moved, so this recording is the control the " +
+          "visibility check must FAIL on"
+      );
+    } else {
+      result.pointer = { mode: "off" };
+    }
+
     let failed = false;
     for (const step of plan.steps) {
       const mechanics = block.steps[step.id];
@@ -614,7 +822,7 @@ async function recordVscodeWalkthrough(options) {
         const started = { event: "started", stepId: step.id, atMillis: since() };
         if (bounds) started.bounds = bounds;
         emit(started);
-        await performStep(page, block, mechanics);
+        await performStep(page, block, mechanics, mouse, step.id);
         const onScreen = Date.now() - stepStarted;
         const budget = Math.max(Number(step.seconds) || 0, 0) * 1000;
         if (onScreen < budget) await page.waitForTimeout(budget - onScreen);
@@ -717,6 +925,29 @@ async function recordVscodeWalkthrough(options) {
       JSON.stringify(driverOutput, null, 2) + "\n",
       "utf8"
     );
+    // Beside the manifest, never inside it: `walkthrough_run finalize` owns
+    // the manifest's shape and refuses keys it does not know. The same file
+    // name and shape as the web recorder writes, so one checker reads both.
+    fs.writeFileSync(
+      path.join(outDir, "pointer-probes.json"),
+      JSON.stringify(
+        {
+          scenarioId: plan.scenarioId,
+          driver: DRIVER_NAME,
+          mode: (result.pointer && result.pointer.mode) || "off",
+          // The frame is the window at its physical size, so the crop has to
+          // grow with the display's scale factor: the system cursor is drawn
+          // in physical pixels and is twice the size at 200%.
+          cropSize: Math.round(56 * Math.max(1, result.window.scaleFactor)),
+          scaleFactor: result.window.scaleFactor,
+          calibration: result.pointer || null,
+          probes: pointerProbes,
+        },
+        null,
+        2
+      ) + "\n",
+      "utf8"
+    );
     result.summary = runPython([
       "-m",
       "ai_router.walkthrough_run",
@@ -733,6 +964,36 @@ async function recordVscodeWalkthrough(options) {
       result.obsUnavailableMessage = err.message;
     }
   } finally {
+    // FIRST, before anything slow. The operator's mouse is the one resource
+    // here that belongs to a person rather than to this process, and every
+    // path out of the run -- success, failure, an exception thrown before a
+    // single step ran -- goes through here.
+    if (topmost && launched) {
+      // Put the window back to an ordinary one. A recorder that leaves an
+      // always-on-top VS Code behind has changed the operator's desktop,
+      // which is exactly the kind of side effect this session is supposed
+      // to be careful about.
+      try {
+        await launched.app.evaluate(async ({ BrowserWindow }) => {
+          const w = BrowserWindow.getAllWindows()[0];
+          if (w) w.setAlwaysOnTop(false);
+        });
+      } catch (err) {
+        /* the host is already gone, which achieves the same thing */
+      }
+      topmost = false;
+    }
+    if (physical) {
+      try {
+        physical.close();
+      } catch (err) {
+        result.cleanupProblems = (result.cleanupProblems || []).concat([
+          "the physical pointer could not be released: " +
+            String((err && err.message) || err),
+        ]);
+      }
+      physical = null;
+    }
     await closeEvents();
     if (capture) {
       try {
@@ -920,6 +1181,8 @@ module.exports = {
   DRIVER_NAME,
   EXPECT_TIMEOUT_MS,
   TAIL_HOLD_MS,
+  POINTER_QUIET_MS,
+  approachWithPointer,
   parseArgs,
   captureApproval,
   validateDriverBlock,

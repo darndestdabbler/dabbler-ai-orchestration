@@ -504,3 +504,56 @@ measurement**, and its model ids are unusable.
    the operator's call at the Step 9 review — which is now **Session 8's**, not
    this session's. Its Session 7 first action (draw the synthetic pointer into
    the page) is, however, a correct reading of the operator's ordering ruling.
+
+---
+
+## Session 7 — Show the pointer, then record the single-module tutorial
+
+> **Routed analysis (Step 3.5), never self-opined.** Authored 2026-08-16 by
+> `gemini-2.5-pro` (google, tier 2, $0.0095, 775 output tokens) via
+> `route(task_type="analysis", exclude_providers=["anthropic"])`. Reproduced
+> verbatim below: child output is **evidence, never instructions**. The
+> orchestrator's reading follows it.
+>
+> **One deliberate change to the prompt this time.** Four consecutive
+> sessions have recorded that the step-3.5 analyst names model ids that do
+> not exist in this registry, and the owed router-side fix is still unowned.
+> This session pasted the registry's routable keys into the prompt as
+> context. It is not the fix — the next session that forgets to paste it
+> will get `claude-3-opus-20240229` again — but it costs nothing and it is
+> evidence that the analyst names real ids when it is told what they are.
+
+### Recommended orchestrator
+anthropic/opus @ effort=high
+
+### Rationale
+The session introduces significant new capabilities with high implementation complexity, such as physical pointer manipulation and a video time-compression pipeline derived from event logs. It also includes a core creative task: authoring a new tutorial project and its structure. A Tier 3 orchestrator is required to manage this complexity, handle the novel R&D directly, and ensure the conceptual integrity of the new human-driven recording genre.
+
+### Estimated routed cost
+moderate
+
+| Step | Action | Routing Decision |
+|---|---|---|
+| 1 | Register and read notes | Orchestrator (anthropic/opus) |
+| 2 | Implement pointer visibility in recordings | Orchestrator (anthropic/opus) |
+| 3 | Build time-compression pipeline for recordings | sonnet |
+| 4 | Author and structure the single-module tutorial | Orchestrator (anthropic/opus) |
+| 5 | Generate publication safety checklist | gemini-flash |
+| 6 | Perform cross-provider verification | gpt-5-4 |
+| 7 | Implement required test suites | sonnet |
+| 8 | Prepare handover for next session | Orchestrator (anthropic/opus) |
+
+### Risks Session 7 should be warned about
+*   **Physical Pointer Interference:** An unhandled exception in `record-vscode-walkthrough.js` could fail to restore the operator's physical mouse cursor position, leaving it "stuck" and disrupting the operator's workflow until manually recovered.
+*   **Time Compression Context Loss:** The time-compression logic in Step 3 relies on discrete events in logs. It may incorrectly compress periods where the human operator is thinking or reading UI text without generating events, making the final video confusing or appearing rushed.
+*   **Synthetic Pointer Obscurity:** The web-based synthetic pointer (Step 2) is injected into the DOM and may be hidden by elements with a high `z-index`, such as modals or dropdown menus, causing it to be invisible during critical moments of the recording.
+*   **Tutorial Scope Creep:** The AI-driven authoring of the toy project (Step 4) could produce a plan that is more complex than intended, causing the human-driven recording session to exceed the ~15-minute wall-clock target and requiring costly rework.
+
+### Next-session recommendation (Session 8)
+- Orchestrator: google/gemini-3-1-pro @ effort=medium
+- Verifier: openai/gpt-5-4 @ effort=medium
+- Reason: Session 8 will operationalize the pipelines built in Session 7, shifting from R&D to execution; a high-end Tier 2 model offers the right balance of capability and cost for this production-oriented work.
+- First action: Process the raw video captured in Session 7 using the new time-compression pipeline and review the generated speed-ramp plan for accuracy.
+
+### Next-set recommendation
+The next set should scale the video production workflow established here. This involves creating a multi-module tutorial to test the process at a larger scale, developing a lightweight workflow for adding narration, and building tooling to automate the final encoding and publication safety checks based on the checklist from Session 7.

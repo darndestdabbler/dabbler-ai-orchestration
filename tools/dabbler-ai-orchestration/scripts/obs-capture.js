@@ -62,6 +62,15 @@ const USER_INI = path.join(OBS_CONFIG_ROOT, "user.ini");
 // black-frame on hardware-accelerated Electron, and does not leak the
 // occluding window into the frame.
 const CAPTURE_METHOD_WGC = 2;
+// The older BitBlt path, and the ONLY one of the two that draws the system
+// cursor into the frame (Set 113 Session 7, measured: same window, same
+// parked pointer, same `cursor: true` setting -- BitBlt has an arrow in it
+// and WGC has nothing at all). It is not the default, because everything in
+// the comment above about WGC is still true and a recording with no pointer
+// in it is worth more than a recording with a black frame in it. It is
+// chosen only by a run that has said it needs the pointer to be visible,
+// which is the one case where the trade goes the other way.
+const CAPTURE_METHOD_BITBLT = 1;
 // Match candidate windows by executable, not by title. Title matching is
 // the single likeliest way this captures the wrong window in a real
 // environment, so the caller narrows by title itself and we REFUSE on more
@@ -388,8 +397,14 @@ class ObsCaptureSession {
       inputName: this.inputName,
       inputKind: "window_capture",
       inputSettings: {
-        method: CAPTURE_METHOD_WGC,
+        method: options.needCursorVisible
+          ? CAPTURE_METHOD_BITBLT
+          : CAPTURE_METHOD_WGC,
         priority: MATCH_PRIORITY_EXE,
+        // Enabled all along, and all along it did nothing on the WGC path.
+        // The setting is honoured by BitBlt and ignored by WGC, which is why
+        // twenty-four captures with cursor drawing "on" contained no cursor
+        // and nobody could see why from the settings.
         cursor: options.captureCursor !== false,
         client_area: true,
       },
@@ -697,6 +712,8 @@ class ObsCaptureSession {
 
 module.exports = {
   ObsCaptureSession,
+  CAPTURE_METHOD_WGC,
+  CAPTURE_METHOD_BITBLT,
   ObsUnavailableError,
   DEFAULT_OBS_EXE,
   WEBSOCKET_CONFIG,

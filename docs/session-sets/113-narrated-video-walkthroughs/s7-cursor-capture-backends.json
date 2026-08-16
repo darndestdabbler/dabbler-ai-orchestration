@@ -1,0 +1,75 @@
+{
+  "measurement": "which Windows capture backend puts the workbench AND the system cursor in the same frame",
+  "startedAt": "2026-08-16T21:11:22.344Z",
+  "platform": "win32",
+  "thresholds": {
+    "windowPresentMinCorrelation": 0.9,
+    "cursorPresentMinChangedFraction": 0.02,
+    "channelTolerance": 28,
+    "cropPixels": 56
+  },
+  "backends": [
+    {
+      "id": "obs-window-wgc",
+      "description": "OBS window capture, Windows Graphics Capture -- the backend the recorder ships with",
+      "windowCorrelation": 0.9996,
+      "cursorChangedFraction": 0,
+      "windowPresent": true,
+      "cursorPresent": false,
+      "error": null
+    },
+    {
+      "id": "obs-window-bitblt",
+      "description": "OBS window capture, BitBlt -- the only OBS method whose cursor setting does anything",
+      "windowCorrelation": 0,
+      "cursorChangedFraction": 0,
+      "windowPresent": false,
+      "cursorPresent": false,
+      "error": null
+    },
+    {
+      "id": "ffmpeg-gdigrab-desktop",
+      "description": "ffmpeg gdigrab over the desktop rectangle the window occupies, with -draw_mouse 1",
+      "windowCorrelation": 0.9697,
+      "cursorChangedFraction": 0.12436,
+      "windowPresent": true,
+      "cursorPresent": true,
+      "error": null
+    }
+  ],
+  "verdict": "MEASURED",
+  "reason": "of 3 candidates, 1 put both the workbench and the cursor in one frame: ffmpeg-gdigrab-desktop",
+  "window": {
+    "content": {
+      "x": 240,
+      "y": 90,
+      "width": 1440,
+      "height": 900
+    },
+    "scale": 1
+  },
+  "pointer": {
+    "parked": {
+      "x": 845,
+      "y": 396
+    },
+    "away": {
+      "x": 4,
+      "y": 4
+    },
+    "inFrame": {
+      "x": 605,
+      "y": 306
+    },
+    "crop": {
+      "x": 595,
+      "y": 296,
+      "width": 56,
+      "height": 56
+    }
+  },
+  "usableBackends": [
+    "ffmpeg-gdigrab-desktop"
+  ],
+  "finishedAt": "2026-08-16T21:12:08.885Z"
+}

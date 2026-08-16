@@ -28,6 +28,12 @@
 //      which is why each step's bounding box is recorded even though
 //      nothing reads it yet.
 //
+// ONE THING IT NOW DOES (Set 113 Session 7). It draws a SYNTHETIC pointer
+// into the page and moves it to each target before acting. Chromium's
+// `recordVideo` composites no system cursor at all, so every recording this
+// script made before now showed controls operating themselves. `--no-pointer`
+// turns it off, which is also how the falsifier control recording is made.
+//
 // Output is ASCII-only (Windows cp1252 console lesson, L-079-1).
 
 "use strict";
@@ -39,6 +45,7 @@ const path = require("path");
 
 const { chromium, expect } = require("@playwright/test");
 const { startFixtureServer, FIXTURE_ROOT } = require("./web-fixture-server.js");
+const pointer = require("./pointer.js");
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(EXTENSION_ROOT, "..", "..");
@@ -106,6 +113,13 @@ const EXPECT_TIMEOUT_MS = 15_000;
 // The failure-path read of what was actually on screen. Short on
 // purpose: by the time it runs, the wait has already run out.
 const DIAGNOSTIC_READ_MS = 1_000;
+
+// How long the page is held still on each side of the two instants the
+// pointer visibility check samples. Half a second is comfortably wider than
+// the ~200ms by which a browser recording starts after the run's own clock
+// anchor, so a frame sampled at either instant is a frame from the middle of
+// a period in which nothing but the pointer was moving.
+const POINTER_QUIET_MS = 260;
 
 function log(msg) {
   console.log(`[walkthrough:web] ${msg}`);
@@ -181,6 +195,7 @@ function parseArgs(argv) {
     url: null,
     video: true,
     keep: false,
+    pointer: true,
   };
   const valueFor = (flag, index) => {
     const value = argv[index];
@@ -199,6 +214,11 @@ function parseArgs(argv) {
     else if (arg === "--url") options.url = valueFor(arg, ++index);
     else if (arg === "--no-video") options.video = false;
     else if (arg === "--keep") options.keep = true;
+    // The falsifier's control run. A recording made with the pointer off
+    // must FAIL the same visibility check the pointer-on recording passes,
+    // and this is how that recording is produced -- from the same script,
+    // on the same scenario, differing in exactly one flag.
+    else if (arg === "--no-pointer") options.pointer = false;
     else throw new Error(`unknown argument '${arg}'`);
   }
   return options;
@@ -328,6 +348,90 @@ async function clearEmphasis(page) {
   });
 }
 
+/**
+ * The selector an action operates on, or null for one that names none.
+ *
+ * The four action verbs each carry their target under their own key, and
+ * the pointer needs the target rather than the verb -- so this is the one
+ * place that knows the mapping, and adding a verb without teaching it here
+ * degrades to "no pointer approach", never to a wrong one.
+ */
+function actionTarget(action) {
+  return action.click || action.check || action.fill || action.press || null;
+}
+
+/**
+ * Walk the synthetic pointer to an action's target before performing it.
+ *
+ * Returns the probe record the visibility checker reads, or null when the
+ * step could not be probed -- an action with no selector, or a target
+ * with no bounding box because it is off-screen or zero-sized. A null is
+ * recorded as "not probed" rather than as a failure: the walkthrough
+ * document is the deliverable and a step that could not be probed is a gap
+ * in the evidence, not a broken recording.
+ */
+async function approachTarget(page, action, since, drawPointer) {
+  const selector = actionTarget(action);
+  if (!selector) return null;
+  const box = await page
+    .locator(selector)
+    .first()
+    .boundingBox()
+    .catch(() => null);
+  if (!box) return null;
+  const to = {
+    x: Math.round(box.x + box.width / 2),
+    y: Math.round(box.y + box.height / 2),
+  };
+  const before = drawPointer ? await pointer.syntheticPointerPosition(page) : null;
+
+  // A still beat before the pointer sets off, and another after it lands.
+  //
+  // These are not pacing decoration, they are what makes the visibility
+  // check decidable. The first measurement of this had neither, and the
+  // control run PASSED: the reference frame and the arrival frame straddled
+  // the emphasis fade and the typing that followed, so a whole band of the
+  // crop changed whether or not a pointer was ever drawn. Both instants now
+  // sit in the middle of a window in which the page is doing nothing, which
+  // is also how a person would record this by hand -- a cursor that lands,
+  // pauses, and then clicks reads as deliberate.
+  await page.waitForTimeout(POINTER_QUIET_MS);
+  const departedAtMillis = since();
+  await page.waitForTimeout(POINTER_QUIET_MS);
+
+  // The control run takes the SAME path through this function and waits the
+  // SAME time; the only thing it does not do is draw a pointer. That is what
+  // makes `--no-pointer` a falsifier rather than a formality: the check gets
+  // an identical probe list pointing at identical instants, and must fail on
+  // the pixels because there is nothing there -- not because the probe list
+  // happened to be empty.
+  const moved = drawPointer
+    ? await pointer.moveSyntheticPointer(page, to)
+    : { from: null, to };
+  if (!drawPointer) await page.waitForTimeout(pointer.APPROACH_TOTAL_MS);
+
+  await page.waitForTimeout(POINTER_QUIET_MS);
+  const arrivedAtMillis = since();
+  await page.waitForTimeout(POINTER_QUIET_MS);
+
+  return {
+    selector,
+    from: moved.from,
+    to,
+    // The instant the pointer had NOT yet started moving, and the instant
+    // it had arrived. The checker crops the same region out of the frames
+    // at these two times and asks whether anything appeared there; without
+    // both, "the pointer is visible" is a claim about a single frame with
+    // nothing to compare it to.
+    departedAtMillis,
+    arrivedAtMillis,
+    // Recorded so the checker can recognise the one case it must not judge:
+    // a previous target close enough that the pointer was ALREADY inside
+    // the crop before it moved.
+    previousPosition: before,
+  };
+}
+
 async function performAction(page, action) {
   if (action.click) await page.click(action.click);
   else if (action.check) await page.check(action.check);
@@ -438,6 +542,11 @@ async function main() {
   let anchorMillis = 0;
   const notes = [];
   const artifacts = [];
+  // What the visibility checker reads. One entry per action the pointer
+  // walked to, carrying the two instants and the point -- written to the
+  // run directory so the check is a separate, re-runnable step against a
+  // recording rather than a self-assessment made by the thing under test.
+  const pointerProbes = [];
   let usable = false;
 
   let eventsClosed = false;
@@ -491,6 +600,21 @@ async function main() {
     const startedAt = new Date().toISOString();
     const page = await context.newPage();
     await page.goto(url);
+    if (options.pointer) {
+      await pointer.ensureSyntheticPointer(page, pointer.entryPoint(viewport));
+      notes.push(
+        "a synthetic pointer was drawn into the page and walked to each " +
+          "target before acting; Chromium's recordVideo composites no system " +
+          "cursor, so without it the recording shows controls operating " +
+          "themselves"
+      );
+      log("synthetic pointer on; --no-pointer records the control");
+    } else {
+      notes.push(
+        "run made with --no-pointer: no pointer was drawn into the page, so " +
+          "this recording is the control the visibility check must FAIL on"
+      );
+    }
     // No up-front style injection: `applyEmphasis` adds the stylesheet if
     // the document does not already have it, which is what makes it
     // survive a navigation. One injection path, not two that can disagree.
@@ -533,6 +657,32 @@ async function main() {
 
       try {
         for (const action of detail.do || []) {
+          {
+            if (options.pointer) {
+              // Re-ensured every time rather than once at startup: a step
+              // that navigates drops the element with the document, and the
+              // failure would otherwise be a pointer that quietly stops
+              // existing part way through a recording.
+              await pointer.ensureSyntheticPointer(
+                page,
+                pointer.entryPoint(viewport)
+              );
+            }
+            const probe = await approachTarget(
+              page,
+              action,
+              since,
+              options.pointer
+            );
+            // Recorded in `pointer-probes.json` and NOT in `events.jsonl`.
+            // The event stream is a shared contract with `walkthrough_run`,
+            // whose reader refuses keys it does not know and whose consumers
+            // are the captions and the chapter list; a pointer approach is
+            // neither a step nor a caption, and putting it there would make
+            // every consumer learn about a mechanism that concerns none of
+            // them.
+            if (probe) pointerProbes.push({ stepId: step.id, ...probe });
+          }
           await performAction(page, action);
         }
         if (detail.emphasize) {
@@ -621,6 +771,30 @@ async function main() {
     fs.writeFileSync(
       path.join(outDir, "driver-output.json"),
       JSON.stringify(driverOutput, null, 2) + "\n",
+      "utf8"
+    );
+
+    // The pointer record is its OWN file, deliberately not a key in
+    // driver-output.json. That manifest is the portable contract between
+    // this driver and `walkthrough_run finalize`, and its reader refuses
+    // keys it does not know -- correctly, because a manifest that silently
+    // accepts anything stops being a contract. Pointer probes are evidence
+    // for a separate, re-runnable check, so they live beside the manifest
+    // rather than inside it.
+    fs.writeFileSync(
+      path.join(outDir, "pointer-probes.json"),
+      JSON.stringify(
+        {
+          scenarioId: plan.scenarioId,
+          driver: DRIVER_NAME,
+          mode: options.pointer ? "synthetic" : "off",
+          elementId: pointer.POINTER_ID,
+          anchor,
+          probes: pointerProbes,
+        },
+        null,
+        2
+      ) + "\n",
       "utf8"
     );
 

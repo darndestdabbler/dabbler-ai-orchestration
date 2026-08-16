@@ -1,0 +1,149 @@
+{
+  "check": "a pointer is visible in the recorded frames at the moment of each action",
+  "runDir": "D:\\Projects\\dabbler-ai-orchestration\\tools\\dabbler-ai-orchestration\\.walkthrough-runs\\pointer-off",
+  "scenarioId": "task-board-first-task",
+  "driver": "playwright-web",
+  "pointerMode": "off",
+  "video": "recording.webm",
+  "thresholds": {
+    "channelTolerance": 28,
+    "arrivalMinChangedFraction": 0.03,
+    "controlMaxChangedFraction": 0.01,
+    "cropPixels": 56
+  },
+  "probes": [
+    {
+      "stepId": "add-a-task",
+      "selector": "#new-task",
+      "at": {
+        "x": 588,
+        "y": 164
+      },
+      "crop": {
+        "x": 578,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 6843,
+      "afterMillis": 7850,
+      "outcome": "failed",
+      "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
+      "targetChangedFraction": 0,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "add-a-task",
+      "selector": "#add-task",
+      "at": {
+        "x": 872,
+        "y": 164
+      },
+      "crop": {
+        "x": 862,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 8396,
+      "afterMillis": 9399,
+      "outcome": "failed",
+      "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
+      "targetChangedFraction": 0,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "add-a-second-task",
+      "selector": "#new-task",
+      "at": {
+        "x": 588,
+        "y": 164
+      },
+      "crop": {
+        "x": 578,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 16826,
+      "afterMillis": 17843,
+      "outcome": "failed",
+      "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
+      "targetChangedFraction": 0,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "add-a-second-task",
+      "selector": "#add-task",
+      "at": {
+        "x": 872,
+        "y": 164
+      },
+      "crop": {
+        "x": 862,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 18390,
+      "afterMillis": 19401,
+      "outcome": "failed",
+      "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
+      "targetChangedFraction": 0,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "mark-one-done",
+      "selector": "li.task:first-child .task-toggle",
+      "at": {
+        "x": 375,
+        "y": 330
+      },
+      "crop": {
+        "x": 365,
+        "y": 320,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 25841,
+      "afterMillis": 26865,
+      "outcome": "failed",
+      "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
+      "targetChangedFraction": 0,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "filter-to-open",
+      "selector": "#filter-open",
+      "at": {
+        "x": 458,
+        "y": 234
+      },
+      "crop": {
+        "x": 448,
+        "y": 224,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 35852,
+      "afterMillis": 36861,
+      "outcome": "failed",
+      "detail": "nothing appeared at the target: only 0 of the crop changed, against a bar of 0.03",
+      "targetChangedFraction": 0,
+      "controlChangedFraction": 0
+    }
+  ],
+  "counts": {
+    "passed": 0,
+    "failed": 6,
+    "indecisive": 0
+  },
+  "verdict": "FAILED",
+  "reason": "no probe showed a pointer arriving (6 failed, 0 indecisive)",
+  "frame": {
+    "width": 1280,
+    "height": 800
+  },
+  "recordingStartOffsetMillis": 202,
+  "recordingStartOffsetBasis": "the run's last event was at 44122ms and the file is 43920ms long"
+}

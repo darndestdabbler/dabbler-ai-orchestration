@@ -1,0 +1,149 @@
+{
+  "check": "a pointer is visible in the recorded frames at the moment of each action",
+  "runDir": "D:\\Projects\\dabbler-ai-orchestration\\tools\\dabbler-ai-orchestration\\.walkthrough-runs\\pointer-on",
+  "scenarioId": "task-board-first-task",
+  "driver": "playwright-web",
+  "pointerMode": "synthetic",
+  "video": "recording.webm",
+  "thresholds": {
+    "channelTolerance": 28,
+    "arrivalMinChangedFraction": 0.03,
+    "controlMaxChangedFraction": 0.01,
+    "cropPixels": 56
+  },
+  "probes": [
+    {
+      "stepId": "add-a-task",
+      "selector": "#new-task",
+      "at": {
+        "x": 588,
+        "y": 164
+      },
+      "crop": {
+        "x": 578,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 6837,
+      "afterMillis": 7931,
+      "outcome": "passed",
+      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "targetChangedFraction": 0.0523,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "add-a-task",
+      "selector": "#add-task",
+      "at": {
+        "x": 872,
+        "y": 164
+      },
+      "crop": {
+        "x": 862,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 8476,
+      "afterMillis": 9558,
+      "outcome": "passed",
+      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "targetChangedFraction": 0.09088,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "add-a-second-task",
+      "selector": "#new-task",
+      "at": {
+        "x": 588,
+        "y": 164
+      },
+      "crop": {
+        "x": 578,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 16854,
+      "afterMillis": 17949,
+      "outcome": "passed",
+      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "targetChangedFraction": 0.05293,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "add-a-second-task",
+      "selector": "#add-task",
+      "at": {
+        "x": 872,
+        "y": 164
+      },
+      "crop": {
+        "x": 862,
+        "y": 154,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 18502,
+      "afterMillis": 19590,
+      "outcome": "passed",
+      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "targetChangedFraction": 0.0896,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "mark-one-done",
+      "selector": "li.task:first-child .task-toggle",
+      "at": {
+        "x": 375,
+        "y": 330
+      },
+      "crop": {
+        "x": 365,
+        "y": 320,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 25889,
+      "afterMillis": 26997,
+      "outcome": "passed",
+      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "targetChangedFraction": 0.05325,
+      "controlChangedFraction": 0
+    },
+    {
+      "stepId": "filter-to-open",
+      "selector": "#filter-open",
+      "at": {
+        "x": 458,
+        "y": 234
+      },
+      "crop": {
+        "x": 448,
+        "y": 224,
+        "width": 56,
+        "height": 56
+      },
+      "beforeMillis": 35872,
+      "afterMillis": 36966,
+      "outcome": "passed",
+      "detail": "something appeared at the target between the two frames and nowhere else in the control",
+      "targetChangedFraction": 0.05261,
+      "controlChangedFraction": 0
+    }
+  ],
+  "counts": {
+    "passed": 6,
+    "failed": 0,
+    "indecisive": 0
+  },
+  "verdict": "PASSED",
+  "reason": "6 of 6 probes showed a pointer arriving at the target and nothing moving in the control (0 indecisive)",
+  "frame": {
+    "width": 1280,
+    "height": 800
+  },
+  "recordingStartOffsetMillis": 179,
+  "recordingStartOffsetBasis": "the run's last event was at 44139ms and the file is 43960ms long"
+}

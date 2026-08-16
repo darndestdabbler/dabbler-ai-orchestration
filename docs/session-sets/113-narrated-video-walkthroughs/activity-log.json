@@ -818,6 +818,118 @@
       "dateTime": "2026-08-16T14:14:00.767964-04:00",
       "description": "**Closed mid-set with a next_orchestrator handover to Session 7.** The Step-8 path-aware critique ran for real against the final code -- two providers, artifact written -- and the producer this session repaired immediately found a real defect in the SET's own prior work: `bar.consecutive: true` is declared in Session 5's isolation criteria and never asserted by its verdict script, which filters interrupted runs out and then merely COUNTS. Verified NOT to change Session 5's recorded PASS (its three clean target runs are indices 1-3, genuinely contiguous), and deliberately not fixed here -- a closed session's deliverable under an open operator ruling. Journaled, and left to the operator or Session 8. **The close itself took an operator adjudication.** The backstop's round 5 raised five Majors saying L1/L2/L4/L5/L6 had no remediation; all five were SCOPING ARTIFACTS, because the backstop anchored at round-4 completion and this session had written its evidence documents afterwards, so the delta it reviewed held twelve files of documentation and ZERO ai_router source. Disputed with deterministic evidence rather than reasoning (C-003) and stopped to the operator rather than re-rounding. The operator authorized one round; round 6, anchored at the session base, returned VERIFIED with 0 findings from the SAME verifier model. Measured routed spend $5.8160; the orchestrator seat and the first critique run are named UNMEASURED rather than zeroed.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "Register. Read the operator notes, and in particular the second note of 2026-08-16.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 2,
+      "stepKey": "show-the-pointer",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Show the pointer.** The diagnosis is already made and does not need repeating \u2014 capture-side cursor drawing is **already on** (`cursor: true` on the OBS window-capture input, `-draw_mouse 1` in the ffmpeg fallback), and nothing ever moved a pointer, because synthesised debug-protocol clicks do not. Two mechanisms, because the two paths fail differently: - **VS Code path:** move the **physical** Windows pointer to the target before each synthesised click, interpolated across a few frames so the recording shows motion rather than teleportation. This **takes over the operator's real mouse** for the length of a capture, so it is opt-in, it announces itself on the console before it starts, and it restores the entry position on every exit path including failure. Never a default; never in the portable core. - **Web path:** draw a **synthetic** pointer into the page, because Chromium's `recordVideo` composites no cursor at all and physical pointer motion would change nothing there. It extends the emphasis injection the web recorder already performs rather than adding a second mechanism. - **Prove it in the artifact, not in the code.** Session 4's discipline: assert that a pointer is *visible in the recorded frames* near the target's bounding box at the moment of the click, and ship the falsifier \u2014 the same check against a recording made with the feature off must fail. A unit test asserting that a flag was passed proves nothing about what a viewer sees. - **Do not expand:** no click ripples, no highlight animations, no cursor theming, no input replay.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 3,
+      "stepKey": "build-the-long-form-recording-pipeline",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Build the long-form recording pipeline** \u2014 capture and time-compression together, because they are one path from a real session to a watchable file, and splitting them across steps would only have split the same work across two logs. - **Capture:** start and stop around a **real** session in a **real** VS Code window, not the Extension Development Host, because the operator is driving the shipped product. One recording per session, named by set and session number. **It observes and nothing more:** it must not write to `session-state.json`, drive the orchestrator, or make a session behave differently because it is being recorded. - **Time compression, derived from the framework's own record.** This is the one place this framework has an advantage over a video editor: a Dabbler session already writes `session-events.jsonl` and `activity-log.json` with real timestamps, so *which stretches were waiting* is **derivable** rather than eyeballed. Emit a **speed-ramp plan** \u2014 segments and rates, as a text artifact \u2014 and apply it with ffmpeg (`setpts`; there is no audio track, which keeps this a one-filter problem). The plan being a file is the point: an edit decision list can be regenerated and reviewed, and a timeline inside an editor cannot. **State the applied compression per segment**, and never compress an interval where something happened.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 4,
+      "stepKey": "author-and-record-the-single-module",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Author and record the single-module tutorial.** A **purpose-built toy project** (operator ruling, 2026-08-16), one module, **three session sets**, each session its own recording \u2014 and it must show **AI helping to author the plan and decompose it into session sets**, which is precisely the half of the lifecycle Set 108's walk could not prove, because an orchestrator cannot drive it. The written walkthrough renders from the Session 2 scenario source as always: the documents stand alone and the video is the enhancement. **Sizing rule, and it is load-bearing:** if a recorded session runs more than about fifteen minutes of wall clock before compression, the toy project is too big. **Shrink the project, not the tutorial** \u2014 dropping steps is how a lifecycle demonstration quietly stops demonstrating the lifecycle.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 5,
+      "stepKey": "publication-safety-pass-before-anything-leaves",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Publication safety pass, before anything leaves the machine.** Every prior recording in this set was for internal review; these are destined for a public URL, and a public video is unrecallable. Check, per video, with a written checklist and a human confirming: window titles, absolute paths, repository and remote names, notification toasts, secrets in terminal output or environment, the cost and model gauges, open browser tabs, the taskbar. **\"Do not publish this one\" is a valid outcome.** Nothing in this session uploads anything.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Required portion of the full test suite** \u2014 this session drives a rendering surface, so Layer 3 is owed (`L-064-12`).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 8,
+      "stepKey": "close-out-mid-set-with-a",
+      "dateTime": "2026-08-16T16:17:07.692027-04:00",
+      "description": "**Close-out**, mid-set, with a `next_orchestrator` handover.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-16T16:17:07.697728-04:00",
+      "description": "Registered session 7 (claude / claude-opus-5).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 2,
+      "stepKey": "show-the-pointer",
+      "dateTime": "2026-08-16T17:11:46.637537-04:00",
+      "description": "WEB PATH DONE AND PROVED. A synthetic pointer is drawn into the page (scripts/pointer.js) and walked to each action's target before the click; Chromium's recordVideo composites no system cursor, so this is the only mechanism that can work there. Proved in the ARTIFACT, not in the code: check-pointer-visible.js crops the recorded frames at the instant before the pointer set off and the instant it arrived, and passes only when the target region changed and a control region did not -- 6 of 6 probes, 5-9% of each crop. The falsifier is a real control: --no-pointer records with IDENTICAL timing and an IDENTICAL probe list and fails on the pixels, 0.00000 at every target. The first version of this check PASSED the control, because both sampled frames straddled the emphasis fade and the typing; fixed by holding the page still around both instants and by deriving the ~200ms gap between the run clock and the video's own zero. VS CODE PATH: the driver half is done and proved, the CAPTURE half turns out to be broken and that was not the diagnosis. The real Windows pointer is now walked to each target, calibrated against the window by measurement rather than by DPI arithmetic (residual 0px, 6 probes); it is opt-in, announces itself, and restores the entry position on every exit path. Three defects found on the way: the driver read its own script from the stdin it needed for commands, its type compilation was still running when the first moves were sent, and real pointer motion goes to whatever window is IN FRONT. But the recorded frames still show no cursor, and measurement says why: OBS window capture on WGC ignores the cursor setting entirely, and BitBlt honours it while black-framing the Electron window. Escalated with evidence rather than fixed by switching backends unmeasured.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 3,
+      "stepKey": "build-the-long-form-recording-pipeline",
+      "dateTime": "2026-08-16T17:11:46.639538-04:00",
+      "description": "TIME COMPRESSION SHIPPED AND PROVED END TO END; the long-form capture harness is blocked behind the same operator decision as step 2. ai_router/speed_ramp.py derives which stretches of a recording were WAITING from session-events.jsonl and activity-log.json -- the framework's own timestamps -- and emits a speed-ramp plan as a reviewable file (segments, rates, and why each one), then applies it with one ffmpeg setpts filter. The invariant is the point and it is built structurally: the real-time intervals are constructed FIRST from a pad around every mark, and quiet is whatever is left, so nothing the record says happened can be inside a compressed segment. Proved on real data (this set's own session 6: 2h58m of record, 29 marks, plans to 6m08s) and applied to a real video (predicted 22.46s, produced 22.52s). 26 falsifiers in ai_router/tests/test_speed_ramp.py, including one that fails if nothing is compressed at all -- otherwise 'no mark was compressed' passes vacuously. The plan states what fraction it is compressing and shouts when that is nearly all of it, because an orchestrator session writes a mark every few minutes and a person reading the screen looks exactly like a suite running.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 4,
+      "stepKey": "author-and-record-the-single-module",
+      "dateTime": "2026-08-16T17:15:37.269242-04:00",
+      "description": "AUTHORED, NOT RECORDED, and the recordings are blocked on a decision that is the operator's rather than on anything left to build. docs/tutorials/single-module-walkthrough.md defines the toy project (`unit-converter`: one module, three session sets, six sessions, one recording each) and it is chosen against three stated requirements -- small enough to finish, big enough that a DECOMPOSITION has something real to decide (temperature breaks the multiply-by-a-factor shape the other two families share), and needing no domain knowledge explained. Set 1 is the set the tutorial exists for: a plan authored WITH the AI and then cut into sets, which is the half of the lifecycle Set 108's walk could not prove. It says on the page that the human must DISAGREE with the first plan on camera -- a recording of a plan being accepted unchanged teaches that the AI is right, which is not what this framework claims. Two things are owed and both are named on the page: a capture backend that draws a cursor (measured, operator's call) and a human driving, because a tutorial showing AI author a plan cannot be scripted. The written walkthrough stands alone with no video, which is spec decision 4 and is why authoring it now is not premature.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 7,
+      "stepNumber": 5,
+      "stepKey": "publication-safety-pass-before-anything-leaves",
+      "dateTime": "2026-08-16T17:15:37.271230-04:00",
+      "description": "docs/walkthroughs/publication-safety-checklist.md: per video, with a human watching the video, covering window titles, absolute paths, repository and remote names, notification toasts, secrets in terminal output and environment, the cost and model gauges, open browser tabs and the taskbar -- plus a BEFORE-you-record half, because most of the list is far cheaper to prevent than to find. 'Do not publish this one' is stated as a valid outcome and needs no justification beyond the finding. Per-video outcomes are recorded as a small JSON record where a `publish` decision with a non-empty findings list must carry a sentence per finding -- that sentence is the whole value of writing it down. It deliberately does NOT scan automatically: a checker that finds nothing is indistinguishable from one that looks for nothing, and a video that has passed a scan invites less human attention than one that has not. Nothing here uploads anything. NOT YET EXERCISED against a real video, because there is no video to run it against.",
+      "status": "complete"
     }
   ]
 }

@@ -1,160 +1,184 @@
 {
-  "status": "completed",
-  "summary": "Session 5 of 8, mid-set: does putting BOTH the target and the capturer inside a container remove the capability risk the operator named on 2026-08-16 -- that a screen recorder is a facility for an AI-driven process to read whatever is on their display -- and what does it cost? MACHINE VERDICT: PASS. Six scored criteria (I1-I6) plus I7 on presence of its required fields, three clean runs, and a fourth run interrupted while capture was OBSERVED producing bytes, excluded from the clean count. Criteria were committed BEFORE the first container run, the harness refuses to run without them and stamps their SHA-256 into every measurement, and the verdict is computed by a separate script that reads the criteria and can produce no measurement of its own -- it refuses to score at all if the stamped digest no longer matches the file. I1 IS THE SESSION. A magenta window was raised and held FOREGROUND on the operator's real desktop for the whole of each container capture: host-pixel fraction in the recordings 0.000000, with the detector proved to fire first at 0.999746 through the identical pipeline. Isolation is also asserted STRUCTURALLY -- the harness builds the run argv and asserts no --privileged, no host net/ipc/pid/userns, no mount of /tmp/.X11-unix, /run/user, /dev/dri, /dev/snd or /dev/video0, and no forbidden env names -- and ZERO bind mounts are used at all, because a bind mount is a hole in the boundary under test; artifacts come out with podman cp afterwards. THE CHEAP MITIGATION DOES NOT DOMINATE, measured first as the spec ordered. OBS's --only-bundled-plugins removes exactly ONE module of twenty-five. What survives is the finding: 24 bundled modules totalling 317 MB including an embedded Chromium (obs-browser/CEF), the DirectShow camera path, the DeckLink SDK, NVIDIA filters, a VST host and a scriptable remote-control server. Every large dependency the Session 4 reservation worried about SHIPS WITH OBS, so a flag that skips non-bundled plugins cannot touch any of them. Both denominators are reported rather than the flattering one: 4% by module count, larger by bytes, so the flag removes the biggest single FILE and none of the biggest RISKS. OBS WAS RUN IN THE CONTAINER, not substituted away. It starts under Mesa software rendering with no GPU device passed in, loads a seeded profile and scene collection, and records -- headless OBS in a container is feasible, which nobody here knew this morning. It did NOT produce a clean capture of the target: with no window manager, --minimize-to-tray has no tray, so OBS renders its GUI onto the display it captures (the first run came out 27% magenta and ~70% OBS), and obs_main_window_mapped is 1 on every run even after unmapping. The scored path is therefore ffmpeg x11grab, and OBS is recorded as feasible-and-unfinished with window suppression as the named next problem -- not as an unexplained instrument mystery, which is a claim this session made and then withdrew on evidence. THE FIDELITY TRADE, named from the runs: the captured window is titled 'Welcome - fixture - Visual Studio Code' on a bare X display with no window manager, so no title-bar controls, no Windows chrome, Linux fonts. The container is the right home for VERIFICATION capture and the wrong home for TRAINING capture, which is exactly the split the operator ruled the same day when they put Sessions 7 and 8 on the host. Endorsed on evidence rather than deference. COST: 1,900 MB image, 56.1 s cold build (--no-cache; `podman rmi` alone keeps the layer cache and reported 2.9 s, which would have shipped as a cold number), 1.9 s warm, 24.4 s container cold start, 12 s capture. --cap-drop=ALL BREAKS THE TARGET, measured: 2 VS Code processes and 0 mapped windows with it, 15 and 4 without, because Chromium's sandbox needs capabilities to build its user namespace. Keeping the flag and passing --no-sandbox was REFUSED -- unsandboxing a browser engine to satisfy a flag is the convenience this session exists to reject -- so the residual is stated: the container runs with Podman's default capability set, plus --network=none and --security-opt=no-new-privileges. The security POLICY is lifted from ai_router/podman_sandbox.py; the plumbing is not, because run_probe_in_container mounts the repo at /repo and a capture container must have no repo mount at all. FIVE VERIFICATION ROUNDS FOUND EIGHT DISTINCT MAJORS, every one accepted, none disputed. The pattern in them is worth more than the list: nearly every finding was this session ASSERTING something instead of OBSERVING it. Three were false passes in this session's own verdict script -- I5 certified the set's cardinal degradation guarantee by scoring three bare podman commands, I6 claimed deterministic cleanup having induced no failure and inspected no files, and I7's required fields were copied rather than checked. Round 2 caught the worst: the plugin probe launched THE OPERATOR'S LIVE OBS CONFIGURATION, which Session 4 had already recorded as carrying a webcam, a microphone and Desktop Audio -- a probe written to measure recorder risk could have initialised the operator's camera to do it. Round 3 rejected two of my fixes for testing themselves: the degradation test called a private helper that always reported success while the documented command aborted with no manifest, and the 'mid-run' failure fired AFTER capture, copying and analysis had all succeeded and was still counted as one of three clean runs. Round 4 rejected the next attempt because the interruption trusted a fixed 22-second timer to mean 'capture is active' against a measurement recording 24.5 s of startup, and because the failure run never raised the headed marker. Round 5 accepted six fixes and found one more: stopping podman-machine-default is a SHARED-RESOURCE side effect that can strand an operator's unrelated containers while the harness publishes 'machine left in entry state' from a VM status string. EACH FIX REPLACED AN ASSUMPTION WITH AN OBSERVATION: a growing capture file polled inside the container, a browser reporting its own disconnection, OBS's log naming the sources it initialised, a --no-cache build rather than a tag deletion, a container inventory compared across the machine stop rather than a status string, and a refusal to stop the machine at all when anything not owned by this harness is running. TWO INSTRUMENT DEFECTS THIS SESSION FOUND IN ITSELF are kept in the record because each produced a clean-looking result worth nothing: the positive control FAILED OPEN -- xsetroot returned exit 0 and captured an all-black screen, because the X server resets when its last client disconnects -- and a fact parser silently dropped host_x11_socket_present, the fact I4 most needs, because its regex could not match digits. The verdict now requires each I4 fact to be OBSERVED rather than merely un-contradicted. WHAT THIS DOES NOT ESTABLISH, stated rather than left to be assumed: the extension is INSTALLED and VS Code runs with it, which is not activation and not rendering -- nobody has looked at the Work Explorer's tree under software rendering. Nothing about Windows display scaling (a virtual display has one fixed geometry, and I3 deliberately dropped Session 4's scaling claim). Nothing about tutorial-length recordings: runs are 12 seconds. And no first-build cost on a clean machine, since no registry pull was measured. SUITES: pytest 4986 passed / 5 skipped / 1 xfailed, mocha 1548 passed, Layer 3 37 passed, all recorded after the last change. ONE ITEM IS OPEN AND IT IS THE OPERATOR'S. Rounds 4 and 5 ran on their explicit authorization of 'up to two more', and that is spent. Round 5's finding is REMEDIATED BUT UNREVIEWED: no verifier has judged the refusal-based fix to the shared-machine hazard. The loop is SUSPENDED and this session does not have the authority to settle it -- self-authorizing another round is precisely what the bound exists to prevent. Accept, dismiss, or authorize one more round.",
-  "verification_method": "api",
-  "verification_verdict": "ISSUES_FOUND",
-  "verification_message_ids": [],
-  "files_changed": [
-    "ai_router/changelog.d/0013-set-113-s4-os-capture-pilot.md",
-    "docs/proposals/2026-08-15-set-113-follow-on-reservations.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/activity-log.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/change-log.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/checklist-posts.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/decisions.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/disposition.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-acceptance-round-1.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-acceptance-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-conventions.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-ffmpeg-fallback-measurement.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues-round-3.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues-round-4.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-issues.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-os-capture-measurement.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-os-capture-outcome.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-pilot-criteria.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-pilot-criteria.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-remediation-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-rounds.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-step9-guidance-review.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-uat-walk.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-fanout-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-round-3.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification-round-4.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s4-verification.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/session-events.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/session-state.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/test-runs.jsonl",
-    "docs/walkthroughs/README.md",
-    "docs/walkthroughs/work-explorer-first-look/scenario.yaml",
-    "tools/dabbler-ai-orchestration/package.json",
-    "tools/dabbler-ai-orchestration/scripts/measure-ffmpeg-fallback.js",
-    "tools/dabbler-ai-orchestration/scripts/measure-os-capture.js",
-    "tools/dabbler-ai-orchestration/scripts/obs-capture.js",
-    "tools/dabbler-ai-orchestration/scripts/obs-websocket-client.js",
-    "tools/dabbler-ai-orchestration/scripts/os-capture-verdict.js",
-    "tools/dabbler-ai-orchestration/scripts/png-metrics.js",
-    "tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js",
-    "tools/dabbler-ai-orchestration/src/test/suite/osCaptureRecorder.test.ts"
-  ],
-  "blockers": [],
-  "residuals": [
-    "ADJUDICATED AT THE BOUND, OWNER: operator. Round 6 rejected the post-capture-step evidence as self-certifying (the degraded path wrote postCaptureStep: \"ran\" and the parent read that same field back). It is FIXED -- the step now renders a standalone walkthrough document on the degraded path and the parent derives the fact from that FILE (marker comment, list items, size floor), measured at 454/581/448 bytes across the three declared variants -- and the fix is UNREVIEWED, because the authorized rounds are spent. Strictly better than what was rejected; not independently confirmed.",
-    "OBS in the container is feasible and unfinished: it runs, renders under Mesa software rendering and records, but its own window stays mapped on the display it captures (obs_main_window_mapped: 1 on every run), so no clean OBS capture of the target was obtained. Window suppression is the named next problem.",
-    "The Dabbler extension is INSTALLED and VS Code runs with it; activation and Work Explorer RENDERING under Linux software rendering are unobserved and unmeasured.",
-    "The container runs with Podman default capabilities. --cap-drop=ALL was measured to break Chromium sandbox setup (2 VS Code processes and 0 mapped windows, against 15 and 4) and the --no-sandbox workaround was refused.",
-    "Layer 3 reuse remains partial: the harness drives Podman directly rather than through the existing Layer 3 machinery, and round 6 recorded that as accepted-with-modification rather than resolved.",
-    "No first-build cost on a clean machine: the cold build uses --no-cache but the base image was already local, so no registry pull is included.",
-    "Runs are 12 seconds. A tutorial-length capture inside a container is unmeasured.",
-    "s5-obs-container-measurement.json is retained as raw OBS evidence in a SUPERSEDED shape; its stale fields are named inside the file itself and it is never scored."
-  ],
-  "next_orchestrator": {
-    "engine": "claude",
-    "provider": "anthropic",
-    "model": "claude-opus-5",
-    "effort": "high",
-    "reason": {
-      "code": "same-engine-continuity",
-      "specifics": "Session 6 diagnoses why the advisory path-aware critique could not reach two providers, and the sharpest fact is already known: the SAME openai models answered five session-verification calls in Session 4 without trouble, so the ordinary routed path works and the pull-critique path does not -- the difference between the two transports is where the answer is. Keep the same engine and effort: this is a transport diagnosis against a cross-provider verifier, so the orchestrator must stay on a provider the verifier excludes, and anthropic is what the registry excludes today. BEFORE STARTING, adjudicate this session's open blocker or carry it forward explicitly -- round 5's Major is remediated but unreviewed and the loop is suspended. AND NOTE THE SET GREW: Session 8 is now set-terminal and owes change-log.md, the Step 9 review, and the UAT accounting for all SEVEN declared components -- including one record that must not default to 'none', because the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched'."
-    },
-    "carried_forward": {
-      "recommendation": "Session 6: diagnose why the advisory path-aware critique could not reach two providers. Start from the sharpest fact, which is already known -- the same openai models answered five session-verification calls in Session 4 without trouble, so the ordinary routed path works and the pull-critique path does not, and the difference between the two transports is where the answer is.",
-      "before_starting": "Adjudicate this session's open blocker first, or carry it forward explicitly. Session 8 is now the set-terminal session and owes change-log.md, the Step 9 review and the UAT accounting for all seven declared components -- including a record that must NOT default to none: the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched'."
-    }
-  },
-  "lessons_cited": [
-    "L-079-1",
-    "L-064-12"
-  ],
-  "cost": {
-    "components": [
-      {
-        "component": "orchestrator_seat",
-        "status": "unknown",
-        "credits": null,
-        "usd": null,
-        "event_count": 0,
-        "session_ids": [],
-        "measured_session_ids": [],
-        "unmeasured_session_ids": [],
-        "reason": "no conversation ids supplied; nothing to measure (this is not zero)"
-      },
-      {
-        "component": "routed_seat",
-        "status": "not_applicable",
-        "credits": 0.0,
-        "usd": 0.0,
-        "event_count": 0,
-        "session_ids": [],
-        "measured_session_ids": [],
-        "unmeasured_session_ids": [],
-        "reason": "declared not applicable by the caller"
-      },
-      {
-        "component": "routed_api",
-        "status": "unavailable",
-        "credits": null,
-        "usd": null,
-        "event_count": 0,
-        "session_ids": [],
-        "measured_session_ids": [],
-        "unmeasured_session_ids": [],
-        "reason": "7 Direct-API calls are recorded for this session; their cost is authoritative in ai_router/router-metrics.jsonl (cost_usd, in dollars) and is not restated here in AI credits. In dollars they sum to $2.9602: two planning calls for the Step 3.5 assignment analysis ($0.0107 + $0.0114) and five session-verification calls ($2.9381). ONE OF THE TWO PLANNING CALLS BOUGHT NOTHING and is named rather than netted out -- the first attempt read an attribute the RouteResult does not carry and lost its own output, which is L-079-1's persist-before-printing rule paid for a second time. The five verification calls are rounds 1 (two-lens discovery fan-out), 2 (supplementary) and 3-4 (remediation review)."
-      }
-    ],
-    "total_status": "unknown",
-    "total_credits": null,
-    "total_usd": null,
-    "unmeasured": [
-      "orchestrator_seat",
-      "routed_api"
-    ],
-    "store_schema_version": 6,
-    "measured_at": "close"
-  },
-  "uat": {
-    "attestation": "Written by the orchestrator, not by the operator, and it records that fact rather than substituting for it. NO HUMAN HAS REVIEWED ANY COMPONENT of this set. Four entries are method 'none' with their own attestations, and the fifth is 'not-applicable' because Session 5 has not created it yet; which Session 1 made a valid and passing answer on the operator's ruling of 2026-08-10 -- the gate demands an accounting, not a walk. What this set can honestly claim is automated evidence: 4986 pytest, 1548 mocha and 37 Layer 3 tests green, a browser recording proved with a control in Session 3, and 24 OS captures measured against criteria fixed before the first one. What it cannot claim is that anybody looked. The guided look is written and offered; whether to spend ten minutes on it is the operator's decision.",
-    "components": [
-      {
-        "component": "Rendered walkthrough and training document",
-        "method": "none",
-        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. Automated evidence in place of a reviewer: scenario_render --check gates all four renderings against a digest of the portable half, and Session 4 rewrote the quarantined driver block entirely while leaving every generated document byte-identical -- so the divergence claim is proved rather than asserted."
-      },
-      {
-        "component": "Static generated index",
-        "method": "none",
-        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. Automated evidence: every one of the 24 pilot captures produced an index, and both degraded paths were exercised by running them -- --no-video, and three induced capture failures -- each yielding an index that says there is no recording rather than looking broken. Whether it READS well is exactly what a human would add, and is item 2 of the guided look."
-      },
-      {
-        "component": "Recorded web scenario",
-        "method": "none",
-        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. Session 3's component, unchanged by Session 4. Its premise was measured with a control (measure-browser-record.js exits non-zero if browser recordVideo ever stops working), and its captions were verified empirically over file://. No human has watched the result."
-      },
-      {
-        "component": "Windows OS-capture pilot",
-        "method": "none",
-        "attestation": "No human has reviewed this component. Session 1's schema closes the reviewer-type vocabulary to developer and business-user precisely so that AI activity cannot be recorded as human review, and this session was driven entirely by the orchestrator -- so 'none' is the only truthful method. The guided look (s4-uat-walk.md) is written, is under ten minutes, and points at recordings already on the operator's machine; committing the operator's time is not this session's call. The most heavily automated component and still unreviewed by a person: 24 captures across two rounds against criteria committed before the first one, with controls, plus a measured ffmpeg fallback. The one thing the instruments cannot cover is whether the video is FOLLOWABLE -- C1 measures OBS's capture source, not the encoded file -- and that is item 1 of the guided look."
-      },
-      {
-        "component": "Containerised capture path",
-        "method": "not-applicable",
-        "attestation": "The component does not exist yet. It was added to the inventory on 2026-08-16 with Session 5, which is the session that will create it -- the entry is here so the terminal session cannot close over it, which is the whole point of an inventory-driven gate. 'not-applicable' rather than 'none' is the accurate word: review would not have bought anything, because there is nothing to review."
-      }
-    ]
-  },
-  "checklist": {
-    "status": "waived",
-    "attestation": "Session 5 posted the step checklist at session start, at the operator stops, and before close, but missed the post-run window on four test-run-recorded transitions and one last-logged-step transition. The gate is explicit that a window already passed cannot be re-entered and that a silent retry is not the exit, so this is recorded as a waiver rather than back-filled. No decision was taken inside the missed windows: each was a suite result being recorded, and the suite results themselves are in test-runs.jsonl with their digests. Waived by the orchestrator under the operator direction of 2026-08-16 to close on the attested path; the omission is bookkeeping, and it is named here rather than left as an unexplained advisory."
+ "status": "completed",
+ "summary": "Diagnosed why Session 4's advisory path-aware critique produced no artifact across three attempts, and fixed it: the critique now reaches two providers, proven live. The three attempts looked like one flaky provider and were TWO unrelated router-side defects on the same stage, with two more found on the way. (1) pull_verifier sent router-registry ALIASES where providers expect their own ids -- route() resolves models[alias].model_id at every call site and this executor did not -- so `gpt-5-6-sol` returned HTTP 400 model_not_found while the same body shape with `gpt-5.6-sol` returned 200. It struck openai alone because OpenAI's ids carry dots where the registry keys carry dashes; `gemini-2.5-pro` is both a valid alias and a valid API id, which is why google succeeded 3-for-3 and nothing looked router-shaped. The same gap had silently unbound cost_ceiling_usd, because _pricing_for matches on model_id. (2) The servant-integrity guard was NOT working correctly: DeterministicServant.run delegates to the very function the guard re-derives with, so it cannot summarize, and on the live repo root pull_critique reviews, a mismatch only ever meant the tree moved. Reproduced with the honest servant, same error text byte for byte. The guard is narrowed, never weakened -- it classifies on servant IDENTITY (exact type), fails closed by default, and a dishonest servant on a stable tree still aborts the run. (3) raise_for_status discarded the provider's error body, which is why three attempts never saw the one sentence naming the cause; all three bindings now raise BindingHTTPError carrying it, redacted. (4) pull_critique wrote no metrics row at all, so a set could spend on critiques and report zero; it now ledgers every arm, including arms that billed and then raised. Both live proof runs succeeded: the config default (the arm that raised DeterministicServantViolation in S4) and the exact alias that returned HTTP 400. 38 falsifiers; every fix and remediation mutation-tested, eight mutants injected and all eight caught.",
+ "verification_method": "api",
+ "verification_verdict": "VERIFIED",
+ "verification_message_ids": [],
+ "files_changed": [
+  "ai_router/__init__.py",
+  "ai_router/changelog.d/0014-set-113-s6-pull-critique-transport.md",
+  "ai_router/pull_critique.py",
+  "ai_router/pull_verifier.py",
+  "ai_router/tests/conftest.py",
+  "ai_router/tests/test_metrics.py",
+  "ai_router/tests/test_pull_critique.py",
+  "ai_router/tests/test_pull_verifier.py",
+  "docs/session-sets/113-narrated-video-walkthroughs/activity-log.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/ai-assignment.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/checklist-posts.jsonl",
+  "docs/session-sets/113-narrated-video-walkthroughs/decisions.jsonl",
+  "docs/session-sets/113-narrated-video-walkthroughs/disposition.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/path-aware-critique.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-acceptance-round-1.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-acceptance-round-2.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-acceptance-round-3.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-conventions.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-critique-proof.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-issues-round-2.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-issues-round-3.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-issues.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-outcome.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-remediation-round-1.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-remediation-round-2.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-remediation-round-3.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-reproduction-measurement.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-reproduction.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-rounds.jsonl",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-verification-fanout-2.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-verification-round-2.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-verification-round-3.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-verification-round-4.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/s6-verification.md",
+  "docs/session-sets/113-narrated-video-walkthroughs/session-events.jsonl",
+  "docs/session-sets/113-narrated-video-walkthroughs/session-state.json",
+  "docs/session-sets/113-narrated-video-walkthroughs/test-runs.jsonl"
+ ],
+ "blockers": [],
+ "residuals": [
+  "OWNED BY THE OPERATOR OR SESSION 8: `bar.consecutive: true` is declared in s5-isolation-criteria.json and never asserted by tools/dabbler-ai-orchestration/scripts/container-isolation-verdict.js, which filters interrupted runs out and then merely COUNTS. Found by this session's own Step-8 path-aware critique (openai arm, Major; google returned VERIFIED). VERIFIED NOT to change Session 5's recorded PASS: its three clean target runs are indices 1, 2 and 3, genuinely contiguous, with the interrupted run at index 4 after them. Deliberately not fixed here -- a closed session's deliverable, under an open operator ruling, and this session's remediation bound is spent so the change would ship unreviewed. Journaled.",
+  "The review sandbox has NO exclusions and is enormous: _walk_files over the default sandbox (the git repo root) returns 62,084 files / 5,594.7 MB, with tools/ alone at 5.4 GB and .git and .venv walked and read as text. An unscoped grep -- the default is path '.' -- reads all of it into memory and JSON-encodes it onto a subprocess stdin inside a 5-second hard timeout. Scoped greps measured 1.4-2.1s against that same budget, so the margin is thin and undeclared. Not bitten yet because critics scope their probes. OWNER: a follow-on; it is a capability change, not a transport fix.",
+  "The pull bindings do not capture the provider's echoed model, so critique ledger rows carry served_model_id: null -- the schema's honest 'not captured' rather than the assumed match the first version wrote. Wiring the served id through BindingResponse and all three _from_response methods is a real change to the response path and was deliberately not made under remediation. OWNER: a follow-on.",
+  "SandboxNotQuiescent CONTINUES the run rather than aborting it. Journaled as an AI judgment with the tension named: a reviewer could read the continue-past as a verification reduction. Cross-provider verification did not dispute the judgment -- it found that the first implementation did not deliver it. Named for the operator as auditor: if a moving tree should kill a critique instead of annotating it, the classification already exists and only the loop's handling changes.",
+  "The FIRST live critique run predates the accounting fix and therefore wrote no ledger row of its own. Its cost is UNMEASURED, not zero, and is excluded from the totals below rather than guessed at.",
+  "re2 is absent on this seat, so every grep in the pull loop takes the subprocess-worker path rather than the inline linear-time one. It widens the window in which a tree can move; it is not the cause of anything found here. Unowned.",
+  "PROCESS, not product: making both proof runs --dry-run cost this session a third paid critique, because the findings of the first two were never written to disk. The second run should have written the artifact."
+ ],
+ "next_orchestrator": {
+  "engine": "claude",
+  "provider": "anthropic",
+  "model": "claude-opus-5",
+  "effort": "high",
+  "reason": {
+   "code": "continue-current-trajectory",
+   "specifics": "Session 7 is 'Show the pointer, then record the single-module tutorial', and THE ORDER IS A REQUIREMENT, not a preference (operator, 2026-08-16): the pointer fix lands BEFORE recording or the tutorial is recorded twice. Keep the same engine and effort -- the orchestrator must stay on a provider the cross-provider verifier excludes, and anthropic is what the registry excludes today. WHAT SESSION 7 SHOULD KNOW BEFORE IT STARTS: cursor capture is already ON (obs-capture.js passes cursor: options.captureCursor !== false, and the pilot never passes the flag), so the defect is NOT capture -- nothing MOVES the pointer, because Playwright's locator.click() synthesises input through the debug protocol and never touches the real Windows pointer. Two different fixes: move the physical pointer on the VS Code path, draw a synthetic one into the page on the web path, because Chromium's recordVideo does not composite a cursor at all. Moving the physical pointer TAKES OVER the operator's actual mouse for the length of a capture: opt-in, and announced in the console before it starts. Record the HOST, not the container, against purpose-built toy projects -- never the operator's real repositories, because the destination is public. Sessions 7 and 8 are downstream of NO Session 5 outcome. AND NOTE: Session 8, not 7, is set-terminal and owes change-log.md, the Step 9 review, and the UAT accounting for all SEVEN declared components -- including one that must NOT default to 'none', because the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding: a developer, count 1, method 'watched'."
   }
+ },
+ "lessons_cited": [
+  "L-112-1",
+  "G-008",
+  "G-005",
+  "G-012",
+  "G-013"
+ ],
+ "cost": {
+  "components": [
+   {
+    "component": "orchestrator_seat",
+    "status": "unknown",
+    "credits": null,
+    "usd": null,
+    "event_count": 0,
+    "session_ids": [],
+    "measured_session_ids": [],
+    "unmeasured_session_ids": [],
+    "reason": "no conversation ids supplied; nothing to measure (this is not zero)"
+   },
+   {
+    "component": "routed_seat",
+    "status": "not_applicable",
+    "credits": 0.0,
+    "usd": 0.0,
+    "event_count": 0,
+    "session_ids": [],
+    "measured_session_ids": [],
+    "unmeasured_session_ids": [],
+    "reason": "declared not applicable by the caller"
+   },
+   {
+    "component": "routed_api",
+    "status": "unavailable",
+    "credits": null,
+    "usd": null,
+    "event_count": 0,
+    "session_ids": [],
+    "measured_session_ids": [],
+    "unmeasured_session_ids": [],
+    "reason": "6 Direct-API calls carry session_number 6 and sum to $1.7117 -- the four verification rounds ($1.7012: a two-call discovery fan-out, the supplementary pass, and two remediation-review cycles) plus the Step 3.5 assignment analysis ($0.0104). THE GENERATOR CANNOT SEE THE REST. Four further rows sit under session_set 113-narrated-video-walkthroughs with NO session_number and sum to $3.1437: the two live critique proof runs (openai/gpt-5.6-sol $1.3294 -- the alias that used to return HTTP 400 -- and google/gemini-2.5-pro $0.6782) and the Step 8 path-aware critique (openai/gpt-5.4 $0.9397, google/gemini-2.5-pro $0.1964). They are unattributed BY DESIGN, and the design is this session's own accounting fix: pull_critique runs per SET, so inventing a session number would attribute spend to a session that may not have made it. A per-set reader finds them; a per-session reader does not, and that is the honest trade rather than an oversight. MEASURED TOTAL FOR THIS SESSION: $4.8554. Two components remain UNMEASURED and are not zero: the orchestrator seat (no conversation ids supplied), and the FIRST live critique run, which predates the accounting fix landing and therefore wrote no row at all."
+   }
+  ],
+  "total_status": "unknown",
+  "total_credits": null,
+  "total_usd": null,
+  "unmeasured": [
+   "orchestrator_seat",
+   "routed_api"
+  ],
+  "store_schema_version": 6,
+  "measured_at": "close"
+ },
+ "uat": {
+  "attestation": "Session 6 is a router-internal transport diagnosis. It creates NO human-observable surface: its deliverables are a reproduction, a diagnosis, four fixes inside ai_router/, 38 falsifiers, and the evidence documents. None of the seven declared uatComponents was touched by it, so every one is recorded 'not-applicable' for THIS session rather than 'none' -- 'none' would claim a reviewable surface existed and nobody looked, which is not what happened. The set-terminal accounting is Session 8's under uatScope: per-set, and the spec says so in Session 6 step 8. ONE THING SESSION 8 MUST NOT DEFAULT TO 'none': the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched' against the Windows OS-capture pilot -- recorded in operator-notes.md so it does not evaporate. What THIS session can claim instead of a reviewer is automated evidence: 5021 pytest, 1548 mocha and 37 Playwright tests green after the last code change, every fix mutation-tested, and a cross-provider VERIFIED verdict that found and closed six Majors first.",
+  "components": [
+   {
+    "component": "Rendered walkthrough and training document",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   },
+   {
+    "component": "Static generated index",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   },
+   {
+    "component": "Recorded web scenario",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   },
+   {
+    "component": "Windows OS-capture pilot",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   },
+   {
+    "component": "Containerised capture path",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   },
+   {
+    "component": "Single-module tutorial recording set",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   },
+   {
+    "component": "Multi-module tutorial recording set",
+    "method": "not-applicable",
+    "reviewers": [],
+    "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+    "findings": [],
+    "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+   }
+  ]
+ },
+ "carried_forward": {
+  "recommendation": "Session 7: fix the mouse pointer FIRST, then record the single-module tutorial. The pointer is captured but never moved -- Playwright synthesises clicks through the debug protocol and never touches the real Windows pointer.",
+  "before_starting": "Read the operator note of 2026-08-16 ('The recordings work; show the pointer, and make two tutorials'). The physical-pointer path takes over the operator's mouse and must be opt-in and announced. Record the Windows host against toy projects; the destination is public."
+ }
 }

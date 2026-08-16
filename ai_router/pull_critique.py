@@ -118,6 +118,128 @@ class PullCritiqueError(Exception):
     """The producer could not assemble a valid multi-provider artifact."""
 
 
+# The ledger call_type for a path-aware critique arm. A distinct value on
+# purpose: report.py filters by explicit type, so these rows cannot be
+# double-counted into the route / verify / tiebreaker breakdowns, while still
+# landing in the by-task totals -- which is correct, the spend is real.
+CRITIQUE_CALL_TYPE = "critique"
+CRITIQUE_TASK_TYPE = "path-aware-critique"
+
+
+def _record_failed_arm(config, sink, provider, model, set_dir, exc) -> None:
+    """Ledger an arm that RAISED, when it had already billed something.
+
+    Set 113 S6 round-1 verification, finding 2: recording only on the success
+    path meant a provider that returned several billable turns and then died -
+    on a servant violation, a verdict-schema failure, a later-turn HTTP error -
+    contributed real dollars and zero rows. That is the failing-arm class this
+    session exists to diagnose, so it is exactly the spend most likely to be
+    under-reported.
+
+    Writes nothing when the arm billed nothing: a run that failed before any
+    response must not have zero-cost spend invented for it, which would be the
+    opposite error.
+    """
+    trace = sink[0] if sink else None
+    if trace is None:
+        return
+    billed = (
+        getattr(trace, "input_tokens", 0)
+        or getattr(trace, "output_tokens", 0)
+        or getattr(trace, "cost_usd", 0.0)
+    )
+    if not billed:
+        return
+    # Round-3 finding: the resolved model comes off the TRACE, which pull_route
+    # stamps before it drives anything. The earlier version read an optional
+    # `pull_model` attribute off the exception -- a channel that does not exist
+    # for the failures this path was built for (a guard-raised
+    # DeterministicServantViolation and a BindingHTTPError both know nothing
+    # about model resolution), so an unpinned arm recorded "(unresolved)" and a
+    # pinned one recorded the caller's alias as the id sent on the wire.
+    resolved = getattr(trace, "resolved_model", "") or model or "(unresolved)"
+    failed = _FailedArm(
+        provider=getattr(trace, "provider", "") or provider,
+        model=resolved,
+        trace=trace,
+    )
+    _record_critique_call(config, failed, set_dir, requested=model or resolved)
+
+
+class _FailedArm:
+    """The shape :func:`_record_critique_call` reads, for an arm that raised.
+
+    Deliberately NOT a PullResult: there is no critique, and constructing a
+    half-valid PullResult would let a failed arm be mistaken for a finished one
+    somewhere downstream.
+    """
+
+    __slots__ = ("provider", "model", "trace", "critique")
+
+    def __init__(self, provider, model, trace):
+        self.provider = provider
+        self.model = model
+        self.trace = trace
+        self.critique = None
+
+
+def _record_critique_call(config, result, set_dir, requested=None) -> None:
+    """Append one router-metrics row for a finished critique arm.
+
+    Mirrors :func:`record_call`'s own contract: never raise. A metrics failure
+    must not cost the caller a completed, paid critique - the artifact is the
+    deliverable and the ledger row is bookkeeping about it.
+
+    Session number is deliberately NOT guessed. The producer is invoked per
+    SET, and inventing a session for the row would attribute spend to a session
+    that may not have made it; ``session_set`` alone is honest and is what the
+    per-set cost readers key on.
+    """
+    try:
+        try:
+            from .metrics import record_call
+        except ImportError:  # pragma: no cover - test/bare context
+            from metrics import record_call  # type: ignore
+        trace = result.trace
+        record_call(
+            config or {},
+            call_type=CRITIQUE_CALL_TYPE,
+            task_type=CRITIQUE_TASK_TYPE,
+            model=requested or result.model,
+            provider=result.provider,
+            tier=0,
+            complexity_score=None,
+            generation_params={},
+            input_tokens=trace.input_tokens,
+            output_tokens=trace.output_tokens,
+            cost_usd=trace.cost_usd,
+            elapsed_seconds=trace.wall_seconds,
+            escalated=False,
+            stop_reason=trace.stop_reason,
+            session_set=str(set_dir),
+            verdict=(
+                result.critique.verdict if result.critique is not None else None
+            ),
+            issue_count=(
+                len(result.critique.findings)
+                if result.critique is not None
+                else None
+            ),
+            # Set 113 S6 round-2 finding 1: match route()'s own convention
+            # rather than inventing one. `model` is the name the CALLER asked
+            # for (an alias, when they pinned one), `requested_model_id` is the
+            # resolved id actually put on the wire, and `served_model_id` is
+            # left NULL because this executor does not capture the provider's
+            # echoed model. Null is the schema's honest "not captured"; the
+            # first version set it to the id we sent, which made
+            # `served_model_mismatch` compute False and assert a match nobody
+            # had observed -- exactly the claim a drift audit would trust.
+            requested_model_id=result.model,
+        )
+    except Exception:  # noqa: BLE001 - bookkeeping never breaks the run
+        pass
+
+
 @dataclass
 class ProducerResult:
     """Outcome of :func:`produce_path_aware_critique`."""
@@ -493,6 +615,12 @@ def produce_path_aware_critique(
 
     for provider, model in providers:
         label = f"{provider}/{model or '(config default)'}"
+        # Set 113 S6 (round-1 finding 2): hold the live trace so an arm that
+        # dies AFTER billing is still ledgered. Without this the exception
+        # branch below discarded the usage along with the result, and the
+        # failing arms -- the exact class this session is diagnosing -- were
+        # the ones that silently disappeared from the set's cost total.
+        sink: List[object] = []
         try:
             result = run_pull(
                 sandbox_dir,
@@ -505,11 +633,20 @@ def produce_path_aware_critique(
                 diff_config=diff_config,
                 probe_template_config=probe_template_config,
                 podman_lane_config=podman_lane_config,
+                trace_sink=sink,
             )
         except Exception as exc:  # a provider failure must not abort the others
             skipped.append(f"{label}: run raised {type(exc).__name__}: {exc}")
+            _record_failed_arm(config, sink, provider, model, set_dir, exc)
             continue
         results.append(result)
+        # Set 113 S6: LEDGER THE SPEND. Set 113 S4's three critique runs wrote
+        # no row to router-metrics.jsonl at all, so a set could spend on
+        # critiques and report zero -- which is the one thing the cost schema
+        # exists to prevent, and that session had to disclose the hole in prose
+        # instead of measuring it. Recorded here rather than inside pull_route
+        # so the injection seam (run_pull) stays a pure function in tests.
+        _record_critique_call(config, result, set_dir, requested=model)
         if not result.ok or result.critique is None:
             why = (
                 "zero tool calls (no probe ran)"

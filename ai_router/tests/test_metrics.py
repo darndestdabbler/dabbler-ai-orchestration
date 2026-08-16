@@ -574,3 +574,58 @@ def test_transport_session_ids_selects_by_set_and_session(tmp_path, monkeypatch)
         "docs/session-sets/130-orchestrator-seat-cost-capture", None
     ) == ["child-1", "child-2", "other-session"]
     assert metrics_mod.transport_session_ids("129-other", None) == ["other-set"]
+
+
+# ===========================================================================
+# Set 113 S6: the suite must not append to the shipped ledger.
+# ===========================================================================
+
+
+class TestShippedLedgerIsIsolatedFromTheSuite:
+    """Falsifier for the conftest guard (L-112-1).
+
+    Set 113 S6 added critique accounting to ``pull_critique`` and three
+    ordinary test runs put 105 fake rows into the developer's own
+    ``router-metrics.jsonl``. A guard that stops protecting reads exactly like
+    a guard that is working, so this asserts the resolved default is somewhere
+    other than the shipped file.
+    """
+
+    def test_default_metrics_path_is_not_the_shipped_ledger(self):
+        import metrics as m
+
+        shipped = Path(m.__file__).parent / "router-metrics.jsonl"
+        assert m._log_path({}) != shipped
+
+    def test_a_write_with_no_config_lands_outside_the_package(self):
+        import metrics as m
+
+        m.record_call(
+            {},
+            call_type="critique",
+            task_type="path-aware-critique",
+            model="fake-model",
+            provider="openai",
+            tier=0,
+            complexity_score=None,
+            generation_params={},
+            input_tokens=1,
+            output_tokens=1,
+            cost_usd=0.0,
+            elapsed_seconds=0.1,
+            escalated=False,
+            stop_reason="verdict",
+        )
+        shipped = Path(m.__file__).parent / "router-metrics.jsonl"
+        if shipped.exists():
+            body = shipped.read_text(encoding="utf-8")
+            assert "fake-model" not in body
+
+    def test_a_test_that_sets_its_own_path_still_wins(self, tmp_path, monkeypatch):
+        # THE LEGITIMATE LOOK-ALIKE: the guard must not override a test that
+        # deliberately points the ledger somewhere of its own.
+        import metrics as m
+
+        mine = tmp_path / "mine.jsonl"
+        monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(mine))
+        assert m._log_path({}) == mine

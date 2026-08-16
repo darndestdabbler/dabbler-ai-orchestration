@@ -1,0 +1,14 @@
+ISSUES FOUND
+
+- **Issue 1: Critique metrics fabricate requested and served model provenance**
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `ai_router/pull_critique.py, ai_router/pull_verifier.py, ai_router/tests/test_pull_critique.py, docs/session-sets/113-narrated-video-walkthroughs/s6-critique-proof.json`
+  - **Failure scenario:** A critique is invoked with a normal registry alias such as `gpt-5-6-sol`. `_resolve_model` changes it to `gpt-5.6-sol`, after which `_record_critique_call` writes that same resolved value as `model`, `requested_model_id`, and `served_model_id`. Thus every alias-based critique loses what the caller requested, while `served_model_id` claims an identity that was never obtained from the provider response. This is probable because registry aliases are the exact main-path configuration fixed by this session. Any model-drift audit using these fields can incorrectly conclude that requested and served models matched.
+  - **Acceptance criterion:** `JUDGMENT - For an alias-based critique, a reviewer must see the ledger preserve the original requested alias separately from the resolved outbound provider model, and must see served_model_id populated only from provider-returned model metadata or left explicitly unknown when unavailable.`
+  - **Details:** **Violation:** The tests and session evidence claim that the ledger records “the id the provider actually serves,” but `_record_critique_call` sets both `requested_model_id` and `served_model_id` to `result.model`; `result.model` is the value produced by router-side `_resolve_model`, not independently observed provider metadata. **Impact:** The newly added production ledger rows provide false model provenance and can defeat the model-drift gate the response explicitly says remains reliable. That changes the merge decision because accurate accounting was presented as a shipped fix, not best-effort logging. **Evidence:** `_registry_model_id` transforms the alias before execution, while `_record_critique_call` has no access to either the original alias or a provider-reported served model and nevertheless records both identities as the transformed value. The corresponding test only asserts the single `model` field and does not falsify either provenance error. The correct implementation must carry the original request identity and actual response identity separately.
+
+## NITS
+
+- **Nit:** `_raise_for_status_with_body` returns successfully for every status below 400, unlike `httpx.Response.raise_for_status()`, which raises for redirects and informational responses. A 3xx provider/proxy response therefore falls through to `resp.json()` and usually becomes a misleading parse failure instead of preserving the status and body.
+- **Nit:** `s6-outcome.md` claims “23 new tests,” but the shown diff adds 25 test functions: 3 in `test_metrics.py`, 4 in `test_pull_critique.py`, and 18 in `test_pull_verifier.py`.

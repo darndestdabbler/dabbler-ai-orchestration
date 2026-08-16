@@ -666,6 +666,150 @@
       "dateTime": "2026-08-16T08:12:48.027839-04:00",
       "description": "CORRECTED RE-LOG, superseding this step description written before remediation. The earlier text said OBS was not run and the Dabbler extension was not installed; both are now false. OBS 30.2.3.1 IS installed in the image and run inside the container under Mesa software rendering with no GPU device passed in, and the published 0.51.0 VSIX IS installed and asserted (darndestdabbler.dabbler-ai-orchestration) against a Dabbler-shaped fixture workspace. OBS starts, renders and records; it did NOT produce a clean capture of the target because its own window stays mapped on the display it captures (obs_main_window_mapped: 1 on every run), so the scored path is ffmpeg and OBS is recorded as feasible-and-unfinished with window suppression as the named next problem. What the extension evidence does NOT establish, stated precisely: installation and a mapped window are not activation, and neither is rendering. Final verdict PASS - six scored criteria (I1-I6) plus I7 on presence, three clean runs, and a fourth run interrupted at 25s while capture was OBSERVED producing bytes, excluded from the clean count. Five verification rounds, eight distinct Majors, all remediated; the last one found that stopping the shared Podman machine could strand an operator unrelated workloads, so the variant now refuses to run when any container outside this harness is running and demonstrates restoration by comparing the container INVENTORY rather than the VM status string.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "reproduce-both-failures-before-changing-anything",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Reproduce both failures before changing anything.** (a) The default openai critic raised `DeterministicServantViolation` \u2014 *\"grep: tool result does not match raw ground truth\"* \u2014 the servant-integrity guard refusing a critic that paraphrased tool output instead of reporting its bytes. (b) Pinned to `gpt-5-6-sol` and then `gpt-5-5`, openai returned **HTTP 400** from `https://api.openai.com/v1/responses`.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "start-from-the-sharpest-fact-which",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Start from the sharpest fact, which is already known.** The *same* openai models answered five `session-verification` calls in Session 4 without trouble. So the ordinary routed path works and the pull-critique path does not \u2014 this is a router-side defect, not a provider outage, and the difference between the two transports is where the answer is.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "judge-the-servant-violation-on-its",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Judge the servant violation on its merits, separately.** A critic that summarises its own evidence is exactly what that guard exists to catch, so (a) may be the guard working correctly rather than a bug. Say which.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "ship-a-falsifier-not-just-a",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Ship a falsifier, not just a fix** (L-112-1): a test that plants the failing transport shape and asserts the critique refuses, and one that plants the legitimate shape and asserts it does not.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Required portion of the full test suite.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-16T11:40:18.154622-04:00",
+      "description": "**Close-out**. This session was set-terminal when it was added on 2026-08-16 and **is no longer**: Sessions 7 and 8 were added later the same day, so `change-log.md`, the Step 9 review and the set's UAT accounting move to **Session 8**. Close mid-set, with a `next_orchestrator` handover.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-16T11:40:18.161248-04:00",
+      "description": "Registered session 6 (claude / claude-opus-5).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 2,
+      "stepKey": "reproduce-both-failures-before-changing-anything",
+      "dateTime": "2026-08-16T11:49:07.247110-04:00",
+      "description": "**Both failures reproduced before anything was changed**, and neither is a provider outage. (b) HTTP 400 is `model_not_found`: the session pinned the router-registry ALIAS `gpt-5-6-sol` (and then `gpt-5-5`), and the binding put that string straight into `body['model']`. The same body shape with the same alias's `model_id` (`gpt-5.6-sol`) returns 200 and a `function_call`, so the Responses-API shape was never wrong. The 400 body naming the cause was discarded by `resp.raise_for_status()`, which is why three attempts could not see it. (a) `DeterministicServantViolation` reproduced with the HONEST default servant, same error text byte for byte: one append to one file between `servant.run` and `_guard_raw_ground_truth` fires it, and `pull_critique` passes the LIVE git repo root as the sandbox. Written up in `s6-reproduction.md`; raw numbers in `s6-reproduction-measurement.json`.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 3,
+      "stepKey": "start-from-the-sharpest-fact-which",
+      "dateTime": "2026-08-16T11:49:07.247110-04:00",
+      "description": "**The sharpest fact paid off exactly as the spec predicted.** The ordinary routed path works and the pull-critique path does not because `route()` resolves `_config['models'][alias]['model_id']` at every call site while `pull_verifier._resolve_model` returns the pinned string verbatim. That single missing resolution is the whole difference between the two transports. It bit `openai` first only because OpenAI's ids carry dots where the registry keys carry dashes; `google`'s pin `gemini-2.5-pro` is simultaneously a valid alias and a valid API id, which is why the google critic succeeded three times for three and nothing looked router-shaped. A second consequence found while confirming it: `_pricing_for` matches on `model_id`, so an alias misses both the registry and `_FALLBACK_PRICING` and yields (0.0, 0.0) -- a run that got past the 400 would have had no `cost_ceiling_usd` binding at all.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 4,
+      "stepKey": "judge-the-servant-violation-on-its",
+      "dateTime": "2026-08-16T11:58:25.160771-04:00",
+      "description": "**Verdict: a BUG, and specifically a false positive -- but the guard's intent is sound and is kept.** The guard exists to catch a servant that summarizes. In production the servant is always `DeterministicServant`, whose `run()` is literally `return _canonical_result(name, args, sandbox)` -- the same call the guard makes for its own truth. It cannot summarize. The two derivations differ in exactly one respect, WHEN they run, so on the production path the comparison can only detect that the filesystem moved, and it reported that as dishonesty and hard-failed a paid run. The fix does NOT remove the check: on mismatch the guard re-derives twice more and classifies. Re-derivations that agree with each other and disagree with the servant still raise `DeterministicServantViolation` unchanged; re-derivations that disagree with EACH OTHER raise the new `SandboxNotQuiescent`, which the loop records on the trace (`sandbox_drift_count`) and continues past, keeping the servant's raw result. A lying servant lies deterministically, so every true positive still fires. Journaled to `decisions.jsonl` (authority ai, goal-over-letter) with the tension named rather than buried: a reviewer could read the continue-past as a verification reduction, and it is put in front of cross-provider verification for exactly that reason.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 5,
+      "stepKey": "ship-a-falsifier-not-just-a",
+      "dateTime": "2026-08-16T11:58:25.160771-04:00",
+      "description": "**Three fixes, three falsifier PAIRS, and each pair MUTATION-TESTED** (L-112-1). 18 new tests in `test_pull_verifier.py`: (1) alias resolution -- the pinned alias resolves to the served `model_id`, and the legitimate look-alikes (an id that is already served, an id absent from the registry, google's dual-valid `gemini-2.5-pro`) pass through untouched; plus a structural assertion that resolution restores `_pricing_for`, which read $0.00/$0.00 for an alias and silently unbound `cost_ceiling_usd`. (2) The provider error body survives into `BindingHTTPError`, a 200 mentioning the word 'error' does not raise, an empty body is named, an oversized one is truncated, and an AST-sliced scan asserts ALL THREE bindings use it with a corpus-non-empty check (G-008). (3) A moving tree raises `SandboxNotQuiescent` and NOT the violation, while a summarizing servant AND a subtler stale-cache servant on a STABLE tree both still raise it -- the test that proves the fix did not buy quiet by weakening the guard -- and at loop level the run SURVIVES drift with `sandbox_drift_count == 1` while a quiescent run reports 0. Four mutants reverting each fix were injected and every one was caught (1, 2, 3 and 2 failures respectively); source restored byte-for-byte after.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 35,
+      "stepKey": "ai-assignment",
+      "dateTime": "2026-08-16T12:07:56.092686-04:00",
+      "description": "**Step 3.5 routed analysis appended to `ai-assignment.md`** (`gemini-2.5-pro`, google, tier 2, $0.0104) with the orchestrator's reading. The analyst's THIRD risk gets this session's central question exactly backwards -- it asserts the servant guard 'is working as intended to catch a non-compliant model, and the bug is elsewhere'. Measurement refutes it: the servant is not the model, and the violation reproduces with the honest default servant. Treated as authority, it would have shipped the alias fix, watched the default critic keep failing, and closed with the guard declared correct. Its risks 2 and 4 were right and were acted on (structural request diff; mutation-tested falsifiers). **Every model id it named is unusable** -- claude-3-opus-20240229, claude-3-haiku-20240307, claude-3-sonnet-20240229, gemini-1.5-flash-latest -- which is the FOURTH consecutive session, against the Session 4 note calling the previous set the first clean one in several. The owed router-side fix is unchanged and still unowned.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T12:12:15.247956-04:00",
+      "description": "**The critique reaches two providers -- proven live, twice.** Run A (config default): `providers=['google', 'openai'] critiques=2 ok=True`, artifact valid. That is the arm that raised `DeterministicServantViolation` three times in Session 4, so it proves the guard fix. Run B pinned openai to `gpt-5-6-sol`, the exact alias that returned HTTP 400 twice: same result, two schema-valid verdicts. Both `--dry-run` on purpose -- the artifact is gated at the SET-TERMINAL close, now Session 8, and banking it five sessions early against code that will keep changing would be a stale artifact, not evidence. Run B also proves the accounting fix and the restored cost ceiling in one place: the first critique rows this repo has ever ledgered, openai/`gpt-5.6-sol` $1.3294 (the SERVED id, not the alias) and google/`gemini-2.5-pro` $0.6782, $2.0076 total. Recorded in `s6-critique-proof.json`. Run A predates the accounting fix and is honestly UNMEASURED rather than zero. Cross-provider session verification follows.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T12:34:03.051031-04:00",
+      "description": "**VERIFIED in round 4, inside the bound** -- two discovery passes and two remediation-review cycles, none wasted. **Six Majors, all real, all mine, all in code this session added; nothing waived and nothing disputed.** Round 1 (both lenses) found that my fix for the false-accusation bug did not handle its OWN documented reproduction -- a tree that changes once and then SETTLES makes two fresh derivations agree with each other, so the honest servant was convicted again -- and that the falsifier I shipped mutated on every derivation and so never planted that shape. Both confirmed against the code before changing anything. The lesson: timing cannot distinguish dishonesty from drift, identity can, so the guard now classifies on servant IDENTITY (exact type), fails closed by default, and drops a re-derivation. Round 1 also caught a **credential leak I had just introduced**: `BindingHTTPError` interpolated the request URL, and google carries its API key there -- my docstring asserted the opposite. Round 2 caught the ledger fabricating `served_model_id`. Round 3 REJECTED one fix, correctly: `_record_failed_arm` read `exc.pull_model`, an attribute that died with the loop-extraction attempt I had reverted, so paid-but-failed arms recorded the caller's alias or the literal '(unresolved)'. Fixed by stamping provider and resolved_model on `PullTrace` at construction. Round 4: VERIFIED, 0 findings, 3 accepted / 0 rejected / 2 accepted-with-modification. Every fix and every remediation is MUTATION-TESTED -- eight mutants injected, every one caught, source restored byte-for-byte each time. Verification cost $1.7012 across four rounds.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 6,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-16T12:47:16.200208-04:00",
+      "description": "**All three suites owed and all three green**, run after the last code change and after the path-aware critique, and each recorded to `test-runs.jsonl`. `run_of_record affected` named all three because each declares `covers: ai_router/` and this session changed `ai_router/`. **pytest 5021 passed / 0 failed / 5 skipped / 1 xfailed (368s)**, **mocha 1548 passing (32s)**, **playwright 37 passed (264s)**. pytest ran at `-n 8` per the operator's standing cap rather than the `-n auto` default in pytest.ini, and came in at 6m07s against a budgeted ~49m. Two suite failures were found and fixed EARLIER in the session, both mine and both caught by the suite rather than by review: a test helper named `_Resp` that shadowed an existing fixture used by the wire-translation tests, and five pre-existing nested fakes that modelled `raise_for_status()` but not `status_code`, which the new error-body handling reads.",
+      "status": "complete"
     }
   ]
 }

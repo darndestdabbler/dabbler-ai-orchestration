@@ -2136,6 +2136,8 @@ from .pull_verifier import (
     Finding,
     DeterministicServant,
     DeterministicServantViolation,
+    SandboxNotQuiescent,
+    BindingHTTPError,
     SandboxEscape,
     VerdictSchemaError,
     PullVerifierError,

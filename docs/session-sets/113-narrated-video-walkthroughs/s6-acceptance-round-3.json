@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 6,
+  "verificationRound": 3,
+  "baselineRound": 2,
+  "baselineIsOwnRound": false,
+  "baselineTree": "9e5cd678b2802249e548cfbf1adbb0632712e535",
+  "fixedTree": "cdd1c9a8939be04a91c286b817a736e88d295481",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-16T16:31:55.483984+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** Failed-arm metrics still fabricate or lose the model sent to the provider - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/pull_critique.py`, `ai_router/pull_verif ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "For paid failed arms using both an unpinned configured model and a caller-supplied alias, the emitted metrics row must retain the caller-facing model value separately from the resolved model actually sent, without relying on the raised exception to provide an optional `pull_model` attribute, and must leave `served_model_id` null unless observed.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

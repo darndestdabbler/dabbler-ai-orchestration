@@ -1,0 +1,109 @@
+{
+ "schemaVersion": 1,
+ "session": 6,
+ "measuredAt": "2026-08-16T11:48:51.974758-04:00",
+ "seat": {
+  "transport": "DIRECT_API",
+  "re2_available": false,
+  "regex_timeout_seconds": 5.0,
+  "note": "re2 absent -> every grep takes the subprocess-worker path"
+ },
+ "failure_b_http_400": {
+  "endpoint": "https://api.openai.com/v1/responses",
+  "body_shape": "identical across all three probes (store, tools, reasoning.effort, input items)",
+  "probes": [
+   {
+    "model_sent": "gpt-5-6-sol",
+    "kind": "router-registry alias",
+    "status": 400,
+    "error": {
+     "message": "The requested model 'gpt-5-6-sol' does not exist.",
+     "type": "invalid_request_error",
+     "param": "model",
+     "code": "model_not_found"
+    }
+   },
+   {
+    "model_sent": "gpt-5.6-sol",
+    "kind": "that alias's model_id",
+    "status": 200,
+    "returned": "function_call",
+    "served_model": "gpt-5.6-sol",
+    "usage": {
+     "input_tokens": 68,
+     "output_tokens": 18,
+     "total_tokens": 86
+    }
+   },
+   {
+    "model_sent": "gpt-5-5",
+    "kind": "router-registry alias",
+    "status": 400,
+    "error": {
+     "message": "The requested model 'gpt-5-5' does not exist.",
+     "type": "invalid_request_error",
+     "param": "model",
+     "code": "model_not_found"
+    }
+   }
+  ],
+  "diagnosis": "pull_verifier._resolve_model returns the pinned string verbatim and the bindings send it as body['model']; route() resolves _config['models'][alias]['model_id'] at every call site",
+  "second_consequence": "_pricing_for matches on model_id, so an alias falls through to (0.0, 0.0) and cost_ceiling_usd stops binding",
+  "third_consequence": "resp.raise_for_status() discards the provider's error body, so the cause was invisible across three Session 4 attempts"
+ },
+ "failure_a_servant_violation": {
+  "servant_used": "DeterministicServant (the production default; the model never touches the result)",
+  "sandbox_in_production": "the live git repo root (pull_critique._default_sandbox_for)",
+  "M1_concurrent_append": {
+   "setup": "one line appended to one file between servant.run and _guard_raw_ground_truth",
+   "result": "violation",
+   "error_text": "grep: tool result does not match raw ground truth - the servant summarized, paraphrased, fabricated an error, or otherwise altered the bytes",
+   "matches_session_4_error": true
+  },
+  "M2_timeout_boundary": {
+   "payload_mb": 76.8,
+   "servant_s": 1.38,
+   "guard_s": 1.29,
+   "identical": true,
+   "note": "the hard timeout is not the binding constraint at this scale; it becomes one unscoped"
+  },
+  "scoped_grep_determinism": [
+   {
+    "pattern": "DeterministicServantViolation",
+    "path": "ai_router",
+    "servant_s": 1.51,
+    "guard_s": 1.45,
+    "identical": true
+   },
+   {
+    "pattern": "pathAwareCritique",
+    "path": "docs",
+    "servant_s": 2.1,
+    "guard_s": 2.02,
+    "identical": true
+   },
+   {
+    "pattern": "def route",
+    "path": "ai_router",
+    "servant_s": 1.44,
+    "guard_s": 1.49,
+    "identical": true
+   }
+  ],
+  "unscoped_grep_on_this_sandbox": {
+   "files": 62084,
+   "megabytes": 5594.7,
+   "derivations_per_tool_call": 2,
+   "timeout_seconds": 5.0,
+   "exclusions": "none",
+   "largest_subtrees": {
+    "tools": 5368.3,
+    ".git": 98.7,
+    ".venv": 63.0,
+    "docs": 31.1,
+    "ai_router": 29.2
+   }
+  },
+  "diagnosis": "the guard's premise is that _canonical_result is a pure function of (name, args, sandbox); on a live tree it is a function of time as well, and the guard reports that difference as servant dishonesty"
+ }
+}

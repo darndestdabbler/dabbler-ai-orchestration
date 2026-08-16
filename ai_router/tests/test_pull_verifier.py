@@ -13,6 +13,7 @@ No metered API calls: a FakeBinding drives a scripted agentic loop.
 from __future__ import annotations
 
 import json
+import pathlib
 import subprocess
 import sys
 from types import SimpleNamespace
@@ -1169,6 +1170,10 @@ class TestOpenAIWireTranslation:
         calls = []
 
         class _Resp:
+            # status_code: an httpx.Response always has one, and the binding
+            # now inspects it (Set 113 S6 - the provider's error body is kept).
+            status_code = 200
+
             def __init__(self, rid):
                 self._rid = rid
 
@@ -1257,6 +1262,10 @@ class TestOpenAIWireTranslation:
         calls = []
 
         class _Resp:
+            # status_code: an httpx.Response always has one, and the binding
+            # now inspects it (Set 113 S6 - the provider's error body is kept).
+            status_code = 200
+
             def __init__(self, rid):
                 self._rid = rid
 
@@ -1363,6 +1372,10 @@ class TestOpenAIWireTranslation:
         # during _from_response() parsing must ALSO leave the cursor untouched
         # (parse-before-commit ordering), so a retry resends, not skips.
         class _Resp:
+            # status_code: an httpx.Response always has one, and the binding
+            # now inspects it (Set 113 S6 - the provider's error body is kept).
+            status_code = 200
+
             def raise_for_status(self):
                 pass
 
@@ -1539,6 +1552,10 @@ class TestGeminiWireTranslation:
         captured = {}
 
         class _Resp:
+            # status_code: an httpx.Response always has one, and the binding
+            # now inspects it (Set 113 S6 - the provider's error body is kept).
+            status_code = 200
+
             def raise_for_status(self):
                 pass
 
@@ -1585,6 +1602,10 @@ class TestGeminiWireTranslation:
         captured = {}
 
         class _Resp:
+            # status_code: an httpx.Response always has one, and the binding
+            # now inspects it (Set 113 S6 - the provider's error body is kept).
+            status_code = 200
+
             def raise_for_status(self):
                 pass
 
@@ -2753,3 +2774,461 @@ class TestVerdictSchemaAuthoredGating:
         props = (pv._verdict_tool_schema()["parameters"]["properties"]
                  ["findings"]["items"]["properties"])
         assert "probeId" not in props
+
+
+# ===========================================================================
+# Set 113 S6: why the path-aware critique could not reach two providers.
+#
+# Three defects, three falsifier PAIRS (L-112-1): each plants the failing
+# shape and asserts the fix fires, and plants the legitimate look-alike and
+# asserts it does not.
+# ===========================================================================
+
+
+# A registry shaped like the real one: keyed by ALIAS, each entry carrying the
+# id the provider actually serves. The dash/dot split is the whole defect.
+_ALIAS_CONFIG = {
+    "providers": {
+        "openai": {
+            "api_key_env": "DABBLER_OPENAI_API_KEY",
+            "base_url": "https://example.invalid/v1",
+            "timeout_seconds": 5,
+        }
+    },
+    "models": {
+        "gpt-5-6-sol": {"model_id": "gpt-5.6-sol", "provider": "openai"},
+        "gpt-5-5": {"model_id": "gpt-5.5", "provider": "openai"},
+        "gemini-2.5-pro": {"model_id": "gemini-2.5-pro", "provider": "google"},
+    },
+    "pull_verifier": {"models": {"openai": "gpt-5-6-sol"}},
+}
+
+
+class TestRegistryAliasResolution:
+    """Set 113 S6 defect 1: a registry alias reached body['model'] verbatim.
+
+    Reproduced live against OpenAI: 'gpt-5-6-sol' -> HTTP 400 model_not_found,
+    'gpt-5.6-sol' -> HTTP 200. route() resolved the indirection at every call
+    site; this executor did not.
+    """
+
+    def test_explicit_alias_resolves_to_the_served_model_id(self):
+        # PLANT THE DEFECT: pass the alias the session actually pinned.
+        assert (
+            pv._resolve_model("openai", "gpt-5-6-sol", _ALIAS_CONFIG)
+            == "gpt-5.6-sol"
+        )
+
+    def test_pinned_alias_resolves_to_the_served_model_id(self):
+        # Same defect through the pull_verifier.models pin rather than model=.
+        assert pv._resolve_model("openai", None, _ALIAS_CONFIG) == "gpt-5.6-sol"
+
+    def test_a_served_id_that_is_not_an_alias_passes_through(self):
+        # THE LEGITIMATE LOOK-ALIKE: 'gpt-5.6-sol' is already what the provider
+        # serves and is NOT a registry key. It must survive untouched, or the
+        # fix would break every pin that was already correct.
+        assert (
+            pv._resolve_model("openai", "gpt-5.6-sol", _ALIAS_CONFIG)
+            == "gpt-5.6-sol"
+        )
+
+    def test_an_id_absent_from_the_registry_passes_through(self):
+        # An operator may pin something the registry does not list at all.
+        assert (
+            pv._resolve_model("openai", "gpt-9-experimental", _ALIAS_CONFIG)
+            == "gpt-9-experimental"
+        )
+
+    def test_google_pin_is_unchanged_which_is_why_it_hid_the_defect(self):
+        # 'gemini-2.5-pro' is simultaneously a valid alias and a valid API id,
+        # so the google critic succeeded three times for three in Set 113 S4
+        # and nothing about the failure looked router-shaped.
+        assert (
+            pv._resolve_model("google", "gemini-2.5-pro", _ALIAS_CONFIG)
+            == "gemini-2.5-pro"
+        )
+
+    def test_resolution_makes_the_cost_ceiling_bind_again(self):
+        # The second consequence of the same missing resolution: _pricing_for
+        # matches on model_id, so an ALIAS missed the registry AND the fallback
+        # table and read $0.00/$0.00 - the per-run cost_ceiling_usd silently
+        # stopped binding. Structural assertion beside the textual one.
+        priced = {
+            "models": {
+                "gpt-5-6-sol": {
+                    "model_id": "gpt-5.6-sol",
+                    "input_cost_per_1m": 4.0,
+                    "output_cost_per_1m": 20.0,
+                }
+            }
+        }
+        assert pv._pricing_for("gpt-5-6-sol", priced) == (0.0, 0.0)  # the bug
+        resolved = pv._resolve_model("openai", "gpt-5-6-sol", priced)
+        assert pv._pricing_for(resolved, priced) == (4.0, 20.0)  # the fix
+
+
+class _ErrResp:
+    """Minimal stand-in for an httpx.Response (status, text, request.url)."""
+
+    def __init__(self, status_code, text,
+                 url="https://example.invalid/v1/responses"):
+        self.status_code = status_code
+        self.text = text
+        self.request = SimpleNamespace(url=url)
+
+
+class TestProviderErrorBodyIsPreserved:
+    """Set 113 S6 defect 2: raise_for_status() discarded the one sentence that
+    named the cause, so three Set 113 S4 attempts could not see it."""
+
+    def test_error_body_is_carried_into_the_exception(self):
+        # PLANT THE DEFECT: the exact 400 body OpenAI returned.
+        body = (
+            '{"error": {"message": "The requested model gpt-5-6-sol does '
+            'not exist.", "type": "invalid_request_error", "param": "model", '
+            '"code": "model_not_found"}}'
+        )
+        with pytest.raises(pv.BindingHTTPError) as exc:
+            pv._raise_for_status_with_body(
+                _ErrResp(400, body), "openai", "gpt-5-6-sol"
+            )
+        msg = str(exc.value)
+        # Assert the RULE - the provider's own explanation survives - not just
+        # that something was raised.
+        assert "does not exist" in msg
+        assert "model_not_found" in msg
+        assert "400" in msg
+        assert "gpt-5-6-sol" in msg
+
+    def test_success_does_not_raise(self):
+        # THE LEGITIMATE LOOK-ALIKE: a 200 whose body merely contains the word
+        # "error" must pass straight through.
+        pv._raise_for_status_with_body(
+            _ErrResp(200, '{"output": [], "note": "no error here"}'),
+            "openai",
+            "gpt-5.6-sol",
+        )
+
+    def test_empty_body_is_named_rather_than_silently_blank(self):
+        with pytest.raises(pv.BindingHTTPError) as exc:
+            pv._raise_for_status_with_body(
+                _ErrResp(503, ""), "google", "gemini-2.5-pro"
+            )
+        assert "empty response body" in str(exc.value)
+
+    def test_oversized_body_is_truncated_not_dumped(self):
+        with pytest.raises(pv.BindingHTTPError) as exc:
+            pv._raise_for_status_with_body(
+                _ErrResp(400, "x" * 50000), "anthropic", "claude-sonnet-4-6"
+            )
+        msg = str(exc.value)
+        assert "truncated" in msg
+        assert len(msg) < 2000
+
+    def test_every_binding_uses_it(self):
+        # G-008: the defect was a CLASS - all three bindings had it. A source
+        # assertion, plus the corpus-non-empty check that makes a
+        # matches-nothing gate distinguishable from a finds-nothing one.
+        import ast
+
+        src = pathlib.Path(pv.__file__).read_text(encoding="utf-8")
+        lines = src.splitlines()
+        wanted = {"AnthropicBinding", "OpenAIBinding", "GeminiBinding"}
+        bodies = {
+            node.name: "\n".join(lines[node.lineno - 1:node.end_lineno])
+            for node in ast.parse(src).body
+            if isinstance(node, ast.ClassDef) and node.name in wanted
+        }
+        # Corpus-non-empty: a scan that matched nothing must not read as a
+        # pass (L-112-1 / corpus_scan_guard).
+        assert set(bodies) == wanted, sorted(bodies)
+        for name, body in bodies.items():
+            assert "_raise_for_status_with_body(" in body, name
+            assert "resp.raise_for_status()" not in body, name
+
+
+class _StaleCacheServant(pv.DeterministicServant):
+    """A servant that answers the FIRST call honestly and then keeps replaying
+    that stale answer - dishonesty a moving tree could be mistaken for."""
+
+    def __init__(self):
+        self._first = None
+
+    def run(self, name, args, sandbox):
+        if self._first is None:
+            self._first = pv._canonical_result(name, args, sandbox)
+        return self._first
+
+
+class TestSandboxDriftIsNotServantDishonesty:
+    """Set 113 S6 defect 3: the guard re-derives ground truth and treats ANY
+    difference as the servant summarizing. On the live repo root pull_critique
+    passes, the only thing that comparison can detect is that the tree moved -
+    and Set 113 S4 lost three runs to that false accusation."""
+
+    def test_one_append_then_settle_is_drift_not_dishonesty(self, sandbox):
+        # PLANT THE ACTUAL REPRODUCED SHAPE: an honest servant reads state A,
+        # the file is appended ONCE, and the tree then SETTLES at state B.
+        #
+        # This is the production failure - a session log, a metrics line, a
+        # git ref, a capture writing under the repo root - and the first
+        # version of this fix did not handle it: it classified by comparing
+        # two fresh derivations with each other, which both see the settled B,
+        # so it still convicted the honest servant. Round-1 verification caught
+        # that, and caught that the earlier test mutated on EVERY derivation
+        # and therefore never planted this shape at all.
+        good = pv.DeterministicServant()
+        args = {"path": "a.py"}
+        result = good.run("read_file", args, sandbox)
+        (sandbox / "a.py").write_text("alpha\nbeta\ngamma\nappended\n",
+                                      encoding="utf-8")
+        # ... and nothing touches the tree again.
+        with pytest.raises(pv.SandboxNotQuiescent):
+            pv._guard_raw_ground_truth(
+                "read_file", args, result, sandbox,
+                servant_is_canonical=True,
+            )
+
+    def test_continuously_moving_tree_is_also_drift(self, sandbox, monkeypatch):
+        # The other timing shape, for completeness: a tree that never settles.
+        good = pv.DeterministicServant()
+        args = {"path": "a.py"}
+        result = good.run("read_file", args, sandbox)
+
+        counter = {"n": 0}
+        real = pv._canonical_result
+
+        def moving(name, a, sb):
+            counter["n"] += 1
+            (sb / "a.py").write_text(
+                "alpha\nbeta\ngamma\nappended %d\n" % counter["n"],
+                encoding="utf-8",
+            )
+            return real(name, a, sb)
+
+        monkeypatch.setattr(pv, "_canonical_result", moving)
+        with pytest.raises(pv.SandboxNotQuiescent):
+            pv._guard_raw_ground_truth(
+                "read_file", args, result, sandbox,
+                servant_is_canonical=True,
+            )
+
+    def test_the_lenient_reading_is_never_the_default(self, sandbox):
+        # THE LEGITIMATE LOOK-ALIKE for the flag itself. Omitting the keyword
+        # must fail CLOSED: a caller who forgets it gets the strict guard, not
+        # the forgiving one. Same planted shape as the first test.
+        good = pv.DeterministicServant()
+        args = {"path": "a.py"}
+        result = good.run("read_file", args, sandbox)
+        (sandbox / "a.py").write_text("rewritten\n", encoding="utf-8")
+        with pytest.raises(pv.DeterministicServantViolation):
+            pv._guard_raw_ground_truth("read_file", args, result, sandbox)
+
+    def test_a_subclass_is_not_the_canonical_servant(self, sandbox):
+        # The identity test is EXACT type, not isinstance - every bad servant
+        # in this file is a DeterministicServant subclass, and each must stay
+        # fully guarded. Asserted structurally so the rule cannot rot.
+        assert type(_SummarizingServant()) is not pv.DeterministicServant
+        assert isinstance(_SummarizingServant(), pv.DeterministicServant)
+        assert type(pv.DeterministicServant()) is pv.DeterministicServant
+
+    def test_drift_is_not_a_subclass_of_the_violation(self):
+        # The rule, asserted structurally: SandboxNotQuiescent must NOT be a
+        # DeterministicServantViolation, or every caller that catches the
+        # violation would still kill the run.
+        assert not issubclass(
+            pv.SandboxNotQuiescent, pv.DeterministicServantViolation
+        )
+        assert issubclass(pv.SandboxNotQuiescent, pv.PullVerifierError)
+
+    def test_dishonest_servant_on_a_STABLE_tree_still_raises(self, sandbox):
+        # THE LEGITIMATE LOOK-ALIKE, and the one that matters most: the fix
+        # must not have bought quiet by weakening the guard. A lying servant
+        # lies deterministically, so it still trips the violation.
+        bad = _SummarizingServant()
+        r = bad.run("read_file", {"path": "a.py"}, sandbox)
+        with pytest.raises(pv.DeterministicServantViolation):
+            pv._guard_raw_ground_truth("read_file", {"path": "a.py"}, r, sandbox)
+
+    def test_stale_cache_servant_is_caught_once_the_tree_settles(self, sandbox):
+        # A subtler liar: honest once, then stale. Against a stable tree the
+        # it is not the canonical servant, so the strict guard applies.
+        bad = _StaleCacheServant()
+        args = {"path": "a.py"}
+        r = bad.run("read_file", args, sandbox)
+        pv._guard_raw_ground_truth("read_file", args, r, sandbox)
+        (sandbox / "a.py").write_text("rewritten\n", encoding="utf-8")
+        stale = bad.run("read_file", args, sandbox)
+        with pytest.raises(pv.DeterministicServantViolation):
+            pv._guard_raw_ground_truth("read_file", args, stale, sandbox)
+
+    def test_honest_servant_on_a_stable_tree_is_silent(self, sandbox):
+        good = pv.DeterministicServant()
+        r = good.run("read_file", {"path": "a.py"}, sandbox)
+        pv._guard_raw_ground_truth("read_file", {"path": "a.py"}, r, sandbox)
+
+    def test_loop_records_drift_and_keeps_the_run(self, sandbox, monkeypatch):
+        # The consequence that cost Set 113 S4 the artifact: the run must
+        # SURVIVE a moving tree, with the drift visible in the trace.
+        real = pv._canonical_result
+        counter = {"n": 0}
+
+        def moving(name, a, sb):
+            # Mutate the very file the tool call reads, so every derivation
+            # genuinely differs - the shape of a repo being written while the
+            # critique reads it.
+            counter["n"] += 1
+            (sb / "a.py").write_text(
+                "alpha\nbeta\ngamma\ndrift %d\n" % counter["n"],
+                encoding="utf-8",
+            )
+            return real(name, a, sb)
+
+        binding = FakeBinding(
+            queue=[
+                _resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                _resp(tool_calls=[_tc(
+                    pv.SUBMIT_VERDICT_TOOL,
+                    {"verdict": "pass", "summary": "ok", "findings": []},
+                    tid="v1",
+                )]),
+            ]
+        )
+        monkeypatch.setattr(pv, "_canonical_result", moving)
+        result = pv.pull_route(
+            sandbox, "review", binding=binding,
+            servant=pv.DeterministicServant(), config=CONFIG,
+        )
+        assert result.trace.sandbox_drift_count == 1
+        assert result.trace.tool_calls[0].sandbox_drift is True
+        assert result.trace.to_dict()["sandbox_drift_count"] == 1
+
+    def test_a_quiescent_loop_reports_no_drift(self, sandbox):
+        # THE LEGITIMATE LOOK-ALIKE at loop level: an ordinary run must report
+        # zero, or an always-on flag would be indistinguishable from a real one.
+        binding = FakeBinding(
+            queue=[
+                _resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                _resp(tool_calls=[_tc(
+                    pv.SUBMIT_VERDICT_TOOL,
+                    {"verdict": "pass", "summary": "ok", "findings": []},
+                    tid="v1",
+                )]),
+            ]
+        )
+        result = pv.pull_route(
+            sandbox, "review", binding=binding,
+            servant=pv.DeterministicServant(), config=CONFIG,
+        )
+        assert result.trace.sandbox_drift_count == 0
+        assert result.trace.tool_calls[0].sandbox_drift is False
+
+    def test_one_change_then_settle_does_not_abort_the_run(
+        self, sandbox, monkeypatch
+    ):
+        # Round-1 verification's acceptance criterion, at loop level and
+        # word for word: with DeterministicServant, mutate the probed file
+        # exactly once after servant.run returns but before guard verification
+        # begins, then leave it stable. The run must NOT raise, and the drift
+        # must still be visible.
+        real = pv._canonical_result
+        calls = {"n": 0}
+
+        def once_then_settle(name, args, sb):
+            calls["n"] += 1
+            # 1 = the servant's own derivation (state A). 2 = the guard's,
+            # preceded by the single change. Nothing after that touches it.
+            if calls["n"] == 2:
+                (sb / "a.py").write_text(
+                    "alpha\nbeta\ngamma\nappended\n", encoding="utf-8"
+                )
+            return real(name, args, sb)
+
+        binding = FakeBinding(
+            queue=[
+                _resp(tool_calls=[_tc("read_file", {"path": "a.py"})]),
+                _resp(tool_calls=[_tc(
+                    pv.SUBMIT_VERDICT_TOOL,
+                    {"verdict": "pass", "summary": "ok", "findings": []},
+                    tid="v1",
+                )]),
+            ]
+        )
+        monkeypatch.setattr(pv, "_canonical_result", once_then_settle)
+        result = pv.pull_route(
+            sandbox, "review", binding=binding,
+            servant=pv.DeterministicServant(), config=CONFIG,
+        )
+        assert result.ok
+        assert result.trace.sandbox_drift_count == 1
+        assert result.critique is not None
+
+    def test_a_lying_servant_still_aborts_the_whole_run(self, sandbox):
+        # The counterweight, at loop level. Narrowing the guard must not have
+        # made a dishonest servant survivable.
+        binding = FakeBinding(
+            queue=[_resp(tool_calls=[_tc("read_file", {"path": "a.py"})])]
+        )
+        with pytest.raises(pv.DeterministicServantViolation):
+            pv.pull_route(
+                sandbox, "review", binding=binding,
+                servant=_SummarizingServant(), config=CONFIG,
+            )
+
+
+class TestErrorUrlIsRedacted:
+    """Set 113 S6 round-1 finding 4. The first version of
+    `_raise_for_status_with_body` interpolated the request URL verbatim and its
+    docstring claimed "nothing here can leak a key" on the grounds that the
+    Authorization header is untouched -- true for anthropic and openai, and
+    irrelevant to google, which puts its credential in the query string."""
+
+    GEMINI_URL = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        "gemini-2.5-pro:generateContent?key=SENTINEL-SECRET-KEY-123"
+    )
+
+    def test_gemini_key_never_reaches_the_exception(self):
+        # PLANT THE DEFECT: a routine 429 on the credential-in-URL provider.
+        with pytest.raises(pv.BindingHTTPError) as exc:
+            pv._raise_for_status_with_body(
+                _ErrResp(429, '{"error": {"message": "rate limited"}}',
+                         url=self.GEMINI_URL),
+                "google", "gemini-2.5-pro",
+            )
+        msg = str(exc.value)
+        assert "SENTINEL-SECRET-KEY-123" not in msg
+        assert "key=REDACTED" in msg
+        # ...and the diagnostically useful part survives, or redaction would
+        # have solved the leak by destroying the error message.
+        assert "429" in msg
+        assert "generativelanguage.googleapis.com" in msg
+        assert "rate limited" in msg
+
+    def test_every_query_value_is_redacted_not_a_denylist(self):
+        with pytest.raises(pv.BindingHTTPError) as exc:
+            pv._raise_for_status_with_body(
+                _ErrResp(400, "bad",
+                         url="https://x.invalid/v1?token=aaa&access_key=bbb&n=1"),
+                "google", "m",
+            )
+        msg = str(exc.value)
+        for secret in ("aaa", "bbb"):
+            assert secret not in msg
+
+    def test_a_url_with_no_query_is_left_alone(self):
+        # THE LEGITIMATE LOOK-ALIKE: anthropic and openai carry no credential
+        # in the URL, and their paths must stay readable.
+        with pytest.raises(pv.BindingHTTPError) as exc:
+            pv._raise_for_status_with_body(
+                _ErrResp(400, "bad", url="https://api.openai.com/v1/responses"),
+                "openai", "gpt-5.6-sol",
+            )
+        assert "https://api.openai.com/v1/responses" in str(exc.value)
+
+    def test_redaction_never_raises_on_a_junk_url(self):
+        # Redaction runs on the failure path; it must not turn a provider
+        # error into a crash inside the error handler.
+        assert pv._redact_url(None) is not None
+        assert pv._redact_url("") is not None
+        assert pv._redact_url("::not a url::") is not None

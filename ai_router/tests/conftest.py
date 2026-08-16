@@ -23,6 +23,7 @@ below ensures that.
 """
 
 import importlib
+import os
 import sys
 from pathlib import Path
 
@@ -194,6 +195,41 @@ def _no_real_project_verify_type(monkeypatch):
 
         monkeypatch.setattr(module, "find_project_file", _blocking_real_file)
         monkeypatch.setattr(module, "find_project_root", _blocking_real_root)
+    yield
+
+
+@pytest.fixture(scope="session")
+def _metrics_scratch(tmp_path_factory):
+    """One throwaway metrics file for the whole session.
+
+    Session-scoped deliberately: a per-test directory would mean thousands of
+    them across this suite, for a file nothing asserts on.
+    """
+    return tmp_path_factory.mktemp("metrics-isolation") / "router-metrics.jsonl"
+
+
+@pytest.fixture(autouse=True)
+def _no_writes_to_the_shipped_metrics_ledger(monkeypatch, _metrics_scratch):
+    """Set 113 S6: the suite must never append to the real
+    ``ai_router/router-metrics.jsonl``.
+
+    Same genre as ``_no_live_backstop_routing`` and
+    ``_no_real_project_verify_type`` above: isolate the suite from a
+    real-world side effect it must not have. ``record_call`` is enabled by
+    default and resolves the package-bundled path when nothing redirects it,
+    so ANY test that reaches a metrics writer silently pollutes the shipped
+    ledger with fixture data - fake providers, fixture set names, $0.00 costs -
+    that every later cost report then reads as real routed history.
+
+    Found the hard way: Set 113 S6 added critique accounting to
+    ``pull_critique`` and three ordinary test runs wrote **105** fake rows into
+    the developer's own ledger before anyone looked. Every metrics-aware test
+    already sets ``AI_ROUTER_METRICS_PATH`` for itself, and a test's own
+    ``setenv`` still wins over this one, so the guard changes no existing
+    behaviour - it only closes the default.
+    """
+    if not os.environ.get("AI_ROUTER_METRICS_PATH"):
+        monkeypatch.setenv("AI_ROUTER_METRICS_PATH", str(_metrics_scratch))
     yield
 
 

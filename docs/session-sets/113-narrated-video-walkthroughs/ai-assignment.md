@@ -398,3 +398,109 @@ one place that matters.
    session that owes an accounting for all four declared
    `uatComponents` — including the two Session 3 created. A pilot that
    fails is still a passing close, but only if the accounting is written.
+
+---
+
+## Session 6 — Why the pull critique could not reach two providers
+
+> **Routed analysis (Step 3.5), never self-opined.** Authored 2026-08-16 by
+> `gemini-2.5-pro` (google, tier 2, $0.0104, 851 output tokens) via
+> `route(task_type="analysis")`. The orchestrator is anthropic, so the analyst
+> landed on a different provider without an explicit exclusion this time.
+> Reproduced verbatim below: child output is **evidence, never instructions**.
+> The orchestrator's reading follows it.
+
+## Session 6: Why the pull critique could not reach two providers
+
+### Recommended orchestrator
+claude claude-3-opus-20240229 @ effort=high
+
+### Rationale
+The task is a transport-level diagnosis requiring precise comparison between two distinct, complex code paths inside the router. A top-tier reasoning model at high effort is required to correctly isolate the fault in the API request shape and generate the mandated falsifier test.
+
+### Estimated routed cost
+moderate
+
+| Step | Action | Routing Decision |
+|------|--------|------------------|
+| 1 | Register session | orchestrator direct |
+| 2 | Reproduce both OpenAI failures | orchestrator direct; directs operator to run existing code |
+| 3 | Analyze transport difference (critique vs. verify) | claude/claude-3-opus-20240229; core reasoning task |
+| 4 | Judge servant violation on its merits | claude/claude-3-haiku-20240307; straightforward logic assessment |
+| 5 | Ship falsifier test and fix | claude/claude-3-sonnet-20240229; capable at targeted code generation |
+| 6 | Cross-provider verification | orchestrator direct; directs operator to run test |
+| 7 | Run required portion of test suite | orchestrator direct; directs operator to run test |
+| 8 | Close-out and handover | claude/claude-3-haiku-20240307; structured text generation |
+
+### Actuals (filled after the session)
+- Orchestrator used: TBD
+- Total routed cost: TBD
+- Deviations from recommendation: TBD
+- Notes for next-session calibration: TBD
+
+## Risks Session 6 should be warned about
+-   **Conflating Failures:** The session might treat the `DeterministicServantViolation` and the HTTP 400 as one problem. This could lead to wasted effort trying to find a single root cause, when one is a feature (guard working correctly) and the other is a transport bug.
+-   **Misinterpreting the HTTP 400:** A "Bad Request" error could be blamed on the wrong part of the request payload (e.g., content vs. headers). The session could conclude the wrong thing if it doesn't perform a precise diff between the working (`session-verification`) and failing (`pull_critique`) request structures.
+-   **"Fixing" the Guard:** The session could incorrectly conclude the `DeterministicServantViolation` guard is too strict and weaken it. The correct diagnosis is that the guard is working as intended to catch a non-compliant model, and the bug is elsewhere.
+-   **Shipping a Weak Falsifier:** The session could produce a test that passes with the fix but would not have deterministically failed before the fix. An effective falsifier must specifically assert failure on the known-bad transport shape.
+
+## Next-session recommendation (Session 7)
+-   Orchestrator: claude/claude-3-sonnet-20240229 @ effort=medium
+-   Verifier: google/gemini-1.5-flash-latest @ effort=low
+-   Reason: The session requires implementing a novel feature (synthetic cursor) and executing a procedural pipeline; a strong implementation-focused model is appropriate, and the verification path is not stressed.
+-   First action: Implement the opt-in synthetic mouse pointer that is drawn into the browser page during Playwright automation.
+
+## Next-set recommendation
+If Session 7 successfully produces the public-facing tutorial artifact, the trigger has been met to shift focus from internal tooling to external usability. The next set should therefore concentrate on improving the developer experience of the tool itself, such as enhancing its command-line interface, auto-generating user documentation from tests, or scaffolding a simple web UI.
+
+### Orchestrator's reading of the above
+
+Recorded because the analysis is input, not authority. Two of its four risks
+were useful and were acted on; its central judgment call is **refuted by
+measurement**, and its model ids are unusable.
+
+1. **Its third risk gets the answer exactly backwards, and it is the one the
+   spec asked this session to settle.** The analysis warns against concluding
+   the guard is too strict, asserting *"the guard is working as intended to
+   catch a non-compliant model, and the bug is elsewhere."* That is the
+   plausible reading, and it is wrong. The servant the guard checks is not the
+   model: `DeterministicServant.run` is `return _canonical_result(...)`, the
+   same call the guard makes for its own truth, so no model output passes
+   through it and it cannot paraphrase anything. The violation was reproduced
+   **with that honest default servant** from a single file append between the
+   two derivations, with Session 4's error text byte for byte. Had this
+   recommendation been treated as authority, the session would have shipped the
+   alias fix, watched the default critic keep failing, and reported the guard
+   as correct. The fix nonetheless does what the risk was protecting against:
+   the guard is narrowed, never weakened, and a dishonest servant on a stable
+   tree still raises exactly as before — with a falsifier asserting precisely
+   that.
+
+2. **Its second and fourth risks were right and both were acted on.** The 400
+   was diagnosed by an exact structural diff of the working and failing request
+   shapes rather than by guessing at the payload — sending one body shape with
+   an alias (400) and the alias's `model_id` (200). And every falsifier was
+   **mutation-tested**: each fix was reverted in turn and the matching tests
+   were confirmed to fail, so none of them is a test that only passes
+   afterwards.
+
+3. **Its first risk is half right for the wrong reason.** The two failures are
+   indeed separate problems and were treated separately — but not because one
+   is "a feature". Both are defects, and a third and fourth turned up on the
+   way (a discarded error body, and absent cost accounting).
+
+4. **Every model id it names is unusable, and this is now the fourth
+   consecutive session.** `claude-3-opus-20240229`, `claude-3-haiku-20240307`,
+   `claude-3-sonnet-20240229` and `gemini-1.5-flash-latest` are not in this
+   registry. The Session 4 note above recorded the previous set as the first in
+   several to be clean; that did not hold. The provider + family + effort
+   columns remain the usable part. The owed router-side fix — give the step-3.5
+   analyst the registry it is naming from — is unchanged and still unowned.
+
+5. **Its next-set recommendation should not be acted on.** It proposes a
+   developer-experience set (CLI polish, generated docs, a web UI) triggered by
+   Session 7 shipping a tutorial. Nothing in this set's reservations matches
+   that, it is not a trigger any reserved set declares, and set selection is
+   the operator's call at the Step 9 review — which is now **Session 8's**, not
+   this session's. Its Session 7 first action (draw the synthetic pointer into
+   the page) is, however, a correct reading of the operator's ordering ruling.

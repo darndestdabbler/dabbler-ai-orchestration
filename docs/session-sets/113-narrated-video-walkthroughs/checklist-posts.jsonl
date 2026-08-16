@@ -45,3 +45,13 @@
 {"sessionNumber": 5, "postedAt": "2026-08-16T08:23:57.081087-04:00", "stepCount": 14, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
 {"sessionNumber": 5, "postedAt": "2026-08-16T09:23:36.760378-04:00", "stepCount": 14, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
 {"sessionNumber": 5, "postedAt": "2026-08-16T09:34:59.986052-04:00", "stepCount": 14, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T11:40:27.626541-04:00", "stepCount": 8, "surface": "markdown", "inProgressStepKeys": ["reproduce-both-failures-before-changing-anything"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T11:58:30.402379-04:00", "stepCount": 8, "surface": "markdown", "inProgressStepKeys": ["cross-provider-verification"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:17:54.630462-04:00", "stepCount": 9, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:22:07.638809-04:00", "stepCount": 9, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:29:25.160091-04:00", "stepCount": 9, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:33:18.376459-04:00", "stepCount": 9, "surface": "text", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:33:43.212547-04:00", "stepCount": 9, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:42:31.104995-04:00", "stepCount": 9, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:47:03.508850-04:00", "stepCount": 9, "surface": "markdown", "inProgressStepKeys": ["required-portion-of-the-full-test"]}
+{"sessionNumber": 6, "postedAt": "2026-08-16T12:49:24.429351-04:00", "stepCount": 9, "surface": "markdown", "inProgressStepKeys": ["close-out"]}

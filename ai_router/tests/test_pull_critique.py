@@ -625,3 +625,323 @@ def test_producer_threads_probe_template_config(tmp_path):
     assert call["probe_template_config"] is probe
     # The template lane is an execution lane -> blast-radius-budgeted caps.
     assert isinstance(call["caps"], pv.PullCaps)
+
+
+# ===========================================================================
+# Set 113 S6: the critique's spend must reach the ledger.
+#
+# Set 113 S4 ran three path-aware critiques and none wrote a row to
+# router-metrics.jsonl, so a set could spend on critiques and report zero.
+# Falsifier pair: plant a finished arm and assert a row is written; plant the
+# shapes that must NOT write one (and must never break the run).
+# ===========================================================================
+
+
+def _capture_rows(monkeypatch):
+    """Intercept record_call at the module the producer imports it from."""
+    rows = []
+    import metrics
+
+    def fake_record_call(config, **kw):
+        rows.append(kw)
+
+    monkeypatch.setattr(metrics, "record_call", fake_record_call)
+    return rows
+
+
+class TestCritiqueSpendIsLedgered:
+    def test_each_arm_writes_one_row(self, tmp_path, monkeypatch):
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        run = _runner(
+            {
+                "openai": _fake_result("openai", "gpt-5.6-sol",
+                                       findings=["bug a"]),
+                "google": _fake_result("google", "gemini-2.5-pro"),
+            }
+        )
+        res = pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, run_pull=run
+        )
+        assert res.ok
+        # PLANT THE DEFECT: before the fix this list was empty for every run.
+        assert len(rows) == 2, rows
+        by_provider = {r["provider"]: r for r in rows}
+        assert set(by_provider) == {"openai", "google"}
+        for r in rows:
+            assert r["call_type"] == pc.CRITIQUE_CALL_TYPE
+            assert r["task_type"] == pc.CRITIQUE_TASK_TYPE
+            assert str(set_dir) == r["session_set"]
+        # The verdict and finding count travel with the row, so the ledger can
+        # answer "what did this critique cost AND what did it say".
+        assert by_provider["openai"]["issue_count"] == 1
+        assert by_provider["google"]["issue_count"] == 0
+        assert by_provider["openai"]["verdict"] == "VERIFIED"
+        # The served id is the id the provider actually serves, not a registry
+        # alias - which is what the Set 113 S6 alias fix guarantees, and what
+        # keeps the Set 109 drift gate reading known ids.
+        assert by_provider["openai"]["model"] == "gpt-5.6-sol"
+
+    def test_a_provider_that_raised_writes_no_row(self, tmp_path, monkeypatch):
+        # THE LEGITIMATE LOOK-ALIKE: an arm that never returned a result has no
+        # measured spend to report, and must not invent a zero row.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+
+        def run_pull(sandbox, instruction, *, provider, model, config, **kw):
+            if provider == "openai":
+                raise RuntimeError("boom")
+            return _fake_result("google", "gemini-2.5-pro")
+
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False, run_pull=run_pull
+        )
+        assert [r["provider"] for r in rows] == ["google"]
+
+    def test_an_arm_with_no_verdict_is_still_ledgered(self, tmp_path,
+                                                      monkeypatch):
+        # It ran, so it SPENT. A failed arm that writes no row is exactly the
+        # under-reporting this fix exists to close.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        run = _runner(
+            {
+                "openai": _fake_result("openai", "gpt-5.6-sol", crit=False,
+                                       stop="max-turns"),
+                "google": _fake_result("google", "gemini-2.5-pro"),
+            }
+        )
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False, run_pull=run
+        )
+        assert len(rows) == 2
+        failed = [r for r in rows if r["provider"] == "openai"][0]
+        assert failed["verdict"] is None
+        assert failed["issue_count"] is None
+        assert failed["stop_reason"] == "max-turns"
+
+    def test_a_broken_ledger_never_costs_the_caller_the_critique(
+        self, tmp_path, monkeypatch
+    ):
+        # record_call's own contract is "never raise". The producer must hold
+        # the same line: bookkeeping about a paid artifact must not destroy it.
+        import metrics
+
+        def exploding(config, **kw):
+            raise OSError("disk full")
+
+        monkeypatch.setattr(metrics, "record_call", exploding)
+        set_dir = _make_set(tmp_path)
+        run = _runner(
+            {
+                "openai": _fake_result("openai", "gpt-5.6-sol"),
+                "google": _fake_result("google", "gemini-2.5-pro"),
+            }
+        )
+        res = pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, run_pull=run
+        )
+        assert res.ok
+
+
+class TestPaidButFailedArmsAreLedgered:
+    """Set 113 S6 round-1 finding 2. Recording only on the success path meant a
+    provider that returned several billable turns and THEN raised contributed
+    real dollars and zero rows -- and failing arms are the exact class this
+    session is diagnosing, so that is the spend most likely to be missing."""
+
+    @staticmethod
+    def _runner_that_bills_then_dies(billed_in, billed_out, cost,
+                                     resolved="gpt-5.6-sol"):
+        def run_pull(sandbox, instruction, *, provider, model, config,
+                     trace_sink=None, **kw):
+            if provider == "openai":
+                # pull_route stamps identity on the trace BEFORE driving
+                # anything, which is what makes a failed arm attributable.
+                trace = pv.PullTrace(stop_reason="verdict", provider=provider,
+                                     resolved_model=resolved)
+                if trace_sink is not None:
+                    trace_sink.append(trace)
+                # ...several billable turns happen...
+                trace.input_tokens = billed_in
+                trace.output_tokens = billed_out
+                trace.cost_usd = cost
+                # ...and then the arm dies.
+                raise pv.DeterministicServantViolation("grep: boom")
+            return _fake_result("google", "gemini-2.5-pro")
+        return run_pull
+
+    def test_an_arm_that_billed_then_raised_is_ledgered(self, tmp_path,
+                                                        monkeypatch):
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        res = pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False,
+            run_pull=self._runner_that_bills_then_dies(1200, 800, 0.47),
+        )
+        assert not res.ok  # only one provider produced a critique
+        failed = [r for r in rows if r["provider"] == "openai"]
+        assert len(failed) == 1, rows
+        assert failed[0]["cost_usd"] == 0.47
+        assert failed[0]["input_tokens"] == 1200
+        assert failed[0]["output_tokens"] == 800
+        assert failed[0]["verdict"] is None
+
+    def test_an_arm_that_billed_nothing_invents_no_spend(self, tmp_path,
+                                                         monkeypatch):
+        # THE LEGITIMATE LOOK-ALIKE: a run that died before any billable
+        # response must not get a zero row - that is the opposite error, and
+        # it would make an unmeasured failure look like a measured $0.00.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False,
+            run_pull=self._runner_that_bills_then_dies(0, 0, 0.0),
+        )
+        assert [r["provider"] for r in rows] == ["google"]
+
+    def test_a_runner_with_no_sink_support_does_not_break_the_producer(
+        self, tmp_path, monkeypatch
+    ):
+        # Injected runners in older tests take **kwargs; one that ignores
+        # trace_sink must still work, with nothing invented for it.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+
+        def run_pull(sandbox, instruction, *, provider, model, config, **kw):
+            if provider == "openai":
+                raise RuntimeError("died with no trace at all")
+            return _fake_result("google", "gemini-2.5-pro")
+
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False, run_pull=run_pull
+        )
+        assert [r["provider"] for r in rows] == ["google"]
+
+    def test_a_paid_failed_arm_is_attributed_to_the_model_that_spent(
+        self, tmp_path, monkeypatch
+    ):
+        # Round-3 finding: the resolved model must come from the trace, not
+        # from an optional attribute on the exception. Guard violations and
+        # BindingHTTPError carry no such attribute, so an unpinned arm used to
+        # record "(unresolved)" and a pinned one recorded the caller's ALIAS as
+        # the id sent on the wire.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False,
+            providers=(("openai", "gpt-5-6-sol"), ("google", None)),
+            run_pull=self._runner_that_bills_then_dies(900, 300, 0.31),
+        )
+        failed = [r for r in rows if r["provider"] == "openai"][0]
+        assert failed["model"] == "gpt-5-6-sol"              # asked for
+        assert failed["requested_model_id"] == "gpt-5.6-sol"  # sent
+        assert failed.get("served_model_id") is None          # never observed
+        assert failed["cost_usd"] == 0.31
+
+    def test_an_unpinned_paid_failed_arm_is_never_unresolved(
+        self, tmp_path, monkeypatch
+    ):
+        # The case that produced the literal string "(unresolved)".
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False,
+            run_pull=self._runner_that_bills_then_dies(900, 300, 0.31),
+        )
+        failed = [r for r in rows if r["provider"] == "openai"][0]
+        assert failed["model"] == "gpt-5.6-sol"
+        assert failed["requested_model_id"] == "gpt-5.6-sol"
+        assert "(unresolved)" not in str(failed.values())
+
+    def test_the_trace_carries_identity_from_the_real_pull_route(self, tmp_path):
+        # Structural: the production path must actually stamp it, or the two
+        # tests above would be asserting a property only the fake has.
+        (tmp_path / "a.py").write_text("alpha\n", encoding="utf-8")
+        sink = []
+        binding = _CritiqueFakeBinding()
+        try:
+            pv.pull_route(
+                tmp_path, "review", binding=binding, trace_sink=sink,
+                config={
+                    "providers": {
+                        "openai": {
+                            "api_key_env": "DABBLER_OPENAI_API_KEY",
+                            "base_url": "https://example.invalid/v1",
+                            "timeout_seconds": 5,
+                        }
+                    },
+                    "models": {"gpt-5-6-sol": {"model_id": "gpt-5.6-sol"}},
+                },
+                model="gpt-5-6-sol", provider="openai",
+            )
+        except Exception:
+            pass
+        assert sink, "pull_route must publish its trace before driving anything"
+        assert sink[0].resolved_model == "gpt-5.6-sol"
+        assert sink[0].provider == "openai"
+
+
+class _CritiqueFakeBinding(pv.ProviderBinding):
+    """Dies on the first request, after pull_route has stamped the trace."""
+
+    provider_name = "openai"
+
+    def request(self, **kw):
+        raise pv.BindingHTTPError("openai returned HTTP 500")
+
+
+class TestLedgerModelProvenance:
+    """Set 113 S6 round-2 finding 1. The first version wrote the RESOLVED id
+    into `model`, `requested_model_id` AND `served_model_id`, so an alias-based
+    critique lost what the caller asked for and asserted a served/requested
+    match that had never been observed - which is precisely what a model-drift
+    audit reads."""
+
+    def test_the_caller_s_alias_and_the_sent_id_are_kept_apart(
+        self, tmp_path, monkeypatch
+    ):
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+
+        def run_pull(sandbox, instruction, *, provider, model, config, **kw):
+            # What pull_route does: resolve the alias, stamp the resolved id.
+            return _fake_result(provider, "gpt-5.6-sol")
+
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False, run_pull=run_pull,
+            providers=(("openai", "gpt-5-6-sol"),),
+        )
+        assert len(rows) == 1
+        row = rows[0]
+        assert row["model"] == "gpt-5-6-sol"              # what was asked for
+        assert row["requested_model_id"] == "gpt-5.6-sol"  # what was sent
+
+    def test_served_model_is_unknown_rather_than_assumed(self, tmp_path,
+                                                         monkeypatch):
+        # This executor does not capture the provider's echoed model. NULL is
+        # the schema's honest "not captured"; asserting the id we sent would
+        # make served_model_mismatch compute False and claim a match nobody
+        # observed.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        run = _runner({"openai": _fake_result("openai", "gpt-5.6-sol"),
+                       "google": _fake_result("google", "gemini-2.5-pro")})
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False, run_pull=run
+        )
+        for row in rows:
+            assert row.get("served_model_id") is None
+
+    def test_an_unpinned_arm_falls_back_to_the_resolved_id(self, tmp_path,
+                                                           monkeypatch):
+        # THE LEGITIMATE LOOK-ALIKE: with no pin there is no alias to keep, so
+        # `model` must carry the resolved id rather than None.
+        rows = _capture_rows(monkeypatch)
+        set_dir = _make_set(tmp_path)
+        run = _runner({"openai": _fake_result("openai", "gpt-5.4"),
+                       "google": _fake_result("google", "gemini-2.5-pro")})
+        pc.produce_path_aware_critique(
+            set_dir, sandbox_dir=tmp_path, write=False, run_pull=run
+        )
+        assert {r["model"] for r in rows} == {"gpt-5.4", "gemini-2.5-pro"}

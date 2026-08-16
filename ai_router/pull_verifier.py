@@ -197,6 +197,11 @@ class ToolCallRecord:
     elided: bool
     result_chars: int
     error: bool
+    # Set 113 S6: True when the guard could not compare against a stable truth
+    # because the sandbox moved under the call. The result is still raw ground
+    # truth; this marks the evidence as taken from a shifting tree so a reader
+    # of the trace can see it (the old code raised here and lost the run).
+    sandbox_drift: bool = False
 
 
 # Stop reasons (ASCII machine tokens).
@@ -218,6 +223,15 @@ class PullTrace:
     cost_usd: float = 0.0
     wall_seconds: float = 0.0
     stop_reason: str = STOP_NO_VERDICT
+    # Set 113 S6 round-3: the identity of what was actually driven, published
+    # on the trace itself. A FAILED arm has no PullResult to read the resolved
+    # model off, and an exception is not a reliable carrier -- a guard-raised
+    # DeterministicServantViolation or a BindingHTTPError knows nothing about
+    # model resolution. Putting it here means the one object the caller is
+    # guaranteed to hold (via trace_sink) carries it, so a paid-but-failed arm
+    # is attributed to the model that actually spent the money.
+    provider: str = ""
+    resolved_model: str = ""
 
     @property
     def tool_call_count(self) -> int:
@@ -228,6 +242,16 @@ class PullTrace:
     def zero_tool_calls(self) -> bool:
         """True when no probe ran - a FAILED run, not a fast one."""
         return self.tool_call_count == 0
+
+    @property
+    def sandbox_drift_count(self) -> int:
+        """Probe calls whose ground truth could not be re-derived stably.
+
+        Non-zero means the review sandbox was being written while the critique
+        read it. The verdict still stands on raw bytes, but a reader should
+        know the tree was moving (Set 113 S6).
+        """
+        return sum(1 for tc in self.tool_calls if tc.sandbox_drift)
 
     def to_dict(self) -> dict:
         return {
@@ -240,6 +264,7 @@ class PullTrace:
                     "elided": tc.elided,
                     "result_chars": tc.result_chars,
                     "error": tc.error,
+                    "sandbox_drift": tc.sandbox_drift,
                 }
                 for tc in self.tool_calls
             ],
@@ -249,8 +274,11 @@ class PullTrace:
             "cost_usd": round(self.cost_usd, 6),
             "wall_seconds": round(self.wall_seconds, 2),
             "stop_reason": self.stop_reason,
+            "provider": self.provider,
+            "resolved_model": self.resolved_model,
             "tool_call_count": self.tool_call_count,
             "zero_tool_calls": self.zero_tool_calls,
+            "sandbox_drift_count": self.sandbox_drift_count,
         }
 
 
@@ -310,6 +338,45 @@ class DeterministicServantViolation(PullVerifierError):
     match the canonical ground truth byte-for-byte (or, for an elided result,
     is not a raw contiguous slice of it). This is the anti-bias guardrail: a
     summarizing servant is a hard failure, never a tolerated degradation.
+    """
+
+
+class SandboxNotQuiescent(PullVerifierError):
+    """The review sandbox changed underneath a tool call.
+
+    NOT a servant violation, and deliberately a separate type. The guard proves
+    servant honesty by re-deriving ground truth and comparing; that comparison
+    silently assumes :func:`_canonical_result` is a pure function of
+    ``(name, args, sandbox)``. On a live tree it is a function of time as well,
+    and ``pull_critique`` passes the live git repo root. Set 113 S6 reproduced
+    the old behaviour with the HONEST default servant: one append to one file
+    between the servant call and the guard fired
+    :class:`DeterministicServantViolation`, accusing a servant that had done
+    nothing but call the guard's own function.
+
+    Raised only when repeated re-derivations disagree with EACH OTHER, which no
+    servant can cause. The loop records it and continues with the servant's raw
+    result: those bytes are ground truth from a real filesystem state and were
+    never model-touched, which is the property the guard exists to protect.
+    """
+
+
+class BindingHTTPError(PullVerifierError):
+    """A provider returned a non-2xx status, WITH the body it sent back.
+
+    ``httpx``'s own ``HTTPStatusError`` carries the status and URL but not the
+    response body, so the provider's own explanation was discarded at the one
+    moment it was needed. Set 113 S4 burned three path-aware-critique attempts
+    on an HTTP 400 whose body said, in one sentence, exactly what was wrong -
+    ``"The requested model 'gpt-5-6-sol' does not exist."`` This carries it.
+
+    The body is truncated, and the URL is **redacted** before it is
+    interpolated. Set 113 S6 round-1 verification caught the first version of
+    this claiming that "nothing here can leak a key" on the grounds that the
+    ``Authorization`` header is untouched - true for anthropic and openai, and
+    irrelevant to google, which carries its credential in the query string
+    (``...:generateContent?key=<API KEY>``). A routine 429 would have printed a
+    live key into the terminal, the logs and the session evidence.
     """
 
 
@@ -1349,8 +1416,23 @@ class DeterministicServant:
         return _canonical_result(name, args, sandbox)
 
 
+def _same_result(a: ToolResult, b: ToolResult) -> bool:
+    """Field-for-field equality of two candidate tool results."""
+    return (
+        a.content == b.content
+        and a.raw == b.raw
+        and a.elided == b.elided
+        and a.bytes_total == b.bytes_total
+    )
+
+
 def _guard_raw_ground_truth(
-    name: str, args: dict, result: ToolResult, sandbox: Path
+    name: str,
+    args: dict,
+    result: ToolResult,
+    sandbox: Path,
+    *,
+    servant_is_canonical: bool = False,
 ) -> None:
     """Assert ``result`` is raw ground truth; raise on any deviation.
 
@@ -1360,6 +1442,32 @@ def _guard_raw_ground_truth(
     bytes_total). Because error results are canonicalized too, a servant cannot
     slip a model-authored view past the guard on EITHER a readable artifact
     (content mismatch) OR a failing probe (error-text mismatch).
+
+    **Set 113 S6 - what a mismatch MEANS depends on which servant ran.**
+
+    ``servant_is_canonical`` is True only when the servant is exactly
+    :class:`DeterministicServant`, whose ``run`` is
+    ``return _canonical_result(name, args, sandbox)`` - the very call this
+    function makes for its own truth. The two therefore differ in exactly one
+    respect, *when* they run, and a mismatch is a **proof** that the sandbox
+    changed between them, not evidence of dishonesty. Because
+    ``pull_critique`` reviews the live git repo root, a single append to a log
+    file was enough to abort a paid critique with a false accusation (Set 113
+    S4, reproduced in ``s6-reproduction.md``). That case raises
+    :class:`SandboxNotQuiescent`, which the loop records and continues past.
+
+    For any other servant - the injected fakes in the tests, and any future
+    pluggable - a mismatch is dishonesty and still raises
+    :class:`DeterministicServantViolation`, unchanged. Failing closed on an
+    unknown servant is the safe direction, and it is the default here so a
+    caller cannot get the lenient reading by forgetting a keyword.
+
+    An earlier attempt at this classified by re-deriving a second time and
+    comparing the two fresh derivations with each other. Round-1 verification
+    correctly rejected it: a tree that changes **once and then settles** - the
+    exact reproduced production shape - makes both fresh derivations agree, so
+    it still convicted the honest servant. Identity of the servant is the
+    sound test; timing of the tree is not.
     """
     if not result.raw:
         raise DeterministicServantViolation(
@@ -1367,17 +1475,22 @@ def _guard_raw_ground_truth(
             "ground truth, never a model-touched view"
         )
     truth = _canonical_result(name, args, sandbox)
-    if (
-        result.content != truth.content
-        or result.raw != truth.raw
-        or result.elided != truth.elided
-        or result.bytes_total != truth.bytes_total
-    ):
-        raise DeterministicServantViolation(
-            f"{name}: tool result does not match raw ground truth - the "
-            "servant summarized, paraphrased, fabricated an error, or "
-            "otherwise altered the bytes"
+    if _same_result(result, truth):
+        return
+    if servant_is_canonical:
+        raise SandboxNotQuiescent(
+            f"{name}: the sandbox changed between the probe and its "
+            "verification. The servant is the canonical one - it returns "
+            "exactly what this check re-derives - so a difference can only "
+            "mean the tree moved. This is NOT a servant violation; the result "
+            "the model was given is raw ground truth from a real filesystem "
+            "state. Point the critique at a quiescent tree for a clean run."
         )
+    raise DeterministicServantViolation(
+        f"{name}: tool result does not match raw ground truth - the "
+        "servant summarized, paraphrased, fabricated an error, or "
+        "otherwise altered the bytes"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1909,7 +2022,7 @@ class AnthropicBinding(ProviderBinding):
         timeout = config.get("timeout_seconds", 120)
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, headers=headers, json=body)
-            resp.raise_for_status()
+            _raise_for_status_with_body(resp, self.provider_name, model)
             data = resp.json()
         return self._from_response(data)
 
@@ -2052,7 +2165,7 @@ class OpenAIBinding(ProviderBinding):
         timeout = config.get("timeout_seconds", 120)
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, headers=headers, json=body)
-            resp.raise_for_status()
+            _raise_for_status_with_body(resp, self.provider_name, model)
             data = resp.json()
         # Parse FIRST, then commit chaining state - so a parse failure on a
         # malformed-but-JSON response leaves the cursor untouched and a retry
@@ -2213,7 +2326,7 @@ class GeminiBinding(ProviderBinding):
         timeout = config.get("timeout_seconds", 120)
         with httpx.Client(timeout=timeout) as client:
             resp = client.post(url, json=body)
-            resp.raise_for_status()
+            _raise_for_status_with_body(resp, self.provider_name, model)
             data = resp.json()
         return self._from_response(data)
 
@@ -2295,6 +2408,55 @@ class GeminiBinding(ProviderBinding):
             output_tokens=out_tokens,
             stop_reason=stop_reason,
         )
+
+
+_ERROR_BODY_CHARS = 800
+
+
+def _redact_url(url) -> str:
+    """Return ``url`` with every query-parameter VALUE replaced by REDACTED.
+
+    Google carries its API key in the query string, so a provider URL is a
+    credential-bearing string. Every value is redacted rather than a named
+    denylist of parameters: a denylist is a list of the leaks someone thought
+    of, and the parameters are diagnostically useless anyway - the path, the
+    host and the status are what a reader needs.
+    """
+    try:
+        from urllib.parse import urlsplit, urlunsplit
+    except ImportError:  # pragma: no cover - stdlib
+        return "(url withheld)"
+    try:
+        parts = urlsplit(str(url))
+    except Exception:  # noqa: BLE001 - never let redaction raise
+        return "(url withheld)"
+    if not parts.query:
+        return str(url)
+    redacted = "&".join(
+        (pair.split("=", 1)[0] + "=REDACTED") if "=" in pair else pair
+        for pair in parts.query.split("&")
+    )
+    return urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, redacted, parts.fragment)
+    )
+
+
+def _raise_for_status_with_body(resp, provider: str, model: str) -> None:
+    """``raise_for_status`` that keeps the provider's explanation.
+
+    Every binding calls this instead of ``resp.raise_for_status()`` (G-008 -
+    the defect is a class, and all three bindings had it).
+    """
+    if resp.status_code < 400:
+        return
+    body = (resp.text or "").strip()
+    if len(body) > _ERROR_BODY_CHARS:
+        body = body[:_ERROR_BODY_CHARS] + " [... truncated]"
+    url = _redact_url(getattr(getattr(resp, "request", None), "url", ""))
+    raise BindingHTTPError(
+        f"{provider} returned HTTP {resp.status_code} for model {model!r} "
+        f"at {url}: {body or '(empty response body)'}"
+    )
 
 
 # Binding registry. S2 added openai / google behind the same driver.
@@ -2416,11 +2578,52 @@ def _resolve_gen_params(provider: str, config: Optional[dict]) -> dict:
     return gp.get(provider, {}) or {}
 
 
+def _registry_model_id(name: str, config: Optional[dict]) -> str:
+    """Map a router-registry ALIAS to the id the provider actually serves.
+
+    The registry is keyed by alias (``gpt-5-6-sol``) and each entry carries the
+    provider's own id (``model_id: gpt-5.6-sol``). :func:`route` resolves that
+    indirection at every call site (``_config["models"][alias]["model_id"]``);
+    this executor did not, so a pinned alias reached ``body["model"]`` verbatim
+    and OpenAI answered **HTTP 400 model_not_found** - "The requested model
+    'gpt-5-6-sol' does not exist." (Set 113 S6, reproduced; the three attempts
+    in S4 could not see that sentence because the transport discarded the
+    response body.)
+
+    ``google`` hid the defect for three runs because ``gemini-2.5-pro`` is
+    simultaneously a valid alias and a valid API id. OpenAI's ids carry dots
+    where the registry keys carry dashes, so ``openai`` fails first and alone.
+
+    A string that is not a registry alias passes through unchanged: the
+    executor's own pins (``pull_verifier.models``) and the ``_DEFAULT_MODELS``
+    fallbacks are already provider ids, and an operator may legitimately pin an
+    id the registry does not list at all.
+    """
+    if not config:
+        return name
+    entry = (config.get("models", {}) or {}).get(name)
+    if isinstance(entry, dict):
+        resolved = entry.get("model_id")
+        if resolved:
+            return str(resolved)
+    return name
+
+
 def _resolve_model(
     provider: str, model: Optional[str], config: Optional[dict] = None
 ) -> str:
+    """Resolve the provider-served model id for this run.
+
+    Resolution order is unchanged - explicit ``model=`` wins, then the
+    ``pull_verifier.models`` pin, then ``_DEFAULT_MODELS``. What is new is that
+    the winner is put through :func:`_registry_model_id`, so an alias becomes
+    the id the provider serves instead of a 400. Doing it here rather than in
+    each binding fixes all three bindings at once (G-008) and keeps
+    :func:`_pricing_for` - which matches on ``model_id`` - able to find the
+    entry, so ``cost_ceiling_usd`` binds instead of silently reading $0.00.
+    """
     if model:
-        return model
+        return _registry_model_id(model, config)
     pinned = _executor_block(config).get("models", {}).get(provider)
     if not pinned:
         pinned = _DEFAULT_MODELS.get(provider)
@@ -2429,7 +2632,7 @@ def _resolve_model(
             f"no default pull-verifier model for provider {provider!r}; "
             "pass model=..."
         )
-    return pinned
+    return _registry_model_id(pinned, config)
 
 
 def _pricing_for(model: str, config: Optional[dict]) -> Tuple[float, float]:
@@ -2487,6 +2690,7 @@ def pull_route(
     diff_config: Optional[DiffConfig] = None,
     probe_template_config: Optional["object"] = None,
     podman_lane_config: Optional["PodmanLaneConfig"] = None,
+    trace_sink: Optional[list] = None,
 ) -> PullResult:
     """Drive a capped, instrumented, sandbox-confined read-only tool loop.
 
@@ -2503,6 +2707,11 @@ def pull_route(
     if not sandbox.is_dir():
         raise PullVerifierError(f"sandbox is not a directory: {sandbox}")
     servant = servant or DeterministicServant()
+    # Set 113 S6: EXACT type, not isinstance. A subclass is a different
+    # implementation - every bad servant in the tests is one - and must stay
+    # fully guarded. Only the canonical servant is provably incapable of
+    # returning anything but what the guard re-derives.
+    servant_is_canonical = type(servant) is DeterministicServant
     if binding is None:
         binding = _get_binding(provider)
     provider_name = binding.provider_name
@@ -2545,7 +2754,15 @@ def pull_route(
         )
     )
     transcript: List[dict] = [{"role": "user", "text": instruction}]
-    trace = PullTrace()
+    trace = PullTrace(provider=provider_name, resolved_model=model)
+    # Set 113 S6 (round-1 finding 2): publish the trace to the caller NOW, not
+    # on return. It is mutated in place for the rest of the run, so a caller
+    # holding this reference can read the tokens and dollars actually billed
+    # even when the loop dies mid-flight - an arm that already spent must not
+    # vanish from the ledger just because it raised. One line, no change to
+    # the loop's own control flow.
+    if trace_sink is not None:
+        trace_sink.append(trace)
     critique: Optional[PullCritique] = None
     # Set 069 S2: captured clean run_test executions, so a REPRODUCED claim can
     # be replayed + transcript-backed by the orchestrator (never the agent).
@@ -2811,7 +3028,19 @@ def pull_route(
                 )
                 continue
             tool_result = servant.run(tc.name, tc.input, sandbox)
-            _guard_raw_ground_truth(tc.name, tc.input, tool_result, sandbox)
+            # A DeterministicServantViolation still propagates and kills the
+            # run - that is dishonesty and must never be tolerated. Sandbox
+            # drift is a different thing: the servant's bytes are raw ground
+            # truth from a real filesystem state, so the loop records it and
+            # carries on rather than throwing away a paid run (Set 113 S6).
+            sandbox_drift = False
+            try:
+                _guard_raw_ground_truth(
+                    tc.name, tc.input, tool_result, sandbox,
+                    servant_is_canonical=servant_is_canonical,
+                )
+            except SandboxNotQuiescent:
+                sandbox_drift = True
             is_error = tool_result.content.startswith("ERROR: ")
             trace.tool_calls.append(
                 ToolCallRecord(
@@ -2822,6 +3051,7 @@ def pull_route(
                     elided=tool_result.elided,
                     result_chars=len(tool_result.content),
                     error=is_error,
+                    sandbox_drift=sandbox_drift,
                 )
             )
             results.append(

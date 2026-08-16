@@ -36,6 +36,7 @@
     "G-005": {
       "kind": "instruction",
       "uses": [
+        "113-06",
         "121-04"
       ],
       "note": "project-guidance.md G-005 Prefer removal over addition when fixing. Usage evidence starts here (Set 121 S3); no prior history."
@@ -55,6 +56,7 @@
     "G-008": {
       "kind": "instruction",
       "uses": [
+        "113-06",
         "133-02",
         "121-04"
       ],
@@ -78,6 +80,7 @@
     "G-012": {
       "kind": "instruction",
       "uses": [
+        "113-06",
         "133-02",
         "121-04"
       ],
@@ -86,6 +89,7 @@
     "G-013": {
       "kind": "instruction",
       "uses": [
+        "113-06",
         "133-02",
         "121-04"
       ],
@@ -454,6 +458,7 @@
     "L-112-1": {
       "kind": "instruction",
       "uses": [
+        "113-06",
         "113-03",
         "113-02",
         "113-01",
@@ -462,8 +467,7 @@
         "121-02",
         "121-01",
         "132-03",
-        "132-02",
-        "132-01"
+        "132-02"
       ]
     },
     "L-125-1": {

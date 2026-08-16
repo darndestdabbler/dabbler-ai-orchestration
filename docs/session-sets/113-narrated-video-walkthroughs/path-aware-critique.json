@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "sessionSetName": "113-narrated-video-walkthroughs",
+  "pathAwareCritique": "advisory",
+  "critiquedAt": "2026-08-16T12:39:01.589290-04:00",
+  "critiques": [
+    {
+      "provider": "openai",
+      "model": "gpt-5.4",
+      "verdict": "ISSUES_FOUND",
+      "summary": "I reviewed the Session 5 container-isolation criteria, measurement, verdict script, and supporting harness/scripts under tools/dabbler-ai-orchestration, plus the related spec and outcome docs for set 113. I found one blocking correctness issue in the verdict logic: the code claims to require three consecutive clean runs, but the scorer only counts clean runs and never checks consecutiveness, so a failed run can be masked by later retries.",
+      "findings": [
+        {
+          "description": "Violation: the committed criteria require \"consecutive\": true and state \"Any of I1 through I6 unmet, or fewer than three consecutive clean runs, is a FAIL,\" but the scorer implements only a count. In tools/dabbler-ai-orchestration/scripts/container-isolation-verdict.js it filters target runs, computes `cleanRuns = targets.filter(...).length`, and passes the session when `cleanRuns >= barRuns`; there is no check that the clean runs are adjacent. Impact: a measurement with an interleaved failed target run can still receive a PASS once enough later retries accumulate, which changes the merge decision because the saved verdict artifact can certify the session against a weaker bar than the committed criteria. Evidence: the criteria file explicitly requires consecutiveness, the harness exposes `--runs` and can emit more than three target runs, and the verdict script never evaluates adjacency. Fix: score the longest consecutive clean streak (or otherwise enforce the declared consecutive-run contract) instead of total clean-run count.",
+          "severity": "Major",
+          "category": "correctness",
+          "evidencePaths": [
+            "docs/session-sets/113-narrated-video-walkthroughs/s5-isolation-criteria.json",
+            "tools/dabbler-ai-orchestration/scripts/measure-container-isolation.js",
+            "tools/dabbler-ai-orchestration/scripts/container-isolation-verdict.js"
+          ]
+        }
+      ]
+    },
+    {
+      "provider": "google",
+      "model": "gemini-2.5-pro",
+      "verdict": "VERIFIED",
+      "summary": "I reviewed the unreviewed remediation for the shared Podman machine hazard. The fix, implemented in `tools/dabbler-ai-orchestration/scripts/measure-container-isolation.js`, correctly inventories running containers before attempting to stop the machine. It properly refuses to proceed if foreign containers are running, and otherwise verifies state restoration by comparing container inventories, not just the VM status. This aligns with the description in `docs/session-sets/113-narrated-video-walkthroughs/change-log.md` and adequately resolves the issue. The implementation is correct and complete.",
+      "findings": []
+    }
+  ]
+}

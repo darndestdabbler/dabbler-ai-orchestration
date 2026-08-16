@@ -336,6 +336,22 @@ suite("Set 113 S7 - pointer visibility", () => {
       assert.strictEqual(checker.looksLikeACursor(tooltip, hotspot, 56).ok, false);
     });
 
+    test("a compact hover repaint on a small control is not", () => {
+      // The case the remediation review named: a checkbox or toolbar icon
+      // whose hover state repaints a compact region right at the pointer.
+      // It clears the size bar and the anchor bar; what it cannot do is be
+      // taller than it is wide, because it follows the control's own shape.
+      const hoverBox = {
+        fraction: 0.06,
+        changed: 200,
+        box: { x: 10, y: 12, width: 24, height: 20 },
+        total: 3136,
+      };
+      const verdict = checker.looksLikeACursor(hoverBox, hotspot, 56);
+      assert.strictEqual(verdict.ok, false);
+      assert.ok(/proportion of an arrow/.test(verdict.why), verdict.why);
+    });
+
     test("a cursor-sized mark somewhere else in the crop is not", () => {
       const elsewhere = {
         fraction: 0.06,
@@ -382,6 +398,21 @@ suite("Set 113 S7 - pointer visibility", () => {
       assert.ok(
         source.includes("not shaped like a "),
         "an unrecognised shape does not report itself as indecisive"
+      );
+    });
+  });
+
+  suite("the pointer stays on top when a modal opens after it", () => {
+    test("it is re-promoted on every ensure, not promoted once", () => {
+      // Top-layer entries stack in the order they were added, so a pointer
+      // promoted once at the start of a run sits UNDER a dialog opened part
+      // way through it -- which is every real walkthrough. Structural,
+      // because the broken version passes any test that only opens a modal
+      // before the pointer exists.
+      const source = fs.readFileSync(path.join(SCRIPTS, "pointer.js"), "utf8");
+      assert.ok(
+        source.includes('if (node.matches(":popover-open")) node.hidePopover();'),
+        "an already-open pointer is never moved back to the top of the stack"
       );
     });
   });

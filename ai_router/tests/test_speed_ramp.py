@@ -363,3 +363,42 @@ class TestScreenDerivedMarks:
             "a stretch kept only because the screen moved is reported as though "
             "the record had vouched for it"
         )
+
+
+class TestTheResidualThisCannotSee:
+    """A person reading a static screen writes nothing and moves nothing.
+
+    Neither evidence source can see them, so the threshold carries a margin
+    instead: anything under it plays at real speed even if it really was a
+    wait.  These pin that margin, because it is a number whose whole value
+    is being larger than a plausible read.
+    """
+
+    def test_a_stretch_of_reading_length_is_never_compressed(self):
+        # Forty-odd seconds of nothing: no timestamp, no movement, and a
+        # person perfectly capable of having spent it reading a plan.
+        segments = speed_ramp.build_segments(
+            [_mark(0.0), _mark(46.0)], duration_seconds=50.0
+        )
+        assert all(segment.rate == 1.0 for segment in segments), (
+            "a stretch short enough to have been someone reading was sped up"
+        )
+
+    def test_a_wait_long_enough_to_be_a_suite_still_is_compressed(self):
+        # The look-alike. If this did not compress, the test above would be
+        # satisfied by a ramp that never compresses anything.
+        segments = speed_ramp.build_segments(
+            [_mark(0.0), _mark(600.0)], duration_seconds=610.0
+        )
+        assert any(segment.rate > 1.0 for segment in segments)
+
+    def test_an_animated_wait_errs_toward_a_longer_video(self):
+        # A spinner or a scrolling log registers as movement, so it is kept
+        # at real speed. That is the safe direction and it is worth pinning:
+        # the dangerous error is compressing work, not failing to compress a
+        # wait.
+        moving = [bytes([120] * 16), bytes([200] * 16), bytes([120] * 16)]
+        assert speed_ramp.marks_from_frames(moving, 4.0, 0.004), (
+            "an animated wait produced no marks, so it would be compressed "
+            "along with everything else"
+        )

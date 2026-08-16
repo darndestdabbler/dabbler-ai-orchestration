@@ -59,9 +59,21 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Sequence
 
-# A gap shorter than this is not worth compressing: the ramp in and out of
-# it costs the viewer more attention than the seconds it saves.
-DEFAULT_QUIET_THRESHOLD_SECONDS = 20.0
+# A gap shorter than this is not compressed at all.
+#
+# It is set at forty-five seconds rather than at the twenty a "not worth the
+# ramp" rule would give, and the extra is a deliberate margin around the one
+# thing neither evidence source can see: a person **reading a static
+# screen**. They write no timestamp and they move no pixels, so they are
+# indistinguishable from a suite running -- and reading is a matter of tens
+# of seconds, while the waits this exists to compress are minutes. Anything
+# under this bar plays at real speed even if it really was a wait, which
+# costs a slightly longer video and cannot cut through someone thinking.
+#
+# The opposite error is safe by construction: a wait that shows a spinner or
+# a scrolling log registers as movement and is kept at real speed. That
+# makes the video longer, never less honest.
+DEFAULT_QUIET_THRESHOLD_SECONDS = 45.0
 
 # What a compressed stretch becomes.  Not zero -- a cut to nothing tells the
 # viewer the wait did not happen, which is exactly the thing a tutorial

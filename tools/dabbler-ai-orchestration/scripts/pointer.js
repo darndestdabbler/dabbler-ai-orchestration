@@ -132,7 +132,16 @@ async function ensureSyntheticPointer(page, at) {
           if (node.getAttribute("popover") !== "manual") {
             node.setAttribute("popover", "manual");
           }
-          if (!node.matches(":popover-open")) node.showPopover();
+          // RE-promoted every time, not promoted once. Top-layer entries
+          // stack in the order they were added, so a pointer promoted
+          // before a dialog opens sits BELOW that dialog -- which is the
+          // ordinary case, because the pointer is created at the start of a
+          // run and modals open part way through it. Hiding and re-showing
+          // moves it back to the top of the stack. The recorders call this
+          // before every action, so the pointer is always the most recently
+          // added entry by the time it matters.
+          if (node.matches(":popover-open")) node.hidePopover();
+          node.showPopover();
           // A popover gets a default border, background, padding and margin
           // from the UA stylesheet, and inherits `position: fixed` semantics
           // it already had. Clear them, or the arrow arrives inside a box.

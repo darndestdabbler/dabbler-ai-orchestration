@@ -25,11 +25,11 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 6843,
-      "afterMillis": 7930,
+      "beforeMillis": 6855,
+      "afterMillis": 7945,
       "outcome": "passed",
       "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
-      "targetChangedFraction": 0.0523,
+      "targetChangedFraction": 0.05198,
       "controlChangedFraction": 0,
       "changedBox": {
         "x": 10,
@@ -52,11 +52,11 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 8490,
-      "afterMillis": 9577,
+      "beforeMillis": 8499,
+      "afterMillis": 9587,
       "outcome": "passed",
       "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
-      "targetChangedFraction": 0.08992,
+      "targetChangedFraction": 0.09056,
       "controlChangedFraction": 0,
       "changedBox": {
         "x": 8,
@@ -79,8 +79,8 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 16856,
-      "afterMillis": 17954,
+      "beforeMillis": 16847,
+      "afterMillis": 17950,
       "outcome": "passed",
       "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
       "targetChangedFraction": 0.0523,
@@ -106,17 +106,17 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 18523,
-      "afterMillis": 19634,
+      "beforeMillis": 18496,
+      "afterMillis": 19582,
       "outcome": "passed",
       "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
-      "targetChangedFraction": 0.08897,
+      "targetChangedFraction": 0.08737,
       "controlChangedFraction": 0,
       "changedBox": {
-        "x": 10,
-        "y": 9,
-        "width": 18,
-        "height": 28
+        "x": 8,
+        "y": 6,
+        "width": 20,
+        "height": 31
       },
       "shape": "compact, cursor-sized, and anchored at the hotspot"
     },
@@ -133,8 +133,8 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 25871,
-      "afterMillis": 26960,
+      "beforeMillis": 25875,
+      "afterMillis": 26991,
       "outcome": "passed",
       "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
       "targetChangedFraction": 0.05357,
@@ -160,16 +160,16 @@
         "width": 56,
         "height": 56
       },
-      "beforeMillis": 35876,
-      "afterMillis": 36967,
+      "beforeMillis": 35870,
+      "afterMillis": 36943,
       "outcome": "passed",
       "detail": "a cursor-shaped mark appeared with its tip at the target, and nothing moved in the control",
       "targetChangedFraction": 0.05198,
       "controlChangedFraction": 0,
       "changedBox": {
-        "x": 9,
+        "x": 10,
         "y": 10,
-        "width": 19,
+        "width": 18,
         "height": 27
       },
       "shape": "compact, cursor-sized, and anchored at the hotspot"
@@ -186,6 +186,6 @@
     "width": 1280,
     "height": 800
   },
-  "recordingStartOffsetMillis": 190,
-  "recordingStartOffsetBasis": "the run's last event was at 44150ms and the file is 43960ms long"
+  "recordingStartOffsetMillis": 216,
+  "recordingStartOffsetBasis": "the run's last event was at 44136ms and the file is 43920ms long"
 }

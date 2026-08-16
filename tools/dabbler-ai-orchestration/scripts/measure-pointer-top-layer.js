@@ -43,11 +43,10 @@ const OUT_PATH = path.join(
 // put it under the hotspot, and both states scored 34%: the instrument was
 // measuring a button, and would have called the broken state a pass.
 const MODAL_RGB = [12, 74, 110];
-const PAGE = `<!doctype html><html><body style="margin:0;background:#ffffff">
+const PAGE_BEFORE = `<!doctype html><html><body style="margin:0;background:#ffffff">
 <dialog id="m" style="margin:0;padding:0;border:0;width:100vw;height:100vh;max-width:none;max-height:none;background:rgb(12,74,110)">
   <button id="target" style="position:absolute;left:600px;top:460px">Confirm</button>
 </dialog>
-<script>document.getElementById("m").showModal();</script>
 </body></html>`;
 
 const AT = { x: 300, y: 200 };
@@ -81,7 +80,16 @@ function foreignFraction(buffer) {
 }
 
 async function shoot(page, promote) {
-  await page.setContent(PAGE);
+  await page.setContent(PAGE_BEFORE);
+  // The ORDER a real walkthrough has: the pointer exists first, from the
+  // start of the run, and the modal opens later. Top-layer entries stack in
+  // the order they were added, so promoting the pointer once at creation
+  // puts it UNDER a dialog opened afterwards -- which is every real case,
+  // and which the first version of this measurement missed by opening the
+  // modal in the page's own markup before the pointer existed.
+  await pointer.ensureSyntheticPointer(page, AT);
+  await page.evaluate(() => document.getElementById("m").showModal());
+  await page.waitForTimeout(80);
   await pointer.ensureSyntheticPointer(page, AT);
   if (!promote) {
     // The control: exactly the fix removed, and nothing else. The element is

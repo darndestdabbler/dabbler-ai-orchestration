@@ -227,6 +227,25 @@ function looksLikeACursor(region, hotspot, cropSize) {
         ", larger than a cursor -- something in the UI moved or repainted",
     };
   }
+  // A cursor is TALLER THAN IT IS WIDE. This is what separates it from the
+  // case the review named: a checkbox or toolbar icon whose hover state
+  // repaints a compact region right at the pointer -- those repaints follow
+  // the control, which is square or wider than tall, because controls are.
+  // Measured on this repo's own recordings, the synthetic arrow comes out
+  // 18-20 wide by 27-31 tall, a ratio of about 1.5; the Windows arrow has
+  // the same proportions.
+  if (region.box.height <= region.box.width * 1.15) {
+    return {
+      ok: false,
+      why:
+        "the change is " +
+        region.box.width +
+        " wide by " +
+        region.box.height +
+        " tall, which is not the proportion of an arrow -- a control's " +
+        "hover state repaints the control's own shape",
+    };
+  }
   if (
     Math.abs(region.box.x - hotspot.x) > slack ||
     Math.abs(region.box.y - hotspot.y) > slack

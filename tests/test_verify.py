@@ -194,6 +194,203 @@ class TestLoop:
         assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
 
 
+class TestDispute:
+    def _dispute(self, set_dir, *extra):
+        from ai_router.verify import main
+
+        return main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "1", "--finding", "0",
+            "--grounds", "out of scope per the not-covered list",
+            *extra,
+        ])
+
+    def _blocked_round_one(self, flight, outcomes):
+        repo, set_dir, install = flight
+        fake = install(outcomes)
+        assert run_round(set_dir) == EXIT_BLOCKING
+        return repo, set_dir, fake
+
+    def test_dispute_records_row(self, flight):
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        (repo / "docs" / "scope.md").write_text(
+            "selector grammar is deliberately not covered\n",
+            encoding="utf-8",
+        )
+        assert self._dispute(set_dir, "--evidence", "docs/scope.md") == EXIT_OK
+        disputes = ledger.read_disputes(repo, set_dir.name, 1)
+        assert len(disputes) == 1
+        assert disputes[0]["round"] == 1
+        assert disputes[0]["finding_index"] == 0
+        assert disputes[0]["evidence_paths"] == ["docs/scope.md"]
+        assert disputes[0]["filed_after_round"] == 1
+        assert disputes[0]["recorded_at"]
+
+    def test_prose_only_dispute_refused(self, flight, capsys):
+        from ai_router.verify import EXIT_USAGE
+
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        assert self._dispute(set_dir) == EXIT_USAGE
+        assert "prose-only disputes are refused" in capsys.readouterr().err
+        assert ledger.read_disputes(repo, set_dir.name, 1) == []
+
+    def test_nonexistent_evidence_path_refused(self, flight, capsys):
+        from ai_router.verify import EXIT_USAGE
+
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        assert self._dispute(
+            set_dir, "--evidence", "docs/ghost.md"
+        ) == EXIT_USAGE
+        assert "docs/ghost.md" in capsys.readouterr().err
+
+    def test_unrecorded_finding_refused_with_listing(self, flight, capsys):
+        from ai_router.verify import EXIT_STATE, main
+
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
+        assert main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "1", "--finding", "5", "--grounds", "nope",
+            "--evidence", "docs/scope.md",
+        ]) == EXIT_STATE
+        err = capsys.readouterr().err
+        assert "finding 5 does not exist" in err
+        assert "0-based" in err          # self-correction listing
+
+    def test_second_dispute_of_same_finding_refused(self, flight, capsys):
+        from ai_router.verify import EXIT_STATE
+
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
+        assert self._dispute(set_dir, "--evidence", "docs/scope.md") == EXIT_OK
+        assert self._dispute(
+            set_dir, "--evidence", "docs/scope.md"
+        ) == EXIT_STATE
+        assert "already disputed" in capsys.readouterr().err
+        assert len(ledger.read_disputes(repo, set_dir.name, 1)) == 1
+
+    def test_rebuttal_rides_next_round_prompt(self, flight):
+        repo, set_dir, fake = self._blocked_round_one(
+            flight,
+            [make_result(BLOCKING_RESPONSE), make_result(CLEAN_RESPONSE)],
+        )
+        (repo / "docs" / "scope.md").write_text(
+            "selector grammar is deliberately not covered\n",
+            encoding="utf-8",
+        )
+        assert self._dispute(set_dir, "--evidence", "docs/scope.md") == EXIT_OK
+        assert run_round(set_dir) == EXIT_OK
+        prompt = fake.calls[1]["prompt"]
+        assert "[DISPUTED]" in prompt
+        assert "out of scope per the not-covered list" in prompt   # grounds
+        assert "deliberately not covered" in prompt        # cited content
+        assert "UPHOLD" in prompt and "WITHDRAW" in prompt
+
+    def test_withdrawn_dispute_not_re_presented_in_later_rounds(self, flight):
+        # Round 2 withdraws the disputed finding (does not re-raise it) but
+        # raises a NEW blocker; round 3 must not present the settled
+        # dispute for adjudication again.
+        second_blocker = (
+            "ISSUES FOUND\n\n- **Issue 1:** the widget lacks input "
+            "validation entirely\n  - **Severity:** Major\n"
+        )
+        repo, set_dir, fake = self._blocked_round_one(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(second_blocker),
+                make_result(CLEAN_RESPONSE),
+            ],
+        )
+        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
+        assert self._dispute(set_dir, "--evidence", "docs/scope.md") == EXIT_OK
+        assert run_round(set_dir) == EXIT_BLOCKING     # round 2: presented
+        assert run_round(set_dir) == EXIT_OK           # round 3: settled
+        prompt = fake.calls[2]["prompt"]
+        assert "[DISPUTED]" not in prompt
+        assert "UPHOLD" not in prompt
+        assert "settled by that round's findings" in prompt
+
+    def test_line_range_cite_renders_exact_passage(self, flight):
+        repo, set_dir, install = flight
+        # Present before round 1, so round 2's fix-delta carries no copy of
+        # the file — the only way its text reaches round 2 is the citation.
+        (repo / "docs" / "scope.md").write_text(
+            "unrelated preamble\nthe grammar is out of scope\ntrailing\n",
+            encoding="utf-8",
+        )
+        fake = install(
+            [make_result(BLOCKING_RESPONSE), make_result(CLEAN_RESPONSE)]
+        )
+        assert run_round(set_dir) == EXIT_BLOCKING
+        assert self._dispute(
+            set_dir, "--evidence", "docs/scope.md:2-2"
+        ) == EXIT_OK
+        disputes = ledger.read_disputes(repo, set_dir.name, 1)
+        assert disputes[0]["evidence_paths"] == ["docs/scope.md:2-2"]
+        assert run_round(set_dir) == EXIT_OK
+        prompt = fake.calls[1]["prompt"]
+        assert "the grammar is out of scope" in prompt
+        assert "unrelated preamble" not in prompt
+
+    def test_oversized_bare_cite_refused_range_accepted(self, flight, capsys):
+        # A bare cite of a file over the inline cap would silently lose its
+        # tail at render time; the CLI refuses it and names the range
+        # syntax, which the same file then satisfies.
+        from ai_router.verify import EXIT_USAGE
+
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        big = repo / "docs" / "big-spec.md"
+        big.write_text("x" * (17 * 1024) + "\nthe real passage\n",
+                       encoding="utf-8")
+        assert self._dispute(
+            set_dir, "--evidence", "docs/big-spec.md"
+        ) == EXIT_USAGE
+        assert "docs/big-spec.md:START-END" in capsys.readouterr().err
+        assert self._dispute(
+            set_dir, "--evidence", "docs/big-spec.md:2-2"
+        ) == EXIT_OK
+
+    def test_relative_path_escaping_repo_refused(self, flight, capsys):
+        from ai_router.verify import EXIT_USAGE
+
+        repo, set_dir, _ = self._blocked_round_one(
+            flight, [make_result(BLOCKING_RESPONSE)]
+        )
+        outside = repo.parent / "private-notes.txt"
+        outside.write_text("secret\n", encoding="utf-8")
+        assert self._dispute(
+            set_dir, "--evidence", "../private-notes.txt"
+        ) == EXIT_USAGE
+        assert "outside the repository" in capsys.readouterr().err
+        assert ledger.read_disputes(repo, set_dir.name, 1) == []
+
+    def test_undisputed_session_prompt_carries_no_dispute_language(
+        self, flight
+    ):
+        repo, set_dir, fake = self._blocked_round_one(
+            flight,
+            [make_result(BLOCKING_RESPONSE), make_result(CLEAN_RESPONSE)],
+        )
+        assert run_round(set_dir) == EXIT_OK
+        prompt = fake.calls[1]["prompt"]
+        assert "DISPUTED" not in prompt
+        assert "UPHOLD" not in prompt
+        assert "RE-RAISE" in prompt      # the plain instruction, unchanged
+
+
 class TestVerifierSelectionFailures:
     def test_retry_excludes_failed_provider(self, flight):
         repo, set_dir, install = flight

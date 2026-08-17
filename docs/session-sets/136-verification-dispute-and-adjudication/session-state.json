@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 4,
+  "sessionSetName": "136-verification-dispute-and-adjudication",
+  "status": "in-progress",
+  "sessions": [
+    {
+      "number": 1,
+      "title": "The dispute channel",
+      "status": "in-progress",
+      "startedAt": "2026-08-17T15:31:43.611310-04:00",
+      "completedAt": null,
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 3,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "costUsd": 0.668005
+      }
+    },
+    {
+      "number": 2,
+      "title": "The adjudication round",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 3,
+      "title": "The operator path, and every refusal names its exit",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    }
+  ]
+}

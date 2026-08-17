@@ -1,0 +1,118 @@
+{
+  "sessionSetName": "136-verification-dispute-and-adjudication",
+  "createdDate": "2026-08-17T15:31:43.723161-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "add-the-dispute-record",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Add the dispute record: `.dabbler/runs/<set>/s<N>/disputes.jsonl`, machine-written only by `ai_router.verify`, one row per dispute \u2014 `round`, `finding_index`, `grounds`, `evidence_paths`, `recorded_at` \u2014 schema-validated on read like `rounds.jsonl`. One dispute per finding, immutable; a second dispute of the same finding is refused.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-the-cli-entry",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Add the CLI entry: `python -m ai_router.verify dispute --session-set-dir <set> --round R --finding F --grounds \"...\" --evidence <path> [--evidence <path> ...]`. At least one `--evidence` naming an existing repo path is required \u2014 a dispute is an argument from the record, not a complaint; prose-only disputes are refused with a message saying exactly that. The bare `verify` invocation keeps its current behavior unchanged.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "render-disputes-in-the-next-round",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Render disputes in the next round's prompt: in the prior-findings block, each disputed finding carries its rebuttal (grounds plus the cited files' relevant content) directly beside it, and the verifier instruction changes from \"if it persists, RE-RAISE it\" to: engage the rebuttal \u2014 UPHOLD with reasons that address the cited evidence, or WITHDRAW. A withdrawn finding no longer counts as unresolved.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-17T15:31:43.723161-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T15:31:43.724196-04:00",
+      "description": "Registered session 1 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "add-the-dispute-record",
+      "dateTime": "2026-08-17T15:37:44.696789-04:00",
+      "description": "disputes.jsonl rows in ledger.py + disputes.schema.json, schema-validated on read, one immutable dispute per finding",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "add-the-cli-entry",
+      "dateTime": "2026-08-17T15:37:44.697783-04:00",
+      "description": "verify dispute subcommand: evidence-backed rebuttals only, prose-only refused, bare verify unchanged",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "render-disputes-in-the-next-round",
+      "dateTime": "2026-08-17T15:37:44.697783-04:00",
+      "description": "disputed findings carry rebuttal + cited evidence in prior-findings block; UPHOLD-or-WITHDRAW instruction",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T15:53:05.321315-04:00",
+      "description": "VERIFIED round 3 (gpt-5-6-sol/openai); rounds 1-2 found 2 real Majors (settled disputes re-presented; oversized bare cites truncated) + 1 containment nit, all remediated",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T15:53:05.322858-04:00",
+      "description": "341 passed via pytest -n 8 -m \"not e2e\", 71s; no testing.suites declared in this repo so the freshness gate is vacuous",
+      "status": "complete"
+    }
+  ]
+}

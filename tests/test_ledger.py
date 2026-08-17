@@ -87,6 +87,24 @@ class TestTamperRefusal:
             ledger.append_round(tmp_path, "010-demo", 2, row)
 
 
+class TestDisputes:
+    def test_prose_only_row_refused_on_read(self, tmp_path):
+        # A hand-written dispute with no cited evidence cannot even be
+        # smuggled in on disk: minItems 1 fails schema validation on read.
+        path = ledger.disputes_path(tmp_path, "010-demo", 1)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(
+            json.dumps({
+                "round": 1, "finding_index": 0, "grounds": "just because",
+                "evidence_paths": [],
+                "recorded_at": "2026-08-17T10:00:00+02:00",
+            }) + "\n",
+            encoding="utf-8",
+        )
+        with pytest.raises(ledger.LedgerError):
+            ledger.read_disputes(tmp_path, "010-demo", 1)
+
+
 class TestRawOutput:
     def test_saved_bytes_unmodified(self, tmp_path):
         content = "VERIFIED\r\nline two\n"

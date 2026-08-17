@@ -1,4 +1,5 @@
-"""The machine-only run ledger: ``.dabbler/runs/<set>/s<N>/rounds.jsonl``.
+"""The machine-only run ledger: ``.dabbler/runs/<set>/s<N>/rounds.jsonl``
+and, beside it, ``disputes.jsonl`` (one row per disputed finding).
 
 One row per completed verification round, appended only by the CLI
 (``ai_router.verify``). The close gate reads it. There is no stamp and no
@@ -19,8 +20,8 @@ from pathlib import Path
 
 import jsonschema
 
-_SCHEMA_PATH = Path(__file__).parent / "schemas" / "rounds.schema.json"
-_schema_cache: dict | None = None
+_SCHEMAS_DIR = Path(__file__).parent / "schemas"
+_schema_cache: dict = {}
 
 RUNS_DIRNAME = ".dabbler/runs"
 
@@ -30,11 +31,12 @@ class LedgerError(RuntimeError):
     caller must treat the verification record as absent, never guess."""
 
 
-def _schema() -> dict:
-    global _schema_cache
-    if _schema_cache is None:
-        _schema_cache = json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
-    return _schema_cache
+def _schema(name: str) -> dict:
+    if name not in _schema_cache:
+        _schema_cache[name] = json.loads(
+            (_SCHEMAS_DIR / name).read_text(encoding="utf-8")
+        )
+    return _schema_cache[name]
 
 
 def session_run_dir(repo_root, set_slug: str, session_number: int) -> Path:
@@ -56,26 +58,30 @@ def raw_output_path(
     )
 
 
-def validate_round(record: dict) -> dict:
+def _validate(record: dict, schema_name: str, noun: str) -> dict:
     try:
-        jsonschema.validate(record, _schema())
+        jsonschema.validate(record, _schema(schema_name))
     except jsonschema.ValidationError as exc:
         location = "/".join(str(p) for p in exc.absolute_path) or "(root)"
         raise LedgerError(
-            f"round record failed schema validation at {location}: "
+            f"{noun} record failed schema validation at {location}: "
             f"{exc.message}"
         ) from exc
     return record
 
 
-def read_rounds(repo_root, set_slug: str, session_number: int) -> list[dict]:
-    """Every recorded round, ascending. Any unparseable or schema-invalid
-    line raises :class:`LedgerError` — the ledger is machine-written, so a
-    bad line is evidence of tampering or corruption, not noise to skip."""
-    path = rounds_path(repo_root, set_slug, session_number)
+def validate_round(record: dict) -> dict:
+    return _validate(record, "rounds.schema.json", "round")
+
+
+def validate_dispute(record: dict) -> dict:
+    return _validate(record, "disputes.schema.json", "dispute")
+
+
+def _read_jsonl(path: Path, validate) -> list[dict]:
     if not path.exists():
         return []
-    rounds = []
+    records = []
     for line_no, line in enumerate(
         path.read_text(encoding="utf-8").splitlines(), start=1
     ):
@@ -90,8 +96,18 @@ def read_rounds(repo_root, set_slug: str, session_number: int) -> list[dict]:
             ) from exc
         if not isinstance(record, dict):
             raise LedgerError(f"{path} line {line_no} is not an object")
-        validate_round(record)
-        rounds.append(record)
+        validate(record)
+        records.append(record)
+    return records
+
+
+def read_rounds(repo_root, set_slug: str, session_number: int) -> list[dict]:
+    """Every recorded round, ascending. Any unparseable or schema-invalid
+    line raises :class:`LedgerError` — the ledger is machine-written, so a
+    bad line is evidence of tampering or corruption, not noise to skip."""
+    rounds = _read_jsonl(
+        rounds_path(repo_root, set_slug, session_number), validate_round
+    )
     rounds.sort(key=lambda r: r["round"])
     return rounds
 
@@ -138,3 +154,43 @@ def save_raw_output(
 def next_round_number(repo_root, set_slug: str, session_number: int) -> int:
     rounds = read_rounds(repo_root, set_slug, session_number)
     return (rounds[-1]["round"] + 1) if rounds else 1
+
+
+# --- disputes.jsonl ----------------------------------------------------------
+
+def disputes_path(repo_root, set_slug: str, session_number: int) -> Path:
+    return (
+        session_run_dir(repo_root, set_slug, session_number)
+        / "disputes.jsonl"
+    )
+
+
+def read_disputes(repo_root, set_slug: str, session_number: int) -> list[dict]:
+    return _read_jsonl(
+        disputes_path(repo_root, set_slug, session_number), validate_dispute
+    )
+
+
+def append_dispute(
+    repo_root, set_slug: str, session_number: int, record: dict
+) -> dict:
+    """Append one validated dispute row. One dispute per finding, ever —
+    a dispute is immutable, and re-arguing a judged point is the loop this
+    channel exists to end."""
+    validate_dispute(record)
+    existing = read_disputes(repo_root, set_slug, session_number)
+    if any(
+        d["round"] == record["round"]
+        and d["finding_index"] == record["finding_index"]
+        for d in existing
+    ):
+        raise LedgerError(
+            f"finding {record['finding_index']} of round {record['round']} "
+            f"is already disputed for {set_slug} s{session_number}; disputes "
+            "are immutable and a finding is disputed at most once"
+        )
+    path = disputes_path(repo_root, set_slug, session_number)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record) + "\n")
+    return record

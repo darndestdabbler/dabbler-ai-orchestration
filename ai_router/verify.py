@@ -16,6 +16,11 @@ Outcomes append to the machine-only ledger; raw verifier output is saved
 before any parsing. The loop suspends at the round cap
 (``verification.settings.max_rounds``, default 3) — the closed severity
 vocabulary is the primary control, the cap is the backstop.
+
+A contested finding has a channel: ``verify dispute`` records an
+evidence-backed rebuttal (never prose alone), and the next round presents
+it beside the finding for UPHOLD-or-WITHDRAW — so a scope dispute
+converges instead of being re-raised until the cap.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ from __future__ import annotations
 import argparse
 import datetime
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -237,12 +243,84 @@ def _check_cap(rendered: str) -> None:
         )
 
 
-def _prior_findings_block(rounds: list) -> str:
+_DISPUTE_EVIDENCE_INLINE_CAP = 16 * 1024
+
+_EVIDENCE_RANGE = re.compile(r"^(.*?):(\d+)(?:-(\d+))?$")
+
+
+def split_evidence_range(token: str) -> tuple:
+    """``(path, start, end)`` from ``path[:START[-END]]``; a bare path is
+    ``(path, None, None)``. The range is how a citation stays *relevant*
+    inside a large file instead of hoping the passage lands in a prefix."""
+    match = _EVIDENCE_RANGE.match(token)
+    if not match:
+        return token, None, None
+    start = int(match.group(2))
+    end = int(match.group(3)) if match.group(3) else start
+    return match.group(1), start, end
+
+
+def _cited_evidence_lines(repo_root, cite: str) -> list:
+    """The cited content, fenced — a rebuttal argues from the record, so
+    the record rides along. A line-range cite renders exactly that passage;
+    a whole-file cite is capped, and the truncation names the range syntax
+    instead of silently dropping the tail. A path missing at render time is
+    said so, never silently dropped."""
+    rel_path, start, end = split_evidence_range(cite)
+    full = Path(repo_root) / rel_path
+    try:
+        text = full.read_bytes().decode("utf-8")
+    except FileNotFoundError:
+        return [f"  - Cited evidence `{cite}`: (missing at render time)"]
+    except (OSError, UnicodeDecodeError):
+        return [f"  - Cited evidence `{cite}`: (unreadable as UTF-8)"]
+    if start is not None:
+        all_lines = text.splitlines()
+        excerpt = "\n".join(all_lines[start - 1:end])
+        if not excerpt:
+            return [
+                f"  - Cited evidence `{cite}`: (the file has only "
+                f"{len(all_lines)} line(s); the cited range is empty)"
+            ]
+        label = f"`{rel_path}` lines {start}-{min(end, len(all_lines))}"
+        return [f"  - Cited evidence {label}:", "", "```", excerpt, "```", ""]
+    if len(text) > _DISPUTE_EVIDENCE_INLINE_CAP:
+        text = (
+            text[:_DISPUTE_EVIDENCE_INLINE_CAP]
+            + "\n... (truncated at the inline cap; cite "
+            f"`{rel_path}:START-END` to include a later passage)"
+        )
+    return [f"  - Cited evidence `{rel_path}`:", "", "```", text, "```", ""]
+
+
+def _split_disputes(rounds: list, disputes: list) -> tuple:
+    """``(pending, settled_round_by_key)``: a dispute is PENDING until a
+    round recorded after its filing has presented it; that round's own
+    findings then carry the outcome (re-raised = upheld, absent =
+    withdrawn), so re-presenting the rebuttal would re-litigate a settled
+    point — the loop this channel exists to end."""
+    pending, settled = {}, {}
+    for d in disputes or []:
+        key = (d["round"], d["finding_index"])
+        later = [
+            r["round"] for r in rounds if r["round"] > d["filed_after_round"]
+        ]
+        if later:
+            settled[key] = min(later)
+        else:
+            pending[key] = d
+    return pending, settled
+
+
+def _prior_findings_block(rounds: list, disputes=None, repo_root=None) -> str:
     """Prior rounds' findings, blocking ones marked unresolved — a
     re-raised unresolved point is not resurrection; a new finding must be
-    a new defect within the fix delta."""
+    a new defect within the fix delta. A disputed finding carries the
+    orchestrator's rebuttal beside it exactly once, so a scope dispute
+    converges instead of being re-raised forever."""
     if not rounds:
         return ""
+    pending, settled = _split_disputes(rounds, disputes or [])
     lines = [
         "#### Prior-round findings (auto-assembled from the run ledger)",
         "",
@@ -252,27 +330,54 @@ def _prior_findings_block(rounds: list) -> str:
         "remediation resolves it, say so.",
         "",
     ]
+    if pending:
+        lines[2:2] = [
+            "A finding marked DISPUTED carries the orchestrator's rebuttal "
+            "and its cited evidence directly beside it. Do not simply "
+            "re-raise a disputed finding: engage the rebuttal — UPHOLD the "
+            "finding with reasons that address the cited evidence, or "
+            "WITHDRAW it. A withdrawn finding no longer counts as "
+            "unresolved.",
+            "",
+        ]
     for row in rounds:
         lines.append(
             f"**Round {row['round']}** — {row.get('verdict')}, "
             f"{len(row.get('findings') or [])} finding(s)"
         )
-        for finding in row.get("findings") or []:
+        for index, finding in enumerate(row.get("findings") or []):
             severity = finding.get("severity", "major")
             description = str(finding.get("description", ""))[:700]
-            lines.append(f"- [{severity}] {description}")
+            key = (row["round"], index)
+            dispute = pending.get(key)
+            marker = " [DISPUTED]" if dispute else ""
+            lines.append(f"- [{severity}]{marker} {description}")
             scenario = finding.get("failureScenario")
             if scenario:
                 lines.append(f"  - Failure scenario: {str(scenario)[:300]}")
+            if dispute:
+                lines.append(
+                    "  - Orchestrator's rebuttal (grounds): "
+                    + str(dispute["grounds"])
+                )
+                for cite in dispute["evidence_paths"]:
+                    lines.extend(_cited_evidence_lines(repo_root, cite))
+            elif key in settled:
+                lines.append(
+                    f"  - (disputed; the rebuttal was presented in round "
+                    f"{settled[key]} and is settled by that round's "
+                    "findings — do not re-adjudicate it here)"
+                )
         lines.append("")
     return "\n".join(lines)
 
 
 def _build_task_block(
-    set_dir, session_number: int, round_number: int, prior_rounds: list
+    set_dir, session_number: int, round_number: int, prior_rounds: list,
+    disputes=None, repo_root=None,
 ) -> str:
     parts = []
-    prior = _prior_findings_block(prior_rounds)
+    prior = _prior_findings_block(prior_rounds, disputes, repo_root)
     if prior:
         parts.append(prior)
     parts.append(
@@ -397,9 +502,13 @@ def run_round(
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_UNAVAILABLE
 
+    disputes = ledger.read_disputes(repo_root, slug, current)
     prompt_body = build_verification_prompt(
         config.get("_verification_template", ""),
-        _build_task_block(set_path, current, round_number, prior_rounds),
+        _build_task_block(
+            set_path, current, round_number, prior_rounds, disputes,
+            repo_root,
+        ),
         "session-verification",
         evidence,
     )
@@ -529,6 +638,158 @@ def run_round(
     return EXIT_OK
 
 
+# --- The dispute channel -----------------------------------------------------
+
+def _resolve_repo_relative(root: Path, token: str) -> tuple:
+    """``(repo-relative-posix-path, None)`` for an existing path inside the
+    repo, else ``(None, "outside" | "missing")``. Relative and absolute
+    forms get the same containment check — ``../elsewhere`` may exist, but
+    it is not the repo's record."""
+    path = Path(token)
+    try:
+        resolved = (
+            path.resolve() if path.is_absolute() else (root / path).resolve()
+        )
+        rel = resolved.relative_to(root.resolve())
+    except ValueError:
+        return None, "outside"
+    except OSError:
+        return None, "missing"
+    if not (root / rel).is_file():
+        return None, "missing"
+    return str(rel).replace("\\", "/"), None
+
+
+def record_dispute(
+    set_dir, *, round_number: int, finding_index: int, grounds: str,
+    evidence: list,
+) -> int:
+    """Record the orchestrator's rebuttal of one recorded finding. The
+    dispute is immutable and rides into the next round's prompt beside the
+    finding it contests, where the verifier must engage it — UPHOLD or
+    WITHDRAW — instead of re-raising it unanswered."""
+    from .progress import read_session_state
+
+    set_path = Path(set_dir)
+    repo_root = repo_root_for(set_path)
+    if repo_root is None:
+        print(
+            f"verify dispute: not inside a git repository: {set_path}",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+    state = read_session_state(set_path)
+    current = (state or {}).get("currentSession")
+    if current is None:
+        print(
+            f"verify dispute: no session is in flight under {set_path}; a "
+            "dispute belongs to the session whose round it contests.",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    if not (grounds or "").strip():
+        print("verify dispute: --grounds must be non-empty",
+              file=sys.stderr)
+        return EXIT_USAGE
+    if not evidence:
+        print(
+            "verify dispute: refused -- a dispute is an argument from the "
+            "record, not a complaint; prose-only disputes are refused. Cite "
+            "at least one existing repo path with --evidence.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
+
+    root = Path(repo_root)
+    cited = []
+    for raw in evidence:
+        rel, why = _resolve_repo_relative(root, raw)
+        suffix = ""
+        if rel is None and why == "missing":
+            # Not a bare path: accept `path:START[-END]` line-range cites,
+            # so a passage deep in a large file can be cited precisely.
+            path_part, start, end = split_evidence_range(raw)
+            if start is not None and 1 <= start <= end:
+                rel, why = _resolve_repo_relative(root, path_part)
+                if rel is not None:
+                    suffix = f":{start}-{end}"
+        if rel is None:
+            reason = (
+                "is outside the repository" if why == "outside"
+                else "does not name a file in the repository"
+            )
+            print(
+                f"verify dispute: refused -- evidence path {raw!r} "
+                f"{reason}; a dispute cites the repo's own record.",
+                file=sys.stderr,
+            )
+            return EXIT_USAGE
+        if not suffix:
+            # A bare cite of an oversized file would silently drop its
+            # tail at render time; refuse it now, naming the exit.
+            size = (root / rel).stat().st_size
+            if size > _DISPUTE_EVIDENCE_INLINE_CAP:
+                print(
+                    f"verify dispute: refused -- {rel} is {size} bytes, "
+                    "over the inline cap "
+                    f"({_DISPUTE_EVIDENCE_INLINE_CAP}); cite the relevant "
+                    f"passage as {rel}:START-END so it rides the prompt "
+                    "whole instead of being truncated.",
+                    file=sys.stderr,
+                )
+                return EXIT_USAGE
+        cited.append(rel + suffix)
+
+    slug = set_path.name
+    rounds = ledger.read_rounds(repo_root, slug, current)
+    target = next((r for r in rounds if r["round"] == round_number), None)
+    if target is None:
+        recorded = [r["round"] for r in rounds]
+        print(
+            f"verify dispute: round {round_number} is not recorded for "
+            f"session {current} (recorded rounds: {recorded or 'none'}).",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+    findings = target.get("findings") or []
+    if not 0 <= finding_index < len(findings):
+        listing = "\n".join(
+            f"  {i}. [{f.get('severity')}] "
+            f"{str(f.get('description', ''))[:120]}"
+            for i, f in enumerate(findings)
+        )
+        print(
+            f"verify dispute: finding {finding_index} does not exist in "
+            f"round {round_number}. Its findings, by 0-based index:\n"
+            f"{listing or '  (none)'}", file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    row = {
+        "round": round_number,
+        "finding_index": finding_index,
+        # The latest round at filing time: the first round recorded after
+        # this presents the rebuttal, and later rounds treat the dispute
+        # as settled by that round's findings instead of re-litigating it.
+        "filed_after_round": rounds[-1]["round"],
+        "grounds": grounds.strip(),
+        "evidence_paths": cited,
+        "recorded_at": datetime.datetime.now().astimezone().isoformat(),
+    }
+    try:
+        ledger.append_dispute(repo_root, slug, current, row)
+    except ledger.LedgerError as exc:
+        print(f"verify dispute: {exc}", file=sys.stderr)
+        return EXIT_STATE
+    print(
+        f"verify dispute: recorded against round {round_number} finding "
+        f"{finding_index}. The next verification round presents the "
+        "rebuttal beside the finding for UPHOLD-or-WITHDRAW."
+    )
+    return EXIT_OK
+
+
 # --- Task-level auto-verify (route()'s deferred seam) ------------------------
 
 def auto_verify(route_result, content: str, task_type: str, config) -> Optional[dict]:
@@ -571,8 +832,45 @@ def auto_verify(route_result, content: str, task_type: str, config) -> Optional[
     }
 
 
+def _dispute_main(argv) -> int:
+    parser = argparse.ArgumentParser(
+        prog="python -m ai_router.verify dispute",
+        description="Rebut one recorded finding with evidence from the "
+                    "repo; the next round presents it for "
+                    "UPHOLD-or-WITHDRAW.",
+    )
+    parser.add_argument("--session-set-dir", required=True,
+                        help="directory, slug, or bare set number")
+    parser.add_argument("--round", type=int, required=True,
+                        help="the recorded round the finding belongs to")
+    parser.add_argument("--finding", type=int, required=True,
+                        help="0-based index into that round's findings")
+    parser.add_argument("--grounds", required=True,
+                        help="the rebuttal's argument, one dispute per "
+                             "finding, immutable once recorded")
+    parser.add_argument("--evidence", action="append", default=[],
+                        help="existing repo path the rebuttal cites, "
+                             "optionally with a line range as "
+                             "path:START-END (repeatable; at least one "
+                             "is required)")
+    args = parser.parse_args(argv)
+    try:
+        set_dir = resolve_session_set_dir(args.session_set_dir)
+    except ValueError as exc:
+        print(f"verify dispute: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return record_dispute(
+        set_dir, round_number=args.round, finding_index=args.finding,
+        grounds=args.grounds, evidence=args.evidence,
+    )
+
+
 def main(argv=None) -> int:
     from .config import VALID_TRANSPORTS
+
+    argv = list(sys.argv[1:]) if argv is None else list(argv)
+    if argv[:1] == ["dispute"]:
+        return _dispute_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="python -m ai_router.verify")
     parser.add_argument("--session-set-dir", required=True,

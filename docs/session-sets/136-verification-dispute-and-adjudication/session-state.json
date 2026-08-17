@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "136-verification-dispute-and-adjudication",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -34,9 +34,9 @@
     {
       "number": 3,
       "title": "The operator path, and every refusal names its exit",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-17T16:55:20.525374-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-17T17:15:23.285498-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

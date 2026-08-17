@@ -99,10 +99,12 @@ is." Session 1 finds out by how much.
 
 ## Sequencing
 
-This set declares **no prerequisite**, deliberately. Set 113 Session 9 is
-still open and is set-terminal, and it will author a `disposition.cost` block
-of its own on the same Copilot seat — so running **this set first** would
-mean Set 113's final accounting is produced rather than asserted. That is the
+This set declares **no prerequisite**, deliberately. Set 113 was re-planned
+to **ten** sessions on 2026-08-17 — Session 9 records the single-module
+tutorial and **Session 10** is set-terminal — so two more Copilot-seat
+sessions will each author a `disposition.cost` block before that set closes.
+Running **this set first** would mean both are produced rather than asserted,
+and would put Set 113's own final accounting on measured numbers. That is the
 operator's call, not this spec's; both orders are valid and the spec says so
 rather than encoding a preference it cannot justify.
 

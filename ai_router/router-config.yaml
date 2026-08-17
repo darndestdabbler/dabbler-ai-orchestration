@@ -489,6 +489,9 @@ verification:
     - architecture
     - documentation
   settings:
+    # The session-verification loop suspends at this bound. The closed
+    # severity vocabulary is the primary control; the cap is the backstop.
+    max_rounds: 3
     on_disagreement: merge     # merge | flag | re-route
     on_disagreement_by_task_type:
       code-review: merge

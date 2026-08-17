@@ -1,6 +1,58 @@
 import copy
+import subprocess
 
 import pytest
+
+SPEC_MD = """# Demo set
+
+## Sessions
+
+### Session 1 of 2: First things
+1. Register.
+2. **Build the widget.** Make it real.
+   1. a nested sub-step that is not a top-level step
+   - a nested bullet
+3. Cross-provider verification.
+4. Close-out.
+
+**Creates:** `widget.py`
+
+### Session 2 of 2: Second things
+1. Register.
+2. Polish the widget.
+3. Cross-provider verification.
+4. Close-out.
+"""
+
+
+def _git(cwd, *args):
+    return subprocess.run(
+        ["git", "-C", str(cwd), *args], capture_output=True, text=True,
+    )
+
+
+@pytest.fixture
+def sandbox_repo(tmp_path):
+    """A real git repo with one committed session set and a bare upstream:
+    the sandbox every gate and loop test runs in."""
+    repo = tmp_path / "repo"
+    set_dir = repo / "docs" / "session-sets" / "010-demo"
+    set_dir.mkdir(parents=True)
+    (set_dir / "spec.md").write_text(SPEC_MD, encoding="utf-8")
+    (repo / ".gitignore").write_text(".dabbler/\n", encoding="utf-8")
+    _git(repo, "init", "-q", "-b", "main")
+    _git(repo, "config", "user.email", "test@example.invalid")
+    _git(repo, "config", "user.name", "Test")
+    _git(repo, "config", "commit.gpgsign", "false")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-q", "-m", "seed")
+    remote = tmp_path / "remote.git"
+    subprocess.run(
+        ["git", "init", "-q", "--bare", str(remote)], capture_output=True,
+    )
+    _git(repo, "remote", "add", "origin", str(remote))
+    _git(repo, "push", "-q", "-u", "origin", "main")
+    return repo, set_dir
 
 KEY_ENV = {
     "anthropic": "TEST_ANTHROPIC_KEY",

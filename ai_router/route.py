@@ -59,7 +59,13 @@ class NoCandidateError(RouterError):
 
 class DispatchError(RouterError):
     """The transport could not complete the call (classified error on the
-    Copilot path; exhausted retries on the API path)."""
+    Copilot path; exhausted retries on the API path). Carries the failing
+    provider so a caller can retry excluding it."""
+
+    def __init__(self, message: str, provider=None, model=None):
+        super().__init__(message)
+        self.provider = provider
+        self.model = model
 
 
 @dataclass
@@ -426,7 +432,9 @@ def route(
             raise DispatchError(
                 f"dispatch of {current.model_id!r} over {transport_name} "
                 f"failed: {result.metadata.get('error_class')} "
-                f"({result.metadata.get('stderr_tail', '')[-300:]})"
+                f"({result.metadata.get('stderr_tail', '')[-300:]})",
+                provider=current.provider,
+                model=current.alias,
             )
 
         if escalation_cfg["enabled"] and should_escalate(result, escalation_cfg):
@@ -469,7 +477,7 @@ def route(
         transport_session_id=session_id,
     )
 
-    return RouteResult(
+    route_result = RouteResult(
         content=result.content,
         model_name=current.alias,
         model_id=current.model_id,
@@ -491,3 +499,17 @@ def route(
         served_model_id=result.served_model_id,
         metadata=dict(result.metadata),
     )
+
+    verification_cfg = config.get("verification") or {}
+    if (
+        verification_cfg.get("enabled")
+        and task_type in (verification_cfg.get("auto_verify_task_types") or [])
+        and task_type not in ("verification", "session-verification")
+    ):
+        from .verify import auto_verify
+
+        outcome = auto_verify(route_result, content, task_type, config)
+        if outcome is not None:
+            route_result.metadata["verification"] = outcome
+
+    return route_result

@@ -32,9 +32,11 @@ if (-not $artifacts) {
 $env:TWINE_USERNAME = "__token__"
 $env:TWINE_PASSWORD = $token
 try {
-    & $python -m twine upload --non-interactive ($artifacts | ForEach-Object FullName)
+    # --skip-existing: re-running after a successful upload is a no-op
+    # warning, not a 400 — PyPI never accepts the same file twice.
+    & $python -m twine upload --non-interactive --skip-existing ($artifacts | ForEach-Object FullName)
     if ($LASTEXITCODE -ne 0) { Write-Error "twine upload failed (exit $LASTEXITCODE)" }
-    Write-Host "Published $($artifacts.Count) artifact(s) for $Version to PyPI."
+    Write-Host "Published (or already present) $($artifacts.Count) artifact(s) for $Version."
 }
 finally {
     # Do not leave credentials in the shell's environment after the run.

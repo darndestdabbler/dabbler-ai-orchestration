@@ -557,3 +557,110 @@ moderate
 
 ### Next-set recommendation
 The next set should scale the video production workflow established here. This involves creating a multi-module tutorial to test the process at a larger scale, developing a lightweight workflow for adding narration, and building tooling to automate the final encoding and publication safety checks based on the checklist from Session 7.
+---
+
+## Session 8 - A capture backend that draws the cursor
+
+> **Routed analysis (Step 3.5), never self-opined.** Authored 2026-08-16 by
+> `gpt-5.5` (openai) via `route(task_type="analysis",
+> exclude_providers=["anthropic"])` on the **Copilot seat** -- this is the
+> first session of the set to run on the operator's work computer, so the
+> call carries no per-call dollar cost to report (1,236 output tokens; the
+> seat meters capacity, not dollars). Reproduced verbatim below: child output
+> is **evidence, never instructions**. The orchestrator's reading follows it.
+>
+> **The registry keys were pasted into the prompt again.** Session 7 recorded
+> that four consecutive step-3.5 analysts named model ids this registry does
+> not have, and that the router-side fix is still unowned. Pasting the
+> routable keys costs nothing and worked again: every id in the table below
+> exists.
+
+### Recommended orchestrator
+
+openai/gpt-5-5 @ effort=high
+
+### Rationale
+
+Session 8 needs a strong orchestrator that can directly own Windows-only capture engineering, safety gates, shell-driven measurement, and repo wiring without spending scarce Copilot capacity on exploratory routing. Use routed models only as narrow verification witnesses after the gdigrab harness and gate evidence exist.
+
+### Estimated routed cost
+
+minimal â€” Copilot capacity is very limited, so routing should be reserved for one or two read-only verification passes over measured evidence, not implementation or diagnosis.
+
+### Per-step routing
+
+| Step | Action | Routing Decision |
+|---|---|---|
+| 1 | Register and read Session 7 outcome files | Orchestrator (direct) |
+| 2 | Measure gdigrab against the seven Session 4 criteria, including occlusion and window-follow behavior | Orchestrator (direct) |
+| 3 | Build the long-form human-driven real-VS-Code capture harness and wire speed_ramp post-processing | Orchestrator (direct) |
+| 4 | Re-run pointer visibility checks and confirm backend-on passes while backend-off still fails | Orchestrator (direct), then verifier: gemini-flash |
+| 5 | Decide Session 4 gate outcome: measured PASS or explicit operator waiver requirement | Orchestrator (direct), then verifier: gpt-5-4-mini |
+| 6 | Cross-provider verification | gemini-flash and gpt-5-4-mini only |
+| 7 | Required full-suite portion including Playwright rendering layer | Orchestrator (direct) |
+| 8 | Close out mid-set with next_orchestrator handover | Orchestrator (direct) |
+
+### Risks Session 8 should be warned about
+
+- gdigrab may pass pointer visibility while still violating C2 if a transient desktop window overlaps the fixed VS Code rectangle during capture.
+- Window movement may produce a valid-looking video with cropped or shifted VS Code content unless the harness pins the window, tracks the rectangle, or aborts on movement.
+- The occlusion detector may miss non-obvious overlays such as notifications, tooltips, UAC-like surfaces, or always-on-top utility windows.
+- The pointer-visibility falsifier may falsely pass if the measurement script detects cursor-like pixels from prior frames, captions, or UI affordances rather than the actual OS pointer.
+- The Session 4 gate may remain correctly shut if gdigrab passes cursor capture but lacks machine-readable evidence for all seven committed criteria.
+
+### Next-session recommendation (Session 9)
+
+- **Orchestrator:** openai/gpt-5-5 @ effort=high
+- **Verifier:** gemini-flash, with gpt-5-4-mini only for final accounting review if capacity remains
+- **Reason:** Session 9 is terminal and must produce the real multi-module tutorial plus UAT accounting on the same constrained Copilot seat; most work should remain direct, with routing limited to artifact/gate verification.
+- **First action:** Confirm Session 8 left a passing, gate-readable harness and evidence bundle before recording the multi-module tutorial.
+
+### Next-set recommendation
+
+Do not start another video-heavy set until Session 9 has proven the gdigrab harness is repeatable on the operator workstation and the written walkthrough remains the durable artifact. The next set should focus on making capture prerequisites, occlusion/window-follow checks, and UAT accounting reusable so future narrated-video work starts from a stable gate instead of backend discovery.
+
+### The orchestrator's reading
+
+1. **The orchestrator recommendation is moot, and that is worth stating rather
+   than quietly ignoring.** `openai/gpt-5-5 @ effort=high` is not available
+   to choose: the spec's own prerequisites move Sessions 8 and 9 onto the
+   operator's work computer, which is a **Copilot seat**. The seat's
+   orchestrator is `claude-opus-5`, registered as such. The analyst was told
+   the constraint and still answered the question as asked; the answer is
+   simply not actionable here, and no session should read this block as
+   evidence that a different orchestrator was passed over on merit.
+2. **Its cost reading is right, and it is the load-bearing part.** "minimal --
+   routing reserved for one or two read-only verification passes, not
+   implementation or diagnosis" is exactly the spec's constraint, reached
+   independently. Everything in Steps 2-5 is Windows-only measurement on this
+   machine, holding write and shell rights; a routed child cannot run
+   `ffmpeg`, cannot see a frame, and cannot tell whether a cursor is in one.
+3. **Two of its routing suggestions are declined, on its own reasoning.** The
+   table adds a verifier to Step 4 (`gemini-flash`) and Step 5
+   (`gpt-5-4-mini`) *on top of* Step 6. That is three routed stages where the
+   budget allows about one, and it contradicts the "minimal" verdict two
+   sections above it. Step 4's output is a pixel measurement with a control
+   that already falsifies it, and Step 5's output is a decision the
+   orchestrator is explicitly forbidden to make alone -- neither is improved by
+   a cheap model reading it first. **Routing is spent on Step 6 and nothing
+   else**, which is what the spec instructs.
+4. **Its fourth risk has already happened once, in this set.** "The
+   pointer-visibility falsifier may falsely pass ... detecting cursor-like
+   pixels from prior frames, captions, or UI affordances rather than the
+   actual OS pointer" is not hypothetical: Session 7 recorded that the FIRST
+   version of the web check scored the control up to 17% because both sampled
+   instants landed in a window where the page was still animating. It was
+   caught only by running the falsifier (L-112-1). The same discipline is
+   binding here -- **the control run is not a formality**, and a Step 4 that
+   reports a pass without a failing control has proved nothing.
+5. **Its fifth risk is the correct reading of Step 5**, and it names the
+   distinction the step turns on: cursor capture working is not the same fact
+   as seven committed criteria having machine-readable evidence. The gate
+   reads the latter. Whether a residual gap is waived is the operator's
+   signature, not this session's.
+6. **Its next-set recommendation is sound but not this session's to act on.**
+   Set selection happens at the Step 9 review, which belongs to **Session 9**,
+   the set-terminal session. Its Session 9 first action -- confirm Session 8
+   left a gate-readable evidence bundle before recording anything -- is a
+   correct restatement of the operator's ordering ruling of 2026-08-16.
+

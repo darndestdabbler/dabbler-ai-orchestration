@@ -946,6 +946,158 @@
       "dateTime": "2026-08-16T17:57:35.869521-04:00",
       "description": "All three layers run after the last code change and recorded to the run of record: pytest 5091 passed / 5 skipped / 1 xfailed in 7m26s (-n 8, the operator's parallelism cap), mocha 1580 passing in 2m, playwright 37 passed in 4m42s at 4 workers -- Layer 3 is owed because this session drives a rendering surface (L-064-12), and it is also where the pointer changes would surface. Run BEFORE the operator's adjudication rather than after, deliberately: the loop is suspended on a decision that is theirs, and having the suites already green takes an hour off whatever they choose.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "Register. Read `s7-pointer-outcome.md` and `s7-cursor-capture-backends.json` first \u2014 the diagnosis is made and does not need remaking.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 2,
+      "stepKey": "measure-gdigrab-against-the-session-4",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Measure `gdigrab` against the Session 4 pilot's seven criteria, and ship nothing until it passes them.** This is a gate the operator's own authorisation put there, not ceremony: `s4-pilot-criteria.json` is the committed contract and `measure-os-capture.js` is the harness that evaluated OBS against it. Two criteria are where a desktop-rectangle capture is *expected* to be weakest, and they are the reason the gate exists rather than an afterthought: - **C2, no unrelated desktop pixels.** `gdigrab` reads the composited desktop, so anything that comes to the front \u2014 a toast, an alert, another window \u2014 lands in the frame. OBS's window capture is immune to this and `gdigrab` is not. **These videos are destined for a public URL**, so this is the criterion that decides whether the backend is usable at all, and a mitigation (refuse to record when another window overlaps the rectangle; abort on occlusion mid-capture) is in scope. - **Window-follow.** A desktop rectangle is fixed and a window can move. Decide and measure one of: re-read the window rectangle per frame, pin the window for the length of a capture, or abort when it moves. The other five still have to be met, not assumed \u2014 and **C7's no-audio clause is the one OBS structurally could not satisfy and `gdigrab` already does** (`s4-ffmpeg-fallback-measurement.json`). **Do not re-litigate Session 4's `gdigrab` result.** It measured `gdigrab title=<window>`, which black-frames for the same reason BitBlt does. This session measures `-i desktop` over the window's rectangle, which is a different mode and was measured to work.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 3,
+      "stepKey": "build-the-long-form-human-driven",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Build the long-form, human-driven capture harness** \u2014 Session 7's step 3 owed it and could not build it on a backend that cannot do the job (residual `S7-R2`). It records a **real** session in a **real** VS Code window, not the Extension Development Host: start before `start_session`, stop after `close_session`, one recording per session, named by set and session. **It observes and nothing more** \u2014 it must not write `session-state.json`, drive the orchestrator, or make a session behave differently because it is being recorded. Wire `python -m ai_router.speed_ramp` in as the post-processing step; it is finished and proved, and it wants `--recording` so it samples the video as well as the record.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 4,
+      "stepKey": "prove-the-pointer-is-visible-in",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Prove the pointer is visible, in the artifact.** `check-pointer-visible.js` and `measure-pointer-visibility.js` already exist and already discriminate: re-run them against the new backend and expect the VS Code path to *pass* where it recorded `FAIL` on 2026-08-16, with the control still failing. Nothing about this session is done until that artifact flips.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 5,
+      "stepKey": "decide-what-happens-to-the-session",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Decide what happens to the Session 4 gate.** The shipped recorder fails closed on capture because the pilot's verdict is FAIL, and no waiver is on file. A new backend does not silently unlock it: either re-measure to a PASS the gate can read, or leave the gate shut and say what the operator would have to sign. **Not the orchestrator's call to waive.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Required portion of the full test suite** \u2014 this session drives a rendering surface, so Layer 3 is owed (`L-064-12`).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 8,
+      "stepKey": "close-out-mid-set-with-a",
+      "dateTime": "2026-08-16T19:10:34.312791-04:00",
+      "description": "**Close-out**, mid-set, with a `next_orchestrator` handover.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-16T19:10:34.336155-04:00",
+      "description": "Registered session 8 (copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 2,
+      "stepKey": "measure-gdigrab-against-the-session-4",
+      "dateTime": "2026-08-16T19:21:45.087825-04:00",
+      "description": "Started: measuring ffmpeg gdigrab desktop-rectangle capture against the seven Session 4 pilot criteria. Prerequisites resolved first: ffmpeg 9.0 + ffprobe installed via winget (gdigrab device confirmed present), OBS Studio 32.2.1 installed, VS Code present, COPILOT_CLI transport already resolved.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 2,
+      "stepKey": "measure-gdigrab-against-the-session-4",
+      "dateTime": "2026-08-16T19:54:47.348811-04:00",
+      "description": "Built the gdigrab backend (window-geometry.js driver, gdigrab-capture.js session, magenta-occluder.js instrument) and the seven-criteria harness (measure-gdigrab-capture.js). Validation pass: C1-C6 PASS, C7 FAIL on its mechanism clause. About to run the full 10-clean-run bar.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 2,
+      "stepKey": "measure-gdigrab-against-the-session-4",
+      "dateTime": "2026-08-16T20:11:39.273046-04:00",
+      "description": "DONE. gdigrab measured against all seven Session 4 criteria at the full bar: 10/10 clean runs (11 measured, 1 excluded as control-contaminated). C1-C6 MET, C7 UNMET on its mechanism clause only. C1 correlation 0.9989 (decoy -0.0159); C2 detector control 0.705 vs 0.5 bar (Session 4 scored 0.441 and failed it), unguarded leakage 0.2539 proving the weakness is real, guard refuses pre-flight and aborts mid-capture with a clean control; C3 delta 0px incl. resize; C4 anchor 202ms; C5 four named failure kinds; C6 15 attempts, zero leaked processes or stray scripts; C7 no audio track on all 11 recordings (the clause OBS structurally could not meet) but the mechanism is a desktop read.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 3,
+      "stepKey": "build-the-long-form-human-driven",
+      "dateTime": "2026-08-16T20:11:39.276380-04:00",
+      "description": "Built scripts/record-long-form.js: detached start/stop/status daemon recording the SHIPPED VS Code window (never the Extension Development Host), observe-only (writes nothing outside its run dir, never touches session-state.json or the orchestrator, never focuses/pins/raises the window), with ai_router.speed_ramp wired as post-processing using --recording so the plan samples the video as well as the record.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 4,
+      "stepKey": "prove-the-pointer-is-visible-in",
+      "dateTime": "2026-08-16T20:11:39.279416-04:00",
+      "description": "Started: re-running measure-pointer-visibility.js against the gdigrab backend, writing s8-pointer-visibility-vscode.json (Session 7 artifact left unedited).",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 4,
+      "stepKey": "prove-the-pointer-is-visible-in",
+      "dateTime": "2026-08-16T20:19:08.303698-04:00",
+      "description": "DONE. s8-pointer-visibility-vscode.json = PASS with the control FAILED. One decisive probe: a cursor-shaped mark 20x26px with its tip anchored at the hotspot, 4.66 pct of the crop; the control changed 0.00000 at five of six probes. Session 7 artifact left unedited at FAIL. Also fixed the stale console note that told operators no backend composites the cursor - it is now backend-conditional.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 5,
+      "stepKey": "decide-what-happens-to-the-session",
+      "dateTime": "2026-08-16T20:19:08.306591-04:00",
+      "description": "Started: the gate decision. Found and closed a hole first - record-long-form.js was a SECOND recorder that never consulted the gate. captureApproval is now per-backend (S4 pilot for obs, S8 measurement for gdigrab, separate waiver paths) and both recorders fail closed. Escalating the waiver question to the operator; not the orchestrator to waive.",
+      "status": "in-progress"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 5,
+      "stepKey": "decide-what-happens-to-the-session",
+      "dateTime": "2026-08-17T01:39:28.017008-04:00",
+      "description": "DONE. Operator waived C7 mechanism clause for gdigrab only (s8-operator-waiver.json, narrow scope asserted by test). OBS gate stays shut at its Session 4 FAIL. Gate is now per-backend and both recorders honour it. 27 unit tests pass including three planted falsifiers on the gate itself.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 8,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T02:21:29.498873-04:00",
+      "description": "DONE. Four rounds: discovery (1 Major), supplementary (2 Major), remediation-review (1 rejected fix + new Major), remediation-review (VERIFIED, 4 accepted, 0 findings). All four findings accepted and fixed, none disputed. Verifier gpt-5.5 throughout (anthropic excluded as orchestrator provider).",
+      "status": "complete"
     }
   ]
 }

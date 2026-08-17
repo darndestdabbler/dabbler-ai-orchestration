@@ -45,6 +45,15 @@ const SET_DIR = path.join(
   "113-narrated-video-walkthroughs"
 );
 const OUT_PATH = path.join(SET_DIR, "s7-pointer-visibility-vscode.json");
+// Session 8 measures the SAME property against a DIFFERENT backend, so it
+// writes a different file. `s7-pointer-visibility-vscode.json` is a raw
+// verification artifact of Session 7 and is never edited or overwritten --
+// its FAIL is the honest record of what the OBS path did, and the value of
+// this session's PASS depends on that record surviving unaltered.
+const OUT_PATH_BY_BACKEND = {
+  obs: OUT_PATH,
+  gdigrab: path.join(SET_DIR, "s8-pointer-visibility-vscode.json"),
+};
 const WORK_ROOT = path.join(EXTENSION_ROOT, ".walkthrough-runs", "pointer-measure");
 
 function log(msg) {
@@ -73,10 +82,23 @@ async function runOne(label, opts) {
 }
 
 async function main() {
+  const argv = process.argv.slice(2);
+  const backendAt = argv.indexOf("--backend");
+  const backend =
+    backendAt >= 0 ? String(argv[backendAt + 1] || "").toLowerCase() : "obs";
+  if (backend !== "obs" && backend !== "gdigrab") {
+    console.error("[pointer-measure] unknown backend: " + backend);
+    process.exitCode = 2;
+    return;
+  }
+  const outPath = OUT_PATH_BY_BACKEND[backend];
+
   const report = {
     measurement:
       "a pointer is visible in the frames an OS capture recorded, at the " +
       "moment of each click, and is not visible in the control",
+    backend:
+      backend === "gdigrab" ? "ffmpeg-gdigrab-desktop" : "obs-window-wgc",
     startedAt: new Date().toISOString(),
     platform: process.platform,
     node: process.version,
@@ -91,14 +113,18 @@ async function main() {
   } else {
     // Deliberately sequential. Two OBS sessions on one machine contend for
     // the same websocket and the same encoder, and the pilot already
-    // measured what that costs.
+    // measured what that costs. gdigrab has no such contention, but two
+    // captures of overlapping desktop rectangles would still fight for the
+    // encoder, so the ordering is kept.
     const withPointer = await runOne("with-pointer", {
       physicalPointer: true,
       obsPort: 44671,
+      backend,
     });
     const control = await runOne("control", {
       pointerControl: true,
       obsPort: 44672,
+      backend,
     });
 
     for (const [label, run] of [
@@ -150,8 +176,8 @@ async function main() {
   }
 
   report.finishedAt = new Date().toISOString();
-  fs.writeFileSync(OUT_PATH, JSON.stringify(report, null, 2) + "\n", "utf8");
-  log("wrote " + path.relative(REPO_ROOT, OUT_PATH));
+  fs.writeFileSync(outPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+  log("wrote " + path.relative(REPO_ROOT, outPath));
   log(report.verdict + ": " + report.reason);
   process.exitCode = report.verdict === "PASS" ? 0 : 1;
 }

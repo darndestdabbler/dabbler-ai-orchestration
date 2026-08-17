@@ -546,6 +546,8 @@
     "walk:smoke": "npm run compile && node scripts/walk-smoke.js",
     "walkthrough:web": "node scripts/record-web-walkthrough.js",
     "pilot:os-capture": "node scripts/measure-os-capture.js",
+    "pilot:gdigrab": "node scripts/measure-gdigrab-capture.js",
+    "record:long-form": "node scripts/record-long-form.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {

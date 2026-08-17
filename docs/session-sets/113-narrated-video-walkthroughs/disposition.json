@@ -1,106 +1,131 @@
 {
   "status": "completed",
-  "summary": "Showed the pointer on the portable path and PROVED it in the artifact; built the driver half on the VS Code path and proved that too; and then found, by measurement, that the VS Code recording still cannot show a cursor for a reason the standing diagnosis had explicitly ruled out. WEB PATH, DONE: a synthetic pointer is drawn into the page and walked to each target -- the only mechanism available there, because Chromium's recordVideo composites no system cursor at all. check-pointer-visible.js crops the recorded frames at the instant before the pointer set off and the instant it arrived: 6 of 6 probes show a compact, cursor-shaped mark 18-20 x 27-31px with its tip within 2px of the click point, while a control recorded with identical timing and an identical probe list reads 0.00000 at every target. The first version of that check PASSED the control, because both sampled frames straddled the emphasis fade and the typing; fixed by holding the page still around both instants and by deriving the ~200ms gap between the run's clock and the video's own zero. The pointer also survives a native modal (9.0% visible over a full-bleed dialog against exactly 0 without the fix), because the browser's top layer beats any z-index and the pointer must be RE-promoted each time or a later-opened dialog covers it. VS CODE PATH, DRIVER DONE: the real Windows pointer is walked to each target, calibrated against the window by measurement rather than DPI arithmetic (three probe points, solved from two, checked against the third; residual 0px). Opt-in, announced before it takes the mouse, and restored on every exit path including failure. Three silent failures found on the way: the PowerShell driver read its own script from the stdin it needed for move commands; its type compilation was still running when the first moves were sent; and real pointer motion reaches only the window that is IN FRONT, which needs always-on-top because Windows refuses SetForegroundWindow to a background process. VS CODE PATH, CAPTURE BROKEN: with the driver working the frames still had no cursor, so the premise was measured instead of repeated. Three backends, two instruments: OBS window capture on WGC puts the workbench in frame (0.9996) and NO cursor (0.00000); OBS BitBlt draws the cursor onto a black frame, because it cannot read a hardware-accelerated Electron surface; only ffmpeg gdigrab over the window's desktop rectangle produces both (0.9697 / 0.124). Session 4's gdigrab probe is not contradicted -- it measured gdigrab title=<window>, a different mode with the same black-frame failure. No backend was swapped: none of the S4 pilot's seven criteria has been run against gdigrab, and the recorder is gated closed pending an operator ruling regardless. ALSO SHIPPED: ai_router.speed_ramp, which derives which stretches of a recording were waiting from the framework's own timestamps AND from movement sampled out of the recording itself -- the record is authoritative and sparse, so a person reading the screen otherwise looks exactly like a suite running. Marks are never compressed, so the two sources can only add real-time segments, never remove one. Proved on this set's own session 6 (2h58m of record, 29 marks, plans to 6m08s) and applied end to end to a real video (predicted 22.46s, produced 22.52s). Plus the publication safety checklist and the single-module tutorial's toy project, session-set plan and runbook. VERIFICATION: four rounds, $2.80, gpt-5-6-sol with anthropic excluded. It caught a REGRESSION I had introduced in this same session -- having measured that BitBlt is the only OBS method whose cursor setting does anything, I wired the physical pointer to select it, trading a video with no pointer for one with no product -- and then caught two more real defects in the fixes, including that the top-layer measurement had the same blind spot as the code it was validating. Closed WAIVED at the enforced bound on operator adjudication: five Majors remain, none disputed, all recorded as residuals with owners. Suites after the last code change: pytest 5091 passed, mocha 1580 passing, playwright 37 passed.",
+  "summary": "Built and measured a capture backend that puts the workbench AND the cursor in one frame, and the pointer artifact the whole set was waiting on FLIPPED. ffmpeg gdigrab over the target window's desktop rectangle was measured against the Session 4 pilot's seven committed criteria -- the same s4-pilot-criteria.json, hashed and unmodified -- and met SIX of seven at the full bar: 10 of 10 consecutive clean runs (11 measured, 1 excluded as control-contaminated). C1 correlation 0.9989 with a decoy control at -0.0159; C3 dimension delta 0px including a deliberate resize; C4 anchor uncertainty 202ms with every cue inside the recording; C6 fifteen attempts with zero leaked processes, zero stray driver scripts and zero cleanup problems. C2 IS THE CRITERION THE BACKEND CHANGE IS ABOUT and it is scored against the mitigation the spec put in scope, because gdigrab reads the composited desktop and is NOT immune to an overlapping window -- measured at 25.39% leakage with the guard off. Four sub-measurements all hold: the detector fires at 0.7053 against a 0.5 bar (Session 4's Chromium occluder scored 0.441219 and FAILED that control with zero leakage, an instrument shortfall this session fixed with a borderless occluder), the weakness is demonstrated with the guard off so the guard is load-bearing rather than decorative, the guard refuses before starting, and it aborts mid-capture with a clean control. C7 IS THE ONE UNMET CRITERION, and only one of its three clauses: no-audio is MET structurally (-an, zero audio streams on all 11 recordings -- the clause OBS could never satisfy, since it muxes a silent track regardless) and single-source is MET, but 'never captures the screen' cannot be met by ANY backend that draws a cursor, because the cursor is composited by the desktop. That is the reason WGC cannot show one. The orchestrator measured it, wrote it up, named the unresolved question and STOPPED; the operator waived that clause and only that clause, narrowly, for gdigrab only. WINDOW-FOLLOW is abort-on-move, decided and falsified: moved 120,80px mid-capture aborted at 1947ms and kept the prefix; held still for 1800ms did not abort. Re-read-per-frame is unimplementable (gdigrab fixes its rectangle at stream open) and pinning was refused on the spec's own observe-only terms. ALSO SHIPPED: the long-form human-driven capture harness Session 7 owed and could not build (residual S7-R2) -- a detached start/stop/status daemon that records the SHIPPED VS Code window, never the Extension Development Host, writes nothing outside its run directory, never touches session-state.json or the orchestrator, and never focuses, pins or raises the window it records, with ai_router.speed_ramp wired in via --recording. THE POINTER ARTIFACT FLIPPED: s8-pointer-visibility-vscode.json is PASS with the control still FAILED -- a cursor-shaped mark, 20x26px, tip anchored at the hotspot, against 0.00000 change at five of six control probes. Session 7's FAIL artifact was left unedited, because this session's PASS is worth nothing without it.",
   "verification_method": "api",
-  "verification_verdict": "WAIVED",
+  "verification_verdict": "VERIFIED",
   "verification_message_ids": [],
   "files_changed": [
-    "ai_router/changelog.d/0017-set-113-s7-speed-ramp.md",
-    "ai_router/speed_ramp.py",
-    "ai_router/tests/test_speed_ramp.py",
     "docs/session-sets/113-narrated-video-walkthroughs/activity-log.json",
     "docs/session-sets/113-narrated-video-walkthroughs/ai-assignment.md",
     "docs/session-sets/113-narrated-video-walkthroughs/checklist-posts.jsonl",
     "docs/session-sets/113-narrated-video-walkthroughs/decisions.jsonl",
     "docs/session-sets/113-narrated-video-walkthroughs/disposition.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-acceptance-round-1.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-acceptance-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-acceptance-round-3.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-adjudication-request.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-cursor-capture-backends.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-issues-round-2.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-issues-round-3.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-issues-round-4.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-issues.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-pointer-outcome.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-pointer-top-layer.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-pointer-visibility-vscode.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-pointer-visibility-web-control.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-pointer-visibility-web.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-remediation-round-1.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-remediation-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-remediation-round-3.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-rounds.jsonl",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-verification-fanout-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-verification-round-2.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-verification-round-3.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-verification-round-4.md",
-    "docs/session-sets/113-narrated-video-walkthroughs/s7-verification.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-acceptance-round-1.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-acceptance-round-2.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-acceptance-round-3.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-gdigrab-capture-measurement.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-gdigrab-outcome.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-issues-round-2.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-issues-round-3.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-issues.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-operator-waiver.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-pointer-visibility-vscode.json",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-remediation-round-1.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-remediation-round-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-remediation-round-3.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-rounds.jsonl",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-verification-fanout-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-verification-round-2.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-verification-round-3.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-verification-round-4.md",
+    "docs/session-sets/113-narrated-video-walkthroughs/s8-verification.md",
     "docs/session-sets/113-narrated-video-walkthroughs/session-events.jsonl",
     "docs/session-sets/113-narrated-video-walkthroughs/session-state.json",
-    "docs/session-sets/113-narrated-video-walkthroughs/spec.md",
     "docs/session-sets/113-narrated-video-walkthroughs/test-runs.jsonl",
-    "docs/tutorials/single-module-walkthrough.md",
-    "docs/walkthroughs/publication-safety-checklist.md",
-    "tools/dabbler-ai-orchestration/scripts/check-pointer-visible.js",
-    "tools/dabbler-ai-orchestration/scripts/measure-cursor-capture-backends.js",
-    "tools/dabbler-ai-orchestration/scripts/measure-pointer-top-layer.js",
+    "tmp-s8-disposition.py",
+    "tools/dabbler-ai-orchestration/dist/extension.js.map",
+    "tools/dabbler-ai-orchestration/package.json",
+    "tools/dabbler-ai-orchestration/scripts/gdigrab-capture.js",
+    "tools/dabbler-ai-orchestration/scripts/magenta-occluder.js",
+    "tools/dabbler-ai-orchestration/scripts/measure-gdigrab-capture.js",
     "tools/dabbler-ai-orchestration/scripts/measure-pointer-visibility.js",
-    "tools/dabbler-ai-orchestration/scripts/obs-capture.js",
-    "tools/dabbler-ai-orchestration/scripts/pointer.js",
+    "tools/dabbler-ai-orchestration/scripts/record-long-form.js",
     "tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js",
-    "tools/dabbler-ai-orchestration/scripts/record-web-walkthrough.js",
-    "tools/dabbler-ai-orchestration/src/test/suite/pointerVisibility.test.ts"
+    "tools/dabbler-ai-orchestration/scripts/window-geometry.js",
+    "tools/dabbler-ai-orchestration/src/test/suite/gdigrabCapture.test.ts"
   ],
   "blockers": [],
   "residuals": [
     {
       "id": "S7-R1",
-      "summary": "The VS Code recorder makes pointer-enabled recordings with no pointer in them: no OBS window-capture method composites the cursor. The recorder now says so on every such run.",
-      "owner": "the reserved capture-backend set",
-      "adjudication": "operator, 2026-08-16: the gdigrab desktop-rectangle route is authorised behind a measurement pass against the S4 criteria"
+      "status": "closed",
+      "closedBy": "session 8",
+      "owner": null,
+      "summary": "CLOSED. 'The VS Code recorder makes pointer-enabled recordings with no pointer in them.' A backend that composites the cursor was measured and shipped, and s8-pointer-visibility-vscode.json flipped to PASS with its control still failing. The stale console note that told operators no backend composites the cursor is now backend-conditional."
     },
     {
       "id": "S7-R2",
-      "summary": "No long-form human-driven capture harness was built (the capture half of spec step 3). Blocked on the same backend.",
-      "owner": "the reserved capture-backend set",
-      "adjudication": "operator, 2026-08-16"
+      "status": "closed",
+      "closedBy": "session 8",
+      "owner": null,
+      "summary": "CLOSED. The long-form human-driven capture harness exists (scripts/record-long-form.js), built on a backend that can do the job. Its happy path is proved on a 10.9s smoke recording rather than a full session -- see S8-R2."
     },
     {
       "id": "S7-R3",
-      "summary": "The single-module tutorial has no recordings, no ramp plans and no per-video safety records. The written walkthrough stands alone (spec decision 4); the six videos are owed.",
-      "owner": "the reserved capture-backend set",
-      "adjudication": "operator, 2026-08-16"
+      "status": "open",
+      "owner": "session 9",
+      "summary": "The single-module tutorial still has no recordings, ramp plans or per-video safety records. NO LONGER BLOCKED: the backend exists, the gate is open for gdigrab, and the harness is built. Ownership moves from 'the reserved capture-backend set' to Session 9, which the 2026-08-16 re-plan folded that set into."
     },
     {
       "id": "S7-R4",
-      "summary": "The pointer visibility check matches a bounding-box PROFILE -- small, compact, taller than wide, tip at the hotspot -- not the cursor's pixels. Accepted: the same instrument must take a cursor this repo draws and a real Windows arrow in the operator's own theme and size. It demonstrably rules out the control at 0.00000, a full-width repaint, the hover tooltip that actually occurred at 6.5%, and a compact hover state.",
+      "status": "accepted",
       "owner": null,
-      "adjudication": "operator, 2026-08-16: accepted residual, not owed"
+      "summary": "Unchanged and NOT re-litigated (operator-adjudicated). The pointer visibility check matches a bounding-box profile, not the cursor's pixels. Five of six probes in this session's passing run are recorded 'indecisive' for exactly that reason, and the verdict rests on the decisive probe plus a control that fails everywhere."
     },
     {
       "id": "S7-R5",
-      "summary": "The speed ramp cannot see a person reading a STATIC screen for longer than its 45-second threshold; fixing it properly needs input events, which nothing here captures. The opposite error is safe by construction -- an animated wait registers as movement and stays at real speed -- and the plan is a file that states the fraction it is compressing.",
+      "status": "accepted",
       "owner": null,
-      "adjudication": "operator, 2026-08-16: accepted residual, not owed"
+      "summary": "Unchanged and NOT re-litigated (operator-adjudicated). The speed ramp cannot see a person reading a static screen. This session exercised the ramp's REFUSAL path instead: handed an 11-second window containing no framework timestamps, it declined to compress on no evidence rather than reading everything as waiting."
+    },
+    {
+      "id": "S8-R1",
+      "status": "open",
+      "owner": "operator / any future re-measurement",
+      "summary": "C7's mechanism clause is WAIVED, not met, and the waiver is narrow: s8-operator-waiver.json covers that clause on the gdigrab backend only, does not cover C1-C6 or C7's other two clauses, does not apply to OBS, and is refused outright if the criteria file's digest changes, if an unmet criterion is not named in it, or if a re-measurement misses the ten-clean-run bar. Enforced by waiverCoverage() with seven falsifiers."
+    },
+    {
+      "id": "S8-R2",
+      "status": "open",
+      "owner": "session 9",
+      "summary": "The long-form harness's happy path is proved on a 10.9-second smoke recording, not a full session. Its daemon lifecycle, ambiguity refusal, guard wiring and speed_ramp hand-off all ran, but the COMPRESSION path is unexercised because an 11-second window carries no framework timestamps to compress. Session 9's first real recording is what exercises it."
+    },
+    {
+      "id": "S8-R3",
+      "status": "open",
+      "owner": "any machine with a left-of-primary monitor",
+      "summary": "The negative virtual-screen-origin branch is UNVERIFIED. gdigrab measures its offsets from the virtual desktop origin, which is negative when a monitor sits left of or above the primary. The code subtracts it; this machine reports (0,0), so the subtraction is a no-op here and the branch never ran. Getting it wrong yields a plausible video of the WRONG PIXELS rather than an error, which is why it is written down."
+    },
+    {
+      "id": "S8-R4",
+      "status": "accepted",
+      "owner": null,
+      "summary": "One display scale (100%) was exercised, so every C3 pass is a claim about that scale only. Identical to Session 4's residual and accepted for the same reason: changing the operator's live display scaling is an intrusive change to their working desktop. The resize variant tests the same dimension-blindness failure mode without touching display settings."
+    },
+    {
+      "id": "S8-R5",
+      "status": "open",
+      "owner": "session 9",
+      "summary": "AVAILABILITY IS THE PRICE OF THIS BACKEND, and Session 9 will feel it. The occlusion guard refuses to start and aborts mid-capture whenever an unrelated window covers the rectangle; on the measurement machine three shipped VS Code windows were open and the harness refused to guess between them until --window-title-contains was added. A long tutorial recording interrupted by a toast loses its tail by design."
     }
   ],
   "next_orchestrator": {
-    "engine": "claude",
+    "engine": "copilot",
     "provider": "anthropic",
     "model": "claude-opus-5",
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "THE SET WAS RE-PLANNED AT SESSION 7's CLOSE, on operator direction, and Session 8 is NOT the session its old spec entry described. The set now has NINE sessions. Session 8 is 'A capture backend that draws the cursor' -- the gdigrab desktop-rectangle measurement against the Session 4 pilot's seven criteria, plus the long-form human-driven capture harness the recordings need. Session 9 is set-terminal and carries both tutorials' recordings and the whole set's accounting. Read both spec entries before anything: the reason for the re-plan is that placing the backend work outside this set would have ended it with two written tutorials and no video at all, and the operator wants the tutorials to exist. AND THE MACHINE CHANGES. The operator is moving this work to their WORK computer, because the API credits on the machine Sessions 1-7 ran on are nearly exhausted and cannot be topped up right now. That is not a detail -- it changes the transport. The work computer is a Copilot seat: it carries NO DABBLER_* provider keys by design, and `project-verify-type.txt` is gitignored machine state that must be resolved there with `python -m ai_router.verify_type --set COPILOT_CLI` before anything routes. Budget accordingly: Copilot capacity is described as very limited, so Session 8 should spend its routed calls on verification and almost nothing else. What Session 8 must NOT do: re-litigate the two accepted residuals S7-R4 and S7-R5, or swap the capture backend without the measurement pass -- the whole point of the operator's authorisation is that gdigrab is GATED behind those seven criteria, and the two where a desktop rectangle is weakest (C2's unrelated desktop pixels, and window-follow) are the reason the gate exists."
+      "specifics": "SESSION 9 IS SET-TERMINAL and inherits the whole accounting: change-log.md, the Step 9 guidance review, and the UAT record for all SEVEN declared uatComponents. It also records the multi-module tutorial on top of what Session 8 built. WHAT IS NOW UNBLOCKED, and it is the point of the re-plan: the capture backend exists and is measured, the gate is OPEN for gdigrab under the operator's narrow waiver, the long-form harness is built, and the pointer-visibility artifact has flipped to PASS. The ordering ruling of 2026-08-16 is satisfied, so Session 9 may record. FIRST ACTION: run `node scripts/record-long-form.js start --set <slug> --session <N> [--window-title-contains ...]` before start_session and stop it after close_session. Expect to need the title filter -- more than one VS Code window open is normal and the harness refuses to guess. WHAT SESSION 9 MUST NOT DO: it must not re-litigate S7-R4 or S7-R5 (both operator-adjudicated), and it must not widen s8-operator-waiver.json -- the waiver covers C7's mechanism clause on gdigrab and nothing else, and waiverCoverage() will refuse it the moment a re-measurement fails anything else or misses the ten-clean-run bar. STAY ON THE COPILOT SEAT: Sessions 8 and 9 run on the operator's work computer, project-verify-type.txt already resolves COPILOT_CLI, and no DABBLER_* keys exist by design. ffmpeg 9.0, ffprobe and OBS Studio 32.2.1 were installed during Session 8 and are on PATH -- but a NEW SHELL is needed to see the PATH change, which cost this session a diagnostic detour. BUDGET: verification consumed four rounds. Spend the routed budget on verification and almost nothing else."
     }
   },
   "lessons_cited": [
     "L-112-1",
-    "G-005",
     "G-008",
+    "G-012",
     "G-013",
-    "L-079-1"
+    "L-079-1",
+    "G-005"
   ],
   "cost": {
     "components": [
@@ -113,10 +138,21 @@
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "no conversation ids supplied; nothing to measure (this is not zero)"
+        "reason": "GitHub Copilot seat (claude-opus-5). The seat meters CAPACITY, not dollars, and exposes no per-session figure to this process. Unmeasured is not zero, and this is the first session of the set to run on it."
       },
       {
         "component": "routed_seat",
+        "status": "measured",
+        "credits": null,
+        "usd": 0.0,
+        "event_count": 6,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "Six routed calls on the Copilot seat: one step-3.5 assignment analysis (gpt-5.5) and five verification calls across four rounds (2 discovery fan-out, 1 supplementary, 2 remediation-review), all gpt-5.5. Every one reported $0.0000 because a Copilot seat carries no per-call dollar cost -- it draws on seat capacity instead. Zero DOLLARS is accurate; zero COST is not."
+      },
+      {
+        "component": "routed_api",
         "status": "not_applicable",
         "credits": 0.0,
         "usd": 0.0,
@@ -124,80 +160,89 @@
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "declared not applicable by the caller"
+        "reason": "No DABBLER_* provider keys exist on this machine by design (transport.profile: copilot-cli). Nothing routed to a direct provider API."
       },
       {
-        "component": "routed_api",
-        "status": "measured",
-        "credits": 0.0,
-        "usd": 2.8213,
-        "event_count": 6,
+        "component": "operator_time",
+        "status": "partially_measured",
+        "credits": null,
+        "usd": null,
+        "event_count": 3,
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "four verification rounds ($1.4561 discovery, $0.5227 supplementary, $0.3934 and $0.4301 remediation-review) plus two step-3.5 analysis calls at $0.0095 each -- the first was paid and then lost to a bug in my own harness, and is counted rather than quietly dropped. credits is 0.0 because this component bills in USD and has no credit meter; the USD figure is the measurement."
+        "reason": "Three operator interactions: installing OBS Studio and ffmpeg, one gate-decision brief answered with a waiver, and two stretches of leaving the machine alone for the measurement runs (roughly 35 minutes each). Wall clock was not instrumented."
       }
     ],
-    "measured_at": "close"
+    "measured_at": null
   },
   "uat": {
-    "attestation": "Session 6 is a router-internal transport diagnosis. It creates NO human-observable surface: its deliverables are a reproduction, a diagnosis, four fixes inside ai_router/, 38 falsifiers, and the evidence documents. None of the seven declared uatComponents was touched by it, so every one is recorded 'not-applicable' for THIS session rather than 'none' -- 'none' would claim a reviewable surface existed and nobody looked, which is not what happened. The set-terminal accounting is Session 8's under uatScope: per-set, and the spec says so in Session 6 step 8. ONE THING SESSION 8 MUST NOT DEFAULT TO 'none': the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding, which is a developer, count 1, method 'watched' against the Windows OS-capture pilot -- recorded in operator-notes.md so it does not evaporate. What THIS session can claim instead of a reviewer is automated evidence: 5021 pytest, 1548 mocha and 37 Playwright tests green after the last code change, every fix mutation-tested, and a cross-provider VERIFIED verdict that found and closed six Majors first.",
+    "attestation": "Session 8 is a capture-backend measurement and a harness build. Its deliverables are a measured backend, two guards, a long-form recorder, 35 unit tests and the evidence documents. Under uatScope: per-set the SET-TERMINAL accounting is Session 9's, not this session's, and every component below is therefore recorded against what THIS session did to it. TWO COMPONENTS ARE NOT 'not-applicable' AND MUST NOT BE RECORDED AS SUCH. The Windows OS-capture pilot was exercised hard by this session and its gate was changed, and the single-module tutorial recording set is the component this session unblocked. ONE RECORD SESSION 9 MUST STILL NOT DEFAULT TO 'none', carried forward unchanged from Session 6 and Session 7: the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding -- a developer, count 1, method 'watched' -- against the Windows OS-capture pilot. It is a real human review, the set's first, and it is not a manual walk. THE OPERATOR ALSO MADE A REAL REVIEW DECISION IN THIS SESSION: they read the C7 split verdict and signed a narrow waiver (s8-operator-waiver.json). That is an accountability sign-off on a measured artifact, recorded below against the OS-capture pilot component rather than left implicit.",
     "components": [
       {
         "component": "Rendered walkthrough and training document",
         "method": "not-applicable",
         "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+        "evidence": "Untouched by this session's change set. The set-terminal accounting is Session 9's.",
         "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "attestation": "Not applicable to this session's change set, rather than unreviewed."
       },
       {
         "component": "Static generated index",
         "method": "not-applicable",
         "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+        "evidence": "Untouched by this session's change set.",
         "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "attestation": "Not applicable to this session's change set, rather than unreviewed."
       },
       {
         "component": "Recorded web scenario",
         "method": "not-applicable",
         "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+        "evidence": "Untouched. The web recorder's synthetic pointer is Session 7's and was not changed; only the VS Code path moved.",
         "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "attestation": "Not applicable to this session's change set, rather than unreviewed."
       },
       {
         "component": "Windows OS-capture pilot",
-        "method": "not-applicable",
-        "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
-        "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "method": "measured-and-reviewed",
+        "reviewers": [
+          {
+            "type": "developer",
+            "count": 1,
+            "method": "signed-off"
+          }
+        ],
+        "evidence": "This session measured a SECOND backend against the same committed criteria (s8-gdigrab-capture-measurement.json, 11 runs, 10 clean) and changed what the gate reads: captureApproval is now per-backend and waiverCoverage refuses a waiver that does not cover what is unmet. The operator read the C7 split verdict and signed s8-operator-waiver.json, waiving one clause of one criterion for one backend.",
+        "findings": [
+          "C7's mechanism clause cannot be met by any cursor-capable backend; waived narrowly rather than reworded away.",
+          "Session 4's C2 failure was an INSTRUMENT shortfall (0.441219 detector control) with zero actual leakage; this session's borderless occluder clears the same bar at 0.7053."
+        ],
+        "attestation": "A human read a measured artifact and made an accountability sign-off on it. Recorded as a real review, not as a walk."
       },
       {
         "component": "Containerised capture path",
         "method": "not-applicable",
         "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+        "evidence": "Untouched. Session 5's container work is orthogonal to the host-side backend measured here, and the operator's ruling that both tutorials record the HOST stands.",
         "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "attestation": "Not applicable to this session's change set, rather than unreviewed."
       },
       {
         "component": "Single-module tutorial recording set",
-        "method": "not-applicable",
+        "method": "unblocked-not-recorded",
         "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+        "evidence": "No recordings were made. What changed is that they are no longer blocked: the backend draws a cursor, the pointer-visibility artifact passes, the long-form harness exists and the gate is open for gdigrab. Owed to Session 9 as residual S7-R3.",
         "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "attestation": "Deliberately not recorded here. The ordering ruling of 2026-08-16 says get the cursor working BEFORE recording, and this session is the 'before'."
       },
       {
         "component": "Multi-module tutorial recording set",
-        "method": "not-applicable",
+        "method": "unblocked-not-recorded",
         "reviewers": [],
-        "evidence": "Session 6 did not touch this component. It changed ai_router/pull_verifier.py, ai_router/pull_critique.py, ai_router/__init__.py and their tests -- a provider-transport path with no human-observable surface. The set-terminal accounting for this component is Session 8's.",
+        "evidence": "Same as the single-module set: unblocked by this session, recorded by Session 9, which owns it directly.",
         "findings": [],
-        "attestation": "Not applicable to this session's change set, rather than unreviewed. Recorded per component so an omitted component cannot become the new form of evaporation (Set 113 S1's own rule)."
+        "attestation": "Deliberately not recorded here, for the same ordering reason."
       }
     ]
   },

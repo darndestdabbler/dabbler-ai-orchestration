@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 8,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** The scripted VS Code recorder treats a gdigrab guard-aborted partial file as a normal completed video artifact.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `docs/session-sets/113-narrated-video-walkthroughs/spec.md:641`, `tools/dabbler-ai-orchestration/scripts/gdigrab-capture.js:809`, `tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js:896`, `docs/session-sets/113-narrated-video-walkthroughs/s8-gdigrab-capture-measurement.json:1061`\n  - **Failure scenario:** During a Session 9 scripted tutorial recording, a notification/window overlap or window move triggers gdigrab’s guard. That is probable, not merely theoretical, because the spec names toasts/alerts/overlapping windows as the expected weak point of desktop-rectangle capture for public videos. `GdigrabCaptureSession` keeps the prefix file with `integrity.aborted`, but `record-vscode-walkthrough.js` still renames it to `recording.mp4` and adds it as an `os-video` artifact if the file exists. The resulting walkthrough artifact can advertise a video for the full run even though the recording only contains the prefix before the abort.\n  - **Acceptance criterion:** `JUDGMENT - A gdigrab guard abort in recordVscodeWalkthrough must not be emitted as a normal completed video artifact; the persisted driver/manifest result must either degrade to explicit no-video/aborted capture or fail the recording path clearly, with the abort reason visible.`\n  - **Details:** **Violation:** the spec says `gdigrab`’s C2 risk is public-URL-relevant and the mitigation is to “refuse to record when another window overlaps the rectangle; abort on occlusion mid-capture.” **Impact:** the guard stops contamination but the scripted recorder can still produce a misleading, truncated tutorial video artifact, which changes the merge decision for a capture backend meant to enable Session 9 recordings. **Evidence:** `gdigrab-capture.js` returns `integrity` on aborted partial recordings, while `record-vscode-walkthrough.js` only checks that `recording.outputPath` exists before registering `recording.mp4`; the measurement artifact proves mid-capture aborts keep partial recordings. **Correct answer:** propagate `recording.integrity.aborted` into the recorder’s artifact decision and do not publish/register that file as a normal full recording.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "During a Session 9 scripted tutorial recording, a notification/window overlap or window move triggers gdigrab’s guard. That is probable, not merely theoretical, because the spec names toasts/alerts/overlapping windows as the expected weak point of desktop-rectangle capture for public videos. `GdigrabCaptureSession` keeps the prefix file with `integrity.aborted`, but `record-vscode-walkthrough.js` still renames it to `recording.mp4` and adds it as an `os-video` artifact if the file exists. The resulting walkthrough artifact can advertise a video for the full run even though the recording only contains the prefix before the abort.",
+      "evidencePaths": [
+        "docs/session-sets/113-narrated-video-walkthroughs/spec.md",
+        "tools/dabbler-ai-orchestration/scripts/gdigrab-capture.js",
+        "tools/dabbler-ai-orchestration/scripts/record-vscode-walkthrough.js",
+        "docs/session-sets/113-narrated-video-walkthroughs/s8-gdigrab-capture-measurement.json"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A gdigrab guard abort in recordVscodeWalkthrough must not be emitted as a normal completed video artifact; the persisted driver/manifest result must either degrade to explicit no-video/aborted capture or fail the recording path clearly, with the abort reason visible."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "f4791328d652da743eb5809fa3b64e519055340e"
+}

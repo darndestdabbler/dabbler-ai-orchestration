@@ -53,6 +53,7 @@
 "use strict";
 
 const cp = require("child_process");
+const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
@@ -62,6 +63,7 @@ const { _electron } = require("@playwright/test");
 const { makeUatWorkspace } = require("./make-uat-workspace.js");
 const { findCodeBinary, electronEnv, makeLaunchStateDirs } = require("./vscode-launch.js");
 const { ObsCaptureSession, ObsUnavailableError } = require("./obs-capture.js");
+const { GdigrabCaptureSession } = require("./gdigrab-capture.js");
 const pointer = require("./pointer.js");
 
 const EXTENSION_ROOT = path.resolve(__dirname, "..");
@@ -180,6 +182,10 @@ function parseArgs(argv) {
     video: true,
     keep: false,
     physicalPointer: false,
+    // OBS stays the DEFAULT until the Session 4 gate says otherwise. Session
+    // 8 measured a second backend; it did not silently promote it. Choosing
+    // the recorder's default is a gate decision, not an import.
+    backend: "obs",
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -187,6 +193,17 @@ function parseArgs(argv) {
     else if (arg === "--out") options.out = argv[++i];
     else if (arg === "--no-video") options.video = false;
     else if (arg === "--keep") options.keep = true;
+    else if (arg === "--backend") {
+      const value = String(argv[++i] || "").toLowerCase();
+      if (value !== "obs" && value !== "gdigrab") {
+        throw new Error(
+          "unknown capture backend: " +
+            JSON.stringify(value) +
+            " (expected 'obs' or 'gdigrab')"
+        );
+      }
+      options.backend = value;
+    }
     // Opt-in, every time, and never inferred from anything else. Taking over
     // someone's mouse is not a thing to do because a heuristic thought a
     // recording would look better for it.
@@ -558,18 +575,43 @@ async function recordVscodeWalkthrough(options) {
       // which TWO were `Code.exe` -- the fixture host and the operator's own
       // editor, running this session. A driver that matched "Code.exe" alone
       // would have recorded whichever came first.
-      const session = new ObsCaptureSession({
-        tag: opts.obsTag || "dabbler-walkthrough",
-        port: opts.obsPort || 44667,
-        obsExe: opts.obsExe,
-        connectPassword: opts.obsConnectPassword,
-        launchEnabled: opts.obsLaunch !== false,
-        // Opt-in, and only the pilot opts in. The shipped recorder must not
-        // reconfigure the user's OBS: "installed with its websocket
-        // disabled" is a supported missing-dependency state, and the
-        // documented fix is one click in OBS's own UI.
-        mayEnableWebsocketConfig: opts.mayEnableWebsocketConfig === true,
-      });
+      const backend = opts.backend === "gdigrab" ? "gdigrab" : "obs";
+      const session =
+        backend === "gdigrab"
+          ? // The Session 8 backend. It needs none of the OBS options
+            // because it has none of the OBS state: no websocket, no scene
+            // collection, no profile, no second application. What it does
+            // need is the two guards, because reading the composited desktop
+            // is what buys the cursor and what costs the immunity.
+            new GdigrabCaptureSession({
+              tag: opts.obsTag || "dabbler-walkthrough",
+              outDir,
+              // Threaded through so the C5 measurement can run a genuinely
+              // ABSENT dependency along the real recorder path, rather than
+              // calling `prepareHost()` in isolation and inferring what the
+              // walkthrough would have done. Verification's finding was
+              // exact: proving the constructor throws proves nothing about
+              // whether a manifest still gets written.
+              ffmpegExe: opts.ffmpegExe,
+              ffprobeExe: opts.ffprobeExe,
+              // Never off in the shipped recorder. The measurement harness
+              // turns them off to run the falsifiers, and nothing else does.
+              occlusionGuard: opts.occlusionGuard !== false,
+              windowFollowGuard: opts.windowFollowGuard !== false,
+            })
+          : new ObsCaptureSession({
+              tag: opts.obsTag || "dabbler-walkthrough",
+              port: opts.obsPort || 44667,
+              obsExe: opts.obsExe,
+              connectPassword: opts.obsConnectPassword,
+              launchEnabled: opts.obsLaunch !== false,
+              // Opt-in, and only the pilot opts in. The shipped recorder must
+              // not reconfigure the user's OBS: "installed with its websocket
+              // disabled" is a supported missing-dependency state, and the
+              // documented fix is one click in OBS's own UI.
+              mayEnableWebsocketConfig: opts.mayEnableWebsocketConfig === true,
+            });
+      result.captureBackend = backend;
       // Cleanup ownership is handed to the `finally` block IMMEDIATELY, and
       // that ordering is load-bearing. `configure` can fail with something
       // that is not an ObsUnavailableError -- the refusal to guess between
@@ -612,8 +654,10 @@ async function recordVscodeWalkthrough(options) {
         // claimed.
         await induceIf(opts, "configure", session);
         result.obs = {
-          version: version.obsVersion,
-          websocket: version.obsWebSocketVersion,
+          backend,
+          version: backend === "gdigrab" ? version.ffmpegVersion : version.obsVersion,
+          websocket:
+            backend === "gdigrab" ? null : version.obsWebSocketVersion,
           window: configured.chosenWindow.name,
           canvas: configured.canvas,
         };
@@ -634,7 +678,7 @@ async function recordVscodeWalkthrough(options) {
         // this driver happens to find embarrassing.
         capture = null;
         result.obsUnavailableKind =
-          err instanceof ObsUnavailableError ? err.kind : "capture-setup-failed";
+          err && err.kind ? err.kind : "capture-setup-failed";
         result.obsUnavailableMessage = String((err && err.message) || err);
         notes.push(
           "OS capture was unavailable (" + result.obsUnavailableKind + "): " +
@@ -675,7 +719,7 @@ async function recordVscodeWalkthrough(options) {
         await induceIf(opts, "start", capture);
       } catch (err) {
         result.obsUnavailableKind =
-          err instanceof ObsUnavailableError ? err.kind : "recording-start-failed";
+          err && err.kind ? err.kind : "recording-start-failed";
         result.obsUnavailableMessage = String((err && err.message) || err);
         notes.push(
           "recording could not be started (" + result.obsUnavailableKind +
@@ -742,16 +786,25 @@ async function recordVscodeWalkthrough(options) {
         physical = new pointer.PhysicalPointer(log).open();
         await physical.waitUntilReady();
         const calibration = await pointer.calibratePhysicalPointer(page, physical);
-        // Said before the run rather than discovered afterwards. Moving the
-        // pointer is now proved to work and the capture is proved not to
-        // draw it, so a run that asked for a visible pointer and gets a
-        // recording without one must be told why by the thing it ran.
-        if (opts.video) {
+        // Said before the run rather than discovered afterwards. Which note
+        // is true depends on the BACKEND, and saying the OBS one while
+        // recording with gdigrab would be a stale echo of a finding Session
+        // 8 overturned -- the operator would be told their pointer will not
+        // appear, in a recording that shows it.
+        if (opts.video && opts.backend !== "gdigrab") {
           log(
             "NOTE: no OBS window-capture method composites the system cursor " +
               "-- WGC ignores the setting and BitBlt black-frames the " +
               "workbench (measured: s7-cursor-capture-backends.json). The " +
               "pointer will MOVE, and this recording will not show it."
+          );
+        } else if (opts.video) {
+          log(
+            "NOTE: the gdigrab backend composites the system cursor " +
+              "(measured: s8-gdigrab-capture-measurement.json), so this " +
+              "recording should show the pointer moving. It reads a fixed " +
+              "desktop rectangle, so the capture aborts if the window moves " +
+              "or anything covers it."
           );
         }
         log(
@@ -879,7 +932,15 @@ async function recordVscodeWalkthrough(options) {
         log("recording could not be stopped cleanly - continuing");
       }
       result.recording = recording;
-      if (recording && recording.outputPath && fs.existsSync(recording.outputPath)) {
+      const abortedMidCapture = Boolean(
+        recording && recording.integrity && recording.integrity.aborted
+      );
+      if (
+        recording &&
+        recording.outputPath &&
+        fs.existsSync(recording.outputPath) &&
+        !abortedMidCapture
+      ) {
         const target = path.join(outDir, "recording.mp4");
         if (path.resolve(recording.outputPath) !== path.resolve(target)) {
           fs.renameSync(recording.outputPath, target);
@@ -891,6 +952,51 @@ async function recordVscodeWalkthrough(options) {
           mediaType: "video/mp4",
           bytes: fs.statSync(target).size,
         });
+      } else if (abortedMidCapture) {
+        // A GUARD ABORT IS NOT A RECORDING. gdigrab's occlusion and
+        // window-follow guards stop the capture part way and KEEP the
+        // footage before that instant, deliberately -- losing the tail of a
+        // long session beats publishing desktop where the product used to
+        // be. But the prefix is not what the walkthrough claims to show, and
+        // registering it as `os-video` would put a manifest entry saying
+        // "here is the video of this run" next to a file containing the
+        // first few seconds of it.
+        //
+        // Measured, not hypothetical: Session 8's own control run produced a
+        // 2.6-SECOND file for a 51-second walkthrough with all five caption
+        // cues, and only the harness's separate contamination flag kept it
+        // out of the C4 numbers. The manifest would have advertised it.
+        //
+        // So the run degrades to the SAME honest no-video state a missing
+        // dependency produces, the partial file is kept beside the manifest
+        // under a name that cannot be mistaken for a complete recording, and
+        // the abort reason is stated.
+        const partial = path.join(outDir, "recording-partial-aborted.mp4");
+        try {
+          if (path.resolve(recording.outputPath) !== path.resolve(partial)) {
+            fs.renameSync(recording.outputPath, partial);
+          }
+          result.recording.outputPath = partial;
+        } catch (err) {
+          /* the file is evidence, not a deliverable; a rename failure must
+             not take the walkthrough with it */
+        }
+        result.recordingAborted = true;
+        result.recordingAbortReason = recording.integrity.reason;
+        notes.push(
+          "the capture was ABORTED mid-recording (" +
+            recording.integrity.reason +
+            "): " +
+            String(recording.integrity.message || "") +
+            " The footage before that instant was kept as " +
+            "recording-partial-aborted.mp4, but it is NOT a recording of " +
+            "this walkthrough and is deliberately not offered as one. The " +
+            "walkthrough document stands alone and is unaffected."
+        );
+        log(
+          "capture aborted (" + recording.integrity.reason +
+            ") - the partial file is kept but NOT registered as the run's video"
+        );
       } else {
         notes.push(
           "OBS reported no output file; the walkthrough document stands " +
@@ -965,7 +1071,8 @@ async function recordVscodeWalkthrough(options) {
     result.failedStep = failed;
   } catch (err) {
     result.failure = String((err && err.stack) || err);
-    if (err instanceof ObsUnavailableError) {
+    // Any backend's named failure, not only OBS's.
+    if (err && err.kind) {
       result.obsUnavailableKind = err.kind;
       result.obsUnavailableMessage = err.message;
     }
@@ -1066,11 +1173,167 @@ async function recordVscodeWalkthrough(options) {
  *     measurements", and without them the measurement cannot be
  *     reproduced at all.
  */
-function captureApproval() {
+/**
+ * Does this waiver actually cover everything the measurement says is unmet?
+ *
+ * Three independent gates, and each closes a different way for the waiver to
+ * be over-applied:
+ *
+ *   1. THE BACKEND. A waiver for `ffmpeg-gdigrab-desktop` must not approve
+ *      OBS, whose Session 4 verdict is FAIL on different criteria.
+ *   2. THE CRITERIA DIGEST. The waiver names the exact `s4-pilot-criteria.json`
+ *      it was signed against. If the criteria file is edited, the signature
+ *      was given for a contract that no longer exists.
+ *   3. THE UNMET SET. Every criterion the measurement reports unmet must be
+ *      named in `waivedCriteria`. An unmet criterion the waiver never
+ *      mentions is exactly the case this function exists to refuse.
+ *
+ * Written to fail CLOSED at every branch: a waiver that omits the scope
+ * block, or names a backend that does not match, or is missing a digest, is
+ * refused rather than given the benefit of the doubt.
+ */
+function waiverCoverage(waiver, evaluation, backend, which) {
+  const wanted = backend === "gdigrab" ? "gdigrab" : "obs";
+  const applies = String(
+    (waiver.scope && waiver.scope.appliesToBackend) || waiver.backend || ""
+  ).toLowerCase();
+  if (!applies) {
+    return {
+      sufficient: false,
+      why:
+        "it does not say which backend it applies to (expected a " +
+        "`scope.appliesToBackend` or `backend` field naming " +
+        wanted + ")",
+      covered: [],
+    };
+  }
+  if (!applies.includes(wanted)) {
+    return {
+      sufficient: false,
+      why:
+        "it applies to '" + applies + "', not to the " + wanted +
+        " backend being requested",
+      covered: [],
+    };
+  }
+
+  if (!evaluation) {
+    return {
+      sufficient: false,
+      why:
+        "there is no measurement to check it against, and a waiver cannot " +
+        "stand in for the evidence it was meant to except",
+      covered: [],
+    };
+  }
+
+  // The criteria the waiver was signed against must still be the criteria in
+  // force. `sha256(s4-pilot-criteria.json)` is recorded in both the waiver
+  // and the measurement, so a drifted criteria file invalidates the
+  // signature instead of silently re-scoping it.
+  const measurementDigest = evaluationDigest();
+  if (waiver.criteriaSha256 && measurementDigest &&
+      waiver.criteriaSha256 !== measurementDigest) {
+    return {
+      sufficient: false,
+      why:
+        "it was signed against criteria " + waiver.criteriaSha256 +
+        " but the criteria file now hashes to " + measurementDigest,
+      covered: [],
+    };
+  }
+
+  const waived = new Set(
+    ((waiver.waivedCriteria || []).map((entry) =>
+      String((entry && entry.id) || entry).toUpperCase()
+    ))
+  );
+  const unmet = (evaluation.unmet || []).map((id) => String(id).toUpperCase());
+  const uncovered = unmet.filter((id) => !waived.has(id));
+  if (uncovered.length) {
+    return {
+      sufficient: false,
+      why:
+        "the measurement reports " + uncovered.join(", ") +
+        " unmet, and the waiver waives only " +
+        (Array.from(waived).join(", ") || "nothing") +
+        ". " + which.waiver + " must name every unmet criterion, or be " +
+        "re-signed by the operator against the new result.",
+      covered: Array.from(waived),
+    };
+  }
+
+  // A WAIVER WAIVES CRITERIA, NOT THE RUN-COUNT BAR. The pilot's bar is ten
+  // CONSECUTIVE CLEAN runs on a fresh fixture, and it is a separate claim
+  // from "which criteria were met": it is what distinguishes a backend that
+  // works from one that worked once. A re-measurement that is shortened, or
+  // in which a run is noisy, can leave C7 as the only unmet CRITERION while
+  // failing the bar outright -- and the criterion-coverage check above would
+  // wave it through, because every unmet criterion really is named in the
+  // waiver.
+  //
+  // Nothing in the operator's attestation waives run counts, so the gate
+  // does not either.
+  const barMet =
+    evaluation.barRunsMet !== undefined
+      ? evaluation.barRunsMet !== false
+      : !(
+          typeof evaluation.cleanRuns === "number" &&
+          typeof evaluation.runsRequired === "number" &&
+          evaluation.cleanRuns < evaluation.runsRequired
+        );
+  if (!barMet) {
+    return {
+      sufficient: false,
+      why:
+        "the measurement did not meet the pilot's run-count bar (" +
+        String(evaluation.cleanRuns) + " clean of " +
+        String(evaluation.runsRequired) + " required). A waiver excepts " +
+        "CRITERIA, not the number of consecutive clean runs, and " +
+        which.waiver + " does not claim to.",
+      covered: Array.from(waived),
+    };
+  }
+
+  return { sufficient: true, why: null, covered: unmet };
+}
+
+/** The digest of the criteria file as it is on disk right now. */
+function evaluationDigest() {
+  try {
+    const file = path.join(SET_DIR, "s4-pilot-criteria.json");
+    return (
+      "sha256:" +
+      crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex")
+    );
+  } catch {
+    return null;
+  }
+}
+
+function captureApproval(backend) {
+  // Which pilot, and which waiver, depends on WHICH BACKEND is being asked
+  // for. Session 4 measured OBS and Session 8 measured gdigrab; they are
+  // separate measurements of separate mechanisms with separate verdicts, and
+  // a gate that read one to approve the other would be approving something
+  // nobody measured.
+  const which =
+    backend === "gdigrab"
+      ? {
+          measurement: "s8-gdigrab-capture-measurement.json",
+          waiver: "s8-operator-waiver.json",
+          label: "the gdigrab backend measurement",
+        }
+      : {
+          measurement: "s4-os-capture-measurement.json",
+          waiver: "s4-operator-waiver.json",
+          label: "the OS-capture pilot",
+        };
+
   let evaluation = null;
   try {
     evaluation = JSON.parse(
-      fs.readFileSync(path.join(SET_DIR, "s4-os-capture-measurement.json"), "utf8")
+      fs.readFileSync(path.join(SET_DIR, which.measurement), "utf8")
     ).evaluation;
   } catch {
     /* handled below -- absence is never treated as approval */
@@ -1082,17 +1345,36 @@ function captureApproval() {
   let waiver = null;
   try {
     waiver = JSON.parse(
-      fs.readFileSync(path.join(SET_DIR, "s4-operator-waiver.json"), "utf8")
+      fs.readFileSync(path.join(SET_DIR, which.waiver), "utf8")
     );
   } catch {
     /* no waiver on disk */
   }
   if (waiver && waiver.attestation && waiver.waivedBy) {
+    // A WAIVER IS NOT A SKELETON KEY. Approving on the mere presence of
+    // `waivedBy` + `attestation` makes the waiver permanent gate state that
+    // covers whatever fails NEXT -- so a later re-measurement that broke C2
+    // (leakage into a public video) or C6 (leaked processes) would still
+    // record, approved by a signature given for something else entirely.
+    //
+    // The waiver this session was granted says in machine-readable form
+    // exactly what it does and does not cover. The gate reads it.
+    const covers = waiverCoverage(waiver, evaluation, backend, which);
+    if (!covers.sufficient) {
+      return {
+        approved: false,
+        reason:
+          "a waiver is on file but it does NOT cover what is currently " +
+          "unmet: " + covers.why,
+        waiverPath: which.waiver,
+      };
+    }
     return {
       approved: true,
       reason:
-        "operator waiver on file (" + waiver.waivedBy + "): " +
-        waiver.attestation,
+        "operator waiver on file (" + waiver.waivedBy + "), covering " +
+        covers.covered.join(", ") + ": " + waiver.attestation,
+      waiverPath: which.waiver,
     };
   }
 
@@ -1100,19 +1382,25 @@ function captureApproval() {
     return {
       approved: false,
       reason:
-        "the OS-capture pilot's measurement could not be read, so nothing " +
+        which.label + " could not be read, so nothing " +
         "here has been verified as passing. Absence of evidence is not " +
         "approval.",
+      waiverPath: which.waiver,
     };
   }
   if (evaluation.verdict === "PASS") {
-    return { approved: true, reason: "the pilot's committed verdict is PASS" };
+    return {
+      approved: true,
+      reason: which.label + "'s committed verdict is PASS",
+      waiverPath: which.waiver,
+    };
   }
   return {
     approved: false,
     reason:
-      "the OS-capture pilot's verdict is " + evaluation.verdict +
+      which.label + "'s verdict is " + evaluation.verdict +
       " (unmet: " + (evaluation.unmet || []).join(", ") + ")",
+    waiverPath: which.waiver,
   };
 }
 
@@ -1122,7 +1410,7 @@ async function main() {
   // FAIL CLOSED on capture. A failed pilot ships no recorder, and a gate
   // that only warns is not a gate.
   if (options.video) {
-    const approval = captureApproval();
+    const approval = captureApproval(options.backend);
     if (!approval.approved) {
       log("REFUSING to capture: " + approval.reason + ".");
       log(
@@ -1191,6 +1479,7 @@ module.exports = {
   approachWithPointer,
   parseArgs,
   captureApproval,
+  waiverCoverage,
   validateDriverBlock,
   locateStepTarget,
   performStep,

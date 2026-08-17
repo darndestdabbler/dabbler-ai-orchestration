@@ -8,6 +8,35 @@
 > that drives the largest component still carries information, and then cuts
 > what the evidence justifies — and only what the evidence justifies.
 
+---
+
+## Revision 1 — 2026-08-17, operator-directed, after Session 1
+
+**Session 1 did its job and the news is bad for this spec.** The 2.3× it was
+built on **does not reproduce** — re-derived over 255 sessions it ranges
+**1.01×–2.96×**, and under this spec's own four named step keys it is flat. The
+2026-08-07 cohort split turned out to be the exact day Set 111 installed the
+instruments the "after" cohort is measured with. Detail:
+[`s1-ceremony-attribution.md`](s1-ceremony-attribution.md).
+
+The operator then raised a **different hypothesis** — that the binding cost is
+not minutes but **context**: ceremony crowds the transcript. A first
+measurement (§4) supports it, and it names things that can be **deleted**
+rather than deferred.
+
+**Operator ruling, 2026-08-17.** Session 2 runs **unchanged**. **Session 3 is
+re-scoped from cutting minutes to cutting context.**
+
+**Changed:** §1, §2, §2b, §4 (new), Session 3's three work steps, Non-goals.
+**Unchanged:** the **Session Set Configuration block** (immutable at runtime
+once `start_session` recorded the gate policy), Session 2 entirely, Session 3's
+title and its 4 ceremony steps + N=3 budget, and §3 — which Session 2 exists
+to test.
+
+> Refuted numbers are **struck through, not deleted**: a spec that quietly
+> edits its own premises leaves the next reader unable to tell a corrected
+> claim from one that was never made (L-064-8).
+
 ## Session Set Configuration
 
 ```yaml
@@ -29,51 +58,75 @@ prerequisites:
 ## The measurements this set acts on
 
 Taken out-of-band 2026-08-15, over 245 schema-v4 sessions. **Session 1 step 2
-re-derives every one of them before anything is acted on.** This repo's specs
-have been wrong about their own numbers three times in the last week (Set 118's
-coupling count, Set 120's file count, Set 132's step parser), and every time it
-was the session that re-measured which caught it.
+re-derived every one of them**, over 255 sessions, and the results are folded in
+below. This repo's specs have been wrong about their own numbers three times in
+the last week (Set 118's coupling count, Set 120's file count, Set 132's step
+parser), and every time it was the session that re-measured which caught it.
+**This set is now the fourth.**
 
-### 1. Session length grows linearly, and the growth is ceremony
+### 1. Session length grows linearly — CONFIRMED
 
-Duration vs calendar day, sessions over 240 min excluded as away-dominated
-(26 of 245):
+Duration vs calendar day, sessions over 240 min excluded as away-dominated:
 
-| fit | n | slope | R² |
-| :--- | ---: | ---: | ---: |
-| trimmed OLS | 219 | **+0.947 min/day** | 0.307 |
-| trimmed Theil–Sen | 219 | **+0.901 min/day** | — |
+| fit | original | **re-derived (Session 1)** | verdict |
+| :--- | ---: | ---: | :--- |
+| trimmed OLS | +0.947 min/day, R² 0.307, n=219 | **+0.966 min/day, R² 0.321, n=226** | reproduces |
+| trimmed Theil–Sen | +0.901 min/day | **+0.909 min/day** | reproduces |
+| excluded as away-dominated | 26 of 245 | **29 of 255** | reproduces |
 
-Over the 81-day corpus that is **+77 minutes**. Splitting at 2026-08-07 and
-attributing per-step intervals from `activity-log.json` (interval before a
-completion belongs to the step that completed; each capped at 45 min to bound
-away-time), over **208 sessions**:
+Over the 82-day corpus that is **+79 minutes**. This is the one headline that
+survived untouched, and it is what justifies the set continuing to exist.
 
-| cohort | n | ceremony steps | work steps | **min/ceremony step** | **min/work step** |
-| :--- | ---: | ---: | ---: | ---: | ---: |
-| pre-cap | 151 | 3.0 | 4.0 | **7.1** | **7.2** |
-| post-cap | 58 | 3.0 | 3.0 | **16.3** | **7.1** |
+**But the trend does not survive into the window the framework can observe.**
+Within the 57 sessions carrying a round ledger, the slope is **+0.122 min/day at
+R² 0.000**. The +0.97 is a May→August baseline effect, not ongoing drift.
 
-**Work costs what it always did. Each ceremony step costs 2.3× what it did.**
-The obvious instrumentation explanation — that Set 128's skeleton merely made
-ceremony steps loggable — predicts a rise in the ceremony step *count*, and the
-count is identical at 3.0. The flat work column is the control: it is both a
-check that the instrument is not inflating every interval, and an independent
-reproduction of Set 132's `w̄ ≈ 6–9 min` from a different measurement path.
+### 2. ~~The growth is ceremony~~ — REFUTED as stated
 
-### 2. Where the ceremony minutes sit
+> ~~pre-cap 7.1 min/ceremony step → post-cap 16.3; work flat at 7.2 → 7.1.~~
+> ~~**Work costs what it always did. Each ceremony step costs 2.3× what it did.**~~
 
-| phase | median | note |
-| :--- | ---: | :--- |
-| verification loop (first round → last) | **41.7 min** | median 3 rounds, ~21 min per remediate-and-re-verify cycle |
-| Step 8 tail (last round → close requested) | 17.9 min | ~15 min of it is real suite runtime |
-| close execution | **0.2 min** | not a cost; do not spend here |
+The same attribution, re-run under six defensible method choices, spans
+**1.01×–2.96×** — including **1.01× (flat) under this spec's own four named step
+keys**, where it is *work* that rises. **A quantity that moves that far on
+method choice cannot size a deletion.** Three named failures, evidenced in
+[`s1-ceremony-attribution.md`](s1-ceremony-attribution.md) §2:
 
-Of the 41.7-minute verification loop, **~4.5 minutes is model latency** — about
-11%. Verifier pins, fan-out width and cheaper discovery variants all act on that
-11%. **The lever is rounds, not models.**
+- **"By step key" cannot be produced at all** — 1,427 distinct `stepKey` values;
+  the four canonical keys appear on a minority of sessions.
+- **The instrumentation explanation was dismissed on the wrong control** — the
+  artifact is timestamp dispersion, not step count: **44%** of pre-cap step
+  intervals are under **one second** (burst-logged) against 34% post-cap.
+- **The flat-work control does not hold** — work rose +29% to +79%.
 
-### 3. Severity has stopped discriminating
+**Dated cause.** The 2026-08-07 split **is Set 111's landing date**, which
+shipped `sN-rounds.jsonl` (08-07 03:16) and `test-runs.jsonl` (08-07 15:40): the
+"before" cohort was not measured worse, it was not measured at all. Also
+corrected — the step skeleton originates in **Set 114**, not Set 128, and **Set
+116 is a cost reduction** (~3.6×) this spec misread as a cause.
+
+### 2b. What survives — the numbers Session 3 may cut against
+
+| measurement | value |
+| :--- | ---: |
+| marginal cost of a verification round | **+17.9 min** of loop span (R² 0.625) |
+| `remediation-review → remediation-review` | 62 transitions, **2,332 min (38.9 h)** |
+| recorded suite runtime | **18.6 min/session** across 3 runs |
+| verification loop span / Step 8 tail | **35.8** (~~41.7~~) / **12.6** (~~17.9~~) min |
+| close execution | 0.2 min — confirmed, not a cost |
+
+~~Of the 41.7-minute loop, ~4.5 min is model latency — about 11%.~~ **No latency
+figure is operative**: the only instrument measuring it is gitignored and
+unreproducible from a fresh checkout (a blocking Major in Session 1).
+**The lever is rounds, not models** still holds on the committed round cost
+alone — a round costs 17.9 min, which dominates any per-call speed-up.
+
+Already disqualified by measurement — **do not re-propose**: staleness-forced
+re-runs (**67 min corpus-wide**; Sets 116/119 closed it), registration + close
+ceremony (**< 1.1 min/session**; `register` got 3× *cheaper*), and
+`discovery → supplementary` (4.6 min, cheapest transition measured).
+
+### 3. Severity has stopped discriminating — UNVERIFIED, Session 2's job
 
 Across **680 findings** in 378 `sN-issues*.json` envelopes:
 
@@ -88,16 +141,46 @@ By round: 280 Majors in round 1, then 98 / 66 / 48, and **136 in rounds 5+**.
 
 The Step 7 gate is *"only a Critical/Major finding continues the loop."* If 92%
 of findings are Major, **that gate approves continuation almost every time it is
-consulted** — which is a mechanism for exactly the round-grinding the bounds
-were later invented to cap. Note also that the Set 119 doc-only cap, which
-caps a class of finding at Minor, is consistent with there being only 21 Minors
-in the entire corpus: it has essentially never fired.
+consulted**. Note also that the Set 119 doc-only cap is consistent with there
+being only 21 Minors in the entire corpus: it has essentially never fired.
 
 The 28 non-canonical values include prose written into the severity field
 (`"Unspecified (treated as blocking per the anti-laundering rule)"`,
 `"Major (reviewer) / adjudicated minor"`, `"Major (claimed)"`). That is the same
 closed-vocabulary drift Set 120 S1 fixed for step status, in a second field,
 and the fix is a known-good pattern already in this repo.
+
+> **Session 1 raised the stakes on this section rather than settling it.** These
+> figures are **exactly as unverified as §1 and §2 were**, and two of those three
+> did not survive contact with the data. Session 2 step 2 re-derives the 92%
+> **first**, and is expected to treat a refutation as a normal outcome.
+
+### 4. Context, not minutes — the operator's hypothesis (2026-08-17)
+
+A first measurement, taken when the hypothesis was raised:
+
+| what | measured |
+| :--- | ---: |
+| **preload read before every session** | **~11,644 tokens** — and **all four files sit at exactly 100% of their ceiling** |
+| Session 1's deliverable | 3,103 words |
+| Session 1's ceremony *about* that deliverable | **~7,700 words** |
+| **ratio** | **≈ 2.5 : 1 ceremony to answer** |
+
+Composition of `lessons-learned.md`, read in full every session: **4 live
+lessons and 5 sections of tables recording where lessons used to live** — half
+its top-level sections are a changelog of its own curation.
+
+Corroborating, from the repo's own docs: `docs/ai-led-session-workflow.md` →
+*Rotation, and the trade we declined* already calls transcript rotation **"the
+largest measured cost effect in this repo's history"** (conversation
+`a9f211a7`: 1,148 inferences, $367.18, compaction at turn 75). The framework has
+known context was the dominant cost since Set 131 and has never targeted it.
+
+**Honest limit on this section.** *"Ceremony crowds the context"* is measured;
+*"and therefore the model produces worse work"* is **not**, and Session 3 must
+not assert it. What is available is the consequence: at 100% of ceiling on every
+preload file, **any addition now requires a deletion**, so the corpus cannot
+absorb another lesson, principle or convention without one leaving.
 
 ---
 
@@ -144,12 +227,31 @@ causes; a candidate list exists in which every entry carries measured minutes,
 a named consequence, and an owner.
 **Progress keys:** `numbersRederived`, `growthAttributedByStep`, `causesDated`, `candidatesCosted`
 
+> **COMPLETE, 2026-08-17 — VERIFIED.** Ends-with satisfied, with the growth
+> attributed to a dated cause the spec did not anticipate: the arrival of the
+> instruments on 2026-08-07. The candidate list carries two live entries and
+> three disqualified by their own measurement. See §2/§2b above and
+> [`s1-ceremony-attribution.md`](s1-ceremony-attribution.md).
+
 ---
 
 ### Session 2 of 3: Does severity still carry information?
 
 The verification loop is the largest ceremony component, and the gate that
 decides whether it continues reads one field. This session tests that field.
+
+> **Unchanged by Revision 1**, on the operator's ruling: severity is genuinely
+> the gate feeding the expensive loop and closing its vocabulary is cheap.
+> **Two carry-forwards from Session 1:**
+> 1. Step 2's premise (§3, the 92%) is **exactly as unverified as the 2.3× was**,
+>    and the 2.3× did not survive. Re-derive it first, state your classifier,
+>    and treat a refutation as a normal, publishable outcome.
+> 2. Step 4 gets easier and larger. Session 1 found the *same* open-vocabulary
+>    defect in a **third** field: **1,427 distinct `stepKey` values**. Session 1's
+>    instruments already parse every `sN-issues*.json` envelope this session
+>    needs. If closing `stepKey` at the writer is the same shape of fix as
+>    closing severity, say so and record it as a costed candidate for Session 3
+>    — do **not** widen this session to take it.
 
 **Steps:**
 
@@ -195,39 +297,60 @@ writer.
 
 ### Session 3 of 3: Cut, on the evidence
 
+> **Re-scoped by Revision 1, on the operator's ruling: this session cuts
+> CONTEXT, not minutes.** The minutes hypothesis was tested in Session 1 and
+> the number it rested on did not reproduce. The context hypothesis (§4) is
+> measured, has independent corroboration in the repo's own rotation analysis,
+> and — unlike minutes — names things that can be **deleted** rather than
+> merely deferred to the operator. The title stands: it is still a cut, still
+> on the evidence, and the evidence is what changed.
+
 **Steps:**
 
 1. Register.
-2. **Take the cuts Sessions 1 and 2 justify — and only those.** Work the
-   candidate list in descending measured minutes. Every cut is a deletion, a
-   parameter change, or a document edit. **If a candidate cannot be taken
-   without adding a module, it is not taken in this set** — record it as a
-   residual with its measured minutes so a later set inherits the number rather
-   than re-deriving it.
-3. **Re-run the measurement on this set's own sessions.** Sessions 1 and 2 are
-   themselves sessions; run the Session 1 instrument over them and report their
-   ceremony-per-step alongside the corpus median. A reduction set that made its
-   own sessions heavier has found something important about itself and must say
-   so.
-4. **Report the net.** Lines removed minus lines added; ceremony minutes
-   returned; obligations retired. **A net-positive line count is a failed
-   outcome for this set and must be stated as one in `change-log.md`** — not
-   explained away. "Nothing could responsibly be cut" is a legitimate result;
-   "we cut nothing and added 400 lines" is not.
+2. **Measure the context footprint, then cut the preload.** Re-derive §4 with
+   `guidance_report --check` and a word/token count over what a session
+   actually reads and writes. Then take the cuts the measurement justifies,
+   **largest first**. `lessons-learned.md` is the named starting point — 4 live
+   lessons against 5 sections of archive bookkeeping — but the measurement
+   picks the targets, not this sentence. **Archival is not deletion**: moving
+   text to `lessons-archive.md` is the sanctioned route and keeps every word
+   greppable. Preload ceilings **ratchet down only**; lowering one after a cut
+   is the point, raising one is an operator decision.
+3. **Cut the per-session ceremony this set can see itself producing.** Session
+   1 emitted **~7,700 words of ceremony against a 3,103-word deliverable**, and
+   named its own worst offender: **1,666 words of `activity-log.json` step
+   descriptions that nothing asked for.** Work the artifacts a session writes
+   every time — the log entry, `ai-assignment.md`, the conventions block, the
+   disposition — and for each, either cut it, cap it, or record why it earns
+   its bytes. **A cap is a documented convention, not a new validator**; if a
+   candidate cannot be taken without adding a module, it is a residual.
+4. **Report the net, and measure this set's own footprint.** Tokens removed
+   from the preload; words removed from the per-session artifact set; lines
+   removed minus added. Then run the same instrument over Sessions 1–3 of this
+   set. **A reduction set whose own sessions got heavier has found something
+   important about itself and must say so.** A net-positive line count, or a
+   preload that did not shrink, is a **failed outcome** and must be stated as
+   one in `change-log.md` — not explained away. *"Nothing could responsibly be
+   cut"* remains legitimate; *"we cut nothing and added 400 lines"* does not.
 5. Cross-provider verification.
 6. Required portion of the full test suite.
 7. Close-out.
 
 **Creates:** `change-log.md`
-**Touches:** whatever Sessions 1–2 justify
-**Ends with:** the justified cuts are taken; unjustifiable candidates are
-recorded as residuals carrying their measured minutes; this set's own ceremony
-cost is measured and reported; and the net effect on lines and on ceremony
-minutes is stated plainly.
-**Progress keys:** `justifiedCutsTaken`, `residualsRecorded`, `ownCostMeasured`, `netReported`
+**Touches:** `docs/planning/lessons-learned.md`, `docs/planning/lessons-archive.md`,
+and whatever else Sessions 1–2 and step 2's measurement justify
+**Ends with:** the preload is measurably smaller and its ceilings are ratcheted
+down to match; the per-session artifact set is cut or capped or justified
+line by line; unjustifiable candidates are residuals carrying their measured
+cost; this set's own context footprint is measured and reported; and the net
+effect on tokens and on lines is stated plainly, including when it is a failure.
+**Progress keys:** `contextMeasured`, `preloadCut`, `perSessionCeremonyCut`, `netReported`
 
 > **Step 9** (the reorganization review of `project-guidance.md` /
 > `lessons-learned.md`) runs after the notification, as the terminal session.
+> Revision 1 makes it unusually load-bearing: step 2 will have just edited one
+> of the two files it reviews.
 
 ---
 
@@ -249,14 +372,31 @@ that Sessions 1 and 2 need to build nothing.
 ## Non-goals
 
 - **Reducing verification on intuition.** Every cut traces to a measured number
-  from Session 1 or 2. Anything that makes the loop stop earlier is an
-  operator decision under the verification-reduction carve-out, and the
-  orchestrator may never self-authorize it.
+  from Session 1, Session 2, or Session 3 step 2. Anything that makes the loop
+  stop earlier is an operator decision under the verification-reduction
+  carve-out, and the orchestrator may never self-authorize it.
 - **Re-opening the round bounds as a number.** The bounds are enforced and the
   operator set them. This set asks whether the *gate feeding* them
   discriminates, which is a different question from whether 2 is the right cap.
 - **Re-opening `WORK_STEP_BUDGET`.** The 2026-08-14 ruling (ceiling N = 4,
-  target 3) stands and its implementation is owed elsewhere. The measurement is
-  clear that N is worth ~7–9 min against a ceremony block several times larger;
-  it is not this set's lever.
+  target 3) stands and its implementation is owed elsewhere.
 - **The extension carve.** Still correctly scheduled last, and still not this.
+
+Added by Revision 1:
+
+- **Re-litigating what Session 1 settled.** The three disqualified candidates in
+  §2b are dead on measured grounds; §1 reproduced and is not re-derived again.
+- **Rescuing the 2.3×** — not by a better classifier, not by closing `stepKey`
+  and re-measuring. If closing that vocabulary is worth doing, it is worth doing
+  as a **context** cut costed on its own merits.
+- **Deleting guidance content.** Archival to `lessons-archive.md` is what "cut
+  the preload" means here: a cut moves text out of the always-read tier, it
+  never destroys it.
+- **Claiming context pressure degrades output quality.** §4 measures that
+  ceremony crowds the context. It does **not** measure that the model therefore
+  reasons worse, and no deliverable may assert it. The defensible consequence is
+  narrower and sufficient: at 100% of ceiling, nothing is added without
+  something leaving.
+- **Building a context meter.** `guidance_report --check` already reports
+  preload tokens against ceilings and word counts are a shell command. The
+  no-new-module rule binds hardest in the session most tempted to break it.

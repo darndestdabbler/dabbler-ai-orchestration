@@ -33,7 +33,13 @@ You don't have to remember to ask for it, and the AI cannot decide its
 own diff is too small to bother: a close with no verification evidence
 runs the verification itself, and when no cross-provider verifier can be
 reached the close stays blocked until an operator resolves it — there is
-no silent pass.
+no silent pass. A finding the orchestrator believes is wrong doesn't
+loop forever either: it can **dispute** the finding with evidence from
+the repo, a deadlock at the round cap goes to a third **adjudicating**
+provider that neither wrote nor reviewed the work, and the operator's
+last resort — **waiving** — is typed at an interactive prompt an AI
+cannot reach, recorded verbatim, and closes the session as *unverified*,
+never as verified.
 
 **3. Works through a Copilot seat or direct API keys.**
 

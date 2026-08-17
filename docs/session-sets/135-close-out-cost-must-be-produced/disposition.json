@@ -31,6 +31,7 @@
   ],
   "blockers": [],
   "residuals": [
+    "LIVE INSTANCE OF THIS SET'S OWN FAILURE, recorded rather than quietly fixed. This session's first disposition.cost was built from CostReport.to_dict() instead of the producer docs/disposition-schema.md names (seat_cost --cost-block / CostReport.to_cost_block). to_dict() omits measured_at and carries store_path, an absolute machine path that has no place in a committed artifact. close_session REFUSED the block and printed exactly which field was malformed -- the same refusal Set 113 S8 met and answered by hand-editing the field until the validator went quiet. This session answered by calling the producer. Two Session 2 inputs follow: (a) the refusal is advisory, so the close still SUCCEEDED with no usable cost record -- the gate reports a malformed block exactly as loudly as a missing one and blocks neither; (b) to_dict() and to_cost_block() are two adjacent methods of which only one is valid here, and nothing in the type system or the call site says so.",
     "The three audit scripts (cost_audit.py, claims_v2.py, cost_classify2.py) live in the session workspace, not the repo: the set declares 'Touches: the set directory only' and three throwaway modules in a docs directory would be worse than the method section in cost-audit.md, which states every input and every rule. Re-deriving the audit means re-writing ~300 lines against a documented method, not recovering a lost one.",
     "router-metrics.jsonl is gitignored machine state and has demonstrably LOST rows it once had (Set 113 S2-S7 and 133 S1-S2 committed blocks quoting Direct-API call counts the surviving file cannot reproduce). Session 2's gate must not treat it as a record of equal standing with session-state.json. Named here, not fixed here.",
     "This session's own cost block exhibits Finding 3: routed_seat comes back 'measured' (exact) at close time while orchestrator_seat correctly comes back 'lower_bound'. It is left as the producer emitted it -- correcting it by hand would be exactly the defect this set exists to stop -- and stands as dogfood evidence for the Session 2 fix.",
@@ -55,15 +56,13 @@
     "G-010"
   ],
   "cost": {
-    "store_path": "C:\\Users\\adm.dennis.mitchell\\.copilot\\session-store.db",
-    "schema_version": 6,
     "components": [
       {
         "component": "orchestrator_seat",
         "status": "lower_bound",
-        "credits": 1724.3195,
-        "usd": 17.243195,
-        "event_count": 116,
+        "credits": 1851.78845,
+        "usd": 18.5178845,
+        "event_count": 124,
         "session_ids": [
           "fae81086-544e-41a3-bcff-b3554b158028"
         ],
@@ -111,8 +110,10 @@
       }
     ],
     "total_status": "lower_bound",
-    "total_credits": 2396.2054,
-    "total_usd": 23.962054,
-    "unmeasured": []
+    "total_credits": 2523.6743500000002,
+    "total_usd": 25.236743500000003,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
   }
 }

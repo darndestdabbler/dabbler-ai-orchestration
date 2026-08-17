@@ -300,9 +300,53 @@ canonical — a **durability regression** nobody recorded as one.
 
 ---
 
+## Finding 7 — this session hit the failure itself, at its own close
+
+Recorded rather than quietly fixed, because it is the cheapest evidence in the
+whole audit.
+
+Session 1's first `disposition.cost` was built from
+`CostReport.to_dict()` — an **adjacent** method — instead of from the producer
+`docs/disposition-schema.md` names, `seat_cost --cost-block`
+(`CostReport.to_cost_block`). The two shapes differ in exactly the ways that
+matter: `to_dict()` omits `measured_at` and carries `store_path`, an absolute
+path on one operator's machine, into a committed artifact.
+
+`close_session` **refused the block and printed the exact field**:
+
+```
+cost: recorded, but REFUSED -- disposition.cost does not satisfy its own
+contract, so nothing from it is reported as a measurement:
+cost.measured_at must be one of: close, retrospective (got None)
+-- a number whose reading time is unknown cannot be told from a floor
+```
+
+That is the same refusal Set 113 S8 met, and Set 113 S8 answered it by
+hand-editing the field until the validator went quiet. This session answered it
+by calling the producer.
+
+**Two things this proves that the reservation only argued:**
+
+1. **The refusal is advisory, so the close SUCCEEDED anyway** — every gate
+   passed, the state flipped to complete, and the set's record carried no usable
+   cost figure. A malformed block and a missing one are reported identically and
+   neither blocks. Session 2's `refuse` must mean *refuse*.
+2. **Deriving the shape from something adjacent is the actual failure mode**,
+   not dishonesty. Nobody asserted anything false here. `to_dict()` and
+   `to_cost_block()` sit next to each other, only one is valid in this position,
+   and nothing at the call site says so. That is why the fix has to be
+   executable: an orchestrator who has read the doc can still reach for the
+   wrong method.
+
+The corrected block was produced by `to_cost_block(MEASURED_AT_CLOSE)` and
+committed as an amendment. It reports `lower_bound` — a floor, correctly
+labelled, because a session cannot measure its own closing turns (§5.2).
+
+---
+
 ## What this means for Session 2
 
-The audit changes the specification in four concrete ways.
+The audit changes the specification in **five** concrete ways.
 
 1. **Produce-or-refuse is right, and "refuse an asserted block" is the smaller
    half.** Exactly one session ever committed an asserted-false block, and
@@ -325,6 +369,13 @@ The audit changes the specification in four concrete ways.
    a close-time reading must label **every** component a floor, and
    `seat-cost.md` §5.2 must say that a retrospective reading is exact only from
    a *different* conversation after the measured one has ended.
+
+5. **Make the close PRODUCE the block rather than validate a hand-assembled
+   one, and make the refusal blocking** (Finding 7). This session's own close
+   refused a malformed block and succeeded anyway, leaving the set with no
+   usable cost record. Two sub-requirements fall out: the close should call
+   `to_cost_block` itself so no caller can reach for `to_dict`, and a refused
+   block must stop the close rather than print beside a `[PASS]` column.
 
 **Is Session 2 still worth running?** Yes — but for the reason the audit found,
 not the reason it was reserved. The corpus is not full of lies; it is nearly

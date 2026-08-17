@@ -131,6 +131,14 @@
       "dateTime": "2026-08-17T09:28:46.817515-04:00",
       "description": "run_of_record affected: no declared suite input set intersects this change (0 paths). Change set is set-directory docs only; nothing owed (A5).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out-mid-set-with-a",
+      "dateTime": "2026-08-17T09:53:15.553351-04:00",
+      "description": "Closed mid-set with next_orchestrator. close_session REFUSED the first cost block (measured_at missing); re-produced it with to_cost_block per the documented producer and recorded the instance as Finding 7.",
+      "status": "complete"
     }
   ]
 }

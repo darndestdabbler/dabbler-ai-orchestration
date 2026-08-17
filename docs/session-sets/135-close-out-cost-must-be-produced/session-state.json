@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "What the cost record actually says",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-17T08:44:04.938743-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-17T09:51:35.293986-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -19,7 +19,7 @@
           "fae81086-544e-41a3-bcff-b3554b158028"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

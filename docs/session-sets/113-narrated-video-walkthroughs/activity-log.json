@@ -1098,6 +1098,85 @@
       "dateTime": "2026-08-17T02:21:29.498873-04:00",
       "description": "DONE. Four rounds: discovery (1 Major), supplementary (2 Major), remediation-review (1 rejected fix + new Major), remediation-review (VERIFIED, 4 accepted, 0 findings). All four findings accepted and fixed, none disputed. Verifier gpt-5.5 throughout (anthropic excluded as orchestrator provider).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "Register. Read `docs/tutorials/single-module-walkthrough.md` first \u2014 the tutorial is authored, the toy project is chosen and the shape is decided. This session records it; it does not re-design it.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 2,
+      "stepKey": "record-the-six-sessions-of-unit",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "**Record the six sessions of `unit-converter`** \u2014 three session sets, two sessions each, **one recording per session**, named for its set and session, each starting before `start_session` and stopping after `close_session`. **Set 1 is the one the tutorial exists for:** a person and an AI authoring a plan together, with the human **disagreeing on camera** and the plan changing because of it \u2014 a recording of a plan accepted unchanged teaches that the AI is right, which is not what this framework claims. **A human drives; the recorder observes and nothing more.** If a session runs past about fifteen minutes of wall clock, shrink the project.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 3,
+      "stepKey": "compress-the-waiting-from-the-framework",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "**Compress the waiting from the framework's own record, and state what was compressed.** `python -m ai_router.speed_ramp plan` derives the waiting stretches from each recorded session's own `session-events.jsonl` and `activity-log.json`; **read the plan before applying it.** This is the **first real exercise of the compression path** \u2014 if it refuses, or reports that it is compressing nearly all of a recording, say so plainly rather than hand-editing a timeline. Never compress an interval where something happened.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 4,
+      "stepKey": "clear-every-video-for-publication-per",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "**Clear every video for publication, per video.** Session 7's [`publication-safety-checklist.md`](../../walkthroughs/publication-safety-checklist.md), run once per artifact rather than once per set, because the risk is per artifact and **these are artifacts that cannot be recalled**. Nothing here uploads anything: publication stays a human upload, the product version belongs in the title, and a stale video is regenerated rather than patched.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "**Cross-provider verification.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "**Required portion of the full test suite** \u2014 Layer 1, plus Layer 3 if the harness had to change to get through step 2 (`L-064-12`).",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 7,
+      "stepKey": "close-out-mid-set-with-a",
+      "dateTime": "2026-08-17T04:27:36.558207-04:00",
+      "description": "**Close-out**, mid-set, with a `next_orchestrator` handover.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T04:27:36.580998-04:00",
+      "description": "Registered session 9 (copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 9,
+      "stepNumber": 2,
+      "stepKey": "record-the-six-sessions-of-unit",
+      "dateTime": "2026-08-17T04:39:20.269616-04:00",
+      "description": "Pre-flight complete and the step is prepared, but the recordings themselves need the human at the keyboard. Verified: ffmpeg/ffprobe 9.0 present on the User PATH; verify_type reads COPILOT_CLI; captureApproval(gdigrab) returns approved under s8-operator-waiver.json while captureApproval(obs) stays refused at the Session 4 FAIL. Found and closed a silent-skip gap the tutorial recordings would have hit: record-long-form.js resolves the speed ramps set directory under THIS repo and its --session-set-dir override was undocumented, so a recording of a toy-project session would have completed with the ramp silently skipped -- the flag is now in the usage text. Wrote s9-recording-runbook.md (per-recording commands, the pre-flight safety half, what must be on screen for each of the six, and how to read the ramp plan). BLOCKED on the operator: step 2 requires a human driving six real sessions, and the recorder observes and nothing more.",
+      "status": "blocked"
     }
   ]
 }

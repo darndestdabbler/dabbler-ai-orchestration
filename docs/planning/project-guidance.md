@@ -5,7 +5,9 @@
 > this repo.
 >
 > **Note for consumer repos:** When bootstrapping a new AI-led-workflow repo
-> from this template, replace all `TODO` sections with repo-specific content.
+> from this template, the stub sections to fill in are listed in
+> [`docs/guidance-lifecycle.md`](../guidance-lifecycle.md) →
+> *Bootstrapping a consumer repo's `project-guidance.md`*.
 
 Read this file before every AI-led session. Use it as the first-stop reference
 before changing architecture, testing strategy, or workflow assets.
@@ -19,20 +21,6 @@ The file has two top-level sections:
 ---
 
 ## Principles
-
-### Architecture
-
-> **TODO:** Add durable architectural principles for this repo.
-> Examples: primary data store, language/runtime, key boundaries between layers.
-
-### Testing
-
-> **TODO:** Add testing strategy principles.
-> Examples: hermetic vs. integration, coverage expectations, CI/CD gating.
-
-### Security and Auth
-
-> **TODO:** Add security and auth principles if applicable.
 
 ### Documentation authority
 <!-- lesson: id="G-001" -->
@@ -158,9 +146,6 @@ Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already
   reproduced the still-latent `path_aware_critique.py` sibling class), and 072 (the
   four deferred sibling readers + `UnicodeError` folded in across both modules).
 
-> **TODO:** Add additional code style conventions (naming, formatting,
-> nullable, async suffix, file layout, etc.).
-
 ### Workflow Expectations
 
 <!-- lesson-pointer: archived-set="121" -->
@@ -243,7 +228,3 @@ Encoded: `ai_router/tests/test_contract_gate_schema.py` — parity tests already
   after the final edit; targeted re-runs are not a substitute. `package.json`
   counts as product. When CI is red, CANCELLED jobs are unknown coverage, not
   passing coverage. (L-064-12)
-
-> **TODO:** Add build and test commands, gating rules, and CI/CD expectations.
-> Example (harvester): `dotnet build && dotnet test` (sequential, not parallel,
-> to avoid file-lock contention on Windows).

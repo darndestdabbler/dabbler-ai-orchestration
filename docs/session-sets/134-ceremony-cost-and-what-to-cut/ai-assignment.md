@@ -178,8 +178,42 @@ stepRuntimes:
 findings:
 ```
 
-**Next-set recommendation:** N/A here — the set-terminal next-set analysis is
-routed at Session 3's Step 3.5 and appended below at that time.
+### Revision 1 refresh (routed at Session 3's own Step 3.5, 2026-08-17)
+
+The table above predates Revision 1's re-scope from minutes to context; its
+Step 3 `routed-analysis` row is **withdrawn**. Re-routed to
+`claude-sonnet-4.6`, which returned the recommendation this session followed:
+
+| Step | Route | Model |
+|------|-------|-------|
+| 2. Measure context footprint; cut the preload | `orchestrator-execute` | — |
+| 3. Cut the per-session ceremony | `orchestrator-execute` | — |
+| 4. Report the net; measure this set's own footprint | `orchestrator-execute` | — |
+| 5. Cross-provider verification | `verifier-execute` | google or openai / current flagship family |
+
+> **Routed verbatim:** *"Steps 2, 3, and 4 must NOT be routed. […] a routed
+> analysis call to count lines the orchestrator can count itself would be
+> self-refuting on the set's own stated premise."*
+
+Step 5 is exempt — its purpose is independence, not analysis cost.
+Orchestrator retained at anthropic / current flagship family; effort raised to
+**high**, because Steps 2–3 mutate the files they measure.
+
+**Next-set recommendation (set-terminal, routed):** **do product work next —
+stop measuring the framework.** The analyst rejected both
+framework-introspection candidates unprompted:
+
+| candidate | verdict | why |
+| :--- | :--- | :--- |
+| `135-stepkey-vocabulary-and-cost-attribution` | rejected | ships measurement infrastructure "the operator explicitly does not want more of, in service of an attribution that already failed to hold up" |
+| `135-loop-gate-signal-proposal` | rejected | "a full session set to produce a document is ceremony by another name" |
+| **product work — an `ai_router` release, or the extension carve** | **recommended** | the open residuals are "a gitignored script that needs committing and an operator decision that needs making. Neither requires a session set." |
+
+> **Routed verbatim:** *"The extension carve has been deferred for at least
+> three sets; it is still correctly scheduled last — but 'correctly scheduled
+> last' should eventually mean 'doing it now.'"*
+
+The feature choice is the operator's.
 
 ---
 

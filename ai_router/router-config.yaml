@@ -1485,11 +1485,12 @@ guidance:
   # (docs/guidance-lifecycle.md -> "Membership follows the
   # required-reading contract").
   preload:
-    # Set 121 S4, 2026-08-15: ratcheted 12234 -> 11644 (measured after
-    # promoting C-002/C-003, collapsing six project-guidance.md entries
-    # that duplicated the constitution, trimming the engine files, and
-    # repointing the engine entry to GEMINI.md, now the largest).
-    total_ceiling_tokens: 11644
+    # Set 134 S3, 2026-08-17: ratcheted 11644 -> 9802 (measured after the
+    # context cut). Composition: lessons-learned.md -1418, engine files
+    # -275, project-guidance.md -149. Every ceiling below is AT
+    # measurement, so the token-neutral anti-rebloat property is retained:
+    # the win is 1842 fewer tokens read EVERY session, not headroom.
+    total_ceiling_tokens: 9802
     files:
       - path: docs/session-constitution.md
         # Set 121 S4, 2026-08-15: ratcheted 4200 -> 4059 (measured). The
@@ -1497,22 +1498,27 @@ guidance:
         # retired; the A1-A4 test-ordering rules it bought are still in
         # the file and still load-bearing, so the measurement sits 59
         # tokens above the pre-authorization 4000 in live content.
+        # Set 134 S3: unchanged. The duplication the cut found was in the
+        # files that POINT at this one, not in it.
         ceiling_tokens: 4059
       - path: docs/planning/project-guidance.md
-        # Set 121 S4, 2026-08-15: ratcheted 3645 -> 3394 (measured NET of
-        # admitting C-002 and C-003 -- the promotions were funded by
-        # collapsing six entries that restated session-constitution.md,
-        # which is preload too, so the duplicate was paid twice).
-        ceiling_tokens: 3394
+        # Set 134 S3, 2026-08-17: ratcheted 3394 -> 3245 (measured). The
+        # Architecture / Testing / Security / Code Style / Build and Test
+        # TODO stubs were consumer-repo scaffolding that all 134 sets paid
+        # for and no session ever filled in; the stub list moved to the
+        # uncapped docs/guidance-lifecycle.md.
+        ceiling_tokens: 3245
       - path: docs/planning/lessons-learned.md
-        # Set 121 S3, 2026-08-15: ratcheted 2504 -> 2269 (measured after
-        # the Set 121 S1/S2/S3 edits; the standing authorization that
-        # permitted the earlier raise is retired by this session).
-        ceiling_tokens: 2269
+        # Set 134 S3, 2026-08-17: ratcheted 2269 -> 851 (measured). The
+        # file was spending 60% of its budget (1371 tokens) on five tables
+        # recording where lessons USED to live, against 436 tokens (19%)
+        # of live lessons. Tables archived whole in lessons-archive.md.
+        ceiling_tokens: 851
       - path: GEMINI.md   # largest engine bootstrap file (representative)
         # Set 121 S4, 2026-08-15: the manifest entry MOVED from AGENTS.md.
-        # S4's lockstep trim of the shared body left GEMINI.md the largest
-        # of the three (7,730 vs 7,646 vs 7,164 bytes), and the manifest
-        # must always count the largest so the total bounds every engine's
-        # session. Ratcheted 2208 -> 1922 (measured).
-        ceiling_tokens: 1922
+        # Set 134 S3, 2026-08-17: ratcheted 1922 -> 1647 (measured). Five
+        # sections that were pure pointers the constitution already
+        # carries IN-PRELOAD were removed in lockstep from all three
+        # engine files; GEMINI.md is still largest (6,626 vs 6,542 vs
+        # 6,060 bytes), so the entry does not move this time.
+        ceiling_tokens: 1647

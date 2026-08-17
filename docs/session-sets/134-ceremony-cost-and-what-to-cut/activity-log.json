@@ -224,6 +224,117 @@
       "dateTime": "2026-08-17T07:12:41.757923-04:00",
       "description": "ALL THREE declared suites were owed and all three were run in full, after the last code change and after the VERIFIED remediation-review round (A2/A4). `run_of_record affected` names them: every suite declares ai_router/ in its covers, and this session changed verification.py, verify_session.py, pull_verifier.py, three test modules and a prompt template under that path. NOTE FOR FUTURE SESSIONS: `affected` and `check` default to disposition.files_changed, which at that moment still held SESSION 1's list, so both initially reported 'no declared suite's input set intersects this change' - the real change set had to be passed with --files-changed. That is a live trap: the default is stale for the whole of a session until its disposition is authored. RESULTS. pytest: 5195 passed, 9 skipped, 1 xfailed, 726s - clean single invocation. mocha: 1609 passing, 2 pending, 0 failing, 50s; the Set 114 S3 symlink test is among the pending because this shell cannot create a symlink, and it did not fail. playwright: 36 passed / 1 failed in the full invocation (487s), then the identical failing spec passed in isolation in 46.0s with no code change between runs, so all 37 Layer 3 tests executed and passed. RECORDED AS A COMPOSITE AND STATED AS ONE, not laundered into a clean green: the run-of-record --detail names the composition, the failing spec and both results, and the route is journaled in decisions.jsonl under project-guidance G-004, whose second worked case is this situation verbatim. The failure was a 300s timeout on vsix-first-run-walkthrough.spec.ts waiting for the Default module row to read '2 sets'; Playwright's own output flags that file as contention-slow at 5.2m against 46s isolated. It cannot be this session's defect - the spec drives the extension's TypeScript session-set reader, is untouched since Set 122/123, and this diff is Python plus docs. The full-suite flake is recorded as a RESIDUAL with a named owner and deliberately not fixed here: the set's no-new-module rule and the fact that the spec is not this session's surface both bar absorbing it.",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "measure-the-context-footprint-then-cut",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "**Measure the context footprint, then cut the preload.** Re-derive \u00a74 with `guidance_report --check` and a word/token count over what a session actually reads and writes. Then take the cuts the measurement justifies, **largest first**. `lessons-learned.md` is the named starting point \u2014 4 live lessons against 5 sections of archive bookkeeping \u2014 but the measurement picks the targets, not this sentence. **Archival is not deletion**: moving text to `lessons-archive.md` is the sanctioned route and keeps every word greppable. Preload ceilings **ratchet down only**; lowering one after a cut is the point, raising one is an operator decision.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "cut-the-per-session-ceremony-this",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "**Cut the per-session ceremony this set can see itself producing.** Session 1 emitted **~7,700 words of ceremony against a 3,103-word deliverable**, and named its own worst offender: **1,666 words of `activity-log.json` step descriptions that nothing asked for.** Work the artifacts a session writes every time \u2014 the log entry, `ai-assignment.md`, the conventions block, the disposition \u2014 and for each, either cut it, cap it, or record why it earns its bytes. **A cap is a documented convention, not a new validator**; if a candidate cannot be taken without adding a module, it is a residual.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "report-the-net-and-measure-this",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "**Report the net, and measure this set's own footprint.** Tokens removed from the preload; words removed from the per-session artifact set; lines removed minus added. Then run the same instrument over Sessions 1\u20133 of this set. **A reduction set whose own sessions got heavier has found something important about itself and must say so.** A net-positive line count, or a preload that did not shrink, is a **failed outcome** and must be stated as one in `change-log.md` \u2014 not explained away. *\"Nothing could responsibly be cut\"* remains legitimate; *\"we cut nothing and added 400 lines\"* does not.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-17T07:27:46.595578-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T07:27:46.609742-04:00",
+      "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "measure-the-context-footprint-then-cut",
+      "dateTime": "2026-08-17T07:40:44.490927-04:00",
+      "description": "Preload 11,644 -> 9,802 tok (-15.8%). lessons-learned -1,418 (5 bookkeeping tables archived); engine files -275 lockstep (5 pointer sections the constitution already carries in-preload); project-guidance -149 (TODO stubs moved to guidance-lifecycle). All 4 ceilings ratcheted to measurement.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "cut-the-per-session-ceremony-this",
+      "dateTime": "2026-08-17T07:45:21.796054-04:00",
+      "description": "Capped 3 artifacts by convention in the authoring guide: activity-log step description 40 w, ai-assignment prose 250 w/block, decisions.jsonl 400 w/decision. Exempted sN-conventions.md (capping it would reduce verification) and disposition.json (schema-set). No validator.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "report-the-net-and-measure-this",
+      "dateTime": "2026-08-17T07:49:04.143945-04:00",
+      "description": "Preload -1,842 tok (-15.8%), -206 lines. Caps project to 164,674 words corpus-wide. NET LINE COUNT +294 = FAILED, stated as such in change-log.md: report is 1.9x the cut. This set logged 250.6 w/entry, worst of 126 sets.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T07:58:51.800247-04:00",
+      "description": "Round 1 discovery (gpt-5.5, fan-out 2): 2 blocking Majors, both the same defect -- a scratch logging helper left at repo root. Round 2 supplementary: clean, nothing new. Accepted without argument; remediated by removal.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T08:23:18.552301-04:00",
+      "description": "All 3 expensive suites (covers ai_router/) run after the last edit and recorded: pytest 5195 passed/9 skipped/1 xfailed 596s; mocha 1609 passing 41s; playwright 36+1 composite 519s (same load flake as S2, passes alone in 46s, journaled under G-004).",
+      "status": "complete"
     }
   ]
 }

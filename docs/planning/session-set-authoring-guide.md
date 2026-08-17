@@ -1466,7 +1466,46 @@ a spec author:
 
 ---
 
-## The guided-look UAT (Set 111 S4)
+## Per-session artifact caps (Set 134 S3)
+
+**A cap here is a documented convention, not a validator.** Set 134's rule was
+*no new module*; a governor over these artifacts would have been the exact
+failure the set was measuring. Nothing below is enforced by code.
+
+Measured over the whole corpus, of every artifact a session writes **every
+time** — cut it, cap it, or say why it earns its bytes:
+
+| artifact | measured | ruling |
+| :--- | ---: | :--- |
+| `activity-log.json` step description | 3,130 entries, **218,391 w**, mean **69.8 w/entry** | **cap 40 words** |
+| `ai-assignment.md` prose per session block | 284 blocks, **94,345 w**, mean **332 w/block** | **cap 250 words** (route tables exempt — a table row is the payload) |
+| `decisions.jsonl` per decision | 211 decisions, mean **361 w** | **cap 400 words** |
+| `sN-conventions.md` | 81 files, mean **1,078 w/file** | **earns its bytes — no cap** |
+| `disposition.json` | 120 files, mean **702 w/file** | **earns its bytes — no cap** |
+
+Applied to the corpus as it stands, the three caps would have removed
+**164,674 words** — 52.7% of the step descriptions, 43.1% of assignment prose,
+11.7% of the decision journal.
+
+**Why 40 words for a log entry.** It is a **ledger row, not a narrative**. Its
+readers are `check_activity_log_entry` (which counts rows), the checklist
+renderer (which truncates to a short label), and a human scanning for where a
+session got to. None reads a paragraph, and no gate has ever failed for a
+description being too terse. Write what changed and the number that proves it;
+the deliverable document is where reasoning belongs.
+
+**Why two artifacts are exempt.** `sN-conventions.md` is G-010 — stating the
+suite baseline and release contract up front is what stops Round 1 burning
+findings, and re-verify rounds, on an agreed baseline. Shortening what a paid
+verifier reads to decide what counts as a defect is a **verification
+reduction**: operator-owned, and not proposed. `disposition.json` is
+schema-shaped and machine-gated at close; its size is owed to a reader, not to
+discretion.
+
+**Rejected: enforcing any of this in `log_step`.** A refusal is only cheap
+where the caller can retry for free (Set 134 S2); `log_step` is called
+mid-session inside stateful work.
+
 
 Canonizes the format piloted in Set 110's operator notes, adopted after
 the operator named the real problem: *"We often bypass UAT. I haven't

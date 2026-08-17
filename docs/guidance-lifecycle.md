@@ -363,6 +363,30 @@ This process is detailed in `docs/guidance-backlog-remediation.md`.
 
 It is supported by the `ai_router/guidance_triage.py` helper, which classifies each existing entry as `keep-active | archive | promote | merge | drop`, projects the post-remediation active-tier size against the ceiling, and writes an operator-reviewed **proposal** without ever editing the target file directly.
 
+## Bootstrapping a consumer repo's `project-guidance.md`
+
+A new AI-led-workflow repo starts from this repo's `project-guidance.md`
+shape: a **Principles** half (durable strategic commitments — the *why* and
+*what*, slow to change) and a **Conventions** half (specific rules, patterns
+and code styles — the *how*, faster to change, often promoted from successful
+lessons). Fill in the sections below with repo-specific content; a section
+with nothing repo-specific to say should be **omitted, not stubbed**.
+
+| Section | What to write |
+| :--- | :--- |
+| Principles → Architecture | Primary data store, language/runtime, key boundaries between layers. |
+| Principles → Testing | Hermetic vs. integration, coverage expectations, CI/CD gating. |
+| Principles → Security and Auth | Auth model and secret handling, if applicable. |
+| Conventions → Code Style | Naming, formatting, nullability, async suffix, file layout. |
+| Conventions → Build and Test | Build/test commands, gating rules, CI/CD expectations. E.g. `dotnet build && dotnet test` run sequentially rather than in parallel, to avoid file-lock contention on Windows. |
+
+> **Why this list lives here and not in the file it describes.** Set 134 S3
+> measured the stub headings in the always-loaded copy at **174 tokens paid by
+> every session of every set** — 134 sets without one of them being filled in.
+> Scaffolding for a repo that does not exist yet is not preload. This document
+> is an on-demand reference and deliberately uncapped, so the template value is
+> preserved at zero recurring cost.
+
 ## Commands at a glance
 
 | Command | Purpose |

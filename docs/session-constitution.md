@@ -53,9 +53,9 @@ Run every router CLI through the workspace venv
     never self-opine.
   - **4. Execute.** Do the plan's steps; log every step to
     `activity-log.json` (`log_step`) **using the spec's own step
-    numbers** — `start_session` seeded the plan there as `pending`
-    rows, and the key (else the number) is what reconciles a logged
-    step to its planned one — and **post the step checklist**
+    numbers** (seeded `pending` rows reconcile by key, else number) in
+    **40 words or fewer — a ledger row, not a narrative** — and **post
+    the step checklist**
     (`python -m ai_router.session_checklist`, `--markdown` for a chat
     surface) at each named transition: session start; before a
     long-running command and again once its run is **recorded**; every
@@ -253,7 +253,7 @@ Open the named reference at the step's trigger moment — not before.
 | 1 | `docs/planning/repo-worktree-layout.md` | Worktree layout, migration, drift recovery |
 | 2 | `docs/planning/session-set-authoring-guide.md` | Authoring or revising a spec (flag semantics, **session-size cap**, slugs) |
 | 2 | `docs/ai-led-session-workflow.md` | The set declares `requiresUAT` / `requiresE2E` — the gated UAT/E2E procedures |
-| 4 | `docs/planning/session-set-authoring-guide.md` | The step-checklist cadence: what a transition is, the post ledger, the `checklist_posted` gate |
+| 4 | `docs/planning/session-set-authoring-guide.md` | The step-checklist cadence: what a transition is, the post ledger, the `checklist_posted` gate; **per-session artifact caps** |
 | 5, 8 | `docs/planning/session-set-authoring-guide.md` | The test-run policy (A1–A4: what runs when, relative to verification) and the run-of-record freshness gate |
 | 7, 8 | `docs/planning/session-set-authoring-guide.md` | The guided-look UAT format, `npm run walk`, and the `disposition.uat` close gate |
 | 3.5–4 | `docs/ai-led-session-workflow.md` | Router config, task types, delegation thresholds, the decision-rights rubric, education-mode briefs, decision-time consensus |

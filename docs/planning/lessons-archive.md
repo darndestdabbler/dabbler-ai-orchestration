@@ -1033,3 +1033,107 @@ constitution at the named place — full text preserved here for grep, and
   conditional on the spec's `requiresUAT` and `requiresE2E` flags. Do not
   re-litigate those flags during a session — if a flag is wrong, surface it
   at the Step 9 reorganization review.
+
+---
+
+## Archived by Set 134 S3 (preload context cut)
+
+Set 134 S3 measured `lessons-learned.md` and found the file that exists to
+carry lessons spent **60% of its 2,269-token preload budget (1,371 tokens) on
+five tables recording where lessons used to live**, against **436 tokens
+(19%) of live lessons**. Those five sections are a changelog of the file's own
+curation: none of them states a rule, and every rule they point *at* already
+lives either in `project-guidance.md` (preload, so the pointer was paid twice
+and bought once) or in shipped code with its own falsifier. They are moved
+here whole, in the order they appeared, so every id stays grep-able via
+`python -m ai_router.guidance_search --archive`.
+
+### Promoted lessons (full text archived) — Set 073 pointer table
+
+These lessons proved durable and were **promoted** — their canonical rule now
+lives in `project-guidance.md` (or the authoring guide), which is also loaded at
+every session start, so the active-tier copy was pure redundancy. Set 073 moved
+their **full text** to this archive.
+
+| id | rule now lives in |
+| :--- | :--- |
+| L-064-4 | `ai_router/cli_glyph_guard.py` (encoded Set 121 S3) |
+| L-064-5 | `project-guidance.md` -> Conventions -> Workflow Expectations (session-state SSOT) |
+| L-064-10 | `project-guidance.md` -> Conventions -> Workflow Expectations (up-front conventions block) — G-010 |
+| L-064-11 | `session-set-authoring-guide.md` + `project-guidance.md` (spec-declared E2E/UAT) |
+| L-066-1 | `ai_router/tests/test_contract_gate_schema.py` (encoded Set 121 S3) |
+| L-069-1 | `project-guidance.md` -> Conventions -> Code Style (fix every sibling site) — G-008 |
+| L-070-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (iterative dogfood is evidence) — G-019 |
+| L-079-3 | `project-guidance.md` -> Conventions -> Workflow Expectations (dogfood the true cold start) — G-020 |
+
+### Promoted lessons (Set 110 Step 9) — pointer table
+
+Set 110's Step 9 promoted three lessons whose citation counts had long since
+passed the two-context bar — 27, 14 and 9 sets respectively. Their canonical
+rules now live in `project-guidance.md`, which is also loaded at every session
+start, so the active-tier copies were pure redundancy.
+
+| id | rule now lives in |
+| :--- | :--- |
+| L-065-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (propagate a consistency fix to every echo) |
+| L-095-1 | `project-guidance.md` -> Conventions -> Workflow Expectations (grade severity by consequence) |
+| L-064-12 | `project-guidance.md` -> Conventions -> Build and Test (Explorer / state-writer / fixture / **manifest** changes run full Layer 3 before close) |
+
+L-064-12 was **broadened** on promotion: Set 110 S4 proved the extension
+manifest belongs in the trigger list, after a `package.json` edit that landed
+after the last full Layer 3 run reached a staged VSIX carrying an icon shape VS
+Code rejects outright.
+
+### Archived lessons (Set 085 preload triage) — pointer table
+
+Set 085 applied the preload **admission test** (recent recurrence AND
+high miss cost AND weak automated detectability AND no executable-gate
+equivalent AND expressible in <=150 tokens; see
+`docs/guidance-lifecycle.md`). Lessons already enforced by automation, or
+whose trigger moment is situational, moved full-text here:
+
+| id | where the rule lives now |
+| :--- | :--- |
+| L-064-1 | encoded in `ai_router/utils.py::detect_truncation` — call it before trusting structured routed output |
+| L-064-2 | encoded in `router-config.yaml` `verification.max_cost_multiplier` (router-enforced, no orchestrator action) |
+| L-064-3 | merged into L-079-1 (one cp1252 class) |
+| L-064-6 | duplicate of `project-guidance.md` -> Workflow Expectations (route `ai-assignment.md`; never self-opine) |
+| L-069-2 | encoded in the shipped reviewer templates (both carry the strong adversarial framing) |
+| L-071-1 | encoded in `ai_router.verification.is_blocking_verdict` / `classify_blocking` + the workflow Step-6 loop discipline; principle stated in `session-constitution.md` |
+| L-072-1, L-073-1 | experiment-design methodology — consult the archive when designing an A/B or recording a replication |
+| L-079-2 | spec-authoring rule — see the authoring guide (gate flags live in the config block, prose cannot arm a gate) |
+
+### Archived lessons (Set 095 preload-ceiling triage) — pointer table
+
+L-095-1's admission required demotions (ceilings ratchet down only):
+
+| id | where the rule lives now |
+| :--- | :--- |
+| L-064-7 | executable-gate-encoded in the `verify_session` CLI (sub-Round-1 `--max-tier` refused without `--wording-only`) |
+| L-078-1 | situational release/rollback-authoring trigger — search the archive at that moment |
+
+### Encoded lessons (Set 121 encode-or-drop pass) — pointer table
+
+Set 121 S1 applied the operator's rule — *a lesson becomes executable
+code or a single instruction line, or it is dropped* — to every active
+lesson. These two were **already enforced by shipped code with true
+falsifiers**, so criterion 4 of the admission test (no executable-gate
+equivalent) disqualified them from preload. The per-lesson dispositions and
+their reasoning are in Set 121's `decisions.jsonl`.
+
+| id | the gate that now enforces it |
+| :--- | :--- |
+| L-064-9 | `ai_router/verify_session.py` — `EvidenceBundle.git_status` renders `git status --short` ahead of the diff (`test_verify_session.py::TestEvidenceAssembly`) |
+| L-125-1 | `ai_router/cli_transport.py` — `READ_ONLY_TOOLS` / `_tool_grant_argv()` on both dispatch paths (`test_routed_calls_cannot_mutate.py`) |
+
+The three lessons that survived that pass (L-079-1, L-064-8, L-112-1) were
+**condensed to one instruction line each**; their pre-condensation full text is
+preserved elsewhere in this archive without trailers, since the live ids stay in
+the active tier.
+
+### Repo-specific tier note (Set 134 S3)
+
+The active tier's "Repo-Specific Lessons" section was an empty placeholder
+stating that it was empty, plus a pointer to L-064-12's promotion (recorded in
+the Set 110 table above). Consumer repos add repo-specific lessons under a
+heading of their own; the section does not need to pre-exist to be added.

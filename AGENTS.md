@@ -5,11 +5,18 @@
 > Assistant reads `GEMINI.md`. All three files describe the same role and
 > rules — only the engine-specific bootstrap at the end differs.
 
-## Quick start
+## Where the rules live
 
-New to this repo? Read [`docs/quick-start.md`](docs/quick-start.md) first —
-it explains the framework in five minutes and points to the right reference
-docs from there.
+Most curator work here is ad-hoc PR-style review and normalization. When a
+structured pass is justified (merging a non-trivial change from a consumer
+repo, refactoring `ai_router/`), author a set under `docs/session-sets/<slug>/`
+and follow [`docs/session-constitution.md`](docs/session-constitution.md) —
+the per-session operating doc. It names the whole preload (this file is its
+engine-file item), and its **per-step pointer table** is the index into every
+on-demand reference — first-time orientation (`docs/quick-start.md`), the
+`session-state.json` schema, the worktree layout standard, close-out and its
+flag matrix, decision rights, guidance lifecycle. Open each at the trigger
+moment it names, not before.
 
 ## Purpose
 
@@ -58,39 +65,11 @@ extension build, the publish runbook, and the CI matrix all live in
 [`CONTRIBUTING.md`](CONTRIBUTING.md). CI itself is defined in
 [`.github/workflows/test.yml`](.github/workflows/test.yml).
 
-## Session state schema
-
-[`docs/session-state-schema.md`](docs/session-state-schema.md) is
-authoritative for `session-state.json` (the v4 shape, the per-session
-`orchestrator` block, the Set 049 writer contract) — read it on demand for
-any state-file question. Sanctioned writers own the shape; hand-touching a
-state file without it is the usual cause of the N−1/N display drift.
-
 ## Repo layout standard
 
 Main checkout at `~/source/repos/<repo>/` (never moves), worktrees at
-`~/source/repos/<repo>-worktrees/<slug>/`. Layout, fresh-repo setup and
-migration recipes, drift recovery and gotchas:
-`docs/planning/repo-worktree-layout.md`. Consumer repos point their own
-agent-instruction files at it.
-
-## Close-out
-
-`ai_router/docs/close-out.md` is the single source of truth for
-`close_session`: when it runs, what it checks, the manual-flag matrix
-(`--interactive`, `--force`, `--manual-verify`, `--repair`), and
-troubleshooting (stranded sessions, mixed-mode drift, the reconciler).
-`close_session --help` echoes its Section 2.
-
-## When curator work runs as a session set
-
-Most curator work here is ad-hoc PR-style review and normalization. When
-a structured pass is justified (merging a non-trivial change from a
-consumer repo, refactoring `ai_router/`), author a set under
-`docs/session-sets/<slug>/` and follow `docs/session-constitution.md` —
-the per-session operating doc, which names the whole preload (this file
-is its engine-file item) and carries the per-step pointer table into the
-on-demand references. Guidance lifecycle: `docs/guidance-lifecycle.md`.
+`~/source/repos/<repo>-worktrees/<slug>/`. Consumer repos point their own
+agent-instruction files at `docs/planning/repo-worktree-layout.md`.
 
 ## Running the router
 
@@ -131,14 +110,6 @@ and every child is bounded (`delegation.child_budget`). Reason codes, the
 full precedence order and the rotation cost evidence:
 `docs/ai-led-session-workflow.md` → **Delegation Discipline**; tunable
 values live under `delegation:` in `ai_router/router-config.yaml`.
-
-## Decision rights (pointer)
-
-Route decisions by **authority, not judgment load**. The rubric, the four
-human-required classes, the verification-reduction carve-out,
-`decisions.jsonl` and education-mode briefs are in
-`docs/session-constitution.md` → *Decision rights* (preload). Canonical:
-`docs/ai-led-session-workflow.md`.
 
 ## Engine-specific bootstrap (Codex / GitHub Copilot, Windows)
 

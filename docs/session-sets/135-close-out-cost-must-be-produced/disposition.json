@@ -1,0 +1,118 @@
+{
+  "status": "completed",
+  "summary": "Session 1 of 2 -- a read-only audit of every cost claim this repo has committed. Walked all 516 committed versions of every docs/session-sets/*/disposition.json (not the 135 surviving ones -- Set 113 S8 repaired its own asserted block 90 seconds after committing it, so a last-version-only audit reports the repair and hides the assertion) and re-priced 265 in-scope schema-v4 sessions with seat_cost. Findings: the recorded cost history is not broadly wrong, it is broadly ABSENT -- only 22 sessions ever authored a cost block, and of the 16 closed sessions priceable today the record under-reports by 13,386.4 credits ($133.86, +27.6%), roughly twice the single $70.24 miss this set was reserved on. Larger still: $3,305.80 of in-repo Copilot consumption is claimed by no session record at all (16.7% attribution rate). Four new findings beyond the reservation: (1) a self-repairing record under-reports its own defect rate; (2) routed_api: measured is unreachable from the producer and appears in 7 committed versions -- a deterministic hand-authorship falsifier Session 2 should ship; (3) routed_seat: measured at close time is not exact, proven by 5 blocks that price higher today, so a close-time reading must label EVERY component a floor; (4) --retrospective from inside your own still-running conversation is also not exact (113 S8: +25.6%), which contradicts seat-cost.md 5.2 and is an owed doc fix. Nothing in a closed session's record was modified.",
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "verification_message_ids": [],
+  "files_changed": [
+    "docs/session-sets/135-close-out-cost-must-be-produced/activity-log.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/ai-assignment.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/checklist-posts.jsonl",
+    "docs/session-sets/135-close-out-cost-must-be-produced/cost-audit.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/cost-audit.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/decisions.jsonl",
+    "docs/session-sets/135-close-out-cost-must-be-produced/disposition.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-acceptance-round-1.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-acceptance-round-2.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-conventions.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-issues-round-2.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-issues.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-remediation-round-1.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-remediation-round-2.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-rounds.jsonl",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-verification-fanout-2.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-verification-round-2.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-verification-round-3.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-verification-round-4.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/s1-verification.md",
+    "docs/session-sets/135-close-out-cost-must-be-produced/session-events.jsonl",
+    "docs/session-sets/135-close-out-cost-must-be-produced/session-state.json",
+    "docs/session-sets/135-close-out-cost-must-be-produced/test-runs.jsonl"
+  ],
+  "blockers": [],
+  "residuals": [
+    "The three audit scripts (cost_audit.py, claims_v2.py, cost_classify2.py) live in the session workspace, not the repo: the set declares 'Touches: the set directory only' and three throwaway modules in a docs directory would be worse than the method section in cost-audit.md, which states every input and every rule. Re-deriving the audit means re-writing ~300 lines against a documented method, not recovering a lost one.",
+    "router-metrics.jsonl is gitignored machine state and has demonstrably LOST rows it once had (Set 113 S2-S7 and 133 S1-S2 committed blocks quoting Direct-API call counts the surviving file cannot reproduce). Session 2's gate must not treat it as a record of equal standing with session-state.json. Named here, not fixed here.",
+    "This session's own cost block exhibits Finding 3: routed_seat comes back 'measured' (exact) at close time while orchestrator_seat correctly comes back 'lower_bound'. It is left as the producer emitted it -- correcting it by hand would be exactly the defect this set exists to stop -- and stands as dogfood evidence for the Session 2 fix.",
+    "The $3,305.80 unattributed figure is scoped by the store's own repository column and includes ad-hoc Copilot CLI use in this checkout that was never a workflow session. Nothing in the record separates the two."
+  ],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 is sized directly by this session's audit and must hold its four specification changes in context: the block is mandatory rather than merely validated, the reachable-status falsifier, floor labelling for every component at close time, and the seat-cost.md 5.2 doc fix. The Step 3.5 routed analyst recommended a direct-API seat to preserve Copilot capacity, but this machine holds no DABBLER_* provider keys by design (project-verify-type.txt = COPILOT_CLI), so that option does not exist here; the dissent is recorded in ai-assignment.md rather than suppressed. Session 2 is set-terminal and additionally owes change-log.md and the Step 9 guidance review."
+    }
+  },
+  "lessons_cited": [
+    "L-064-8",
+    "L-112-1",
+    "G-008",
+    "G-012",
+    "G-013",
+    "G-010"
+  ],
+  "cost": {
+    "store_path": "C:\\Users\\adm.dennis.mitchell\\.copilot\\session-store.db",
+    "schema_version": 6,
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 1724.3195,
+        "usd": 17.243195,
+        "event_count": 116,
+        "session_ids": [
+          "fae81086-544e-41a3-bcff-b3554b158028"
+        ],
+        "measured_session_ids": [
+          "fae81086-544e-41a3-bcff-b3554b158028"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 671.8859,
+        "usd": 6.718859,
+        "event_count": 64,
+        "session_ids": [
+          "43c9467f-5def-4d90-8405-e3270ab1ce33",
+          "599897a0-00c4-4845-83bb-bd8f610f842c",
+          "f32a3fea-e023-49fa-8b96-a255875f817b",
+          "0d57db91-ef64-45ad-b091-d3349ab3d506",
+          "735d1d81-653e-4e89-abf3-498c72dfef91",
+          "1c7efc3f-6cab-44d1-a2d6-459b552a4f9e"
+        ],
+        "measured_session_ids": [
+          "43c9467f-5def-4d90-8405-e3270ab1ce33",
+          "599897a0-00c4-4845-83bb-bd8f610f842c",
+          "f32a3fea-e023-49fa-8b96-a255875f817b",
+          "0d57db91-ef64-45ad-b091-d3349ab3d506",
+          "735d1d81-653e-4e89-abf3-498c72dfef91",
+          "1c7efc3f-6cab-44d1-a2d6-459b552a4f9e"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 2396.2054,
+    "total_usd": 23.962054,
+    "unmeasured": []
+  }
+}

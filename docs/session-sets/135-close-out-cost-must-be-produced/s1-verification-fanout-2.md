@@ -1,0 +1,15 @@
+ISSUES FOUND
+
+- **Issue 1:** The audit counts open/in-flight sessions as historical `recoverable` gaps, then uses that inflated count to justify the Session 2 conclusion that four sessions “wrote nothing.”
+  - **Category:** Correctness
+  - **Severity:** Major
+  - **Evidence paths:** `docs/session-sets/135-close-out-cost-must-be-produced/spec.md:168-171`, `docs/session-sets/135-close-out-cost-must-be-produced/spec.md:193-200`, `docs/session-sets/135-close-out-cost-must-be-produced/cost-audit.md:206-217`, `docs/session-sets/135-close-out-cost-must-be-produced/cost-audit.md:268-272`, `docs/session-sets/135-close-out-cost-must-be-produced/cost-audit.json:20052-20100`, `docs/session-sets/135-close-out-cost-must-be-produced/cost-audit.json:23410-23457`
+  - **Failure scenario:** Session 2 is explicitly told to read Session 1’s audit first, and the audit says it changes the specification. A typical Session 2 implementer will treat the reported `recoverable: 4` / “four sessions that could have measured wrote nothing” as the historical gap count, even though two cited sessions are not closed and the audit itself says no block is owed yet. That materially corrupts the “which part is recoverable” deliverable and the evidence basis for Session 2.
+  - **Acceptance criterion:** `JUDGMENT - The recoverable historical-gap count excludes or separately buckets sessions that are still in-progress/not closed, and the Session 2 implications distinguish closed omitted blocks from open sessions where no block is owed yet.`
+  - **Details:** The spec defines `recoverable` as “a measurement was available and was not taken.” The audit’s own prose says 113 S9 is “paused mid-flight; no close, so no block is owed yet” and 135 S1 is “in flight,” but `cost-audit.json` classifies both as `recoverable`, and `cost-audit.md` later concludes that “Four sessions that could have measured wrote nothing at all.” The correct historical conclusion is narrower: 121 S3 is the clear post-contract omitted block; 130 S2 is recoverable but pre-contract/not a fault; 113 S9 and 135 S1 should not be counted as missed close-out cost blocks yet.
+
+NITS
+
+- **Nit:** `cost-audit.md` says the read was at `2026-08-17T12:52Z`, while `cost-audit.json` records `readAt` / `storeReadAt` as `2026-08-17T12:48:45.707110+00:00`.
+- **Nit:** The Session 2 implication says `routed_api: measured` plus components outside `seat_cost.COMPONENTS` would catch “7 of the 47 committed versions,” but the JSON also records a non-canonical `operator_time` component in another version. Either the count should include that additional falsifier hit or the prose should scope “7” to `routed_api: measured` only.
+- **Nit:** The spec says to walk “schema-v4 sets,” but the JSON corpus includes rows with `schemaVersion: 3`. If that broader denominator is intentional, the report should explicitly reconcile it with the scoped instruction so the 431-session denominator is not mistaken for schema-v4-only.

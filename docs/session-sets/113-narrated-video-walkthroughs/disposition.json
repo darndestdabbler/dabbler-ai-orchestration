@@ -131,25 +131,43 @@
     "components": [
       {
         "component": "orchestrator_seat",
-        "status": "unavailable",
-        "credits": null,
-        "usd": null,
-        "event_count": 0,
-        "session_ids": [],
-        "measured_session_ids": [],
+        "status": "measured",
+        "credits": 6112.075725,
+        "usd": 61.12075725,
+        "event_count": 242,
+        "session_ids": [
+          "b4201ded-d4b1-46f0-8ec1-15b11e5e76c0"
+        ],
+        "measured_session_ids": [
+          "b4201ded-d4b1-46f0-8ec1-15b11e5e76c0"
+        ],
         "unmeasured_session_ids": [],
-        "reason": "GitHub Copilot seat (claude-opus-5). The seat meters CAPACITY, not dollars, and exposes no per-session figure to this process. Unavailable is not zero. This is the first session of the set to run on a Copilot seat -- Sessions 1-7 ran on the operator personal machine against direct provider APIs."
+        "reason": "Measured from the Copilot session store by ai_router.seat_cost, attributed by conversation id (seatSessionIds in session-state.json), not by clock. 242 turns on the orchestrator conversation."
       },
       {
         "component": "routed_seat",
-        "status": "unavailable",
-        "credits": null,
-        "usd": null,
-        "event_count": 6,
-        "session_ids": [],
-        "measured_session_ids": [],
+        "status": "measured",
+        "credits": 912.3652,
+        "usd": 9.123652,
+        "event_count": 57,
+        "session_ids": [
+          "f1c149eb-afbe-43dd-a5fb-99755b7731eb",
+          "e5af9d48-6ec8-44b4-90d2-256800dc25f6",
+          "c5545ac6-0dff-4955-896c-ad99733d4ee5",
+          "4b5201db-ba99-4053-abe9-8a5397ef85db",
+          "b732dbd9-7131-4f4e-b23e-3cef52262390",
+          "7e8de6b3-b97d-486d-9498-58f2a64ae13b"
+        ],
+        "measured_session_ids": [
+          "f1c149eb-afbe-43dd-a5fb-99755b7731eb",
+          "e5af9d48-6ec8-44b4-90d2-256800dc25f6",
+          "c5545ac6-0dff-4955-896c-ad99733d4ee5",
+          "4b5201db-ba99-4053-abe9-8a5397ef85db",
+          "b732dbd9-7131-4f4e-b23e-3cef52262390",
+          "7e8de6b3-b97d-486d-9498-58f2a64ae13b"
+        ],
         "unmeasured_session_ids": [],
-        "reason": "Six routed calls: one step-3.5 assignment analysis and five verification calls across four rounds (2 discovery fan-out, 1 supplementary, 2 remediation-review), all gpt-5.5 with anthropic excluded as the orchestrator provider. Every call reported \\.0000 because a Copilot seat carries no per-call dollar cost; it draws on seat capacity, which is not exposed here. Zero DOLLARS is accurate, zero COST is not, so this is reported unavailable rather than measured at zero."
+        "reason": "Measured the same way, over the six routed Copilot CLI conversations this session dispatched: one step-3.5 assignment analysis and five verification calls across four rounds. 57 turns."
       },
       {
         "component": "routed_api",
@@ -160,10 +178,15 @@
         "session_ids": [],
         "measured_session_ids": [],
         "unmeasured_session_ids": [],
-        "reason": "No DABBLER_* provider keys exist on this machine by design (transport.profile: copilot-cli, derived from project-verify-type.txt). Nothing routed to a direct provider API."
+        "reason": "No DABBLER_* provider keys exist on this machine by design (transport.profile: copilot-cli, derived from project-verify-type.txt). Nothing routed to a direct provider API, so this is an honest zero rather than an unmeasured component."
       }
     ],
-    "measured_at": "close"
+    "total_status": "measured",
+    "total_credits": 7024.440925,
+    "total_usd": 70.24440925,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "retrospective"
   },
   "uat": {
     "attestation": "Session 8 is a capture-backend measurement and a harness build. Its deliverables are a measured backend, two guards, a long-form recorder, 35 unit tests and the evidence documents. Under uatScope: per-set the SET-TERMINAL accounting is Session 9's, not this session's, and every component below is therefore recorded against what THIS session did to it. TWO COMPONENTS ARE NOT 'not-applicable' AND MUST NOT BE RECORDED AS SUCH. The Windows OS-capture pilot was exercised hard by this session and its gate was changed, and the single-module tutorial recording set is the component this session unblocked. ONE RECORD SESSION 9 MUST STILL NOT DEFAULT TO 'none', carried forward unchanged from Session 6 and Session 7: the operator WATCHED the Session 4 pilot recording on 2026-08-16 and returned a finding -- a developer, count 1, method 'watched' -- against the Windows OS-capture pilot. It is a real human review, the set's first, and it is not a manual walk. THE OPERATOR ALSO MADE A REAL REVIEW DECISION IN THIS SESSION: they read the C7 split verdict and signed a narrow waiver (s8-operator-waiver.json). That is an accountability sign-off on a measured artifact, recorded below against the OS-capture pilot component rather than left implicit.",
@@ -236,7 +259,6 @@
     ]
   },
   "carried_forward": [],
-  "operator_time_note": "Not a cost component the schema recognises, recorded here instead of being dropped: three operator interactions -- installing OBS Studio 32.2.1 and ffmpeg 9.0, one gate-decision brief answered with a narrow C7 waiver, and two stretches of leaving the machine alone for the measurement runs (roughly 35 minutes each, since the occlusion guard aborts any run a foreground window covers). Wall clock was not instrumented.",
   "checklist": {
     "status": "advisory-noted",
     "attestation": "close_session recorded a checklist_posted ADVISORY for one transition: the operator-stop that escalated the C7 waiver. The checklist WAS posted before that brief, and again before and after both long-running measurement runs and before close; the gate reads one transition as uncovered. It is left as an advisory rather than retro-posted, because the window it names has passed and a post recorded now would claim a coverage that did not happen."

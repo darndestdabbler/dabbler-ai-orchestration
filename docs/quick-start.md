@@ -1,0 +1,132 @@
+# Quick start
+
+Prerequisites: Python 3.11+, git, `pip install dabbler-ai-router`, and at
+least two provider API keys in env vars (`DABBLER_ANTHROPIC_API_KEY`,
+`DABBLER_OPENAI_API_KEY`, `DABBLER_GEMINI_API_KEY`) — verification needs
+a second provider. A GitHub Copilot seat with the Copilot CLI works as an
+alternative transport (`DABBLER_TRANSPORT=copilot-cli`).
+
+## 1. Bootstrap a project
+
+From your project root:
+
+```
+python -m ai_router.bootstrap --project-dir .
+```
+
+This writes a fenced managed block into `AGENTS.md` and `CLAUDE.md` —
+the orchestrator instructions every engine reads (Claude Code reads
+`CLAUDE.md`; Codex, Copilot, and Gemini read `AGENTS.md`; same body).
+Existing files keep their user content; only the fenced section is
+refreshed. Re-run the command any time to refresh it.
+
+Then run the two bootstrap sessions with your AI of choice, using the
+prompts the package provides:
+
+```
+python -m ai_router.bootstrap --print-plan-prompt
+python -m ai_router.bootstrap --print-decomposition-prompt
+```
+
+The plan session produces `docs/planning/project-plan.md`; the
+decomposition session turns it into session sets, each a
+`docs/session-sets/<NNN-slug>/spec.md`. Do not hand-author
+`session-state.json` — the first session start creates it from the spec.
+
+## 2. Start a session
+
+```
+python -m ai_router.session start --session-set-dir docs/session-sets/<set> --engine <engine>
+```
+
+`--session-set-dir` accepts a directory, a slug, or a bare set number.
+`--engine` is required (e.g. `claude-code`, `codex`, `copilot`,
+`gemini`); `--provider`, `--model`, and `--effort` record the seat
+identity (Copilot seats must pass `--model` — the seat label is not
+trusted). The start registers the session in `session-state.json` and
+seeds the spec's step list into `activity-log.json` once. It is
+idempotent — safe to re-run after a context reset. It refuses to start
+a session that is already in flight, re-open a completed one, or skip
+ahead.
+
+## 3. Work the steps
+
+Follow the spec's step list for the current session: make the edits,
+run the tests, log progress. **Do not commit yet** — verification
+reviews the working tree, and an already-committed tree presents an
+empty diff.
+
+## 4. Verify (mandatory, before commit)
+
+```
+python -m ai_router.verify --session-set-dir docs/session-sets/<set>
+```
+
+- **Round 1** sends the full evidence: spec excerpt, `git status`, the
+  complete working-tree diff, untracked file contents.
+- **Rounds ≥ 2** send only the fix delta (a diff from the previous
+  round's recorded tree snapshot) plus the prior unresolved findings.
+- The verifier is always a **different provider** than the
+  orchestrator, on either transport; one retry excludes a failed
+  provider.
+- Each round appends one row to
+  `.dabbler/runs/<set>/s<N>/rounds.jsonl` — machine-written only, never
+  edit it — with the raw verifier output saved alongside.
+- On blocking findings (`critical`/`major`): remediate, then re-run the
+  same command. The loop suspends at the round cap
+  (`verification.settings.max_rounds`, default 3; `--max-rounds`
+  overrides).
+
+Then record the test run of record and commit/push the verified work:
+
+```
+python -m ai_router.test_evidence record --session-set-dir docs/session-sets/<set> \
+    --suite <name> --outcome passed --duration-seconds <elapsed>
+```
+
+## 5. Close
+
+```
+python -m ai_router.session close --session-set-dir docs/session-sets/<set>
+```
+
+Five gates run: verification clean (reads the round ledger),
+working tree clean, pushed to remote, test run fresh, verdict
+vocabulary. All pass → the session (and, on the last session, the set)
+flips state, and the close commits and pushes its bookkeeping.
+
+```
+python -m ai_router.session close --session-set-dir <set> --dry-run
+```
+
+previews the gate rows read-only at any time. `--force` bypasses
+bookkeeping gates only — never the evidence gates — and stamps
+`forceClosed` in the state.
+
+## Cancel and restore
+
+```
+python -m ai_router.session cancel <set> --reason "why"
+python -m ai_router.session restore <set> [--reason "why"]
+```
+
+Cancel records the reason in `CANCELLED.md` and preserves the
+pre-cancel status; restore returns the set to it. `--force` cancels
+even with a session in flight.
+
+## The Work Explorer (VS Code)
+
+Install the extension VSIX
+(`code --install-extension dabbler-ai-orchestration-1.0.0.vsix`). The
+AI Work Explorer view lists every set under `docs/session-sets/` with
+its sessions and, for the in-flight session, its step rows. The tree
+is a pure renderer of
+
+```
+python -m ai_router.progress --json <set-dir>
+```
+
+so what the extension shows is exactly what the gates read. Tree
+actions cover opening the four artifacts, copying session prompts,
+starting/closing sessions in a terminal, new module scaffolding, and
+cancel/restore.

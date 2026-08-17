@@ -29,23 +29,28 @@
         "model": "claude-fable-5",
         "identityProvenance": "direct"
       },
-      "verificationVerdict": "VERIFIED",
-      "verification": {
-        "rounds": 2,
-        "verifierModel": "gpt-5-6-sol",
-        "verifierProvider": "openai",
-        "transport": "api",
-        "costUsd": 0.466455
-      }
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,
       "title": "The operator path, and every refusal names its exit",
-      "status": "not-started",
-      "startedAt": null,
+      "status": "in-progress",
+      "startedAt": "2026-08-17T16:55:20.525374-04:00",
       "completedAt": null,
-      "orchestrator": null,
-      "verificationVerdict": null
+      "orchestrator": {
+        "engine": "claude-code",
+        "provider": "anthropic",
+        "model": "claude-fable-5",
+        "identityProvenance": "direct"
+      },
+      "verificationVerdict": "VERIFIED",
+      "verification": {
+        "rounds": 1,
+        "verifierModel": "gpt-5-6-sol",
+        "verifierProvider": "openai",
+        "transport": "api",
+        "costUsd": 0.36475
+      }
     }
   ]
 }

@@ -241,6 +241,125 @@
       "dateTime": "2026-08-17T16:38:02.313096-04:00",
       "description": "Full suite post-remediation: 353 passed with -n 8 (ceiling 480).",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "wire-the-waived-verdict-to-a",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Wire the WAIVED verdict to a mechanism. `VERDICT_WAIVED` exists in the closed vocabulary today with no writer path to it. Add `python -m ai_router.verify waive --session-set-dir <set>`: permitted only when the machine path is exhausted (an adjudication row exists and upheld at least one blocking finding, or adjudication was unavailable). Interactive-only: the attestation text is typed at a prompt, and the command refuses when stdin is not a TTY \u2014 an engine in a non-interactive shell cannot invoke it, which is the mechanical distinction between an operator attestation and a confabulated one (the 2026-07-08 lesson). The row records the attestation verbatim, what was waived, and that the session is NOT verified \u2014 WAIVED means \"operator accepts unverified,\" never \"verified another way.\" Close then closes carrying WAIVED into session-state and the change-log block.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "every-refusal-in-the-loop-names",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Every refusal in the loop names its exit, verbatim commands: the round-cap refusal prints the `dispute` and `adjudicate` invocations; an upheld adjudication prints remediate-or-`waive`; `VERIFICATION UNAVAILABLE` prints its operator resolution. No message may describe a dead end without naming the sanctioned next command.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "documentation",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Documentation: `docs/quick-start.md` gains the dispute \u2192 adjudicate \u2192 waive ladder in its verification section; `docs/schema-reference.md` documents `disputes.jsonl`, the adjudication row type, and the WAIVED row. The extension needs no change \u2014 it renders `verificationVerdict` strings as-is.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-17T16:55:20.634876-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T16:55:20.637339-04:00",
+      "description": "Registered session 3 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 2,
+      "stepKey": "wire-the-waived-verdict-to-a",
+      "dateTime": "2026-08-17T17:11:36.987777-04:00",
+      "description": "verify waive shipped: TTY-gated, machine-path-exhausted preconditions, terminal WAIVED rounds row, session-state stamp.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 3,
+      "stepKey": "every-refusal-in-the-loop-names",
+      "dateTime": "2026-08-17T17:11:36.988778-04:00",
+      "description": "Round-cap refusal prints dispute+adjudicate; upheld adjudication prints waive; both UNAVAILABLE paths print operator exits.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 4,
+      "stepKey": "documentation",
+      "dateTime": "2026-08-17T17:11:36.989831-04:00",
+      "description": "quick-start gained the dispute-adjudicate-waive ladder; schema-reference documents disputes.jsonl, adjudication and waive rows.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T17:15:08.188385-04:00",
+      "description": "VERIFIED round 1 by gpt-5-6-sol (openai) over api; orchestrator provider anthropic excluded.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T17:15:08.189395-04:00",
+      "description": "Full Python suite green: 361 tests (ceiling 480); 7 new S3 tests incl. the acceptance-criterion replay fixture.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 3,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-17T17:15:08.190395-04:00",
+      "description": "Work and bookkeeping committed before close (working_tree_clean workaround); closing.",
+      "status": "complete"
     }
   ]
 }

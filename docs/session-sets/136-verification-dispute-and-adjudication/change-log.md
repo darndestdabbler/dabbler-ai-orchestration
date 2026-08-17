@@ -11,3 +11,10 @@
 - Orchestrator provider (excluded): anthropic
 - Routed verification cost: $0.4665
 - Raw round output: `.dabbler/runs/136-verification-dispute-and-adjudication/s2/`
+
+## Session 3 verification — VERIFIED after 1 round(s)
+
+- Verifier: gpt-5-6-sol (openai) over api
+- Orchestrator provider (excluded): anthropic
+- Routed verification cost: $0.3648
+- Raw round output: `.dabbler/runs/136-verification-dispute-and-adjudication/s3/`

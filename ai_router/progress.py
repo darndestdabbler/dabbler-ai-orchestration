@@ -528,15 +528,22 @@ def is_logged_step(entry: dict) -> bool:
 
 
 def _collapse_by_step_key(entries: list) -> list:
-    """Latest entry wins, at the first-seen position. Keyless entries get
-    an anonymous bucket each so two unnamed steps stay two steps."""
+    """Latest entry wins, at the first-seen position, carrying the first
+    entry's ``dateTime`` forward as ``firstDateTime`` — the latest entry
+    is the step's current status, the first is when the step actually
+    started (an in-progress log followed by a complete log must not lose
+    the start). Keyless entries get an anonymous bucket each so two
+    unnamed steps stay two steps."""
     order: list = []
     latest: dict = {}
     for index, entry in enumerate(entries):
         key = _py_str(entry.get("stepKey")) or f"\0anon-{index}"
         if key not in latest:
             order.append(key)
-        latest[key] = entry
+            first = entry.get("dateTime")
+        else:
+            first = latest[key].get("firstDateTime")
+        latest[key] = dict(entry, firstDateTime=first)
     return [latest[k] for k in order]
 
 
@@ -671,11 +678,31 @@ def build_projection(set_dir) -> dict:
         if in_flight and isinstance(number, int):
             rows = build_step_rows(set_path, number)
             _mark_active_step(rows, in_flight=True)
+            # The derived active row's start is the moment it became the
+            # frontier: the last logged event (falling back to the session
+            # start). Display-only inference, like the active marker
+            # itself — engines log completions, not beginnings, so the
+            # record has no start line to read.
+            logged_times = [
+                r.get("dateTime") for r in rows
+                if is_logged_step(r) and r.get("dateTime")
+            ]
+            frontier = (
+                max(logged_times) if logged_times else entry.get("startedAt")
+            )
             for position, row in enumerate(rows):
                 raw_status = row.get("status")
                 effective = (
                     "in-progress" if row.get("isActive") else raw_status
                 )
+                if is_logged_step(row):
+                    # The step's start, not its latest status change — a
+                    # plan row's dateTime is only when the plan was seeded.
+                    started = row.get("firstDateTime") or row.get("dateTime")
+                elif row.get("isActive"):
+                    started = frontier
+                else:
+                    started = None
                 session_out["steps"].append({
                     "position": position,
                     "stepNumber": row.get("stepNumber"),
@@ -689,12 +716,7 @@ def build_projection(set_dir) -> dict:
                     "iconKey": step_icon_key(effective),
                     "isPlanned": bool(row.get("isPlanned")),
                     "isActive": bool(row.get("isActive")),
-                    # A plan row's dateTime is when the plan was seeded,
-                    # not when the step started; only logged steps carry
-                    # a real start.
-                    "startedAt": (
-                        row.get("dateTime") if is_logged_step(row) else None
-                    ),
+                    "startedAt": started,
                 })
         sessions_out.append(session_out)
 

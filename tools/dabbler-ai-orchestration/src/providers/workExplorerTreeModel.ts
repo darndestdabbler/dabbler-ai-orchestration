@@ -524,8 +524,17 @@ export function stepDescriptor(node: StepNode): RowDescriptor {
       ? "planned — not started"
       : row.state || String(row.status || "unknown").replace(/[-_]/g, " ");
   tooltipLines.push("", state);
-  // The full timestamp goes here, where width is free.
-  if (row.startedAt) tooltipLines.push("", `Started ${row.startedAt}`);
+  // The full timestamp goes here, where width is free. A derived-active
+  // row's time is when it became the current step (inferred), not a
+  // logged start.
+  if (row.startedAt) {
+    tooltipLines.push(
+      "",
+      row.isActive
+        ? `Current since ${row.startedAt}`
+        : `Started ${row.startedAt}`,
+    );
+  }
   const description = row.description.trim();
   if (description) tooltipLines.push("", description);
 

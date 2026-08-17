@@ -262,7 +262,38 @@ class TestProjectionSteps:
         assert steps[1]["isActive"]
         assert steps[1]["box"] == "[~]"
         assert steps[1]["status"] == "pending"  # the record is never edited
-        assert steps[1]["startedAt"] is None  # unstarted rows show no time
+        # The derived-active row starts when it became the frontier: the
+        # last logged event. Display-only, like the active marker.
+        assert steps[1]["startedAt"] == "t2"
+
+    def test_logged_start_survives_later_status_entries(self, tmp_path):
+        # A step logged in-progress and later complete keeps the
+        # in-progress entry's time as its start — the latest entry owns
+        # the status, the first owns the start.
+        (tmp_path / "session-state.json").write_text(json.dumps({
+            "schemaVersion": 4, "sessionSetName": tmp_path.name,
+            "status": "in-progress",
+            "sessions": [{"number": 1, "title": "One",
+                          "status": "in-progress"}],
+        }), encoding="utf-8")
+        (tmp_path / "activity-log.json").write_text(json.dumps({
+            "sessionSetName": tmp_path.name, "entries": [
+                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
+                 "dateTime": "t0", "description": "Do the work.",
+                 "status": "pending", "kind": "plan-step"},
+                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
+                 "dateTime": "t1", "description": "Working.",
+                 "status": "in-progress"},
+                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "work",
+                 "dateTime": "t2", "description": "Done.",
+                 "status": "complete"},
+            ],
+        }), encoding="utf-8")
+        p = build_projection(tmp_path)
+        step = p["sessions"][0]["steps"][0]
+        assert step["status"] == "complete"
+        assert step["description"] == "Done."
+        assert step["startedAt"] == "t1"
 
     def test_paraphrased_key_claims_planned_row_by_number(self, tmp_path):
         (tmp_path / "session-state.json").write_text(json.dumps({

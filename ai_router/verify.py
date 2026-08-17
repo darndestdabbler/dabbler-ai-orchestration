@@ -304,6 +304,7 @@ def build_verification_prompt(
 
 def _dispatch_verification(
     prompt: str, *, exclude_providers: list, session_set, session_number,
+    transport=None,
 ):
     """Two attempts, one exclusion accumulator: a fallback can never
     re-cross the caller's constraint. NoCandidateError propagates — that is
@@ -320,6 +321,7 @@ def _dispatch_verification(
                 session_set=str(session_set),
                 session_number=session_number,
                 exclude_providers=excluded,
+                transport=transport,
             )
         except DispatchError as exc:
             last_exc = exc
@@ -333,10 +335,13 @@ def _dispatch_verification(
 
 # --- The loop entry point ----------------------------------------------------
 
-def run_round(set_dir, *, max_rounds: Optional[int] = None) -> int:
+def run_round(
+    set_dir, *, max_rounds: Optional[int] = None, transport: Optional[str] = None,
+) -> int:
     """One verification round: assemble evidence, dispatch cross-provider,
     record the outcome. Returns a CLI exit code; re-invoking after
-    remediation continues the loop automatically."""
+    remediation continues the loop automatically. *transport* overrides the
+    resolved transport preference for this round's dispatch."""
     from .config import load_config
     from .route import NoCandidateError, RouterError
     from .session import append_change_log_block, record_session_verification
@@ -404,6 +409,7 @@ def run_round(set_dir, *, max_rounds: Optional[int] = None) -> int:
         result = _dispatch_verification(
             prompt_body, exclude_providers=exclude,
             session_set=slug, session_number=current,
+            transport=transport,
         )
     except NoCandidateError as exc:
         print(
@@ -566,17 +572,27 @@ def auto_verify(route_result, content: str, task_type: str, config) -> Optional[
 
 
 def main(argv=None) -> int:
+    from .config import VALID_TRANSPORTS
+
     parser = argparse.ArgumentParser(prog="python -m ai_router.verify")
     parser.add_argument("--session-set-dir", required=True,
                         help="directory, slug, or bare set number")
     parser.add_argument("--max-rounds", type=int)
+    parser.add_argument(
+        "--transport", choices=list(VALID_TRANSPORTS),
+        help="override the resolved transport preference for this round "
+             "(highest level of the precedence: flag > DABBLER_TRANSPORT > "
+             "transport.profile > api)",
+    )
     args = parser.parse_args(argv)
     try:
         set_dir = resolve_session_set_dir(args.session_set_dir)
     except ValueError as exc:
         print(f"verify: {exc}", file=sys.stderr)
         return EXIT_USAGE
-    return run_round(set_dir, max_rounds=args.max_rounds)
+    return run_round(
+        set_dir, max_rounds=args.max_rounds, transport=args.transport,
+    )
 
 
 if __name__ == "__main__":

@@ -114,6 +114,22 @@ class TestRoundOne:
         assert call["exclude_providers"] == ["anthropic"]
         assert call["task_type"] == "session-verification"
 
+    def test_transport_override_reaches_dispatch(self, flight):
+        repo, set_dir, install = flight
+        fake = install([make_result(CLEAN_RESPONSE)])
+        run_round(set_dir, transport="copilot-cli")
+        assert fake.calls[0]["transport"] == "copilot-cli"
+
+    def test_cli_rejects_unknown_transport(self, flight, capsys):
+        _repo, set_dir, _install = flight
+        from ai_router.verify import main
+
+        with pytest.raises(SystemExit) as exc:
+            main(["--session-set-dir", str(set_dir),
+                  "--transport", "carrier-pigeon"])
+        assert exc.value.code == 2  # argparse usage error
+        assert "--transport" in capsys.readouterr().err
+
     def test_clean_round_stamps_verdict_and_change_log(self, flight):
         repo, set_dir, install = flight
         install([make_result(CLEAN_RESPONSE)])

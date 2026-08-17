@@ -15,9 +15,18 @@
   work → REAL cross-provider verification (anthropic orchestrator, openai
   verifier, $0.026, VERIFIED round 1) → 5 gates → close → push. LOC: Python
   7,776 (~9,000 budget), TS 5,034 src + 2,668 tests ≈ 7,700 (~7,500 target).
-- Deviations: Python gained `modules.py` (113 LOC, create-only) and
-  session cancel/restore subcommands — the plan's kept extension features
-  required seams the inventory lacked. No `--transport` CLI flag surfaced yet
-  (config precedence works; flag level is programmatic). PyPI already has a
-  1.0.0 (uploaded 2026-08-15); if this build differs, publishing needs 1.0.1.
-  Copilot lock still pins CLI 1.0.69 (re-probe before a live seat run).
+- Deviations (post-evaluation review, all deliberate): `modules.py`
+  (110 LOC, create-only) stays — the plan's Session 3 keep-list requires the
+  `python -m ai_router.modules` seam its own inventory omitted; recorded as
+  a plan contradiction, not regrowth. `--transport` flag now exists on
+  `python -m ai_router.verify` (full precedence: flag > env > profile >
+  api). session.py reconsidered per ground rule 8: sanctioned artifact
+  writers extracted to `writers.py` (488) leaving session.py at 745 for the
+  flows it was told to absorb (lock+resolve+spec-parser+cancel/restore).
+  Remaining S1 per-module overruns (copilot.py ~1.5x, selection.py ~1.5x,
+  route.py ~2x incl. escalation loop) are accepted as-is: the code is
+  e2e-verified and under the global budget; a simplification
+  pass is deliberately deferred. Total Python after the writer extraction:
+  7,855 vs the ~9,000 budget. PyPI already has a 1.0.0 (uploaded
+  2026-08-15); publishing this build needs 1.0.1. Copilot lock still pins
+  CLI 1.0.69 (re-probe before a live seat run).

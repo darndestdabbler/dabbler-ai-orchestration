@@ -113,6 +113,134 @@
       "dateTime": "2026-08-17T15:53:05.322858-04:00",
       "description": "341 passed via pytest -n 8 -m \"not e2e\", 71s; no testing.suites declared in this repo so the freshness gate is vacuous",
       "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-python-m-airouter",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Add `python -m ai_router.verify adjudicate --session-set-dir <set>`. Machine-checked preconditions, each refusal naming the unmet one: the round cap is reached; the latest round is blocking; every blocking finding in the latest round carries a recorded dispute. Engine-invokable by design \u2014 consensus precedes human, and a routed call costs the developer nothing; the audit trail is the control.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "adjudicator-selection",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Adjudicator selection: exclude the orchestrator's effective provider AND every provider that verified any round of this session. No eligible provider left \u2192 the existing `VERIFICATION UNAVAILABLE` path, unchanged.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "adjudication-evidence",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Adjudication evidence: per disputed finding \u2014 the finding verbatim, the dispute verbatim, the cited evidence content, and the current fix-delta. The adjudicator's task is to judge each dispute \u2014 UPHOLD the finding or OVERRULE it, with reasons. It may not raise new findings: it judges the dispute; it does not re-review the world.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "ledger",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Ledger: one additional row in `rounds.jsonl` with `type: \"adjudication\"`, the per-finding outcomes, and the excluded-provider list (additive `rounds.schema.json` change; rows without `type` remain valid). All blocking findings overruled \u2192 the row's verdict is VERIFIED, `blocking: false`, and the existing `verification_clean` gate passes with no gate change \u2014 assert this in a test. Any finding upheld \u2192 ISSUES_FOUND, still blocked. One adjudication per session, ever; after it, no further verify rounds may open.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 8,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-17T16:20:49.694116-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T16:20:49.696244-04:00",
+      "description": "Registered session 2 (claude-code).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 2,
+      "stepKey": "add-python-m-airouter",
+      "dateTime": "2026-08-17T16:30:13.367789-04:00",
+      "description": "verify adjudicate CLI added: machine-checked preconditions (cap reached, latest round blocking, every blocking finding disputed), each refusal naming the unmet one; engine-invokable.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 3,
+      "stepKey": "adjudicator-selection",
+      "dateTime": "2026-08-17T16:30:13.368789-04:00",
+      "description": "Exclusion superset: orchestrator's effective provider plus every provider that verified any round; NoCandidateError falls to the unchanged VERIFICATION UNAVAILABLE path.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 4,
+      "stepKey": "adjudication-evidence",
+      "dateTime": "2026-08-17T16:30:13.370678-04:00",
+      "description": "Per disputed finding: finding verbatim, dispute verbatim, cited evidence content, current fix-delta; adjudicator judges UPHOLD/OVERRULE and may not raise new findings; ambiguity fails closed as UPHELD.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 5,
+      "stepKey": "ledger",
+      "dateTime": "2026-08-17T16:30:13.371792-04:00",
+      "description": "Additive rounds.schema change: type=adjudication row with outcomes and excluded_providers; untyped rows stay valid. All-overruled -> VERIFIED non-blocking row, verification_clean passes unchanged (asserted in a test). One adjudication ever; rounds refuse to open after it. 12 new tests, 353 total (<=480).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 6,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T16:38:02.310937-04:00",
+      "description": "2 rounds, verifier gpt-5-6-sol (openai) over api. Round 1: 1 Major (adjudication prompt projected the finding instead of carrying the complete recorded row) + 2 nits; Major fixed (full JSON row in prompt), nit 1 taken (reason-less OVERRULE fails closed as UPHELD), nit 2 declined (--max-rounds mirrors verify's own seam). Round 2 VERIFIED.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 2,
+      "stepNumber": 7,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T16:38:02.313096-04:00",
+      "description": "Full suite post-remediation: 353 passed with -n 8 (ceiling 480).",
+      "status": "complete"
     }
   ]
 }

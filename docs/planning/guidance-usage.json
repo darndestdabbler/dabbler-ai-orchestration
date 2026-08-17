@@ -29,6 +29,7 @@
     "G-004": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "133-02"
       ],
       "note": "project-guidance.md G-004 Practicality outranks rule-perfectionism. Usage evidence starts here (Set 121 S3); no prior history."
@@ -36,6 +37,7 @@
     "G-005": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "134-01",
         "113-08",
         "113-06",
@@ -58,6 +60,7 @@
     "G-008": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "113-08",
         "113-06",
         "133-02",
@@ -73,6 +76,7 @@
     "G-010": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "134-01"
       ],
       "note": "project-guidance.md G-010 Open every session-verification prompt with conventions block (L-064-10). Usage evidence starts here (Set 121 S3); no prior history."
@@ -85,6 +89,7 @@
     "G-012": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "134-01",
         "113-08",
         "113-06",
@@ -96,6 +101,7 @@
     "G-013": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "134-01",
         "113-08",
         "113-06",
@@ -467,6 +473,7 @@
     "L-112-1": {
       "kind": "instruction",
       "uses": [
+        "134-02",
         "113-08",
         "113-06",
         "113-03",
@@ -475,8 +482,7 @@
         "121-04",
         "121-03",
         "121-02",
-        "121-01",
-        "132-03"
+        "121-01"
       ]
     },
     "L-125-1": {

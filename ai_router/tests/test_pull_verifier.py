@@ -396,7 +396,12 @@ class TestVerdictSchema:
         )
         assert c.verdict == "ISSUES_FOUND"
         assert c.findings[0].description == "off by one"
-        assert c.findings[0].severity == "major"
+        # Set 134 S2: the producer surface no longer persists a non-canonical
+        # severity. "major" is refused as a token and omitted; the finding
+        # survives and still blocks (an absent severity blocks under the
+        # anti-laundering rule). See test_severity_vocabulary.py.
+        assert c.findings[0].severity == ""
+        assert "severity" not in c.findings[0].to_dict()
 
     def test_missing_verdict_rejected(self):
         with pytest.raises(pv.VerdictSchemaError):

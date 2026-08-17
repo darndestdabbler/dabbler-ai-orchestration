@@ -41,6 +41,7 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -80,9 +81,17 @@ except ImportError:  # pragma: no cover - test/bare context
 
 
 try:  # package vs bare-import (mirrors the rest of ai_router)
-    from .verification import normalize_evidence_path
+    from .verification import (
+        CANONICAL_SEVERITIES,
+        canonical_severity_for_write,
+        normalize_evidence_path,
+    )
 except ImportError:  # pragma: no cover - test/bare context
-    from verification import normalize_evidence_path  # type: ignore
+    from verification import (  # type: ignore
+        CANONICAL_SEVERITIES,
+        canonical_severity_for_write,
+        normalize_evidence_path,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1558,7 +1567,23 @@ def _verdict_tool_schema(
     """
     finding_props: dict = {
         "description": {"type": "string"},
-        "severity": {"type": "string"},
+        # Set 134 S2: the severity vocabulary, declared to the provider. This
+        # was an unconstrained `{"type": "string"}`, which is how tokens no
+        # reader knows ('Suggestion', 'Medium') reached disk in July 2026. An
+        # enum is the tool-schema half of the closed vocabulary: the writer
+        # refuses an unknown token, and here the refusal happens before the
+        # model ever emits one. The Python parse stays tolerant on purpose --
+        # a provider that ignores the enum must not cost the round.
+        "severity": {
+            "type": "string",
+            "enum": list(CANONICAL_SEVERITIES),
+            "description": (
+                "EXACTLY one of Critical, Major, Minor. A blocking finding is "
+                "never Minor; grade by consequence (probability the stated "
+                "failure scenario reaches a real user x impact). Do not write "
+                "prose, a qualifier, or a token outside this list."
+            ),
+        },
         "category": {"type": "string"},
         # Set 119 S1: the finding's provenance. Ungated (unlike the evidence
         # lanes below) — it is core contract on every configuration, so the
@@ -1682,6 +1707,33 @@ def _parse_verdict(provider: str, model: str, payload: dict) -> PullCritique:
                 f"findings[{i}].description is missing or empty"
             )
         sev = f.get("severity") or ""
+        # Set 134 S2 (verification round 1, Major): the JSON Schema enum on
+        # the severity property is a DECLARATION to the provider, not an
+        # enforcement -- a binding that ignores it could still submit
+        # "major" or "Medium", and this parse used to copy it straight into
+        # Finding and out through to_dict() onto disk. The producer surface
+        # is closed here too, on the same blocking-preserving terms as the
+        # push surface's envelope writer: canonical spelling, or omitted
+        # (Finding.to_dict() drops an empty severity, and an absent severity
+        # blocks under the anti-laundering rule).
+        sev = sev if isinstance(sev, str) else str(sev)
+        canonical_sev = canonical_severity_for_write(sev)
+        if sev and canonical_sev != sev:
+            print(
+                f"pull_verifier: refused non-canonical severity {sev!r} on "
+                f"findings[{i}] -- "
+                + (
+                    f"recorded as {canonical_sev!r}"
+                    if canonical_sev is not None
+                    else "severity OMITTED (blocking, per the "
+                         "anti-laundering rule)"
+                )
+                + f". Legal set: {CANONICAL_SEVERITIES}. The critic's "
+                  f"wording is preserved in the finding description and in "
+                  f"the raw trace.",
+                file=sys.stderr,
+            )
+        sev = canonical_sev or ""
         cat = f.get("category") or ""
         findings.append(
             Finding(

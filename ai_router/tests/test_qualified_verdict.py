@@ -300,7 +300,10 @@ class TestQualificationTravelsWithTheVerdict:
 
     def test_every_verdict_record_carries_it_omit_null(self, tmp_path):
         set_dir = _set_dir(tmp_path)
-        issues = [{"description": "x", "severity": "minor"}]
+        # Set 134 S2: the writer's severity vocabulary is exact, so this
+        # fixture spells the canonical token. Unrelated to what this test
+        # asserts (the qualification field's omit-null behaviour).
+        issues = [{"description": "x", "severity": "Minor"}]
 
         write_issues_artifact(
             set_dir / "s1-issues.json", 1, 1, "ISSUES_FOUND", issues,

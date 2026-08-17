@@ -173,12 +173,15 @@ try:
         resolve_session_set_dir,
     )
     from verification import (  # type: ignore[import-not-found]
+        CANONICAL_SEVERITIES,
         build_verification_prompt,
+        canonical_severity_for_write,
         classify_blocking,
         classify_verification_qualification,
         is_blocking_issue,
         parse_fix_verdicts,
         parse_verification_response,
+        require_severity,
     )
     # Set 116 S2: the round ledger's `source` vocabulary IS the stamp's
     # producer vocabulary -- the two describe the same rounds, so they
@@ -200,12 +203,15 @@ except ImportError:
         resolve_session_set_dir,
     )
     from .verification import (  # type: ignore[no-redef]
+        CANONICAL_SEVERITIES,
         build_verification_prompt,
+        canonical_severity_for_write,
         classify_blocking,
         classify_verification_qualification,
         is_blocking_issue,
         parse_fix_verdicts,
         parse_verification_response,
+        require_severity,
     )
     from .verification_stamp import (  # type: ignore[no-redef]
         STAMP_SOURCE_CLOSE_BACKSTOP as ROUND_SOURCE_CLOSE_BACKSTOP,
@@ -2822,7 +2828,9 @@ def evaluate_fix_verdicts(
                     "escalate to the operator."
                 ),
                 "category": "incomplete-fix-verdict-coverage",
-                "severity": "unknown",
+                # Set 134 S2: severity key OMITTED, not "unknown". An absent
+                # severity blocks under the anti-laundering rule, which is the
+                # only property this synthesized escalation ever needed.
             })
     return fix_verdicts, escalations
 
@@ -2918,13 +2926,74 @@ def write_issues_artifact(
     ``verificationQualification``. It is present only when the round's
     verdict is qualified (today: ``"same-provider"``), so an envelope that
     has always been cross-provider never grows the key.
+
+    Set 134 S2 -- **the severity vocabulary is closed here**. This is the
+    sanctioned writer of ``sN-issues*.json``, so it is where a token no reader
+    knows is refused. The refusal costs the TOKEN, never the round:
+    :func:`ai_router.verification.canonical_severity_for_write` returns the
+    canonical spelling or ``None`` (omit the key), and it is exactly
+    blocking-preserving, so the envelope, the round ledger and the loop's
+    decision are all unaffected.
+
+    **Why it does not raise** (Set 134 S2, verification round 1, Major,
+    accepted without argument). An earlier draft called ``require_severity``
+    here and let it raise. That is safe for Set 120 S1's step-status writer,
+    whose caller can re-run a CLI for nothing -- and unsafe here, because this
+    writer runs mid-round: the raw ``sN-verification*.md`` is already on disk,
+    ``record_round_completed`` has not run yet, and ``resolve_round`` advances
+    on raw-artifact existence while the cross-round ledger reads only
+    ``sN-issues*.json``. A raise therefore left a paid blocking finding in a
+    raw-only round that the next invocation skipped -- the exact
+    anti-laundering hole the vocabulary was meant to close. Refusing the token
+    while always writing the envelope closes it instead.
+
+    Readers stay lenient regardless: 28 non-canonical values are already
+    committed and :func:`ai_router.verification.is_blocking_issue` still reads
+    every one of them. Writer strict, reader lenient.
     """
+    persisted_issues = []
+    for index, issue in enumerate(issues or []):
+        if not isinstance(issue, dict) or "severity" not in issue:
+            # Absence is legal, and blocking. Nothing to canonicalize.
+            persisted_issues.append(issue)
+            continue
+        raw = issue["severity"]
+        canonical = canonical_severity_for_write(raw)
+        if canonical == raw:
+            persisted_issues.append(issue)
+            continue
+        # Copy: the caller's list is also the list the round's blocking
+        # decision and ledger were computed from, and it must not be mutated
+        # underneath them.
+        rewritten = dict(issue)
+        if canonical is None:
+            rewritten.pop("severity", None)
+        else:
+            # Post-condition guard: the writer's own output is canonical.
+            rewritten["severity"] = require_severity(
+                canonical, field=f"issues[{index}].severity"
+            )
+        persisted_issues.append(rewritten)
+        print(
+            f"verify_session: refused non-canonical severity "
+            f"{raw!r} on issues[{index}] -- "
+            + (
+                f"persisted as {canonical!r}"
+                if canonical is not None
+                else "severity key OMITTED (blocking, per the "
+                     "anti-laundering rule)"
+            )
+            + f". Legal set: {CANONICAL_SEVERITIES}. The verifier's wording "
+              f"is preserved verbatim in the raw sN-verification*.md "
+              f"artifact and in the finding's description.",
+            file=sys.stderr,
+        )
     envelope = {
         "schemaVersion": 1,
         "sessionNumber": session_number,
         "verificationRound": round_number,
         "verificationVerdict": verdict,
-        "issues": issues,
+        "issues": persisted_issues,
     }
     if phase:
         envelope["phase"] = phase
@@ -3971,8 +4040,10 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
             # whose findings did not parse must still produce an envelope —
             # otherwise the phased loop stalls (no prior-findings block for
             # supplementary, no discoveryBaselineTree for the fix delta).
-            # Synthesize one unknown-severity finding (blocking by the
-            # anti-laundering rule) pointing at the raw artifact.
+            # Synthesize one finding that blocks by the anti-laundering rule
+            # (Set 134 S2: severity key OMITTED rather than "unknown" -- an
+            # absent severity blocks, and one spelling per meaning) pointing
+            # at the raw artifact.
             issues_k = [{
                 "description": (
                     "the verifier returned a blocking verdict but no "
@@ -3982,7 +4053,6 @@ def run(args: argparse.Namespace, route_fn=None) -> int:
                     "treat its findings as unresolved."
                 ),
                 "category": "unparseable-findings",
-                "severity": "unknown",
             }]
         if phase == PHASE_DISCOVERY and len(artifact_paths) > 1:
             for issue in issues_k:

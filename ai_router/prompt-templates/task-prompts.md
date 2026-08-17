@@ -48,7 +48,9 @@ Review the following code for:
 4. Style and maintainability
 
 For each issue found, provide:
-- **Severity:** Critical / Major / Minor / Suggestion
+- **Severity:** Critical / Major / Minor — EXACTLY one of these three tokens.
+  ("Suggestion" was removed in Set 134 S2: no reader of a findings envelope
+  knows it, and it reached disk as a severity value. A suggestion is a Minor.)
 - **Location:** File and line reference
 - **Issue:** What's wrong
 - **Fix:** Specific code change

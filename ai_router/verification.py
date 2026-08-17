@@ -516,12 +516,16 @@ def parse_verification_response(response: str) -> tuple[str, list]:
 
     # If no structured issue parsed but verdict is ISSUES_FOUND, treat the whole
     # (header-stripped) body as one issue so it is never silently dropped.
+    #
+    # Set 134 S2: the ``"severity": "unknown"`` sentinel this used to write is
+    # GONE, and the key is simply omitted. Both spellings block identically
+    # (:func:`is_blocking_issue` blocks on a missing key), so this removes a
+    # second spelling for one meaning without changing one blocking decision.
     if not issues and verdict == "ISSUES_FOUND":
         if body:
             issues.append({
                 "description": body,
                 "category": "unknown",
-                "severity": "unknown"
             })
 
     return verdict, issues
@@ -676,6 +680,258 @@ def parse_nits(response: str) -> list:
 BLOCKING_SEVERITIES = frozenset({"critical", "major"})
 # The only severity that is recorded but never loop-opening on its own.
 NONBLOCKING_SEVERITIES = frozenset({"minor"})
+
+# ---------------------------------------------------------------------------
+# Set 134 S2: the severity vocabulary, closed at the writer.
+#
+# Measured first (s2-severity-discrimination.md): across 771 committed findings
+# the field carries 715 Major, 21 Minor, 7 Critical and **28 non-canonical**
+# values -- nine with the key absent, seven the machinery's own ``"unknown"``
+# sentinel, and the rest prose written into a token field
+# (``"Unspecified (treated as blocking per the anti-laundering rule)"``,
+# ``"Major (claimed)"``, ``"Suggestion"``, ``"Medium"``). Every one of the 28
+# was written between 2026-07-02 and 2026-07-10; 698 findings across 49 sets
+# have been written since without a single recurrence. This block is therefore
+# a GUARD on a closed episode, not a repair of a live leak -- and the guard is
+# what keeps the episode closed, because nothing else did.
+#
+# Same shape as Set 120 S1's step-status vocabulary
+# (:mod:`ai_router.session_log`), deliberately: exact match at the writer,
+# hints that are advisory ONLY and never normalize on the way to disk, and
+# readers left lenient about the 28 values already committed. It lives here,
+# beside the predicates it serves, because this set ships no new module.
+#
+# ABSENCE IS LEGAL AND IS THE ONE SPELLING FOR "the verifier did not say".
+# ``is_blocking_issue`` already blocks on a missing key, so the machinery's
+# ``"unknown"`` sentinel was a SECOND spelling for a meaning the absent key
+# already carried -- two spellings for one meaning is the exact defect Set 120
+# named. The three sites that wrote it now omit the key, and every reader's
+# behaviour is byte-for-byte unchanged.
+# ---------------------------------------------------------------------------
+
+SEVERITY_CRITICAL = "Critical"
+SEVERITY_MAJOR = "Major"
+SEVERITY_MINOR = "Minor"
+
+#: The legal set, most severe first. Every token here is named by every reader:
+#: :func:`is_blocking_issue` (Critical/Major block, Minor does not),
+#: :func:`classify_blocking`, the doc-only cap, the acceptance harness, and
+#: ``docs/session-issues-schema.md``.
+CANONICAL_SEVERITIES = (SEVERITY_CRITICAL, SEVERITY_MAJOR, SEVERITY_MINOR)
+
+ALLOWED_SEVERITIES = frozenset(CANONICAL_SEVERITIES)
+
+# Spellings a caller might reasonably reach for, mapped to what they meant.
+# Used ONLY to make a refusal actionable -- nothing here is ever written to
+# disk. Sourced from the drift actually measured in the committed corpus plus
+# the case variants a hand-written caller reaches for first.
+_SEVERITY_DRIFT_HINTS = {
+    "critical": SEVERITY_CRITICAL,
+    "major": SEVERITY_MAJOR,
+    "minor": SEVERITY_MINOR,
+    "blocker": SEVERITY_CRITICAL,
+    "high": SEVERITY_MAJOR,
+    "medium": SEVERITY_MINOR,
+    "moderate": SEVERITY_MINOR,
+    "low": SEVERITY_MINOR,
+    "nit": SEVERITY_MINOR,
+    "suggestion": SEVERITY_MINOR,
+    "trivial": SEVERITY_MINOR,
+}
+
+# Tokens refused for a reason worth stating, rather than by falling through to
+# "not in the legal set". A caller reaching for one of these is not making a
+# typo, so the message explains the decision instead of suggesting a near-miss
+# it did not mean.
+_SEVERITY_REFUSAL_REASONS = {
+    "unknown": (
+        "'unknown' was the machinery's own sentinel and was removed in Set "
+        "134 S2. It is a SECOND spelling for what an absent 'severity' key "
+        "already says, and both block identically under the anti-laundering "
+        "rule. OMIT the key instead -- that is the single sanctioned spelling "
+        "for 'the verifier did not state a severity', and it blocks."
+    ),
+    "unspecified": (
+        "'unspecified' is prose about the absence of a severity, not a "
+        "severity. OMIT the key -- an absent 'severity' blocks under the "
+        "anti-laundering rule, which is exactly what this token was trying to "
+        "say at greater length."
+    ),
+    "none": (
+        "'none' reads as 'no severity' but is indistinguishable on disk from "
+        "a verifier grading something as harmless. OMIT the key if no "
+        "severity was stated; write 'Minor' if the finding is real but "
+        "non-blocking."
+    ),
+}
+
+# A severity is a token. Anything longer than this is prose that belongs in the
+# description, and echoing it whole would bury the remediation.
+_SEVERITY_ECHO_LIMIT = 60
+
+
+class InvalidSeverityError(ValueError):
+    """Raised by a sanctioned writer asked to persist a severity outside the
+    vocabulary. A ``ValueError`` subclass so existing ``except ValueError``
+    callers still catch it (mirrors
+    :class:`ai_router.session_log.InvalidStepStatusError`)."""
+
+
+def _echo_severity(severity: object) -> str:
+    """``repr`` of *severity*, truncated so a prose blob stays readable."""
+    text = repr(severity)
+    if len(text) <= _SEVERITY_ECHO_LIMIT:
+        return text
+    return f"{text[:_SEVERITY_ECHO_LIMIT]}... ({len(str(severity))} chars)"
+
+
+def is_valid_severity(severity: object) -> bool:
+    """True iff *severity* is EXACTLY one of :data:`CANONICAL_SEVERITIES`.
+
+    Exact means exact: no case folding, no whitespace tolerance, no prefix
+    match. The point of the vocabulary is that the field carries one spelling
+    per meaning, so ``"major"`` and ``" Major"`` are refused at the writer even
+    though :func:`is_blocking_issue` would read both -- a near-miss admitted
+    here is a near-miss on disk forever.
+
+    NOTE the deliberate asymmetry with the READERS in this module.
+    :func:`_severity_of` lower-cases and strips, and it must keep doing so:
+    it reads 771 committed findings this function would refuse. Writer strict,
+    reader lenient.
+    """
+    return isinstance(severity, str) and severity in ALLOWED_SEVERITIES
+
+
+def suggest_severity(severity: object) -> Optional[str]:
+    """The canonical token *severity* most likely meant, or ``None``.
+
+    Advisory only: used to make a refusal message actionable. Never call this
+    to normalize a value on the way to disk -- the writer refuses, it does not
+    silently rewrite what the caller said. Silently rewriting a verifier's
+    ``"High"`` into ``"Major"`` would be the laundering this module exists to
+    prevent, in the permissive direction.
+    """
+    if not isinstance(severity, str):
+        return None
+    normalized = severity.strip().lower()
+    if normalized in _SEVERITY_REFUSAL_REASONS:
+        return None
+    return _SEVERITY_DRIFT_HINTS.get(normalized)
+
+
+def validate_severity(severity: object, *, field: str = "severity") -> Optional[str]:
+    """Return a remediation message when *severity* is outside the vocabulary;
+    ``None`` when it is exactly canonical.
+
+    The message always names the legal set, so a caller that hits it learns the
+    vocabulary from the failure itself.
+    """
+    if is_valid_severity(severity):
+        return None
+
+    allowed = ", ".join(f"'{t}'" for t in CANONICAL_SEVERITIES)
+    echo = _echo_severity(severity)
+    hint = suggest_severity(severity)
+    hint_text = f" Did you mean '{hint}'?" if hint else ""
+
+    if not isinstance(severity, str):
+        return (
+            f"{field} {echo} is not a severity: it must be a string, and "
+            f"EXACTLY one of the legal set ({allowed}), or the key must be "
+            f"omitted entirely."
+        )
+    if not severity.strip():
+        return (
+            f"{field} {echo} is not a severity: an empty value is "
+            f"indistinguishable from corrupt data. Write EXACTLY one of the "
+            f"legal set ({allowed}), or omit the key -- an absent severity "
+            f"blocks under the anti-laundering rule."
+        )
+    reason = _SEVERITY_REFUSAL_REASONS.get(severity.strip().lower())
+    if reason is not None:
+        return (
+            f"{field} {echo} is not a severity. The legal set is ({allowed}). "
+            f"{reason}"
+        )
+    if "\n" in severity or len(severity) > _SEVERITY_ECHO_LIMIT:
+        return (
+            f"{field} {echo} is prose, not a severity. The severity field "
+            f"carries EXACTLY one of the legal set ({allowed}); the narrative "
+            f"belongs in the finding's description. If the prose is saying "
+            f"that no severity was stated, OMIT the key -- an absent severity "
+            f"blocks under the anti-laundering rule."
+        )
+    return (
+        f"{field} {echo} is not a severity. It must be EXACTLY one of the "
+        f"legal set ({allowed}) --- a near-miss spelling is refused too, "
+        f"because every reader of a findings envelope recognises only "
+        f"these.{hint_text}"
+    )
+
+
+def require_severity(severity: object, *, field: str = "severity") -> str:
+    """Return *severity* unchanged, or raise :class:`InvalidSeverityError`.
+
+    **This is a post-condition guard, not an input filter**, and the
+    distinction is load-bearing. Set 120 S1's ``require_step_status`` refuses
+    its caller because that caller -- an orchestrator running a CLI -- can fix
+    the flag and re-run for nothing. The callers here cannot: by the time a
+    severity exists, a verification round has been paid for and is midway
+    through a stateful, bounded loop. Raising at that point does not refuse a
+    token, it **destroys a round** -- see :func:`canonical_severity_for_write`
+    for what happens instead, and Set 134 S2's round-1 Major for the failure
+    this replaced.
+
+    So the one production caller is the envelope writer asserting that its OWN
+    output is canonical, after canonicalization. It fires only on a bug in
+    :func:`canonical_severity_for_write`, never on anything a verifier said.
+    """
+    message = validate_severity(severity, field=field)
+    if message is not None:
+        raise InvalidSeverityError(message)
+    return severity  # type: ignore[return-value]
+
+
+def canonical_severity_for_write(severity: object) -> Optional[str]:
+    """The canonical token to persist for *severity*, or ``None`` to OMIT the
+    key. Never raises.
+
+    This is how a writer refuses a token no reader knows **without** refusing
+    the round that carried it. The refusal is real -- the non-canonical string
+    never reaches disk -- but it costs the token, not the finding, not the
+    round, and not the ledger entry.
+
+    **It is exactly blocking-preserving**, which is the property that makes it
+    safe rather than a quiet rewrite:
+
+    ============================  ==================  ==================
+    given                         persisted           blocking, before/after
+    ============================  ==================  ==================
+    ``"Critical"``/``"Major"``     unchanged           blocks / blocks
+    ``"Minor"``                    unchanged           nit / nit
+    ``"minor"``, ``" MINOR "``     ``"Minor"``         nit / nit
+    ``"major"``, ``"High"``        **omitted**         blocks / blocks
+    ``"unknown"``, prose, ``""``   **omitted**         blocks / blocks
+    non-string                     **omitted**         blocks / blocks
+    ============================  ==================  ==================
+
+    The only value ever rewritten is one that already lower-cases to the sole
+    non-blocking token, and it is rewritten to that token's own canonical
+    spelling. Everything else is omitted, and omission is the sanctioned
+    spelling for "no canonical severity was stated" -- which blocks under the
+    anti-laundering rule, exactly as the refused string did.
+
+    Nothing is lost. The verifier's literal wording survives verbatim in the
+    immutable ``sN-verification*.md`` artifact (persisted BEFORE parsing,
+    L-064-3) and again inside the finding's own ``description``.
+    """
+    if is_valid_severity(severity):
+        return severity  # type: ignore[return-value]
+    if _severity_of({"severity": severity}) in NONBLOCKING_SEVERITIES:
+        # Reader-nonblocking today; keep it nonblocking, in canonical spelling.
+        return SEVERITY_MINOR
+    return None
+
 
 # ---------------------------------------------------------------------------
 # Set 119 S1: the doc-only severity cap.

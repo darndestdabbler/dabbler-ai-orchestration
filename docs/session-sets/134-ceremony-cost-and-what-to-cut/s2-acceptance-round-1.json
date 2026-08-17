@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "baselineRound": 1,
+  "baselineIsOwnRound": true,
+  "baselineTree": "a0b68bbf9f1df1b580721db86d32da2ce15e6a59",
+  "fixedTree": "d186ba97444705cd8c9d71e23392c2726179fea3",
+  "criteriaBoundToRawArtifact": true,
+  "generatedAt": "2026-08-17T10:44:54.096451+00:00",
+  "timeoutSeconds": 180,
+  "results": [
+    {
+      "issueIndex": 0,
+      "summary": "** A refused non-canonical severity can leave a raw-only verification round that the next run skips. - **Category:** Correctness - **Severity:** Major - **Evidence paths:** `ai_router/verification.py: ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "A verifier response with an Issue whose severity is \"major\" must not leave an unledgered raw-only round that future verify_session runs skip; the finding must either be persisted as blocking without a non-canonical severity value or the round must remain explicitly blocked until repaired.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    },
+    {
+      "issueIndex": 1,
+      "summary": "** The pull-verifier path still persists arbitrary severity strings. - **Category:** Completeness - **Severity:** Major - **Evidence paths:** `ai_router/pull_verifier.py:149`, `ai_router/pull_verifier ...",
+      "severity": "Major",
+      "outcome": "judgment",
+      "criterion": "The pull-verifier submit_verdict parse/write path must be unable to produce a critique finding with a non-canonical severity value; payloads such as \"major\" or \"Medium\" must be rejected before persistence or represented without a severity key.",
+      "reason": "judgment-based criterion: never executed, never auto-closed"
+    }
+  ]
+}

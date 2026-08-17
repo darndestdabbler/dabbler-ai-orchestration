@@ -3,32 +3,42 @@
   "verification_verdict": "VERIFIED",
   "status": "completed",
   "files_changed": [
+    "ai_router/prompt-templates/task-prompts.md",
+    "ai_router/pull_verifier.py",
+    "ai_router/tests/test_pull_verifier.py",
+    "ai_router/tests/test_qualified_verdict.py",
+    "ai_router/tests/test_severity_vocabulary.py",
+    "ai_router/tests/test_verify_session_phases.py",
+    "ai_router/verification.py",
+    "ai_router/verify_session.py",
+    "docs/session-issues-schema.md",
     "docs/session-sets/134-ceremony-cost-and-what-to-cut/activity-log.json",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/ai-assignment.md",
     "docs/session-sets/134-ceremony-cost-and-what-to-cut/checklist-posts.jsonl",
     "docs/session-sets/134-ceremony-cost-and-what-to-cut/decisions.jsonl",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/disposition.json",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-acceptance-round-1.json",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-ceremony-attribution.md",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-conventions.md",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-issues.json",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-remediation-round-1.md",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-rounds.jsonl",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification-fanout-2.md",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification-round-2.md",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification-round-3.md",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-acceptance-round-1.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-conventions.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-issues.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-remediation-round-1.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-rounds.jsonl",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-severity-discrimination.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-verification-fanout-2.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-verification-round-2.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-verification-round-3.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s2-verification.md",
     "docs/session-sets/134-ceremony-cost-and-what-to-cut/session-events.jsonl",
-    "docs/session-sets/134-ceremony-cost-and-what-to-cut/session-state.json"
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/session-state.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/test-runs.jsonl"
   ],
   "verification_message_ids": [],
   "blockers": [],
   "lessons_cited": [
+    "G-004",
     "G-005",
+    "G-008",
     "G-010",
     "G-012",
     "G-013",
-    "L-064-8"
+    "L-112-1"
   ],
   "next_orchestrator": {
     "engine": "github-copilot",
@@ -37,23 +47,23 @@
     "effort": "high",
     "reason": {
       "code": "continue-current-trajectory",
-      "specifics": "Session 2 asks whether the severity field still carries information, over ~680 findings in 378 sN-issues*.json envelopes, and then applies Set 120 S1's closed-vocabulary pattern to the severity writer. It is the same shape as Session 1 - measure a corpus, test a premise the spec asserts, and be willing to contradict it - so the same seat and provider keeps continuity of the measurement method and of Session 1's corrections. Two carry-forwards make this concrete: Session 1 found the corpus holds 1,427 distinct stepKey values, which is the same open-vocabulary defect in a third field and directly informs Session 2 step 4; and Session 1's own instruments already parse every sN-issues*.json envelope Session 2 needs. The Step 3.5 routed analyst recommended anthropic's current flagship family at effort MEDIUM for this session; recorded here at HIGH, deviation stated rather than silent, because Session 1's load-bearing result was a contradiction of the spec's own headline that only surfaced from sensitivity analysis nobody asked for. Session 2 rests on a premise stated just as confidently (92% Major) and its step 3 requires an authority-sensitive (a)/(b)/(c) call, so the operator may prefer to pay for the same depth. Whichever runs it, cross-provider verification excludes the orchestrator's own provider."
+      "specifics": "Session 3 is the set-terminal session and Revision 1 re-scoped it from cutting minutes to cutting CONTEXT: it edits docs/planning/lessons-learned.md and the rest of the preload at 100% of their ceilings, where every addition now requires a deletion, and it must also run Step 9's reorganization review of the very file step 2 just edited. The Step 3.5 routed analyst (gpt-5.5, cross-provider) recommended anthropic's current flagship long-context family at effort HIGH for exactly this reason, calling the re-scoped work higher-risk than the original framing because it edits central preload files while having to preserve active guidance and report a real net without building a new meter; it also advised adding no paid stages beyond the required cross-provider verification, which a set about reducing ceremony should honour. This is the first session of the three where the analyst's effort recommendation and the seat actually used agree, so no deviation is being recorded. Two concrete carry-forwards make continuity worth paying for. First, Sessions 1 and 2 both contradicted the spec they serve - the 2.3x did not reproduce and severity turned out to be constrained by instruction rather than drifting - and Session 3 must not quietly inherit either as settled fact. Second, this session's own verification found that porting a known-good pattern without porting its preconditions opened an anti-laundering hole; Session 3 deletes from shared guidance, which is the same class of move at larger blast radius. Whichever seat runs it, cross-provider verification excludes the orchestrator's own provider, and anything that would make the verification loop stop earlier remains the operator's."
     }
   },
-  "summary": "Re-derived every headline measurement this set is built on, over 255 completed schema-v4 sessions, using four read-only instruments over committed artifacts and adding no module. THE DURATION GROWTH REPRODUCES: trimmed OLS +0.966 min/day (claimed +0.947), R2 0.321 (0.307), Theil-Sen +0.909 (0.901), 29 of 255 excluded above 240 min - +79 minutes over the 82-day corpus. THE 2.3x DOES NOT. Re-running the identical attribution under six defensible method choices yields ratios from 1.01x to 2.96x, and under the spec's OWN named breakdown (the four canonical step keys) ceremony cost per step is FLAT (7.88 -> 8.00) while work rises. Three further corrections: the by-step-key breakdown the spec asks for cannot be produced at all, because the corpus holds 1,427 distinct completed stepKey values and the canonical four appear on a minority of sessions; the instrumentation explanation was dismissed on the wrong control, since the artifact is timestamp dispersion rather than step count (44% of pre-cap completion intervals are under ONE SECOND vs 34% post-cap, and collapsing bursts moves the ratio 2.65x -> 1.71x); and the flat-work control that the whole argument rests on does not hold (+29% to +79%). The phase figures are also smaller than published: loop 35.8 min not 41.7, tail 12.6 not 17.9. DATED: the 2026-08-07 cohort split IS Set 111's landing date, and Set 111 built every instrument the post-cap cohort is measured with - sN-rounds.jsonl first row 08-07 03:16, test-runs.jsonl first row 08-07 15:40 - so the comparison crosses an instrumented/uninstrumented boundary rather than two operating regimes. Two corrections to the spec's candidate list: the step skeleton originates in Set 114 on 08-10, not Set 128; and Set 116 is a cost REDUCTION (~3.6x via xdist) misread as a cause. No ceremony category acquired more steps - the per-session count is 1.0 in both cohorts - what moved is logging COVERAGE, and register got 3x CHEAPER while its coverage tripled. CANDIDATES: C1 remediation round-trips, 2,332 min (38.9 h) corpus and +17.9 min per round, gated on Session 2's severity question; C2 recorded suite runtime, 18.6 min/session, operator-owned as a verification reduction and surfaced not proposed. THREE CANDIDATES DISQUALIFIED BY THEIR OWN MEASUREMENT: staleness-forced re-runs are only 67 minutes across the entire instrumented corpus (Sets 116 and 119 already closed it), registration plus close ceremony is under 1.1 min/session, and discovery -> supplementary at 4.6 min is the cheapest transition measured. Verification closed VERIFIED in 3 rounds within bounds; the single blocking Major - that operative conclusions drew on the gitignored router-metrics.jsonl against a committed-artifacts-only spec - was accepted without argument and fixed by quarantining every latency figure as non-operative, with no measured minutes moved.",
+  "summary": "Tested whether the severity field still carries information, over the whole committed corpus - 415 sN-issues*.json envelopes, 771 findings, 70 round ledgers, 108 acceptance-harness files - with five read-only instruments run from the session workspace, no new module, and no gitignored input. THE 92% REPRODUCES, unlike Session 1's 2.3x: 715 of 771 findings are Major (92.7%), stable at 92.7% under both sensitivity variants, with exactly 28 non-canonical values, the figure the spec named. THE FIELD STILL DOES NOT DISCRIMINATE, and the reason is stronger than the spec supposed. By round, Major share RISES (88.8 / 95.0 / 96.4 / 94.9 / 97.3%) and is_blocking_issue is TRUE on 100% of findings from round 3 onward; by phase, supplementary and remediation-review are 100% Major. The last Minor any verifier assigned is Set 082, committed 2026-07-06 - 49 sets and 698 findings ago - and in the ledger era where the bounded loop actually exists the field takes two values across 281 findings, Major 98.6% and Critical 1.4%, both blocking. Severity carries 0.511 bits of a possible 2.000; the gate's own answer carries 0.194. THE DECISIVE MEASUREMENT: of 249 ledgered rounds, 143 returned findings, the gate called 13 non-blocking, and 12 of those are supplementary rounds with zero findings that never end a loop by protocol - so the field has changed the course of exactly ONE round in the corpus, its deciding Minor was written by the Set 119 doc-only cap rather than by a verifier, and that session then ran three more rounds anyway. 106 of 107 loop terminations came from a round that reported nothing at all. THE CAUSE IS DATED AND DELIBERATE: verification.md line 93 instructs 'Severity: Critical / Major (a blocking Issue is never Minor - Minor goes under NITS)', shipped by Set 071 S1 on 2026-06-18 and hardened by Set 096 S1 on 2026-07-12, and the era table tracks it exactly (77.6% Major with 20 Minors before, 98.9-100% with zero after). THE DEFECT IS (b), THE GATE READS THE WRONG SIGNAL, journaled with the (a) option REFUTED by measurement - sharpening the rubric is what produced the condition - and the surviving half of (c) reported plainly: the findings ARE material, since the loop accepts fixes at 52.3/59.6/59.6% at rounds 3/4/5+ and later rounds are not low-yield. AUTHORITY HELD: no gate was touched; every remedy that could make the loop stop earlier is surfaced as an operator-owned education-mode brief. THE VOCABULARY IS CLOSED at the writer in existing modules only, and the measurement reframed that work honestly - all 28 non-canonical values were written between 2026-07-02 and 2026-07-10 and none since, so this is a guard on a closed episode rather than a repair, but three live sources remained: the machinery's own 'unknown' sentinel at three production sites (removed in favour of key omission, byte-identical reader behaviour), 'Suggestion' offered by a shipped prompt template, and an unconstrained severity string in the submit_verdict tool schema. VERIFICATION FOUND TWO MAJORS IN THIS SESSION'S OWN FIX, both accepted without argument: a raising writer left a paid blocking finding in a raw-only unledgered round the next run would skip, and the tool-schema enum is a declaration rather than an enforcement so the pull producer still wrote arbitrary strings - with the existing test suite pinning lowercase 'major' open. Remediated by refusing the TOKEN rather than the ROUND, blocking-preserving and asserted token by token, closing VERIFIED in 3 rounds within bounds with 2 fixes accepted and 0 rejected. No measured number moved. All three suites owed and run in full: pytest 5195 passed, mocha 1609 passing, playwright 36+1 recorded as an explicitly composite pass under G-004 with the flaky spec named as a residual.",
   "cost": {
     "components": [
       {
         "component": "orchestrator_seat",
         "status": "lower_bound",
-        "credits": 1084.01475,
-        "usd": 10.8401475,
-        "event_count": 100,
+        "credits": 3050.634825,
+        "usd": 30.506348250000002,
+        "event_count": 201,
         "session_ids": [
-          "cbf81e16-d5e2-4a5b-85d6-4826cb33d47a"
+          "dc2ad8e7-0e7f-4f8e-9e90-cad058e2cf67"
         ],
         "measured_session_ids": [
-          "cbf81e16-d5e2-4a5b-85d6-4826cb33d47a"
+          "dc2ad8e7-0e7f-4f8e-9e90-cad058e2cf67"
         ],
         "unmeasured_session_ids": [],
         "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
@@ -61,22 +71,24 @@
       {
         "component": "routed_seat",
         "status": "measured",
-        "credits": 364.100295,
-        "usd": 3.6410029500000003,
-        "event_count": 40,
+        "credits": 934.9016,
+        "usd": 9.349016,
+        "event_count": 82,
         "session_ids": [
-          "d5975c06-f562-416a-9c28-1b223678a77f",
-          "59f5cde9-981b-4ce1-a763-2c84b9cc5c7e",
-          "ddd0070f-77aa-4e5d-9577-6f5ed47e1247",
-          "23eac11f-3a17-42a7-8bf0-5156de26b2de",
-          "3641f395-83f4-4cab-95d8-a8d962d94e49"
+          "7ae73574-95ec-4dbd-8e0d-b3eedcf4652c",
+          "42c7ec36-1d34-476a-b178-83e62392ad68",
+          "62728a06-a263-4893-b459-953bd0ce36a9",
+          "349ee04f-f58f-4a6e-9996-f563c80440ff",
+          "8e5557fb-a057-43a0-abc8-5761735890ca",
+          "70d04cea-2fc4-44f0-b104-b3c6d22d37d1"
         ],
         "measured_session_ids": [
-          "d5975c06-f562-416a-9c28-1b223678a77f",
-          "59f5cde9-981b-4ce1-a763-2c84b9cc5c7e",
-          "ddd0070f-77aa-4e5d-9577-6f5ed47e1247",
-          "23eac11f-3a17-42a7-8bf0-5156de26b2de",
-          "3641f395-83f4-4cab-95d8-a8d962d94e49"
+          "7ae73574-95ec-4dbd-8e0d-b3eedcf4652c",
+          "42c7ec36-1d34-476a-b178-83e62392ad68",
+          "62728a06-a263-4893-b459-953bd0ce36a9",
+          "349ee04f-f58f-4a6e-9996-f563c80440ff",
+          "8e5557fb-a057-43a0-abc8-5761735890ca",
+          "70d04cea-2fc4-44f0-b104-b3c6d22d37d1"
         ],
         "unmeasured_session_ids": [],
         "reason": null
@@ -94,8 +106,8 @@
       }
     ],
     "total_status": "lower_bound",
-    "total_credits": 1448.115045,
-    "total_usd": 14.48115045,
+    "total_credits": 3985.5364250000002,
+    "total_usd": 39.85536425,
     "unmeasured": [],
     "store_schema_version": 6,
     "measured_at": "close"

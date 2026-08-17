@@ -135,15 +135,18 @@ top-level contract:
 ### Issue objects
 
 Verifier-emitted fields are preserved **verbatim**. Only `description`
-is reliably present; `category` and `severity` are loose optional
-strings (the parser may emit `"unknown"`). Extra verifier-emitted keys
-are tolerated (`additionalProperties` is open on the issue object).
+is reliably present; `category` is a loose optional string. Extra
+verifier-emitted keys are tolerated (`additionalProperties` is open on
+the issue object).
+
+`severity` is **optional, and closed at the writer** — see
+[The severity vocabulary](#the-severity-vocabulary-set-134-s2) below.
 
 | Field | Type | Required | Source |
 |---|---|---|---|
 | `description` | string | yes | verifier |
 | `category` | string | no | verifier (loose) |
-| `severity` | string | no | verifier (loose) |
+| `severity` | string | no | verifier. **Closed vocabulary at the writer** (Set 134 S2): exactly `Critical`, `Major` or `Minor`, or the key is omitted. Readers stay lenient — 28 non-canonical values are already committed and every reader still reads them. |
 | `failureScenario` | string | no | verifier (Set 096). The concrete failure scenario + probability justification the consequence-graded severity rubric requires per blocking Issue. Parsed tolerantly from the `Failure scenario:` line; valid under both schema versions; its absence never changes blocking classification (`classify_blocking` semantics unchanged). |
 | `evidencePaths` | array of string | no | verifier (Set 119 S1). The repo-relative paths the verifier actually read that prove the finding — its **provenance**. The reviewer template makes it mandatory on a Critical/Major Issue; the schema keeps it optional because its **absence must not launder a blocking finding** (a finding with no paths keeps its declared severity — unknown still blocks). Parsed tolerantly from the `Evidence paths:` line (comma/whitespace separated; backticks, emphasis and `:<line>` suffixes normalized off). It is the **only** input to the doc-only severity cap: a finding whose paths are *all* documentation prose is recorded at Minor and opens no round. Doc-ness is derived from the paths, never self-declared. |
 | `discoveryCall` | integer ≥ 1 | no | machinery (Set 096). On a fanned-out discovery round, which fan-out call reported the finding (call 1 = the canonical round artifact; call k = the `-fanout-<k>` sibling). Absent on single-call rounds. |
@@ -152,6 +155,62 @@ are tolerated (`additionalProperties` is open on the issue object).
 | `resolution_status` | string | no | orchestrator annotation (advisory). v1: loose. v2: enum-enforced **when present** (see below). |
 | `resolution_notes` | string | no | orchestrator annotation (advisory) |
 | `resolved_in_round` | integer ≥ 1 | no | orchestrator annotation (advisory) |
+
+### The severity vocabulary (Set 134 S2)
+
+`severity` was a free string. Set 134 S2 measured what that produced across
+the 771 findings committed at the time: **715 `Major`, 21 `Minor`, 7
+`Critical`, and 28 non-canonical values** — nine with the key absent, seven
+carrying the machinery's own `"unknown"` sentinel, and the rest prose written
+into a token field (`"Unspecified (treated as blocking per the anti-laundering
+rule)"`, `"Major (claimed)"`, `"Suggestion"`, `"Medium"`). All 28 were written
+between **2026-07-02 and 2026-07-10**; 698 findings across 49 sets have been
+written since without a recurrence. The vocabulary below is the guard that
+keeps that true, not a repair of a live leak.
+
+**The legal set is `Critical`, `Major`, `Minor` — or the key is omitted.**
+
+| | |
+| :--- | :--- |
+| **the writer** | `verify_session.write_issues_artifact` — the sanctioned writer of `sN-issues*.json` — refuses any token outside the legal set, **including a near-miss spelling** (`"major"`, `" Major"`). It refuses the **token, not the round**: `ai_router.verification.canonical_severity_for_write` returns the canonical spelling or `None` (omit the key), and the envelope is always written. |
+| **absence** | **Legal, and never disturbed.** It is the one sanctioned spelling for *"the verifier did not state a severity"*, and it **blocks** under the anti-laundering rule. |
+| **blocking-preserving** | The refusal can never change whether a finding opens a round. `"major"` / `"High"` / `"unknown"` / prose → key omitted → blocks, exactly as they did. `"minor"` / `"MINOR"` → `"Minor"` → stays a nit. Canonical tokens pass through untouched. That equivalence is asserted directly, token by token, in `ai_router/tests/test_severity_vocabulary.py`. |
+| **the readers** | Unchanged and deliberately lenient. `is_blocking_issue` still lower-cases and strips, so every one of the 28 committed non-canonical values still reads exactly as it always did — and still blocks. |
+| **the pull surface** | Two layers, because one was not enough. The `submit_verdict` tool schema's `severity` property is `enum`-constrained — but that is a **declaration to the provider, not an enforcement**, so `_parse_verdict` applies the same `canonical_severity_for_write` before a `Finding` is built. Neither layer ever raises: a paid agentic critique must not be discarded over a token. |
+| **the parser** | `_parse_issue_blocks` is **deliberately left tolerant**. It reads untrusted model output; refusing there would discard a paid round or drop a finding, and dropping a finding is exactly the anti-laundering failure the unknown-severity default exists to prevent. |
+| **the JSON Schema** | `docs/session-issues.schema.json` keeps `severity: {"type": "string"}` — **deliberately, do not "fix" it to an enum.** The schema validates *committed* envelopes, and 28 of them carry non-canonical values. Enum-constraining it would make the repo's own history invalid. Enforcement belongs at the writer, where it can refuse before the value exists; the schema is a reader. |
+
+**Why the writer does not raise** — Set 134 S2, verification round 1, Major,
+accepted without argument. An earlier draft called a raising `require_severity`
+here. That is safe for Set 120 S1's step-status writer, whose caller can re-run
+a CLI for nothing. It is **unsafe here**, because this writer runs mid-round:
+the raw `sN-verification*.md` is already on disk, `record_round_completed` has
+not run yet, `resolve_round` advances on raw-artifact existence, and the
+cross-round ledger reads only `sN-issues*.json`. A raise therefore left a paid
+blocking finding in a raw-only round that the next invocation **skipped** — the
+exact anti-laundering hole the vocabulary was meant to close. The general
+lesson, worth carrying: **a refusal is only cheap where the caller can retry
+for free.** In a paid, stateful, bounded loop, refuse the value and keep the
+transaction.
+
+Nothing is lost by omission. The verifier's literal wording survives verbatim
+in the immutable `sN-verification*.md` artifact (persisted **before** parsing,
+L-064-3) and again inside the finding's own `description`. Both writers also
+print a loud `stderr` line naming the refused token, so a refusal is auditable
+rather than silent.
+
+**Why `"unknown"` was removed rather than admitted.** It was a *second*
+spelling for what an absent key already said: both block, identically. Two
+spellings for one meaning is the defect Set 120 S1 named for step status. The
+three machinery sites that wrote it now omit the key, and **no reader's
+behaviour changed by a single byte** (`ai_router/tests/test_severity_vocabulary.py`
+asserts exactly that).
+
+**Same shape as Set 120 S1**, deliberately: `CANONICAL_SEVERITIES`,
+`is_valid_severity`, `suggest_severity`, `validate_severity`,
+`require_severity`, `InvalidSeverityError` — with hints that are advisory only
+and **never** normalize on the way to disk. Silently rewriting a verifier's
+`"High"` into `"Major"` would be laundering in the permissive direction.
 
 ### Acceptance criteria (Set 111 S2)
 

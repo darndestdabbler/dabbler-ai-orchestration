@@ -1041,8 +1041,12 @@ class TestVerificationRoundHardening:
         self, repo: Path, monkeypatch
     ):
         # A blocking verdict whose findings did not parse must still
-        # produce an envelope (synthetic unknown-severity finding) so the
-        # phased loop can continue (prior-findings block + baseline).
+        # produce an envelope so the phased loop can continue
+        # (prior-findings block + baseline). Set 134 S2: the synthesized
+        # finding now OMITS the severity key rather than writing the
+        # "unknown" sentinel -- an absent severity blocks under the
+        # anti-laundering rule, which is the only property this finding
+        # ever needed, and one spelling per meaning is the rule.
         _phase_config(monkeypatch, fan_out=1)
         set_dir = _set_dir(repo)
         monkeypatch.setattr(
@@ -1059,9 +1063,53 @@ class TestVerificationRoundHardening:
         )
         assert len(envelope["issues"]) == 1
         assert envelope["issues"][0]["category"] == "unparseable-findings"
-        assert envelope["issues"][0]["severity"] == "unknown"
+        assert "severity" not in envelope["issues"][0]
+        # The behaviour the sentinel existed for is unchanged and asserted
+        # directly, not via the token that used to stand in for it.
+        assert vs.is_blocking_issue(envelope["issues"][0]) is True
         assert "s1-verification.md" in envelope["issues"][0]["description"]
         assert envelope.get("discoveryBaselineTree")
+
+    def test_a_non_canonical_severity_still_ledgers_the_round(
+        self, repo: Path, monkeypatch
+    ):
+        # Set 134 S2, verification round 1 (Major, accepted without
+        # argument). A verifier writing `Severity: major` -- case drift the
+        # parser accepts via re.IGNORECASE -- must NOT leave a raw-only,
+        # unledgered round. resolve_round advances on raw-artifact existence
+        # while the cross-round ledger reads only sN-issues*.json, so a
+        # writer that raised here silently dropped a paid blocking finding
+        # out of the structured loop.
+        _phase_config(monkeypatch, fan_out=1)
+        set_dir = _set_dir(repo)
+        monkeypatch.setattr(
+            vs, "parse_verification_response",
+            lambda content: (
+                "ISSUES_FOUND",
+                [{"description": "off by one", "severity": "major"}],
+            ),
+        )
+        fake = FakeMultiRoute(["ISSUES FOUND"])
+        code = vs.run(
+            _args(set_dir, phase=vs.PHASE_DISCOVERY), route_fn=fake
+        )
+        assert code == vs.EXIT_BLOCKING
+        envelope_path = set_dir / "s1-issues.json"
+        assert envelope_path.exists(), (
+            "the envelope must exist or the round is unledgered and the "
+            "next verify_session run skips it"
+        )
+        envelope = json.loads(envelope_path.read_text(encoding="utf-8"))
+        issue = envelope["issues"][0]
+        # The token was refused...
+        assert issue.get("severity") != "major"
+        # ...and the finding still blocks, exactly as it did before.
+        assert vs.is_blocking_issue(issue) is True
+        assert issue["description"] == "off by one"
+        # The round IS on the ledger.
+        ledger = (set_dir / "s1-rounds.jsonl").read_text(encoding="utf-8")
+        assert '"round-completed"' in ledger
+        assert '"blocking": true' in ledger
 
     def test_fix_rejected_without_issue_block_escalates_to_blocking(
         self, repo: Path, monkeypatch

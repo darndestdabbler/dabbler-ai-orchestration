@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "sessionNumber": 2,
+  "verificationRound": 1,
+  "verificationVerdict": "ISSUES_FOUND",
+  "issues": [
+    {
+      "description": "** A refused non-canonical severity can leave a raw-only verification round that the next run skips.\n  - **Category:** Correctness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/verification.py:407`, `ai_router/verify_session.py:618`, `ai_router/verify_session.py:3958`, `ai_router/verify_session.py:4080`, `ai_router/verify_session.py:1344`\n  - **Failure scenario:** A verifier emits `Severity: major`, a common case drift the parser explicitly accepts via `re.IGNORECASE`. The raw `sN-verification*.md` is written, `write_issues_artifact` then raises before the issues envelope and round ledger are written, and the next invocation auto-selects the next missing raw artifact, while the cross-round ledger only reads `sN-issues*.json`. That makes a paid blocking finding easy to drop from the structured loop.\n  - **Acceptance criterion:** `JUDGMENT - A verifier response with an Issue whose severity is \"major\" must not leave an unledgered raw-only round that future verify_session runs skip; the finding must either be persisted as blocking without a non-canonical severity value or the round must remain explicitly blocked until repaired.`\n  - **Details:** Violation: the safety claim says writer refusal “never drops one — it stops the write and names the token.” Impact: the main verification loop can lose the structured finding and continue without carrying it in the ledger. Evidence: `_parse_issue_blocks` captures case-insensitive severity text verbatim, raw output is persisted before parsing, `write_issues_artifact` runs before `record_round_completed`, `resolve_round` advances based only on raw artifact existence, and the ledger reads only issue envelopes.",
+      "category": "Correctness",
+      "severity": "Major",
+      "failureScenario": "A verifier emits `Severity: major`, a common case drift the parser explicitly accepts via `re.IGNORECASE`. The raw `sN-verification*.md` is written, `write_issues_artifact` then raises before the issues envelope and round ledger are written, and the next invocation auto-selects the next missing raw artifact, while the cross-round ledger only reads `sN-issues*.json`. That makes a paid blocking finding easy to drop from the structured loop.",
+      "evidencePaths": [
+        "ai_router/verification.py",
+        "ai_router/verify_session.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "A verifier response with an Issue whose severity is \"major\" must not leave an unledgered raw-only round that future verify_session runs skip; the finding must either be persisted as blocking without a non-canonical severity value or the round must remain explicitly blocked until repaired."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    },
+    {
+      "description": "** The pull-verifier path still persists arbitrary severity strings.\n  - **Category:** Completeness\n  - **Severity:** Major\n  - **Evidence paths:** `ai_router/pull_verifier.py:149`, `ai_router/pull_verifier.py:1681`, `ai_router/tests/test_pull_verifier.py:384`, `ai_router/pull_critique.py:10`, `ai_router/path_aware_critique.py:662`\n  - **Failure scenario:** A provider or binding ignores the JSON Schema enum and submits `{\"severity\": \"major\"}` or `\"Medium\"`. `_parse_verdict` accepts it, `Finding.to_dict()` emits it, and the path-aware critique producer can write an artifact whose finding severity is non-canonical. The existing test still asserts lowercase `\"major\"` survives, so this is not just theoretical.\n  - **Acceptance criterion:** `JUDGMENT - The pull-verifier submit_verdict parse/write path must be unable to produce a critique finding with a non-canonical severity value; payloads such as \"major\" or \"Medium\" must be rejected before persistence or represented without a severity key.`\n  - **Details:** Violation: the session claims the `submit_verdict` severity string is closed to `Critical`, `Major`, `Minor`, but only the provider-facing schema changed. Impact: an existing producer surface can keep writing the same open vocabulary this session says it closed. Evidence: `_parse_verdict` copies any string severity into `Finding`, `to_dict()` writes any non-empty severity, the runtime artifact validator only checks that severity is a string, and the test suite still locks in lowercase acceptance.",
+      "category": "Completeness",
+      "severity": "Major",
+      "failureScenario": "A provider or binding ignores the JSON Schema enum and submits `{\"severity\": \"major\"}` or `\"Medium\"`. `_parse_verdict` accepts it, `Finding.to_dict()` emits it, and the path-aware critique producer can write an artifact whose finding severity is non-canonical. The existing test still asserts lowercase `\"major\"` survives, so this is not just theoretical.",
+      "evidencePaths": [
+        "ai_router/pull_verifier.py",
+        "ai_router/tests/test_pull_verifier.py",
+        "ai_router/pull_critique.py",
+        "ai_router/path_aware_critique.py"
+      ],
+      "acceptance": {
+        "kind": "judgment",
+        "statement": "The pull-verifier submit_verdict parse/write path must be unable to produce a critique finding with a non-canonical severity value; payloads such as \"major\" or \"Medium\" must be rejected before persistence or represented without a severity key."
+      },
+      "discoveryCall": 2,
+      "discoveryLens": "failure-scenario"
+    }
+  ],
+  "phase": "discovery",
+  "discoveryBaselineTree": "a0b68bbf9f1df1b580721db86d32da2ce15e6a59"
+}

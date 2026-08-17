@@ -236,6 +236,24 @@ class TestTestRunFresh:
         assert "PREDATES" in row.remediation
 
 
+class TestCloseCommit:
+    def test_close_leaves_a_clean_tree_and_never_commits_the_lock(
+        self, close_ready
+    ):
+        from ai_router.session import close
+
+        repo, set_dir = close_ready
+        assert close(set_dir) == 0
+        # The close held .lifecycle.lock while committing its bookkeeping;
+        # sweeping the lock into that commit left a tracked deletion
+        # behind after release — every close ended on a dirty tree.
+        committed = _git(repo, "show", "--name-only", "--format=", "HEAD")
+        assert ".lifecycle.lock" not in committed.stdout
+        assert "session-state.json" in committed.stdout
+        status = _git(repo, "status", "--porcelain", "-uall")
+        assert status.stdout.strip() == ""
+
+
 class TestVerdictVocabulary:
     def test_invented_state_token_blocks(self, close_ready):
         # Incident replay: a confabulated token must never survive to a

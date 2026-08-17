@@ -41,11 +41,19 @@ _IGNORE_BASENAME_PATTERNS = (
     ".lifecycle.lock",
 )
 
-# Set-dir files the close itself commits after the flip.
-_SET_BOOKKEEPING_BASENAMES = frozenset({
+# Set-dir files the close itself commits after the flip. The lifecycle
+# lock is deliberately absent: it is still held during the close commit
+# and deleted on release, so committing it leaves every close behind a
+# tracked-deletion dirty tree.
+SET_BOOKKEEPING_COMMIT_BASENAMES = (
     "session-state.json", "activity-log.json", "change-log.md",
-    ".lifecycle.lock",
-})
+)
+
+# What may legitimately be dirty in the set dir at close time: the files
+# the close will commit, plus the lock the close itself is holding.
+_SET_BOOKKEEPING_BASENAMES = (
+    frozenset(SET_BOOKKEEPING_COMMIT_BASENAMES) | {".lifecycle.lock"}
+)
 
 EVIDENCE_GATES = frozenset({"verification_clean", "verdict_vocabulary"})
 

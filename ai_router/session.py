@@ -460,7 +460,7 @@ def _local_only(repo_root) -> bool:
 
 
 def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
-    from .gates import run_gates
+    from .gates import SET_BOOKKEEPING_COMMIT_BASENAMES, run_gates
     from .ledger import latest_round
 
     set_path = Path(set_dir)
@@ -523,7 +523,13 @@ def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
               + (f" ({verdict})" if verdict else "") + ".")
 
         if repo_root:
-            run_git(repo_root, "add", "--", str(set_path))
+            bookkeeping = [
+                str(set_path / name)
+                for name in SET_BOOKKEEPING_COMMIT_BASENAMES
+                if (set_path / name).is_file()
+            ]
+            if bookkeeping:
+                run_git(repo_root, "add", "--", *bookkeeping)
             rc, _, err = run_git(
                 repo_root, "commit", "-m",
                 f"Close session {current} of {set_path.name}",

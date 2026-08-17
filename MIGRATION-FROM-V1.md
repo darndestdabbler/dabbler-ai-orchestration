@@ -10,9 +10,9 @@ unchanged — a v1 project opens in the v2 Work Explorer unmodified.
   (schema v4), `change-log.md`, `activity-log.json`. The metrics ledger
   format `router-metrics.jsonl` is unchanged.
 - **Schema v3 state files normalize on read** — no rewrite needed. A
-  one-shot v3→v4 migrator existed and was retired after migrating the
-  reference corpus; if ever needed again it lives in git history at
-  commit `6a1e4b7` (`ai_router/migrate_v3.py`).
+  one-shot v3→v4 migrator existed and was retired after a validation
+  run over the full v1 reference corpus; if ever needed it lives in
+  git history at commit `6a1e4b7` (`ai_router/migrate_v3.py`).
 
 ## Verification records
 

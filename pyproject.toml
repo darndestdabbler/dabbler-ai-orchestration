@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dabbler-ai-router"
-version = "1.0.0"
+version = "1.0.1"
 description = "Multi-provider model routing, session lifecycle, and metrics for the Dabbler AI-led workflow (v2)."
 readme = "README.md"
 license = "MIT"

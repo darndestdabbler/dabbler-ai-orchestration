@@ -1,30 +1,23 @@
-# STATUS — after Session 2 (lifecycle, gates, verification loop)
+# STATUS — after Session 3 (extension as renderer, corpus migrated, packaged)
 
-- Done: session.py (start/close, boundary triad at CLI *and* writer, lock,
-  spec step parser, --dry-run), progress.py (+ `--json` projection),
-  gates.py (exactly 5, each incident-cited), identity.py, ledger.py
-  (`.dabbler/runs/<set>/s<N>/rounds.jsonl`, schema-validated, tamper =
-  refusal), verify.py + verdict.py (full loop: round 1 full evidence,
-  rounds ≥2 fix-delta via tree snapshots, provider exclusion + one retry,
-  cap 3), evidence.py (transcripts + state-write hash ledger + git
-  primitives), test_evidence.py (digest-based run of record, records under
-  .dabbler/), bootstrap.py (managed AGENTS.md/CLAUDE.md + two prompts),
-  route() auto-verify wired.
-- Verified: 317 tests green (160 S1 + 157 new; ceiling 410). E2E sandbox
-  script: start → work → 2 verification rounds → 5 gates → close →
-  commit/push, all pass. Corpus acceptance: all 134 v1 sets read in place,
-  zero crashes, totals match manifest (119 complete / 13 cancelled / 1
-  in-progress / 1 not-started; 46 v3 normalized on read), corroborated by
-  an independent census. Fixtures: 6 sets vendored (~360 KB).
-- Deviations: LOC 4,228 vs ~3,200 (+32%, same ratio as S1). session.py is
-  920 vs 450 (2x — it absorbs lock+resolve+spec-parser as planned, but
-  flag it for a Session 3 look). Workflow order corrected: verify BEFORE
-  commit (working-tree evidence); commit+push after loop, before close.
-  Simplifications: no plan-less carve-out writes (readers still tolerate),
-  no disposition.json (test gate requires all expensive suites; digest
-  match subsumes "untouched"), step reconcile drops v1's ordinal pass,
-  fewer tests than the ~250 sketch (one per behavior).
-- Next (Session 3): extension fork+delete, tree on `progress --json`,
-  command surface ~12, one-shot v3 migrator, docs, package. Note
-  Copilot lock still pins CLI 1.0.69 vs installed 1.0.75 (re-probe with
-  v1's copilot_catalog --refresh before any live seat run).
+- Done: extension forked into tools/ and cut to a renderer — all six TS ports
+  of Python logic deleted; tree renders from `python -m ai_router.progress
+  --json` (async scan, mtime-keyed projection cache, file-presence fallback
+  with a visible "install ai-router" message when python is unreachable).
+  Commands 43 → 17 (15 user-facing + 2 internal). One-shot v3→v4 migrator ran
+  over all 46 stale v1 sets (totals unchanged 119/13/1/1) then was retired
+  (add 6a1e4b7, delete 5d041fb). Docs rewritten (README 142 / quick-start 132 /
+  schema-reference 163 / MIGRATION-FROM-V1 47). Packaged: VSIX 1.0.0 (737 KB)
+  + wheel; tagged v1.0.0.
+- Verified: 325 Python tests (≤480) and 158 TS unit + 16 Playwright = 174
+  (≤215), all green. Playwright drives a real VS Code against corpus fixtures
+  through the real projection. Real-session e2e on a scratch repo: start →
+  work → REAL cross-provider verification (anthropic orchestrator, openai
+  verifier, $0.026, VERIFIED round 1) → 5 gates → close → push. LOC: Python
+  7,776 (~9,000 budget), TS 5,034 src + 2,668 tests ≈ 7,700 (~7,500 target).
+- Deviations: Python gained `modules.py` (113 LOC, create-only) and
+  session cancel/restore subcommands — the plan's kept extension features
+  required seams the inventory lacked. No `--transport` CLI flag surfaced yet
+  (config precedence works; flag level is programmatic). PyPI already has a
+  1.0.0 (uploaded 2026-08-15); if this build differs, publishing needs 1.0.1.
+  Copilot lock still pins CLI 1.0.69 (re-probe before a live seat run).

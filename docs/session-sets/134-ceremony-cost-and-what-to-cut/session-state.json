@@ -1,7 +1,7 @@
 {
   "schemaVersion": 4,
   "sessionSetName": "134-ceremony-cost-and-what-to-cut",
-  "status": "in-progress",
+  "status": "complete",
   "sessions": [
     {
       "number": 1,
@@ -42,9 +42,9 @@
     {
       "number": 3,
       "title": "Cut, on the evidence",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-17T07:27:46.585380-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-17T08:29:44.731000-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -55,7 +55,7 @@
           "ed600ffe-a490-468b-b104-251545d6c3c2"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     }
   ]
 }

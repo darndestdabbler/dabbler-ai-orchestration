@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-17T07:15:46.188261-04:00",
+  "generatedAt": "2026-08-17T08:29:44.734008-04:00",
   "sessionSetDir": "134-ceremony-cost-and-what-to-cut",
   "inputs": {
-    "activity-log.json": "0b210f74373bd021b08a0c5178e93bf2e268cb2e233059e5bec4e58569f022b7",
-    "session-state.json": "d890d153b885543a06fee24bf1201477cac4f3ea46abab4b294fdcc3469404bd",
+    "activity-log.json": "36331f689e1a6a2f993d2658db786dc6b5baa42a2574439af64786d419722ccd",
+    "session-state.json": "e3674ef3204c913cb4beb8dc91c9d0baa919e3053c8901bbceb9e7c3e477cd9f",
     "spec.md": "5937a4bba57cf3b13da4d5f5459dbcbcdfba664d91930d2d1cee553479fcdf46"
   },
   "orphanEntries": 0,
@@ -219,19 +219,106 @@
     },
     {
       "number": 3,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 3 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T07:27:46.585380-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "measure-the-context-footprint-then-cut",
+          "description": "Preload 11,644 -> 9,802 tok (-15.8%). lessons-learned -1,418 (5 bookkeeping tables archived); engine files -275 lockstep (5 pointer sections the constitution already carries in-preload); project-guidance -149 (TODO stubs moved to guidance-lifecycle). All 4 ceilings ratcheted to measurement.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T07:27:46.609742-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "cut-the-per-session-ceremony-this",
+          "description": "Capped 3 artifacts by convention in the authoring guide: activity-log step description 40 w, ai-assignment prose 250 w/block, decisions.jsonl 400 w/decision. Exempted sN-conventions.md (capping it would reduce verification) and disposition.json (schema-set). No validator.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T07:40:44.490927-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "report-the-net-and-measure-this",
+          "description": "Preload -1,842 tok (-15.8%), -206 lines. Caps project to 164,674 words corpus-wide. NET LINE COUNT +294 = FAILED, stated as such in change-log.md: report is 1.9x the cut. This set logged 250.6 w/entry, worst of 126 sets.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T07:45:21.796054-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Round 1 discovery (gpt-5.5, fan-out 2): 2 blocking Majors, both the same defect -- a scratch logging helper left at repo root. Round 2 supplementary: clean, nothing new. Accepted without argument; remediated by removal.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T07:49:04.143945-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "All 3 expensive suites (covers ai_router/) run after the last edit and recorded: pytest 5195 passed/9 skipped/1 xfailed 596s; mocha 1609 passing 41s; playwright 36+1 composite 519s (same load flake as S2, passes alone in 46s, journaled under G-004).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T07:58:51.800247-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "Close-out.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     }
   ]
 }

@@ -203,6 +203,55 @@ with no enforcing validator.
 
 ---
 
+## Step 9 — the reorganization review
+
+Run against `guidance_ledger report`, and unusually load-bearing here because
+Step 2 had just edited one of the two files under review.
+
+**`lessons-learned.md`: nothing to archive, nothing to promote.** After the cut
+it holds three lessons and all three are heavily used — **L-064-8 cited in 10 of
+the last 30 active sessions, L-112-1 in 10, L-079-1 in 6.** The file went from
+60% bookkeeping to 100% live guidance, and the ledger says every survivor earns
+its place.
+
+**`project-guidance.md`: 12 never-cited entries flagged** (C-002, C-003, G-001,
+G-002, G-003, G-015, G-018, G-019, G-020, G-022, G-023, G-024). These are
+**retention candidates for the operator's batched prune review — not this
+session's to evict.** `guidance_ledger` evicts nothing by design, and the
+specific defect that rule exists to prevent is an orchestrator at 100% of a
+ceiling deleting prose under time pressure. This session is exactly that
+orchestrator, so it stops at naming them. Note the honest caveat: "never cited"
+partly reflects when the usage ledger began recording, not only the entry's
+worth. Instruction lines stand at **21 of a 22 cap**.
+
+### Two candidate lessons from this session, both REJECTED
+
+The real test of a context-reduction set is whether it then adds to the file it
+just cut. Both candidates failed the Set 085 admission test, and neither was
+admitted:
+
+- **"A scope claim in a conventions block is an assertion about the tree —
+  check `git status --short` before routing."** Genuinely instructive, and it
+  cost a Major and a remediation round-trip. But it **fails criterion 4 (no
+  executable-gate equivalent)**: L-064-9 is already encoded, so
+  `EvidenceBundle.git_status` renders `git status --short` ahead of the diff —
+  which is precisely *why* the verifier caught this immediately, from both
+  lenses, in round 1. The gate works. Recurrence is also 1.
+- **"Write changelog fragments early, before the suites run."** A scheduling
+  tip with a recurrence of 1. Recorded where a session-specific finding belongs
+  — `decisions.jsonl` and the residual table above.
+
+Admitting either would have required evicting a lesson cited 6–10 times in the
+last 30 sessions, because the ceiling was ratcheted to measurement earlier in
+this same session. That trade is obviously bad, and the mechanism made it
+visible rather than letting the file quietly grow.
+
+**Outcome: no changes recommended.** Which is the point — a set about ceremony
+cost that ended by adding two lessons to the always-read tier would have
+demonstrated the thesis rather than addressed it.
+
+---
+
 ## Residuals, with owners
 
 | residual | owner | why it is open |

@@ -391,6 +391,209 @@ class TestDispute:
         assert "RE-RAISE" in prompt      # the plain instruction, unchanged
 
 
+ADJ_OVERRULE = (
+    "Dispute 1: OVERRULE — the scope decision is documented in the cited "
+    "file; the finding re-litigates it."
+)
+ADJ_UPHOLD = (
+    "Dispute 1: UPHOLD — the cited evidence does not address the failure "
+    "scenario."
+)
+
+
+class TestAdjudicate:
+    def _adjudicate(self, set_dir, *extra):
+        from ai_router.verify import main
+
+        return main([
+            "adjudicate", "--session-set-dir", str(set_dir),
+            "--max-rounds", "1", *extra,
+        ])
+
+    def _capped_and_disputed(self, flight, outcomes):
+        """Round 1 blocking at a cap of 1, the finding disputed — the
+        adjudication preconditions all met."""
+        from ai_router.verify import main
+
+        repo, set_dir, install = flight
+        fake = install(outcomes)
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        (repo / "docs" / "scope.md").write_text(
+            "selector grammar is deliberately not covered\n",
+            encoding="utf-8",
+        )
+        assert main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "1", "--finding", "0",
+            "--grounds", "out of scope per the not-covered list",
+            "--evidence", "docs/scope.md",
+        ]) == EXIT_OK
+        return repo, set_dir, fake
+
+    def test_refuses_below_cap(self, flight, capsys):
+        from ai_router.verify import EXIT_STATE
+
+        repo, set_dir, install = flight
+        install([make_result(BLOCKING_RESPONSE)])
+        assert run_round(set_dir) == EXIT_BLOCKING
+        assert self._adjudicate(set_dir, "--max-rounds", "3") == EXIT_STATE
+        err = capsys.readouterr().err
+        assert "round cap (3) is not reached" in err
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
+
+    def test_refuses_when_latest_round_not_blocking(self, flight, capsys):
+        from ai_router.verify import EXIT_STATE
+
+        repo, set_dir, install = flight
+        install([make_result(CLEAN_RESPONSE)])
+        assert run_round(set_dir, max_rounds=1) == EXIT_OK
+        assert self._adjudicate(set_dir) == EXIT_STATE
+        assert "is not blocking" in capsys.readouterr().err
+
+    def test_refuses_undisputed_blocking_finding(self, flight, capsys):
+        from ai_router.verify import EXIT_STATE
+
+        repo, set_dir, install = flight
+        install([make_result(BLOCKING_RESPONSE)])
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        assert self._adjudicate(set_dir) == EXIT_STATE
+        err = capsys.readouterr().err
+        assert "finding(s) 0" in err
+        assert "verify dispute" in err       # the refusal names the exit
+
+    def test_adjudicator_exclusion_superset(self, flight):
+        repo, set_dir, fake = self._capped_and_disputed(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(ADJ_OVERRULE, model_name="gemini-pro",
+                            provider="google"),
+            ],
+        )
+        assert self._adjudicate(set_dir) == EXIT_OK
+        call = fake.calls[1]
+        # Orchestrator (anthropic) AND the round-1 verifier (openai).
+        assert call["exclude_providers"] == ["anthropic", "openai"]
+        assert call["task_type"] == "session-verification"
+
+    def test_no_eligible_adjudicator_is_operator_only(self, flight, capsys):
+        repo, set_dir, _ = self._capped_and_disputed(
+            flight,
+            [make_result(BLOCKING_RESPONSE),
+             NoCandidateError("nothing survives the exclusions")],
+        )
+        assert self._adjudicate(set_dir) == EXIT_UNAVAILABLE
+        assert "VERIFICATION UNAVAILABLE" in capsys.readouterr().err
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
+
+    def test_overrule_writes_verified_row_and_gate_passes(self, flight):
+        repo, set_dir, _ = self._capped_and_disputed(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(ADJ_OVERRULE, model_name="gemini-pro",
+                            provider="google"),
+            ],
+        )
+        assert self._adjudicate(set_dir) == EXIT_OK
+        rounds = ledger.read_rounds(repo, set_dir.name, 1)
+        row = rounds[-1]
+        assert row["type"] == "adjudication"
+        assert row["verdict"] == "VERIFIED"
+        assert row["blocking"] is False
+        assert row["outcomes"] == [{
+            "finding_index": 0, "outcome": "OVERRULED",
+            "reasons": ADJ_OVERRULE.split("— ", 1)[1],
+        }]
+        assert row["excluded_providers"] == ["anthropic", "openai"]
+        assert row["previous_tree"] == rounds[0]["completion_tree"]
+        raw = ledger.raw_output_path(repo, set_dir.name, 1, row["round"])
+        assert raw.read_text(encoding="utf-8") == ADJ_OVERRULE
+        from ai_router.progress import read_session_state
+
+        state = read_session_state(set_dir)
+        assert state["sessions"][0]["verificationVerdict"] == "VERIFIED"
+        # The existing gate reads the row with NO gate change.
+        from ai_router.gates import check_verification_clean
+
+        ok, _remediation = check_verification_clean(set_dir)
+        assert ok
+
+    def test_upheld_adjudication_still_blocked(self, flight):
+        repo, set_dir, _ = self._capped_and_disputed(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(ADJ_UPHOLD, model_name="gemini-pro",
+                            provider="google"),
+            ],
+        )
+        assert self._adjudicate(set_dir) == EXIT_BLOCKING
+        row = ledger.read_rounds(repo, set_dir.name, 1)[-1]
+        assert row["verdict"] == "ISSUES_FOUND"
+        assert row["blocking"] is True
+        assert row["outcomes"][0]["outcome"] == "UPHELD"
+        from ai_router.progress import read_session_state
+
+        state = read_session_state(set_dir)
+        assert state["sessions"][0]["verificationVerdict"] is None
+
+    def test_second_adjudication_refused(self, flight, capsys):
+        from ai_router.verify import EXIT_STATE
+
+        repo, set_dir, _ = self._capped_and_disputed(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(ADJ_UPHOLD, provider="google"),
+            ],
+        )
+        assert self._adjudicate(set_dir) == EXIT_BLOCKING
+        assert self._adjudicate(set_dir) == EXIT_STATE
+        assert "One adjudication per session, ever" in (
+            capsys.readouterr().err
+        )
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
+
+    def test_no_verify_round_opens_after_adjudication(self, flight, capsys):
+        repo, set_dir, _ = self._capped_and_disputed(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(ADJ_UPHOLD, provider="google"),
+            ],
+        )
+        assert self._adjudicate(set_dir) == EXIT_BLOCKING
+        assert run_round(set_dir, max_rounds=99) == EXIT_USAGE
+        assert "terminal" in capsys.readouterr().err
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
+
+    def test_prompt_carries_finding_dispute_evidence_and_delta(self, flight):
+        repo, set_dir, fake = self._capped_and_disputed(
+            flight,
+            [
+                make_result(BLOCKING_RESPONSE),
+                make_result(ADJ_OVERRULE, provider="google"),
+            ],
+        )
+        # Post-round remediation, so the fix-delta is non-empty.
+        (repo / "widget.py").write_text(
+            "def f(xs): return 1 / len(xs) if xs else 0\n", encoding="utf-8"
+        )
+        assert self._adjudicate(set_dir) == EXIT_OK
+        prompt = fake.calls[1]["prompt"]
+        assert "divides by zero" in prompt                  # finding verbatim
+        # The COMPLETE recorded row, not a projection — recorded fields
+        # beyond description/severity must ride along.
+        assert '"category": "Correctness"' in prompt
+        assert '"blocking": true' in prompt
+        assert "out of scope per the not-covered list" in prompt   # grounds
+        assert "deliberately not covered" in prompt         # cited content
+        assert "if xs else 0" in prompt                     # fix-delta hunks
+        assert "may NOT raise new findings" in prompt
+        assert "UPHOLD" in prompt and "OVERRULE" in prompt
+
+
 class TestVerifierSelectionFailures:
     def test_retry_excludes_failed_provider(self, flight):
         repo, set_dir, install = flight

@@ -158,3 +158,27 @@ class TestSessionVerdictVocabulary:
     def test_invented_tokens_refused(self, token):
         with pytest.raises(ValueError):
             validate_session_verdict(token)
+
+
+class TestAdjudicationParsing:
+    def test_judged_disputes_parsed_ambiguity_fails_closed(self):
+        from ai_router.verdict import parse_adjudication_response
+
+        response = (
+            "Dispute 1: OVERRULE — the scope file settles it\n"
+            "Dispute 3: OVERRULE — fine here\n"
+            "Dispute 3: UPHOLD — no wait\n"
+            "Dispute 4: OVERRULE\n"
+        )
+        outcomes = parse_adjudication_response(response, 4)
+        assert outcomes[0]["outcome"] == "OVERRULED"
+        assert outcomes[0]["reasons"] == "the scope file settles it"
+        # Dispute 2 was never judged; dispute 3 was judged both ways;
+        # dispute 4 was overruled on no argument at all. Ambiguity never
+        # overrules a finding.
+        assert outcomes[1]["outcome"] == "UPHELD"
+        assert "no parseable judgment" in outcomes[1]["reasons"]
+        assert outcomes[2]["outcome"] == "UPHELD"
+        assert "contradictory" in outcomes[2]["reasons"]
+        assert outcomes[3]["outcome"] == "UPHELD"
+        assert "without reasons" in outcomes[3]["reasons"]

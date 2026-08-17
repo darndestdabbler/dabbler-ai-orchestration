@@ -21,12 +21,22 @@ A contested finding has a channel: ``verify dispute`` records an
 evidence-backed rebuttal (never prose alone), and the next round presents
 it beside the finding for UPHOLD-or-WITHDRAW — so a scope dispute
 converges instead of being re-raised until the cap.
+
+When the cap is reached with every blocking finding disputed, ``verify
+adjudicate`` routes the disputes to a third provider — one excluded
+harder than any verifier: the orchestrator's provider AND every provider
+that verified a round are all ineligible. The adjudicator judges each
+dispute (UPHOLD or OVERRULE; it may not raise new findings) and its
+outcome lands as one terminal ``type: "adjudication"`` ledger row the
+existing close gate reads unchanged. One adjudication per session, ever;
+no verification round may open after it.
 """
 
 from __future__ import annotations
 
 import argparse
 import datetime
+import json
 import os
 import re
 import sys
@@ -479,6 +489,14 @@ def run_round(
 
     slug = set_path.name
     prior_rounds = ledger.read_rounds(repo_root, slug, current)
+    if any(r.get("type") == "adjudication" for r in prior_rounds):
+        print(
+            f"verify: refused -- session {current} already carries its "
+            "adjudication row. Adjudication is terminal: one per session, "
+            "ever, and no further verification rounds may open after it.",
+            file=sys.stderr,
+        )
+        return EXIT_USAGE
     round_number = (prior_rounds[-1]["round"] + 1) if prior_rounds else 1
     if round_number > cap:
         print(
@@ -790,6 +808,321 @@ def record_dispute(
     return EXIT_OK
 
 
+# --- The adjudication round --------------------------------------------------
+
+def _adjudication_prompt(
+    set_path, session_number: int, disputed: list, fix_delta: str,
+    repo_root,
+) -> str:
+    """The adjudicator judges each dispute — UPHOLD or OVERRULE — and may
+    not raise new findings: it judges the dispute, it does not re-review
+    the world. Per dispute: the finding verbatim, the rebuttal verbatim,
+    the cited evidence content, and the current fix-delta ride along."""
+    lines = [
+        "You are the ADJUDICATOR for a verification session that reached "
+        "its round cap with disputed blocking findings. Two parties are "
+        "deadlocked: the verifier maintains each finding below; the "
+        "orchestrator has recorded an evidence-backed dispute against "
+        "each. Your task is to judge each dispute on its merits.",
+        "",
+        "You may NOT raise new findings. You are judging the disputes; "
+        "you are not re-reviewing the work.",
+        "",
+    ]
+    for number, (round_number, index, finding, dispute) in enumerate(
+        disputed, start=1
+    ):
+        lines.append(
+            f"#### Dispute {number} — round {round_number}, "
+            f"finding {index}"
+        )
+        lines.append("")
+        # The complete stored finding record, never a projection — a
+        # partial rendering hands the adjudicator a one-sided record
+        # (the dispute rides in full) and can clear a valid finding.
+        lines.extend([
+            "The finding, verbatim (the complete recorded row):",
+            "",
+            "```json",
+            json.dumps(finding, indent=2),
+            "```",
+            "",
+        ])
+        lines.append(
+            "The orchestrator's dispute, verbatim (grounds): "
+            + str(dispute["grounds"])
+        )
+        for cite in dispute["evidence_paths"]:
+            lines.extend(_cited_evidence_lines(repo_root, cite))
+        lines.append("")
+    lines.extend([
+        "#### The current fix-delta (last verified snapshot -> current "
+        "working tree)",
+        "",
+        "```diff",
+        fix_delta or "(no changes since the last round)",
+        "```",
+        "",
+        "#### Required output",
+        "",
+        "For each dispute, exactly one judgment line, nothing else "
+        "decides the outcome:",
+        "",
+        "Dispute N: UPHOLD — reasons that address the cited evidence",
+        "Dispute N: OVERRULE — reasons",
+        "",
+        "A dispute you do not clearly judge counts as UPHELD.",
+    ])
+    return "\n".join(lines)
+
+
+def run_adjudication(
+    set_dir, *, max_rounds: Optional[int] = None,
+    transport: Optional[str] = None,
+) -> int:
+    """Route the session's recorded disputes to a third provider for
+    judgment. Machine-checked preconditions, each refusal naming the unmet
+    one; the outcome is one terminal ledger row the existing
+    ``verification_clean`` gate already knows how to read."""
+    from .config import load_config
+    from .route import NoCandidateError, RouterError
+    from .session import append_change_log_block, record_session_verification
+    from .progress import read_session_state
+    from .verdict import (
+        OUTCOME_OVERRULED,
+        VERDICT_ISSUES_FOUND,
+        parse_adjudication_response,
+    )
+
+    set_path = Path(set_dir)
+    repo_root = repo_root_for(set_path)
+    if repo_root is None:
+        print(
+            f"verify adjudicate: not inside a git repository: {set_path}",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+    state = read_session_state(set_path)
+    current = (state or {}).get("currentSession")
+    if current is None:
+        print(
+            f"verify adjudicate: no session is in flight under {set_path}.",
+            file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    try:
+        orchestrator = resolve_session_orchestrator_identity(set_path, current)
+    except IdentityResolutionError as exc:
+        print(f"verify adjudicate: {exc}", file=sys.stderr)
+        return EXIT_STATE
+
+    config = load_config()
+    settings = (config.get("verification") or {}).get("settings") or {}
+    cap = max_rounds or settings.get("max_rounds", DEFAULT_MAX_ROUNDS)
+
+    slug = set_path.name
+    rounds = ledger.read_rounds(repo_root, slug, current)
+    if any(r.get("type") == "adjudication" for r in rounds):
+        print(
+            "verify adjudicate: refused -- unmet precondition: session "
+            f"{current} already carries its adjudication row. One "
+            "adjudication per session, ever.", file=sys.stderr,
+        )
+        return EXIT_STATE
+    latest = rounds[-1] if rounds else None
+    if latest is None or latest["round"] < cap:
+        reached = latest["round"] if latest else 0
+        print(
+            "verify adjudicate: refused -- unmet precondition: the round "
+            f"cap ({cap}) is not reached (recorded rounds: {reached}). "
+            "Adjudication is the exit from a capped impasse, not a "
+            "shortcut around remediation.", file=sys.stderr,
+        )
+        return EXIT_STATE
+    if not latest.get("blocking"):
+        print(
+            "verify adjudicate: refused -- unmet precondition: the latest "
+            f"round ({latest['round']}) is not blocking; there is no "
+            "impasse to adjudicate. Close the session.", file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    disputes = ledger.read_disputes(repo_root, slug, current)
+    by_key = {(d["round"], d["finding_index"]): d for d in disputes}
+    findings = latest.get("findings") or []
+    blocking_indices = [
+        i for i, f in enumerate(findings) if f.get("blocking", True)
+    ]
+    undisputed = [
+        i for i in blocking_indices if (latest["round"], i) not in by_key
+    ]
+    if undisputed:
+        listing = ", ".join(str(i) for i in undisputed)
+        print(
+            "verify adjudicate: refused -- unmet precondition: blocking "
+            f"finding(s) {listing} of round {latest['round']} carry no "
+            "recorded dispute. Adjudication judges disputes; record one "
+            "per finding first:\n"
+            f"  python -m ai_router.verify dispute --session-set-dir "
+            f"{set_path} --round {latest['round']} --finding <F> "
+            "--grounds \"...\" --evidence <path>", file=sys.stderr,
+        )
+        return EXIT_STATE
+
+    current_tree = snapshot_worktree_tree(repo_root)
+    if current_tree is None:
+        print(
+            "verify adjudicate: could not snapshot the working tree "
+            "(failing closed).", file=sys.stderr,
+        )
+        return EXIT_CALL_FAILED
+    rc, fix_delta, err = run_git(
+        repo_root, "diff", "--no-color", latest["completion_tree"],
+        current_tree, "--", *build_diff_pathspecs(),
+    )
+    if rc != 0:
+        print(f"verify adjudicate: fix-delta diff failed: {err}",
+              file=sys.stderr)
+        return EXIT_CALL_FAILED
+
+    disputed = [
+        (latest["round"], i, findings[i], by_key[(latest["round"], i)])
+        for i in blocking_indices
+    ]
+    prompt = _adjudication_prompt(
+        set_path, current, disputed, fix_delta, repo_root
+    )
+    _check_cap(prompt)
+
+    # The exclusion superset: the orchestrator's effective provider AND
+    # every provider that verified any round of this session. The
+    # adjudicator is a third voice, never a repeat one.
+    excluded = sorted(
+        {orchestrator.effective_provider}
+        | {r["verifier_provider"] for r in rounds}
+    )
+    try:
+        result = _dispatch_verification(
+            prompt, exclude_providers=excluded,
+            session_set=slug, session_number=current,
+            transport=transport,
+        )
+    except NoCandidateError as exc:
+        print(
+            "verify adjudicate: VERIFICATION UNAVAILABLE -- no eligible "
+            "adjudicator exists outside the excluded providers "
+            f"({', '.join(excluded)}). Reason: {exc}\n"
+            "No verdict was written; the close stays BLOCKED. This state "
+            "is resolvable only by the operator (never the engine).",
+            file=sys.stderr,
+        )
+        return EXIT_UNAVAILABLE
+    except RouterError as exc:
+        print(
+            f"verify adjudicate: routed adjudication call failed: {exc}\n"
+            "Nothing was written. Retry once; if the second provider also "
+            "fails, escalate to the operator.", file=sys.stderr,
+        )
+        return EXIT_CALL_FAILED
+
+    if result.truncated:
+        print(
+            "verify adjudicate: the adjudicator response is truncated — "
+            "invalid evidence; nothing was written.", file=sys.stderr,
+        )
+        return EXIT_UNAVAILABLE
+
+    round_number = latest["round"] + 1
+    raw_path = ledger.save_raw_output(
+        repo_root, slug, current, round_number, result.content
+    )
+
+    judged = parse_adjudication_response(result.content, len(disputed))
+    outcomes = [
+        {
+            "finding_index": index,
+            "outcome": judgment["outcome"],
+            "reasons": judgment["reasons"],
+        }
+        for (_, index, _, _), judgment in zip(disputed, judged)
+    ]
+    all_overruled = all(
+        o["outcome"] == OUTCOME_OVERRULED for o in outcomes
+    )
+    verdict = VERDICT_VERIFIED if all_overruled else VERDICT_ISSUES_FOUND
+
+    row = {
+        "round": round_number,
+        "type": "adjudication",
+        "verdict": verdict,
+        "blocking": not all_overruled,
+        "verifier_model": result.model_name,
+        "verifier_provider": result.provider,
+        "orchestrator_provider": orchestrator.effective_provider,
+        "findings": [],
+        "outcomes": outcomes,
+        "excluded_providers": excluded,
+        "cost_usd": result.cost_usd,
+        "completion_tree": current_tree,
+        "previous_tree": latest["completion_tree"],
+        "recorded_at": datetime.datetime.now().astimezone().isoformat(),
+        "transport": result.transport,
+    }
+    ledger.append_round(repo_root, slug, current, row)
+
+    outcome_lines = "\n".join(
+        f"- Dispute on round {latest['round']} finding "
+        f"{o['finding_index']}: {o['outcome']}"
+        + (f" — {o['reasons']}" if o["reasons"] else "")
+        for o in outcomes
+    )
+    if not all_overruled:
+        upheld = sum(1 for o in outcomes if o["outcome"] != OUTCOME_OVERRULED)
+        print(
+            f"verify adjudicate: {verdict} — the adjudicator "
+            f"({result.model_name}/{result.provider}) upheld {upheld} of "
+            f"{len(outcomes)} disputed finding(s); the close stays "
+            f"BLOCKED. Raw output: {raw_path}\n{outcome_lines}"
+        )
+        return EXIT_BLOCKING
+
+    rounds_all = rounds + [row]
+    total_cost = sum(
+        r["cost_usd"] for r in rounds_all if r.get("cost_usd") is not None
+    )
+    priced = any(r.get("cost_usd") is not None for r in rounds_all)
+    record_session_verification(
+        set_path, current, verdict,
+        summary={
+            "rounds": round_number,
+            "verifierModel": result.model_name,
+            "verifierProvider": result.provider,
+            "transport": result.transport,
+            "costUsd": round(total_cost, 6) if priced else None,
+        },
+    )
+    cost_text = f"${total_cost:.4f}" if priced else "unpriced (seat transport)"
+    append_change_log_block(
+        set_path,
+        f"## Session {current} adjudication — {verdict} (every disputed "
+        f"finding OVERRULED)\n\n"
+        f"- Adjudicator: {result.model_name} ({result.provider}) over "
+        f"{result.transport}\n"
+        f"- Excluded providers: {', '.join(excluded)}\n"
+        f"- Routed cost, all rounds: {cost_text}\n"
+        f"{outcome_lines}\n"
+        f"- Raw round output: `.dabbler/runs/{slug}/s{current}/`\n",
+    )
+    print(
+        f"verify adjudicate: {verdict} — the adjudicator "
+        f"({result.model_name}/{result.provider}) overruled every "
+        f"disputed finding; session {current} is clear to close.\n"
+        f"{outcome_lines}"
+    )
+    return EXIT_OK
+
+
 # --- Task-level auto-verify (route()'s deferred seam) ------------------------
 
 def auto_verify(route_result, content: str, task_type: str, config) -> Optional[dict]:
@@ -865,12 +1198,44 @@ def _dispute_main(argv) -> int:
     )
 
 
+def _adjudicate_main(argv) -> int:
+    from .config import VALID_TRANSPORTS
+
+    parser = argparse.ArgumentParser(
+        prog="python -m ai_router.verify adjudicate",
+        description="Route the session's recorded disputes to a third "
+                    "provider for judgment — UPHOLD or OVERRULE, one "
+                    "adjudication per session, ever.",
+    )
+    parser.add_argument("--session-set-dir", required=True,
+                        help="directory, slug, or bare set number")
+    parser.add_argument("--max-rounds", type=int,
+                        help="override the configured round cap the "
+                             "precondition checks against")
+    parser.add_argument(
+        "--transport", choices=list(VALID_TRANSPORTS),
+        help="override the resolved transport preference for the "
+             "adjudication dispatch",
+    )
+    args = parser.parse_args(argv)
+    try:
+        set_dir = resolve_session_set_dir(args.session_set_dir)
+    except ValueError as exc:
+        print(f"verify adjudicate: {exc}", file=sys.stderr)
+        return EXIT_USAGE
+    return run_adjudication(
+        set_dir, max_rounds=args.max_rounds, transport=args.transport,
+    )
+
+
 def main(argv=None) -> int:
     from .config import VALID_TRANSPORTS
 
     argv = list(sys.argv[1:]) if argv is None else list(argv)
     if argv[:1] == ["dispute"]:
         return _dispute_main(argv[1:])
+    if argv[:1] == ["adjudicate"]:
+        return _adjudicate_main(argv[1:])
 
     parser = argparse.ArgumentParser(prog="python -m ai_router.verify")
     parser.add_argument("--session-set-dir", required=True,

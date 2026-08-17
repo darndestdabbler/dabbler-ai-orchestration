@@ -146,6 +146,59 @@ def normalize_evidence_path(token: str) -> str:
     return cleaned.strip("`*_ ")
 
 
+# --- Adjudication parsing ---------------------------------------------------
+
+OUTCOME_UPHELD = "UPHELD"
+OUTCOME_OVERRULED = "OVERRULED"
+
+# One judgment line per dispute: `Dispute N: UPHOLD — reasons` (or
+# OVERRULE). Both verb and past-participle forms are accepted; anything
+# else is no judgment at all.
+_ADJUDICATION_LINE = re.compile(
+    r"^[\s*_#>-]*Dispute\s*(\d+)\s*[:.\-]?\s*\*{0,2}"
+    r"(UPHOLD|UPHELD|OVERRULE|OVERRULED)\b\*{0,2}\s*[-—:.,]*\s*(.*)$",
+    re.IGNORECASE | re.MULTILINE,
+)
+
+
+def parse_adjudication_response(response: str, dispute_count: int) -> list[dict]:
+    """One outcome per dispute, 1-based positional. Fail-closed on every
+    ambiguity: a dispute with no parseable judgment, or judged more than
+    once with disagreeing verdicts, is UPHELD — an adjudicator that did not
+    clearly overrule a finding has not overruled it."""
+    judged: dict[int, dict] = {}
+    for match in _ADJUDICATION_LINE.finditer(response or ""):
+        number = int(match.group(1))
+        verb = match.group(2).upper()
+        outcome = (
+            OUTCOME_OVERRULED if verb.startswith("OVERRULE")
+            else OUTCOME_UPHELD
+        )
+        reasons = match.group(3).strip()[:1000]
+        if outcome == OUTCOME_OVERRULED and not reasons:
+            # A judgment is UPHOLD-or-OVERRULE *with reasons*; a bare
+            # overrule clears a blocking finding on no argument at all.
+            outcome = OUTCOME_UPHELD
+            reasons = "(overrule without reasons — fail closed as UPHELD)"
+        prior = judged.get(number)
+        if prior is not None and prior["outcome"] != outcome:
+            judged[number] = {
+                "outcome": OUTCOME_UPHELD,
+                "reasons": "(contradictory judgments — fail closed as "
+                           "UPHELD)",
+            }
+            continue
+        if prior is None:
+            judged[number] = {"outcome": outcome, "reasons": reasons}
+    outcomes = []
+    for number in range(1, dispute_count + 1):
+        outcomes.append(judged.get(number) or {
+            "outcome": OUTCOME_UPHELD,
+            "reasons": "(no parseable judgment — fail closed as UPHELD)",
+        })
+    return outcomes
+
+
 # --- Severity and blocking --------------------------------------------------
 
 def normalize_severity(raw) -> str:

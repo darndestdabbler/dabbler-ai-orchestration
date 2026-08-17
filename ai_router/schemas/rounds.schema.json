@@ -47,12 +47,35 @@
     "completion_tree": { "type": "string", "minLength": 7 },
     "previous_tree": { "type": "string", "minLength": 7 },
     "recorded_at": { "type": "string", "minLength": 1 },
-    "transport": { "type": "string" }
+    "transport": { "type": "string" },
+    "type": { "type": "string", "enum": ["adjudication"] },
+    "excluded_providers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "minItems": 1
+    },
+    "outcomes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["finding_index", "outcome"],
+        "properties": {
+          "finding_index": { "type": "integer", "minimum": 0 },
+          "outcome": { "type": "string", "enum": ["UPHELD", "OVERRULED"] },
+          "reasons": { "type": "string" }
+        }
+      }
+    }
   },
-  "if": {
-    "properties": { "round": { "minimum": 2 } }
-  },
-  "then": {
-    "required": ["previous_tree"]
-  }
+  "allOf": [
+    {
+      "if": { "properties": { "round": { "minimum": 2 } } },
+      "then": { "required": ["previous_tree"] }
+    },
+    {
+      "if": { "required": ["type"] },
+      "then": { "required": ["outcomes", "excluded_providers"] }
+    }
+  ]
 }

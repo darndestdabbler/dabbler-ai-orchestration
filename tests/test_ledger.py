@@ -110,3 +110,24 @@ class TestRawOutput:
         content = "VERIFIED\r\nline two\n"
         path = ledger.save_raw_output(tmp_path, "010-demo", 1, 1, content)
         assert path.read_bytes() == content.encode("utf-8")
+
+
+class TestAdjudicationRow:
+    def test_type_tagged_row_requires_its_fields(self, tmp_path):
+        # The additive schema: an untyped row stays valid (every other test
+        # here), a typed row validates round-trip, and a typed row missing
+        # its outcomes is refused on read like any tampered line.
+        row = make_row(
+            2, type="adjudication", verdict="VERIFIED", blocking=False,
+            findings=[],
+            outcomes=[{"finding_index": 0, "outcome": "OVERRULED",
+                       "reasons": "scope is documented"}],
+            excluded_providers=["anthropic", "openai"],
+        )
+        ledger.append_round(tmp_path, "010-demo", 1, row)
+        assert ledger.read_rounds(tmp_path, "010-demo", 1)[-1][
+            "type"] == "adjudication"
+        bad = dict(row, round=3)
+        del bad["outcomes"]
+        with pytest.raises(ledger.LedgerError):
+            ledger.validate_round(bad)

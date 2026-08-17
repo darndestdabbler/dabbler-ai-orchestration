@@ -1,0 +1,118 @@
+{
+  "sessionSetName": "134-ceremony-cost-and-what-to-cut",
+  "createdDate": "2026-08-17T04:54:25.943064-04:00",
+  "totalSessions": 3,
+  "entries": [
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "Register.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "re-derive-the-numbers-above-then",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "**Re-derive the numbers above, then attribute the growth per ceremony step.** Rebuild the per-step interval analysis from `activity-log.json` across every schema-v4 session (method stated in *The measurements this set acts on*; state your outlier rule and idle cap explicitly, and report medians). Then break the ceremony total down **by step key** \u2014 register, cross-provider-verification, required-portion-of-the-full-test, close-out \u2014 so the 7.1 \u2192 16.3 rise is attributed rather than aggregate. Any number that fails to reproduce is reported as a correction, and the corrected value is what the rest of the set uses.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "date-each-rise-against-what-landed",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "**Date each rise against what landed.** For whichever ceremony step(s) carry the growth, identify the changes that plausibly caused it, by date, from the session sets and changelog fragments in that window (Sets 111, 116, 119, 127, 128 are the candidates the timeline suggests \u2014 confirm or refute). Distinguish a step that got **slower** from a step that acquired **more obligations**; they have different remedies and conflating them is how a reduction pass cuts the wrong thing.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "name-the-reduction-candidates-with-a",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "**Name the reduction candidates, with a cost and a consequence each.** For each candidate: minutes it would return (from the measurement, not estimated), what verification or record is lost, and whether the operator or the orchestrator owns the decision. Candidates that only *move* cost do not qualify. **A candidate with no measured minutes attached does not go on the list.**",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "Cross-provider verification.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "Required portion of the full test suite.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 7,
+      "stepKey": "close-out",
+      "dateTime": "2026-08-17T04:54:25.942914-04:00",
+      "description": "Close-out.",
+      "status": "pending",
+      "kind": "plan-step"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 1,
+      "stepKey": "register",
+      "dateTime": "2026-08-17T04:54:25.950330-04:00",
+      "description": "Registered session 1 (github-copilot / claude-opus-5, high).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 2,
+      "stepKey": "re-derive-the-numbers-above-then",
+      "dateTime": "2026-08-17T05:06:09.805037-04:00",
+      "description": "Re-derived every headline over 255 completed schema-v4 sessions (the corpus grew from 245 since 2026-08-15) with four read-only instruments over committed artifacts; no new module. REPRODUCES: duration growth (trimmed OLS +0.966 min/day vs +0.947 claimed, R2 0.321 vs 0.307, Theil-Sen +0.909 vs +0.901, 29 of 255 excluded >240min). CORRECTIONS: (1) the 2.3x is NOT robust - it ranges 1.01x to 2.96x across defensible method choices, and under the spec's OWN named breakdown (the canonical four step keys) it is 1.01x, no rise at all. (2) The by-step-key attribution the spec asks for cannot be performed: the corpus holds 1,427 distinct completed step keys and the canonical four appear on a minority of sessions (register 91, cross-provider-verification 30, required-portion 27, close-out 9, of 255). (3) The instrumentation explanation is NOT ruled out: the count control the spec relies on misses the real artifact, which is timestamp dispersion - 44% of pre-cap completion intervals are under ONE SECOND (burst-logged) vs 34% post-cap, and burst logging mechanically deflates min/step; collapsing bursts at <=10s moves the ratio 2.65x -> 1.71x. (4) The flat-work control does not hold: work rose 5.96 -> 7.68 min/step (+29%), and +79% on the canonical classifier. (5) Model latency is 24% of the loop (8.0 of 33.5 min), not 11%. (6) Loop span is 33.5-35.8 min, not 41.7; the Step 8 tail is 12.6 min, not 17.9, and 8.1 of those 12.6 are recorded suite runtime. (7) The calendar trend does not survive into the measurable window: within the 57 round-ledger sessions the slope is +0.122 min/day, R2=0.000. NEW ATTRIBUTION, taxonomy-independent: a verification round costs +17.9 min of loop span (R2=0.625), of which only 3.3 min is model latency and 14.6 is not; 113 of 246 logged rounds (46%) are beyond the 2nd; remediation-review -> remediation-review is 62 transitions, median 18.1 min, 2,332 min (38.9 h) total, the largest single line item in the corpus; discovery -> supplementary is cheap at 4.6 min median. Recorded suite runtime is 18.6 min per instrumented session across 3 runs (pytest 9.53 median, playwright 6.65, mocha 0.62).",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 3,
+      "stepKey": "date-each-rise-against-what-landed",
+      "dateTime": "2026-08-17T05:10:24.020145-04:00",
+      "description": "Dated every rise from first-row timestamps in the artifacts themselves. THE FINDING: the 2026-08-07 cohort split IS Set 111's landing date, and Set 111 built every instrument the post-cap cohort is measured with - sN-rounds.jsonl first row 2026-08-07 03:16 (bounds enforcement) and test-runs.jsonl first row 2026-08-07 15:40 (run_of_record + test_run_fresh). For those two ledgers the pre-cap cohort was not measured worse, it was not measured AT ALL, so the per-step comparison crosses an instrumented/uninstrumented boundary. Set 111 also shipped session_checklist, decision_journal, disposition.uat + uat_walk_recorded and spec_admission in the same window. TWO CORRECTIONS TO THE SPEC'S CANDIDATE LIST: (a) Set 128 is NOT the origin of the step skeleton - seeded plan-step rows first appear in Set 114 on 2026-08-10, two days before Set 128 ran; (b) Set 116 is a cost REDUCTION not a cause - it cut the suite ~3.6x via xdist and corrected published timings wrong by up to 30x, and raised the measured number only by making durationSeconds a required field on 2026-08-10. SLOWER vs MORE OBLIGATIONS, separated: no ceremony category acquired more steps (1.0 per session per category in BOTH cohorts). What moved is coverage - register 40%->98%, tests 42%->70% - which is instrumentation, not obligation. register is the clean case: coverage tripled while its per-step cost FELL 2.42 -> 0.80 min because start_session now logs it at the true moment. The one genuine new obligation is Set 111 S4's run-of-record, sized at 18.6 min/session.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 4,
+      "stepKey": "name-the-reduction-candidates-with-a",
+      "dateTime": "2026-08-17T05:10:24.022476-04:00",
+      "description": "Named the candidates with measured minutes, consequence and owner, and recorded the DISQUALIFIED ones with the measurement that disqualified them. C1 remediation round-trips: 62 remediation-review -> remediation-review transitions, median 18.1 min, 2,332 min (38.9 h) corpus, mean 33.8 min/session; marginal round cost +17.9 min of loop span (R2 0.625) of which only 3.3 min is model latency and 14.6 (82%) is not; consequence NONE if the same findings are fixed in fewer round-trips; owner orchestrator for fixing more per round, OPERATOR for anything that stops the loop earlier. Its real lever is Session 2's severity question. C2 recorded suite runtime: 18.6 min/session across 3 runs = 19% of the median session; consequence is a verification reduction; owner OPERATOR unconditionally, surfaced not proposed. DISQUALIFIED BY MEASUREMENT: C3 staleness-forced re-runs - only 13 runs / 67 minutes across the ENTIRE instrumented corpus had an unchanged surfaceDigest, 1.1 min/session mean and 0.0 median, so Sets 116 and 119 already closed it; C4 registration + close ceremony - 0.80 and 0.2 min/step, under 1.1 min/session combined, and register got 3x CHEAPER not more expensive; C5 discovery -> supplementary - 4.6 min median, the cheapest transition measured. C6 closing the stepKey vocabulary returns ZERO minutes so it does not go on the list; recorded as a measurement-integrity residual because 1,427 distinct keys are why the by-step-key breakdown could not be produced.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 5,
+      "stepKey": "cross-provider-verification",
+      "dateTime": "2026-08-17T05:23:51.701765-04:00",
+      "description": "Phased loop, 3 rounds, closed within bounds (2 discovery passes and 2 remediation-review cycles permitted; 1 and 1 used). Verifier gpt-5.5 on openai; anthropic auto-excluded as the orchestrator's effective provider. Round 1 discovery, fan-out 2 (spec-conformance / failure-scenario lenses): ISSUES_FOUND, 1 blocking Major, 0 minor. Round 2 supplementary, run BEFORE any remediation as the loop requires: VERIFIED, zero findings, nothing joined the merge. THE FINDING, ACCEPTED WITHOUT ARGUMENT: the document drew operative conclusions from ai_router/router-metrics.jsonl, which git check-ignore confirms is ignored at .gitignore:7 and which git ls-files confirms is untracked - against a spec that requires analysis over committed artifacts only. The document had disclosed the file's machine-local status in section 6 while simultaneously promoting 'model latency 24% of the loop' into the section 5 list of values the rest of the set inherits; disclosure in a footnote does not cancel promotion in the inheritance list. Fixed by QUARANTINE not deletion, in four places (Method sources split committed vs machine-local; section 1 re-derived 'the lever is rounds not models' from the committed round cost alone; C1's latency row retitled NON-OPERATIVE and carrying the clause that C1's minutes are unchanged if it is struck; section 5 latency figure removed and replaced with an explicit prohibition). NO MEASURED MINUTES MOVED - every candidate number comes from sN-rounds.jsonl, test-runs.jsonl, activity-log.json and session-state.json, all committed. Consistency propagated to all three echoes in the same pass (G-012): s1-conventions.md edited, a CORRECTING record appended to decisions.jsonl via the sanctioned writer rather than editing the append-only journal, and the activity log correction carried here rather than by editing history. Acceptance harness round 1: 1 judgment-kind criterion, never auto-closed by design. Round 3 remediation-review over the fix delta: VERIFIED, 1 fix accepted / 0 rejected / 0 accepted-with-modification, zero new findings.",
+      "status": "complete"
+    },
+    {
+      "sessionNumber": 1,
+      "stepNumber": 6,
+      "stepKey": "required-portion-of-the-full-test",
+      "dateTime": "2026-08-17T05:23:51.703158-04:00",
+      "description": "Nothing owed, and this is the gate's own answer rather than a judgement: `run_of_record affected` reports 'No declared suite's input set intersects this change (0 path(s))', re-run after remediation with the final change set. Every file this session touched is under docs/session-sets/134-ceremony-cost-and-what-to-cut/ - one analysis document, a conventions block, a remediation sidecar, the routed ai-assignment ledger, and machine-written lifecycle files. No ai_router path, no extension path, no test input set. Under the constitution a suite this session did not touch is not owed at all, so no run of record is produced and none is required by test_run_fresh. The four analysis instruments were written and run from the session workspace, never in the repo, so the set adds no module and no suite covers them.",
+      "status": "complete"
+    }
+  ]
+}

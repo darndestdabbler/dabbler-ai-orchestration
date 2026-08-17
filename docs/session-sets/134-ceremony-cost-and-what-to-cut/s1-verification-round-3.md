@@ -1,0 +1,3 @@
+**VERIFIED** — I checked the modified attribution document, conventions note, decision ledger, and `.gitignore`; the local router metrics source is now explicitly quarantined, removed from inherited values, and any remaining latency text is marked non-operative and strikeable. No new Critical/Major defect appears in the fix hunks.
+
+- Fix verdict: L1 local router metrics used for operative latency/reduction conclusions -- fix-accepted

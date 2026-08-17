@@ -36,6 +36,7 @@
     "G-005": {
       "kind": "instruction",
       "uses": [
+        "134-01",
         "113-08",
         "113-06",
         "121-04"
@@ -71,7 +72,9 @@
     },
     "G-010": {
       "kind": "instruction",
-      "uses": [],
+      "uses": [
+        "134-01"
+      ],
       "note": "project-guidance.md G-010 Open every session-verification prompt with conventions block (L-064-10). Usage evidence starts here (Set 121 S3); no prior history."
     },
     "G-011": {
@@ -82,6 +85,7 @@
     "G-012": {
       "kind": "instruction",
       "uses": [
+        "134-01",
         "113-08",
         "113-06",
         "133-02",
@@ -92,6 +96,7 @@
     "G-013": {
       "kind": "instruction",
       "uses": [
+        "134-01",
         "113-08",
         "113-06",
         "133-02",
@@ -257,6 +262,7 @@
     "L-064-8": {
       "kind": "instruction",
       "uses": [
+        "134-01",
         "113-03",
         "113-02",
         "113-01",
@@ -265,8 +271,7 @@
         "121-02",
         "132-03",
         "132-02",
-        "132-01",
-        "131-03"
+        "132-01"
       ]
     },
     "L-064-9": {

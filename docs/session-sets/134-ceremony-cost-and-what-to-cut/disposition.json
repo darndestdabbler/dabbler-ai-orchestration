@@ -1,0 +1,103 @@
+{
+  "verification_method": "api",
+  "verification_verdict": "VERIFIED",
+  "status": "completed",
+  "files_changed": [
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/activity-log.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/ai-assignment.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/checklist-posts.jsonl",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/decisions.jsonl",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/disposition.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-acceptance-round-1.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-ceremony-attribution.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-conventions.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-issues.json",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-remediation-round-1.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-rounds.jsonl",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification-fanout-2.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification-round-2.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification-round-3.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/s1-verification.md",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/session-events.jsonl",
+    "docs/session-sets/134-ceremony-cost-and-what-to-cut/session-state.json"
+  ],
+  "verification_message_ids": [],
+  "blockers": [],
+  "lessons_cited": [
+    "G-005",
+    "G-010",
+    "G-012",
+    "G-013",
+    "L-064-8"
+  ],
+  "next_orchestrator": {
+    "engine": "github-copilot",
+    "provider": "anthropic",
+    "model": "claude-opus-5",
+    "effort": "high",
+    "reason": {
+      "code": "continue-current-trajectory",
+      "specifics": "Session 2 asks whether the severity field still carries information, over ~680 findings in 378 sN-issues*.json envelopes, and then applies Set 120 S1's closed-vocabulary pattern to the severity writer. It is the same shape as Session 1 - measure a corpus, test a premise the spec asserts, and be willing to contradict it - so the same seat and provider keeps continuity of the measurement method and of Session 1's corrections. Two carry-forwards make this concrete: Session 1 found the corpus holds 1,427 distinct stepKey values, which is the same open-vocabulary defect in a third field and directly informs Session 2 step 4; and Session 1's own instruments already parse every sN-issues*.json envelope Session 2 needs. The Step 3.5 routed analyst recommended anthropic's current flagship family at effort MEDIUM for this session; recorded here at HIGH, deviation stated rather than silent, because Session 1's load-bearing result was a contradiction of the spec's own headline that only surfaced from sensitivity analysis nobody asked for. Session 2 rests on a premise stated just as confidently (92% Major) and its step 3 requires an authority-sensitive (a)/(b)/(c) call, so the operator may prefer to pay for the same depth. Whichever runs it, cross-provider verification excludes the orchestrator's own provider."
+    }
+  },
+  "summary": "Re-derived every headline measurement this set is built on, over 255 completed schema-v4 sessions, using four read-only instruments over committed artifacts and adding no module. THE DURATION GROWTH REPRODUCES: trimmed OLS +0.966 min/day (claimed +0.947), R2 0.321 (0.307), Theil-Sen +0.909 (0.901), 29 of 255 excluded above 240 min - +79 minutes over the 82-day corpus. THE 2.3x DOES NOT. Re-running the identical attribution under six defensible method choices yields ratios from 1.01x to 2.96x, and under the spec's OWN named breakdown (the four canonical step keys) ceremony cost per step is FLAT (7.88 -> 8.00) while work rises. Three further corrections: the by-step-key breakdown the spec asks for cannot be produced at all, because the corpus holds 1,427 distinct completed stepKey values and the canonical four appear on a minority of sessions; the instrumentation explanation was dismissed on the wrong control, since the artifact is timestamp dispersion rather than step count (44% of pre-cap completion intervals are under ONE SECOND vs 34% post-cap, and collapsing bursts moves the ratio 2.65x -> 1.71x); and the flat-work control that the whole argument rests on does not hold (+29% to +79%). The phase figures are also smaller than published: loop 35.8 min not 41.7, tail 12.6 not 17.9. DATED: the 2026-08-07 cohort split IS Set 111's landing date, and Set 111 built every instrument the post-cap cohort is measured with - sN-rounds.jsonl first row 08-07 03:16, test-runs.jsonl first row 08-07 15:40 - so the comparison crosses an instrumented/uninstrumented boundary rather than two operating regimes. Two corrections to the spec's candidate list: the step skeleton originates in Set 114 on 08-10, not Set 128; and Set 116 is a cost REDUCTION (~3.6x via xdist) misread as a cause. No ceremony category acquired more steps - the per-session count is 1.0 in both cohorts - what moved is logging COVERAGE, and register got 3x CHEAPER while its coverage tripled. CANDIDATES: C1 remediation round-trips, 2,332 min (38.9 h) corpus and +17.9 min per round, gated on Session 2's severity question; C2 recorded suite runtime, 18.6 min/session, operator-owned as a verification reduction and surfaced not proposed. THREE CANDIDATES DISQUALIFIED BY THEIR OWN MEASUREMENT: staleness-forced re-runs are only 67 minutes across the entire instrumented corpus (Sets 116 and 119 already closed it), registration plus close ceremony is under 1.1 min/session, and discovery -> supplementary at 4.6 min is the cheapest transition measured. Verification closed VERIFIED in 3 rounds within bounds; the single blocking Major - that operative conclusions drew on the gitignored router-metrics.jsonl against a committed-artifacts-only spec - was accepted without argument and fixed by quarantining every latency figure as non-operative, with no measured minutes moved.",
+  "cost": {
+    "components": [
+      {
+        "component": "orchestrator_seat",
+        "status": "lower_bound",
+        "credits": 1084.01475,
+        "usd": 10.8401475,
+        "event_count": 100,
+        "session_ids": [
+          "cbf81e16-d5e2-4a5b-85d6-4826cb33d47a"
+        ],
+        "measured_session_ids": [
+          "cbf81e16-d5e2-4a5b-85d6-4826cb33d47a"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": "a conversation in this component is still in flight; its closing turns are not in the store yet, so this is a floor"
+      },
+      {
+        "component": "routed_seat",
+        "status": "measured",
+        "credits": 364.100295,
+        "usd": 3.6410029500000003,
+        "event_count": 40,
+        "session_ids": [
+          "d5975c06-f562-416a-9c28-1b223678a77f",
+          "59f5cde9-981b-4ce1-a763-2c84b9cc5c7e",
+          "ddd0070f-77aa-4e5d-9577-6f5ed47e1247",
+          "23eac11f-3a17-42a7-8bf0-5156de26b2de",
+          "3641f395-83f4-4cab-95d8-a8d962d94e49"
+        ],
+        "measured_session_ids": [
+          "d5975c06-f562-416a-9c28-1b223678a77f",
+          "59f5cde9-981b-4ce1-a763-2c84b9cc5c7e",
+          "ddd0070f-77aa-4e5d-9577-6f5ed47e1247",
+          "23eac11f-3a17-42a7-8bf0-5156de26b2de",
+          "3641f395-83f4-4cab-95d8-a8d962d94e49"
+        ],
+        "unmeasured_session_ids": [],
+        "reason": null
+      },
+      {
+        "component": "routed_api",
+        "status": "not_applicable",
+        "credits": 0.0,
+        "usd": 0.0,
+        "event_count": 0,
+        "session_ids": [],
+        "measured_session_ids": [],
+        "unmeasured_session_ids": [],
+        "reason": "declared not applicable by the caller"
+      }
+    ],
+    "total_status": "lower_bound",
+    "total_credits": 1448.115045,
+    "total_usd": 14.48115045,
+    "unmeasured": [],
+    "store_schema_version": 6,
+    "measured_at": "close"
+  }
+}

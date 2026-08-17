@@ -1,5 +1,7 @@
 import json
 import os
+import shutil
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +17,7 @@ from ai_router.session import (
     extract_spec_excerpt,
     flip_state_to_closed,
     log_step,
+    main,
     parse_session_plans,
     plan_step_key,
     record_session_verification,
@@ -25,6 +28,8 @@ from ai_router.session import (
     start,
 )
 from tests.conftest import SPEC_MD
+
+CORPUS = Path(__file__).parent / "fixtures" / "corpus"
 
 
 class TestResolveSet:
@@ -253,3 +258,72 @@ class TestBoundaryTriad:
                 acquire_lock(set_dir)
         finally:
             release_lock(lock)
+
+
+class TestCancelRestoreCLI:
+    """CLI contract: `cancel <set-dir> --reason <text> [--force]` and
+    `restore <set-dir> [--reason <text>]`, one-line JSON on stdout."""
+
+    COMPLETE_SET = "004-cost-enforcement-and-capacity"
+
+    def _copy(self, tmp_path, name):
+        dst = tmp_path / name
+        shutil.copytree(CORPUS / name, dst)
+        return dst
+
+    def _state(self, set_dir):
+        return json.loads(
+            (set_dir / "session-state.json").read_text(encoding="utf-8")
+        )
+
+    def test_cancel_flips_status_and_prints_json(self, tmp_path, capsys):
+        set_dir = self._copy(tmp_path, self.COMPLETE_SET)
+        assert main(["cancel", str(set_dir), "--reason", "scope cut"]) \
+            == EXIT_OK
+        assert json.loads(capsys.readouterr().out.strip()) == {
+            "status": "cancelled", "sessionSetName": self.COMPLETE_SET,
+        }
+        assert self._state(set_dir)["status"] == "cancelled"
+
+    def test_cancel_records_pre_cancel_status(self, tmp_path):
+        set_dir = self._copy(tmp_path, self.COMPLETE_SET)
+        main(["cancel", str(set_dir), "--reason", "scope cut"])
+        assert self._state(set_dir)["preCancelStatus"] == "complete"
+
+    def test_cancel_writes_cancelled_marker(self, tmp_path):
+        set_dir = self._copy(tmp_path, self.COMPLETE_SET)
+        main(["cancel", str(set_dir), "--reason", "budget freeze"])
+        text = (set_dir / "CANCELLED.md").read_text(encoding="utf-8")
+        assert "Cancelled on " in text  # timestamp line
+        assert "budget freeze" in text
+
+    def test_cancel_refuses_in_flight_session(self, set_dir, capsys):
+        register_session_start(set_dir, 1, engine="claude-code")
+        assert main(["cancel", str(set_dir), "--reason", "x"]) \
+            == EXIT_BOUNDARY
+        assert "in flight" in capsys.readouterr().err
+        assert not (set_dir / "CANCELLED.md").exists()
+        state = json.loads(
+            (set_dir / "session-state.json").read_text(encoding="utf-8")
+        )
+        assert state["status"] == "in-progress"
+
+    def test_restore_returns_pre_cancel_status(self, tmp_path, capsys):
+        set_dir = self._copy(tmp_path, self.COMPLETE_SET)
+        main(["cancel", str(set_dir), "--reason", "scope cut"])
+        capsys.readouterr()
+        assert main(["restore", str(set_dir)]) == EXIT_OK
+        assert json.loads(capsys.readouterr().out.strip()) == {
+            "status": "complete", "sessionSetName": self.COMPLETE_SET,
+        }
+        state = self._state(set_dir)
+        assert state["status"] == "complete"
+        assert "preCancelStatus" not in state
+        assert not (set_dir / "CANCELLED.md").exists()
+        assert (set_dir / "RESTORED.md").is_file()  # history preserved
+
+    def test_restore_refuses_not_cancelled(self, tmp_path, capsys):
+        set_dir = self._copy(tmp_path, self.COMPLETE_SET)
+        assert main(["restore", str(set_dir)]) == EXIT_BOUNDARY
+        assert "not cancelled" in capsys.readouterr().err
+        assert self._state(set_dir)["status"] == "complete"

@@ -31,9 +31,12 @@ import jsonschema
 from .evidence import record_state_write, repo_root_for, run_git
 from .progress import (
     SessionStateInvariantError,
+    STATUS_CANCELLED,
     STATUS_COMPLETE,
     STATUS_IN_PROGRESS,
     STATUS_NOT_STARTED,
+    TOP_LEVEL_STATUSES,
+    canonicalize_status,
     extract_session_titles_from_spec,
     get_progress,
     normalize_to_v4_shape,
@@ -875,6 +878,233 @@ def close(set_dir, *, dry_run: bool = False, forced: bool = False) -> int:
         release_lock(lock)
 
 
+# --- cancel / restore --------------------------------------------------------
+
+CANCELLED_FILENAME = "CANCELLED.md"
+RESTORED_FILENAME = "RESTORED.md"
+_CANCEL_HISTORY_HEADER = "# Cancellation history"
+
+_RESTORABLE_STATUSES = (STATUS_NOT_STARTED, STATUS_IN_PROGRESS,
+                        STATUS_COMPLETE)
+
+
+def _now_iso_seconds() -> str:
+    """Second precision with timezone — the marker-file timestamp shape
+    legacy readers parse."""
+    return (
+        datetime.datetime.now().astimezone().replace(microsecond=0)
+        .isoformat()
+    )
+
+
+def _prepend_history_entry(existing, verb: str, reason: str,
+                           when: str) -> str:
+    """New entry above prior ones, one accumulated history per marker file.
+    Malformed prior content (manual edits) is preserved verbatim below a
+    fresh header — filename presence is the signal that must survive."""
+    entry = f"{verb} on {when}\n{reason}\n\n"
+    if existing is None:
+        return f"{_CANCEL_HISTORY_HEADER}\n\n{entry}"
+    if existing.startswith(_CANCEL_HISTORY_HEADER):
+        tail = existing[len(_CANCEL_HISTORY_HEADER):].lstrip("\n")
+        return f"{_CANCEL_HISTORY_HEADER}\n\n{entry}{tail}"
+    return f"{_CANCEL_HISTORY_HEADER}\n\n{entry}{existing}"
+
+
+def _write_text_lf(path: Path, content: str) -> None:
+    with open(path, "w", encoding="utf-8", newline="") as f:
+        f.write(content)
+
+
+def _v4_on_disk_state(set_path: Path, raw: dict) -> dict:
+    """Project any historical on-disk shape to the canonical v4 write
+    shape: ledger normalized, derived top-level keys dropped, the plan-less
+    carve-out and passthrough keys preserved."""
+    normalized = normalize_to_v4_shape(raw, set_path / "spec.md")
+    state = {
+        "schemaVersion": SCHEMA_VERSION,
+        "sessionSetName": normalized.get("sessionSetName") or set_path.name,
+        "status": canonicalize_status(normalized.get("status")),
+    }
+    normalized_sessions = normalized.get("sessions")
+    if isinstance(raw.get("sessions"), list) or normalized_sessions:
+        state["sessions"] = normalized_sessions or []
+    else:
+        for key in ("startedAt", "orchestrator"):  # plan-less carve-out
+            if raw.get(key) is not None:
+                state[key] = raw[key]
+    for key in ("forceClosed", "nextOrchestrator"):
+        if key in raw:
+            state[key] = raw[key]
+    if "preCancelStatus" in raw:
+        pre = canonicalize_status(raw["preCancelStatus"])
+        # A drifted value is dropped, not written: restore then falls back
+        # to ledger derivation instead of trusting a token nothing owns.
+        if pre is None or pre in TOP_LEVEL_STATUSES:
+            state["preCancelStatus"] = pre
+    return state
+
+
+def _infer_status_from_files(set_path: Path) -> str:
+    """File-presence inference for sets with no usable state file — the
+    same rules build_projection applies on read."""
+    if (set_path / "change-log.md").is_file():
+        return STATUS_COMPLETE
+    if (set_path / "activity-log.json").is_file():
+        return STATUS_IN_PROGRESS
+    return STATUS_NOT_STARTED
+
+
+def _derive_pre_cancel_status(normalized: dict) -> str:
+    """Ledger-derived fallback when preCancelStatus is absent: any complete
+    sessions -> in-progress if incomplete sessions remain else complete;
+    none complete -> not-started."""
+    statuses = [
+        s.get("status") for s in (normalized or {}).get("sessions") or []
+        if isinstance(s, dict)
+    ]
+    complete = [s for s in statuses if s == STATUS_COMPLETE]
+    if not complete:
+        return STATUS_NOT_STARTED
+    if len(complete) < len(statuses):
+        return STATUS_IN_PROGRESS
+    return STATUS_COMPLETE
+
+
+def cancel(set_dir, *, reason: str, force: bool = False) -> int:
+    set_path = Path(set_dir)
+    if not set_path.is_dir():
+        print(f"cancel: not a directory: {set_path}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        lock = acquire_lock(set_path, worker_id=f"cancel/{os.getpid()}")
+    except LockContentionError as exc:
+        print(f"cancel: refused -- {exc}", file=sys.stderr)
+        return EXIT_BOUNDARY
+    try:
+        raw = read_raw_session_state(set_path)
+        normalized = (
+            normalize_to_v4_shape(raw, set_path / "spec.md") if raw else None
+        )
+        current = (normalized or {}).get("currentSession")
+        if current is not None and not force:
+            print(
+                f"cancel: refused -- session {current} of {set_path.name} "
+                "is in flight. Close it first, or pass --force.",
+                file=sys.stderr,
+            )
+            return EXIT_BOUNDARY
+
+        if raw is not None:
+            state = _v4_on_disk_state(set_path, raw)
+            prior = state.get("status")
+            # A re-cancel keeps the original preCancelStatus: overwriting
+            # it with "cancelled" would lose the status a restore returns to.
+            if prior in _RESTORABLE_STATUSES:
+                state["preCancelStatus"] = prior
+            state["status"] = STATUS_CANCELLED
+        else:
+            state = {
+                "schemaVersion": SCHEMA_VERSION,
+                "sessionSetName": set_path.name,
+                "status": STATUS_CANCELLED,
+                "preCancelStatus": _infer_status_from_files(set_path),
+            }
+        try:
+            _validate_and_write_state(set_path, state)
+        except SessionStateInvariantError as exc:
+            print(f"cancel: refused -- {exc}", file=sys.stderr)
+            return EXIT_GATE_FAILED
+
+        # Marker file second: the state file is authoritative for v2
+        # readers; the marker is the audit trail legacy readers and humans
+        # consult. History accumulates in one file, so an earlier restore's
+        # RESTORED.md is renamed back before the new entry is prepended.
+        cancelled_path = set_path / CANCELLED_FILENAME
+        restored_path = set_path / RESTORED_FILENAME
+        if restored_path.is_file() and not cancelled_path.is_file():
+            os.replace(restored_path, cancelled_path)
+        existing = None
+        if cancelled_path.is_file():
+            existing = cancelled_path.read_text(encoding="utf-8")
+        _write_text_lf(cancelled_path, _prepend_history_entry(
+            existing, "Cancelled", reason, _now_iso_seconds()
+        ))
+        print(json.dumps({
+            "status": STATUS_CANCELLED,
+            "sessionSetName": state["sessionSetName"],
+        }))
+        return EXIT_OK
+    finally:
+        release_lock(lock)
+
+
+def restore(set_dir, *, reason: str = "") -> int:
+    set_path = Path(set_dir)
+    if not set_path.is_dir():
+        print(f"restore: not a directory: {set_path}", file=sys.stderr)
+        return EXIT_USAGE
+    try:
+        lock = acquire_lock(set_path, worker_id=f"restore/{os.getpid()}")
+    except LockContentionError as exc:
+        print(f"restore: refused -- {exc}", file=sys.stderr)
+        return EXIT_BOUNDARY
+    try:
+        raw = read_raw_session_state(set_path)
+        cancelled_path = set_path / CANCELLED_FILENAME
+        is_cancelled = (
+            canonicalize_status(raw.get("status")) == STATUS_CANCELLED
+            if raw is not None else cancelled_path.is_file()
+        )
+        if not is_cancelled:
+            print(
+                f"restore: refused -- {set_path.name} is not cancelled; "
+                "there is nothing to restore.", file=sys.stderr,
+            )
+            return EXIT_BOUNDARY
+
+        # Marker rename first (history preserved under RESTORED.md), state
+        # write second, CANCELLED.md removal last — a crash mid-way leaves
+        # the set still looking cancelled, and restore is re-runnable.
+        marker_history = None
+        if cancelled_path.is_file():
+            marker_history = cancelled_path.read_text(encoding="utf-8")
+            _write_text_lf(set_path / RESTORED_FILENAME,
+                           _prepend_history_entry(
+                               marker_history, "Restored", reason,
+                               _now_iso_seconds(),
+                           ))
+
+        if raw is not None:
+            state = _v4_on_disk_state(set_path, raw)
+            prior = state.pop("preCancelStatus", None)
+            if prior not in _RESTORABLE_STATUSES:
+                prior = _derive_pre_cancel_status(
+                    normalize_to_v4_shape(raw, set_path / "spec.md")
+                )
+            state["status"] = prior
+            try:
+                _validate_and_write_state(set_path, state)
+            except SessionStateInvariantError as exc:
+                print(f"restore: refused -- {exc}", file=sys.stderr)
+                return EXIT_GATE_FAILED
+            restored_status = prior
+        else:
+            restored_status = _infer_status_from_files(set_path)
+
+        try:
+            cancelled_path.unlink()
+        except OSError:
+            pass
+        print(json.dumps({
+            "status": restored_status,
+            "sessionSetName": set_path.name,
+        }))
+        return EXIT_OK
+    finally:
+        release_lock(lock)
+
+
 # --- CLI --------------------------------------------------------------------
 
 def main(argv=None) -> int:
@@ -899,9 +1129,26 @@ def main(argv=None) -> int:
                          help="bypass bookkeeping gates, never evidence; "
                               "stamps forceClosed")
 
+    p_cancel = sub.add_parser("cancel", help="cancel a session set")
+    p_cancel.add_argument("set_dir",
+                          help="directory, slug, or bare set number")
+    p_cancel.add_argument("--reason", required=True,
+                          help="recorded in CANCELLED.md")
+    p_cancel.add_argument("--force", action="store_true",
+                          help="cancel even with a session in flight")
+
+    p_restore = sub.add_parser(
+        "restore", help="restore a cancelled session set"
+    )
+    p_restore.add_argument("set_dir",
+                           help="directory, slug, or bare set number")
+    p_restore.add_argument("--reason", default="",
+                           help="recorded in RESTORED.md")
+
     args = parser.parse_args(argv)
+    target = getattr(args, "session_set_dir", None) or args.set_dir
     try:
-        set_dir = resolve_session_set_dir(args.session_set_dir)
+        set_dir = resolve_session_set_dir(target)
     except (SetNotFoundError, SetCollisionError) as exc:
         print(f"session: {exc}", file=sys.stderr)
         return EXIT_USAGE
@@ -913,6 +1160,10 @@ def main(argv=None) -> int:
             session_number=args.session_number,
             total_sessions=args.total_sessions,
         )
+    if args.command == "cancel":
+        return cancel(set_dir, reason=args.reason, force=args.force)
+    if args.command == "restore":
+        return restore(set_dir, reason=args.reason)
     return close(set_dir, dry_run=args.dry_run, forced=args.force)
 
 

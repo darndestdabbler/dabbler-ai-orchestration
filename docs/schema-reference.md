@@ -89,9 +89,14 @@ Machine-written step log. Shape:
   enforces the closed status vocabulary `pending` / `in-progress` /
   `complete` / `blocked`; drifted synonyms are read-tolerated.
 - `stepKey` is a slug derived from the step's first clause; a logged
-  entry whose `stepKey` matches a planned row claims that row (latest
-  entry wins), unclaimed logged steps append, unclaimed planned rows
-  stay pending. Nothing is dropped either way.
+  entry claims a planned row by exact `stepKey` match, or failing that
+  by `stepNumber` (latest entry wins). Unclaimed logged steps append,
+  unclaimed planned rows stay pending. Nothing is dropped either way.
+  `session start` prints the seeded keys and numbers so the logger
+  never has to re-derive the slug.
+- Session start also logs the `register` plan step complete itself —
+  registration is the fact the start call established, not something
+  the engine reports afterward.
 
 ## change-log.md
 

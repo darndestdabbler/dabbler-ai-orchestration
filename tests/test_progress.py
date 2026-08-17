@@ -257,7 +257,39 @@ class TestProjectionSteps:
         # Logged step claimed the planned register row.
         assert steps[0]["status"] == "complete"
         assert steps[0]["isPlanned"]
+        assert steps[0]["startedAt"] == "t2"  # the logged time, not the seed
         # The next planned row derives active (in-flight, nothing answers).
         assert steps[1]["isActive"]
         assert steps[1]["box"] == "[~]"
         assert steps[1]["status"] == "pending"  # the record is never edited
+        assert steps[1]["startedAt"] is None  # unstarted rows show no time
+
+    def test_paraphrased_key_claims_planned_row_by_number(self, tmp_path):
+        (tmp_path / "session-state.json").write_text(json.dumps({
+            "schemaVersion": 4, "sessionSetName": tmp_path.name,
+            "status": "in-progress",
+            "sessions": [{"number": 1, "title": "One",
+                          "status": "in-progress"}],
+        }), encoding="utf-8")
+        (tmp_path / "activity-log.json").write_text(json.dumps({
+            "sessionSetName": tmp_path.name, "entries": [
+                {"sessionNumber": 1, "stepNumber": 1, "stepKey": "register",
+                 "dateTime": "t", "description": "Register.",
+                 "status": "pending", "kind": "plan-step"},
+                {"sessionNumber": 1, "stepNumber": 2,
+                 "stepKey": "choose-the-schema-validation-tool-it",
+                 "dateTime": "t", "description": "Choose the tool.",
+                 "status": "pending", "kind": "plan-step"},
+                {"sessionNumber": 1, "stepNumber": 2,
+                 "stepKey": "choose-the-schema-validation-tool",
+                 "dateTime": "t2", "description": "Chose jsonschema.",
+                 "status": "complete"},
+            ],
+        }), encoding="utf-8")
+        p = build_projection(tmp_path)
+        steps = p["sessions"][0]["steps"]
+        # The paraphrased key misses, but the stepNumber claims the row.
+        assert len(steps) == 2
+        assert steps[1]["status"] == "complete"
+        assert steps[1]["isPlanned"]
+        assert steps[1]["description"] == "Chose jsonschema."

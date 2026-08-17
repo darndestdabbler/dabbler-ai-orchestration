@@ -34,7 +34,9 @@ from .progress import (
     STATUS_IN_PROGRESS,
     STATUS_NOT_STARTED,
     canonicalize_status,
+    is_logged_step,
     normalize_to_v4_shape,
+    read_activity_log,
     read_raw_session_state,
 )
 # Re-exported so the public surface stays importable from ai_router.session
@@ -412,10 +414,40 @@ def start(
             set_path, requested,
             total_sessions=len(state.get("sessions") or []),
         )
+
+        log = read_activity_log(set_path) or {}
+        mine = [
+            e for e in log.get("entries", [])
+            if isinstance(e, dict) and e.get("sessionNumber") == requested
+        ]
+        plan_rows = [e for e in mine if e.get("kind") == "plan-step"]
+        logged_keys = {e.get("stepKey") for e in mine if is_logged_step(e)}
+        # This call IS the register step; the machine records what it did
+        # rather than asking the engine to report it (and pick a key).
+        reg = next(
+            (r for r in plan_rows if r.get("stepKey") == "register"), None
+        )
+        if reg is not None and "register" not in logged_keys:
+            log_step(
+                set_path, requested, "register",
+                f"Registered session {requested} ({engine}).", "complete",
+                step_number=reg.get("stepNumber"),
+            )
+
         print(
             f"start: session {requested} of {set_path.name} registered "
             f"({engine}); {seeded} plan step(s) seeded."
         )
+        if plan_rows:
+            # The engine cannot guess these derived slugs; a step logged
+            # under any other key (and no stepNumber) lands as a NEW row
+            # instead of ticking the planned one.
+            print(
+                "plan steps -- log each with this stepKey (or at least "
+                "its stepNumber) to tick the planned row:"
+            )
+            for r in plan_rows:
+                print(f"  {r.get('stepNumber')}. {r.get('stepKey')}")
         return EXIT_OK
     finally:
         release_lock(lock)

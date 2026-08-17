@@ -542,9 +542,10 @@ def _collapse_by_step_key(entries: list) -> list:
 
 def build_step_rows(set_dir, session_number: int) -> list:
     """Plan rows own position, logged steps own content: a logged step
-    whose stepKey matches a planned row claims it; unclaimed logged steps
-    append; unclaimed planned rows stay as pending rows with the spec's
-    words. Nothing is dropped either way."""
+    claims a planned row by exact stepKey, or failing that by stepNumber —
+    keys are derived slugs an engine paraphrases, numbers are the stable
+    address; unclaimed logged steps append; unclaimed planned rows stay
+    as pending rows with the spec's words. Nothing is dropped either way."""
     log = read_activity_log(set_dir)
     if log is None:
         return []
@@ -565,11 +566,18 @@ def build_step_rows(set_dir, session_number: int) -> list:
         rows = [dict(e, isPlanned=True) for e in plan]
         claimed = set()
         by_key = {_py_str(r.get("stepKey")): i for i, r in enumerate(rows)}
+        by_num = {
+            r.get("stepNumber"): i for i, r in enumerate(rows)
+            if isinstance(r.get("stepNumber"), int)
+        }
         leftovers = []
         for entry in real:
             key = _py_str(entry.get("stepKey"))
-            slot = by_key.get(key)
-            if key and slot is not None and slot not in claimed:
+            slot = by_key.get(key) if key else None
+            if slot is None or slot in claimed:
+                num = entry.get("stepNumber")
+                slot = by_num.get(num) if isinstance(num, int) else None
+            if slot is not None and slot not in claimed:
                 rows[slot] = dict(entry, isPlanned=True)
                 claimed.add(slot)
             else:
@@ -681,7 +689,12 @@ def build_projection(set_dir) -> dict:
                     "iconKey": step_icon_key(effective),
                     "isPlanned": bool(row.get("isPlanned")),
                     "isActive": bool(row.get("isActive")),
-                    "startedAt": row.get("dateTime"),
+                    # A plan row's dateTime is when the plan was seeded,
+                    # not when the step started; only logged steps carry
+                    # a real start.
+                    "startedAt": (
+                        row.get("dateTime") if is_logged_step(row) else None
+                    ),
                 })
         sessions_out.append(session_out)
 

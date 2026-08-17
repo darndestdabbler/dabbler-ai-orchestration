@@ -224,6 +224,35 @@ class TestWriters:
         assert text.index("First block") < text.index("Second block")
 
 
+class TestStartChecklistHandoff:
+    def _log(self, set_dir):
+        return json.loads(
+            (set_dir / "activity-log.json").read_text(encoding="utf-8")
+        )
+
+    def test_start_ticks_register_and_prints_step_addresses(
+        self, set_dir, capsys
+    ):
+        assert start(set_dir, engine="claude-code",
+                     provider="anthropic") == EXIT_OK
+        out = capsys.readouterr().out
+        # The engine is handed the seeded addresses it must log against.
+        assert "1. register" in out
+        assert "2. build-the-widget" in out
+        # start performed the registration, so start records it.
+        regs = [e for e in self._log(set_dir)["entries"]
+                if e.get("stepKey") == "register" and "kind" not in e]
+        assert len(regs) == 1
+        assert regs[0]["status"] == "complete"
+        assert regs[0]["stepNumber"] == 1
+        # Idempotent resume neither re-seeds nor double-logs.
+        assert start(set_dir, engine="claude-code",
+                     provider="anthropic") == EXIT_OK
+        regs = [e for e in self._log(set_dir)["entries"]
+                if e.get("stepKey") == "register" and "kind" not in e]
+        assert len(regs) == 1
+
+
 class TestBoundaryTriad:
     def _start(self, set_dir, number=None):
         return start(

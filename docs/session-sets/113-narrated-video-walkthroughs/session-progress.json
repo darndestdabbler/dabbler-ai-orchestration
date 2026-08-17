@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-16T18:15:45.283541-04:00",
+  "generatedAt": "2026-08-17T02:49:42.342486-04:00",
   "sessionSetDir": "113-narrated-video-walkthroughs",
   "inputs": {
-    "activity-log.json": "e8c1f48af58dd76f5abc8e4cd603119c40cf7f9ddc3bdec8f8c0d2b6ab52b9aa",
-    "session-state.json": "531082c898a6519f4c9a03e56d19a693c7c6cfe358bea974d5e4f6b1a1d8cba2",
-    "spec.md": "4088678eed35f7ac7ef367cc3801f17c93e0368f78e30fbce9c0783ec9bb536c"
+    "activity-log.json": "cf1f5e96ddaf333796d5a10f4d6025c5e27e317706210b3c3b5177f26f313708",
+    "session-state.json": "c5856922091a368a961d6012e77c984d162ae48f858502189fde8eab4ffd0363",
+    "spec.md": "90d2aaec6416a49d4d3d86cfec1e960ef236fc9eefd77b9c2f57e61de63e7678"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -855,6 +855,122 @@
     },
     {
       "number": 8,
+      "status": "complete",
+      "evidence": "read",
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 8 (copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T19:10:34.285654-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "measure-gdigrab-against-the-session-4",
+          "description": "DONE. gdigrab measured against all seven Session 4 criteria at the full bar: 10/10 clean runs (11 measured, 1 excluded as control-contaminated). C1-C6 MET, C7 UNMET on its mechanism clause only. C1 correlation 0.9989 (decoy -0.0159); C2 detector control 0.705 vs 0.5 bar (Session 4 scored 0.441 and failed it), unguarded leakage 0.2539 proving the weakness is real, guard refuses pre-flight and aborts mid-capture with a clean control; C3 delta 0px incl. resize; C4 anchor 202ms; C5 four named failure kinds; C6 15 attempts, zero leaked processes or stray scripts; C7 no audio track on all 11 recordings (the clause OBS structurally could not meet) but the mechanism is a desktop read.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T19:10:34.336155-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "build-the-long-form-human-driven",
+          "description": "Built scripts/record-long-form.js: detached start/stop/status daemon recording the SHIPPED VS Code window (never the Extension Development Host), observe-only (writes nothing outside its run dir, never touches session-state.json or the orchestrator, never focuses/pins/raises the window), with ai_router.speed_ramp wired as post-processing using --recording so the plan samples the video as well as the record.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T20:11:39.273046-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "prove-the-pointer-is-visible-in",
+          "description": "DONE. s8-pointer-visibility-vscode.json = PASS with the control FAILED. One decisive probe: a cursor-shaped mark 20x26px with its tip anchored at the hotspot, 4.66 pct of the crop; the control changed 0.00000 at five of six probes. Session 7 artifact left unedited at FAIL. Also fixed the stale console note that told operators no backend composites the cursor - it is now backend-conditional.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T20:11:39.276380-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "decide-what-happens-to-the-session",
+          "description": "DONE. Operator waived C7 mechanism clause for gdigrab only (s8-operator-waiver.json, narrow scope asserted by test). OBS gate stays shut at its Session 4 FAIL. Gate is now per-backend and both recorders honour it. 27 unit tests pass including three planted falsifiers on the gate itself.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-16T20:19:08.303698-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "cross-provider-verification",
+          "description": "DONE. Four rounds: discovery (1 Major), supplementary (2 Major), remediation-review (1 rejected fix + new Major), remediation-review (VERIFIED, 4 accepted, 0 findings). All four findings accepted and fixed, none disputed. Verifier gpt-5.5 throughout (anthropic excluded as orchestrator provider).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T01:39:28.017008-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "**Required portion of the full test suite** \u2014 this session drives a rendering surface, so Layer 3 is owed (`L-064-12`).",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        },
+        {
+          "stepNumber": 8,
+          "stepKey": "close-out-mid-set-with-a",
+          "description": "**Close-out**, mid-set, with a `next_orchestrator` handover.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
+      "counts": {
+        "pending": 2,
+        "in-progress": 0,
+        "complete": 6,
+        "blocked": 0,
+        "unknown": 0,
+        "total": 8
+      },
+      "current": [],
+      "remaining": [
+        "required-portion-of-the-full-test",
+        "close-out-mid-set-with-a"
+      ]
+    },
+    {
+      "number": 9,
       "status": "not-started",
       "evidence": "read",
       "steps": [],

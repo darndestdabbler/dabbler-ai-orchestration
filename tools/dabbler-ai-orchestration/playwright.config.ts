@@ -7,6 +7,7 @@ import { defineConfig } from "@playwright/test";
 export default defineConfig({
   testDir: "./src/test/playwright",
   testMatch: /.*\.spec\.ts$/,
+  globalSetup: "./src/test/playwright/globalSetup.ts",
   // Per spec § Session 4: text-only assertions (Option B). The launch
   // itself is the long tail (~30s cold start), so a per-test timeout
   // of 90s gives the test body ~60s after activation.

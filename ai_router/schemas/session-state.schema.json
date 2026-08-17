@@ -42,8 +42,9 @@
       "description": "Opaque passthrough set by close_session --force; preserved across rewrites."
     },
     "preCancelStatus": {
-      "type": "string",
-      "description": "Opaque passthrough captured by cancel_session_set; preserved across rewrites."
+      "type": ["string", "null"],
+      "enum": ["not-started", "in-progress", "complete", "cancelled", null],
+      "description": "The top-level status captured when a set is cancelled; restore returns the set to it (falling back to ledger derivation when absent). Preserved across rewrites; a re-cancel never overwrites it."
     }
   },
   "required": ["schemaVersion", "sessionSetName", "status"],

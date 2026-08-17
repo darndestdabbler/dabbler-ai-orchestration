@@ -1,2 +1,0 @@
-{"event": "round-completed", "sessionNumber": 1, "verificationRound": 1, "phase": "discovery", "source": "verify_session_cli", "verdict": "VERIFIED", "blocking": false, "endedLoop": true, "recordedAt": "2026-08-10T19:34:39.044176-04:00"}
-{"event": "round-completed", "sessionNumber": 1, "verificationRound": 2, "phase": null, "source": "close_session_backstop", "verdict": "VERIFIED", "blocking": false, "endedLoop": true, "recordedAt": "2026-08-10T19:43:11.778138-04:00"}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "rounds.jsonl row (one verification round)",
+  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip.",
+  "type": "object",
+  "required": [
+    "round",
+    "verdict",
+    "blocking",
+    "verifier_model",
+    "verifier_provider",
+    "findings",
+    "completion_tree",
+    "recorded_at"
+  ],
+  "properties": {
+    "round": { "type": "integer", "minimum": 1 },
+    "phase": { "type": "string", "enum": ["full", "fix-delta"] },
+    "verdict": { "type": "string", "enum": ["VERIFIED", "ISSUES_FOUND"] },
+    "blocking": { "type": "boolean" },
+    "verifier_model": { "type": "string", "minLength": 1 },
+    "verifier_provider": { "type": "string", "minLength": 1 },
+    "orchestrator_provider": { "type": "string" },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "severity"],
+        "properties": {
+          "description": { "type": "string", "minLength": 1 },
+          "severity": {
+            "type": "string",
+            "enum": ["critical", "major", "minor"]
+          },
+          "category": { "type": "string" },
+          "failureScenario": { "type": "string" },
+          "evidencePaths": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "blocking": { "type": "boolean" }
+        }
+      }
+    },
+    "cost_usd": { "type": ["number", "null"] },
+    "baseline_tree": { "type": ["string", "null"] },
+    "completion_tree": { "type": "string", "minLength": 7 },
+    "previous_tree": { "type": "string", "minLength": 7 },
+    "recorded_at": { "type": "string", "minLength": 1 },
+    "transport": { "type": "string" }
+  },
+  "if": {
+    "properties": { "round": { "minimum": 2 } }
+  },
+  "then": {
+    "required": ["previous_tree"]
+  }
+}

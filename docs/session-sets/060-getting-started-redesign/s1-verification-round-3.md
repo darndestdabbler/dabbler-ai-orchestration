@@ -1,9 +1,0 @@
-# ISSUES FOUND
-
-- **Issue** → Step 1 is still not fully live. `structureBuilt` depends on `.venv/.../site-packages/ai_router` existence, but the new watcher only invalidates on engine-file / `project-plan.md` changes. If the engine files land first and `ai_router` lands later—a plausible external-build sequence in Session 1, where the form buttons are still inert—the UI can remain stale until the 30s poll. The Session 2 action-refresh rationale does not resolve this for Session 1.  
-  **Location** → `src/extension.ts` deliberate exclusion of `.venv/**/site-packages/ai_router`; `src/utils/gettingStartedDetection.ts` `routerInstalled()` / `detectCompletion()`  
-  **Fix** → Add a narrow refresh trigger for the router probe input (at least create/delete on `.venv/**/site-packages/ai_router`, ideally scoped to create/delete only), or add an explicit Session 1 refresh at the end of the external structure-build path. Poll-only is not live invalidation.
-
-- **Issue** → Step 3 is still not fully live. `sessionSetsPresent` is defined by bare `docs/session-sets/NNN-*` directory existence, but the host still does not invalidate on numbered-directory create/delete unless `spec.md` materializes. That leaves the form’s step-3 grey/check stale after a valid D3 input change.  
-  **Location** → `src/extension.ts` deliberate exclusion of bare `docs/session-sets/NNN-*` directory events; `src/utils/gettingStartedDetection.ts` `sessionSetsPresent()`  
-  **Fix** → Add create/delete invalidation for `docs/session-sets/*` directory entries (filter numbered dirs in the handler or use a matching glob) so the D3 step-3 dir probe recomputes when its source-of-truth changes.

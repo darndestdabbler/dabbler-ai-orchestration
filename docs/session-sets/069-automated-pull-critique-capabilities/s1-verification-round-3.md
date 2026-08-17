@@ -1,6 +1,0 @@
-## Verdict
-**NOT VERIFIED**
-
-- **Issue →** The F3 schema change itself is complete, but the updated parity documentation is still not fully honest. `pattern: "\\S"` does align with Python’s `bool(value.strip())` for the repo’s actual Python validator path, and it was added everywhere needed. But the markdown’s carve-out — “non-issue for these fields, which are ASCII by construction” — is false for free-text `summary` / `description`, so the spec-level ECMA-262 exotic-whitespace caveat is not actually eliminated by that rationale. The repo also still has stale test docstrings that misdescribe the remaining schema/Python gaps.
-- **Location →** `docs/path-aware-critique-schema.md` parity paragraph; `ai_router/tests/test_path_aware_critique_schema.py` module docstring; `TestEvidenceTierContract` docstring.
-- **Fix →** Reword the markdown to say the `\S` == `.strip()` equivalence is exact for the shipped Python runtime, or narrow the “ASCII by construction” claim to the machine-id/hash/ref fields and explicitly exclude free-text fields. Update the stale test docstrings so they consistently state that the only runtime Python-only semantic gaps are distinct-provider and replay-hash equality.

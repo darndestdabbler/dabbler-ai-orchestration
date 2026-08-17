@@ -1,1 +1,0 @@
-{"suite": "pytest", "command": ".venv/Scripts/python.exe -m pytest ai_router/tests -q -n auto", "outcome": "passed", "surfaceDigest": "754789f8423a8e73f5bf9ca7b4137abbe3bc01e4b85b94215d63ba80aed19842", "recordedAt": "2026-08-17T09:49:17.262041-04:00", "durationSeconds": 894.0}

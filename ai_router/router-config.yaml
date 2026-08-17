@@ -1,26 +1,14 @@
 # ============================================================
-# AI Router Configuration
+# AI Router Configuration (v2)
 # ============================================================
 # All model info, pricing, thresholds, and behavior in one file.
-# API keys are NEVER stored here — use environment variables.
-#
-# This YAML is the single source of truth for every tunable knob.
-# The former router-tuning.json overlay was removed in Session 2 of
-# BATON v2. If you need to change a value, change it here.
-# ============================================================
+# API keys are NEVER stored here — providers name an env var and
+# values resolve through ai_router.secret_resolver at call time.
 
-# --- Metadata ---
-# pricing_reviewed:      ISO date — last time a human verified the
-#                         input/output costs below against provider
-#                         pricing pages.
-# review_frequency_days: Soft threshold. If the YAML is older than
-#                         this, config.py prints a warning at load
-#                         time (does not block execution).
 metadata:
   pricing_reviewed: "2026-08-04"
   review_frequency_days: 30
 
-# --- Provider Configuration ---
 providers:
   anthropic:
     display_label: Anthropic
@@ -34,7 +22,7 @@ providers:
     timeout_seconds: 600
     retry:
       max_retries: 2
-      backoff_base_seconds: 2  # exponential: 2s, 4s
+      backoff_base_seconds: 2
 
   google:
     display_label: Google
@@ -44,13 +32,9 @@ providers:
     rate_limit:
       requests_per_minute: 60
       tokens_per_minute: 100000
-    # Set 109 S3: raised 300 -> 900. Anthropic has always been 600; these two
-    # were half that, and a tier-3 model reasoning at high effort over a large
-    # evidence bundle exceeds 300s routinely. It cost this session two routed
-    # architecture calls and TWO WHOLE VERIFICATION ROUNDS -- 3 attempts x 300s
-    # each, paid for, returning nothing but "The read operation timed out".
-    # That is a mandatory gate the transport could not complete, which makes
-    # this a correctness knob rather than a comfort one.
+    # 900, not 300: a tier-3 model reasoning at high effort over a large
+    # evidence bundle routinely exceeds 300s, and a timeout on a mandatory
+    # verification call is a correctness failure, not a comfort issue.
     timeout_seconds: 900
     retry:
       max_retries: 2
@@ -64,108 +48,30 @@ providers:
     rate_limit:
       requests_per_minute: 60
       tokens_per_minute: 100000
-    timeout_seconds: 900     # Set 109 S3 -- see the note on google above.
+    timeout_seconds: 900
     retry:
       max_retries: 2
       backoff_base_seconds: 2
 
-# --- Transport profile (Set 078) ---
-# Selects HOW every routed call is dispatched, independent of WHICH model is
-# picked. "api" (default) is the existing direct-HTTPS path above — fully
-# unchanged. "copilot-cli" dispatches through the GitHub Copilot CLI's
-# headless mode instead (ai_router/cli_transport.py), for shops whose staff
-# hold only a Copilot seat and no provider API keys. See
-# docs/concepts/tier-model.md and
-# docs/session-sets/078-copilot-cli-hybrid-tier/spec.md for the full
-# seat-profile contract and its explicitly degraded guarantees (asserted
-# provider provenance, no billed-usage accounting).
-#
-# Set 123 S1: this value is now the FALLBACK, not the authority. When the
-# project holds a project-verify-type.txt (DIRECT_API | COPILOT_CLI),
-# ai_router/verify_type.py derives transport.profile from it and the file wins
-# — over this file, and over anything a seat could once set locally. Two
-# mechanisms for one fact is a defect class this repo has hit three times; the
-# file is the one. Set 124 S2 finished the job by retiring
-# local-overrides.yaml's `transport.profile` outright.
-# `python -m ai_router.verify_type` prints which branch answered.
-#
-# Set 125: TRANSPORT PARITY — a routed call CANNOT MUTATE THE WORKSPACE on
-# either profile. On "api" that was always true by construction (providers.py
-# sends no `tools` key, so the provider returns text). On "copilot-cli" it was
-# NOT: the profile dispatches an agentic CLI, and `--allow-all-tools` alone
-# granted the model arbitrary shell plus file create/edit plus sub-agent
-# spawning against the live working tree. On 2026-08-12 routed calls fired
-# from the test suite modified 23 files here with no human in the loop, and a
-# verifier able to edit the code it judges can report VERIFIED on its own
-# edit. cli_transport.py now also passes `--available-tools` with a read-only
-# allowlist (view, grep, glob) on BOTH dispatch paths, so the seat profile
-# gives the same guarantee the api profile always did. This is NOT part of
-# the "explicitly degraded guarantees" above — those cover provenance and
-# billing, never write access.
+# Transport for routine dispatch. Resolution precedence: --transport CLI
+# flag > DABBLER_TRANSPORT env var > this value > default "api". This file
+# is package data, so it carries the profile that works for a fresh install
+# with provider API keys; a Copilot seat sets DABBLER_TRANSPORT=copilot-cli.
 transport:
-  profile: api   # api | copilot-cli — derived from project-verify-type.txt when present
-  # This is PACKAGE DATA (pyproject.toml ships this file), so it must carry the
-  # profile that works for a fresh install with provider API keys.
-  #
-  # Set 124 S2: a machine that runs on a Copilot seat no longer sets a profile
-  # in ai_router/local-overrides.yaml — `transport.profile` was RETIRED as a
-  # local override, because once project-verify-type.txt became gitignored
-  # machine/project state the two files answered the same question in the same
-  # scope. A stale key there is refused at config load with the replacement
-  # named. The one way to say it is now:
-  #
-  #     python -m ai_router.verify_type --set COPILOT_CLI
-  #
-  # Set 110 S4 learned the underlying rule the hard way: a seat-local
-  # `copilot-cli` was edited into this file and committed, which would have made
-  # the router fail to load for every API-key-only consumer of the wheel. That
-  # rule still holds — the seat's answer just has a better home than this file
-  # or local-overrides.yaml.
+  profile: api
 
-# The copilot-cli profile's own settings. Only read/validated when
-# transport.profile == copilot-cli; otherwise inert. Roles are late-bound
-# aliases resolved against the seat-local catalog lockfile at
-# transports.copilot-cli.lockfile — the same role config resolves to
-# different concrete models on different seats (the lock is model-truth;
-# this config is intent). See s1-design-adjudication.md Sections 1-2 for the
-# resolution algorithm and the lockfile schema.
+# The copilot-cli transport's own settings; inert unless that transport is
+# selected. Roles are late-bound aliases resolved against the seat-local
+# catalog lockfile (the lock is model-truth; this config is intent).
 transports:
   copilot-cli:
-    kind: cli_subprocess
     binary: copilot
-    lockfile: ai_router/copilot-catalog.lock
-    require_pinned_version: true       # asserts --no-auto-update on every call
-    billed_usage_unavailable: true      # honest non-accounting; see guard-exclusion list below
-    max_invocations_per_session: 200    # hard circuit breaker, not a budget (design lock Section 5)
-    # Set 086 S2: togglable transport diagnostics. When enabled, every FAILED
-    # copilot-cli dispatch on the route()/verify() path appends one structured
-    # record (error_class, exit_code, argv with the -p prompt redacted,
-    # auth-reprobe result, stderr tail) to log_path, so a dispatch failure is
-    # never swallowed. Default off (no file writes). The env var
-    # DABBLER_COPILOT_DIAGNOSTICS (truthy/falsy) overrides this both ways;
-    # DABBLER_COPILOT_DIAGNOSTICS_LOG overrides log_path. A compact one-line
-    # summary is embedded in the raised error regardless of this toggle.
-    diagnostics:
-      enabled: false
-      log_path: ai_router/copilot-transport-diagnostics.jsonl
-    # Set 111 S1: the three dispatch ceilings, previously hardcoded in
-    # cli_transport.py with no config or env path. Constraint (design lock
-    # Section 3, now enforced at load): spawn < first_byte < total.
-    #
-    # total_seconds was 300 and is a CORRECTNESS knob, not a comfort one --
-    # the same call Set 109 S3 made when it raised providers.google from 300
-    # to 900. A session-verification round is MANDATORY and its evidence
-    # bundle is the largest prompt this system ever sends (a full working-tree
-    # diff; ~116 KB in the Set 111 S1 session that found this). Through the
-    # Copilot CLI that dispatch goes over the Set 104 file-handoff path, and
-    # the verifier must read the whole file before it emits its first
-    # enumeration -- which does not fit in 300s. The observed failure was two
-    # consecutive `error_class='total-timeout'` dispatches with NOTHING
-    # written, i.e. a mandatory gate the transport could not complete, while a
-    # trivial prompt through the same CLI returned in 13s. 1200 is 4x the old
-    # ceiling and 1.33x the highest existing api timeout; the discovery phase
-    # deliberately asks for the largest answer the loop ever requests, so the
-    # margin is the point. Lower it if your bundles are small.
+    lockfile: copilot-catalog.lock   # relative to this file's directory
+    billed_usage_unavailable: true    # honest non-accounting; seat spend is measured by ai_router.seat_cost
+    max_invocations_per_session: 200  # per-process hard circuit breaker, not a budget
+    # Dispatch ceilings; must satisfy spawn < first_byte < total. total is a
+    # correctness knob: a session-verification evidence bundle is the
+    # largest prompt this system sends and does not fit in 300s.
     timeouts:
       spawn_seconds: 10
       first_byte_seconds: 30
@@ -177,108 +83,17 @@ transports:
       verifier:
         prefer: [gpt-5.4, gemini-3.1-pro-preview, claude-sonnet-4.6]
         require_provider_in: [anthropic, openai, google]
-    constraints:
-      cross_role_provider_diversity:
-        distinct_provider: [generator, verifier]   # verifier family MUST differ from generator
-        on_violation: fail_closed
 
 # --- Model Registry ---
-# Each model has a tier (1=cheap/fast, 2=balanced, 3=powerful/expensive),
-# pricing, context limits, and a reference to its prompt template.
-#
-# Two eligibility flags control where a model can be used:
-#   is_enabled               — included in the generator pool at all.
-#                              Default: true (omit to accept default).
-#   is_enabled_as_verifier   — trusted to verify other models' output.
-#                              Default: true. Set to false when adding
-#                              a new model so it can be evaluated as a
-#                              generator first; promote by flipping to
-#                              true once calibration data supports it.
-# The two flags exist so adding a cheap new model does not silently
-# enroll it in verifier duty. See docs/planning/project-guidance.md
-# (workflow-expectations) for the promotion criterion.
-#
-# Set 109 S1 — every model_id below is checkable against what the provider
-# actually offers:
-#
-#     python -m ai_router.model_inventory --refresh   # probe + write the lock
-#     python -m ai_router.model_inventory --check     # compare, fail loud
-#
-# The snapshot lives in ai_router/model-inventory.lock. `--check` reads only
-# local files, so it adds no session-start latency and is safe in CI.
-# Set 109 S4 corrected the registry, `--check` now PASSES — all 15 model_ids
-# are offered by their provider — and the check is WIRED into
-# `ai_router/scripts/drift_guard.py`, which CI runs. So a commit that
-# reintroduces an id no provider offers goes red without anyone remembering to
-# look. It stayed unwired until S4 only because the repo could not have gone
-# green; that reason expired, and its own verification round pointed out that
-# a gate nothing invokes catches nothing.
-#
-# Set 109 S3 — HOW RATES ARE DECLARED.
-#
-# An entry states its rates ONE of two ways, never both (`ai_router/pricing.py`
-# rejects an entry that tries, because two declarations on one entry can drift
-# apart silently — which is the exact defect this set exists to end):
-#
-#   1. FLAT — two scalars. Right for a single-rate model, which is most of
-#      them. Nothing about this changed.
-#
-#        input_cost_per_1m: 0.75
-#        output_cost_per_1m: 4.50
-#
-#   2. `pricing:` — a list of rate rows, for a model whose real billing is
-#      context-tiered, effective-dated, or both. Two optional keys per row:
-#
-#        max_input_tokens: N   the row applies when input_tokens <= N.
-#                              Exactly one row per period omits it, and that
-#                              row prices everything above the largest bound.
-#        effective_from: DATE  the first day the row applies. Rows sharing a
-#                              date form one period; rows with no date are the
-#                              base period. A future date is invisible until
-#                              its day, which is the point of recording it
-#                              early.
-#
-#      Gemini 2.5 Pro, as Google publishes it:
-#
-#        pricing:
-#          - max_input_tokens: 200000
-#            input_cost_per_1m: 1.25
-#            output_cost_per_1m: 10.00
-#          - input_cost_per_1m: 2.50
-#            output_cost_per_1m: 15.00
-#
-#      Claude Sonnet 5, whose introductory rate lapses on 2026-09-01:
-#
-#        pricing:
-#          - input_cost_per_1m: 2.00
-#            output_cost_per_1m: 10.00
-#          - effective_from: "2026-09-01"
-#            input_cost_per_1m: 3.00
-#            output_cost_per_1m: 15.00
-#
-# Per-call cost resolves the row from the call's own input_tokens and today's
-# date. The model-SELECTION paths (verifier tiebreak, escalation fallback) rank
-# models by the WORST declared output rate instead: they choose before the
-# output length or a future billing date is known, and a candidate that looks
-# cheaper than it can bill is how a "cheapest" choice becomes the expensive one.
-#
-# `confirmed_on: "YYYY-MM-DD"` records the day a HUMAN last confirmed that
-# entry's rates against the provider's published page. Its ABSENCE is honest
-# and is the state of every entry below: nothing here has been confirmed under
-# this regime yet, and Set 109 S4 is the session that confirms them.
-#
-# Set 119 S3 deleted `pricing_proposal`, the CLI that used to propose rates
-# from the providers' published pages and apply the ones a human accepted:
-# nothing in the package imported it, and on a Copilot seat every routed call
-# records `billed_usage_unavailable: true` with `cost_usd: 0.0`, so the cost
-# surface it fed could not be populated at all. Confirming a rate is now the
-# manual step it always ended in -- read the provider's published page, edit
-# the entry, and stamp `confirmed_on` with the date you read it.
-#
-# No rate below was edited by Session 3, deliberately. This set's own rule is
-# that a human confirms every rate change, and the flow that makes that
-# possible only exists as of this session — so correcting the rates is S4's
-# job, walked through the confirmation flow rather than hand-typed.
+# tier: 1=cheap/fast, 2=balanced, 3=powerful/expensive.
+# is_enabled: in the routed generator pool at all (identity-only entries
+#   set false — they exist so orchestrator identity can resolve).
+# is_enabled_as_verifier: trusted to verify other models' output.
+# Rates are declared ONE way per entry: flat scalars, or a `pricing:` list
+# of context-tiered / effective-dated rows (see ai_router/pricing.py).
+# confirmed_on records the day a human last checked the entry's rates
+# against the provider's published page; absence is the honest unchecked
+# state.
 models:
   gemini-flash:
     provider: google
@@ -291,16 +106,11 @@ models:
     max_context_tokens: 1048576
     max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Best for simple analysis, formatting, boilerplate generation"
-    # Default API parameters sent with every call. Can be overridden
-    # per-task-type under task_type_params below.
-    # For Gemini 2.5 models: thinking_budget is an integer cap on
-    # thinking tokens. -1 = dynamic, 0 = off, positive = hard cap.
-    # For Gemini 3.x models: use thinking_level (MINIMAL|LOW|MEDIUM|HIGH).
+    notes: "Best for simple analysis, formatting, boilerplate generation."
     generation_params:
-      thinking_budget: 0          # Flash tier: thinking off by default
-
+      thinking_budget: 0
     confirmed_on: '2026-08-04'
+
   gemini-pro:
     provider: google
     model_id: gemini-2.5-pro
@@ -310,10 +120,9 @@ models:
     max_context_tokens: 1048576
     max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Good for medium-complexity analysis, documentation, code review. Set 109 S4 RE-CHECKED this pin and PROPOSES LEAVING IT (operator's call, deliberately not taken here). The question was whether to move the tier-2 assignment to Gemini 3.x now that it exists. Three reasons not to, on today's confirmed numbers: (1) 3.1 Pro costs MORE, not less -- $2.00/$12.00 against this entry's $1.25/$10.00 at the same <=200k tier, so the swap is a ~60% input-cost rise on the busiest routed slot in the registry (366 ledger rows); (2) the only 3.x entry available is `gemini-3.1-pro-preview`, a PREVIEW id that the provider may change at GA, and this alias is the tier-2 assignment AND an enabled verifier -- the two roles a preview id is least suited to; (3) the registry's own convention is that a new model is calibrated as a generator before it is trusted to verify, and `gemini-3-1-pro` still carries is_enabled_as_verifier: false for exactly that reason. Nothing about 2.5 Pro is wrong -- its rate is confirmed and its >200k tier is now representable, which is what this session fixed. Switch it when 3.x reaches a GA id and has verifier calibration behind it, not because it is newer."
+    notes: "Medium-complexity analysis, documentation, code review."
     generation_params:
-      thinking_budget: -1         # dynamic; Gemini picks how deep to think
-
+      thinking_budget: -1
     pricing:
       - input_cost_per_1m: 1.25
         output_cost_per_1m: 10.0
@@ -321,21 +130,20 @@ models:
       - input_cost_per_1m: 2.5
         output_cost_per_1m: 15.0
     confirmed_on: '2026-08-04'
+
   gemini-3-1-pro:
     provider: google
     model_id: gemini-3.1-pro-preview
     tier: 2
     is_enabled: true
-    is_enabled_as_verifier: false   # new model: generator + explicit-call only until calibrated (registry convention, lines 120-130); promote later
+    # New model: generator + explicit-call only until calibrated.
+    is_enabled_as_verifier: false
     max_context_tokens: 1048576
     max_output_tokens: 65536
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier Google Pro (preview id gemini-3.1-pro-preview). Cross-provider verifier + consensus engine. PLACEHOLDER pricing/limits mirror gemini-2.5-pro — confirm against Google's published 3.1 Pro rates before trusting cost reports; the preview model_id may change at GA."
-    # Gemini 3.x uses thinking_level (MINIMAL|LOW|MEDIUM|HIGH), not the
-    # 2.5-era integer thinking_budget.
+    notes: "Frontier Google Pro (preview id; may change at GA)."
     generation_params:
       thinking_level: HIGH
-
     pricing:
       - input_cost_per_1m: 2.0
         output_cost_per_1m: 12.0
@@ -343,6 +151,7 @@ models:
       - input_cost_per_1m: 4.0
         output_cost_per_1m: 18.0
     confirmed_on: '2026-08-04'
+
   sonnet:
     provider: anthropic
     model_id: claude-sonnet-5
@@ -352,20 +161,12 @@ models:
     max_context_tokens: 200000
     max_output_tokens: 16000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Use when Anthropic quality needed but Opus overkill. Set 109 S4: RE-POINTED from claude-sonnet-4-6. Sonnet 5 is newer AND currently cheaper -- $2.00/$10.00 against 4.6's $3.00/$15.00 -- so staying on 4.6 was paying more for the older model. The introductory rate lapses on 2026-08-31, which is why this entry carries a dated pricing: schedule rather than two scalars: on 2026-09-01 it becomes $3.00/$15.00, exactly what 4.6 costs, and nothing has to be edited for the cost record to stay true. max_context_tokens / max_output_tokens are UNCHANGED and unconfirmed -- this session confirmed rates, not limits."
-    # effort is set explicitly rather than left unset. The reason recorded
-    # when this alias served Sonnet 4.6 was that an unset effort defaulted to
-    # high internally and burned tokens on every call; whether Sonnet 5
-    # behaves the same way was NOT confirmed by Set 109 S4, which confirmed
-    # rates and not model behaviour. Stating it explicitly is correct either
-    # way. Adaptive thinking is opt-in; when disabled, the model responds
-    # without thinking blocks (fastest, cheapest).
+    notes: "Anthropic quality without Opus cost. Introductory rate lapses 2026-09-01; the dated pricing row keeps the cost record true with no edit."
     generation_params:
-      effort: medium              # low|medium|high|xhigh
+      effort: medium
       thinking:
-        enabled: false            # set true to send thinking:{type:adaptive}
+        enabled: false
         type: adaptive
-
     pricing:
       - input_cost_per_1m: 2.0
         output_cost_per_1m: 10.0
@@ -373,6 +174,7 @@ models:
         output_cost_per_1m: 15.0
         effective_from: '2026-09-01'
     confirmed_on: '2026-08-04'
+
   opus:
     provider: anthropic
     model_id: claude-opus-5
@@ -384,43 +186,29 @@ models:
     max_context_tokens: 200000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Reserved for complex architectural reasoning. Set 109 S4: RE-POINTED from claude-opus-4-8. Opus 5 bills the SAME $5.00/$25.00 as 4.8, so this is a newer model at no extra cost -- the rate is unchanged and was confirmed against Anthropic's published page, not merely carried over. max_context_tokens / max_output_tokens are UNCHANGED and unconfirmed."
-    # Opus is only invoked for tier-3 tasks (architecture, security review,
-    # session verification). Adaptive thinking is on by default because
-    # those tasks benefit from deep reasoning. Override per task type below
-    # if a specific tier-3 task should skip thinking.
+    notes: "Reserved for complex architectural reasoning."
     generation_params:
-      effort: high                # architecture-class work gets high effort
+      effort: high
       thinking:
         enabled: true
         type: adaptive
-    # NOTE: model_id is claude-opus-5 as of Set 109 S4. The previous note here
-    # described claude-opus-4-8 and its task_budget (beta) support; it was
-    # left behind by the re-point and is removed rather than carried over,
-    # because nothing in this session confirmed what Opus 5 supports and a
-    # claim inherited from a superseded entry reads as current (L-064-8).
-    # max_output_tokens stays at 32000 for cost control on tier-3 calls.
-
     confirmed_on: '2026-08-04'
+
   fable:
     provider: anthropic
     model_id: claude-fable-5
-    tier: 3
-    is_enabled: false               # Registered and priced, not routed. At $10.00/$50.00 it is twice Opus 5 on input and twice on output, and nothing in this repo has established what that buys. Turning it on is an operator decision with a cost attached, not a default.
+    # Registered and priced, not routed: at 2x Opus on both axes, enabling
+    # it is an operator decision with a cost attached, not a default.
+    is_enabled: false
     is_enabled_as_verifier: false
     max_context_tokens: 200000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Claude Fable 5. Set 109 S4 added it: the registry had NO entry at all (grep count 0), so a Fable-5 orchestrator could not even record its own identity, and its price was nowhere on file. Present now, priced from Anthropic's published page, and deliberately disabled. max_context_tokens / max_output_tokens are UNCONFIRMED -- this session confirmed rates, not limits."
-
-  # --- OpenAI GPT-5.x family -----------------------------------------------
-  # Added as verification models initially. Used by the cross-provider map
-  # to independently review work from Anthropic and Google models. Once you
-  # have data on how well they verify, consider promoting them to generator
-  # slots in tier_assignments.
+    notes: "Claude Fable 5. Present so a Fable-5 orchestrator can record its identity and its price is on file."
     input_cost_per_1m: 10.0
     output_cost_per_1m: 50.0
     confirmed_on: '2026-08-04'
+
   gpt-5-4:
     provider: openai
     model_id: gpt-5.4
@@ -432,89 +220,64 @@ models:
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model. Used to verify Opus output (cross-provider) and as a cheaper frontier alternative for session verification of implementation-heavy work. Opus-class quality at ~60% of Opus cost."
+    notes: "Frontier OpenAI model; cross-provider verifier for Anthropic/Google output."
     generation_params:
       reasoning_effort: high
-    # NOTE: Prompts over 272K input tokens trigger 2x input + 1.5x output
-    # pricing for the full session. The router caps input at 80% of
-    # max_context_tokens, which keeps you under that ceiling by default.
-
     confirmed_on: '2026-08-04'
+
   gpt-5-5:
     provider: openai
     model_id: gpt-5.5
     tier: 3
     is_enabled: true
-    is_enabled_as_verifier: true    # Set 090 follow-up: PROMOTED to verifier (repinned session-verification below) to cut gpt-5-4's false positives on small meta-work sets. Deliberately overrides the calibrate-as-generator-first convention, on the operator's call. (Newer sibling frontier model: gpt-5-6 "Sol".)
+    is_enabled_as_verifier: true
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier + consensus engine. PLACEHOLDER pricing/limits mirror gpt-5.4 — confirm against OpenAI's published GPT-5.5 rates before trusting cost reports."
+    notes: "Frontier OpenAI model (GPT-5.5). Cross-provider verifier + consensus engine."
     generation_params:
       reasoning_effort: high
-
-  # --- The GPT-5.6 family, split (Set 109 S4) -------------------------------
-  # There used to be ONE entry here, `gpt-5-6`, sending `model_id: gpt-5.6`.
-  # OpenAI does not list that id. It served the request from `gpt-5.6-sol` at
-  # $5.00/$30.00 while this file recorded $2.50/$15.00, so every cost this repo
-  # reported for it was exactly half the truth, for 245 calls and ~$49. The
-  # alias is RETIRED rather than corrected: three explicit entries mean the
-  # variant is a deliberate choice at every call site, and `model_inventory
-  # --check` now fails loud on any id a provider does not offer, so the class
-  # cannot silently reopen. Rates below were taken from OpenAI's published
-  # page under the Set 109 confirmation flow (`pricing_proposal --apply`,
-  # since deleted in Set 119 S3), never hand-typed.
     input_cost_per_1m: 5.0
     output_cost_per_1m: 30.0
     confirmed_on: '2026-08-04'
+
   gpt-5-6-sol:
     provider: openai
     model_id: gpt-5.6-sol
     tier: 3
     is_enabled: true
-    is_enabled_as_verifier: true    # PINNED as the session-verification verifier (operator, 2026-07-10) — the newest frontier model, to minimize the false-positive Majors gpt-5-4 produced on small meta-work sets. Set 109 S4: the pin now names this id explicitly; it is what the bare alias was silently reaching all along, so the verifier is UNCHANGED in behaviour and only honest about its price.
+    # Pinned session-verification verifier: a verifier's job is to be right
+    # about whether work ships — the wrong place to economise.
+    is_enabled_as_verifier: true
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Frontier OpenAI model GPT-5.6 'Sol' — the most capable and most expensive of the three 5.6 variants. Deliberately kept on the adjudicating verification calls: a verifier's job is to be right about whether work ships, and that is the wrong place to economise. The cheap variant goes on the discovery fan-out instead (see gpt-5-6-luna)."
+    notes: "GPT-5.6 'Sol' — the most capable of the 5.6 variants."
     generation_params:
       reasoning_effort: high
-
     input_cost_per_1m: 5.0
     output_cost_per_1m: 30.0
     confirmed_on: '2026-08-04'
+
   gpt-5-6-luna:
     provider: openai
     model_id: gpt-5.6-luna
     tier: 3
     is_enabled: true
-    is_enabled_as_verifier: false   # NOT a general verifier. Enabled so the discovery fan-out can prefer it by name; left out of the verifier pool so it can never win a cheapest-survivor tiebreak for an ADJUDICATING round, where being right matters more than the 25x.
-    max_context_tokens: 272000
-    max_output_tokens: 32000
-    system_prompt_file: prompt-templates/system-prompts.md
-    notes: "GPT-5.6 'Luna' — $0.20/$1.20, one twenty-fifth of Sol. It is the INTENDED occupant of verification.discovery.model (K identical prompts whose value is BREADTH of findings, every one adjudicated downstream by a stronger model), but that pin ships UNSET: Set 109 S4 armed it on price, its own verification round caught that the spec requires evidence of finding QUALITY first, and the pin was withdrawn. See the commented block under verification.discovery for what would arm it. Nothing routes here today. max_context_tokens / max_output_tokens mirror the family and are UNCONFIRMED; this session confirmed rates, not limits."
-    generation_params:
-      reasoning_effort: high
-
-    input_cost_per_1m: 0.2
-    output_cost_per_1m: 1.2
-    confirmed_on: '2026-08-04'
-  gpt-5-6-terra:
-    provider: openai
-    model_id: gpt-5.6-terra
-    tier: 3
-    is_enabled: false               # Registered, not routed. It has no assigned role, and an enabled tier-3 entry with no role is a candidate that can win a cheapest-survivor tiebreak nobody reasoned about.
+    # Not a general verifier: enabled so a discovery fan-out can prefer it
+    # by name, kept out of the verifier pool so it can never win a
+    # cheapest-survivor tiebreak for an adjudicating round.
     is_enabled_as_verifier: false
     max_context_tokens: 272000
     max_output_tokens: 32000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "GPT-5.6 'Terra' — $2.00/$12.00, the middle variant. Recorded so the family is completely enumerated and its price is on the record; nothing routes here today. Enable it deliberately if a mid-priced frontier slot is ever wanted, rather than letting selection discover it by accident."
+    notes: "GPT-5.6 'Luna' — one twenty-fifth of Sol's price; breadth-of-findings work only."
     generation_params:
       reasoning_effort: high
-
-    input_cost_per_1m: 2.0
-    output_cost_per_1m: 12.0
+    input_cost_per_1m: 0.2
+    output_cost_per_1m: 1.2
     confirmed_on: '2026-08-04'
+
   gpt-5-4-mini:
     provider: openai
     model_id: gpt-5.4-mini
@@ -526,335 +289,63 @@ models:
     max_context_tokens: 400000
     max_output_tokens: 16000
     system_prompt_file: prompt-templates/system-prompts.md
-    notes: "Small OpenAI model. Used to verify Gemini Pro output (cross-provider). Cheaper than Sonnet ($3/$15) and Claude Haiku ($1/$5) with a larger context window."
+    notes: "Small OpenAI model; cross-provider verifier for Gemini output."
     generation_params:
       reasoning_effort: medium
-
-  # --- Identity-registry-only entries (Set 084 F1) --------------------------
-  # Orchestrator models that are NOT part of the routed generator/verifier
-  # pool but must resolve in the identity registry so start_session can
-  # validate them and the close gate / verifier exclusion can derive their
-  # effective provider (orchestrator_identity.resolve_model_provider walks
-  # models: keys and model_ids). is_enabled: false keeps them out of every
-  # selection path — pick_model, verifier selection, and escalation all
-  # skip disabled entries. Add a sibling entry here whenever a new
-  # orchestrator model appears that neither the routed pool nor the Copilot
-  # CLI's documented model universe covers.
     confirmed_on: '2026-08-04'
-  claude-sonnet-5:
-    provider: anthropic
-    model_id: claude-sonnet-5
-    is_enabled: false
-    is_enabled_as_verifier: false
-    notes: "Identity registry only: Claude Code orchestrator sessions. Set 109 S4: now REDUNDANT — `sonnet` above carries this same model_id, and identity resolution matches on model_id as well as on the key, so an orchestrator recording claude-sonnet-5 resolves through `sonnet` whether or not this entry exists. It is kept rather than deleted because removing a registry key is a change consumer repos could be pinned to, which wants an operator's sanction and not a passing edit; it is flagged for retirement. It carries NO rates on purpose: the 2026-08-04 pricing walk proposed rates for it and they were REJECTED, because a second priced surface for one model is two numbers that can drift apart — the exact defect this set exists to end. The price of claude-sonnet-5 lives on `sonnet`, once."
+
+  # --- Identity-registry-only entries ---
+  # Orchestrator models outside the routed pool that must still resolve in
+  # the registry so identity resolution and the verifier exclusion can
+  # derive their effective provider. is_enabled: false keeps them out of
+  # every selection path, and they deliberately carry no rates — a model's
+  # price lives in this file exactly once, on its routed entry.
   gemini-3-pro:
     provider: google
     model_id: gemini-3-pro-preview
     is_enabled: false
     is_enabled_as_verifier: false
-    notes: "Identity registry only: Gemini Code Assist orchestrator sessions (the Set 084 S2 ai-assignment recommendation). Set 109 S4: model_id CORRECTED from the bare `gemini-3-pro`, which the Gemini API does not list, to `gemini-3-pro-preview`, which it does. S1 offered two remedies — correct the id, or move identity records out of the model registry entirely. The id is corrected here because the second is a real design question (an orchestrator's identity need not be an id the generative API sells) that deserves its own session rather than being decided in passing while closing a gate. The gate now passes on fact, not on exemption."
-  claude-opus-5:
-    provider: anthropic
-    model_id: claude-opus-5
-    is_enabled: false
-    is_enabled_as_verifier: false
-    notes: "Identity registry only: Claude Code orchestrator sessions (Set 106 S1 was the first; recording claude-opus-4-8 would have been a false identity). Set 109 S4: now REDUNDANT for the same reason as claude-sonnet-5 above — `opus` carries this model_id since the re-point. Kept, flagged for retirement, and deliberately unpriced: its rate proposal was REJECTED in the 2026-08-04 walk so that claude-opus-5 has exactly one price in this file."
+    notes: "Identity registry only: Gemini Code Assist orchestrator sessions."
 
-# --- Routing Thresholds ---
-# Complexity score 1-100 mapped to tiers.
 routing:
-  # outsourcing_mode: controls when cross-provider calls are made.
-  # whenever-helpful (default) | verification-only | disabled
-  #
-  # Set 131 S1 restored the default. The 2026-08-05 operator policy pinned
-  # this to verification-only "until Set 111 revisits the routing rules";
-  # Set 111 shipped the decision-rights rubric and never lifted the pin, so
-  # a three-set window silently became twenty sets of policy. Temporary
-  # narrowings now carry the set that OWNS THEIR REMOVAL in the comment,
-  # and Set 131 Session 1 is the set that owned this line.
-  #
-  # This value does NOT widen authority. The decision-rights rubric and the
-  # verification-reduction carve-out are evaluated BEFORE any delegation
-  # rule; see docs/ai-led-session-workflow.md "Delegation Discipline" for
-  # the precedence order, which is a contract rather than a preference.
-  outsourcing_mode: whenever-helpful
-  tier1_max_complexity: 30    # score ≤ 30 → tier 1 (Flash)
-  tier2_max_complexity: 65    # score 31–65 → tier 2 (Pro or Sonnet)
-  default_tier: 2             # fallback when estimation is uncertain
-
-  # Which model to use for each tier
+  tier1_max_complexity: 30    # score <= 30 -> tier 1
+  tier2_max_complexity: 65    # 31-65 -> tier 2
+  default_tier: 2
   tier_assignments:
     1: gemini-flash
     2: gemini-pro
     3: opus
-
-  # Override: force a specific model for specific task types
+  # Preferences, never exclusion overrides: a pin whose provider is
+  # excluded falls through to the cheapest surviving candidate.
   task_type_overrides:
-    # Force Sonnet for code review -- Anthropic models are stronger at
-    # careful line-by-line reasoning and catching subtle issues.
     code-review: sonnet
-    # Force Opus for architecture. Short architecture prompts can score
-    # below the Tier-3 threshold and route to Tier 2 (gemini-pro), which
-    # produced a 100% verifier rejection rate in early metrics — the
-    # task type is always high-stakes regardless of prompt length.
     architecture: opus
-    # UAT checklist generation and its coverage audit are high-stakes
-    # governance gates; route them straight to Tier 3 rather than relying
-    # on heuristic scoring to land there indirectly.
-    uat-plan-generation: opus
-    uat-coverage-review: opus
-    # End-of-session cross-provider verification. Set 084 (F2): this
-    # pin is a PREFERENCE ONLY — it can never override the dynamic
-    # orchestrator exclusion. route(task_type="session-verification")
-    # with session context resolves the session orchestrator's
-    # EFFECTIVE provider (registry lookup on the orchestrator block's
-    # model, via ai_router/orchestrator_identity.py) and excludes it
-    # from selection as a hard constraint; when this pinned model's
-    # provider is excluded, selection falls through to the cheapest
-    # surviving same-tier model from another provider, and an exclusion
-    # that leaves NO candidate is the explicit verification_unavailable
-    # outcome (never a silent same-provider verification). The pre-084
-    # hand-tuned static pin ("swap this value if a different
-    # orchestrator runs sessions") was the incident-3 hole: it
-    # dispatched a Copilot-seat verification to the orchestrator's own
-    # underlying model. Set 090 follow-up: the preferred verifier is now
-    # gpt-5-6 "Sol" (was gpt-5-4, briefly gpt-5-5) — gpt-5-4 produced repeated
-    # false-positive Major findings on small meta-work sets (Sets 088/089/090),
-    # so the newest frontier model is pinned to reduce them. Still a PREFERENCE
-    # ONLY; the dynamic orchestrator exclusion is unchanged, so on a Claude-
-    # orchestrator session gpt-5-6 (openai) survives the anthropic exclusion
-    # and is used.
-    # Set 109 S4: was `gpt-5-6`, an alias OpenAI does not list and which it
-    # served from `gpt-5.6-sol`. The pin now names -sol explicitly. The
-    # verifier this repo has actually been using does not change; only the
-    # price it reports does (it was understated 2x). The DISCOVERY fan-out
-    # deliberately does not use this pin — see verification.discovery.model.
     session-verification: gpt-5-6-sol
-    # Fresh close-out turn. The orchestrator routes a new turn with
-    # task_type=session-close-out after disposition.json reports
-    # status=completed AND verification has terminated. The work is
-    # mechanical: read close-out.md, run `python -m
-    # ai_router.close_session`, summarize the outcome. Sonnet at low
-    # effort is the cheapest model that reliably reads a doc and runs
-    # a script — Tier-1 (Flash) lacks tool-use discipline for the
-    # close-out gate's structured output, and Tier-3 is overkill for
-    # what is essentially a CLI invocation. Auto-verification is
-    # intentionally NOT enabled for this task type — close-out either
-    # succeeds (the gate passed) or the gate's own structured failure
-    # is the verdict; a separate verifier round adds cost without
-    # improving reliability.
     session-close-out: sonnet
-    # Set 030 Session 1: spec-title-extraction is the AI-fallback path
-    # the Session 5 in-extension migrator and the bulk migrator use
-    # when ``### Session K of N: <title>`` regex extraction fails on a
-    # malformed spec.md. The task is mechanical: read spec.md, emit a
-    # JSON array of {number, title} records. Pinned to gemini-flash
-    # because Flash is the cheapest structured-JSON producer in the
-    # pool and short-extract latency matters more than depth here.
-    # NOT auto-routed (operator-driven only — see absence from
-    # delegation.always_route_task_types) and NOT auto-verified
-    # (structured output is its own verdict; a second-opinion round
-    # would burn budget without buying reliability).
-    spec-title-extraction: gemini-flash
 
-# --- Delegation ---
-# Guidance for orchestrators (Claude Code / Codex / Gemini) on which task
-# types must always go through route() rather than being handled directly,
-# and on what it costs to decide either way. The orchestrator reads this
-# block at session start. Canonical prose, including the PRECEDENCE ORDER
-# that makes these keys safe to read in isolation:
-# docs/ai-led-session-workflow.md -> "Delegation Discipline".
-delegation:
-  # Work whose VALUE IS an independent perspective. These are not "expensive
-  # tasks" -- they are tasks where the orchestrator doing them destroys the
-  # thing being bought. Routing is mandatory and the effective provider must
-  # differ from the orchestrator's.
-  #
-  # Set 131 S1: that provider requirement is ENFORCED, for all three, by
-  # route() -- a call carrying session context resolves the orchestrator's
-  # effective provider (registry lookup, ai_router/orchestrator_identity.py)
-  # and excludes it from selection on both transports. The task_type_overrides
-  # pin below is a PREFERENCE only and loses to the exclusion. Before Set 131
-  # the exclusion was derived for session-verification alone, so the
-  # `code-review: sonnet` pin handed an Anthropic orchestrator an Anthropic
-  # reviewer.
-  #
-  # This list is a FLOOR, not a free field. load_config() unions
-  # config.INDEPENDENCE_REQUIRED_TASK_TYPES into whatever the file says, so
-  # deleting an entry here cannot remove the requirement -- an economic edit
-  # may never overrule precedence rule 2. Adding entries is allowed; the
-  # restraint of keeping it to three is deliberate (see the workflow doc).
-  always_route_task_types:
-    - session-verification
-    - code-review
-    - security-review
-
-  # Set 131 S1: the reason codes that replace the old "~50 lines of reasoned
-  # output" threshold. That threshold measured the WRONG END -- emitted
-  # output is not what gets re-billed; RETAINED INPUT is. An orchestrator at
-  # 631K input tokens paid ~33-35 credits per inference; the same
-  # conversation immediately after a compaction, at 54K, paid ~3.6-5.0
-  # (conversation a9f211a7, 2026-08-11, measured).
-  #
-  # The operator's "don't spend more deciding than doing" clause survives
-  # here and ONLY here: classification must be CONSTANT-TIME. Pick a code or
-  # route -- no narrative justification, and no reading files to decide. If
-  # determining which code applies requires opening a file, that IS the
-  # answer: route it. Anything not covered by a code is routed by default.
-  #
-  # The list is a CLOSED ENUM (config._DIRECT_WORK_REASON_CODES): an unknown
-  # code is refused at load, because inventing a code is inventing a new way
-  # to keep work. These are audited in aggregate (which codes fire, how
-  # often), not debated per call. A code that dominates is either a real
-  # pattern or the "I'll just do this directly" trap wearing a label.
-  direct_work_reason_codes:
-    - direct-mechanical            # rename, import, formatting, boilerplate the spec dictates verbatim
-    - direct-current-pass          # completable now, from what is already in context
-    - direct-context-packaging-dominates  # explaining it costs more than doing it (see transport note)
-    - direct-authority-retained    # decision-rights rubric assigns it to the orchestrator or the human
-
-  # Set 131 S1: a routed child's cost is driven by its INFERENCE COUNT, which
-  # is unbounded, not by its rate. Measured over true sub-agent children
-  # (initiator='sub-agent'): gemini-3.1-pro 70.2 credits/child over 17
-  # inferences, sonnet-4.6 39.7 over 18, haiku-4.5 47.1 over 34 -- but
-  # gpt-5.5 721.8 credits/child over 89 inferences, which is more than
-  # twenty orchestrator inferences at a >300K context. An unbounded agentic
-  # child can cost MORE than the orchestrator doing the work, which inverts
-  # the delegation posture exactly where it is most confident.
-  #
-  # A child that would exceed its budget is a task that should have been
-  # SPLIT, not a task that should quietly cost 721 credits. ADVISORY in
-  # Set 131 (this repo measures before it gates) and derived from only 11
-  # child conversations -- a starting point, not a calibration. A set that
-  # REFUSES work on cost grounds is a later one with an operator
-  # attestation behind it.
-  child_budget:
-    max_inferences_per_child: 30
-    warn_at_credits: 100
-
-  # Thresholds differ by transport because the CHILD'S CAPABILITY differs,
-  # not because the money does. On copilot-cli a child holds a read-only
-  # tool allowlist (view, grep, glob) and can explore the repo itself, so
-  # delegating exploration is cheap. On the api transport a child gets NO
-  # tools and the orchestrator must package every byte of context into the
-  # prompt, so context-packaging cost frequently dominates and
-  # direct-context-packaging-dominates is legitimately common.
-  #
-  # One philosophy (quarantine retained context), two thresholds. Keyed on
-  # transport.profile, which is derived from project-verify-type.txt; an
-  # unknown profile key is refused at load rather than silently ignored.
-  thresholds:
-    copilot-cli:
-      route_when_files_exceed: 1
-      route_when_exploration_unbounded: true
-    api:
-      route_when_files_exceed: 3
-      route_when_exploration_unbounded: false
-
-  # decision_consensus: opt-in cross-engine consult for in-session design /
-  # architecture / process decisions. Set 111 S3 re-drew what this IS: it is
-  # TIEBREAK 5 of the decision-rights rubric, not a parallel mechanism with
-  # its own eligibility split. The orchestrator applies the rubric first
-  # (four human-required classes, then tiebreaks 1-4); consensus is what it
-  # reaches for when an AI-decidable question is STILL tied, and tiebreak 6
-  # (an education-mode brief to the operator) is where a split lands.
-  # When enabled, the orchestrator routes an eligible question to the listed
-  # engines in parallel and synthesizes their responses into a single
-  # recommendation. Default is opt-out (enabled: false) - every existing
-  # repo's behavior is unchanged until the operator explicitly flips it on.
-  #
-  # NOT laundering: consensus can never move a decision from human authority
-  # to AI authority. Two engines agreeing that a verification bound should be
-  # lowered does not make it the orchestrator's call - the verification-
-  # reduction carve-out is checked before this block is ever consulted, and
-  # ai_router/decision_journal.py REFUSES to write such a record.
-  #
-  # See docs/ai-led-session-workflow.md "Decision rights - the rubric" for the
-  # authority split and the ordered tiebreaks, and "Decision-time consensus"
-  # for the decision tree, category examples, and the journal format.
-  # Design proposal: docs/planning/delegation-consensus-config.md.
-  decision_consensus:
-    enabled: false
-    # Engines the orchestrator consults in parallel. Each entry is a
-    # "provider:model" reference that must resolve against the
-    # models: table above. Independent of verification.preferred_pairings
-    # — verify and consult are different roles and may want different
-    # pairings.
-    engines:
-      - openai:gpt-5-4
-      - google:gemini-pro
-    # V1 starts narrow: the four highest-convergence "mechanical" question
-    # categories where engines reliably agree. Broader categories
-    # (testing-strategy, api-surface, design, architecture) are V1.5+;
-    # operators can opt in any category at any time by editing this list.
-    #
-    # Set 111 S3: this list is a COST control on tiebreak 5, not an authority
-    # split. A category absent from it is not "human-only" - it is resolved
-    # under tiebreak 6 (education-mode brief) instead of by a paid consult.
-    # Adding a category can never widen AI authority beyond what the rubric
-    # already grants.
-    categories:
-      - refactor-placement
-      - file-layout
-      - scoping
-      - spec-clarification
-    # What the orchestrator does when the engines disagree materially or
-    # the synthesis hinges on information neither engine has. Both branches
-    # are journaled to the per-set decisions.jsonl as well as here.
-    #   ask_user: tiebreak 6 - an education-mode brief to the operator (safe default)
-    #   proceed_with_orchestrator_judgment: orchestrator picks a side (power-user)
-    unresolved_action: ask_user
-    # Per-call structured log line (append-only JSONL, one object per call).
-    # Mirrors router-metrics.jsonl precedent. Set to null to disable.
-    journal_path: ai_router/consensus-decisions.jsonl
-    # Full-payload sibling directory (one file per call: prompt + per-engine
-    # responses + synthesized recommendation). Set to null to disable.
-    # The directory is gitignored by default — see repo-root .gitignore.
-    journal_full_payloads_dir: ai_router/consensus-decisions
-
-# --- Per-Task-Type Generation Parameter Overrides ---
-# Structure: task_type_params.<task_type>.<model_name> = {params to override}
-# These override the model-level generation_params above. Missing entries
-# fall back to model defaults.
 task_type_params:
-  # Cheap, mechanical tasks: no thinking, low effort.
   formatting:
     sonnet: {effort: low, thinking: {enabled: false}}
     opus: {effort: low, thinking: {enabled: false}}
     gemini-flash: {thinking_budget: 0}
-    gemini-pro: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
     gpt-5-4-mini: {reasoning_effort: none}
     gpt-5-4: {reasoning_effort: none}
   summarization:
     sonnet: {effort: low, thinking: {enabled: false}}
     opus: {effort: low, thinking: {enabled: false}}
     gemini-flash: {thinking_budget: 0}
-    gemini-pro: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
     gpt-5-4-mini: {reasoning_effort: none}
     gpt-5-4: {reasoning_effort: low}
   documentation:
     sonnet: {effort: low, thinking: {enabled: false}}
     gemini-pro: {thinking_budget: -1}
     gpt-5-4-mini: {reasoning_effort: low}
-  # Close-out turn. The work is reading a doc and running a CLI;
-  # thinking is unhelpful and just burns tokens.
   session-close-out:
     sonnet: {effort: low, thinking: {enabled: false}}
-    gemini-pro: {thinking_budget: 0}
+    gemini-pro: {thinking_budget: 128}   # Pro rejects 0 ("only works in thinking mode"); 128 is its minimum
     gpt-5-4-mini: {reasoning_effort: none}
-  # Set 030 Session 1: spec-title-extraction is a short structured
-  # extract; thinking off everywhere for speed + cost. Defaults are
-  # provided for every model in the pool so a tier-bump or override
-  # never lands on an un-tuned config.
-  spec-title-extraction:
-    gemini-flash: {thinking_budget: 0}
-    gemini-pro: {thinking_budget: 0}
-    sonnet: {effort: low, thinking: {enabled: false}}
-    opus: {effort: low, thinking: {enabled: false}}
-    gpt-5-4-mini: {reasoning_effort: none}
-    gpt-5-4: {reasoning_effort: none}
-
-  # Medium tasks: adaptive thinking, medium effort.
   test-generation:
     sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
     gemini-pro: {thinking_budget: -1}
@@ -871,9 +362,6 @@ task_type_params:
     sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
     gemini-pro: {thinking_budget: -1}
     gpt-5-4-mini: {reasoning_effort: medium}
-
-  # Heavy tasks: high effort, deep thinking. These are the places
-  # where you actually want the model to spend tokens.
   session-verification:
     sonnet: {effort: high, thinking: {enabled: true, type: adaptive}}
     opus: {effort: high, thinking: {enabled: true, type: adaptive}}
@@ -893,18 +381,6 @@ task_type_params:
     opus: {effort: high, thinking: {enabled: true, type: adaptive}}
     gemini-pro: {thinking_budget: -1}
     gpt-5-4: {reasoning_effort: high}
-  uat-plan-generation:
-    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: high}
-  uat-coverage-review:
-    opus: {effort: high, thinking: {enabled: true, type: adaptive}}
-    gemini-pro: {thinking_budget: -1}
-    gpt-5-4: {reasoning_effort: high}
-
-  # Verification task type used by the internal verify() path. Kept
-  # separate from 'session-verification' so per-task-type overrides
-  # won't bleed across them. Default is medium reasoning for the verifier.
   verification:
     sonnet: {effort: medium, thinking: {enabled: true, type: adaptive}}
     opus: {effort: high, thinking: {enabled: true, type: adaptive}}
@@ -912,53 +388,36 @@ task_type_params:
     gpt-5-4: {reasoning_effort: high}
     gpt-5-4-mini: {reasoning_effort: medium}
 
-# --- Complexity Estimation Weights ---
-# These weights control how the complexity score is calculated.
-# Adjust based on observed results.
-#
-# DELIBERATE NON-GOAL: Do not invest further engineering in tightening
-# this heuristic (e.g., embeddings, ML-based complexity prediction).
-# The current heuristic + 2-try escalation safety net is the intended
-# stopping point. If the score misjudges a task, escalation catches it
-# and the metrics log shows the pattern. Spending effort to save a few
-# pennies on retried calls is a false economy. This decision is
-# ratified in docs/planning/lessons-learned.md under "Heuristics that
-# earn their keep".
+# Deliberate non-goal: do not invest further engineering in tightening this
+# heuristic. The heuristic + escalation safety net is the intended stopping
+# point; if the score misjudges a task, escalation catches it and the
+# metrics log shows the pattern.
 complexity:
   weights:
-    context_length: 0.30      # longer prompts = more complex
-    keyword_signals: 0.35     # content-based signals
-    task_type: 0.20           # some task types are inherently harder
-    explicit_hint: 0.15       # caller can provide a hint (1-100)
-
-  # Context length breakpoints → sub-scores
+    context_length: 0.30
+    keyword_signals: 0.35
+    task_type: 0.20
+    explicit_hint: 0.15
   context_length_scores:
     - {max_chars: 500, score: 10}
     - {max_chars: 2000, score: 25}
     - {max_chars: 5000, score: 45}
     - {max_chars: 10000, score: 65}
     - {max_chars: 999999, score: 85}
-
-  # Task type base scores
   task_type_scores:
     code-review: 40
     documentation: 25
     analysis: 55
     test-generation: 35
     planning: 70
-    uat-plan-generation: 70
-    uat-coverage-review: 70
     formatting: 10
     summarization: 20
     architecture: 80
     security-review: 75
     refactoring: 65
     session-verification: 70
-    session-close-out: 15        # mechanical: read doc + run CLI
-    spec-title-extraction: 20    # short structured-JSON extract from spec.md
+    session-close-out: 15
     general: 50
-
-  # Keywords that push complexity up (+3 each, capped at +15)
   high_complexity_keywords:
     - architect
     - security
@@ -980,8 +439,6 @@ complexity:
     - CSRF
     - token
     - encryption
-
-  # Keywords that push complexity down (-3 each, capped at -15)
   low_complexity_keywords:
     - rename
     - typo
@@ -996,15 +453,14 @@ complexity:
     - log
     - copy
 
-# --- Escalation ---
 escalation:
   enabled: true
-  max_escalations: 2          # tier 1 → 2 → 3, then give up
+  max_escalations: 2          # tier 1 -> 2 -> 3, then give up
   triggers:
     empty_response: true
-    max_tokens_hit: true       # response truncated
-    min_output_tokens: 30      # suspiciously short response
-    refusal_detection: true    # model declined the task
+    max_tokens_hit: true
+    min_output_tokens: 30
+    refusal_detection: true
   refusal_phrases:
     - "i can't help with"
     - "i'm unable to"
@@ -1012,513 +468,44 @@ escalation:
     - "beyond my capabilities"
     - "i don't have enough context"
 
-# --- Verification (IV&V) ---
-# Cross-provider verification: a model from a different provider
-# checks the work of the original model to catch provider-specific
-# blind spots and biases.
-#
-# Verification-surface policy (Set 083 — MANDATORY, reversing the Set 068
-# DEMOTE): per-session cross-provider verification runs on EVERY Full-tier
-# session before close_session. The Set 068 routed-gate SKIP path is retired
-# (operator decision after the 2026-07-06 UAT incident: the gating predicate's
-# verdict was only as honest as the path list the policed actor fed it, and an
-# engine offered a skip affordance will eventually take it). The end-of-set
-# path-aware critique + the S5 contract-test gate remain as additional
-# surfaces, not replacements. The only exception is the operator-declared
-# zero-budget tier (ai_router/budget.yaml, threshold_usd: 0) — never an
-# engine's own call. Historical record of the demote-and-reversal:
-# docs/session-sets/068-cadence-study-and-contract-gate/routed-fate-decision.md;
-# policy: docs/ai-led-session-workflow.md -> "Verification-surface policy".
+# Cross-provider verification. Session 2 wires the loop; the settings here
+# are read by the verifier selection and prompt template resolution.
 verification:
   enabled: true
-
-  # --- Phased verification loop (Set 096) ---
-  # Sizes verify_session's --phase machinery. Values are the Set 096 S1
-  # fan-out experiment's measured recommendation
-  # (docs/session-sets/096-consequence-graded-phased-verification/
-  # s1-fanout-experiment.md): same-model pairwise finding overlap on a
-  # frozen artifact state measured Jaccard 0.13-0.31, so K=2 identical-
-  # bundle discovery calls harvest ~81% (mean) of the observable finding
-  # pool vs ~50% for one call; the third call added one finding (+$0.25)
-  # and the cross-provider call added zero, so provider diversity is a
-  # PREFERENCE knob for the supplementary pass, not a hard rule. Both
-  # values are operator-tunable; verify_session clamps fan_out to [1, 4]
-  # and falls back to these defaults on a malformed value.
-  discovery:
-    # Set 109 S4 — the cheap variant, put where it pays. Discovery is K calls
-    # with IDENTICAL prompts, bought for BREADTH of findings: the Set 096 S1
-    # experiment measured pairwise finding overlap at Jaccard 0.13-0.31, so
-    # the value is a second independent read, not a marginally better single
-    # one. Everything discovery raises is adjudicated downstream by the pinned
-    # session-verification verifier, so a false positive here costs a
-    # paragraph rather than a wrong ship decision. gpt-5.6-luna bills
-    # $0.20/$1.20 against -sol's $5.00/$30.00 — one twenty-fifth — which buys
-    # the fan-out outright at a fraction of what one -sol call used to cost.
-    #
-    # This is a PREFERENCE, not a pin. It is consulted before the
-    # task_type_overrides pin and under the identical guard, so the dynamic
-    # orchestrator-provider exclusion still overrides it, and an alias that is
-    # unknown, disabled, or above max_tier falls through to the pinned
-    # verifier. Deleting this line restores the pre-Set-109 behaviour exactly.
-    #
-    # It deliberately does NOT apply to the supplementary or
-    # remediation-review passes: those adjudicate, and a verifier deciding
-    # whether work ships is the wrong place to economise.
-    #
-    # ---- LEFT UNSET, DELIBERATELY (Set 109 S4) --------------------------
-    # The mechanism ships; the pin does not. The spec's own risk register
-    # says: "Moving the fan-out to a cheaper variant may change finding
-    # quality; that is an empirical question, and the pin should move only
-    # with evidence, not with the price list." S4 armed it on price, its own
-    # verification caught that, and the pin was withdrawn.
-    #
-    # What little evidence exists points the WRONG way. In S4's own rounds,
-    # on the same session's diff:
-    #   - Luna, 2 discovery calls, $0.046 total -> 1 Major.
-    #   - Sol,  1 supplementary call, $0.520    -> 3 further Majors, two of
-    #     them ordinary correctness bugs (a wrong exit code, a cost
-    #     disclosure that overstated) that a discovery pass should catch.
-    # The framings differ -- supplementary is a completeness critic by
-    # design -- so this is a data point and not an experiment. It is not
-    # grounds for arming the pin, and it is the first thing an experiment
-    # should try to overturn.
-    #
-    # To arm it: run both variants over several past sessions' bundles with
-    # KNOWN findings, compare recall and material false negatives, write down
-    # an acceptance threshold BEFORE looking, and set the line below only if
-    # Luna meets it. Uncomment to enable; the code path is shipped, tested,
-    # and inert while this stays commented.
-    #
-    #   model: gpt-5-6-luna
-    fan_out: 2                       # K same-model discovery calls, identical bundles
-    min_output_tokens: 32000         # discovery output-budget FLOOR (spec: "raised
-                                     #   output budget"). Every routed call already runs
-                                     #   at its model's configured max_output_tokens --
-                                     #   the per-model ceiling above, which is bound by
-                                     #   provider limits and is the operator's to raise.
-                                     #   This floor makes an under-budget verifier LOUD:
-                                     #   verify_session warns when a discovery call is
-                                     #   answered by a model whose configured ceiling is
-                                     #   below it (exhaustive enumeration needs headroom;
-                                     #   observed discovery responses run well under 8k
-                                     #   tokens, and a truncated response is already a
-                                     #   fail-closed invalid round, never silent loss).
-    provider_diversity: same-model   # same-model | cross-provider
-                                     # same-model: the supplementary pass decorrelates by
-                                     #   prompt (completeness-critic framing) on the same
-                                     #   verifier pool -- the measured-better harvest.
-                                     # cross-provider: the supplementary pass ALSO excludes
-                                     #   the round-1 verifier's provider, preferring a third
-                                     #   family when one exists (degrades loudly to the base
-                                     #   orchestrator-only exclusion when none survives).
-
-  # --- Per-session routed-verification gate (Set 068 S6) — RETIRED (Set 083),
-  # DELETED (Set 119 S3). The predicate always answered REQUIRED after the
-  # retirement and nothing in the package called it, so the module and this
-  # block's knobs are gone. Per-session cross-provider verification is
-  # mandatory on every Full-tier session; there is no gate to configure.
-
-  # Verifier selection is RULE-BASED, not map-based. A candidate
-  # verifier must be:
-  #   1. From a different provider than the generator.
-  #   2. is_enabled (in the active model pool).
-  #   3. is_enabled_as_verifier (trusted to verify, not just to generate).
-  #   4. Same tier as the generator, or one tier higher.
-  # Among survivors, cheapest output cost wins.
-  #
-  # preferred_pairings below is an OPTIONAL tiebreaker layer — if the
-  # listed pairing survives the rules, it is used; otherwise the rules
-  # decide. This means a model can be swapped or retired by editing the
-  # models: section alone, without hunting through a pairing table.
-  #
-  # Consequence: verifier selection is cost-sensitive at runtime. If a
-  # new model enters the pool at a lower price, the rules may start
-  # preferring it over the listed pairing. The metrics log records the
-  # exact verifier used for every call (router-metrics.jsonl), so the
-  # audit trail remains complete. New models should be added with
-  # is_enabled_as_verifier: false until their reliability is
-  # demonstrated against real generation work.
-  #
-  # The legacy key name cross_provider_map is still accepted by
-  # verification.py for backward compatibility with older branches.
+  # Verifier selection is rule-based: different provider than the
+  # generator, is_enabled, is_enabled_as_verifier, same tier or one higher;
+  # cheapest worst-case output rate wins. preferred_pairings is an optional
+  # tiebreaker layer consulted only when the pairing survives the rules.
   preferred_pairings:
-    # Anthropic ↔ Google
     sonnet: gemini-pro
-    # Google → OpenAI (distributes verifier load across all three providers)
     gemini-flash: gpt-5-4-mini
     gemini-pro: gpt-5-4-mini
-    # Anthropic Opus (expensive) → OpenAI frontier (rules-engine also
-    # lands here on cost; preference just documents the intent)
     opus: gpt-5-4
-    # OpenAI → Anthropic (closes the triangle)
     gpt-5-4-mini: sonnet
     gpt-5-4: opus
-
-  # Which task types are auto-verified when using route().
-  # If a task type is listed here, route() automatically calls verify()
-  # after getting the initial response. No extra code needed.
   auto_verify_task_types:
     - code-review
     - security-review
     - architecture
-    - uat-plan-generation
-    - uat-coverage-review
-    - documentation           # Sonnet verifies Gemini's doc output (uses weekly Sonnet credits)
-    # - test-generation       # uncomment to auto-verify test generation
-    # - analysis              # uncomment to auto-verify general analysis
-
-  # Verification behavior
+    - documentation
   settings:
-    # What the verifier checks for
-    check_categories:
-      - correctness            # factual and logical errors
-      - completeness           # missing items the original should have caught
-      - false_positives        # issues flagged by the original that aren't real
-
-    # If the verifier finds issues, what happens?
-    # Global default — applies to any task type NOT listed in
-    # on_disagreement_by_task_type below.
-    on_disagreement: merge     # "merge" | "flag" | "re-route"
-                                # merge:    combine original + verifier feedback into final output
-                                # flag:     return both responses, let Claude Code decide
-                                # re-route: send to a Tier 3 model as tiebreaker
-
-    # Per-task-type override of on_disagreement.
-    # Merge is sound for task types where generator and verifier outputs
-    # combine naturally (code review: "here are the bugs — here are the
-    # ones the verifier would add"). Merge is NOT sound for task types
-    # where a disagreement signals a logic divergence — synthesizing
-    # two different architectural recommendations into one produces a
-    # hallucinated compromise. For those, flag instead and force the
-    # orchestrator to adjudicate under the Step 7 human-decision
-    # procedure.
+    # The session-verification loop suspends at this bound. The closed
+    # severity vocabulary is the primary control; the cap is the backstop.
+    max_rounds: 3
+    on_disagreement: merge     # merge | flag | re-route
     on_disagreement_by_task_type:
       code-review: merge
       security-review: merge
       test-generation: merge
       documentation: merge
-      formatting: merge
-      summarization: merge
       analysis: flag
       planning: flag
       architecture: flag
       refactoring: flag
-
-    # Tier 3 tiebreaker model (used when on_disagreement = "re-route")
     tiebreaker_model: opus
-
-    # Maximum cost multiplier for verification.
-    # If verification would cost more than this multiplier × original cost,
-    # skip verification for this call.
     max_cost_multiplier: 3.0
-
-    # Verification prompt template
     prompt_template_file: prompt-templates/verification.md
 
-# --- Pull-verifier executor (Set 067) ---
-# Config for the route()-PARALLEL agentic seam in ai_router/pull_verifier.py
-# (pull_route). This is NOT a single-shot routed model: the verifier drives a
-# multi-turn read-only tool loop and the orchestrator answers tool calls with
-# raw ground truth. Distinct from the routing table above on purpose - it owns
-# its own per-provider model pins, the shared per-run caps, and the per-provider
-# generation knobs. The providers: block above is shared (api_key_env /
-# base_url / timeout_seconds); only the call path differs.
-pull_verifier:
-  # Per-provider model pin. Resolved by pull_verifier._resolve_model when the
-  # caller does not pass model=...; falls back to _DEFAULT_MODELS if absent.
-  models:
-    anthropic: claude-sonnet-4-6
-    openai: gpt-5.4
-    google: gemini-2.5-pro
-  # Shared per-run bounds (PullCaps). The loop stops at the first ceiling.
-  # max_output_tokens is deliberately generous: GPT-5.4 reasoning consumes the
-  # output budget, and a too-small ceiling yields empty content (the observed
-  # 9000-is-empty / 24000-is-fine failure mode), so 24000 keeps reasoning +
-  # the tool call + the verdict inside one call across all three providers.
-  caps:
-    max_turns: 14
-    max_output_tokens: 24000
-    token_budget: 300000
-    cost_ceiling_usd: 1.00
-  # Per-provider reasoning knobs (same vocabulary as providers.py /
-  # generation_params). Bounded for Gemini per L-064-1 (no -1 dynamic budget in
-  # a headless loop); medium reasoning for the frontier models keeps the
-  # path-aware critique careful without runaway spend.
-  generation_params:
-    anthropic:
-      effort: medium
-      thinking:
-        enabled: true
-        type: adaptive
-    openai:
-      reasoning_effort: medium
-    google:
-      thinking_budget: 8192
-  # Set 068: the run_test execution cage (run_test_sandbox.RunTestCaps). run_test
-  # is OFFERED to the loop only when a RunTestConfig is built and passed to
-  # pull_route(); these are the cage's per-run bounds. The command surface itself
-  # is bounded by the operator-supplied RunTestConfig (a fixed argv / named map),
-  # NOT by this file - the model can never author a shell string. run_test is a
-  # bounded verification cage, not a CI runner (spec non-goal).
-  run_test:
-    caps:
-      wall_seconds: 120        # hard wall-clock; the process tree is killed on overrun
-      output_byte_cap: 60000   # per-stream byte cap; over-cap output elided to a raw head slice
-  # Set 069 S4: the Podman model-authored-probe cage (podman_sandbox.PodmanCaps).
-  # The run_authored_probe lane is OFFERED to the loop only when a
-  # PodmanLaneConfig is built and passed to pull_route() AND a green Podman spike
-  # + a built image exist; these are the cage's per-probe bounds. wall_seconds is
-  # the LOAD-BEARING bound on a rootless-cgroups-v1 host, where --memory/
-  # --pids-limit/--cpus are ignored (spike finding 1) - it is kept conservative
-  # because the timeout teardown path is ~10s in rootless WSL (spike finding 2).
-  # enforce_resource_caps is omitted -> auto-detect the cgroup version (emit the
-  # resource caps only on cgroup v2, where they are honored); pin it true/false to
-  # override. The container is the security boundary, not these caps.
-  podman:
-    caps:
-      wall_seconds: 30         # hard wall-clock; the timed-out container is force-removed by name
-      output_byte_cap: 60000   # per-stream byte cap (stdout=probe output, stderr=runtime diagnostics)
-      memory: 512m             # cgroup-v2 only (ignored on rootless cgroups-v1)
-      pids_limit: 256          # cgroup-v2 only
-      cpus: "2"                # cgroup-v2 only
-  # Set 072: the verification-only application mode (verification_only_app.py).
-  # COMMENTARY ONLY -- there is NO behavioral knob here and NOTHING reads this
-  # block; it documents the shipped best-guess defaults so an operator sees them
-  # in one place. The mode reuses the pull_verifier caps / models / generation
-  # params above (each cell is a matrix-mode run_dual_surface call, which resolves
-  # its arms through the same executor block). Shipped best-guess matrix defaults:
-  #   - BOTH arms run strong adversarial framing (L-069-2 -- the matrix varies
-  #     PROVIDER, never framing; the framing gate stays on both arms).
-  #   - pull = a RELIABLE default (GPT-5.4); push = Anthropic or GPT.
-  #   - the first external run includes a Gemini-on-pull-under-strong-framing cell
-  #     (the load-bearing datapoint: is "Gemini-quiet-on-pull" a fixed framing
-  #     artifact now that both templates are strong adversarial?).
-  # The LIVE default pull provider in this file is UNCHANGED: the Gemini-pull cell
-  # is an experiment cell, not a default change -- that decision belongs to a later
-  # set on accumulated telemetry (spec non-goal). Cells are passed per-run on the
-  # CLI (`--cell push:anthropic --cell pull:google`), not configured here.
-
-# --- Contract-test / CDC gate (Set 068 S5) ---
-# The deterministic verification FLOOR: a per-set, opt-in contractGate
-# (none|advisory|required) whose close-out gate confirms a set's contract /
-# falsifier tests ran and PASSED in the run_test cage above and cover every
-# probeable defect class, reserving the path-aware critique agent for the
-# non-probeable residual (Experiment A H4: ~95% of seeded defects are probeable).
-# There is NO behavioral flag to flip here - the gate is declared per-set
-# (contract-manifest.json) and produced via `python -m ai_router.contract_gate
-# run`; the floor's execution bounds are the pull_verifier.run_test.caps block
-# above (the gate's producer drives the same cage). This gate is the replacement
-# floor the Set 068 S4 routed-demotion transition guard waited on; S6 wired the
-# blast-radius gating predicate (routed_gate.py, retired in Set 083 and deleted
-# in Set 119 S3) that flipped per-session routed verification to gated. Doc:
-# docs/contract-gate.md; design:
-# docs/session-sets/068-cadence-study-and-contract-gate/contract-gate-design.md.
-
-# --- Metrics ---
-# Controls the append-only metrics log read by report.py (Session 4).
-# Disable if you want to stop collecting. Retention note: log is
-# append-only JSON lines; rotate manually when it gets large.
 metrics:
   enabled: true
   log_filename: router-metrics.jsonl
-
-# --- State Database ---
-state:
-  db_path: router-state.db       # relative to ai_router/
-  log_prompts: false           # if true, stores full prompts (large!)
-  log_responses: true          # store full responses for review
-
-# --- Output ---
-output:
-  # `cost_report_on_exit` lived here with no reader in the package; Set 119 S3
-  # deleted it with the cost_report module it named.
-  verbose: false               # detailed logging of each API call
-
-# --- Authoring-time admission tests (Set 111 S4; shape added by Set 128 S1) ---
-# Checks a spec author runs BEFORE a set starts, so an oversized or
-# mis-shaped session is fixed at authoring rather than discovered at hour
-# three.
-#
-# max_steps_per_session is MEASURED, not asserted. Across the 172 schema-v4
-# sessions in this repo carrying both a parseable spec plan and start/complete
-# timestamps, crossing from 5 declared steps to 6 doubles the median session
-# (42 -> 84 min), triples the p90 (110 -> 386 min), and nearly triples the
-# share running past two hours (10% -> 28%). The operator target is 15-20 min
-# of work per session plus 5-20 min of verification scaled to risk.
-#
-# RE-BASELINED to 7 by Set 128 S1 - the number now COUNTS SOMETHING ELSE, so
-# do not compare it to the old bands. Every session declares four baked-in
-# ceremony steps (Register, then cross-provider verification / required
-# portion of the full test suite / close-out) plus N authored work steps.
-# The measurement above was taken on specs whose declared steps ALREADY
-# ABSORBED that ceremony - Set 127 S1 spent three of its six on it - so a
-# historical "5 declared" was roughly 3-4 real work steps. 7 = 4 ceremony + 3
-# work, and N = 3 is the value that holds the measured 42-minute median. The
-# operator ratified N = 3 on 2026-08-12, rejecting their own opening
-# suggestion of N = 4 as a deliberate loosening rather than a re-count
-# (journalled in docs/session-sets/128-.../decisions.jsonl). Raising this
-# number loosens the real budget; it is not bookkeeping.
-#
-# Known limit, stated so a green result is not over-read: step count predicts
-# the MEDIAN, not the TAIL. The longest sessions on record (591/562/544/509
-# min) all declared 5-8 steps. This is a floor on obvious oversizing.
-#
-# An author with a real reason to exceed the cap declares it IN THE SPEC:
-#   sessionSizeException: 4 - terminal ceremony session; steps are independent
-# so the justification survives review instead of being argued at hour three.
-authoring:
-  max_steps_per_session: 7
-
-# --- Guidance lifecycle (Set 064) ---
-# Token ceilings for the always-loaded guidance files and the disuse
-# window for the D5 archive trigger. The whole block is optional and
-# fully defaulted (ai_router/guidance_config.py) — a repo with no block
-# inherits these exact values. Ceilings are a HARD BACKSTOP, not the
-# archive trigger: over ceiling means a pruning sweep is required before
-# adding new content, but the sweep archives by the evidence rules
-# (superseded / encoded-in-automation / subsystem-retired / disused-AND-
-# unreferenced), never by raw length. Tokens are the ceil(chars/4)
-# proxy the reporter prints, not a billing number.
-guidance:
-  active_lessons_ceiling_tokens: 10000   # docs/planning/lessons-learned.md (~40 KB)
-  project_guidance_ceiling_tokens: 6000  # docs/planning/project-guidance.md (~24 KB)
-  disuse_window_sets: 20                  # D5: archive after N sets unused AND unreferenced
-
-  # --- Retention, split by artifact type (Set 121 S2) ---
-  # The operator's concern is that code and one-liners accrete exactly as
-  # prose did. A single "unused in N sets -> drop" rule cannot govern both:
-  # a preventive gate that never fires is indistinguishable from a useless
-  # one, which IS L-112-1. So the rule splits, and the usage record lives
-  # in docs/planning/guidance-usage.json -- a sidecar read only at prune
-  # time, never at session start.
-  #
-  # NOTHING HERE EVICTS ANYTHING. `python -m ai_router.guidance_ledger
-  # report` classifies; eviction is a batched pass the operator initiates,
-  # never automatic and never mid-session (operator, 2026-08-11). The
-  # specific defect that broke the old scheme was an orchestrator at 100%
-  # of a ceiling evicting prose under time pressure -- which is how the
-  # instruction to run the path-aware critique was deleted and became the
-  # next round's Major.
-  #
-  # These numbers were DERIVED, not inherited. Proposal 5.3 proposed
-  # N = 10 sets and a cap of 20 lines, and section 4b of the sequencing
-  # note flagged both as proposed-not-measured.
-  retention:
-    # Measured over 694 intra-lesson gaps across 345 recorded active
-    # sessions: median 1, p90 5, p95 10, p99 30.2, max 51. A window of 30
-    # keeps 99% of genuinely recurring guidance through its quiet
-    # stretches. At this repo's measured 2.88 sessions per set that is
-    # ~10.4 sets -- so 5.3's number survives measurement, but only once
-    # the UNIT is corrected to active sessions. Retention is counted in
-    # sessions and NEVER in elapsed time: a repository dormant for a month
-    # must not lose its guidance to the calendar (operator, 2026-08-11).
-    instruction_window_sessions: 30
-
-    # Expensive checks (a routed call, or >10s) must FIRE -- catch
-    # something -- at least once per N sets. Recording mere execution
-    # would be worthless: a check that runs in CI every session would look
-    # permanently in use. There is no fire history to derive N from (the
-    # ledger records its first fire after this session), so this is an
-    # honest default rather than a fabricated derivation: it reuses the
-    # operator-set disuse_window_sets above, so the repo carries ONE
-    # disuse horizon rather than two that drift apart.
-    #
-    # Cheap checks (<1s, deterministic, no routed call) are kept
-    # indefinitely and need no usage record at all -- free insurance that
-    # never expires. Every check ships with a falsifier regardless.
-    check_window_sets: 20
-
-    # RE-DERIVED AGAIN (Set 121 S4). S3 set 25 because the corpus was 25:
-    # a cap equal to its own corpus is tautological -- it can only ever
-    # fire on the very next entry, so it measures nothing.
-    #
-    # S4 collapsed six project-guidance.md entries that restated
-    # session-constitution.md and admitted two (C-002, C-003), leaving a
-    # live corpus of 21 instruction lines. That is now BELOW the measured
-    # historical peak of 22 (peak distinct ids cited in any trailing
-    # 30-session window, over the same 345 sessions and the same method),
-    # so the honest derivation is available again: the cap is the measured
-    # peak, not a restatement of the corpus size.
-    #
-    # 22 against a corpus of 21 is a gate with one slot of real headroom --
-    # it admits the next genuinely-earned line and fires on the one after,
-    # which is what a backstop is supposed to do.
-    instruction_line_cap: 22
-
-  # --- Preload manifest + ratcheting ceiling gate (Set 085 F1) ---
-  # Every file the session-start workflow requires in context, each with
-  # a per-file token ceiling, plus a combined total_ceiling_tokens. The
-  # gate is the anti-rebloat mechanism: `guidance_report --check` (run in
-  # CI) fails the build on any per-file OR total breach, so at ceiling,
-  # adding prose requires removing prose -- token-neutral by construction.
-  #
-  # Ceilings RATCHET DOWN ONLY. Raising any ceiling (or the total) is an
-  # operator-authorized config edit with a stated reason, never an
-  # in-session accommodation (docs/guidance-lifecycle.md).
-  #
-  # These ceilings are the "preload residency" budget and are DISTINCT
-  # from the two Set-064 lifecycle ceilings above (which remain the
-  # lessons/guidance pruning backstop that summarize_overhead and
-  # --write-headers use). A repo with no `preload:` block keeps exactly
-  # the two-file Set-064 behavior (universal core, gated extension).
-  #
-  # `stamp: true` opts a file in to --write-headers auto-editing; the
-  # default (false) means canonical docs and the engine bootstrap files
-  # are never machine-stamped. Ratchet start: nothing opts in.
-  #
-  # Set 085 S2 (the slimming): the manifest bounds the per-session
-  # preload defined by the required-reading contract --
-  # docs/session-constitution.md (the per-session operating doc, capped
-  # at its declared 4000-token budget), the two guidance-lifecycle
-  # files at their measured sizes, and ONE engine bootstrap file. A
-  # session reads exactly one of CLAUDE.md / AGENTS.md / GEMINI.md, so
-  # the manifest (a sum-based gate) counts the LARGEST of the three as
-  # the representative entry -- the total then bounds every engine's
-  # session. The three engine files share one body by policy and are
-  # kept in lockstep; an edit that makes an uncounted sibling the
-  # largest must repoint this entry in the same change (review-time
-  # discipline; see docs/guidance-lifecycle.md).
-  # The demoted on-demand references (ai-led-session-workflow.md,
-  # session-state-schema.md, close-out.md, the authoring guide,
-  # quick-start.md) left the manifest deliberately UNCAPPED, like the
-  # archive: their size is no longer a recurring per-session tax
-  # (docs/guidance-lifecycle.md -> "Membership follows the
-  # required-reading contract").
-  preload:
-    # Set 134 S3, 2026-08-17: ratcheted 11644 -> 9802 (measured after the
-    # context cut). Composition: lessons-learned.md -1418, engine files
-    # -275, project-guidance.md -149. Every ceiling below is AT
-    # measurement, so the token-neutral anti-rebloat property is retained:
-    # the win is 1842 fewer tokens read EVERY session, not headroom.
-    total_ceiling_tokens: 9802
-    files:
-      - path: docs/session-constitution.md
-        # Set 121 S4, 2026-08-15: ratcheted 4200 -> 4059 (measured). The
-        # Set 128 S2 raise was made under the standing authorization now
-        # retired; the A1-A4 test-ordering rules it bought are still in
-        # the file and still load-bearing, so the measurement sits 59
-        # tokens above the pre-authorization 4000 in live content.
-        # Set 134 S3: unchanged. The duplication the cut found was in the
-        # files that POINT at this one, not in it.
-        ceiling_tokens: 4059
-      - path: docs/planning/project-guidance.md
-        # Set 134 S3, 2026-08-17: ratcheted 3394 -> 3245 (measured). The
-        # Architecture / Testing / Security / Code Style / Build and Test
-        # TODO stubs were consumer-repo scaffolding that all 134 sets paid
-        # for and no session ever filled in; the stub list moved to the
-        # uncapped docs/guidance-lifecycle.md.
-        ceiling_tokens: 3245
-      - path: docs/planning/lessons-learned.md
-        # Set 134 S3, 2026-08-17: ratcheted 2269 -> 851 (measured). The
-        # file was spending 60% of its budget (1371 tokens) on five tables
-        # recording where lessons USED to live, against 436 tokens (19%)
-        # of live lessons. Tables archived whole in lessons-archive.md.
-        ceiling_tokens: 851
-      - path: GEMINI.md   # largest engine bootstrap file (representative)
-        # Set 121 S4, 2026-08-15: the manifest entry MOVED from AGENTS.md.
-        # Set 134 S3, 2026-08-17: ratcheted 1922 -> 1647 (measured). Five
-        # sections that were pure pointers the constitution already
-        # carries IN-PRELOAD were removed in lockstep from all three
-        # engine files; GEMINI.md is still largest (6,626 vs 6,542 vs
-        # 6,060 bytes), so the entry does not move this time.
-        ceiling_tokens: 1647

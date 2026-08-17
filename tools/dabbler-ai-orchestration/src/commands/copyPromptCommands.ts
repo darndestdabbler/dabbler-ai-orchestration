@@ -21,65 +21,13 @@
 // is the intended UX — the operator wrote the file to be spliced into
 // every prompt.
 
-import * as fs from "fs";
-import * as path from "path";
 import * as vscode from "vscode";
 import { SessionRecord, SessionSet } from "../types";
 import { sessionOffersRunPrompt } from "../providers/rowMenuHelpers";
 import { asSessionNode } from "./workExplorerTreeCommands";
-import {
-  CROSS_PROVIDER_VERIFICATION_REL_PATH,
-  loadTemplateBundle,
-  renderCrossProviderVerification,
-  resolveBundledTemplateDir,
-  structureOnlyContext,
-} from "../utils/consumerBootstrap";
 
 interface SetItem extends vscode.TreeItem {
   set: SessionSet;
-}
-
-/**
- * Idempotently write/refresh the canonical cross-provider verification
- * doc into the workspace BEFORE a pointer prompt is emitted (Set 077
- * S4, critique M2). Consumer repos bootstrapped before Set 077 get the
- * doc on first use after upgrading the extension — no re-bootstrap.
- * The doc follows the start-here.md generated-never-hand-edited
- * pattern, so refreshing a stale copy to the bundled content is
- * correct by contract. Returns true when the doc is present (written
- * or already current); false on any failure — the prompt's fallback
- * line covers that case, so failures are non-fatal by design.
- */
-export function ensureCrossProviderVerificationDoc(
-  extensionPath: string,
-  root: string,
-): boolean {
-  try {
-    const bundle = loadTemplateBundle(resolveBundledTemplateDir(extensionPath));
-    const ctx = structureOnlyContext(
-      path.basename(root),
-      new Date().toISOString().slice(0, 10),
-    );
-    const rendered = renderCrossProviderVerification(bundle, ctx);
-    const target = path.join(
-      root,
-      ...CROSS_PROVIDER_VERIFICATION_REL_PATH.split("/"),
-    );
-    let existing: string | null = null;
-    try {
-      existing = fs.readFileSync(target, "utf8");
-    } catch {
-      existing = null;
-    }
-    if (existing !== null && existing.replace(/\r\n/g, "\n") === rendered) {
-      return true;
-    }
-    fs.mkdirSync(path.dirname(target), { recursive: true });
-    fs.writeFileSync(target, rendered, { encoding: "utf8" });
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // Defense-in-depth: a backtick inside the slug would break the

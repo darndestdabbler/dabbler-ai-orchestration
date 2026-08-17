@@ -1,8 +1,8 @@
 {
   "name": "dabbler-ai-orchestration",
   "displayName": "Dabbler AI Orchestration",
-  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree \u2014 plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
-  "version": "0.51.0",
+  "description": "Organize AI-led development like work: modules, session sets and step-by-step session plans in a native tree — plus routed verification before every close, normally cross-provider, recorded as evidence you can check.",
+  "version": "1.0.1",
   "publisher": "DarndestDabbler",
   "private": true,
   "engines": {
@@ -10,8 +10,7 @@
   },
   "categories": [
     "Other",
-    "AI",
-    "SCM Providers"
+    "AI"
   ],
   "keywords": [
     "ai",
@@ -19,14 +18,8 @@
     "agent workflow",
     "orchestration",
     "verification",
-    "code review",
-    "copilot",
-    "claude",
-    "gemini",
-    "codex",
     "session sets",
     "planning",
-    "git workflow",
     "dabbler"
   ],
   "icon": "media/darndest-dabbler-icon.png",
@@ -87,63 +80,8 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabblerSessionSets.openUatChecklist",
-        "title": "Open UAT Checklist",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.revealPlaywrightTests",
-        "title": "Reveal Playwright Tests for This Set",
-        "category": "Dabbler"
-      },
-      {
         "command": "dabblerSessionSets.openSessionState",
         "title": "Open Session State",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.openPrerequisiteSpec",
-        "title": "Open Prerequisite Spec",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.openFolder",
-        "title": "Reveal Folder",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.copyStartCommand.default",
-        "title": "Copy Start next session",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.copySlug",
-        "title": "Copy Slug only",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.openPrForSet",
-        "title": "Open PR for this set",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.finalizeMergedSet",
-        "title": "Finalize merged set",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.cutReleaseTag",
-        "title": "Cut release tag",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.startHotfixFromTag",
-        "title": "Start hotfix from tag",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.rollBackToTag",
-        "title": "Roll back to tag",
         "category": "Dabbler"
       },
       {
@@ -152,66 +90,25 @@
         "category": "Dabbler"
       },
       {
-        "command": "dabbler.getStarted",
-        "title": "Get Started",
-        "category": "Dabbler",
-        "icon": "$(star)"
+        "command": "dabbler.copySessionRunPrompt",
+        "title": "Copy Run Prompt",
+        "category": "Dabbler"
       },
       {
-        "command": "dabbler.setupNewProject",
-        "title": "Set Up New Project",
-        "category": "Dabbler",
-        "icon": "$(add)"
+        "command": "dabblerSessionSets.startSession",
+        "title": "Start Session (terminal)",
+        "category": "Dabbler"
       },
       {
-        "command": "dabbler.trySampleProject",
-        "title": "Try a sample project",
-        "category": "Dabbler",
-        "icon": "$(beaker)"
+        "command": "dabblerSessionSets.closeSession",
+        "title": "Close Session (terminal)",
+        "category": "Dabbler"
       },
       {
         "command": "dabbler.newModule",
         "title": "New Module",
         "category": "Dabbler",
         "icon": "$(add)"
-      },
-      {
-        "command": "dabbler.assignLegacySetsToModule",
-        "title": "Assign Legacy Sets to Module",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.renameModule",
-        "title": "Rename Module",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.deleteModule",
-        "title": "Delete Module",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.openModulePlan",
-        "title": "Open Module Plan",
-        "category": "Dabbler",
-        "icon": "$(go-to-file)"
-      },
-      {
-        "command": "dabbler.openModulesManifest",
-        "title": "Open modules.yaml",
-        "category": "Dabbler",
-        "icon": "$(list-tree)"
-      },
-      {
-        "command": "dabbler.copyModuleDecompositionPrompt",
-        "title": "Copy Module Decomposition Prompt",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.troubleshoot",
-        "title": "Troubleshoot",
-        "category": "Dabbler",
-        "icon": "$(debug)"
       },
       {
         "command": "dabblerSessionSets.cancel",
@@ -224,60 +121,22 @@
         "category": "Dabbler"
       },
       {
+        "command": "dabbler.setupNewProject",
+        "title": "Set Up New Project",
+        "category": "Dabbler",
+        "icon": "$(add)"
+      },
+      {
         "command": "dabblerSessionSets.installAiRouter",
         "title": "Install ai-router",
         "category": "Dabbler",
         "icon": "$(cloud-download)"
       },
       {
-        "command": "dabblerSessionSets.updateAiRouter",
-        "title": "Update ai-router",
+        "command": "dabbler.troubleshoot",
+        "title": "Troubleshoot",
         "category": "Dabbler",
-        "icon": "$(sync)"
-      },
-      {
-        "command": "dabblerSessionSets.setUpCopilotSeat",
-        "title": "Set Up Copilot Seat",
-        "category": "Dabbler",
-        "icon": "$(github)"
-      },
-      {
-        "command": "dabbler.flagDecisionForReview",
-        "title": "Flag Decision for Cross-Provider Review",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.scanAnnotationsForActiveSet",
-        "title": "Scan Workspace for @dabbler:outsource-review Annotations",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.migrate",
-        "title": "Migrate to v3 schema",
-        "category": "Dabbler",
-        "icon": "$(arrow-up)"
-      },
-      {
-        "command": "dabblerSessionSets.migrateToV4",
-        "title": "Migrate to v4 schema",
-        "category": "Dabbler",
-        "icon": "$(arrow-up)"
-      },
-      {
-        "command": "dabbler.regenerateNarrationTemplates",
-        "title": "Regenerate Narration Templates",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.resolveSetNumber",
-        "title": "Resolve Session Set by Number",
-        "category": "Dabbler"
-      },
-      {
-        "command": "dabblerSessionSets.upgradeOlderSets",
-        "title": "Upgrade Older Session Sets",
-        "category": "Dabbler",
-        "icon": "$(arrow-up)"
+        "icon": "$(debug)"
       },
       {
         "command": "dabblerWorkExplorer.activateSet",
@@ -288,23 +147,10 @@
         "command": "dabblerWorkExplorer.activateSession",
         "title": "Open Session Plan",
         "category": "Dabbler"
-      },
-      {
-        "command": "dabbler.copySessionRunPrompt",
-        "title": "Copy Run Prompt",
-        "category": "Dabbler"
       }
     ],
     "menus": {
       "commandPalette": [
-        {
-          "command": "dabblerSessionSets.openUatChecklist",
-          "when": "dabblerSessionSets.uatSupportActive"
-        },
-        {
-          "command": "dabblerSessionSets.revealPlaywrightTests",
-          "when": "dabblerSessionSets.e2eSupportActive"
-        },
         {
           "command": "dabblerWorkExplorer.activateSet",
           "when": "false"
@@ -325,61 +171,16 @@
           "group": "navigation@1"
         },
         {
-          "command": "dabbler.getStarted",
+          "command": "dabbler.newModule",
           "when": "view == dabblerWorkExplorerTree",
-          "group": "navigation@3"
-        },
-        {
-          "command": "dabbler.openModulesManifest",
-          "when": "view == dabblerWorkExplorerTree",
-          "group": "navigation@4"
-        },
-        {
-          "command": "dabblerSessionSets.upgradeOlderSets",
-          "when": "view == dabblerWorkExplorerTree && dabblerSessionSets.hasSubCurrentSets",
-          "group": "navigation@5"
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
         {
-          "command": "dabbler.openModulePlan",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-open-plan;/",
-          "group": "inline@1"
-        },
-        {
           "command": "dabbler.newModule",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
-          "group": "inline@2"
-        },
-        {
-          "command": "dabbler.openModulePlan",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-open-plan;/",
           "group": "1_module@1"
-        },
-        {
-          "command": "dabbler.copyModuleDecompositionPrompt",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
-          "group": "1_module@2"
-        },
-        {
-          "command": "dabbler.newModule",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;dabblerModule;/",
-          "group": "2_module_lifecycle@1"
-        },
-        {
-          "command": "dabbler.renameModule",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-manage-module;/",
-          "group": "2_module_lifecycle@2"
-        },
-        {
-          "command": "dabbler.deleteModule",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-manage-module;/",
-          "group": "2_module_lifecycle@3"
-        },
-        {
-          "command": "dabbler.assignLegacySetsToModule",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;can-assign-legacy;/",
-          "group": "3_module_legacy@1"
         },
         {
           "submenu": "dabblerWorkExplorer.openFile",
@@ -392,24 +193,14 @@
           "group": "1_open@2"
         },
         {
-          "command": "dabblerSessionSets.copySlug",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySlug;/",
-          "group": "5_actions@501"
+          "command": "dabblerSessionSets.startSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-startSession;/",
+          "group": "6_session@601"
         },
         {
-          "command": "dabblerSessionSets.openPrerequisiteSpec",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-openPrerequisiteSpec;/",
-          "group": "5_actions@503"
-        },
-        {
-          "command": "dabblerSessionSets.migrate",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-migrate;/",
-          "group": "8_migrate@801"
-        },
-        {
-          "command": "dabblerSessionSets.migrateToV4",
-          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-migrateToV4;/",
-          "group": "8_migrate@802"
+          "command": "dabblerSessionSets.closeSession",
+          "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-closeSession;/",
+          "group": "6_session@602"
         },
         {
           "command": "dabblerSessionSets.cancel",
@@ -424,7 +215,7 @@
         {
           "command": "dabbler.copySessionRunPrompt",
           "when": "view == dabblerWorkExplorerTree && viewItem =~ /;act-copySessionRunPrompt;/",
-          "group": "6_session@601"
+          "group": "6_session@603"
         }
       ],
       "dabblerWorkExplorer.openFile": [
@@ -460,65 +251,10 @@
     "configuration": {
       "title": "Dabbler AI Orchestration",
       "properties": {
-        "dabblerSessionSets.uatSupport.enabled": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "always",
-            "never"
-          ],
-          "default": "auto",
-          "markdownDescription": "Controls whether UAT-related commands and badges are shown.\n\n- `auto` (default): show UAT features only when at least one spec in the workspace declares `requiresUAT: true`.\n- `always`: always show UAT features.\n- `never`: hide UAT features regardless of spec contents."
-        },
-        "dabblerSessionSets.e2eSupport.enabled": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "always",
-            "never"
-          ],
-          "default": "auto",
-          "markdownDescription": "Controls whether E2E-related commands are shown.\n\n- `auto` (default): show E2E features only when at least one spec declares `requiresE2E: true`.\n- `always`: always show E2E features.\n- `never`: hide E2E features regardless of spec contents."
-        },
-        "dabblerSessionSets.e2e.testDirectory": {
-          "type": "string",
-          "default": "tests",
-          "markdownDescription": "Root directory (relative to workspace root) to search for E2E test files. Defaults to `tests/`."
-        },
         "dabblerSessionSets.pythonPath": {
           "type": "string",
           "default": "python",
-          "markdownDescription": "Python executable used by `Dabbler: Install ai-router` and `Dabbler: Update ai-router` for venv detection / creation and `pip install` commands. Accepts an absolute path, a workspace-relative path (e.g. `.venv/Scripts/python.exe`), or a bare command on `PATH`. When the path points at an interpreter inside an existing venv (parent dir is `Scripts/` or `bin/`), the install command treats that venv as the install target instead of hunting for `.venv/` at the workspace root."
-        },
-        "dabblerSessionSets.copilotCliPath": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "GitHub Copilot CLI executable used by the Copilot seat option (`transport.profile: copilot-cli`). Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `copilot` on `PATH` \u2014 on Windows the auto-detect (like the catalog subprocess it pre-flights) resolves a `copilot.exe` only, so an npm-installed `copilot.cmd` shim is found only when this setting points at it explicitly (with its extension)."
-        },
-        "dabblerSessionSets.gitHost": {
-          "type": "string",
-          "enum": [
-            "auto",
-            "github",
-            "azure-devops"
-          ],
-          "default": "auto",
-          "markdownDescription": "Which git host the git-workflow commands (`Dabbler: Open PR for this set`) talk to.\n\n- `auto` (default): detect from the `origin` remote URL \u2014 `github.com` \u2192 GitHub, `dev.azure.com` / `*.visualstudio.com` \u2192 Azure DevOps.\n- `github`: force GitHub \u2014 required for a GitHub Enterprise host on a custom domain, which auto-detect cannot recognize.\n- `azure-devops`: force Azure DevOps.\n\nEverything except PR creation is pure git and identical on every host."
-        },
-        "dabblerSessionSets.ghCliPath": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "GitHub CLI executable used by `Dabbler: Open PR for this set` on GitHub repos. Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `gh` on `PATH`. Install: `winget install GitHub.cli`, then `gh auth login` (add `--hostname <host>` for GitHub Enterprise)."
-        },
-        "dabblerSessionSets.azCliPath": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Azure CLI executable used by `Dabbler: Open PR for this set` on Azure DevOps repos. Accepts an absolute path, a workspace-relative path, or a bare command on `PATH`. Leave blank to auto-detect `az` on `PATH` (including the standard `az.cmd`). Install: `winget install Microsoft.AzureCLI`, then `az extension add --name azure-devops`, then `az login` (or set the `AZURE_DEVOPS_EXT_PAT` environment variable)."
-        },
-        "dabblerSessionSets.aiRouterRepoUrl": {
-          "type": "string",
-          "default": "",
-          "markdownDescription": "Git repo URL the `Dabbler: Install ai-router` command's GitHub-fallback path clones from. Leave blank to use the upstream Dabbler repository. Override to point at a fork \u2014 handy for fork-trackers who want the GitHub fallback to pull *their* tags / branches rather than upstream's."
+          "markdownDescription": "Python executable used for every `python -m ai_router.*` invocation (tree projections, session lifecycle, module creation, install). Accepts an absolute path, a workspace-relative path (e.g. `.venv/Scripts/python.exe`), or a bare command on `PATH`. When unset, a workspace `.venv` interpreter is auto-detected."
         }
       }
     },
@@ -538,16 +274,8 @@
     "watch": "node esbuild.js --watch",
     "test": "npm run compile && npx tsc --outDir out && node ./out/test/runTests.js",
     "test:unit": "mocha --require ts-node/register --require ./src/test/vscode-stub.js --ui tdd --timeout 120000 'src/test/suite/**/*.test.ts'",
-    "test:dogfood": "mocha --require ts-node/register --require ./src/test/vscode-stub.js --ui tdd --timeout 900000 'src/test/dogfood/**/*.test.ts'",
     "test:playwright": "npm run compile && npx tsc --outDir out && npx playwright test",
     "package": "npm run compile && npx vsce package",
-    "make-uat-workspace": "node scripts/make-uat-workspace.js",
-    "walk": "npm run compile && node scripts/stage-walk.js",
-    "walk:smoke": "npm run compile && node scripts/walk-smoke.js",
-    "walkthrough:web": "node scripts/record-web-walkthrough.js",
-    "pilot:os-capture": "node scripts/measure-os-capture.js",
-    "pilot:gdigrab": "node scripts/measure-gdigrab-capture.js",
-    "record:long-form": "node scripts/record-long-form.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
@@ -565,8 +293,6 @@
     "typescript": "^5.3.0"
   },
   "dependencies": {
-    "ajv": "^8.17.1",
-    "simple-git": "^3.22.0",
     "yaml": "^2.7.0"
   }
 }

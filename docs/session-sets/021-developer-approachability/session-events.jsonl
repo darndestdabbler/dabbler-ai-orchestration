@@ -1,2 +1,0 @@
-{"timestamp": "2026-05-11T18:56:57.180605Z", "session_number": 2, "event_type": "closeout_requested", "force": false, "manual_verify": false}
-{"timestamp": "2026-05-11T18:56:57.501848Z", "session_number": 2, "event_type": "closeout_succeeded", "method": "api"}

@@ -1,0 +1,94 @@
+import json
+
+import pytest
+
+from ai_router import ledger
+
+
+def make_row(round_number=1, **overrides):
+    row = {
+        "round": round_number,
+        "phase": "full" if round_number == 1 else "fix-delta",
+        "verdict": "ISSUES_FOUND",
+        "blocking": True,
+        "verifier_model": "gpt-5-4",
+        "verifier_provider": "openai",
+        "findings": [{"description": "broken", "severity": "major"}],
+        "cost_usd": 0.12,
+        "completion_tree": "a" * 40,
+        "recorded_at": "2026-08-17T10:00:00+02:00",
+    }
+    if round_number >= 2:
+        row["previous_tree"] = "b" * 40
+    row.update(overrides)
+    return row
+
+
+class TestLedgerRoundtrip:
+    def test_append_and_read(self, tmp_path):
+        ledger.append_round(tmp_path, "010-demo", 1, make_row())
+        rounds = ledger.read_rounds(tmp_path, "010-demo", 1)
+        assert len(rounds) == 1
+        assert rounds[0]["verdict"] == "ISSUES_FOUND"
+
+    def test_rounds_are_per_session(self, tmp_path):
+        ledger.append_round(tmp_path, "010-demo", 1, make_row())
+        assert ledger.read_rounds(tmp_path, "010-demo", 2) == []
+
+    def test_duplicate_round_refused(self, tmp_path):
+        ledger.append_round(tmp_path, "010-demo", 1, make_row())
+        with pytest.raises(ledger.LedgerError, match="append-only"):
+            ledger.append_round(tmp_path, "010-demo", 1, make_row())
+
+    def test_next_round_number(self, tmp_path):
+        assert ledger.next_round_number(tmp_path, "010-demo", 1) == 1
+        ledger.append_round(tmp_path, "010-demo", 1, make_row())
+        assert ledger.next_round_number(tmp_path, "010-demo", 1) == 2
+
+    def test_missing_ledger_is_empty(self, tmp_path):
+        assert ledger.read_rounds(tmp_path, "nope", 9) == []
+
+
+class TestTamperRefusal:
+    def _path(self, tmp_path):
+        path = ledger.rounds_path(tmp_path, "010-demo", 1)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
+
+    def test_hand_written_severity_refused_on_read(self, tmp_path):
+        row = make_row()
+        row["findings"][0]["severity"] = "totally-fine"
+        self._path(tmp_path).write_text(
+            json.dumps(row) + "\n", encoding="utf-8"
+        )
+        with pytest.raises(ledger.LedgerError):
+            ledger.read_rounds(tmp_path, "010-demo", 1)
+
+    def test_invented_verdict_refused_on_read(self, tmp_path):
+        row = make_row(verdict="manual-override-development")
+        self._path(tmp_path).write_text(
+            json.dumps(row) + "\n", encoding="utf-8"
+        )
+        with pytest.raises(ledger.LedgerError):
+            ledger.read_rounds(tmp_path, "010-demo", 1)
+
+    def test_garbage_line_refused_not_skipped(self, tmp_path):
+        path = self._path(tmp_path)
+        path.write_text(
+            json.dumps(make_row()) + "\nnot json\n", encoding="utf-8"
+        )
+        with pytest.raises(ledger.LedgerError, match="not valid JSON"):
+            ledger.read_rounds(tmp_path, "010-demo", 1)
+
+    def test_round_two_requires_previous_tree(self, tmp_path):
+        row = make_row(2)
+        del row["previous_tree"]
+        with pytest.raises(ledger.LedgerError, match="previous_tree"):
+            ledger.append_round(tmp_path, "010-demo", 2, row)
+
+
+class TestRawOutput:
+    def test_saved_bytes_unmodified(self, tmp_path):
+        content = "VERIFIED\r\nline two\n"
+        path = ledger.save_raw_output(tmp_path, "010-demo", 1, 1, content)
+        assert path.read_bytes() == content.encode("utf-8")

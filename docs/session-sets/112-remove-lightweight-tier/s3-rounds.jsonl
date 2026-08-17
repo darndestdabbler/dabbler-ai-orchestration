@@ -1,4 +1,0 @@
-{"event": "round-completed", "sessionNumber": 3, "verificationRound": 1, "phase": "discovery", "verdict": "ISSUES_FOUND", "blocking": true, "endedLoop": false, "recordedAt": "2026-08-09T12:18:07.120745-04:00"}
-{"event": "round-completed", "sessionNumber": 3, "verificationRound": 2, "phase": "supplementary", "verdict": "ISSUES_FOUND", "blocking": true, "endedLoop": false, "recordedAt": "2026-08-09T12:22:02.325480-04:00"}
-{"event": "round-completed", "sessionNumber": 3, "verificationRound": 3, "phase": "remediation-review", "verdict": "ISSUES_FOUND", "blocking": true, "endedLoop": false, "recordedAt": "2026-08-09T12:57:30.856593-04:00"}
-{"event": "round-completed", "sessionNumber": 3, "verificationRound": 4, "phase": "remediation-review", "verdict": "ISSUES_FOUND", "blocking": true, "endedLoop": false, "recordedAt": "2026-08-09T13:20:40.269882-04:00"}

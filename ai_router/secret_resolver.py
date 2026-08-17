@@ -1,18 +1,9 @@
-"""Secret resolver abstraction.
+"""Secret resolver: the single call site for looking up secret values.
 
-Provides ``resolve_secret(name, source)`` — the single call site for
-looking up secret values (API keys, tokens). The env-var backend is the
-only backend in Set 026; future sets can register additional backends
-(secretStorage, keyring, etc.) via ``register_backend`` without touching
-callers.
-
-Usage::
-
-    from secret_resolver import resolve_secret
-
-    api_key = resolve_secret("DABBLER_ANTHROPIC_API_KEY")
-    if api_key is None:
-        raise EnvironmentError("DABBLER_ANTHROPIC_API_KEY not set")
+The env-var backend is the only built-in backend; additional backends
+(keyring, secretStorage) can be registered via ``register_backend``
+without touching callers. An empty-string value is normalized to ``None``
+so callers can use a simple truthiness check.
 """
 
 from __future__ import annotations
@@ -20,15 +11,14 @@ from __future__ import annotations
 import os
 from typing import Callable
 
-# Registry: backend_name → callable(name) → str | None
 _BACKENDS: dict[str, Callable[[str], str | None]] = {}
 
 
 def register_backend(name: str, fn: Callable[[str], str | None]) -> None:
     """Register a secret backend under *name*.
 
-    *fn* receives the secret name (e.g. ``"DABBLER_ANTHROPIC_API_KEY"``) and
-    returns its value, or ``None`` if the secret is absent.
+    *fn* receives the secret name (e.g. ``"DABBLER_ANTHROPIC_API_KEY"``)
+    and returns its value, or ``None`` if the secret is absent.
     """
     _BACKENDS[name] = fn
 
@@ -36,26 +26,18 @@ def register_backend(name: str, fn: Callable[[str], str | None]) -> None:
 def resolve_secret(name: str, source: str = "env") -> str | None:
     """Look up *name* via the named *source* backend.
 
-    Returns the secret value, or ``None`` if it is absent (or if the
-    value is an empty string — callers should treat empty-string the same
-    as absent).
-
+    Returns the secret value, or ``None`` if it is absent or empty.
     Raises ``ValueError`` if *source* names an unregistered backend.
     """
     backend = _BACKENDS.get(source)
     if backend is None:
         raise ValueError(
-            f"Unknown secret backend: {source!r}. "
-            f"Registered: {list(_BACKENDS)}"
+            f"Unknown secret backend: {source!r}. Registered: {list(_BACKENDS)}"
         )
     value = backend(name)
-    # Normalize empty-string to None so callers can do a simple truthiness check.
     if value == "":
         return None
     return value
-
-
-# --- Built-in backends -------------------------------------------------------
 
 
 def _env_backend(name: str) -> str | None:

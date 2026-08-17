@@ -14,17 +14,61 @@
 // the configuration block. A range of lines is the smallest thing that
 // expresses that; an extracted string would be the copy the set refuses.
 //
-// THE HEADING SCAN IS BORROWED, NOT REWRITTEN
-// -------------------------------------------
-// `sessionStepModel.scanSessionHeads` (mirroring
-// `spec_admission._SESSION_HEAD_RE`) already decides what a session
-// heading is and where a session's text ends. Re-deriving that here would
-// be the duplicate-parser defect L-069-1 names, with the two copies free
-// to disagree about where session 3 begins — which the operator would
-// report as "it opened the wrong section". So this module owns exactly one
-// new decision: how an offset becomes a LINE.
+// The heading scan below is the ONE place the extension decides what a
+// session heading is; it mirrors the Python session-head regex so the
+// two languages cannot disagree about where session 3 begins.
 
-import { scanSessionHeads, stripFencedBlocks } from "./sessionStepModel";
+// `### Session 2 of 4: Title`. Mirrors Python's session-head regex so
+// the two languages agree on where a session's text begins.
+const SESSION_HEAD_RE = /^###\s+Session\s+(\d+)(?:\s+of\s+(\d+))?\s*:\s*(.*)$/gm;
+
+const FENCE_RE = /^\s*(?:```|~~~)/;
+
+/**
+ * Blank out fenced code blocks, preserving LINE COUNT (not character
+ * offsets), so a heading inside a fence reads as a sample, not a
+ * section. Every stripped line is replaced by an empty line, which is
+ * what makes an offset->line mapping computed on the stripped body valid
+ * for the ORIGINAL text.
+ */
+export function stripFencedBlocks(text: string): string {
+  let inFence = false;
+  return text
+    .split("\n")
+    .map((line) => {
+      if (FENCE_RE.test(line)) {
+        inFence = !inFence;
+        return "";
+      }
+      return inFence ? "" : line;
+    })
+    .join("\n");
+}
+
+export interface SessionHead {
+  readonly number: number;
+  /** Offset of the `###` itself. */
+  readonly headStart: number;
+  /** Offset just past the heading line. */
+  readonly contentStart: number;
+}
+
+export function scanSessionHeads(body: string): SessionHead[] {
+  const heads: SessionHead[] = [];
+  SESSION_HEAD_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = SESSION_HEAD_RE.exec(body)) !== null) {
+    heads.push({
+      number: Number(match[1]),
+      headStart: match.index,
+      contentStart: match.index + match[0].length,
+    });
+    // A zero-length match would spin forever; the guard costs nothing
+    // and the alternative is a hung extension host.
+    if (match[0].length === 0) SESSION_HEAD_RE.lastIndex += 1;
+  }
+  return heads;
+}
 
 /**
  * A zero-based, inclusive line range inside `spec.md`.

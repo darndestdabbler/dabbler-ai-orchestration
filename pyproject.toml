@@ -4,95 +4,31 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "dabbler-ai-router"
-version = "1.0.0"
-description = "Multi-provider model routing, prompt templates, session state, and metrics for the Dabbler AI-led-workflow."
+version = "1.0.1"
+description = "Multi-provider model routing, session lifecycle, and metrics for the Dabbler AI-led workflow (v2)."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10"
-authors = [
-    { name = "darndestdabbler" },
-]
-keywords = ["ai", "router", "claude", "gemini", "openai", "session", "workflow"]
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Developers",
-    "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12",
-    "Topic :: Software Development :: Libraries :: Python Modules",
-]
+requires-python = ">=3.11"
+authors = [{ name = "darndestdabbler" }]
 dependencies = [
     "pyyaml>=6.0",
     "httpx>=0.27.0",
+    "jsonschema>=4.0.0",
 ]
 
 [project.optional-dependencies]
 tests = [
     "pytest>=7.0",
-    # Set 116 S1: measured 3.6x wall-clock reduction (14.1min -> 3.9min,
-    # identical 3769 passed / 5 skipped) on a 20-core machine; see
-    # docs/test-suite-benchmark-DENICI.txt. Default parallelism is wired
-    # via pytest.ini's addopts, so every `python -m pytest` invocation
-    # (local, CI, run_of_record) inherits it without a duplicated flag.
     "pytest-xdist>=3.5",
-    "jsonschema>=4.0.0",
-    "ruamel.yaml>=0.17",
-]
-# Optional extras for users who run `python -m ai_router.migrate_router_config`
-# on their own `router-config.yaml` / `budget.yaml`. The migrator preserves
-# YAML comments via ruamel.yaml's AST round-trip; without ruamel installed,
-# the migrator prints a clear remediation pointing operators at this extras
-# group. The schema-migration code path is the only thing in the package
-# that requires this dep, so it stays opt-in (PyPI users who never touch
-# the migrator pay nothing).
-migration = [
-    "ruamel.yaml>=0.17",
 ]
 
-[project.urls]
-Homepage = "https://github.com/darndestdabbler/dabbler-ai-orchestration"
-Source = "https://github.com/darndestdabbler/dabbler-ai-orchestration"
-Issues = "https://github.com/darndestdabbler/dabbler-ai-orchestration/issues"
-
-# Console scripts. Every target here is import-checked by
-# ai_router/tests/test_entry_points.py so a broken path can never ship.
-# (Set 051 retired the long-broken ``backfill_session_state`` entry point:
-# it pointed at a top-level ``ai_router.backfill_session_state`` module that
-# has lived under the unpackaged ``ai_router/scripts/`` dir since Set 021,
-# so the installed console script never resolved. The one-shot v1->v2
-# backfill utility remains runnable from a source checkout via
-# ``python ai_router/scripts/backfill_session_state.py``.)
-[project.scripts]
-start_session = "ai_router.start_session:main"
-close_session = "ai_router.close_session:main"
-report = "ai_router.report:main"
-reconciler = "ai_router.reconciler:main"
-
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["ai_router*"]
-# Tests live under ai_router/tests/ so the test suite can run via the
-# package's own conftest. They are not part of the public API and
-# should not bloat the installed wheel. The directory has no
-# __init__.py, so under PEP 420 it would otherwise be picked up as an
-# implicit namespace package; ``namespaces = false`` plus the explicit
-# excludes block both discovery paths.
-exclude = ["ai_router.tests", "ai_router.tests.*"]
-namespaces = false
+[tool.setuptools]
+packages = ["ai_router", "ai_router.transports"]
 
 [tool.setuptools.package-data]
 ai_router = [
     "router-config.yaml",
+    "copilot-catalog.lock",
     "prompt-templates/*.md",
     "schemas/*.json",
-    "docs/*.md",
-    # Set 122 S1: the two module-lifecycle spec templates
-    # (`ai_router.modules create` renders them). They must ship in the wheel,
-    # because a pip-installed router has no repo checkout to read
-    # `docs/templates/consumer-bootstrap/` from. The two copies are pinned
-    # byte-identical by `test_modules_lifecycle.py`.
-    "templates/*.template",
 ]

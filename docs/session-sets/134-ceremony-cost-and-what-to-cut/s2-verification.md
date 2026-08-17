@@ -1,3 +1,0 @@
-VERIFIED
-
-I checked the plan obligations against the changed writer/parser path, blocking predicates, acceptance and close-backstop consumers, pull-verifier tool schema, prompt templates, schema docs, measurement document, and decision record. The work closes the severity vocabulary at the sanctioned writer while keeping readers lenient, preserves the missing-severity blocking behavior, and journals the (b) diagnosis without changing the gate; I did not find a Critical/Major defect.

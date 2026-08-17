@@ -1,9 +1,0 @@
-ISSUES FOUND
-
-- **Issue 1:** The TypeScript absent-state reader still treats an empty `activity-log.json` as in-progress, diverging from the router-owned synthesis it claims to mirror.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Evidence paths:** `tools/dabbler-ai-orchestration/src/utils/sessionState.ts:232-240`, `ai_router/session_state.py:2208-2223`, `ai_router/session_log.py:321-335`, `ai_router/tests/test_session_state_backfill.py:235-257`
-  - **Failure scenario:** A newly authored set has `spec.md`, no `session-state.json`, and the standard pre-created `activity-log.json` with `"entries": []`. The Work Explorer calls `readStatus()` / `inferStateInMemory()` and marks the set plus session 1 as `in-progress`, while the router’s sanctioned writer classifies that same state as `not-started`. This is probable because `SessionLog` creates empty logs up front.
-  - **Acceptance criterion:** `JUDGMENT - For a set with spec.md, no session-state.json, and activity-log.json containing an empty entries list or empty bare list, the TypeScript absent-state path classifies the set and derived sessions as not-started, matching the router backfill rule.`
-  - **Details:** **Violation:** the change records that the extension derives “the same inference the router’s backfill does” and that router writers own creation. **Impact:** the Explorer’s no-write path now presents a false active session for normal authored-but-not-started sets, undermining the ownership/read-view contract. **Evidence:** TS branches on mere activity-log presence, but Python explicitly returns not-started when the log has no entries and has a regression test for that exact quick-start flow.

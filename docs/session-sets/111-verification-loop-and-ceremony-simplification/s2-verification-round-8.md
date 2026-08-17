@@ -1,8 +1,0 @@
-**ISSUES FOUND**
-
-- **Issue 1:** The containment boundary still falsely claims verifier-authored criteria cannot damage the live working tree.
-  - **Category:** Correctness
-  - **Severity:** Major
-  - **Failure scenario:** A verifier-authored criterion, influenced by untrusted repo content, emits an allowed Python command that locates or directly names the main checkout and overwrites files. This is probable within the stated threat model because the harness explicitly treats criteria as untrusted, automatically runs Python criteria, and does not sandbox or path-confine the child process.
-  - **Acceptance criterion:** JUDGMENT - The containment docs/code must either enforce live working-tree protection or stop claiming that guarantee, explicitly stating that malicious absolute-path or shared-git writes are not prevented.
-  - **Details:** **Violation:** `ai_router/acceptance_harness.py` says the “honest boundary” is that “a criterion cannot damage your working tree,” and `docs/ai-led-session-workflow.md` repeats that claim. **Impact:** This changes a reasonable merge decision because the session’s core deliverable is safe execution of untrusted verifier-authored checks; users may run the harness trusting a protection it does not provide. **Evidence:** `run_criterion_in()` is plain `subprocess.run(..., cwd=<disposable worktree>, env=child_environment())` with no sandbox, no path guard, and no process isolation beyond cwd/env stripping. The tokenizer accepts a Python command that writes an absolute path, so the disposable cwd only protects ordinary relative writes, not the live checkout.

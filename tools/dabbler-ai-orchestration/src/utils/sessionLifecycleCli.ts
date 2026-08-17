@@ -30,7 +30,7 @@ import {
 } from "./routerCli";
 
 /** The router module both launchers here invoke. */
-export const SESSION_LIFECYCLE_CLI = "ai_router.session_lifecycle";
+export const SESSION_LIFECYCLE_CLI = "ai_router.session";
 
 /**
  * `cancel` / `restore` argv.
@@ -41,11 +41,11 @@ export const SESSION_LIFECYCLE_CLI = "ai_router.session_lifecycle";
  * stays intact.
  */
 export function cancelArgs(sessionSetDir: string, reason: string): string[] {
-  return ["--json", "cancel", "--session-set-dir", sessionSetDir, "--reason", reason];
+  return ["cancel", sessionSetDir, "--reason", reason];
 }
 
 export function restoreArgs(sessionSetDir: string, reason: string): string[] {
-  return ["--json", "restore", "--session-set-dir", sessionSetDir, "--reason", reason];
+  return ["restore", sessionSetDir, "--reason", reason];
 }
 
 /**

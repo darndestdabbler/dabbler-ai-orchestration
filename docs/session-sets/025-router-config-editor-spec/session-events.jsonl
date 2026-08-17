@@ -1,3 +1,0 @@
-{"timestamp": "2026-05-15T14:04:13.332086Z", "session_number": 1, "event_type": "work_started"}
-{"timestamp": "2026-05-15T14:22:28.284766Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
-{"timestamp": "2026-05-15T14:22:28.426054Z", "session_number": 1, "event_type": "closeout_succeeded", "method": "api"}

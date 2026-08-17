@@ -1,3 +1,0 @@
-{"verdict":"VERIFIED","issues":[]}
-- **Issue 1 resolved:** no stale instruction remains to implement or test a D3 extension. The relevant sections now consistently say **D3 stays unchanged** and the fix is a **content-aware close-time validator**: `What this set delivers` item 3, Session 2 step 6, Session 2 Ends-with, and Session 2 Progress keys are aligned with that.
-- **Issue 2 resolved:** in both `spec.md` and `verdict.md`, `--accept-suggestions` is now framed only as a possible **S3 implementation detail**, explicitly **not** part of consensus and **not** operator-locked under Q6.

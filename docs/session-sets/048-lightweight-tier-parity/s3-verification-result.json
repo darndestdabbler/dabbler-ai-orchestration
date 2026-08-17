@@ -1,9 +1,0 @@
-{
-  "session_set": "048-lightweight-tier-parity",
-  "session_number": 3,
-  "route_model": "sonnet",
-  "route_cost": 0.1469835,
-  "verify_model": "gemini-pro",
-  "verify_cost": 0.013655,
-  "verify_verdict": "VERIFIED"
-}

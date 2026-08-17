@@ -1,117 +1,94 @@
+// The extension's view of one session set, assembled from the Python
+// projection (`python -m ai_router.progress --json <set-dir>`) plus the
+// few spec-level grouping attributes the tree needs (module, kind,
+// prerequisites). TypeScript renders; Python decides — nothing in this
+// file may be derived by re-reading session-state.json in TS.
+
 export type SessionState = "complete" | "in-progress" | "not-started" | "cancelled";
 
-// Set 127 S2: the step ledger carries the flight facts the row builder
-// derives from, and the row builder owns that vocabulary. A TYPE-only
-// import, and `providers/sessionStepModel.ts` imports nothing at all, so
-// there is no cycle and no runtime edge.
-import type { SessionFlightFacts } from "./providers/sessionStepModel";
-
-// Set 030 Session 1 — session-state.json schema v3 ledger.
-// The set-level `SessionState` above is the extension's bucketing
-// state (Cancelled / Complete / Active / Not Started). Set 030
-// Session 3 unified the bucketing literal with the per-session
-// status under the canonical name `complete`, retiring the older
-// `done` label so JSON and display vocabulary match.
-// The union below is the per-session status used in v3's
-// `sessions[]` ledger and must match Python's `SESSION_STATUSES` in
-// `ai_router/progress.py`.
+// Per-session status vocabulary; must match Python's SESSION_STATUSES in
+// ai_router/progress.py.
 export type SessionStatus = "not-started" | "in-progress" | "complete" | "cancelled";
+
+/** One step row of an in-flight session, verbatim from the projection. */
+export interface StepRecord {
+  position: number;
+  stepNumber?: number | null;
+  stepKey: string | null;
+  description: string;
+  status: string | null;
+  /** Human-readable state phrase the projection derived. */
+  state: string;
+  /** The `[x]`-style checklist box, for tooltips. */
+  box: string;
+  /** Which status glyph the row renders. */
+  iconKey: SessionStatus;
+  isPlanned: boolean;
+  isActive: boolean;
+  startedAt: string | null;
+}
 
 export interface SessionRecord {
   number: number;
   title: string;
   status: SessionStatus;
-}
-
-export interface ProgressView {
-  sessions: SessionRecord[];
-  totalSessions: number;
-  completedSessions: number[];
-  currentSession: number | null;
-  nextSession: number | null;
-  isBetweenSessions: boolean;
-}
-
-// v3 session-state.json shape. Top-level fields mirror v2 except
-// the legacy progress triple (currentSession / totalSessions /
-// completedSessions) is replaced by the `sessions[]` ledger.
-// Set 030 Session 2's dual-write writers emit BOTH shapes on disk
-// so legacy readers keep working; this interface describes the v3
-// canonical fields only.
-export interface SessionStateV3 {
-  schemaVersion: 3;
-  sessionSetName: string;
-  status: "not-started" | "in-progress" | "complete" | "cancelled";
-  lifecycleState: "work_in_progress" | "closed" | null;
+  iconKey: SessionStatus;
+  inFlight: boolean;
   startedAt: string | null;
   completedAt: string | null;
   verificationVerdict: string | null;
+  steps: StepRecord[];
+}
+
+export interface OrchestratorInfo {
+  engine?: string;
+  provider?: string;
+  model?: string;
+  effort?: string;
+}
+
+// The set-level half of the projection payload, as progress.py emits it.
+export interface ProjectionSet {
+  slug: string;
+  status: SessionState;
+  iconKey: SessionState;
+  schemaVersionOnDisk: number | null;
+  totalSessions: number | null;
+  sessionsCompleted: number;
+  currentSession: number | null;
+  verificationVerdict: string | null;
+  forceClosed: boolean;
+  preCancelStatus: string | null;
   orchestrator: OrchestratorInfo | null;
+  invariantViolation: string | null;
+}
+
+export interface ProjectionPayload {
+  schemaVersion: number;
+  generatedAt: string;
+  set: ProjectionSet;
   sessions: SessionRecord[];
 }
 
-// Set 048 Session 2: tri-state UAT/E2E enum per audit decision D4.
-// `true` blocks close-out until checklist evidence present; `false`
-// skips; `"suggested"` triggers an upfront positive-confirmation prompt
-// from the AI orchestrator at session start when the session has UX
-// scope (per operator override of audit Bias 4), with the choice
-// recorded in activity-log as a `suggestion_disposition` entry.
-export type TriStateFlag = boolean | "suggested";
-
-// Set 098 Session 1 (module-lifecycle verdict decision 5): the two
-// module-lifecycle set kinds. `kind` is a small, optional,
-// machine-readable identity for scaffolded plan/decomposition sets —
-// set numbers are global and carry no meaning, so the attribute, never
-// a magic number, is what tooling reads. Exactly two sanctioned
-// consumers: Set 099's delete removal rule (only an unstarted
-// plan/decomposition set with no execution artifacts may be removed
-// outright) and human/tooling legibility. It must NOT grow into a
-// workflow/state schema. Absent means ordinary work set — every
-// pre-098 spec is untouched and valid.
+// The two module-lifecycle set kinds. Absent means ordinary work set.
 export type SessionSetKind = "plan" | "decomposition";
 
+// Spec-declared grouping attributes, parsed from the spec's
+// `Session Set Configuration` YAML block. Raw values as authored;
+// validation against docs/modules.yaml happens at scan time.
 export interface SessionSetConfig {
-  requiresUAT: TriStateFlag;
-  requiresE2E: TriStateFlag;
-  uatScope: string;
-  // Set 087 Session 1: the spec's declared `module:` key — the RAW value
-  // as authored, before validation against `docs/modules.yaml`. A
-  // grouping attribute only, never part of set identity (the Set 087
-  // invariant: names stay globally unique; `RowPayload.slug` and
-  // `findSetBySlug` are unchanged on purpose). Null when the spec
-  // declares no module. The validated result lives on
-  // `SessionSet.module` / `SessionSet.moduleTitle`; the raw value is
-  // kept here so later sessions can surface a declared-but-unknown slug
-  // instead of silently reading it as "no module".
   module: string | null;
-  // Set 098 Session 1: the spec's declared `kind:` key — the RAW value
-  // as authored (the `module` posture above), kept so later surfaces
-  // can show a declared-but-unknown kind instead of silently reading it
-  // as an ordinary work set. Undefined when the spec declares no kind
-  // (every pre-098 spec). The validated enum lives on `SessionSet.kind`.
   kind?: string;
 }
 
-// Set 087 Session 1 (routed architecture ruling, saved raw at
-// docs/session-sets/087-.../s1-collision-check-architecture.json): the
-// fail-loud duplicate-set-name error attached to the one merged row the
-// Explorer shows for a collided name. Undefined on every non-collided
-// set, so a workspace with globally-unique names renders byte-identically
-// to pre-087. Session 2 renders the affordance (badge/tooltip); Session 1
-// ships the data only.
+// The fail-loud duplicate-set-name error attached to the one merged row
+// the Explorer shows for a collided name.
 export interface DuplicateNameError {
   name: string;
-  // The winning copy's dir — always a member of `conflictingDirs`.
   chosenDir: string;
-  // One dir per DISTINCT logical set sharing the name (legitimate
-  // main-checkout/worktree copies of the same set collapse to one
-  // entry), sorted.
   conflictingDirs: string[];
 }
 
-// The diagnostics-level record for one collided name, returned by
-// `readAllSessionSetsWithDiagnostics().collisions` so a future surface
-// (throttled notification, status item) can report without re-scanning.
 export interface DuplicateNameCollision extends DuplicateNameError {
   candidates: Array<{
     dir: string;
@@ -121,14 +98,7 @@ export interface DuplicateNameCollision extends DuplicateNameError {
   }>;
 }
 
-// Set 087 Session 1: one entry of `docs/modules.yaml` (the module
-// manifest — recommendation §2.4). `slug` is the machine identity of the
-// module; `title` is what the Explorer displays (defaults to the slug);
-// `codeRoots` are the code paths the module owns (ownership enforcement
-// is later-phase machinery — carried, not enforced, in Phase 1);
-// `planPath` locates the module's project plan; `touches` names the
-// modules an integration module is sanctioned to edit across. Display
-// order in the Explorer = manifest file order.
+// One entry of `docs/modules.yaml`. Display order = manifest file order.
 export interface ModuleManifestEntry {
   slug: string;
   title: string;
@@ -137,360 +107,60 @@ export interface ModuleManifestEntry {
   touches: string[];
 }
 
-// Set 047 Session 5: prerequisites field schema landed by spec §3.3.
-// Authored under the ``Session Set Configuration`` YAML block; the
-// reader cross-references each set's prereqs against the target
-// set's ``status`` to derive the ``blockedByPrereqs`` flag on
-// SessionSet below. ``condition`` is an enum with one value today
-// (``"complete"``) but is kept as a string field so a future spec
-// can add (e.g.) ``"started"`` without rewriting consumers.
 export interface SessionSetPrerequisite {
   slug: string;
   condition: "complete";
 }
 
-// Set 061 Session 2 (spec D3): one unsatisfied prerequisite, carried on
-// the SessionSet record so the blocked marker's tooltip can name what
-// the row is waiting on instead of collapsing to a boolean.
-// `targetState` is the prereq target's bucketed state at scan time, or
-// "unknown" when no scanned set matches the slug (typo / missing set —
-// still blocking, per the Set 047 rule).
+// One unsatisfied prerequisite, carried so the blocked marker's tooltip
+// can name what the row is waiting on. `targetState` is "unknown" when
+// no scanned set matches the slug — a typo still blocks.
 export interface UnsatisfiedPrerequisite {
   slug: string;
   condition: "complete";
   targetState: SessionState | "unknown";
 }
 
-export interface UatSummary {
-  totalItems: number;
-  pendingItems: number;
-  e2eRefs: string[];
-}
-
-export interface OrchestratorInfo {
-  engine?: string;
-  provider?: string;
-  model?: string;
-  effort?: string;
-  // Set 033 Session 1: check-out / check-in nested timestamps under the
-  // orchestrator block. `checkedOutAt` is set on transition to
-  // status: in-progress and preserved across same-holder re-attaches
-  // (H4 identity = engine + provider). `lastActivityAt` is bumped on
-  // every re-attach. Both are `null`able for tolerated reads of pre-S1
-  // in-flight files; next same-holder start_session populates them.
-  checkedOutAt?: string;
-  lastActivityAt?: string;
-}
-
-export interface LiveSession {
-  currentSession: number | null;
-  status: string | null;
-  orchestrator: OrchestratorInfo | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  verificationVerdict: string | null;
-  // Set 9 Session 3 (D-2 hard-scoping): true when the close-out path
-  // was bypassed via ``--force`` / ``mark_session_complete(force=True)``.
-  // Surfaced as a ``[FORCED]`` badge on the Session Set Explorer row so
-  // reviewers can spot emergency-bypass close-outs at a glance. Absent
-  // or false on every snapshot written by a normal close-out.
-  forceClosed: boolean | null;
-  // Set 022 Session 2: completedSessions[] is the authoritative
-  // progress ledger under the state-first lifecycle protocol. Surfaced
-  // here so the tree-view can compute the "currentSession is in flight"
-  // predicate (currentSession not in completedSessions[]) without
-  // re-reading the state file. Null when the snapshot pre-dates the
-  // array (legacy sets); empty array when the protocol has been
-  // applied but no session has closed yet.
-  completedSessions: number[] | null;
-}
-
-/**
- * Set 114 Session 3: everything the pure model needs to build one
- * in-flight session's step rows, lifted at scan time.
- *
- * Deliberately raw. The rows themselves are built on EXPAND by
- * `providers/sessionStepModel.ts`, so a set that is never expanded pays
- * only the (already-performed) activity-log parse plus one spec read.
- */
-export interface SessionStepLedger {
-  /** The session the entries and `specSteps` belong to. */
-  sessionNumber: number;
-  /**
-   * `activity-log.json` entries for that session, in file order, narrowed
-   * to the fields the row builder reads. Empty when the log is absent,
-   * unreadable, or has nothing for this session.
-   */
-  entries: SessionStepEntry[];
-  /**
-   * The step texts `spec.md` currently declares for that session. Used for
-   * one question only — whether the seeded plan still matches the spec —
-   * and never as a source of rows.
-   */
-  specSteps: string[];
-  /**
-   * Set 127 S2: `(is this session in flight, when did it start)`, lifted
-   * from the same normalized `session-state.json` the rest of the scan
-   * reads — the single source of truth for progress, never file presence.
-   *
-   * The row builder derives the ACTIVE step and each started row's start
-   * time from it. Carried rather than re-read on expand for the same reason
-   * `entries` is: the scan has already parsed the file, and a second read
-   * on a tree that refreshes on every watcher tick would be pure cost.
-   */
-  flight: SessionFlightFacts;
-}
-
-/** One `activity-log.json` entry, narrowed to the row builder's inputs. */
-export interface SessionStepEntry {
-  sessionNumber?: number;
-  stepNumber?: number;
-  stepKey?: string;
-  description?: string;
-  status?: string;
-  kind?: string;
-  /**
-   * Set 127 S2: `log_step` writes AFTER a step finishes, so this is that
-   * step's COMPLETION — and the next row's derived start.
-   */
-  dateTime?: string;
-}
-
-/**
- * Set 115 Session 4 — one close-out obligation, exactly as
- * `ai_router.close_preflight` recorded it. The snake_case keys are the
- * Python report's own: the projection embeds `PreflightReport.to_dict()`
- * verbatim so the CLI's `--json` and the file the tree reads cannot
- * disagree, and re-spelling them here would reintroduce the divergence
- * that embedding avoids.
- */
-export interface CloseObligation {
-  check: string;
-  met: boolean;
-  blocking: boolean;
-  detail: string;
-  action: string;
-  cost_warning: string;
-  /**
-   * True when the obligation's predicate reads git rather than files, so
-   * NO content digest can tell whether it is still true — committing
-   * changes no byte this projection hashed. The tree renders these rows
-   * "as of" the projection's timestamp rather than as current truth.
-   */
-  volatile: boolean;
-}
-
-/**
- * How a serialized projection stands against the inputs it derived from.
- * The vocabulary is `ai_router.session_projection`'s, unchanged: one
- * framework, one answer to "is this file still true".
- */
-export type CloseObligationsState =
-  | "fresh"
-  | "stale"
-  | "absent"
-  | "unreadable";
-
-/**
- * Set 115 Session 4 — the in-flight session's close-out obligations, read
- * from `.dabbler/close-obligations.json` at scan time.
- *
- * The projection is READ, never computed here: `close_preflight` costs
- * 2-7 seconds (git-backed predicates plus interpreter startup) and this
- * runs on every watcher tick and 30-second poll.
- *
- * `state` is computed by re-digesting the set directory and comparing
- * against what the file recorded — the CONTENT half of the freshness
- * question only. The git half is deliberately not checked (that would be
- * a subprocess on a redraw path); the rows that depend on it carry
- * `volatile` and are labelled instead.
- */
-export interface CloseObligations {
-  state: CloseObligationsState;
-  /** The session the recorded report is about; null when it never resolved. */
-  sessionNumber: number | null;
-  /** `would-close` / `would-refuse` / `undecided-backstop-would-route`. */
-  verdict: string | null;
-  /** ISO timestamp the projection was computed at, for the "as of" label. */
-  generatedAt: string | null;
-  /** Empty whenever the state is `absent` or `unreadable`. */
-  obligations: CloseObligation[];
-}
-
 export interface SessionSet {
   name: string;
-  // Set 087 Session 1: the VALIDATED module attribution — the spec's
-  // `module:` key when it names a `docs/modules.yaml` slug, else null
-  // (the implicit module: absent manifest, absent key, or a declared
-  // slug the manifest doesn't know). `moduleTitle` is the manifest
-  // entry's display title (null exactly when `module` is null). Grouping
-  // attributes only — never identity; every name-keyed lookup
-  // (`findSetBySlug`, prerequisite resolution, the cross-root merge)
-  // stays keyed on `name` alone.
+  // Validated module attribution: the spec's `module:` key when it names
+  // a docs/modules.yaml slug, else null. Grouping only — never identity.
   module: string | null;
   moduleTitle: string | null;
-  // Set 087 Session 2 (routed ruling Q3, saved raw at
-  // s2-explorer-render-architecture.json): the validated module's index
-  // in its root's docs/modules.yaml `modules:` list — the Explorer's
-  // module DISPLAY order (manifest file order). Stamped at scan time so
-  // the view-model's `groupByModule(all)` stays pure and multi-root
-  // merges carry their ordering with the data. Null exactly when
-  // `module` is null (the implicit module, which always sorts last).
+  // The validated module's index in its root's manifest list (display
+  // order). Null exactly when `module` is null.
   moduleOrder: number | null;
-  // Set 098 Session 1: the VALIDATED lifecycle-set kind — the spec's
-  // `kind:` key when it names a `SessionSetKind` member, else undefined
-  // (absent key, or a declared-but-unknown value that warned at scan
-  // time and degrades to an ordinary work set). Undefined on every
-  // ordinary work set, so a workspace with no lifecycle sets renders
-  // byte-identically to pre-098 — no rendering change ships in this
-  // set (Set 100 owns kind-aware rows).
+  // Validated lifecycle-set kind; undefined on ordinary work sets and on
+  // declared-but-unknown values (which degrade to ordinary work sets).
   kind?: SessionSetKind;
   dir: string;
   specPath: string;
   activityPath: string;
   changeLogPath: string;
   statePath: string;
-  aiAssignmentPath: string;
-  uatChecklistPath: string;
+  root: string;
   state: SessionState;
   totalSessions: number | null;
   sessionsCompleted: number;
-  lastTouched: string | null;
-  liveSession: LiveSession | null;
-  config: SessionSetConfig;
-  uatSummary: UatSummary | null;
-  root: string;
-  // Set 030 Session 5: true when this set's session-state.json needs
-  // a one-shot migration to the next canonical schema. The tree
-  // renders a "(needs migration)" badge and exposes a context-menu
-  // migrate command. Default false; absent / broken state files do
-  // not flag (the v3 reader's tolerant path already handles
-  // missing-file display).
-  //
-  // Set 047 Session 3: extended to flag v3 → v4 migrations too. The
-  // overall `needsMigration` boolean drives the badge (which is the
-  // same colored chip regardless of target version); the
-  // `migrationTargetSchemaVersion` field tells the ActionRegistry
-  // which migrate command to surface in the right-click menu.
-  needsMigration: boolean;
-  // Set 047 Session 3: which canonical schema version is the
-  // migration target. 3 → operator needs to run "Migrate to v3
-  // schema" first (v1/v2 source, or broken-v3 with no sessions[]).
-  // 4 → "Migrate to v4 schema" (canonical v3 with sessions[]). null
-  // → no migration needed (already at v4 or no state file to act on).
-  // Reading the badge: `needsMigration === (migrationTargetSchemaVersion !== null)`.
-  migrationTargetSchemaVersion: 3 | 4 | null;
-  // Set 050 Session 4 (Explorer UX revision): the raw `schemaVersion`
-  // the set's state file carries on disk — the version it "ran under" —
-  // or null when the field is absent / unreadable. Surfaced ONLY to
-  // populate the unobtrusive asterisk's "Ran under schema v<N>" tooltip
-  // that replaces the old intrusive "(needs migration)" row label
-  // (operator non-goal: old schema is acceptable; no per-row nag). Not
-  // a migration signal itself — `needsMigration` remains the driver.
+  currentSession: number | null;
+  verificationVerdict: string | null;
+  forceClosed: boolean;
   schemaVersionOnDisk: number | null;
-  // Set 047 Session 5 (spec §3.3): prerequisites authored under the
-  // set's ``spec.md`` ``Session Set Configuration`` block. `null`
-  // when the field is absent (no dependency declared); empty array
-  // when the spec wrote `prerequisites: []` explicitly. Carried on
-  // the SessionSet record so the renderer can surface the slug list
-  // in tooltips / decorations without re-parsing the spec.
+  invariantViolation: string | null;
+  orchestrator: OrchestratorInfo | null;
+  startedAt: string | null;
+  // Newest artifact mtime, for bucket ordering. Rendering only.
+  lastTouched: string | null;
+  // Raw declared config; `module`/`kind` above are the validated forms.
+  config: SessionSetConfig;
   prerequisites: SessionSetPrerequisite[] | null;
-  // Set 047 Session 5 (spec §3.3): derived by `readSessionSets` —
-  // `true` iff at least one prerequisite's target set has a `status`
-  // that does not satisfy the declared `condition`. A `complete`
-  // condition is satisfied by `state === "complete"`; everything
-  // else is "still blocking". Unknown prereq slugs (typo, missing
-  // set) keep `blockedByPrereqs: true` so a typo doesn't silently
-  // unblock the row. False when `prerequisites` is null or empty.
-  // Set 061 Session 2 (spec D3): kept for compatibility; always equals
-  // `unsatisfiedPrereqs.length > 0`.
+  // Always equals `unsatisfiedPrereqs.length > 0`.
   blockedByPrereqs: boolean;
-  // Set 061 Session 2 (spec D3): the full unsatisfied list behind
-  // `blockedByPrereqs` — slug, required condition, and the target's
-  // current state ("unknown" for unresolvable slugs). Derived in-memory
-  // by the same cross-reference pass; never persisted. Empty when the
-  // row is unblocked.
   unsatisfiedPrereqs: UnsatisfiedPrerequisite[];
-  // Set 110 Session 2 (operator ask 1, 2026-08-04): the normalized
-  // `sessions[]` ledger, surfaced so the Work Explorer's FOURTH tree
-  // level (the sessions inside a set) can be built from memory. The
-  // scanner already parses and normalizes this array while reading the
-  // state file and then discards it — carrying it costs **no additional
-  // disk read**, which is what keeps the fourth level off the startup
-  // path S1 measured. Empty array when the state file is unreadable or
-  // carries no usable ledger. A set with NO state file is not one of
-  // those cases: `inferStateInMemory` derives a not-started view from the
-  // spec (Set 115 S1 — in memory; no file is written), so such a set
-  // lists its PLANNED sessions, all `not-started`. Entries are narrowed to
-  // the three display fields; per-session extras the ledger carries
-  // (`type`, `verificationVerdict`, …) are deliberately NOT lifted here
-  // — their consumers read the ledger through `tierLegibility`.
-  //
-  // Optional for the same reason `workflowState` and `duplicateNameError`
-  // are: fixture-shaped records built by the Layer-2 suite need no update,
-  // and absent reads identically to empty (no session rows). The single
-  // production construction site — `readSessionSets` in `fileSystem.ts` —
-  // always populates it.
-  sessions?: SessionRecord[];
-  // Set 114 Session 3: the source data for the FIFTH tree level — the
-  // in-flight session's steps, as the step checklist renders them.
-  //
-  // Carried, not computed, and populated ONLY for a set whose state is
-  // `in-progress` (decisions.jsonl, session 3): 45 of this repo's 46 sets
-  // pay nothing, and the entries come out of the `activity-log.json` parse
-  // the scan already performs, so the only added cost on an in-flight set
-  // is one `spec.md` read for `specSteps` — the same file
-  // `parseSessionSetConfig` and `parsePrerequisites` each already read.
-  //
-  // `undefined` / `null` means "no step children", which is exactly the
-  // degradation an absent or unreadable activity log must produce: no
-  // children, never a stale or invented list.
-  stepLedger?: SessionStepLedger | null;
-  // Set 115 Session 4: the in-flight session's close-out obligations, read
-  // from the set's git-ignored `.dabbler/close-obligations.json`.
-  //
-  // Same shape of contract as `stepLedger` above — populated ONLY for a
-  // set whose state is `in-progress`, so every other set pays nothing —
-  // but the cost here is a genuinely new read (the projection plus a
-  // digest pass over the set directory), which is why it is gated on the
-  // one set at most that can use it.
-  //
-  // `undefined` / `null` means the tree shows no close-out row at all.
-  // An ABSENT projection is not that: it is a real state the operator is
-  // told about, because "nobody has computed this yet" and "there is
-  // nothing to compute" are opposite facts.
-  closeObligations?: CloseObligations | null;
-  // Set 087 Session 1: the fail-loud duplicate-set-name flag, set by
-  // `readAllSessionSetsWithDiagnostics` on the ONE merged row shown for
-  // a collided name. Undefined everywhere else (and always on the
-  // per-root `readSessionSets` output — collisions are a cross-root
-  // property). Optional so the no-collision path stays byte-identical
-  // to pre-087 and fixture-shaped records need no update.
+  // The normalized sessions ledger, with steps populated on the
+  // in-flight session only. Empty when the projection was unavailable
+  // (no python, projection error) — the set still renders from its
+  // fallback scan, just without session rows.
+  sessions: SessionRecord[];
   duplicateNameError?: DuplicateNameError;
-}
-
-// Set 052 S2: reconciled with the on-disk schema the router actually
-// writes (`ai_router/metrics.py` → `router-metrics.jsonl`). The
-// pre-Set-052 shape used `session_num`, a field the router never
-// emits — it writes `session_number` — so the CSV export silently
-// produced blank columns. `call_type` is carried so the reader can
-// drop `adjudication` bookkeeping rows (no model, zero cost). Optional
-// fields tolerate older/sparser lines.
-export interface MetricsEntry {
-  session_set: string;
-  session_number: number;
-  model: string;
-  effort: string;
-  input_tokens: number;
-  output_tokens: number;
-  cost_usd: number;
-  timestamp: string;
-  call_type?: string;
-}
-
-export interface CostSummary {
-  totalCost: number;
-  bySessionSet: Record<string, { sessions: number; cost: number; lastRun: string }>;
-  byModel: Record<string, number>;
-  dailyCosts: Array<{ date: string; cost: number }>;
 }

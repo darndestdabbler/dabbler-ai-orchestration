@@ -1,43 +1,36 @@
-import * as vscode from "vscode";
-import * as crypto from "crypto";
+// Workspace discovery and the session-set scan.
+//
+// The scan's job is assembly, not derivation: per-set display state comes
+// from the Python projection (utils/projection.ts); this module discovers
+// roots and set directories, parses the few spec-level grouping
+// attributes the tree needs (module, kind, prerequisites), validates them
+// against docs/modules.yaml, and merges cross-root duplicates (a main
+// checkout and its worktrees legitimately carry copies of one set).
+
+import * as cp from "child_process";
 import * as fs from "fs";
 import * as path from "path";
+import * as vscode from "vscode";
 import * as YAML from "yaml";
-import { listGitWorktrees } from "./git";
-import { inferStateInMemory, readStatus } from "./sessionState";
-import { isCancelled, readCancellationState } from "./cancelLifecycle";
-import { readProgress, SessionStateInvariantError, normalizeToV4Shape, canonicalizeStatus } from "./progress";
-import { parseSpecSteps, sessionFlightFacts } from "../providers/sessionStepModel";
 import {
-  CloseObligation,
-  CloseObligations,
-  CloseObligationsState,
   DuplicateNameCollision,
   ModuleManifestEntry,
-  SessionRecord,
   SessionSet,
-  SessionState,
   SessionSetConfig,
   SessionSetKind,
   SessionSetPrerequisite,
-  SessionStepEntry,
-  SessionStepLedger,
-  TriStateFlag,
+  SessionState,
   UnsatisfiedPrerequisite,
-  UatSummary,
-  LiveSession,
 } from "../types";
+import { ProjectionCache, ProjectionResult, projectAll } from "./projection";
+import { resolvePythonInterpreter } from "./pythonInterpreter";
 
 export const SESSION_SETS_REL = path.join("docs", "session-sets");
 export const MODULES_MANIFEST_REL = path.join("docs", "modules.yaml");
-export const PLAYWRIGHT_REL_DEFAULT = "tests";
 
 /**
- * Set 098 S2: directory basenames directly under ``docs/session-sets``,
- * ``_``-prefixed dirs skipped — mirrors ``ai_router.resolve_set._list_set_dirs``
- * (no ``spec.md`` / ``session-state.json`` requirement, so a freshly-scaffolded
- * dir still counts toward next-number resolution). Feeds
- * {@link nextSessionSetNumberFrom} for `scaffoldModuleLifecycleSets`.
+ * Directory basenames directly under docs/session-sets, `_`-prefixed
+ * dirs skipped — mirrors the Python resolver's listing rule.
  */
 export function listSessionSetDirNames(root: string): string[] {
   const dir = path.join(root, SESSION_SETS_REL);
@@ -49,139 +42,31 @@ export function listSessionSetDirNames(root: string): string[] {
     .sort();
 }
 
-/**
- * Set 094: a genuinely ATOMIC, symlink-safe, no-replace create — the trust
- * boundary for the create-on-demand docs/modules.yaml ensure-write
- * (adjudication A). Writes `content` to `absPath`, or throws an
- * `EEXIST`-coded error when ANY directory entry already exists there (a
- * regular file, a directory, or a symlink — including a dangling one),
- * NEVER following the link to its target.
- *
- * The SAFETY mechanism is the atomic publish, NOT any precheck. Round-4
- * verifier catch: neither an O_EXCL `wx` write nor an `lstat`+`wx` pair is both
- * atomic AND symlink-safe cross-platform — `wx` alone follows a reparse point
- * on Windows (writing THROUGH a dangling symlink to an out-of-workspace
- * target), and an `lstat` precheck GATING a `wx` write reintroduces a
- * write-through race. Instead, the absent case publishes with a HARD LINK:
- * write the content to an UNPREDICTABLE same-directory temp, then `fs.linkSync`
- * creates the destination name in ONE syscall and fails `EEXIST` when any entry
- * already exists there — on both POSIX (`link(2)`) and Windows
- * (`CreateHardLink`), WITHOUT following a symlink. Even if an entry RACES in
- * after the fast-path stat, `linkSync` still fails EEXIST and never
- * follows/replaces it, so a dangling manifest symlink can never be written
- * through. Hard links need no elevation (unlike symlink creation) and work on
- * NTFS / POSIX filesystems.
- *
- * Round-6 verifier catch: the EXISTING case is short-circuited by a no-follow
- * `lstat` FAST-PATH so it fails `EEXIST` WITHOUT staging a temp beside the
- * file — opening an existing manifest must not require WRITING next to it (it
- * would otherwise surface EACCES/EROFS/ENOSPC on a read-only or full `docs/`).
- * The fast-path is an optimization only; the linkSync is what guards the race.
- *
- * Round-7 verifier catch: (1) hard links are unsupported on some filesystems
- * (FAT/exFAT, some network/virtual FS), where `linkSync` fails ENOTSUP/EPERM.
- * Rather than fall back to a create that could follow a racing symlink (the
- * round-4 hazard), the primitive FAILS LOUD with an actionable message — a
- * Dabbler workspace is expected on a hard-link-capable filesystem (NTFS / APFS
- * / ext*). (2) `ops` is injectable so a test can PROVE the existing-destination
- * fast-path never stages a temp, and exercise the link-unsupported branch,
- * without an exotic real filesystem.
- */
-export interface ExclusiveWriteOps {
-  /** `fs.lstatSync` — throws `ENOENT` when absent; never follows a symlink. */
-  lstat(absPath: string): void;
-  /** O_EXCL write (`fs.writeFileSync(p, data, { flag: "wx" })`). */
-  writeExclusive(absPath: string, data: string): void;
-  /** `fs.linkSync` — atomic no-replace, no-follow hard-link publish. */
-  link(fromAbs: string, toAbs: string): void;
-  /** Best-effort remove (`fs.rmSync(p, { force: true })`). */
-  remove(absPath: string): void;
-}
-
-const NODE_EXCLUSIVE_WRITE_OPS: ExclusiveWriteOps = {
-  lstat: (p) => void fs.lstatSync(p),
-  writeExclusive: (p, data) =>
-    fs.writeFileSync(p, data, { encoding: "utf8", flag: "wx" }),
-  link: (from, to) => fs.linkSync(from, to),
-  remove: (p) => fs.rmSync(p, { force: true }),
-};
-
-/** Error codes a hard-link create reports when the destination filesystem does
- *  not support hard links (FAT/exFAT, some network / virtual filesystems). */
-const LINK_UNSUPPORTED_CODES = new Set([
-  "ENOTSUP",
-  "EOPNOTSUPP",
-  "EPERM",
-  "EMLINK",
-  "EXDEV",
-]);
-
-export function writeFileExclusiveSync(
-  absPath: string,
-  content: string,
-  ops: ExclusiveWriteOps = NODE_EXCLUSIVE_WRITE_OPS,
-): void {
-  // Fast path (round-6): an EXISTING destination fails `EEXIST` via a no-follow
-  // `lstat` WITHOUT staging a temp beside it — so opening an already-present
-  // manifest never fails merely because `docs/` is read-only or full. `lstat`
-  // never follows, so a file, directory, or dangling symlink all count as
-  // present. This stat is ONLY an optimization for the present case — the
-  // ABSENT case's safety comes entirely from the atomic `link` below.
-  let destExists = false;
+export function listGitWorktrees(cwd: string): string[] {
+  let out: string;
   try {
-    ops.lstat(absPath);
-    destExists = true;
-  } catch (e) {
-    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e; // a real stat error
+    out = cp.execFileSync("git", ["worktree", "list", "--porcelain"], {
+      cwd,
+      encoding: "utf8",
+      windowsHide: true,
+      maxBuffer: 1024 * 1024,
+      timeout: 5000,
+    });
+  } catch {
+    return [];
   }
-  if (destExists) {
-    const err: NodeJS.ErrnoException = new Error(`EEXIST: ${absPath} already exists`);
-    err.code = "EEXIST";
-    throw err;
-  }
-
-  // Destination absent -> atomic, no-replace, no-follow publish. Same-directory
-  // temp so the hard link stays on one filesystem/volume; the pid + random
-  // suffix makes the staging name unpredictable and collision-free.
-  const tmp = `${absPath}.${process.pid}.${crypto
-    .randomBytes(6)
-    .toString("hex")}.dabbler-exclusive-tmp`;
-  ops.writeExclusive(tmp, content);
-  try {
-    // If an entry (file / directory / symlink) RACED in after the lstat above,
-    // `link` fails EEXIST here and NEVER follows or replaces it — no dangerous
-    // write-through window (round-4). One syscall.
-    ops.link(tmp, absPath);
-  } catch (e) {
-    const code = (e as NodeJS.ErrnoException).code;
-    if (code && LINK_UNSUPPORTED_CODES.has(code)) {
-      // Round-7: the filesystem lacks hard-link support. Fail loud with an
-      // actionable message rather than a racy O_EXCL fallback (which could
-      // follow a symlink on Windows — the round-4 hazard). No manifest written.
-      throw new Error(
-        `Could not create ${absPath} atomically: this workspace's filesystem ` +
-          `does not support hard links (${code}). Move the project to a ` +
-          `filesystem with hard-link support (NTFS, APFS, ext4, …), then retry.`,
-      );
-    }
-    throw e; // EEXIST (a racing create) or a genuine I/O error — surfaced as-is.
-  } finally {
-    // Best-effort: drop the staging link whether the publish succeeded (content
-    // now lives at absPath) or threw (absPath untouched). An orphaned
-    // unpredictable-named temp is harmless.
-    try {
-      ops.remove(tmp);
-    } catch {
-      /* leftover temp is harmless; the destination is what matters */
+  const paths: string[] = [];
+  for (const line of out.split(/\r?\n/)) {
+    if (line.startsWith("worktree ")) {
+      const wt = line.slice("worktree ".length).trim();
+      if (wt) paths.push(path.resolve(wt));
     }
   }
+  return paths;
 }
 
-// Cancelled sets sort below all other groups in the merge logic — Set 8
-// keeps cancelled state as the lowest precedence so a set that exists in
-// two roots (one cancelled, one active) prefers the active copy when
-// dedup-merging. Within a single root the file-presence rule still wins
-// because readSessionSets has already resolved each entry's state.
+// Cancelled sorts lowest so a set present in two roots (one cancelled,
+// one active) prefers the active copy when dedup-merging.
 const STATE_RANK: Record<SessionState, number> = {
   complete: 3,
   "in-progress": 2,
@@ -189,16 +74,13 @@ const STATE_RANK: Record<SessionState, number> = {
   cancelled: 0,
 };
 
-// Set 087 Session 1: one discovered root plus the identity of the git
-// repository ("family") it belongs to. A workspace folder and every
-// worktree it enumerates share one `familyId` (the realpath of the
-// repo's MAIN worktree — the first `git worktree list` entry, which git
-// guarantees lists first); a non-git folder is its own family. The
-// familyId is what lets the duplicate-set-name check tell the
-// legitimate cross-root merge (same repo, main checkout + worktrees)
-// apart from a true collision (two different repos sharing a set name).
-// Derived entirely from the worktree enumeration discovery already
-// runs — no additional git calls.
+/**
+ * One discovered root plus the identity of the git repository ("family")
+ * it belongs to: a workspace folder and every worktree it enumerates
+ * share one familyId (the realpath of the repo's main worktree). The
+ * familyId lets the duplicate-name check tell the legitimate cross-root
+ * merge apart from a true collision (two different repos, one name).
+ */
 export interface DiscoveredRoot {
   dir: string;
   familyId: string;
@@ -207,13 +89,9 @@ export interface DiscoveredRoot {
 export function discoverRootsWithFamilies(): DiscoveredRoot[] {
   const seen = new Map<string, string>();
   const order: DiscoveredRoot[] = [];
-  // Set 077 S1 (verifier round 2): dedup on the filesystem's own
-  // canonical form, not an OS-name proxy — realpath collapses case
-  // variants only where the volume itself is case-insensitive (so
-  // case-sensitive APFS/Linux keep distinct roots distinct), and
-  // resolves symlinked duplicates as a bonus. Fall back to the
-  // resolved path when realpath fails (nonexistent target — filtered
-  // by the existsSync check below).
+  // Dedup on the filesystem's own canonical form: realpath collapses
+  // case variants only where the volume is case-insensitive, and
+  // resolves symlinked duplicates as a bonus.
   const canonicalKey = (p: string): string => {
     try {
       return fs.realpathSync.native(p);
@@ -229,9 +107,6 @@ export function discoverRootsWithFamilies(): DiscoveredRoot[] {
     seen.set(key, canonical);
     order.push({ dir: canonical, familyId });
   };
-  // One worktree enumeration per workspace folder (same git-call count
-  // as before Set 087 — the list is reused for both the familyId and
-  // the worktree-root additions below).
   const folders = (vscode.workspace.workspaceFolders ?? []).map((f) => {
     const folderPath = path.resolve(f.uri.fsPath);
     const worktrees = listGitWorktrees(folderPath);
@@ -242,13 +117,9 @@ export function discoverRootsWithFamilies(): DiscoveredRoot[] {
     );
     return { folderPath, worktrees, familyId };
   });
+  for (const f of folders) add(f.folderPath, f.familyId);
   for (const f of folders) {
-    add(f.folderPath, f.familyId);
-  }
-  for (const f of folders) {
-    for (const wt of f.worktrees) {
-      add(wt, f.familyId);
-    }
+    for (const wt of f.worktrees) add(wt, f.familyId);
   }
   return order;
 }
@@ -257,225 +128,19 @@ export function discoverRoots(): string[] {
   return discoverRootsWithFamilies().map((r) => r.dir);
 }
 
-// Detect a stale `status: "complete"` snapshot that doesn't actually
-// reflect a finished set. Set 030 Session 3 collapses the old Set 022 +
-// Set 023 multi-signal guard into a single v3-invariant probe: the v3
-// reader (`readProgress`) validates that `sessions[]` matches the
-// top-level `status`, and any drift surfaces as a rule-4/7 violation.
-// The v2 read path goes through `synthesizeV3FromV2` first; a v2
-// snapshot with `status: "complete"` but an empty/short
-// `completedSessions[]` synthesizes to a sessions[] that fails rule 7,
-// flagging the same drift cases (count mismatch, final-session signal
-// gap) without the explicit predicate ladder.
-//
-// Set 047 Session 2: `readProgress` itself runs through
-// `normalizeToV4Shape` now, so this probe is robust to both v3 and v4
-// state-file shapes. The v2-compat ledger-merge below stays unchanged
-// — it operates on the raw parsed dict before any normalization.
-//
-// V2-compat: pre-Set-022 snapshots without `completedSessions[]` get
-// their array pre-populated from the events ledger before synthesis,
-// so a legacy snapshot whose ledger has all closeouts still validates
-// cleanly (no false drift downgrade).
-//
-// Returns false on parse failure — trust the canonical status rather
-// than second-guessing on garbled input. Returns true ONLY when the v3
-// invariants themselves reject the snapshot.
-export function isMidSetComplete(statePath: string): boolean {
-  if (!fs.existsSync(statePath)) return false;
-  let sd: any;
-  try {
-    sd = JSON.parse(fs.readFileSync(statePath, "utf8"));
-  } catch {
-    return false; // parse error: trust the canonical status
-  }
-  if (sd === null || typeof sd !== "object" || Array.isArray(sd)) return false;
-  // V2-compat ledger merge: same shape as the readSessionSets path.
-  let stateForProgress: any = sd;
-  if (
-    sd.sessions === undefined &&
-    (!Array.isArray(sd.completedSessions) || sd.completedSessions.length === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
-  ) {
-    const eventsPath = path.join(path.dirname(statePath), "session-events.jsonl");
-    const ledgerSessions = readClosedSessionsFromLedger(eventsPath);
-    if (ledgerSessions.length > 0) {
-      stateForProgress = { ...sd, completedSessions: ledgerSessions };
-    }
-  }
-  const specPath = path.join(path.dirname(statePath), "spec.md");
-  try {
-    readProgress(stateForProgress, specPath);
-    return false; // invariants hold — snapshot is internally consistent
-  } catch (e) {
-    if (e instanceof SessionStateInvariantError) {
-      return true; // drift: invariants violated
-    }
-    return false; // TypeError / other: trust canonical status
-  }
-}
+const QUOTED_SCALAR = (key: string) =>
+  new RegExp(
+    `^\\s*${key}\\s*:\\s*(?:"([\\w-]+)"|'([\\w-]+)'|([\\w-]+))\\s*(?:#.*)?$`,
+    "im",
+  );
 
-// Set 030 Session 3: v2-compat helper used to pre-populate
-// `completedSessions[]` on a v2 snapshot whose state file lacks the
-// field. Returns the sorted, deduplicated list of session numbers the
-// events ledger records as closed via `closeout_succeeded`. Empty
-// list on any read/parse failure or when the file is absent.
-function readClosedSessionsFromLedger(eventsPath: string): number[] {
-  if (!fs.existsSync(eventsPath)) return [];
-  let text: string;
-  try {
-    text = fs.readFileSync(eventsPath, "utf8");
-  } catch {
-    return [];
-  }
-  const seen = new Set<number>();
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) continue;
-    try {
-      const event = JSON.parse(line) as {
-        session_number?: number;
-        event_type?: string;
-      };
-      if (
-        event.event_type === "closeout_succeeded" &&
-        typeof event.session_number === "number" &&
-        Number.isInteger(event.session_number) &&
-        event.session_number > 0
-      ) {
-        seen.add(event.session_number);
-      }
-    } catch {
-      // skip malformed lines — append-only ledger may carry partial writes
-    }
-  }
-  return [...seen].sort((a, b) => a - b);
-}
-
-// Set 022 Session 2: events-ledger fallback for `sessionsCompleted`.
-// Returns the count of distinct `closeout_succeeded` session numbers
-// in `session-events.jsonl`. Used as the v2-compat fallback for
-// pre-Set-022 snapshots (and pre-Set-030 consumer-repo snapshots)
-// whose state file lacks both v3 sessions[] and v2 completedSessions[]
-// — without a snapshot signal, the ledger is the next-best source.
-// Returns 0 on any read/parse failure or when the file is absent —
-// the caller treats 0 as "no authoritative signal" and falls through
-// to the next derivation step rather than asserting "0 sessions done."
-export function countDistinctCloseoutSessions(eventsPath: string): number {
-  if (!fs.existsSync(eventsPath)) return 0;
-  let text: string;
-  try {
-    text = fs.readFileSync(eventsPath, "utf8");
-  } catch {
-    return 0;
-  }
-  const seen = new Set<number>();
-  for (const raw of text.split(/\r?\n/)) {
-    const line = raw.trim();
-    if (!line) continue;
-    try {
-      const event = JSON.parse(line) as {
-        session_number?: number;
-        event_type?: string;
-      };
-      if (
-        event.event_type === "closeout_succeeded" &&
-        Number.isInteger(event.session_number) &&
-        (event.session_number as number) > 0
-      ) {
-        seen.add(event.session_number as number);
-      }
-    } catch {
-      // skip malformed lines — append-only ledger may carry partial writes
-    }
-  }
-  return seen.size;
-}
-
-// Set 110 Session 2: narrow the normalized `sessions[]` ledger down to
-// the three display fields the Work Explorer's fourth tree level needs.
-// Deliberately TOLERANT in exactly the way every other reader in this
-// file is: a non-array, a non-object entry, a missing/non-integer
-// `number` or an unrecognized `status` drops that entry rather than
-// failing the whole scan, because a malformed ledger must degrade to
-// "fewer session rows", never to "this set does not render".
-//
-// `title` falls back to `Session <n>` — the same label the sanctioned
-// Python writer emits — so a ledger written by an older schema (or
-// hand-edited to drop the field) still produces a legible row instead
-// of an empty one.
-const _SESSION_STATUSES: ReadonlySet<string> = new Set([
-  "not-started",
-  "in-progress",
-  "complete",
-  "cancelled",
-]);
-
-export function normalizeLedgerSessions(raw: unknown): SessionRecord[] {
-  if (!Array.isArray(raw)) return [];
-  const out: SessionRecord[] = [];
-  // Session numbers are the row identity the Work Explorer's fourth level
-  // builds its `TreeItem.id` from (`session:<set>/<n>`), and VS Code keys
-  // selection and expansion state on that id. A DUPLICATE number in a
-  // hand-edited or corrupt ledger would therefore make two rows share one
-  // identity and move together, so the first occurrence wins and later
-  // ones are dropped rather than rendered. (Verification round 1 nit,
-  // raised independently by both fan-out calls.)
-  const seen = new Set<number>();
-  for (const entry of raw) {
-    if (entry === null || typeof entry !== "object") continue;
-    const e = entry as { number?: unknown; title?: unknown; status?: unknown };
-    // `typeof true === "boolean"`, so no bool/int confusion here — but
-    // guard the integer-ness explicitly anyway, since a float or a
-    // numeric string would otherwise produce a nonsense row number.
-    // Numbers are 1-indexed everywhere in the workflow, so zero and
-    // negatives are corrupt rather than merely unusual.
-    if (typeof e.number !== "number" || !Number.isInteger(e.number)) continue;
-    if (e.number < 1) continue;
-    if (seen.has(e.number)) continue;
-    // Set 115 S3: every `continue` above DROPS a session rather than
-    // rendering it degraded, so the returned array can carry a HOLE in its
-    // numbering where a corrupt entry used to be. A consumer that reads
-    // past such a hole is reading a ledger the scan already refused to
-    // believe: `rowMenuHelpers.nextRunnableSessionNumber` therefore treats
-    // a number gap as "unknowable" rather than walking through it. Any
-    // future consumer that asks a sequential question of this array owes
-    // the same check.
-    if (typeof e.status !== "string" || !_SESSION_STATUSES.has(e.status)) continue;
-    const rawTitle = typeof e.title === "string" ? e.title.trim() : "";
-    seen.add(e.number);
-    out.push({
-      number: e.number,
-      // Trimmed, not just trim-TESTED: a whitespace-padded ledger title
-      // would otherwise render with the padding intact.
-      title: rawTitle.length > 0 ? rawTitle : `Session ${e.number}`,
-      status: e.status as SessionRecord["status"],
-    });
-  }
-  return out;
-}
-
+/**
+ * Parse the spec's `Session Set Configuration` YAML block for the two
+ * grouping attributes the tree reads. Raw capture only; validation
+ * against docs/modules.yaml lives in the scan.
+ */
 export function parseSessionSetConfig(specPath: string): SessionSetConfig {
-  // Set 048 Session 2: defaults are conservative — `requiresUAT: false`,
-  // `requiresE2E: false`.
-  // Set 087 Session 1: `module` joins the parsed fields — the raw
-  // declared grouping slug, validated against docs/modules.yaml by the
-  // caller (readSessionSets), never here (the parser has no root
-  // context). Absent defaults to null (the implicit module).
-  // Set 098 Session 1: `kind` joins the parsed fields — the raw
-  // declared lifecycle-set identity, validated by the caller the same
-  // way. Absent stays undefined (an ordinary work set).
-  // Set 112 S2: `tier` and `verificationMode` are gone with the
-  // Lightweight tier. A spec that still declares `tier: lightweight` is
-  // refused by the router's loader (ai_router/spec_config.py); the
-  // Explorer is a READER, so it neither honors nor flags the dead field
-  // — the routed CLIs are the boundary that fails loud.
-  const config: SessionSetConfig = {
-    requiresUAT: false,
-    requiresE2E: false,
-    uatScope: "none",
-    module: null,
-  };
-  if (!fs.existsSync(specPath)) return config;
+  const config: SessionSetConfig = { module: null };
   let text: string;
   try {
     text = fs.readFileSync(specPath, "utf8");
@@ -483,86 +148,27 @@ export function parseSessionSetConfig(specPath: string): SessionSetConfig {
     return config;
   }
   const headingMatch = text.match(
-    /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i
+    /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i,
   );
   const block = headingMatch ? headingMatch[1] : text;
-  // Set 048 Session 2: triStateRe accepts `true | false | suggested` (with
-  // optional surrounding quotes on `suggested` since YAML allows either).
-  const triStateRe = (key: string) =>
-    new RegExp(
-      `^\\s*${key}\\s*:\\s*(?:"(suggested)"|(true|false|suggested))\\s*(?:#.*)?$`,
-      "im",
-    );
-  // Set 061 S1 (verifier fix S061-S1-V1-001): accept optional single or
-  // double quotes around scalar enum values — YAML allows either, and
-  // the tri-state parser above already accepts quoted "suggested".
-  const stringRe = (key: string) =>
-    new RegExp(
-      `^\\s*${key}\\s*:\\s*(?:"([\\w-]+)"|'([\\w-]+)'|([\\w-]+))\\s*(?:#.*)?$`,
-      "im",
-    );
-  const stringValue = (m: RegExpMatchArray | null): string | null =>
+  const value = (m: RegExpMatchArray | null): string | null =>
     m ? (m[1] ?? m[2] ?? m[3] ?? null) : null;
-  const parseTriState = (m: RegExpMatchArray | null): TriStateFlag | null => {
-    if (!m) return null;
-    const raw = (m[1] ?? m[2] ?? "").toLowerCase();
-    if (raw === "true") return true;
-    if (raw === "false") return false;
-    if (raw === "suggested") return "suggested";
-    return null;
-  };
-
-  const uat = parseTriState(block.match(triStateRe("requiresUAT")));
-  if (uat !== null) config.requiresUAT = uat;
-  const e2e = parseTriState(block.match(triStateRe("requiresE2E")));
-  if (e2e !== null) config.requiresE2E = e2e;
-  const scope = stringValue(block.match(stringRe("uatScope")));
-  if (scope) config.uatScope = scope;
-  const mod = stringValue(block.match(stringRe("module")));
+  const mod = value(block.match(QUOTED_SCALAR("module")));
   if (mod) config.module = mod;
-  // Set 098 Session 1: `kind` joins the parsed fields — the optional
-  // module-lifecycle set identity (verdict decision 5). RAW capture
-  // only, same posture as `module`: validation against the
-  // `SessionSetKind` enum (with the unknown-value warning) lives in the
-  // caller (`readSessionSets`), so the rewrite-path callers of this
-  // parser don't re-warn on every read. A value the `stringRe` scalar
-  // shape cannot match (flow list, empty, non-scalar) reads as absent.
-  const kd = stringValue(block.match(stringRe("kind")));
+  const kd = value(block.match(QUOTED_SCALAR("kind")));
   if (kd) config.kind = kd;
   return config;
 }
 
 /**
- * Set 047 Session 5: parse the optional ``prerequisites:`` field from
- * the spec's ``Session Set Configuration`` YAML block.
- *
- * Expected shape (per spec §3.3):
- *
- * ```yaml
- * prerequisites:
- *   - slug: 046-some-other-set
- *     condition: complete
- *   - slug: 044-another-set
- *     condition: complete
- * ```
- *
- * Returns ``null`` when the field is absent (no dependency declared).
- * Returns ``[]`` when ``prerequisites: []`` is written explicitly.
- * Returns the parsed list otherwise. Tolerant of operator typos:
- * entries missing ``slug`` are dropped; unrecognized ``condition``
- * values are dropped (only ``"complete"`` is in the enum today, per
- * spec §3.3).
- *
- * The parser is intentionally lightweight (regex, not a YAML parser)
- * so this module stays dependency-free and so a stray indentation
- * issue in the spec doesn't fail-closed across the entire Explorer.
- * A full YAML round-trip lives in the config-editor module; readers
- * here only need to recognize the array form.
+ * Parse the optional `prerequisites:` list from the spec's configuration
+ * block. Null when absent; [] when declared empty. Entries missing a
+ * slug are dropped; a present-but-unknown condition drops the entry (an
+ * absent condition defaults to "complete").
  */
 export function parsePrerequisites(
   specPath: string,
 ): SessionSetPrerequisite[] | null {
-  if (!fs.existsSync(specPath)) return null;
   let text: string;
   try {
     text = fs.readFileSync(specPath, "utf8");
@@ -570,27 +176,18 @@ export function parsePrerequisites(
     return null;
   }
   const headingMatch = text.match(
-    /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i
+    /##\s*Session Set Configuration[\s\S]*?```ya?ml\s*([\s\S]*?)```/i,
   );
   const block = headingMatch ? headingMatch[1] : text;
-  // Detect the key first — distinguishes "field absent" from
-  // "field present with empty list".
   const keyRe = /^\s*prerequisites\s*:(.*)$/im;
   const keyMatch = block.match(keyRe);
   if (!keyMatch) return null;
-  const inlineRest = keyMatch[1].trim();
-  // Inline empty: ``prerequisites: []`` — distinct from absent.
-  if (inlineRest === "[]") return [];
-  // Locate the list body following the key. Each entry begins with
-  // ``- slug: ...`` followed (in any order) by ``condition: ...``.
+  if (keyMatch[1].trim() === "[]") return [];
   const keyIndex = block.search(keyRe);
   if (keyIndex < 0) return null;
   const after = block.slice(keyIndex + keyMatch[0].length);
-  // Stop at the next top-level (or shallower) key. We allow nested
-  // (indented) lines until we hit a non-indented non-empty line.
-  const lines = after.split(/\r?\n/);
   const bodyLines: string[] = [];
-  for (const line of lines) {
+  for (const line of after.split(/\r?\n/)) {
     if (line.trim() === "") {
       bodyLines.push(line);
       continue;
@@ -598,94 +195,30 @@ export function parsePrerequisites(
     if (!/^\s/.test(line)) break; // next top-level key
     bodyLines.push(line);
   }
-  const body = bodyLines.join("\n");
-  // Split the body on the YAML list-item marker (``\n  - ``) so each
-  // chunk holds one entry's key/value pairs. Splitting (rather than
-  // matching with a lookahead) avoids a subtle regex-end-of-line bug
-  // where `(?=...\\s*$)` truncated multi-line entries at the first
-  // whitespace-only EOL inside the entry.
-  const chunks = body.split(/\r?\n[ \t]*-[ \t]+/);
-  // chunks[0] is the pre-list text (typically blank/whitespace);
-  // each subsequent chunk is one entry's body.
+  const chunks = bodyLines.join("\n").split(/\r?\n[ \t]*-[ \t]+/);
   const out: SessionSetPrerequisite[] = [];
-  // Strip a YAML inline comment from a scalar value
-  // (``slug: 046-foo # comment`` → ``046-foo``). Comments are stripped
-  // before matching so an operator-friendly annotation does not drop
-  // the entry. Per the YAML spec a ``#`` mid-value requires a
-  // preceding whitespace to start a comment; we honor that to avoid
-  // mangling values like ``slug: foo#bar`` (unusual, but valid).
-  const stripComment = (s: string): string =>
-    s.replace(/\s+#.*$/, "").trim();
-  // S5 verifier-fix Important-1: distinguish "no condition key
-  // present → default to complete" from "condition key present but
-  // invalid → drop the entry". The earlier all-in-one ``\S+`` capture
-  // collapsed the two cases by treating an unparseable condition
-  // (e.g., with an inline comment that broke the ``\S+`` capture) as
-  // if it were absent.
+  // A `#` mid-value needs preceding whitespace to start a YAML comment.
+  const stripComment = (s: string): string => s.replace(/\s+#.*$/, "").trim();
   for (const chunk of chunks.slice(1)) {
-    // Match the slug line; tolerate a trailing YAML comment on the
-    // value via stripComment(). Slug is mandatory.
-    const slugLineMatch = chunk.match(/^\s*slug\s*:\s*(.+)$/im);
-    if (!slugLineMatch) continue;
-    const slug = stripComment(slugLineMatch[1]);
+    const slugLine = chunk.match(/^\s*slug\s*:\s*(.+)$/im);
+    if (!slugLine) continue;
+    const slug = stripComment(slugLine[1]);
     if (!slug) continue;
-    // Detect presence of the ``condition`` key first; parse its
-    // value (with comment-strip) afterwards. Presence-with-bad-value
-    // is the drop case; absence is the default-to-"complete" case.
-    const condLineMatch = chunk.match(/^\s*condition\s*:\s*(.*)$/im);
-    let condition: "complete";
-    if (condLineMatch) {
-      const raw = stripComment(condLineMatch[1]);
-      if (raw === "complete") {
-        condition = "complete";
-      } else {
-        // Present but not in the enum → drop per spec §3.3.
-        continue;
-      }
-    } else {
-      // Absent → default to "complete".
-      condition = "complete";
-    }
-    out.push({ slug, condition });
+    const condLine = chunk.match(/^\s*condition\s*:\s*(.*)$/im);
+    if (condLine && stripComment(condLine[1]) !== "complete") continue;
+    out.push({ slug, condition: "complete" });
   }
   return out;
 }
 
 /**
- * Set 087 Session 1 (recommendation §2.4): read the module manifest at
- * ``docs/modules.yaml`` for one root.
- *
- * Returns ``null`` when the manifest is absent, unreadable, or not a
- * mapping with a ``modules:`` list — the single-implicit-module case:
- * every set groups into one unlabeled module and the Explorer renders
- * exactly today's flat view. Returns the entries in FILE ORDER (which is
- * the Explorer's module display order) otherwise; an empty array means
- * "manifest present but no usable entries" and behaves like the implicit
- * module downstream. Set 091 S1 (verdict amendment 3): a bare
- * ``modules:`` key (YAML null) is a VALID empty manifest — it reads as
- * ``[]`` exactly like a flow-style ``modules: []``, silently; only a
- * missing ``modules`` key or a wrong-typed value keeps the warn+degrade
- * path.
- *
- * Tolerant read, mirroring `parseSessionSetConfig` / `parsePrerequisites`
- * posture: entries missing a ``slug`` are dropped; a duplicate ``slug``
- * keeps the first entry (later duplicates dropped with a console.warn);
- * ``title`` defaults to the slug; ``codeRoots`` / ``touches`` keep only
- * their string members; ``planPath`` is null when absent. Unlike the two
- * markdown-embedded parsers this uses the real YAML parser — the
- * manifest is a standalone .yaml file (same posture as
- * `utils/routerConfig.ts`), not a fenced block inside a spec.
+ * Read docs/modules.yaml for one root. Null when absent, unreadable, or
+ * not a mapping with a `modules:` list (the single-implicit-module
+ * case); a bare `modules:` key is a valid empty manifest. Entries in
+ * file order — the Explorer's module display order.
  */
 export function readModulesManifest(root: string): ModuleManifestEntry[] | null {
   const manifestPath = path.join(root, MODULES_MANIFEST_REL);
-  // S1 verifier rounds 4–5: attempt the read FIRST rather than
-  // pre-classifying absence with existsSync (which reads a dangling
-  // symlink as "absent" and would skip the warning). A PRESENT manifest
-  // that cannot be read — wrong permissions, a directory, a broken
-  // symlink — is an I/O / config failure and warns before degrading to
-  // the implicit module; only a truly absent path (ENOENT with no
-  // directory entry under lstat) is silent, because that is the
-  // designed no-manifest fallback.
   let text: string;
   try {
     text = fs.readFileSync(manifestPath, "utf8");
@@ -696,13 +229,12 @@ export function readModulesManifest(root: string): ModuleManifestEntry[] | null 
         fs.lstatSync(manifestPath); // succeeds for a dangling symlink
         entryExists = true;
       } catch {
-        // no directory entry at all — truly absent
+        // truly absent — the designed no-manifest fallback, silent
       }
       if (!entryExists) return null;
     }
     console.warn(
-      `[dabblerSessionSets] ${manifestPath} exists but could not be ` +
-        `read (${e instanceof Error ? e.message : String(e)}) — ` +
+      `[dabblerSessionSets] ${manifestPath} exists but could not be read — ` +
         `falling back to the single implicit module.`,
     );
     return null;
@@ -717,10 +249,6 @@ export function readModulesManifest(root: string): ModuleManifestEntry[] | null 
     );
     return null;
   }
-  // S1 verifier round 1: a PRESENT manifest with the wrong shape is a
-  // config error, not the intentional no-manifest case — warn so the
-  // operator can tell the two apart, then degrade the same way (the
-  // implicit module must never block the Explorer).
   if (doc === null || typeof doc !== "object" || Array.isArray(doc)) {
     console.warn(
       `[dabblerSessionSets] ${manifestPath} is not a YAML mapping — ` +
@@ -729,8 +257,6 @@ export function readModulesManifest(root: string): ModuleManifestEntry[] | null 
     return null;
   }
   const rawModules = (doc as Record<string, unknown>).modules;
-  // Set 091 S1 (verdict amendment 3): a bare `modules:` parses as null
-  // and is a valid EMPTY manifest, not a config error — no warning.
   if (rawModules === null) return [];
   if (!Array.isArray(rawModules)) {
     console.warn(
@@ -751,951 +277,121 @@ export function readModulesManifest(root: string): ModuleManifestEntry[] | null 
     if (raw === null || typeof raw !== "object" || Array.isArray(raw)) continue;
     const obj = raw as Record<string, unknown>;
     const slug = typeof obj.slug === "string" ? obj.slug.trim() : "";
-    if (!slug) continue;
-    if (seen.has(slug)) {
-      console.warn(
-        `[dabblerSessionSets] duplicate module slug "${slug}" in ` +
-          `${manifestPath} — keeping the first entry.`,
-      );
-      continue;
-    }
+    if (!slug || seen.has(slug)) continue;
     seen.add(slug);
-    const title =
-      typeof obj.title === "string" && obj.title.trim() !== ""
-        ? obj.title.trim()
-        : slug;
-    const planPath =
-      typeof obj.planPath === "string" && obj.planPath.trim() !== ""
-        ? obj.planPath.trim()
-        : null;
     out.push({
       slug,
-      title,
+      title:
+        typeof obj.title === "string" && obj.title.trim() !== ""
+          ? obj.title.trim()
+          : slug,
       codeRoots: stringList(obj.codeRoots),
-      planPath,
+      planPath:
+        typeof obj.planPath === "string" && obj.planPath.trim() !== ""
+          ? obj.planPath.trim()
+          : null,
       touches: stringList(obj.touches),
     });
   }
   return out;
 }
 
-export function parseUatChecklist(checklistPath: string): UatSummary | null {
-  if (!fs.existsSync(checklistPath)) return null;
-  let data: unknown;
+const KNOWN_KINDS: ReadonlySet<string> = new Set(["plan", "decomposition"]);
+
+/** Newest artifact mtime in the set dir, for bucket ordering. */
+function lastTouchedOf(setDir: string): string | null {
+  let newest = 0;
+  let entries: string[];
   try {
-    data = JSON.parse(fs.readFileSync(checklistPath, "utf8"));
+    entries = fs.readdirSync(setDir);
   } catch {
     return null;
   }
-  const items: Record<string, unknown>[] = [];
-  const collect = (node: unknown) => {
-    if (!node || typeof node !== "object") return;
-    if (Array.isArray(node)) { for (const v of node) collect(v); return; }
-    const obj = node as Record<string, unknown>;
-    if (obj["Result"] !== undefined || obj["result"] !== undefined) {
-      items.push(obj);
-    }
-    for (const v of Object.values(obj)) collect(v);
-  };
-  collect(data);
-
-  const e2eRefs = new Set<string>();
-  let pending = 0;
-  for (const it of items) {
-    const r = (it["Result"] ?? it["result"] ?? "") as string;
-    if (r === "" || /^pending$/i.test(String(r))) pending++;
-    const ref = it["E2ETestReference"] || it["e2eTestReference"];
-    if (ref) e2eRefs.add(String(ref));
-  }
-  return { totalItems: items.length, pendingItems: pending, e2eRefs: Array.from(e2eRefs) };
-}
-
-// Set 077 Session 5 (Features 4–5): the most recent sN-issues*.json
-// envelope in a set directory, or null. TS mirror of Python's
-// `dedicated_verification.read_latest_issues_envelope`: "most recent" =
-// highest (sessionNumber, round) pair; round 1 files carry no -round-
-// suffix; malformed/unreadable files are skipped. Feeds the derived
-// workflow state (awaiting-remediation vs awaiting-human need the
-// issue dispositions).
-const ISSUES_FILE_RE = /^s(\d+)-issues(?:-round-(\d+))?\.json$/;
-
-export function readLatestIssuesEnvelope(dir: string): unknown | null {
-  let names: string[];
-  try {
-    names = fs.readdirSync(dir);
-  } catch {
-    return null;
-  }
-  let bestKey: [number, number] | null = null;
-  let bestPayload: unknown = null;
-  for (const name of names) {
-    const m = ISSUES_FILE_RE.exec(name);
-    if (!m) continue;
-    const key: [number, number] = [
-      parseInt(m[1], 10),
-      m[2] ? parseInt(m[2], 10) : 1,
-    ];
-    let payload: unknown;
+  for (const name of entries) {
     try {
-      payload = JSON.parse(fs.readFileSync(path.join(dir, name), "utf8"));
+      const st = fs.statSync(path.join(setDir, name));
+      if (st.isFile() && st.mtimeMs > newest) newest = st.mtimeMs;
     } catch {
-      continue;
-    }
-    if (
-      bestKey === null ||
-      key[0] > bestKey[0] ||
-      (key[0] === bestKey[0] && key[1] > bestKey[1])
-    ) {
-      bestKey = key;
-      bestPayload = payload;
+      /* raced deletion — skip */
     }
   }
-  return bestPayload;
+  return newest > 0 ? new Date(newest).toISOString() : null;
 }
 
 /**
- * Set 114 Session 3: assemble the in-flight session's step-ledger payload,
- * or `null` when there is nothing honest to show.
- *
- * Returns `null` — never a partial or synthesized list — in every failure
- * direction the spec's step 3 names: a set that is not in flight, a ledger
- * that never resolved a current session, an absent or unreadable activity
- * log (the caller hands in `null` for those), and a session with no
- * entries of its own. "No children" is the required degradation; a stale
- * or invented list is the failure mode being avoided.
- *
- * The `spec.md` read is the ONLY new I/O this feature adds, it happens at
- * most once per in-flight set, and it is tolerant: an unreadable spec
- * yields `[]`, which makes `planMatchesSpec` answer `false` and costs only
- * the ordinal half of reconciliation.
- *
- * Set 127 S2 adds *state*: the already-normalized `session-state.json` the
- * caller has in hand, from which `sessionFlightFacts` lifts the two facts
- * the derivation needs. No new read, and no second source of truth for
- * progress — it is the same object `readProgress` resolved
- * `currentSession` from.
+ * When the projection is unavailable (python missing, ai_router not
+ * installed), bucket by file presence — the same rule progress.py
+ * applies to a set with no state file. This is the ONE deliberate
+ * duplication of a Python rule, taken so a workspace without the router
+ * still shows its work; the scan carries the error so the tree can say
+ * the rendering is degraded.
  */
-export function buildStepLedger(
-  state: SessionState,
-  currentSession: number | null,
-  entries: SessionStepEntry[] | null,
-  specPath: string,
-  sessionState?: unknown,
-): SessionStepLedger | null {
-  if (state !== "in-progress") return null;
-  if (currentSession === null || !Array.isArray(entries)) return null;
+export function fallbackState(setDir: string): SessionState {
+  if (fs.existsSync(path.join(setDir, "CANCELLED.md"))) return "cancelled";
+  if (fs.existsSync(path.join(setDir, "change-log.md"))) return "complete";
+  if (fs.existsSync(path.join(setDir, "activity-log.json"))) return "in-progress";
+  return "not-started";
+}
 
-  const mine = entries.filter(
-    (entry) =>
-      entry &&
-      typeof entry === "object" &&
-      !Array.isArray(entry) &&
-      entry.sessionNumber === currentSession,
-  );
-  if (mine.length === 0) return null;
+function buildSessionSet(
+  root: string,
+  setDir: string,
+  manifest: ModuleManifestEntry[] | null,
+  projection: ProjectionResult,
+): SessionSet {
+  const name = path.basename(setDir);
+  const specPath = path.join(setDir, "spec.md");
+  const config = parseSessionSetConfig(specPath);
 
-  let specSteps: string[] = [];
-  try {
-    specSteps = parseSpecSteps(fs.readFileSync(specPath, "utf8"), currentSession);
-  } catch {
-    /* an unreadable spec is not an error here — see the docstring */
+  let module: string | null = null;
+  let moduleTitle: string | null = null;
+  let moduleOrder: number | null = null;
+  if (config.module && manifest) {
+    const idx = manifest.findIndex((m) => m.slug === config.module);
+    if (idx >= 0) {
+      module = manifest[idx].slug;
+      moduleTitle = manifest[idx].title;
+      moduleOrder = idx;
+    }
   }
+  const kind: SessionSetKind | undefined =
+    config.kind && KNOWN_KINDS.has(config.kind)
+      ? (config.kind as SessionSetKind)
+      : undefined;
 
-  // Narrowed on the way in, so a large `routedApiCalls` payload on a step
-  // entry is not retained for the lifetime of the scan cache.
+  const p = projection.payload;
   return {
-    sessionNumber: currentSession,
-    entries: mine.map((e) => ({
-      sessionNumber: e.sessionNumber,
-      stepNumber: e.stepNumber,
-      stepKey: e.stepKey,
-      description: e.description,
-      status: e.status,
-      kind: e.kind,
-      dateTime: e.dateTime,
-    })),
-    specSteps,
-    flight: sessionFlightFacts(sessionState, currentSession),
+    name,
+    module,
+    moduleTitle,
+    moduleOrder,
+    ...(kind ? { kind } : {}),
+    dir: setDir,
+    specPath,
+    activityPath: path.join(setDir, "activity-log.json"),
+    changeLogPath: path.join(setDir, "change-log.md"),
+    statePath: path.join(setDir, "session-state.json"),
+    root,
+    state: p ? p.set.status : fallbackState(setDir),
+    totalSessions: p ? p.set.totalSessions : null,
+    sessionsCompleted: p ? p.set.sessionsCompleted : 0,
+    currentSession: p ? p.set.currentSession : null,
+    verificationVerdict: p ? p.set.verificationVerdict : null,
+    forceClosed: p ? p.set.forceClosed : false,
+    schemaVersionOnDisk: p ? p.set.schemaVersionOnDisk : null,
+    invariantViolation: p ? p.set.invariantViolation : null,
+    orchestrator: p ? p.set.orchestrator : null,
+    startedAt: p?.sessions.find((s) => s.inFlight)?.startedAt ?? null,
+    lastTouched: lastTouchedOf(setDir),
+    config,
+    prerequisites: parsePrerequisites(specPath),
+    blockedByPrereqs: false,
+    unsatisfiedPrereqs: [],
+    sessions: p ? p.sessions : [],
   };
 }
 
-// ---------------------------------------------------------------------------
-// Set 115 Session 4 — the close-out obligation projection
-// ---------------------------------------------------------------------------
-
-/**
- * Where `ai_router.close_preflight --write` puts its projection. The
- * directory is git-ignored on purpose (see that module's header): the
- * file is a per-machine cache written mid-session, and a tracked one
- * would land inside the verification stamp's work diff every time it was
- * refreshed.
- */
-export const CLOSE_OBLIGATIONS_REL = path.join(
-  ".dabbler",
-  "close-obligations.json",
-);
-
-/**
- * The highest projection shape this reader understands. A file claiming a
- * newer one reads as `unreadable` rather than being guessed at — the same
- * posture `session_projection.read_projection` takes, and the reason a
- * schema bump on the Python side cannot make the tree render a shape it
- * does not know.
- */
-export const CLOSE_OBLIGATIONS_SCHEMA_VERSION = 1;
-
-/**
- * Digest every top-level file of a session-set directory, mirroring
- * `close_preflight.input_digests`.
- *
- * Byte-for-byte the same question the writer asked, so the comparison is
- * meaningful: sha256 over raw bytes, files only (which is also what keeps
- * the projection — one level down in `.dabbler/`) out of its own digest.
- * A file that cannot be read records `null`, exactly as the writer does,
- * so "unreadable then" and "unreadable now" compare equal instead of
- * flapping the state.
- *
- * `statSync` rather than `Dirent.isFile()` **deliberately**, and this is
- * not a style choice: Python's `os.path.isfile` FOLLOWS a symlink to a
- * regular file while `Dirent.isFile()` reports `false` for it. A set
- * holding one symlinked artifact would then be digested by the writer and
- * skipped by this reader, the key sets would never match, and the panel
- * would read `stale` forever with no way for the operator to fix it.
- * Both end-of-set path-aware critics found this independently. A broken
- * symlink throws here and is skipped, which is what `os.path.isfile`
- * answers for it too.
- */
-function digestSetDirectory(dir: string): Record<string, string | null> {
-  const digests: Record<string, string | null> = {};
-  let names: string[];
-  try {
-    names = fs.readdirSync(dir);
-  } catch {
-    return digests;
-  }
-  for (const name of names) {
-    const full = path.join(dir, name);
-    try {
-      if (!fs.statSync(full).isFile()) continue;
-    } catch {
-      continue;
-    }
-    try {
-      digests[name] = crypto
-        .createHash("sha256")
-        .update(fs.readFileSync(full))
-        .digest("hex");
-    } catch {
-      digests[name] = null;
-    }
-  }
-  return digests;
-}
-
-/** Content-digest comparison only. See `CloseObligations.state`. */
-function projectionIsFresh(
-  recorded: unknown,
-  live: Record<string, string | null>,
-): boolean {
-  if (!recorded || typeof recorded !== "object" || Array.isArray(recorded)) {
-    return false;
-  }
-  const was = recorded as Record<string, unknown>;
-  const wasKeys = Object.keys(was);
-  const liveKeys = Object.keys(live);
-  if (wasKeys.length !== liveKeys.length) return false;
-  for (const key of liveKeys) {
-    if (!(key in was)) return false;
-    const before = was[key] === null ? null : String(was[key]);
-    if (before !== live[key]) return false;
-  }
-  return true;
-}
-
-function narrowObligation(raw: unknown): CloseObligation | null {
-  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
-  const row = raw as Record<string, unknown>;
-  if (typeof row.check !== "string" || !row.check) return null;
-  return {
-    check: row.check,
-    met: row.met === true,
-    // Unknown reads as BLOCKING, and unknown volatility reads as
-    // volatile: both defaults answer a missing field with the claim that
-    // costs the operator least if it is wrong. A row that silently
-    // demoted itself to advisory is how a close-out list starts lying.
-    blocking: row.blocking !== false,
-    detail: typeof row.detail === "string" ? row.detail : "",
-    action: typeof row.action === "string" ? row.action : "",
-    cost_warning:
-      typeof row.cost_warning === "string" ? row.cost_warning : "",
-    volatile: row.volatile !== false,
-  };
-}
-
-/**
- * Read the close-out obligation projection for one session set.
- *
- * Never computes and never spawns anything: `close_preflight` takes 2-7
- * seconds and this runs on every watcher tick. The four states are the
- * ones Set 120 S3 established, and the distinctions are the point —
- * "nobody has computed this" (`absent`), "the file is damaged or from a
- * newer schema" (`unreadable`) and "computed against inputs that have
- * since changed" (`stale`) are three different things to tell an
- * operator, and collapsing any of them into "nothing to show" is how a
- * checklist ends up claiming nothing remains while something does.
- *
- * **Damage is `unreadable`, never an empty list.** Only a genuine
- * `ENOENT` reads as `absent`; a permissions error, a directory in the
- * file's place, a payload whose `report.obligations` is missing or not an
- * array, and a single malformed row all read as `unreadable`. Filtering a
- * bad row out and rendering the rest would turn a damaged record into a
- * shorter, confident one — and an empty result would render "nothing
- * outstanding", which is the exact false all-clear this feature exists to
- * prevent (found by an end-of-set path-aware critic on the first cut,
- * which defaulted a non-array to `[]`).
- *
- * Returns `null` only for a set that is not in flight — the one case
- * where there is no close to preflight.
- */
-export function readCloseObligations(
-  dir: string,
-  state: SessionState,
-): CloseObligations | null {
-  if (state !== "in-progress") return null;
-
-  const empty = (s: CloseObligationsState): CloseObligations => ({
-    state: s,
-    sessionNumber: null,
-    verdict: null,
-    generatedAt: null,
-    obligations: [],
-  });
-
-  const file = path.join(dir, CLOSE_OBLIGATIONS_REL);
-  let raw: string;
-  try {
-    raw = fs.readFileSync(file, "utf8");
-  } catch (err) {
-    // "Not there" is the only read failure that means nobody computed
-    // it. Anything else — a permissions error, a directory in its place,
-    // an I/O fault — is a file we cannot read, which is a different
-    // thing to tell the operator and a different thing to fix.
-    const code = (err as NodeJS.ErrnoException)?.code;
-    return empty(code === "ENOENT" ? "absent" : "unreadable");
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return empty("unreadable");
-  }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return empty("unreadable");
-  }
-  const payload = parsed as Record<string, unknown>;
-  const version = payload.schemaVersion;
-  if (typeof version !== "number" || version > CLOSE_OBLIGATIONS_SCHEMA_VERSION) {
-    return empty("unreadable");
-  }
-  const report = payload.report;
-  if (!report || typeof report !== "object" || Array.isArray(report)) {
-    return empty("unreadable");
-  }
-  const reportRecord = report as Record<string, unknown>;
-  if (!Array.isArray(reportRecord.obligations)) return empty("unreadable");
-
-  const obligations: CloseObligation[] = [];
-  for (const row of reportRecord.obligations) {
-    const narrowed = narrowObligation(row);
-    if (narrowed === null) return empty("unreadable");
-    obligations.push(narrowed);
-  }
-
-  return {
-    state: projectionIsFresh(payload.inputs, digestSetDirectory(dir))
-      ? "fresh"
-      : "stale",
-    sessionNumber:
-      typeof reportRecord.session_number === "number"
-        ? reportRecord.session_number
-        : null,
-    verdict:
-      typeof reportRecord.verdict === "string" ? reportRecord.verdict : null,
-    generatedAt:
-      typeof payload.generatedAt === "string" ? payload.generatedAt : null,
-    obligations,
-  };
-}
-
-export function readSessionSets(root: string): SessionSet[] {
-  const sessionSetsDir = path.join(root, SESSION_SETS_REL);
-  if (!fs.existsSync(sessionSetsDir)) return [];
-  const entries = fs.readdirSync(sessionSetsDir, { withFileTypes: true });
-  const sets: SessionSet[] = [];
-  // Set 087 Session 1: the module manifest, read ONCE per root. Null =
-  // no manifest → every set lands in the single implicit module.
-  const modulesManifest = readModulesManifest(root);
-
-  for (const entry of entries) {
-    if (!entry.isDirectory() || entry.name.startsWith("_")) continue;
-    const dir = path.join(sessionSetsDir, entry.name);
-    const specPath = path.join(dir, "spec.md");
-    if (!fs.existsSync(specPath)) continue;
-
-    const activityPath = path.join(dir, "activity-log.json");
-    const changeLogPath = path.join(dir, "change-log.md");
-    const statePath = path.join(dir, "session-state.json");
-    const aiAssignmentPath = path.join(dir, "ai-assignment.md");
-    const uatChecklistPath = path.join(dir, `${entry.name}-uat-checklist.json`);
-
-    // Set 035: state-file-first cancellation detection. Set 8 originally
-    // made `CANCELLED.md` presence the first gate; Set 033 Session 2
-    // locked the H2 verdict that `session-state.json` is the single
-    // source of truth for session-set state, and Set 035 extends that
-    // verdict to the cancellation lifecycle. `readCancellationState`
-    // consults the state file's `status` field first; the markdown
-    // marker (`CANCELLED.md`) survives as an audit-trail artifact and
-    // as the legacy-fallback signal when no usable state file is
-    // present (the `"unknown"` branch below). The writer
-    // (`cancelLifecycle.ts`) continues to keep both signals in lockstep
-    // at every cancel/restore boundary, so the state file's `status`
-    // is the authoritative read.
-    let state: SessionState;
-    // Set 115 S1: the in-memory synthesis for a folder with no state
-    // file, computed at most once per set (see the absent-file branch
-    // below) and reused as the ledger input further down.
-    let inferredState: Record<string, unknown> | null = null;
-    const cancellation = readCancellationState(dir);
-    if (cancellation === "cancelled") {
-      state = "cancelled";
-    } else if (cancellation === "unknown" && isCancelled(dir)) {
-      // Legacy fallback: no usable state file (v1 snapshot, hand-edited
-      // shape, brand-new folder), but `CANCELLED.md` is present. Honor
-      // the file-presence signal so a pre-035 set still buckets
-      // correctly. A `console.warn` documents the fallback so a
-      // diagnostic trail exists if a state-file write bug ever masks
-      // a real cancellation behind a "complete" status.
-      console.warn(
-        `[dabblerSessionSets] Cancellation detected via legacy file-presence ` +
-          `fallback for ${dir} — session-state.json is missing or unparseable. ` +
-          `Consider running ensure_state_file to repair.`
-      );
-      state = "cancelled";
-    } else {
-      // Set 115 S1 (round-1 finding): infer ONCE per set. `readStatus`
-      // would re-derive the same shape a second time for a spec-only
-      // folder, so the absent-file branch computes it here and both the
-      // bucketing status and the ledger below read that one object.
-      if (!fs.existsSync(statePath)) {
-        inferredState = inferStateInMemory(dir);
-        const raw = inferredState.status;
-        state =
-          typeof raw === "string"
-            ? (canonicalizeStatus(raw) as SessionState)
-            : "not-started";
-        if (state === "complete" && isMidSetComplete(statePath)) {
-          state = "in-progress";
-        }
-      } else {
-        const status = readStatus(dir);
-        if (status === "complete") {
-          // Defensive: a snapshot with status: "complete" that doesn't
-          // actually satisfy the v3 invariants (e.g., sessions[] still
-          // contains a not-started entry) is a stale mid-set close-out —
-          // either a manual edit or a snapshot a consumer repo hasn't
-          // refreshed yet. Downgrade so the set doesn't briefly show
-          // Complete in the window between sessions.
-          state = isMidSetComplete(statePath) ? "in-progress" : "complete";
-        } else if (status === "in-progress") {
-          state = "in-progress";
-        } else {
-          state = "not-started";
-        }
-      }
-    }
-
-    let totalSessions: number | null = null;
-    let sessionsCompleted = 0;
-    let lastTouched: string | null = null;
-    let liveSession: LiveSession | null = null;
-    // Set 030 Session 5: v2-detection signal for the migration CTA.
-    // Default false (no nag on absent / unreadable state — the rest
-    // of the read path already degrades gracefully). Flipped to true
-    // only when the parsed state file is an object with either no
-    // schemaVersion / a non-3 value, OR schemaVersion === 3 but
-    // sessions[] is missing (a broken v3 shape that the bulk migrator
-    // refuses to rewrite — see migrate_session_state.py's
-    // ACTION_SKIPPED_MALFORMED case for the same heuristic).
-    //
-    // Set 047 Session 3: expanded so canonical v3 files (schemaVersion=3
-    // with sessions[]) also flag — the migration target in that case
-    // is v4, and the ActionRegistry surfaces "Migrate to v4 schema"
-    // instead of "Migrate to v3 schema". `migrationTargetSchemaVersion`
-    // carries the target so the ActionRegistry can pick the right
-    // command without re-reading the file.
-    let needsMigration = false;
-    let migrationTargetSchemaVersion: 3 | 4 | null = null;
-    // Set 061 Session 1 (spec D1): the normalized sessions[] ledger,
-    // captured for the plus-fraction predicate (which needs to see
-    // whether a `type: "verification"` session has been appended yet).
-    // Stays null when the state file is absent/unreadable — that reads
-    // as "no typed session yet", which is correct for fresh sets.
-    let ledgerSessions: unknown = null;
-    // Set 050 S4: the raw on-disk schemaVersion, surfaced only for the
-    // asterisk tooltip ("Ran under schema v<N>"). null when absent /
-    // non-numeric (the asterisk then reads "an older schema").
-    let schemaVersionOnDisk: number | null = null;
-    // Set 114 S3: the in-flight set's raw activity-log entries, retained
-    // from the parse below so the fifth tree level (an in-flight session's
-    // steps) needs no second read. Stays null on every other set.
-    let rawStepEntries: SessionStepEntry[] | null = null;
-    // Set 127 S2: the NORMALIZED state object, retained for the same
-    // reason `rawStepEntries` is — the fifth tree level's derivation needs
-    // `(is this session in flight, when did it start)`, and this is the
-    // object `readProgress` already resolved `currentSession` from. Not a
-    // second source of truth, and not a second read.
-    let normalizedState: unknown = null;
-    const eventsPath = path.join(dir, "session-events.jsonl");
-
-    // Activity log is a step log, not a count source. The activity-log
-    // read is retained for two non-count signals: `totalSessions` (which
-    // lives at the top level of activity-log.json — a different artifact
-    // / different schema from session-state.json, outside D13's scope)
-    // and the per-entry `dateTime` for the `lastTouched` display, which
-    // is more granular than the state-file's session-boundary timestamps
-    // while a session is mid-flight.
-    // Set 112 S3: those two ARE the whole reason this read survives. It
-    // used to keep the parsed log in scope as well, for the Set 077 (A7)
-    // durable `verificationMode` record (`verification_mode` /
-    // `verification_mode_change` entries) that the tier's config
-    // resolution preferred over the spec seed. S2 deleted that resolution
-    // with the tier and left the binding behind, reading to nothing.
-    if (fs.existsSync(activityPath)) {
-      try {
-        const data = JSON.parse(fs.readFileSync(activityPath, "utf8")) as {
-          totalSessions?: number;
-          entries?: Array<{ sessionNumber?: number; dateTime?: string }>;
-        };
-        if (typeof data.totalSessions === "number") totalSessions = data.totalSessions;  // noqa: D13 - activity-log.json carrier field, not session-state
-        for (const e of data.entries ?? []) {
-          if (e.dateTime && (!lastTouched || e.dateTime > lastTouched)) lastTouched = e.dateTime;
-        }
-        // Set 114 S3: the fifth tree level's raw material. Retained ONLY
-        // for an in-flight set — the checklist answers "where is THIS
-        // session", so a complete / not-started / cancelled set has no
-        // step children and no reason to carry entries. That gate is what
-        // keeps this off the startup path S1 measured: the parse above
-        // already happened, and everything here is a narrowing of it.
-        if (state === "in-progress" && Array.isArray(data.entries)) {
-          rawStepEntries = data.entries as SessionStepEntry[];
-        }
-      } catch { /* ignore */ }
-    }
-
-    // Set 115 S1: the state file is no longer created as a side effect of
-    // this read (`readStatus` used to write one), so the absent-file case
-    // is now real and is answered in memory. `inferStateInMemory` applies
-    // the same inference the router's backfill does, which keeps a
-    // spec-only set showing its PLANNED session rows — and its real
-    // titles — without the Explorer putting an untracked file in the
-    // operator's tree.
-    {
-      try {
-        // Set 047 Session 2 (reader-first phase): pipe the raw parsed
-        // state through `normalizeToV4Shape` so a v4-shaped file (whose
-        // writers — Sessions 4-5 — drop `orchestrator`, `startedAt`,
-        // `completedAt`, `verificationVerdict` from the top level in
-        // favor of per-session metadata) reads identically to a v3 file.
-        // The shim re-derives the top-level fields from `sessions[]` on
-        // v4 inputs and is a no-op on pure v3 inputs that already carry
-        // them. `needsMigration` detection below reads the RAW parsed
-        // object (`rawSd`) because the v3/v4 distinction is precisely
-        // the signal we're checking for there.
-        const stateFileOnDisk = fs.existsSync(statePath);
-        const rawSd = (stateFileOnDisk
-          ? JSON.parse(fs.readFileSync(statePath, "utf8"))
-          : (inferredState ?? inferStateInMemory(dir))) as {
-          schemaVersion?: number;
-          sessions?: unknown;
-          completedSessions?: unknown;
-        };
-
-        // Set 030 Session 5 + Set 047 Session 3: needs-migration detection.
-        // Computed FIRST — before normalize/progress reads — so the
-        // badge surfaces even when the downstream shim/reader rejects
-        // the file (e.g., an invariant violation in `normalizeToV4Shape`
-        // would otherwise jump straight to the outer catch and lose
-        // the migration affordance entirely, leaving the operator
-        // unable to either fix or migrate the row). The S3 verifier
-        // flagged the prior ordering as a coupling bug; this block
-        // depends only on the parsed `rawSd`, not on any derived
-        // value, so it's safe to run first.
-        //
-        // The criteria match the bulk migrators' "would migrate" rule
-        // so the badge and the CLIs agree set-for-set:
-        //   - schemaVersion === 4 (or higher): already current, no
-        //     migration needed.
-        //   - canonical v3 (schemaVersion === 3 with sessions[]): the
-        //     `migrate_v3_to_v4` migrator's target — flag with
-        //     target=4 so the ActionRegistry surfaces "Migrate to v4
-        //     schema".
-        //   - schemaVersion === 3 but sessions[] missing: broken-v3
-        //     shape neither migrator will rewrite. Operator must
-        //     hand-repair to canonical v3 (then re-run the v4
-        //     migrator). Flag with target=3 so the menu offers
-        //     "Migrate to v3 schema" — the v2→v3 migrator's
-        //     same-shaped branch will also skip, which is the right
-        //     "hand-repair, then come back" UX.
-        //   - schemaVersion absent or < 3: legacy v1/v2; the v2→v3
-        //     migrator's target. Flag with target=3.
-        if (rawSd && typeof rawSd === "object" && !Array.isArray(rawSd)) {
-          const sv = rawSd.schemaVersion;
-          schemaVersionOnDisk = typeof sv === "number" ? sv : null;
-          if (typeof sv === "number" && sv >= 4) {
-            needsMigration = false;
-            migrationTargetSchemaVersion = null;
-          } else if (sv === 3) {
-            if (Array.isArray(rawSd.sessions)) {
-              needsMigration = true;
-              migrationTargetSchemaVersion = 4;
-            } else {
-              needsMigration = true;
-              migrationTargetSchemaVersion = 3;
-            }
-          } else if (typeof sv !== "number" || sv < 3) {
-            needsMigration = true;
-            migrationTargetSchemaVersion = 3;
-          }
-        }
-
-        // Set 030 Session 3 v2-compat pre-processing: if the snapshot
-        // is v2-shape (no sessions[]) and lacks a non-empty
-        // completedSessions[], pre-populate it from the events ledger
-        // BEFORE handing the dict to the normalize shim. This keeps
-        // the ledger as a count signal for pre-Set-022 snapshots that
-        // haven't been healed by their next boundary write yet.
-        // Pure-v3 / v4 snapshots skip this entirely — sessions[] is
-        // authoritative for them. Set 047 Session 2 moved this branch
-        // ahead of the normalize call because normalize guarantees
-        // sessions[] on the output, which would mask the v2-compat
-        // signal if checked post-normalize.
-        let preNormalizeSd: any = rawSd;
-        if (
-          rawSd &&
-          typeof rawSd === "object" &&
-          !Array.isArray(rawSd) &&
-          rawSd.sessions === undefined &&
-          (!Array.isArray(rawSd.completedSessions) ||  // noqa: D13 - v2-compat ledger-merge for synthesizer input
-            (rawSd.completedSessions as unknown[]).length === 0)  // noqa: D13 - v2-compat ledger-merge for synthesizer input
-        ) {
-          const closedLedgerSessions = readClosedSessionsFromLedger(eventsPath);
-          if (closedLedgerSessions.length > 0) {
-            preNormalizeSd = { ...rawSd, completedSessions: closedLedgerSessions };
-          }
-        }
-
-        const sd = normalizeToV4Shape(
-          preNormalizeSd,
-          specPath,
-          // Set 115 S1: an in-memory synthesis already resolved its
-          // titles from the one `spec.md` read it performed, so forbid a
-          // second read here.
-          inferredState !== null ? new Map<number, string>() : undefined,
-        ) as {
-          completedAt?: string;
-          startedAt?: string;
-          status?: string;
-          orchestrator?: {
-            engine?: string;
-            provider?: string;
-            model?: string;
-            effort?: string;
-            checkedOutAt?: string;
-            lastActivityAt?: string;
-          };
-          verificationVerdict?: string;
-          forceClosed?: boolean;
-          schemaVersion?: number;
-          sessions?: unknown;
-        };
-        // Set 061 Session 1: the shim preserves per-session extras
-        // (including the Set 057 `type` field) via entry spread, so
-        // the normalized ledger is the right predicate input for
-        // every input schema version.
-        ledgerSessions = sd.sessions ?? null;
-        // Set 127 S2 round 1 (Major, spec-conformance lens): ONLY a state
-        // file that is really on disk may arm the derivation. When it is
-        // absent, `inferStateInMemory` synthesizes an `in-progress`
-        // snapshot from `activity-log.json` — including a `startedAt`
-        // taken from the log's EARLIEST entry, which is a different
-        // quantity from a session's start — and Python's
-        // `session_flight_facts` answers `(False, None)` for the same set,
-        // because `read_session_state` returns `None` for a missing file.
-        // Passing the inferred object here would make the tree derive an
-        // active step and start times the CLI checklist does not: a
-        // cross-language divergence on a path this repo supports, which is
-        // the one thing this set says is worse than the silence it
-        // replaced. The inference still drives bucketing and the session
-        // rows, exactly as before — only the flight facts are withheld.
-        normalizedState = stateFileOnDisk ? sd : null;
-
-        // Set 030 Session 3: route progress reads through the v3/v4
-        // helper. `readProgress` itself runs through `normalizeToV4Shape`
-        // so a v4 file (per-session metadata) and a v3 file (top-level
-        // metadata) both produce the same `ProgressView`. We trap
-        // invariant violations and fall through to the v2-compat
-        // events-ledger fallback below so a pre-Set-022 snapshot
-        // lacking completedSessions[] still derives a sensible count.
-        //
-        // Set 047 Session 2: the v2-compat ledger-merge pre-step that
-        // used to sit here is hoisted above the normalize call (see
-        // `preNormalizeSd` above) — `sd` is already normalized to v4
-        // with sessions[] guaranteed, so the historical ledger-merge
-        // check (`sd.sessions === undefined`) would no longer fire.
-        let progressTotal: number | null = null;
-        let progressCompleted: number[] | null = null;
-        let progressCurrent: number | null = null;
-        try {
-          // `sd` is already normalized and healed above, so this
-          // re-normalization must never re-read `spec.md` (Set 115 S1).
-          const view = readProgress(sd, specPath, new Map<number, string>());
-          progressTotal = view.totalSessions;
-          progressCompleted = [...view.completedSessions];
-          progressCurrent = view.currentSession;
-        } catch (e) {
-          if (!(e instanceof SessionStateInvariantError)) {
-            throw e;
-          }
-          // Invariant violation: state is drift-shaped. Leave the
-          // progress-derived signals null and fall through to the
-          // v2-compat heuristics below.
-        }
-
-        // State file is authoritative for `totalSessions` when the
-        // v3 reader succeeded. The activity-log carries the field at
-        // its top level (read above for legacy compatibility), but if
-        // both are present the state-file value wins — a Set 022
-        // Session 2 round-1 verifier finding caught the inverted
-        // preference, which would silently mis-display the fraction
-        // whenever a Lightweight-tier set hand-edited one file but
-        // not the other.
-        if (progressTotal !== null && progressTotal > 0) {
-          totalSessions = progressTotal;
-        }
-        const stateTouched = sd.completedAt || sd.startedAt;
-        if (stateTouched && (!lastTouched || stateTouched > lastTouched)) lastTouched = stateTouched;
-        liveSession = {
-          currentSession: progressCurrent,
-          status: sd.status ?? null,
-          orchestrator: sd.orchestrator ?? null,
-          startedAt: sd.startedAt ?? null,
-          completedAt: sd.completedAt ?? null,
-          verificationVerdict: sd.verificationVerdict ?? null,
-          forceClosed: sd.forceClosed ?? null,
-          completedSessions: progressCompleted,
-        };
-        // sessionsCompleted priority (highest first):
-        //  1. v3 `readProgress` derivation — authoritative for any
-        //     state file whose sessions[] satisfies the invariants
-        //     (every Full-tier write since Set 030 Session 2; every
-        //     Lightweight-tier file with proper sessions[] entries).
-        //  2. Distinct `closeout_succeeded` session numbers in
-        //     `session-events.jsonl` — v2-compat fallback for sets
-        //     whose snapshot fails the invariants (pre-Set-022 sets
-        //     that haven't been healed by their next boundary write
-        //     yet, or consumer repos awaiting the bulk migrator).
-        //  3. `state === "complete"` plus `totalSessions` — terminal
-        //     state with no granular count signal (e.g., a
-        //     Lightweight-tier set marked complete without sessions[]
-        //     or completedSessions[]). Using the canonicalized
-        //     `state` instead of raw `sd.status` keeps this in
-        //     lockstep with the bucketing alias map; also naturally
-        //     skips the mid-set-complete drift case where `state`
-        //     is downgraded to in-progress.
-        if (progressCompleted !== null) {
-          sessionsCompleted = progressCompleted.length;
-        } else {
-          const ledgerCount = countDistinctCloseoutSessions(eventsPath);
-          if (ledgerCount > 0) {
-            sessionsCompleted = ledgerCount;
-          } else if (state === "complete" && typeof totalSessions === "number") {
-            sessionsCompleted = totalSessions;
-          }
-        }
-      } catch { /* ignore */ }
-    }
-
-    const config = parseSessionSetConfig(specPath);
-    // Set 087 Session 1: validate the spec's declared `module:` against
-    // the manifest. Only a manifest-known slug attributes the set; an
-    // unknown slug (typo, module removed, manifest absent) reads as the
-    // implicit module — grouping must degrade gracefully, never block a
-    // row — with a console.warn as the diagnostic trail. The raw declared
-    // value stays on `config.module` so later sessions can surface the
-    // mismatch in the UI if warranted.
-    let module: string | null = null;
-    let moduleTitle: string | null = null;
-    // Set 087 Session 2 (routed ruling Q3): the manifest entry's index —
-    // the Explorer's module display order — stamped alongside the
-    // validated attribution so `groupByModule` stays pure downstream.
-    let moduleOrder: number | null = null;
-    if (config.module !== null && modulesManifest !== null) {
-      // S1 verifier round 2: the unknown-slug warning only fires when a
-      // manifest actually LOADED and lacks the slug. With no usable
-      // manifest (absent, or malformed — which already warned once at
-      // manifest level), a declared module: reads silently as implicit;
-      // repeating a per-set "not a slug" warning there would misreport
-      // the real condition.
-      const manifestIndex = modulesManifest.findIndex(
-        (m) => m.slug === config.module,
-      );
-      const manifestEntry =
-        manifestIndex >= 0 ? modulesManifest[manifestIndex] : undefined;
-      if (manifestEntry) {
-        module = manifestEntry.slug;
-        moduleTitle = manifestEntry.title;
-        moduleOrder = manifestIndex;
-      } else {
-        console.warn(
-          `[dabblerSessionSets] ${entry.name}: spec declares ` +
-            `module: ${config.module}, which is not a slug in ` +
-            `docs/modules.yaml — treating as the implicit module.`,
-        );
-      }
-    }
-    // Set 098 Session 1: validate the spec's declared `kind:` against
-    // the two-member enum. An unknown value warns and degrades to an
-    // ordinary work set — a typo must never block or reclassify a row
-    // (the Set 091 warn-and-degrade posture); the raw declared value
-    // stays on `config.kind` so later surfaces can name the mismatch.
-    // Case-tolerant, matching the `module` parse.
-    let kind: SessionSetKind | undefined;
-    if (config.kind !== undefined) {
-      const v = config.kind.toLowerCase();
-      if (v === "plan" || v === "decomposition") {
-        kind = v;
-      } else {
-        console.warn(
-          `[dabblerSessionSets] ${entry.name}: spec declares ` +
-            `kind: ${config.kind}, which is not a known set kind ` +
-            `(plan | decomposition) — treating as an ordinary work set.`,
-        );
-      }
-    }
-    const uatSummary = config.requiresUAT ? parseUatChecklist(uatChecklistPath) : null;
-    const prerequisites = parsePrerequisites(specPath);
-    // Set 114 S3: the fifth level's data, assembled once the ledger has
-    // told us WHICH session is in flight. `liveSession.currentSession` is
-    // `readProgress`'s derivation, which is the same session
-    // `session_checklist.current_session_number` resolves for the CLI —
-    // both read `sessions[]`, never file presence.
-    const stepLedger = buildStepLedger(
-      state,
-      liveSession?.currentSession ?? null,
-      rawStepEntries,
-      specPath,
-      normalizedState,
-    );
-
-    sets.push({
-      name: entry.name,
-      module,
-      moduleTitle,
-      moduleOrder,
-      kind,
-      dir,
-      specPath,
-      activityPath,
-      changeLogPath,
-      statePath,
-      aiAssignmentPath,
-      uatChecklistPath,
-      state,
-      totalSessions,
-      sessionsCompleted,
-      lastTouched,
-      liveSession,
-      config,
-      uatSummary,
-      root,
-      needsMigration,
-      migrationTargetSchemaVersion,
-      schemaVersionOnDisk,
-      prerequisites,
-      // Default false; the cross-reference pass below overwrites this
-      // once every set's `state` is known so each prereq can resolve
-      // against an up-to-date snapshot. Sets without declared
-      // prerequisites stay at false in both passes.
-      blockedByPrereqs: false,
-      unsatisfiedPrereqs: [],
-      // Set 110 S2: the fourth tree level's data, taken from the ledger
-      // this scan already parsed — no extra read, no extra stat.
-      sessions: normalizeLedgerSessions(ledgerSessions),
-      // Set 114 S3: the fifth level's data. Null on every set that is not
-      // in flight, and on an in-flight set whose activity log is absent,
-      // unreadable, or silent about the current session.
-      stepLedger,
-      // Set 115 S4: the close-out obligations for the in-flight session.
-      // Null on every set that is not in flight; a real state (including
-      // `absent`) on the one that is.
-      closeObligations: readCloseObligations(dir, state),
-    });
-  }
-
-  // Set 047 Session 5 (spec §3.3): per-root cross-reference for the
-  // single-root caller. `readAllSessionSets()` recomputes against the
-  // merged map below so prereqs that resolve to a set discovered in a
-  // different worktree / root still find their target. Single-root
-  // callers (tests, isolated workspace scans) get the right answer
-  // here without needing the merge step.
-  deriveBlockedByPrereqs(sets);
-  // Diagnostic: one-line summary in the dev console showing how the
-  // extension bucketed each root. Useful for spotting UI/cache bugs vs.
-  // state-derivation bugs without needing a breakpoint.
-  if (sets.length > 0) {
-    const counts = sets.reduce(
-      (acc, s) => {
-        acc[s.state] = (acc[s.state] ?? 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>,
-    );
-    console.log(
-      `[dabbler-ai-orchestration] readSessionSets(${path.basename(root)}): ` +
-        `${sets.length} set(s) — ` +
-        `complete=${counts.complete ?? 0}, ` +
-        `in-progress=${counts["in-progress"] ?? 0}, ` +
-        `not-started=${counts["not-started"] ?? 0}, ` +
-        `cancelled=${counts.cancelled ?? 0}`,
-    );
-  }
-  return sets;
-}
-
-/**
- * Set 047 Session 5 (spec §3.3): mutate each set in *sets* to set
- * ``blockedByPrereqs`` against the in-memory map of the same list.
- *
- * Cross-references each set's ``prerequisites`` (the parsed
- * spec.md field) against the target set's bucketed ``state`` and
- * sets the boolean accordingly. ANY unsatisfied prereq blocks the
- * row; an unknown prereq slug also blocks (typo / missing set must
- * surface, not silently unblock).
- *
- * Set 061 Session 2 (spec D3): the pass no longer collapses to a
- * boolean — it also carries the full unsatisfied list (slug,
- * condition, target state or "unknown") onto ``unsatisfiedPrereqs``
- * so the blocked marker's tooltip can name what the row is waiting
- * on. ``blockedByPrereqs`` stays as the compatibility boolean and
- * always equals ``unsatisfiedPrereqs.length > 0``.
- *
- * Idempotent: callable on a `sets` array that has been merged
- * across roots in `readAllSessionSets`, so cross-root prerequisites
- * resolve against the merged view rather than the per-root scan
- * (S5 verifier Important-2 fix).
- */
-function deriveBlockedByPrereqs(sets: SessionSet[]): void {
+export function deriveBlockedByPrereqs(sets: SessionSet[]): void {
   const setsByName = new Map<string, SessionSet>();
   for (const s of sets) setsByName.set(s.name, s);
   for (const s of sets) {
@@ -1715,7 +411,7 @@ function deriveBlockedByPrereqs(sets: SessionSet[]): void {
         });
         continue;
       }
-      if (prereq.condition === "complete" && target.state !== "complete") {
+      if (target.state !== "complete") {
         unsatisfied.push({
           slug: prereq.slug,
           condition: prereq.condition,
@@ -1728,33 +424,21 @@ function deriveBlockedByPrereqs(sets: SessionSet[]): void {
   }
 }
 
-// Set 087 Session 1: the diagnostics envelope for the fail-loud
-// duplicate-set-name check (routed architecture ruling, saved raw at
-// docs/session-sets/087-.../s1-collision-check-architecture.json).
-export interface ReadAllSessionSetsResult {
+export interface ScanResult {
   sets: SessionSet[];
   collisions: DuplicateNameCollision[];
+  /** One entry per set whose projection failed; feeds TreeView.message. */
+  projectionErrors: Array<{ setDir: string; error: string }>;
 }
 
-// One record per discovered copy of a set, carried through the merge so
-// the collision pass can group by logical identity afterwards.
 interface MergeCandidate {
   set: SessionSet;
   familyId: string;
-  // familyId + NUL + posix relPath(root → set dir). Two records with
-  // the SAME key are copies of one set (main checkout + its worktrees)
-  // — the legitimate merge. Two records for one name with DIFFERENT
-  // keys are two different sets sharing a name — the collision. The
-  // relPath component makes a future nested layout
-  // (docs/session-sets/<module>/<name>) register as a collision with
-  // no predicate change.
+  // familyId + NUL + posix relPath. Same key = copies of one set (main
+  // checkout + worktrees); different keys under one name = collision.
   identityKey: string;
 }
 
-// True when `candidate` outranks `incumbent` under the merge-precedence
-// rule (state rank, tie-broken by lastTouched) — the SAME rule the
-// pre-087 merge applied, factored out so the per-identity representative
-// pick below cannot drift from the winner pick.
 function outranks(candidate: SessionSet, incumbent: SessionSet): boolean {
   const candRank = STATE_RANK[candidate.state] ?? -1;
   const incRank = STATE_RANK[incumbent.state] ?? -1;
@@ -1762,24 +446,42 @@ function outranks(candidate: SessionSet, incumbent: SessionSet): boolean {
   return (candidate.lastTouched || "") > (incumbent.lastTouched || "");
 }
 
-// Deduped fail-loud log state: one console.error per distinct collision
-// signature. Reconciled on every scan — a signature that disappears
-// re-arms, so a collision that clears and later reappears logs again
-// instead of staying silent forever.
+// One console.error per distinct collision signature; a signature that
+// disappears re-arms.
 const loggedCollisionSignatures = new Set<string>();
 
-export function readAllSessionSetsWithDiagnostics(): ReadAllSessionSetsResult {
+/**
+ * The full workspace scan: discover roots, project every set through the
+ * cache, assemble records, merge cross-root duplicates, derive prereq
+ * blocking against the merged map.
+ */
+export async function scanAllSessionSets(
+  cache: ProjectionCache,
+): Promise<ScanResult> {
   const byName = new Map<string, MergeCandidate[]>();
+  const projectionErrors: Array<{ setDir: string; error: string }> = [];
   for (const root of discoverRootsWithFamilies()) {
-    for (const set of readSessionSets(root.dir)) {
-      const relPath = path
-        .relative(root.dir, set.dir)
-        .split(path.sep)
-        .join("/");
+    const manifest = readModulesManifest(root.dir);
+    const setDirs = listSessionSetDirNames(root.dir).map((n) =>
+      path.join(root.dir, SESSION_SETS_REL, n),
+    );
+    if (setDirs.length === 0) continue;
+    const python = resolvePythonInterpreter(root.dir);
+    const projections = await projectAll(cache, python, setDirs, root.dir);
+    for (const setDir of setDirs) {
+      const projection = projections.get(setDir) ?? {
+        payload: null,
+        error: "projection did not run",
+      };
+      if (!projection.payload && projection.error) {
+        projectionErrors.push({ setDir, error: projection.error });
+      }
+      const set = buildSessionSet(root.dir, setDir, manifest, projection);
+      const relPath = path.relative(root.dir, setDir).split(path.sep).join("/");
       const candidate: MergeCandidate = {
         set,
         familyId: root.familyId,
-        identityKey: `${root.familyId}\u0000${relPath}`,
+        identityKey: `${root.familyId} ${relPath}`,
       };
       const bucket = byName.get(set.name);
       if (bucket) bucket.push(candidate);
@@ -1791,13 +493,10 @@ export function readAllSessionSetsWithDiagnostics(): ReadAllSessionSetsResult {
   const collisions: DuplicateNameCollision[] = [];
   const currentSignatures = new Set<string>();
   for (const [name, candidates] of byName) {
-    // The merge winner — identical precedence to the pre-087 merge
-    // (first-seen wins ties, since `outranks` is strict).
     let winner = candidates[0];
     for (const c of candidates.slice(1)) {
       if (outranks(c.set, winner.set)) winner = c;
     }
-
     const distinctIdentities = new Map<string, MergeCandidate>();
     for (const c of candidates) {
       const rep = distinctIdentities.get(c.identityKey);
@@ -1806,60 +505,41 @@ export function readAllSessionSetsWithDiagnostics(): ReadAllSessionSetsResult {
       }
     }
     if (distinctIdentities.size > 1) {
-      // True collision: the name spans more than one logical set.
-      // Fail loud — but NEVER blank the Explorer or drop the name:
-      // one deterministic winner row ships, flagged, so name-keyed
-      // actions stay unambiguous while the error is visible.
-      const representatives = Array.from(distinctIdentities.values());
-      const conflictingDirs = representatives
+      // True collision: fail loud, but never blank the Explorer or drop
+      // the name — one deterministic winner ships, flagged.
+      const conflictingDirs = Array.from(distinctIdentities.values())
         .map((c) => c.set.dir)
         .sort();
-      winner.set.duplicateNameError = {
+      winner.set.duplicateNameError = { name, chosenDir: winner.set.dir, conflictingDirs };
+      collisions.push({
         name,
         chosenDir: winner.set.dir,
         conflictingDirs,
-      };
-      const collision: DuplicateNameCollision = {
-        name,
-        chosenDir: winner.set.dir,
-        conflictingDirs,
-        candidates: representatives.map((c) => ({
+        candidates: Array.from(distinctIdentities.values()).map((c) => ({
           dir: c.set.dir,
           familyId: c.familyId,
           state: c.set.state,
           lastTouched: c.set.lastTouched,
         })),
-      };
-      collisions.push(collision);
-      const signature = `${name}\u0000${conflictingDirs.join("|")}`;
+      });
+      const signature = `${name} ${conflictingDirs.join("|")}`;
       currentSignatures.add(signature);
       if (!loggedCollisionSignatures.has(signature)) {
         loggedCollisionSignatures.add(signature);
         console.error(
           `[dabblerSessionSets] DUPLICATE SESSION-SET NAME "${name}": ` +
             `${conflictingDirs.length} different sets share this name ` +
-            `(${conflictingDirs.join(", ")}). Session-set names must be ` +
-            `globally unique across the workspace — rename one of them. ` +
-            `Showing only ${winner.set.dir}; name-keyed actions resolve ` +
-            `to that copy.`,
+            `(${conflictingDirs.join(", ")}). Rename one of them; showing ` +
+            `only ${winner.set.dir}.`,
         );
       }
     }
     mergedList.push(winner.set);
   }
-  // Re-arm cleared collisions so a reintroduction logs again.
   for (const sig of loggedCollisionSignatures) {
     if (!currentSignatures.has(sig)) loggedCollisionSignatures.delete(sig);
   }
 
-  // S5 verifier Important-2 fix: re-derive blockedByPrereqs against
-  // the merged map so a prereq target discovered in a different root
-  // / worktree still resolves. The per-root pass inside
-  // readSessionSets() handles the single-root case.
   deriveBlockedByPrereqs(mergedList);
-  return { sets: mergedList, collisions };
-}
-
-export function readAllSessionSets(): SessionSet[] {
-  return readAllSessionSetsWithDiagnostics().sets;
+  return { sets: mergedList, collisions, projectionErrors };
 }

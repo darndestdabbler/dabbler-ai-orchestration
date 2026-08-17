@@ -1,6 +1,0 @@
-```json
-{
-  "verdict": "VERIFIED",
-  "issues": []
-}
-```

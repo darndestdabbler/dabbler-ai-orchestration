@@ -1,1 +1,0 @@
-VERIFIED — The three source templates, both cold-start fixtures, bundled outputs, version/CHANGELOG changes, and green-on-empty evidence align with the supplied tutorial and session contract. The scaffolded `test` job runs on pull requests and pushes to `main`, remains green before modules exist, and the CODEOWNERS cast and tutorial links are correctly re-cut.

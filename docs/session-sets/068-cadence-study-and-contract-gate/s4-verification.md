@@ -1,1 +1,0 @@
-{"verdict":"VERIFIED","issues":[]}

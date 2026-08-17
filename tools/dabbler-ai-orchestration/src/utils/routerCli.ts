@@ -35,10 +35,45 @@ import {
   describeMissingPython,
 } from "./pythonInterpreter";
 import { makeUtf8ChunkDecoder } from "./utf8ChunkDecoder";
-import {
-  isAiRouterNotInstalled,
-  describeAiRouterImportFailure,
-} from "./aiRouterInstall";
+
+/**
+ * True when *stderr* says the interpreter cannot import ai_router — an
+ * installation problem, not a CLI verdict. Covers the plain
+ * ModuleNotFoundError, `python -m`'s module-specification wrapper, and
+ * the namespace-shadow case (a config-only `ai_router/` folder in the
+ * cwd with no installed package), anchored to a submodule path so it
+ * does not match unrelated modules.
+ */
+export function isAiRouterNotInstalled(stderr: string): boolean {
+  if (!stderr) return false;
+  if (/ModuleNotFoundError:\s*No module named ['"]ai_router['"]/.test(stderr)) return true;
+  if (
+    /Error while finding module specification for ['"]ai_router\./.test(stderr) &&
+    /No module named ['"]ai_router['"]/.test(stderr)
+  ) {
+    return true;
+  }
+  if (/No module named ['"]?ai_router\.[\w.]+['"]?/.test(stderr)) return true;
+  return false;
+}
+
+export function describeAiRouterImportFailure(
+  pythonPath: string,
+  hint?: string,
+): string {
+  const venvHint =
+    process.platform === "win32"
+      ? ".venv\\Scripts\\python.exe"
+      : ".venv/bin/python";
+  return (
+    `ai_router could not be imported by the interpreter '${pythonPath}'. ` +
+    `This is an interpreter / installation problem — NOT missing API keys. ` +
+    `Point the 'dabblerSessionSets.pythonPath' setting at your workspace ` +
+    `venv (e.g. ${venvHint}), or install the router into that interpreter: ` +
+    `${pythonPath} -m pip install dabbler-ai-router.` +
+    (hint ? ` (${hint})` : "")
+  );
+}
 
 /** The output channel name, shared by every router CLI the extension runs. */
 export const ROUTER_OUTPUT_CHANNEL = "Dabbler Commands";

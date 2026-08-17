@@ -1,9 +1,0 @@
-VERIFIED — I re-evaluated unsettled findings L7–L11 against the current source: canonical-servant drift handling, failed-arm accounting, URL redaction, successful-arm provenance, and failed-arm provenance are all implemented with corresponding regression tests. I also checked the alias-resolution and cross-provider paths and found no blocking correctness or completeness defect.
-
-## NITS
-
-- **Nit:** `docs/session-sets/113-narrated-video-walkthroughs/path-aware-critique.json` now exists even though `s6-conventions.md` explicitly says it must remain absent until Session 8 to avoid banking stale evidence. `s6-outcome.md` also contains both the earlier dry-run-only rationale and a later non-dry-run artifact claim. Remove the artifact until Session 8 or update the governing convention with an authorized reason this early artifact cannot satisfy the terminal gate.
-
-- **Nit:** Exact type identity does not prove that a supplied servant still uses the canonical implementation. A caller can create `DeterministicServant()`, replace its instance `run` attribute, and pass it to `pull_route`; `type(servant) is DeterministicServant` remains true, so fabricated raw-looking output is classified as sandbox drift and accepted. This is a low-probability injected-servant scenario, not the production default. Determine leniency from whether `pull_route` constructed the servant internally, rather than merely from its type. Location: `ai_router/pull_verifier.py`.
-
-- **Nit:** `SandboxNotQuiescent` still documents the superseded algorithm—“raised only when repeated re-derivations disagree with each other”—while the current guard performs one re-derivation and classifies by servant identity. Update the exception documentation to match the implementation. Location: `ai_router/pull_verifier.py`.

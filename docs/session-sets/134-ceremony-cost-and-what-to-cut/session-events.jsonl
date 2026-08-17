@@ -1,9 +1,0 @@
-{"timestamp": "2026-08-17T08:54:25.931841Z", "session_number": 1, "event_type": "work_started"}
-{"timestamp": "2026-08-17T09:26:36.689347Z", "session_number": 1, "event_type": "closeout_requested", "force": false, "manual_verify": false}
-{"timestamp": "2026-08-17T09:26:42.364742Z", "session_number": 1, "event_type": "closeout_succeeded", "method": "api", "engine": "github-copilot", "provider": "anthropic", "model": "claude-opus-5", "verdict": "VERIFIED", "lessons_cited": ["G-005", "G-010", "G-012", "G-013", "L-064-8"]}
-{"timestamp": "2026-08-17T09:54:06.479036Z", "session_number": 2, "event_type": "work_started"}
-{"timestamp": "2026-08-17T11:15:25.331702Z", "session_number": 2, "event_type": "closeout_requested", "force": false, "manual_verify": false}
-{"timestamp": "2026-08-17T11:15:46.180235Z", "session_number": 2, "event_type": "closeout_succeeded", "method": "api", "engine": "github-copilot", "provider": "anthropic", "model": "claude-opus-5", "verdict": "VERIFIED", "lessons_cited": ["G-004", "G-005", "G-008", "G-010", "G-012", "G-013", "L-112-1"]}
-{"timestamp": "2026-08-17T11:27:46.584479Z", "session_number": 3, "event_type": "work_started"}
-{"timestamp": "2026-08-17T12:29:26.093842Z", "session_number": 3, "event_type": "closeout_requested", "force": false, "manual_verify": false}
-{"timestamp": "2026-08-17T12:29:44.728368Z", "session_number": 3, "event_type": "closeout_succeeded", "method": "api", "engine": "github-copilot", "provider": "anthropic", "model": "claude-opus-5", "verdict": "VERIFIED", "lessons_cited": ["G-004", "G-005", "G-008", "G-012", "G-013", "L-064-8", "L-112-1"]}

@@ -1,9 +1,0 @@
-**ISSUES FOUND**
-
-- **Issue 1:** `CONTRIBUTING.md` still teaches the deleted Lightweight UAT fixture and removed row actions.
-  - **Category:** Completeness
-  - **Severity:** Major
-  - **Failure scenario:** The next maintainer following the repo’s authoritative UAT fixture instructions will expect two fixture projects, Lightweight rows, and actions like `Switch Tier` / `Set Up Dedicated Verification`; those surfaces are deleted, so the guide sends release/UAT work down a false path.
-  - **Acceptance criterion:** `python -c "exec(__import__('base64').b64decode('ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCnRleHQgPSBQYXRoKCJDT05UUklCVVRJTkcubWQiKS5yZWFkX3RleHQoZW5jb2Rpbmc9InV0Zi04IikKc3RhbGUgPSBbCiAgICAidHdvIHRyaXZpYWwgaGVsbG8td29ybGQgY29uc3VtZXIgcHJvamVjdHMiLAogICAgImV2ZXJ5IExpZ2h0d2VpZ2h0IHN0YXRlIiwKICAgICJTd2l0Y2ggVGllciIsCiAgICAiU2V0IFVwIERlZGljYXRlZCBWZXJpZmljYXRpb24iLAogICAgInZlcmlmaWNhdGlvbi1tb2RlIHdyaXRlciIsCl0KcmFpc2UgU3lzdGVtRXhpdCgxIGlmIGFueShpdGVtIGluIHRleHQgZm9yIGl0ZW0gaW4gc3RhbGUpIGVsc2UgMCkK'))"`
-  - **Acceptance expectation:** exit 0
-  - **Details:** Violation: the task’s UAT/doc acceptance says “docs read as one story,” and the end state is one tier with the Lightweight fixture tree and commands removed. Impact: this is root contributor guidance for the committed UAT matrix, so it is likely to be used during future extension UAT/release work. Evidence: `CONTRIBUTING.md:91-117` still says the matrix has “two trivial hello-world consumer projects,” covers “every Lightweight state,” and that mutating actions including `Switch Tier`, `Set Up Dedicated Verification`, and the “verification-mode writer” work; the actual fixture README says `hello-world-lightweight/` is deleted and those surfaces were removed.

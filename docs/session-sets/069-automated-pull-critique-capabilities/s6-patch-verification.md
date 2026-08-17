@@ -1,3 +1,0 @@
-- **Verdict:** VERIFIED
-- **Summary:** Fix 1 correctly removes the description fallback while preserving stable-ref coverage and existing admitted/pending/waived vs. rejected behavior, and Fix 2’s schema/CHANGELOG prose now accurately describes `falseReproduced` as an independent flag rather than a value derived from `replayed`.
-- **Residual issue:** None

@@ -1,1 +1,0 @@
-**VERIFIED** — I found no new Critical/Major issues beyond the prior-reported stale manifest parity test. I checked the manifest/runtime bundle, close-out reader/model/provider path, Playwright inclusion, adjacent caption/menu tests, and changelog fragment; the new behavior is wired through the reviewed surfaces.

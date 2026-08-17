@@ -115,16 +115,17 @@ validation blocks the close — a bad line is evidence of tampering, not
 noise to skip. Duplicate round numbers are refused; rounds are
 immutable history.
 
-Row fields (required: `round`, `verdict`, `blocking`, `verifier_model`,
-`verifier_provider`, `findings`, `completion_tree`, `recorded_at`):
+Row fields (required: `round`, `verdict`, `blocking`, `findings`,
+`completion_tree`, `recorded_at`; `verifier_model` and
+`verifier_provider` are required on every row except `type: "waive"`):
 
 | Field | Type | Meaning |
 |---|---|---|
 | `round` | integer ≥ 1 | |
 | `phase` | enum | `full` (round 1) or `fix-delta` (rounds ≥ 2) |
-| `verdict` | enum | `VERIFIED` / `ISSUES_FOUND` |
+| `verdict` | enum | `VERIFIED` / `ISSUES_FOUND`; `WAIVED` on waive rows only |
 | `blocking` | boolean | any `critical`/`major` finding outstanding |
-| `verifier_model`, `verifier_provider` | string | who verified |
+| `verifier_model`, `verifier_provider` | string | who verified (on an adjudication row: the adjudicator) |
 | `orchestrator_provider` | string | the excluded provider |
 | `findings` | array | each: `description`, `severity` (`critical`/`major`/`minor`, closed vocabulary), optional `category`, `failureScenario`, `evidencePaths`, `blocking` |
 | `cost_usd` | number \| null | null on seat transport, never 0.0 |
@@ -133,9 +134,57 @@ Row fields (required: `round`, `verdict`, `blocking`, `verifier_model`,
 | `previous_tree` | string | previous round's tree-SHA; **required for rounds ≥ 2** (the fix-delta base) |
 | `recorded_at` | string | timestamp |
 | `transport` | string | `api` or `copilot-cli` |
+| `type` | enum | absent on plain rounds; `adjudication` or `waive` — both terminal: no later round may open |
 
 Raw verifier output is saved beside the ledger as
 `round-<N>-verifier-output.md`, byte-identical to the response.
+
+**The adjudication row** (`type: "adjudication"`, written by
+`ai_router.verify adjudicate`, one per session ever) additionally
+requires:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `outcomes` | array | one per disputed finding: `finding_index`, `outcome` (`UPHELD`/`OVERRULED`, fail-closed to UPHELD on any parse ambiguity or reason-less overrule), `reasons` |
+| `excluded_providers` | array | the exclusion superset: the orchestrator's provider plus every provider that verified a round |
+
+All disputes overruled → `verdict: "VERIFIED"`, `blocking: false`, and
+the close gate passes unchanged. Any upheld → `ISSUES_FOUND`, still
+blocked.
+
+**The waive row** (`type: "waive"`, written by `ai_router.verify
+waive` — interactive-only, operator-attested) has no verifier fields;
+it requires `verdict: "WAIVED"`, `blocking: false`, and:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `attestation` | string | the operator's typed attestation, verbatim |
+| `waived` | object | `exhausted_via` (`upheld-adjudication` / `adjudication-unavailable`) and `findings` — the blocking findings being waived, copied verbatim |
+
+WAIVED means the operator accepted **unverified** work; it is not a
+verification. The command is permitted only when the machine path is
+exhausted, and refuses when stdin is not a TTY.
+
+## Disputes ledger — `.dabbler/runs/<set>/s<N>/disputes.jsonl`
+
+One row per disputed finding, written **only** by `ai_router.verify
+dispute`; schema-validated on read
+(`ai_router/schemas/disputes.schema.json`). One dispute per finding,
+ever — rows are immutable, and a second dispute of the same finding is
+refused. The next round's prompt presents the rebuttal beside the
+finding exactly once (UPHOLD-or-WITHDRAW); the adjudicator reads it
+verbatim.
+
+Row fields (all required):
+
+| Field | Type | Meaning |
+|---|---|---|
+| `round` | integer ≥ 1 | the recorded round the finding belongs to |
+| `finding_index` | integer ≥ 0 | 0-based index into that round's `findings` |
+| `filed_after_round` | integer ≥ 1 | latest round at filing time; the first later round presents the rebuttal, after which the dispute is settled by that round's findings |
+| `grounds` | string | the rebuttal's argument |
+| `evidence_paths` | array, min 1 | repo-relative cites, optionally `path:START-END`; prose-only disputes are refused at the CLI |
+| `recorded_at` | string | timestamp |
 
 ## Metrics ledger — `router-metrics.jsonl`
 

@@ -8,10 +8,25 @@ from ai_router.session import register_session_start
 from ai_router.verify import (
     EXIT_BLOCKING,
     EXIT_OK,
+    EXIT_STATE,
     EXIT_UNAVAILABLE,
     EXIT_USAGE,
     run_round,
 )
+
+
+def _interactive(monkeypatch, text):
+    """A TTY stdin and a scripted attestation — the operator at the
+    prompt."""
+    import sys
+
+    class Tty:
+        @staticmethod
+        def isatty():
+            return True
+
+    monkeypatch.setattr(sys, "stdin", Tty())
+    monkeypatch.setattr("builtins.input", lambda prompt="": text)
 
 BLOCKING_RESPONSE = """ISSUES FOUND
 
@@ -185,13 +200,17 @@ class TestLoop:
         assert rounds[1]["previous_tree"] == rounds[0]["completion_tree"]
         assert rounds[1]["phase"] == "fix-delta"
 
-    def test_round_cap_suspends(self, flight):
+    def test_round_cap_suspends(self, flight, capsys):
         repo, set_dir, install = flight
         install([make_result(BLOCKING_RESPONSE)])
         assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
         assert run_round(set_dir, max_rounds=1) == EXIT_USAGE
         # The bound refuses BEFORE any metered call: only one round exists.
         assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
+        # The refusal names its exits, verbatim commands.
+        err = capsys.readouterr().err
+        assert "ai_router.verify dispute" in err
+        assert "ai_router.verify adjudicate" in err
 
 
 class TestDispute:
@@ -483,7 +502,9 @@ class TestAdjudicate:
              NoCandidateError("nothing survives the exclusions")],
         )
         assert self._adjudicate(set_dir) == EXIT_UNAVAILABLE
-        assert "VERIFICATION UNAVAILABLE" in capsys.readouterr().err
+        err = capsys.readouterr().err
+        assert "VERIFICATION UNAVAILABLE" in err
+        assert "ai_router.verify waive" in err   # the refusal names its exit
         assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
 
     def test_overrule_writes_verified_row_and_gate_passes(self, flight):
@@ -519,7 +540,7 @@ class TestAdjudicate:
         ok, _remediation = check_verification_clean(set_dir)
         assert ok
 
-    def test_upheld_adjudication_still_blocked(self, flight):
+    def test_upheld_adjudication_still_blocked(self, flight, capsys):
         repo, set_dir, _ = self._capped_and_disputed(
             flight,
             [
@@ -529,6 +550,8 @@ class TestAdjudicate:
             ],
         )
         assert self._adjudicate(set_dir) == EXIT_BLOCKING
+        # The blocked outcome names remediate-or-waive, verbatim command.
+        assert "ai_router.verify waive" in capsys.readouterr().out
         row = ledger.read_rounds(repo, set_dir.name, 1)[-1]
         assert row["verdict"] == "ISSUES_FOUND"
         assert row["blocking"] is True
@@ -594,6 +617,267 @@ class TestAdjudicate:
         assert "UPHOLD" in prompt and "OVERRULE" in prompt
 
 
+class TestWaive:
+    def _waive(self, set_dir, *extra):
+        from ai_router.verify import main
+
+        return main(["waive", "--session-set-dir", str(set_dir), *extra])
+
+    def _upheld(self, flight):
+        """Round 1 blocking at a cap of 1, disputed, adjudicated UPHELD —
+        the machine path exhausted via an upheld adjudication."""
+        from ai_router.verify import main
+
+        repo, set_dir, install = flight
+        install([
+            make_result(BLOCKING_RESPONSE),
+            make_result(ADJ_UPHOLD, model_name="gemini-pro",
+                        provider="google"),
+        ])
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        (repo / "docs" / "scope.md").write_text(
+            "scope: deliberately not covered\n", encoding="utf-8"
+        )
+        assert main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "1", "--finding", "0",
+            "--grounds", "out of scope", "--evidence", "docs/scope.md",
+        ]) == EXIT_OK
+        assert main([
+            "adjudicate", "--session-set-dir", str(set_dir),
+            "--max-rounds", "1",
+        ]) == EXIT_BLOCKING
+        return repo, set_dir
+
+    def test_noninteractive_stdin_refused(self, flight, capsys):
+        # pytest's stdin is not a TTY — exactly the engine's situation.
+        repo, set_dir = self._upheld(flight)
+        assert self._waive(set_dir) == EXIT_USAGE
+        assert "not a TTY" in capsys.readouterr().err
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
+
+    def test_machine_path_not_exhausted_refusals_name_exits(
+        self, flight, capsys, monkeypatch
+    ):
+        import importlib
+        from ai_router.verify import main
+
+        repo, set_dir, install = flight
+        install([make_result(BLOCKING_RESPONSE)])
+        assert run_round(set_dir) == EXIT_BLOCKING
+        # Below the cap: the exit is the loop itself.
+        assert self._waive(set_dir, "--max-rounds", "3") == EXIT_STATE
+        err = capsys.readouterr().err
+        assert "round cap (3) is not reached" in err
+        assert "ai_router.verify --session-set-dir" in err
+        # Cap reached, finding undisputed: the exit is dispute.
+        assert self._waive(set_dir, "--max-rounds", "1") == EXIT_STATE
+        err = capsys.readouterr().err
+        assert "no recorded dispute" in err
+        assert "ai_router.verify dispute" in err
+        # Disputed, but an eligible adjudicator exists: the exit is
+        # adjudicate — consensus precedes the operator.
+        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
+        assert main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "1", "--finding", "0",
+            "--grounds", "out of scope", "--evidence", "docs/scope.md",
+        ]) == EXIT_OK
+        monkeypatch.setattr(
+            importlib.import_module("ai_router.route"),
+            "any_candidate_survives", lambda excluded: True,
+        )
+        assert self._waive(set_dir, "--max-rounds", "1") == EXIT_STATE
+        assert "ai_router.verify adjudicate" in capsys.readouterr().err
+        # No refusal wrote anything; the TTY gate was never even reached.
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 1
+
+    def test_waive_after_upheld_adjudication_is_terminal_waived_row(
+        self, flight, monkeypatch
+    ):
+        repo, set_dir = self._upheld(flight)
+        _interactive(monkeypatch, "operator accepts the scope risk")
+        assert self._waive(set_dir) == EXIT_OK
+        rounds = ledger.read_rounds(repo, set_dir.name, 1)
+        row = rounds[-1]
+        assert row["type"] == "waive"
+        assert row["verdict"] == "WAIVED"
+        assert row["blocking"] is False
+        assert row["attestation"] == "operator accepts the scope risk"
+        assert row["waived"]["exhausted_via"] == "upheld-adjudication"
+        assert "divides by zero" in row["waived"]["findings"][0]["description"]
+        assert row["previous_tree"] == rounds[-2]["completion_tree"]
+        from ai_router.progress import read_session_state
+
+        state = read_session_state(set_dir)
+        assert state["sessions"][0]["verificationVerdict"] == "WAIVED"
+        # The existing gate reads the row with NO gate change.
+        from ai_router.gates import check_verification_clean
+
+        ok, _remediation = check_verification_clean(set_dir)
+        assert ok
+        # Terminal: no further round and no second waiver.
+        assert run_round(set_dir, max_rounds=99) == EXIT_USAGE
+        assert self._waive(set_dir) == EXIT_STATE
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 3
+
+    def test_waive_when_adjudication_unavailable(self, flight, monkeypatch):
+        import importlib
+        from ai_router.verify import main
+
+        repo, set_dir, install = flight
+        install([make_result(BLOCKING_RESPONSE)])
+        assert run_round(set_dir, max_rounds=1) == EXIT_BLOCKING
+        (repo / "docs" / "scope.md").write_text("scope\n", encoding="utf-8")
+        assert main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "1", "--finding", "0",
+            "--grounds", "out of scope", "--evidence", "docs/scope.md",
+        ]) == EXIT_OK
+        seen = {}
+
+        def fake_survives(excluded):
+            seen["excluded"] = list(excluded)
+            return False
+
+        monkeypatch.setattr(
+            importlib.import_module("ai_router.route"),
+            "any_candidate_survives", fake_survives,
+        )
+        _interactive(monkeypatch, "no third provider exists here")
+        assert self._waive(set_dir, "--max-rounds", "1") == EXIT_OK
+        # The availability check ran against the adjudication superset.
+        assert seen["excluded"] == ["anthropic", "openai"]
+        row = ledger.read_rounds(repo, set_dir.name, 1)[-1]
+        assert row["waived"]["exhausted_via"] == "adjudication-unavailable"
+        assert row["attestation"] == "no third provider exists here"
+        assert row["waived"]["findings"][0]["severity"] == "major"
+
+    def test_empty_attestation_refused_nothing_written(
+        self, flight, monkeypatch, capsys
+    ):
+        repo, set_dir = self._upheld(flight)
+        _interactive(monkeypatch, "   ")
+        assert self._waive(set_dir) == EXIT_USAGE
+        assert "empty attestation" in capsys.readouterr().err
+        assert len(ledger.read_rounds(repo, set_dir.name, 1)) == 2
+        from ai_router.progress import read_session_state
+
+        state = read_session_state(set_dir)
+        assert state["sessions"][0]["verificationVerdict"] is None
+
+
+class TestIncidentReplay:
+    """The set's acceptance criterion: the dabbler-simulation-player
+    incident shape (three blocking rounds re-raising a disputed finding)
+    replayed end-to-end through dispute -> adjudicate -> close, on both
+    adjudication outcomes."""
+
+    def _three_rounds_and_dispute(self, flight, final_outcome):
+        from ai_router.verify import main
+
+        repo, set_dir, install = flight
+        fake = install([
+            make_result(BLOCKING_RESPONSE),
+            make_result(BLOCKING_RESPONSE),
+            make_result(BLOCKING_RESPONSE),
+            final_outcome,
+        ])
+        assert run_round(set_dir) == EXIT_BLOCKING
+        (repo / "widget.py").write_text(
+            "def f(xs): return 1/len(xs)  # r2\n", encoding="utf-8"
+        )
+        assert run_round(set_dir) == EXIT_BLOCKING
+        (repo / "widget.py").write_text(
+            "def f(xs): return 1/len(xs)  # r3\n", encoding="utf-8"
+        )
+        assert run_round(set_dir) == EXIT_BLOCKING     # cap (3) reached
+        (repo / "docs" / "scope.md").write_text(
+            "selector grammar is deliberately not covered\n",
+            encoding="utf-8",
+        )
+        assert main([
+            "dispute", "--session-set-dir", str(set_dir),
+            "--round", "3", "--finding", "0",
+            "--grounds", "re-litigates a documented scope decision",
+            "--evidence", "docs/scope.md",
+        ]) == EXIT_OK
+        return repo, set_dir, fake
+
+    def _commit_and_push(self, repo):
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "session work")
+        _git(repo, "push", "-q")
+
+    def test_overruled_replay_closes_with_honest_ledger(self, flight):
+        from ai_router.session import close
+        from ai_router.verify import main
+
+        repo, set_dir, _ = self._three_rounds_and_dispute(
+            flight,
+            make_result(ADJ_OVERRULE, model_name="gemini-pro",
+                        provider="google"),
+        )
+        assert main(
+            ["adjudicate", "--session-set-dir", str(set_dir)]
+        ) == EXIT_OK
+        self._commit_and_push(repo)
+        assert close(set_dir) == 0
+        # The honest ledger, in order: three ISSUES_FOUND rounds, one
+        # dispute, one adjudication row naming the finding it overruled.
+        rounds = ledger.read_rounds(repo, set_dir.name, 1)
+        assert [r["verdict"] for r in rounds] == (
+            ["ISSUES_FOUND"] * 3 + ["VERIFIED"]
+        )
+        assert [r.get("type") for r in rounds] == (
+            [None] * 3 + ["adjudication"]
+        )
+        assert rounds[3]["outcomes"][0] == {
+            "finding_index": 0, "outcome": "OVERRULED",
+            "reasons": ADJ_OVERRULE.split("— ", 1)[1],
+        }
+        disputes = ledger.read_disputes(repo, set_dir.name, 1)
+        assert len(disputes) == 1 and disputes[0]["round"] == 3
+        from ai_router.progress import read_session_state
+
+        record = read_session_state(set_dir)["sessions"][0]
+        assert record["status"] == "complete"
+        assert record["verificationVerdict"] == "VERIFIED"
+
+    def test_upheld_replay_blocks_close_until_waived(
+        self, flight, monkeypatch
+    ):
+        from ai_router.session import close
+        from ai_router.verify import main
+
+        repo, set_dir, _ = self._three_rounds_and_dispute(
+            flight,
+            make_result(ADJ_UPHOLD, model_name="gemini-pro",
+                        provider="google"),
+        )
+        assert main(
+            ["adjudicate", "--session-set-dir", str(set_dir)]
+        ) == EXIT_BLOCKING
+        self._commit_and_push(repo)
+        assert close(set_dir) == 1       # refused until waive is attested
+        _interactive(monkeypatch, "scope decision documented; risk owned")
+        assert self._waive_via_main(set_dir) == EXIT_OK
+        assert close(set_dir) == 0
+        from ai_router.progress import read_session_state
+
+        record = read_session_state(set_dir)["sessions"][0]
+        assert record["status"] == "complete"
+        assert record["verificationVerdict"] == "WAIVED"
+        text = (set_dir / "change-log.md").read_text(encoding="utf-8")
+        assert "WAIVED" in text
+        assert "scope decision documented; risk owned" in text
+
+    def _waive_via_main(self, set_dir):
+        from ai_router.verify import main
+
+        return main(["waive", "--session-set-dir", str(set_dir)])
+
+
 class TestVerifierSelectionFailures:
     def test_retry_excludes_failed_provider(self, flight):
         repo, set_dir, install = flight
@@ -612,6 +896,7 @@ class TestVerifierSelectionFailures:
         assert run_round(set_dir) == EXIT_UNAVAILABLE
         err = capsys.readouterr().err
         assert "VERIFICATION UNAVAILABLE" in err
+        assert "Operator exit" in err    # the refusal names its resolution
         assert ledger.read_rounds(repo, set_dir.name, 1) == []
 
     def test_second_failure_propagates_as_call_failed(self, flight):

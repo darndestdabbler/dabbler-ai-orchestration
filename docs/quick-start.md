@@ -77,6 +77,48 @@ python -m ai_router.verify --session-set-dir docs/session-sets/<set>
   (`verification.settings.max_rounds`, default 3; `--max-rounds`
   overrides).
 
+### If a blocking finding is contested: dispute → adjudicate → waive
+
+A finding you believe is wrong is not remediated by grinding rounds.
+The ladder, in order — every refusal along the way prints the next
+rung's exact command:
+
+1. **Dispute** — rebut the finding on the record. Evidence is
+   mandatory (at least one existing repo path, optionally with a line
+   range as `path:START-END`); prose-only disputes are refused. The
+   next round presents the rebuttal beside the finding and the
+   verifier must UPHOLD it with reasons or WITHDRAW it.
+
+   ```
+   python -m ai_router.verify dispute --session-set-dir <set> \
+       --round <R> --finding <F> --grounds "..." --evidence <path>
+   ```
+
+2. **Adjudicate** — at the round cap, with every blocking finding
+   disputed, route the disputes to a third provider that neither
+   orchestrated nor verified any round. It judges each dispute
+   (UPHOLD or OVERRULE, with reasons; it may not raise new findings)
+   and writes one terminal ledger row. All overruled → the session is
+   clear to close; any upheld → still blocked. One adjudication per
+   session, ever; no verification round may open after it.
+
+   ```
+   python -m ai_router.verify adjudicate --session-set-dir <set>
+   ```
+
+3. **Waive** — the operator's last exit, permitted only when the
+   machine path is exhausted: the adjudication upheld a blocking
+   finding, or adjudication is unavailable (no eligible third
+   provider exists). Interactive-only — the attestation is typed at a
+   prompt and the command refuses when stdin is not a TTY, so an
+   engine cannot invoke it. WAIVED means the session closes
+   **unverified** with the operator's attestation on the record; it
+   never means "verified another way".
+
+   ```
+   python -m ai_router.verify waive --session-set-dir <set>
+   ```
+
 Then record the test run of record and commit/push the verified work:
 
 ```

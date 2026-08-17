@@ -1,14 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "rounds.jsonl row (one verification round)",
-  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip.",
+  "description": "One row per completed verification round in .dabbler/runs/<set>/s<N>/rounds.jsonl. Written only by the CLI (ai_router.verify); the close gate reads it. A row that fails this schema on read is a refusal, never a skip. Two terminal row types exist beside plain rounds: 'adjudication' (a third provider judged the recorded disputes) and 'waive' (the operator attested acceptance of UNVERIFIED work at an interactive prompt — WAIVED is not a verification).",
   "type": "object",
   "required": [
     "round",
     "verdict",
     "blocking",
-    "verifier_model",
-    "verifier_provider",
     "findings",
     "completion_tree",
     "recorded_at"
@@ -16,7 +14,10 @@
   "properties": {
     "round": { "type": "integer", "minimum": 1 },
     "phase": { "type": "string", "enum": ["full", "fix-delta"] },
-    "verdict": { "type": "string", "enum": ["VERIFIED", "ISSUES_FOUND"] },
+    "verdict": {
+      "type": "string",
+      "enum": ["VERIFIED", "ISSUES_FOUND", "WAIVED"]
+    },
     "blocking": { "type": "boolean" },
     "verifier_model": { "type": "string", "minLength": 1 },
     "verifier_provider": { "type": "string", "minLength": 1 },
@@ -48,7 +49,7 @@
     "previous_tree": { "type": "string", "minLength": 7 },
     "recorded_at": { "type": "string", "minLength": 1 },
     "transport": { "type": "string" },
-    "type": { "type": "string", "enum": ["adjudication"] },
+    "type": { "type": "string", "enum": ["adjudication", "waive"] },
     "excluded_providers": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },
@@ -66,6 +67,25 @@
           "reasons": { "type": "string" }
         }
       }
+    },
+    "attestation": { "type": "string", "minLength": 1 },
+    "waived": {
+      "type": "object",
+      "required": ["exhausted_via", "findings"],
+      "properties": {
+        "exhausted_via": {
+          "type": "string",
+          "enum": ["upheld-adjudication", "adjudication-unavailable"]
+        },
+        "findings": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["description", "severity"]
+          }
+        }
+      }
     }
   },
   "allOf": [
@@ -74,8 +94,30 @@
       "then": { "required": ["previous_tree"] }
     },
     {
-      "if": { "required": ["type"] },
+      "if": {
+        "properties": { "type": { "const": "adjudication" } },
+        "required": ["type"]
+      },
       "then": { "required": ["outcomes", "excluded_providers"] }
+    },
+    {
+      "if": {
+        "properties": { "type": { "const": "waive" } },
+        "required": ["type"]
+      },
+      "then": {
+        "required": ["attestation", "waived"],
+        "properties": {
+          "verdict": { "const": "WAIVED" },
+          "blocking": { "const": false }
+        }
+      },
+      "else": {
+        "required": ["verifier_model", "verifier_provider"],
+        "properties": {
+          "verdict": { "enum": ["VERIFIED", "ISSUES_FOUND"] }
+        }
+      }
     }
   ]
 }

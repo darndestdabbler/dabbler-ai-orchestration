@@ -659,8 +659,11 @@ Do not start another video-heavy set until Session 9 has proven the gdigrab harn
    reads the latter. Whether a residual gap is waived is the operator's
    signature, not this session's.
 6. **Its next-set recommendation is sound but not this session's to act on.**
-   Set selection happens at the Step 9 review, which belongs to **Session 9**,
-   the set-terminal session. Its Session 9 first action -- confirm Session 8
-   left a gate-readable evidence bundle before recording anything -- is a
-   correct restatement of the operator's ordering ruling of 2026-08-16.
+   Set selection happens at the Step 9 review, which belongs to the
+   set-terminal session — **Session 10** after the 2026-08-17 re-plan, which
+   made the single-module recording Session 9 in its own right. The first
+   action it names — confirm Session 8 left a gate-readable evidence bundle
+   before recording anything — is a correct restatement of the operator's
+   ordering ruling of 2026-08-16, and it binds Session 9, which is now the
+   first session that records.
 

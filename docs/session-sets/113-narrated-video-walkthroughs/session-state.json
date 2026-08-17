@@ -125,6 +125,15 @@
     },
     {
       "number": 9,
+      "title": "The single-module tutorial, on video",
+      "status": "not-started",
+      "startedAt": null,
+      "completedAt": null,
+      "orchestrator": null,
+      "verificationVerdict": null
+    },
+    {
+      "number": 10,
       "title": "The multi-module tutorial, and the set's accounting",
       "status": "not-started",
       "startedAt": null,

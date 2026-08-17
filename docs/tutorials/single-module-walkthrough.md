@@ -164,29 +164,42 @@ stays manual.
 
 ## What the recordings are waiting on
 
-Two things, and the first is an operator decision:
+One thing, now that the first has been settled:
 
-1. **A capture backend that draws the cursor.** Measured in Session 7
+1. **A capture backend that draws the cursor — SETTLED 2026-08-17.**
+   Measured in Session 7
    ([`s7-cursor-capture-backends.json`](../session-sets/113-narrated-video-walkthroughs/s7-cursor-capture-backends.json)):
    OBS window capture on WGC — what the recorder ships with — puts the
    workbench in the frame and **no cursor at all**; OBS BitBlt draws the
    cursor and black-frames the window; only `ffmpeg gdigrab` over the
-   desktop rectangle produces both. Swapping backends is a decision the
-   Session 4 pilot's seven criteria exist to judge, and none of them has
-   been run against `gdigrab`.
+   desktop rectangle produces both.
 
-   Recording these tutorials before that is settled would produce six videos
-   of controls operating themselves — which is exactly what the operator's
-   ordering ruling of 2026-08-16 forbids: *"we should get the cursor
-   functionality working before recording the purpose-built new
+   Recording these tutorials before that was settled would have produced six
+   videos of controls operating themselves — which is exactly what the
+   operator's ordering ruling of 2026-08-16 forbids: *"we should get the
+   cursor functionality working before recording the purpose-built new
    tutorials."*
 
    **Adjudicated 2026-08-16, then re-planned the same day.** The operator
    authorised the `gdigrab` desktop-rectangle route, **gated behind a
    measurement pass against the Session 4 pilot's seven criteria** rather
    than swapped in — and, rather than leave it to a follow-on set, extended
-   Set 113 to nine sessions so the videos exist. **Session 8 builds the
-   backend and the long-form harness; Session 9 records these six.**
+   Set 113 so the videos exist.
+
+   **Measured and cleared in Session 8.** `gdigrab` met **six of the seven
+   criteria at the full bar** — ten consecutive clean runs — and the VS Code
+   pointer-visibility artifact flipped from `FAIL` to `PASS` with its control
+   still failing. The one unmet criterion was C7's *mechanism* clause, which
+   no cursor-drawing backend can meet (the cursor is composited by the
+   desktop), and the operator waived **that clause only**:
+   [`s8-operator-waiver.json`](../session-sets/113-narrated-video-walkthroughs/s8-operator-waiver.json).
+   The waiver is narrow — it does not cover OBS, does not waive C1–C6 or
+   C7's no-audio and single-source clauses, and **every video made under it
+   still owes the publication safety pass**.
+
+   **Session 8 builds the backend and the long-form harness; Session 9
+   records these six** — a session of its own since the 2026-08-17 re-plan,
+   with the multi-module tutorial following as Session 10.
 
 2. **A human driving.** These are not scripted scenarios. A tutorial that
    shows *AI helping to author a plan* cannot be scripted, because the AI's

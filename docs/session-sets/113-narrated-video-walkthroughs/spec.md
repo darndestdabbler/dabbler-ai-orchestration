@@ -36,6 +36,18 @@
 > 7, and that both tutorials record the **host**, not the container. See the
 > operator note of 2026-08-16, *"The recordings work; show the pointer, and
 > make two tutorials"*. Journaled.
+> **Amended 2026-08-17** (during Session 8, operator direction): the set
+> grows from nine sessions to **TEN**, and the **single-module tutorial
+> recording becomes a session of its own — the new Session 9**. The
+> multi-module tutorial and the set's accounting move to **Session 10**,
+> which stays set-terminal. This is a **recovery, not new scope**: the
+> 2026-08-16 amendment placed the single-module recording in Session 7,
+> Session 7 could not record it (no backend drew a cursor) and closed
+> `WAIVED`, and the re-plan at its close inserted the backend session
+> without re-homing the recording — so a declared deliverable and a
+> declared `uatComponents` entry had no session that made them. `No arming
+> flag changes` and `uatComponents` is unchanged: both recording sets were
+> already declared. Journaled.
 > **Prerequisites:** Set 112 complete (operator sequencing decision, 2026-08-08).
 > **Session Set:** `docs/session-sets/113-narrated-video-walkthroughs/`
 > **Workflow:** Orchestrator → AI Router → Cross-provider verification
@@ -65,12 +77,12 @@
 
 ```yaml
 tier: full
-totalSessions: 9          # Re-planned 2026-08-16 at Session 7's close: EIGHT to NINE. Declared here so the boundary writers derive the count from the spec instead of from a stale sessions[] length.
+totalSessions: 10         # Re-planned 2026-08-16 at Session 7's close (EIGHT to NINE), and again 2026-08-17 during Session 8 (NINE to TEN, re-homing the single-module recording). Declared here so the boundary writers derive the count from the spec instead of from a stale sessions[] length.
 requiresUAT: true           # A set whose deliverable IS the UAT experience must be judged as an experience. Its own walk is the acceptance test — and Session 4 is what keeps that walk possible on this repo's own product.
 requiresE2E: true         # Sessions 3 and 4 drive real rendering surfaces (a browser fixture and the Extension Development Host).
 uatStyle: ad-hoc
 uatScope: per-set
-uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 9, after the 2026-08-16 re-plan) owes one record per line.
+uatComponents:            # Set 113 S1's own gate, applied to this set. The TERMINAL session (now 10, after the 2026-08-17 re-plan) owes one record per line.
   - Rendered walkthrough and training document
   - Static generated index
   - Recorded web scenario
@@ -83,9 +95,16 @@ pathAwareCritique: advisory
 # NINE sessions on operator direction. Session 7's measurement established
 # that no capture backend draws a cursor, and placing the fix outside the
 # set would have ended a set about narrated video with no video in it.
-# Session 8 is now the backend; the old Session 8 became Session 9 and is
-# still set-terminal. Sessions 8 and 9 run on the operator's WORK COMPUTER,
-# on a Copilot seat -- see Session 8's prerequisites block.
+# Session 8 is now the backend; the old Session 8 became Session 9.
+#
+# Re-planned again 2026-08-17, during Session 8: NINE to TEN. The 8-to-9
+# re-plan inserted the backend session but never re-homed the single-module
+# recording that Session 7 owed and could not make, so the set carried a
+# declared deliverable and a declared uatComponents entry that no session
+# produced. The single-module recording is now Session 9 in its own right
+# and the multi-module tutorial is Session 10, still set-terminal. Sessions
+# 8, 9 and 10 run on the operator's WORK COMPUTER, on a Copilot seat --
+# see Session 8's prerequisites block.
 #
 # Declared 2026-08-16, when the admission test was run against the whole
 # amended spec and reported four sessions over cap. Sessions 7 and 8 were
@@ -209,7 +228,7 @@ truthful record.
 
 ## Sessions
 
-### Session 1 of 9: Truthful UAT accounting
+### Session 1 of 10: Truthful UAT accounting
 
 The gate first, because it is the part that is useful even if every later
 session is cancelled.
@@ -246,7 +265,7 @@ session is cancelled.
 
 ---
 
-### Session 2 of 9: Portable scenario source and standalone rendering
+### Session 2 of 10: Portable scenario source and standalone rendering
 
 **Steps:**
 
@@ -277,7 +296,7 @@ session is cancelled.
 
 ---
 
-### Session 3 of 9: Browser recording proof
+### Session 3 of 10: Browser recording proof
 
 The portable recording path, proved where the framework's actual products
 live. **Not** against this repo's extension.
@@ -312,7 +331,7 @@ live. **Not** against this repo's extension.
 
 ---
 
-### Session 4 of 9: Bounded Windows OS-capture dogfood
+### Session 4 of 10: Bounded Windows OS-capture dogfood
 
 **Strictly bounded. One session. It ends in a measurement either way.**
 
@@ -376,7 +395,7 @@ tooling on its own product.
 
 ---
 
-### Session 5 of 9: Containerised capture — measure the isolation
+### Session 5 of 10: Containerised capture — measure the isolation
 
 **Added 2026-08-16 on operator direction**, after Session 4 put two large
 open-source media stacks (OBS Studio, ffmpeg) into this framework's
@@ -449,7 +468,7 @@ pixels, host windows or host devices. That is the right shape.
 
 ---
 
-### Session 6 of 9: Why the pull critique could not reach two providers
+### Session 6 of 10: Why the pull critique could not reach two providers
 
 **Added 2026-08-16 on operator direction.** Session 4's advisory
 path-aware critique produced **no artifact** across three attempts: google
@@ -491,7 +510,7 @@ succeeded every time, openai failed every time, in two distinct ways.
 
 ---
 
-### Session 7 of 9: Show the pointer, then record the single-module tutorial
+### Session 7 of 10: Show the pointer, then record the single-module tutorial
 
 **Added 2026-08-16 on operator direction**, with the first tutorial video.
 Two pieces of work, and **the order between them is a requirement rather
@@ -591,11 +610,11 @@ scenario has misread it.
 
 ---
 
-### Session 8 of 9: A capture backend that draws the cursor
+### Session 8 of 10: A capture backend that draws the cursor
 
 **Re-planned 2026-08-16, at Session 7's close, on operator direction.** The
 session that was here — the multi-module tutorial and the set's accounting —
-is now **Session 9**, and this session is the thing that has to happen first
+is now **Session 10**, and this session is the thing that has to happen first
 if either tutorial is to have a video at all.
 
 **Why the set grew instead of deferring.** Session 7 measured that **no
@@ -608,12 +627,13 @@ window's desktop rectangle produces both. The operator adjudicated the
 follow-on set — which would have ended this set with two written tutorials
 and **no video**, against a direction whose whole point was two videos. The
 operator's ruling: extend the set. This session does the backend; Session 9
-stays terminal and does the accounting, so a terminal session is not also
+records the single-module tutorial on top of it and Session 10 stays
+terminal and does the accounting, so a terminal session is not also
 building a capture stack.
 
 **THE MACHINE CHANGES HERE, and it is a prerequisite rather than a note.**
 Sessions 1–7 ran on the operator's personal machine, whose API credits are
-now nearly exhausted and cannot be topped up. Sessions 8 and 9 run on the
+now nearly exhausted and cannot be topped up. Sessions 8, 9 and 10 run on the
 operator's **work computer**, which is a **Copilot seat**: it carries no
 `DABBLER_*` provider keys by design, and their absence is not an error.
 Before anything routes there:
@@ -689,25 +709,121 @@ Before anything routes there:
 
 ---
 
-### Session 9 of 9: The multi-module tutorial, and the set's accounting
+### Session 9 of 10: The single-module tutorial, on video
+
+**Added 2026-08-17 on operator direction, and it is a recovery rather than
+new scope.** Session 7 was to record this and could not — no capture backend
+drew a cursor — and the re-plan at its close inserted the backend session
+without re-homing the recording. The written walkthrough
+[`docs/tutorials/single-module-walkthrough.md`](../../tutorials/single-module-walkthrough.md)
+has said **"Recording status: not yet recorded"** since 2026-08-16, and
+`Single-module tutorial recording set` is a declared `uatComponents` entry
+the terminal session owes a record for. **No other session in this set
+produces it.**
+
+> **Why its own session, rather than folded into Session 10.** Session 10
+> declares six steps against a cap of seven, so the slot exists — and using
+> it would be wrong on three counts, the first of which is evidence rather
+> than preference:
+>
+> - **Session 8's harness has never recorded a real session.** It was proved
+>   on a **10.9-second smoke recording**, and `speed_ramp` correctly
+>   *refused* to compress it (*"refusing to compress on no evidence"*), so
+>   the compression path is unexercised. One module and no manifest is the
+>   right first real load: a harness should break on the simpler tutorial.
+> - **Session 10's acceptance test presupposes this video exists.** Its
+>   step 2 requires the multi-module recording to show *"what the
+>   single-module tutorial cannot"*, on pain of being *"the same video three
+>   times at three times the cost"* — which is judged against an actual
+>   first video. And *"reuse Session 8's harness unchanged"* is only
+>   evidence if something already used it.
+> - **The accounting wants the gap.** The terminal session owes a UAT record
+>   for this component; recording a session earlier lets the operator
+>   **watch** it before that record is written — the same `method: watched`
+>   shape as the Session 4 pilot review, and this set's only real form of
+>   human review.
+
+> **Prerequisites: Session 8's, unchanged** — the work computer, the Copilot
+> seat, `python -m ai_router.verify_type --set COPILOT_CLI`, and
+> `ffmpeg`/`ffprobe` on `PATH`. Plus one this session adds: **the capture
+> gate is open only under [`s8-operator-waiver.json`](s8-operator-waiver.json)**,
+> which waives C7's *mechanism* clause for the `gdigrab` backend and nothing
+> else. **Record on that backend.** The waiver does not cover OBS (whose
+> Session 4 verdict still stands at FAIL), does not waive C1–C6 or C7's
+> no-audio and single-source clauses, and does not remove the per-video
+> publication safety pass.
+
+> **Two things this session must not do.** It must not re-litigate residuals
+> `S7-R4` and `S7-R5`, both operator-adjudicated. And **it must not shrink
+> the tutorial to fit the clock**: the rule is *shrink the project, not the
+> tutorial*, because dropping steps is how a lifecycle demonstration quietly
+> stops demonstrating the lifecycle.
+
+**Steps:**
+
+1. Register. Read `docs/tutorials/single-module-walkthrough.md` first — the
+   tutorial is authored, the toy project is chosen and the shape is decided.
+   This session records it; it does not re-design it.
+2. **Record the six sessions of `unit-converter`** — three session sets, two
+   sessions each, **one recording per session**, named for its set and
+   session, each starting before `start_session` and stopping after
+   `close_session`. **Set 1 is the one the tutorial exists for:** a person
+   and an AI authoring a plan together, with the human **disagreeing on
+   camera** and the plan changing because of it — a recording of a plan
+   accepted unchanged teaches that the AI is right, which is not what this
+   framework claims. **A human drives; the recorder observes and nothing
+   more.** If a session runs past about fifteen minutes of wall clock,
+   shrink the project.
+3. **Compress the waiting from the framework's own record, and state what
+   was compressed.** `python -m ai_router.speed_ramp plan` derives the
+   waiting stretches from each recorded session's own `session-events.jsonl`
+   and `activity-log.json`; **read the plan before applying it.** This is
+   the **first real exercise of the compression path** — if it refuses, or
+   reports that it is compressing nearly all of a recording, say so plainly
+   rather than hand-editing a timeline. Never compress an interval where
+   something happened.
+4. **Clear every video for publication, per video.** Session 7's
+   [`publication-safety-checklist.md`](../../walkthroughs/publication-safety-checklist.md),
+   run once per artifact rather than once per set, because the risk is per
+   artifact and **these are artifacts that cannot be recalled**. Nothing
+   here uploads anything: publication stays a human upload, the product
+   version belongs in the title, and a stale video is regenerated rather
+   than patched.
+5. **Cross-provider verification.**
+6. **Required portion of the full test suite** — Layer 1, plus Layer 3 if
+   the harness had to change to get through step 2 (`L-064-12`).
+7. **Close-out**, mid-set, with a `next_orchestrator` handover.
+
+**Creates:** the six single-module tutorial recordings, their speed-ramp plans, and one publication safety record per video
+**Touches:** `docs/tutorials/single-module-walkthrough.md`, `docs/walkthroughs/`, the set directory
+**Ends with:** the single-module tutorial is watchable as one video per session, with the waiting compressed out by a plan derived from the framework's own timestamps and the compression stated — and its written half no longer says "not yet recorded".
+**Progress keys:** `singleModuleRecorded`, `rampExercised`, `safetyPassPerVideo`, `harnessReused`
+
+---
+
+### Session 10 of 10: The multi-module tutorial, and the set's accounting
 
 **Added 2026-08-16 on operator direction.** The second tutorial, and the
 **set-terminal** session — it inherits `change-log.md`, the Step 9 review
 and this set's own UAT accounting from Session 6.
 
 > **RE-PLANNED 2026-08-16 at Session 7's close, and this session MOVED from
-> 8 to 9.** Its recordings were blocked by the same thing that blocked
+> 8 to 9. Re-planned again 2026-08-17 during Session 8, and MOVED from 9 to
+> 10** to make room for the single-module recording Session 7 owed and never
+> made. Its recordings were blocked by the same thing that blocked
 > Session 7's — no capture backend draws a cursor — and the first placement
 > of the fix, a reserved follow-on set, would have ended this set with two
 > written tutorials and no video at all. The operator extended the set
-> instead: **Session 8 builds the backend and the long-form harness**, and
-> this session records on top of them. That ordering is the same ruling as
+> instead: **Session 8 builds the backend and the long-form harness**,
+> **Session 9 records the single-module tutorial on it**, and this session
+> records on top of both. That ordering is the same ruling as
 > 2026-08-16's original one — get the cursor working *before* recording, or
 > the tutorial gets recorded twice.
 >
 > **It also runs on the operator's WORK COMPUTER**, on a Copilot seat with
 > no `DABBLER_*` keys; see Session 8's prerequisites, which apply here
-> unchanged.
+> unchanged — as does the narrow scope of `s8-operator-waiver.json`, which
+> is what opened the capture gate and covers the `gdigrab` backend only.
 >
 > **Two things this session must not do.** It must not re-litigate the two
 > accepted residuals `S7-R4` and `S7-R5` (the pointer check matches a
@@ -723,11 +839,15 @@ and this set's own UAT accounting from Session 6.
 2. **Record the multi-module tutorial:** a purpose-built toy repository with
    **three modules, one session set each**, individual sessions as
    individual recordings, waiting compressed out. **Reuse Session 8's
-   harness unchanged.** If it cannot be reused unchanged, say plainly what
+   harness unchanged — as Session 9 already exercised it**, which is what
+   makes "unchanged" a claim with evidence behind it rather than an
+   assertion. If it cannot be reused unchanged, say plainly what
    had to generalise and why — that is the signal that the capability was
    fitted to one example, and it is worth more written down than worked
    around.
-   **It must show what the single-module tutorial cannot**, or it is the
+   **It must show what the single-module tutorial cannot**, judged against
+   Session 9's actual recordings rather than against its written half, or it
+   is the
    same video three times at three times the cost: module declaration, the
    Explorer grouped by module, review routed by ownership, and work
    proceeding **in parallel** across modules while nobody waits. If those

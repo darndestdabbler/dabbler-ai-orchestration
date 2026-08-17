@@ -24,9 +24,9 @@
     {
       "number": 2,
       "title": "Does severity still carry information?",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-17T05:54:06.480945-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-17T07:15:46.184050-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -37,7 +37,7 @@
           "dc2ad8e7-0e7f-4f8e-9e90-cad058e2cf67"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 3,

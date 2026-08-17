@@ -2,12 +2,12 @@
   "schemaVersion": 1,
   "derived": true,
   "regenerateWith": "python -m ai_router.session_projection --session-set-dir <dir> --write",
-  "generatedAt": "2026-08-17T05:26:42.376180-04:00",
+  "generatedAt": "2026-08-17T07:15:46.188261-04:00",
   "sessionSetDir": "134-ceremony-cost-and-what-to-cut",
   "inputs": {
-    "activity-log.json": "f6b96d4ddd48b9caa253a767d9695e99e699a93676efaff28cb83a1c2af04503",
-    "session-state.json": "d1c8ef5e225f6bc21ac51f1db65e23f34ad98040cd96dc1b7188cc223a60f98d",
-    "spec.md": "0caf2f1ffd12260d51004c986f97cb5db40f7deeb8a8ace1ef0b0f29344b6f24"
+    "activity-log.json": "0b210f74373bd021b08a0c5178e93bf2e268cb2e233059e5bec4e58569f022b7",
+    "session-state.json": "d890d153b885543a06fee24bf1201477cac4f3ea46abab4b294fdcc3469404bd",
+    "spec.md": "5937a4bba57cf3b13da4d5f5459dbcbcdfba664d91930d2d1cee553479fcdf46"
   },
   "orphanEntries": 0,
   "sessions": [
@@ -116,19 +116,106 @@
     },
     {
       "number": 2,
-      "status": "not-started",
+      "status": "complete",
       "evidence": "read",
-      "steps": [],
+      "steps": [
+        {
+          "stepNumber": 1,
+          "stepKey": "register",
+          "description": "Registered session 2 (github-copilot / claude-opus-5, high).",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T05:54:06.480945-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 2,
+          "stepKey": "measure-the-severity-distribution-and-what",
+          "description": "Measured the severity field over the whole committed corpus with five read-only instruments run from the session workspace (no new module, no repo script). Classifier stated first: corpus = every docs/session-sets/**/s*-issues*.json (415 envelopes), finding = one object in the issues array (771), canonical = {Critical, Major, Minor} case-insensitively after strip, blocking = the PRODUCTION predicate ai_router.verification.is_blocking_issue, not a re-implementation. THE 92% REPRODUCES, unlike Session 1's 2.3x: 715/771 = 92.7% Major, and 92.7% under both sensitivity variants (dedup by description, and excluding the two non-schema envelopes). Non-canonical is EXACTLY 28, the figure the spec claimed. Critical 7 (0.9%), Minor 21 (2.7%). BUT THE FIELD DOES NOT DISCRIMINATE, and the reason is stronger than the spec supposed. (1) By round, Major share RISES: 88.8 / 95.0 / 96.4 / 94.9 / 97.3%, and is_blocking_issue is TRUE on 100% of findings from round 3 onward. (2) By phase: discovery 98.4%, supplementary 100%, remediation-review 100%. (3) The last Minor a verifier assigned anywhere in this repo is Set 082, committed 2026-07-06; since then 49 sets and 698 findings have produced ZERO Minors (97.3% Major). In the ledger era (Set 111+, where the bounded loop actually exists) the field takes exactly two values across 281 findings, Major 98.6% and Critical 1.4% - both blocking. (4) Entropy: severity carries 0.511 bits of a possible 2.000; the gate's own answer carries 0.194. classify_blocking() says CONTINUE on 406 of 413 rounds (98.3%). (5) THE DECISIVE MEASUREMENT: of 249 ledgered rounds, 143 returned findings and the gate called 13 of them non-blocking; 12 of those 13 are supplementary rounds with zero findings, which never end a loop by protocol. The severity field has therefore changed the course of exactly ONE round in the corpus (113-narrated-video-walkthroughs S3 r1) - and on that occasion the deciding Minor was written by the Set 119 doc-only cap, not by a verifier, AND the session then ran three more rounds anyway. 106 of 107 loop terminations came from a round that reported NO findings at all. (6) Severity does not predict outcome either: on the 73 findings carrying resolution_status, Minors were fixed 90.5% of the time against Majors' 77.8% - the ordering is inverted; and 80.4% of shipped acceptance criteria are judgment-kind, with only 12 findings auto-closed by their own criterion corpus-wide. (7) What the loop returns, by round: fix-accepted 52.3 / 59.6 / 59.6% at rounds 3 / 4 / 5+, duplicate-of 20.6 / 23.0 / 25.2%, fix-rejected 22.6 / 12.9 / 11.3% - later rounds are NOT low-yield, so the findings are material even though the label is constant. CAUSE, DATED FROM THE TEMPLATE ITSELF: ai_router/prompt-templates/verification.md line 93 instructs 'Severity: Critical / Major (a blocking Issue is never Minor - Minor goes under NITS)', shipped by Set 071 S1 on 2026-06-18 and hardened by Set 096 S1 on 2026-07-12. The field cannot carry Minor because the template forbids it. The 92% is not a judgment failure; it is an instruction being followed.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T05:54:06.522908-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 3,
+          "stepKey": "decide-what-the-defect-is-and",
+          "description": "Named (b) - the gate reads the wrong signal - and journaled it via decision_journal (authority ai, rubric line goal-over-letter, verification_effect strengthens). (a) is REFUTED BY MEASUREMENT rather than merely rejected: sharpening the rubric is what produced the present state, since pre-consequence-rubric the field carried 77.6% Major with 20 Minors and after Sets 095/096 it carries 98.9-100% Major with zero across 49 sets, so prescribing more sharpening would prescribe more of the intervention that caused the condition. (c) is reported as HALF TRUE and the surviving half is stated plainly rather than buried: the findings ARE material, because the loop accepts fixes at 52.3/59.6/59.6% at rounds 3/4/5+ and later rounds are not low-yield - but a gate whose input has taken one blocking value for 281 consecutive findings, and which has changed the course of one round in 413 via a value its own doc-only cap wrote, is not pricing a guarantee. AUTHORITY BOUNDARY HELD: the diagnosis is the orchestrator's, but every remedy that would change what the gate reads could make the loop stop earlier, which is a verification reduction and the operator's alone under the set's hard carve-out; decision_journal refuses such a record under ai authority and none was attempted. No gate code was touched. The remedy is surfaced as an education-mode brief with the measurement attached, and the one non-constant quantity the corpus offers as an alternative signal - duplicate-of at 22.8% of fix verdicts, rising 20.6 -> 23.0 -> 25.2% with round depth - is named as EVIDENCE, explicitly not proposed as a change.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T06:08:03.229919-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 4,
+          "stepKey": "give-severity-the-set-120-treatment",
+          "description": "Applied the Set 120 S1 closed-vocabulary pattern to severity, in existing modules only (the set's no-new-module rule). MEASURED FIRST, and it changed the framing: all 28 non-canonical values were written between 2026-07-02 and 2026-07-10 across sets 077-087, and 698 findings across 49 sets have been written since without one recurrence - so this is a GUARD on a closed episode, not a repair of a live leak, and the deliverable says so. But two live sources remained and both are closed here. (1) THE MACHINERY WROTE A NON-CANONICAL TOKEN ITSELF: three production sites wrote 'severity': 'unknown' (verification.py once, verify_session.py twice). That sentinel is a SECOND spelling for what an absent key already says - is_blocking_issue blocks on both, identically - so it was fixed by REMOVAL per project-guidance G-005: the key is omitted and no reader's behaviour changed by a byte, which a test asserts directly. (2) A SHIPPED TEMPLATE OFFERED A TOKEN NO READER KNOWS: prompt-templates/task-prompts.md offered 'Critical / Major / Minor / Suggestion', and 'Suggestion' is one of the 28 values on disk; removed. (3) The pull surface's submit_verdict tool schema declared severity as an unconstrained {'type': 'string'}; now enum-constrained to the canonical three, so the vocabulary is declared to the provider before a token is emitted. THE VOCABULARY lives in verification.py beside the BLOCKING_SEVERITIES it serves: CANONICAL_SEVERITIES, ALLOWED_SEVERITIES, InvalidSeverityError, is_valid_severity, suggest_severity, validate_severity, require_severity - the same shape as session_log.py's step-status vocabulary, with hints that are advisory only and never normalize on the way to disk, because silently rewriting a verifier's 'High' into 'Major' would be laundering in the permissive direction. THE CHOKEPOINT is write_issues_artifact, the sanctioned writer of sN-issues*.json. Two properties make the refusal safe rather than destructive and both are asserted: the raw sN-verification*.md artifact is persisted BEFORE parsing (L-064-3) so a refusal costs the envelope and never the paid response, and an ABSENT severity is legal and never refused, so a refusal can never launder a finding into a nit. DELIBERATELY NOT DONE: _parse_issue_blocks is left tolerant (it reads untrusted model output) and docs/session-issues.schema.json keeps severity: {'type': 'string'} - enum-constraining the schema would make 28 committed envelopes invalid. Writer strict, reader lenient, recorded in docs/session-issues-schema.md with a do-not-fix note on the schema. TESTS: ai_router/tests/test_severity_vocabulary.py, 54 cases, per L-112-1 each rule ships a falsifier that plants the violation and one that plants the legitimate look-alike; the corpus scans assert their corpus is non-empty. Two pre-existing tests encoded the old contract and were updated, not weakened: the phases test now asserts key-omission AND asserts is_blocking_issue is still True (the property the sentinel stood in for, now asserted directly), and a qualified-verdict fixture spelled 'minor' lowercase. 906 targeted tests green across all 12 suites covering the changed modules.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T06:25:24.126118-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 5,
+          "stepKey": "cross-provider-verification",
+          "description": "Phased loop, 3 rounds, closed VERIFIED within bounds (2 discovery passes and 2 remediation-review cycles permitted; 1 and 1 used). Verifier gpt-5.5 on openai; anthropic auto-excluded as the orchestrator's effective provider via model-registry lookup. Round 1 discovery, fan-out 2 (spec-conformance / failure-scenario lenses): ISSUES_FOUND, 2 blocking Majors, 0 minor - BOTH raised by the failure-scenario lens. Round 2 supplementary, run BEFORE any remediation as the loop requires: VERIFIED, zero new findings, so the two discovery blockers were the whole set. BOTH ACCEPTED WITHOUT ARGUMENT, and both were defects this session INTRODUCED at step 4. FINDING 1 (Correctness): the step-4 writer called a RAISING require_severity, and the safety argument for that ('the raw artifact is persisted before parsing, so nothing paid is lost') was true but insufficient - write_issues_artifact runs BEFORE record_round_completed, resolve_round advances on raw-artifact existence, and the cross-round ledger reads only sN-issues*.json, so a raise left a paid blocking finding in a raw-only UNLEDGERED round that the next invocation would skip. A vocabulary shipped to close an anti-laundering hole had opened one, and the trigger was ordinary case drift ('Severity: major') that the parser accepts by design. FINDING 2 (Completeness): the submit_verdict JSON Schema enum is a DECLARATION to the provider, not an enforcement, so _parse_verdict still copied any string through Finding.to_dict() onto disk - and the existing test suite ASSERTED lowercase 'major' survives, so the vocabulary this session claimed to close was pinned open by its own tests (the G-008 sibling-site rule biting: same defect class, parallel writer, fixed at one site only). REMEDIATION: refuse the TOKEN, not the ROUND. canonical_severity_for_write() never raises and returns the canonical spelling or None (omit the key); it is exactly blocking-preserving, asserted token by token over 20 inputs including non-strings - major/High/unknown/prose omit and still block, minor/MINOR become 'Minor' and stay nits, canonical tokens pass through. The envelope is now ALWAYS written, the caller's issue list is copied rather than mutated (it is the list the blocking decision and ledger were computed from), both writers print a loud stderr refusal, and require_severity survives as a POST-CONDITION guard on the writer's own output. An end-to-end test drives a full vs.run() round with 'Severity: major' and asserts the envelope exists, the token was refused, is_blocking_issue is still True, and s1-rounds.jsonl carries round-completed with blocking true. G-012 consistency propagated in the same pass to all four echoes: the schema doc, section 8 of the deliverable, the conventions block this round's verifier read, and the remediation sidecar. Acceptance harness round 1: both criteria judgment-kind, never auto-closed by design - itself an instance of the 80.4% figure this session measured. Round 3 remediation-review over the fix delta: VERIFIED, 2 fixes accepted / 0 rejected / 0 accepted-with-modification, zero new findings. NO MEASURED NUMBER MOVED: both findings concern how the vocabulary is ENFORCED, not whether severity discriminates, so the (a)/(b)/(c) call and every figure in sections 1-7 stand unchanged.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T06:25:24.128183-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 6,
+          "stepKey": "required-portion-of-the-full-test",
+          "description": "ALL THREE declared suites were owed and all three were run in full, after the last code change and after the VERIFIED remediation-review round (A2/A4). `run_of_record affected` names them: every suite declares ai_router/ in its covers, and this session changed verification.py, verify_session.py, pull_verifier.py, three test modules and a prompt template under that path. NOTE FOR FUTURE SESSIONS: `affected` and `check` default to disposition.files_changed, which at that moment still held SESSION 1's list, so both initially reported 'no declared suite's input set intersects this change' - the real change set had to be passed with --files-changed. That is a live trap: the default is stale for the whole of a session until its disposition is authored. RESULTS. pytest: 5195 passed, 9 skipped, 1 xfailed, 726s - clean single invocation. mocha: 1609 passing, 2 pending, 0 failing, 50s; the Set 114 S3 symlink test is among the pending because this shell cannot create a symlink, and it did not fail. playwright: 36 passed / 1 failed in the full invocation (487s), then the identical failing spec passed in isolation in 46.0s with no code change between runs, so all 37 Layer 3 tests executed and passed. RECORDED AS A COMPOSITE AND STATED AS ONE, not laundered into a clean green: the run-of-record --detail names the composition, the failing spec and both results, and the route is journaled in decisions.jsonl under project-guidance G-004, whose second worked case is this situation verbatim. The failure was a 300s timeout on vsix-first-run-walkthrough.spec.ts waiting for the Default module row to read '2 sets'; Playwright's own output flags that file as contention-slow at 5.2m against 46s isolated. It cannot be this session's defect - the spec drives the extension's TypeScript session-set reader, is untouched since Set 122/123, and this diff is Python plus docs. The full-suite flake is recorded as a RESIDUAL with a named owner and deliberately not fixed here: the set's no-new-module rule and the fact that the spec is not this session's surface both bar absorbing it.",
+          "status": "complete",
+          "state": "complete",
+          "box": "[x]",
+          "isPlanned": false,
+          "isActive": false,
+          "startedAt": "2026-08-17T06:47:59.308111-04:00",
+          "isTerminal": true
+        },
+        {
+          "stepNumber": 7,
+          "stepKey": "close-out",
+          "description": "Close-out.",
+          "status": "pending",
+          "state": "pending",
+          "box": "[ ]",
+          "isPlanned": true,
+          "isActive": false,
+          "startedAt": null,
+          "isTerminal": false
+        }
+      ],
       "counts": {
-        "pending": 0,
+        "pending": 1,
         "in-progress": 0,
-        "complete": 0,
+        "complete": 6,
         "blocked": 0,
         "unknown": 0,
-        "total": 0
+        "total": 7
       },
       "current": [],
-      "remaining": []
+      "remaining": [
+        "close-out"
+      ]
     },
     {
       "number": 3,

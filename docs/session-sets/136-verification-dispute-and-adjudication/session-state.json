@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "The dispute channel",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-17T15:31:43.611310-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-17T15:53:26.071237-04:00",
       "orchestrator": {
         "engine": "claude-code",
         "provider": "anthropic",

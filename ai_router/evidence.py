@@ -42,7 +42,9 @@ def run_git(repo_root, *args, env=None) -> tuple:
         )
     except FileNotFoundError:
         return 127, "", "git not available on PATH"
-    return result.returncode, result.stdout.strip(), result.stderr.strip()
+    # stdout drops only the newline framing: porcelain status columns are
+    # positional, and the first line may legitimately begin with a space.
+    return result.returncode, result.stdout.strip("\n"), result.stderr.strip()
 
 
 def repo_root_for(path) -> Optional[str]:

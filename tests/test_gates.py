@@ -131,6 +131,18 @@ class TestWorkingTreeClean:
         assert not row.passed
         assert "stray.py" in row.remediation
 
+    def test_modified_tracked_bookkeeping_first_line_ignored(self, close_ready):
+        repo, set_dir = close_ready
+        # A worktree-modified tracked file renders as " M path"; the leading
+        # space is column-significant even when it opens the status output,
+        # so the file must be tracked and nothing else may sort ahead of it.
+        (set_dir / "activity-log.json").write_text("[]\n", encoding="utf-8")
+        _git(repo, "add", "-A")
+        _git(repo, "commit", "-q", "-m", "track bookkeeping")
+        (set_dir / "activity-log.json").write_text("[{}]\n", encoding="utf-8")
+        row = by_name(run_gates(set_dir))["working_tree_clean"]
+        assert row.passed, row.remediation
+
     def test_editor_noise_ignored(self, close_ready):
         repo, set_dir = close_ready
         (repo / "notes.swp").write_text("x", encoding="utf-8")

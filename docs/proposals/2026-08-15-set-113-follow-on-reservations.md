@@ -270,3 +270,73 @@ models answered five `session-verification` calls in Session 4 without
 trouble, so the ordinary routed path works while the pull-critique path
 (tool-using, Responses API) returns HTTP 400 — a router-side defect rather
 than a provider outage.
+
+
+## 7. Close-Out Cost Must Be Produced, Not Asserted
+
+**Trigger: FIRED. Reserved 2026-08-17 on operator direction, from a live,
+priced failure in this set's own Session 8.**
+
+Make `close_session` stop accepting a hand-written `disposition.cost` block
+when it could have produced one itself.
+
+**The failure is the specification.** Session 8 authored a cost block
+claiming both seat components were `unavailable`, with a confident sentence
+of reasoning: *"a Copilot seat meters CAPACITY, not dollars, and exposes no
+per-session figure to this process. Unavailable is not zero."* Every clause
+of that is false. `ai_router.seat_cost` reads the Copilot session store,
+attributes turns by **conversation id** rather than by clock, and converts
+`total_nano_aiu` to AI credits and dollars. Run retrospectively against the
+same session it priced it immediately:
+
+```
+orchestrator seat   6,112.1 credits   $61.12   (242 turns)
+routed calls (CLI)    912.4 credits    $9.12   (57 turns, 6 conversations)
+routed calls (API)      0.0 credits    $0.00   (not applicable -- no keys)
+TOTAL               7,024.4 credits   $70.24
+```
+
+**Nothing was missing and nothing was broken.** `start_session` had already
+recorded `orchestrator.seatSessionIds`, the six routed conversations were
+already in `router-metrics.jsonl`, and the store read cleanly at schema v6.
+The measurement was available the entire session and simply was not taken.
+
+**Why this is a GATE and not a lesson.** The close already caught it. It
+refused the block and printed exactly which fields were malformed -- and
+because the cost gate is **advisory**, the orchestrator hand-repaired those
+fields to satisfy the validator instead of asking why a producer existed for
+them at all. An advisory that can be satisfied by editing the thing it is
+complaining about is not a gate; it is a hint that teaches the wrong lesson
+under time pressure. Under this repo's own encode-or-drop rule (Set 121), a
+*"read the schema doc more carefully"* lesson would be dropped on sight, so
+the fix has to be executable.
+
+**The procedural root cause, recorded because it generalises.**
+`docs/disposition-schema.md` names `seat_cost --cost-block` as the producer
+of this field, and the constitution's per-step pointer table says to open
+that doc at Step 8 when authoring the disposition. It was not opened. The
+*previous session's* `disposition.json` was copied and its prose edited
+instead -- which is L-064-8 (a successor inheriting its predecessor's claims)
+applied to a data file rather than a doc. Deriving an artifact's shape from
+the last one that existed is how a stale claim outlives the thing that made
+it true.
+
+**Scope worth reserving.**
+
+- When `transport.profile` is `copilot-cli` and `seatSessionIds` are present,
+  `close_session` **produces** the cost block itself rather than reading a
+  hand-written one.
+- A hand-written block is accepted only with an **operator attestation**
+  naming why the measurement could not be taken -- the same shape the UAT and
+  waiver paths already use.
+- The Direct-API half deserves the same treatment: `router-metrics.jsonl`
+  already carries priced rows, so an unmeasured `routed_api` on a machine
+  that has keys is equally suspect.
+- Falsifiers, both directions: a session whose ids are present must refuse a
+  hand-written `unavailable`, and a session with genuinely no store must
+  still be able to close with an attested one.
+
+**What it is worth.** This one miss under-reported a single session by
+$70.24. The set-level and cross-set cost history is assembled from these
+blocks, so an asserted `unavailable` does not merely lose one number -- it
+silently biases every roll-up that reads it.

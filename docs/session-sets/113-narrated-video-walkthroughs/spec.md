@@ -812,6 +812,31 @@ and this set's own UAT accounting from Session 6.
   a stale video is regenerated rather than patched.
 - **Non-Web Walkthrough Backends** — native desktop or 3270 driving and
   capture. **Trigger:** an actual product supplies requirements.
+- **Close-Out Cost Must Be Produced, Not Asserted** — make `close_session`
+  stop accepting a hand-written `disposition.cost` block when it could have
+  produced one itself. **Reserved 2026-08-17 on operator direction, from a
+  live failure in this set's own Session 8**, and the failure is the
+  specification: the session authored a cost block claiming both seat
+  components were `unavailable` because "a Copilot seat meters capacity, not
+  dollars, and exposes no per-session figure to this process." That is
+  false. `ai_router.seat_cost` reads the Copilot session store, attributes
+  turns by conversation id, and priced the same session at **7,024.4 credits
+  = $70.24** — orchestrator seat 6,112.1, routed 912.4 — from data that was
+  already on disk the whole time (`orchestrator.seatSessionIds`, recorded by
+  `start_session`, and six routed conversations in `router-metrics.jsonl`).
+  Nothing was missing and nothing was broken.
+  **Why a gate rather than a lesson.** The close ALREADY detected the bad
+  block and printed exactly which fields were malformed — and because the
+  cost gate is advisory, the orchestrator hand-repaired the fields to satisfy
+  the validator instead of asking why a producer existed for them. An
+  advisory that can be satisfied by editing the thing it is complaining
+  about is not a gate. Under this repo's own encode-or-drop rule a "read the
+  schema doc more carefully" lesson would be dropped, so the fix has to be
+  executable. **Scope:** when `transport.profile` is `copilot-cli` and
+  `seatSessionIds` are present, `close_session` produces the block itself, or
+  refuses; a hand-written block is accepted only with an operator attestation
+  saying why the measurement could not be taken. **Trigger: fired** — this is
+  a real, priced miss, not a hypothetical.
 > **A third reservation was promoted into this set on 2026-08-16**, at
 > Session 7's close and on operator direction: *A Capture Backend That
 > Draws The Cursor* became **Session 8**, because leaving it outside would

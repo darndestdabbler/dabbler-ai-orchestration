@@ -6,9 +6,9 @@
     {
       "number": 1,
       "title": "Attribute the 2.3x",
-      "status": "in-progress",
+      "status": "complete",
       "startedAt": "2026-08-17T04:54:37.513661-04:00",
-      "completedAt": null,
+      "completedAt": "2026-08-17T05:26:42.370302-04:00",
       "orchestrator": {
         "engine": "github-copilot",
         "provider": "anthropic",
@@ -19,7 +19,7 @@
           "cbf81e16-d5e2-4a5b-85d6-4826cb33d47a"
         ]
       },
-      "verificationVerdict": null
+      "verificationVerdict": "VERIFIED"
     },
     {
       "number": 2,

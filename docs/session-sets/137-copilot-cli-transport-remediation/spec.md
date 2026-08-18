@@ -13,6 +13,17 @@
 > **Prerequisite:** an authenticated GitHub Copilot CLI seat on this
 > machine (present: CLI 1.0.80).
 
+> **The seat is the only transport.** This operator has a Copilot seat and
+> **no provider API keys** — `DABBLER_ANTHROPIC_API_KEY`,
+> `DABBLER_OPENAI_API_KEY` and `DABBLER_GEMINI_API_KEY` are unset and are
+> not going to be set. Every routed call in this set, including the
+> mandatory cross-provider verification of each of its own sessions, runs
+> on `copilot-cli`. That is deliberate and it is the point: the transport
+> under repair is the transport doing the verifying, so a session cannot
+> be closed unless the thing it fixed actually works. Cross-provider
+> diversity comes from the seat catalog, which carries all three providers
+> (anthropic, openai, google).
+
 > **Note on rule 6:** this repo's ground rules say v2 development uses
 > plain commits, not its own session machinery. Like set 136, this set is
 > an operator-authorized exception.
@@ -61,6 +72,12 @@ JSONL parsing and the read-only tool grant — and dropped the handoff.
 The v1 source is recoverable at `git show 96a2f17c^:ai_router/cli_transport.py`
 and its spec at `git show 96a2f17c^:docs/session-sets/104-copilot-cli-large-prompt-handoff/spec.md`.
 
+Because the seat is the only transport, defect A is not one broken
+feature among many: it is total. Verification prompts carry a diff and a
+spec excerpt and are the largest routed payloads the system builds, so
+the *first* thing an operator on this seat does is the thing that cannot
+work.
+
 **B. The transport preference cannot be written.** Commit `2aa7287b`
 (today) taught `bootstrap` to remember a detected seat in
 `DABBLER_TRANSPORT`, but `_persist_env_var_windows` writes only HKLM
@@ -72,7 +89,9 @@ rather than writing a weaker scope, which is honest and useless: the
 operator ends up with no persisted preference at all, and the durable
 choice the commit promised is never made. A developer workstation is
 single-account; the machine-scope requirement buys nothing there and
-costs the whole feature.
+costs the whole feature. The operator's admin account is a *different*
+user, so "just run it elevated" writes the variable into the wrong hive
+and the working account still never sees it.
 
 ## What this set does NOT change (do not reopen)
 
@@ -164,7 +183,10 @@ make a monolithic 200 KB verification bundle a good idea.
    backslashes, spaces and non-BMP characters; `payload_file_modified`;
    and a regression asserting the inline path is unchanged below
    threshold.
-8. Cross-provider verification on the `api` transport.
+8. Cross-provider verification through the `copilot-cli` transport, using
+   the handoff this session just built. This is the session's own
+   acceptance evidence, not a formality: the verification bundle is a
+   large payload, so a broken handoff fails the session's own close.
 9. Required portion of the full test suite.
 10. Close-out.
 
@@ -176,17 +198,23 @@ within the 480 ceiling (380 collected today).
 
 1. Register.
 2. Make `persist_transport_preference` scope-aware in
-   `ai_router/bootstrap.py`. Try machine scope first when the process is
-   elevated; otherwise write **user scope** — HKCU `Environment` on
-   Windows, a marked block in the user's shell profile on POSIX — and
-   broadcast `WM_SETTINGCHANGE` as the machine path already does. Return
-   which scope actually landed rather than a bare bool, and set the value
-   in `os.environ` so the current run sees it either way.
+   `ai_router/bootstrap.py`. Prefer **user scope** — HKCU `Environment` on
+   Windows, a marked block in the user's shell profile on POSIX — because
+   the variable is a property of the operator's working account, not the
+   machine; a workstation whose admin account is a *different user*
+   (this one) gets nothing useful from a machine-scope write. Attempt
+   machine scope only when explicitly asked for it and the process is
+   elevated. Broadcast `WM_SETTINGCHANGE` on the Windows path so shells
+   launched afterwards inherit it. Return which scope actually landed
+   rather than a bare bool, and set the value in `os.environ` so the
+   current run sees it either way.
 3. Make the bootstrap output say what happened: which variable, which
-   value, which scope, and that a new shell is needed to inherit it. A
-   machine-scope write that was refused for lack of elevation is reported
-   as a *downgrade to user scope that succeeded*, not as a failure — and
-   only a failure at both scopes prints the manual fallback command.
+   value, which scope, and that a new shell is needed to inherit it. Only
+   a failure at every scope it tried prints a manual fallback command,
+   and that command must be the unelevated one
+   (`[Environment]::SetEnvironmentVariable('DABBLER_TRANSPORT',
+   'copilot-cli','User')` on Windows) — never one that requires an admin
+   account the operator is not signed into.
 4. Stop routed dispatches inheriting the workspace's orchestrator
    instructions. The CLI loads `AGENTS.md` / `CLAUDE.md` as custom
    instructions by default; a routed verifier call is not an orchestrator
@@ -199,7 +227,7 @@ within the 480 ceiling (380 collected today).
    reports failure; an existing preference is still never overridden;
    `--transport` still forces; `--no-transport-detect` still opts out; and
    the routed argv carries `--no-custom-instructions`.
-6. Cross-provider verification on the `api` transport.
+6. Cross-provider verification through the `copilot-cli` transport.
 7. Required portion of the full test suite.
 8. Close-out.
 
@@ -222,9 +250,10 @@ custom-instructions opt-out. Est. 7–9 new Python tests.
    ack validated and was stripped, and the metadata shows `handoff: true`
    with a plausible `payload_bytes`; (b) one control dispatch below the
    threshold asserting `handoff: false`.
-4. Run one real cross-provider verification round for this session with
-   `--transport copilot-cli`, which is the actual acceptance evidence:
-   the surface that failed is the surface that must now pass.
+4. Confirm the retrieval quality of the pull, not just its mechanics. The
+   ack proves the model reached EOF; it does not prove the payload was
+   used. The three-fact probe in step 3 is what distinguishes them, and
+   its result is recorded verbatim whether or not it flatters the design.
 5. Fix whatever the live probe surfaces, and re-probe the failed case.
    Every fix lands with a fake-spawner regression test — live dogfood
    finds wire-shape realities fakes cannot, and the fake suite stays the
@@ -235,7 +264,8 @@ custom-instructions opt-out. Est. 7–9 new Python tests.
    `STATUS.md` to say the seat transport is exercised, not merely
    implemented.
 7. Required portion of the full test suite.
-8. Close-out, and the end-of-set `change-log.md`.
+8. Close-out (cross-provider verification through `copilot-cli` as in
+   every session of this set), and the end-of-set `change-log.md`.
 
 **Creates:** `s3-live-probe.md`, probe-driven fixes, the version bump and
 STATUS update. Est. 0–4 new Python tests (regressions only).
